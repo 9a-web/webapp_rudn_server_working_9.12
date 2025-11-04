@@ -293,8 +293,12 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               
               {/* Center content with time */}
               <motion.div 
-                className="relative w-20 h-20 md:w-22 md:h-22 lg:w-24 lg:h-24 rounded-full flex items-center justify-center z-10" 
-                style={{ backgroundColor: '#343434' }}
+                className="relative w-20 h-20 md:w-22 md:h-22 lg:w-24 lg:h-24 rounded-full flex items-center justify-center z-10 border border-white/10" 
+                style={{ 
+                  backgroundColor: 'rgba(52, 52, 52, 0.8)',
+                  backdropFilter: 'blur(30px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(30px) saturate(180%)'
+                }}
                 animate={{ 
                   boxShadow: currentClass 
                     ? [
