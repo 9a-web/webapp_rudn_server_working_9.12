@@ -85,7 +85,7 @@ export const BottomNavigation = ({ activeTab = 'home', onTabChange, hapticFeedba
           style={{ 
             borderRadius: '80px', 
             overflow: 'hidden',
-            backgroundColor: 'rgba(28, 28, 30, 0.95)',
+            backgroundColor: 'rgba(28, 28, 30, 0.7)',
             backdropFilter: 'blur(40px) saturate(180%)',
             WebkitBackdropFilter: 'blur(40px) saturate(180%)'
           }}
