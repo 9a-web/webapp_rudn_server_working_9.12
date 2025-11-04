@@ -91,6 +91,11 @@
   "sidebar": {
     "quickActions": "Быстрые действия"
   },
+  "bottomNav": {
+    "home": "Главная",
+    "tasks": "Список дел",
+    "journal": "Журнал"
+  },
   "common": {
     "loading": "Загрузка...",
     "retry": "Повторить",
