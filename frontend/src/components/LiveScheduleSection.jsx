@@ -363,9 +363,11 @@ export const LiveScheduleSection = ({
                   key={index}
                   variants={listItemVariants}
                   custom={index}
-                  className="rounded-2xl md:rounded-3xl p-4 md:p-5 transition-all duration-300 cursor-pointer hover:shadow-md"
+                  className="rounded-2xl md:rounded-3xl p-4 md:p-5 transition-all duration-300 cursor-pointer hover:shadow-md border border-white/20"
                   style={{ 
-                    backgroundColor: '#F5F5F5',
+                    backgroundColor: 'rgba(245, 245, 245, 0.85)',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(180%)'
                   }}
                   onClick={() => toggleExpand(index)}
                 >
