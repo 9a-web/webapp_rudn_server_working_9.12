@@ -273,7 +273,12 @@ const GroupSelector = ({ onGroupSelected, onCancel }) => {
               <button
                 key={item.id || item.value || index}
                 onClick={() => handleItemClick(item)}
-                className="w-full bg-card rounded-2xl p-4 text-left hover:bg-card/80 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full rounded-2xl p-4 text-left transition-all transform hover:scale-[1.02] active:scale-[0.98] border border-white/10"
+                style={{
+                  backgroundColor: 'rgba(52, 52, 52, 0.6)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+                }}
                 disabled={item.disabled}
               >
                 <p className="text-white font-medium">
