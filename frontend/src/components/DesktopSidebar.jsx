@@ -21,7 +21,14 @@ export const DesktopSidebar = ({
       
       {/* Быстрая статистика достижений */}
       {user && userStats && (
-        <div className="bg-card rounded-3xl p-6 shadow-card">
+        <div 
+          className="rounded-3xl p-6 shadow-card border border-white/10"
+          style={{
+            backgroundColor: 'rgba(52, 52, 52, 0.7)',
+            backdropFilter: 'blur(40px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(180%)'
+          }}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-foreground">
               {t('achievements.title', 'Достижения')}
