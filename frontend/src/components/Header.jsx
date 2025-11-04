@@ -223,7 +223,12 @@ export const Header = React.memo(({ user, userSettings, onCalendarClick, onNotif
           {user && (
             <motion.button
               onClick={handleProfileClick}
-              className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-accent/50 hover:bg-accent transition-all duration-300 relative overflow-hidden group border-2 border-transparent hover:border-cyan-400/30"
+              className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-full transition-all duration-300 relative overflow-hidden group border-2 border-white/10 hover:border-cyan-400/30"
+              style={{
+                backgroundColor: 'rgba(52, 52, 52, 0.6)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+              }}
               aria-label="Open profile"
               custom={4}
               initial="initial"
