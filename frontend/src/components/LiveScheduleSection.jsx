@@ -410,7 +410,9 @@ export const LiveScheduleSection = ({
                           <span 
                             className="px-2 py-0.5 rounded text-xs"
                             style={{ 
-                              backgroundColor: '#E0E0E0',
+                              backgroundColor: 'rgba(224, 224, 224, 0.8)',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
                               color: '#555555',
                               fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
                             }}
