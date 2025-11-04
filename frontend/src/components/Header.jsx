@@ -156,7 +156,12 @@ export const Header = React.memo(({ user, userSettings, onCalendarClick, onNotif
               if (hapticFeedback) hapticFeedback('impact', 'medium');
               onCalendarClick();
             }}
-            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl bg-accent/50 hover:bg-accent transition-all duration-300 relative overflow-hidden group"
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative overflow-hidden group"
+            style={{
+              backgroundColor: 'rgba(52, 52, 52, 0.6)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+            }}
             aria-label="Open calendar"
             custom={1}
             initial="initial"
@@ -175,7 +180,12 @@ export const Header = React.memo(({ user, userSettings, onCalendarClick, onNotif
               if (hapticFeedback) hapticFeedback('impact', 'medium');
               onNotificationsClick();
             }}
-            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl bg-accent/50 hover:bg-accent transition-all duration-300 relative overflow-hidden group"
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative overflow-hidden group"
+            style={{
+              backgroundColor: 'rgba(52, 52, 52, 0.6)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+            }}
             aria-label="Open notifications"
             custom={2}
             initial="initial"
@@ -191,7 +201,12 @@ export const Header = React.memo(({ user, userSettings, onCalendarClick, onNotif
           {/* Menu button */}
           <motion.button
             onClick={handleMenuClick}
-            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl bg-accent/50 hover:bg-accent transition-all duration-300 relative overflow-hidden group"
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative overflow-hidden group"
+            style={{
+              backgroundColor: 'rgba(52, 52, 52, 0.6)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+            }}
             aria-label="Open menu"
             custom={3}
             initial="initial"
