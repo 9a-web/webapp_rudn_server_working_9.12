@@ -51,7 +51,7 @@ export const BottomNavigation = ({ activeTab = 'home', onTabChange, hapticFeedba
       }}
     >
       {/* Main navigation with rounded corners */}
-      <div className="relative h-full">
+      <div className="relative h-full" style={{ overflow: 'visible' }}>
         {/* Background with blur and border */}
         <div 
           className="absolute inset-0 bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/10"
@@ -59,8 +59,8 @@ export const BottomNavigation = ({ activeTab = 'home', onTabChange, hapticFeedba
         />
         
         {/* Content container */}
-        <div className="relative h-full px-4 py-1">
-          <div className="flex items-center justify-around gap-2 h-full">
+        <div className="relative h-full px-4 py-1" style={{ overflow: 'visible' }}>
+          <div className="flex items-center justify-around gap-2 h-full" style={{ overflow: 'visible' }}>
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
