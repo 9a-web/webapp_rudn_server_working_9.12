@@ -67,8 +67,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber }) => {
   useEffect(() => {
     if (user) {
       loadTasks();
+      loadScheduleSubjects();
     }
-  }, [user]);
+  }, [user, userSettings, weekNumber]);
 
   const loadTasks = async () => {
     try {
@@ -79,6 +80,28 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber }) => {
       console.error('Error loading tasks:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Загрузка предметов из расписания для интеграции
+  const loadScheduleSubjects = async () => {
+    if (!userSettings) return;
+    
+    try {
+      const scheduleData = await scheduleAPI.getSchedule({
+        facultet_id: userSettings.facultet_id,
+        level_id: userSettings.level_id,
+        kurs: userSettings.kurs,
+        form_code: userSettings.form_code,
+        group_id: userSettings.group_id,
+        week_number: weekNumber || 1,
+      });
+      
+      // Извлекаем уникальные предметы
+      const subjects = [...new Set(scheduleData.events?.map(e => e.discipline) || [])];
+      setScheduleSubjects(subjects);
+    } catch (error) {
+      console.error('Error loading schedule subjects:', error);
     }
   };
 
