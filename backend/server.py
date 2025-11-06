@@ -612,6 +612,86 @@ async def get_user_profile_photo_proxy(telegram_id: int):
         raise HTTPException(status_code=500, detail="Failed to load profile photo")
 
 
+# ============ Эндпоинты для списка дел ============
+
+@api_router.get("/tasks/{telegram_id}", response_model=List[TaskResponse])
+async def get_user_tasks(telegram_id: int):
+    """Получить все задачи пользователя"""
+    try:
+        tasks = await db.tasks.find({"telegram_id": telegram_id}).sort("created_at", -1).to_list(1000)
+        return [TaskResponse(**task) for task in tasks]
+    except Exception as e:
+        logger.error(f"Ошибка при получении задач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/tasks", response_model=TaskResponse)
+async def create_task(task_data: TaskCreate):
+    """Создать новую задачу"""
+    try:
+        task = Task(**task_data.dict())
+        task_dict = task.dict()
+        
+        await db.tasks.insert_one(task_dict)
+        
+        return TaskResponse(**task_dict)
+    except Exception as e:
+        logger.error(f"Ошибка при создании задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(task_id: str, task_update: TaskUpdate):
+    """Обновить задачу (текст или статус completed)"""
+    try:
+        # Проверяем существование задачи
+        existing_task = await db.tasks.find_one({"id": task_id})
+        
+        if not existing_task:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Обновляем только переданные поля
+        update_data = {}
+        if task_update.text is not None:
+            update_data["text"] = task_update.text
+        if task_update.completed is not None:
+            update_data["completed"] = task_update.completed
+        
+        update_data["updated_at"] = datetime.utcnow()
+        
+        await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": update_data}
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        return TaskResponse(**updated_task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/tasks/{task_id}", response_model=SuccessResponse)
+async def delete_task(task_id: str):
+    """Удалить задачу"""
+    try:
+        result = await db.tasks.delete_one({"id": task_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        return SuccessResponse(success=True, message="Задача удалена")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
