@@ -83,6 +83,13 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber }) => {
     }
   };
 
+  // Обновление порядка задач после перетаскивания
+  const handleReorderTasks = (newOrder) => {
+    setTasks(newOrder);
+    // Здесь можно добавить сохранение порядка на сервер при необходимости
+    hapticFeedback && hapticFeedback('impact', 'light');
+  };
+
   // Загрузка предметов из расписания для интеграции
   const loadScheduleSubjects = async () => {
     if (!userSettings) return;
