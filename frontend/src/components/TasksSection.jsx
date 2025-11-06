@@ -1034,30 +1034,24 @@ const TaskGroup = ({
                         </div>
                       </div>
                       
-                      {/* Кнопки редактирования (десктоп) */}
-                      <div className="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => onEdit(task)}
-                          className="p-1.5 text-yellow-600 hover:bg-yellow-100 rounded"
-                          title="Редактировать"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => onDelete(task.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-100 rounded"
-                          title="Удалить"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {/* Кнопка удаления (всегда видна) */}
+                      <button
+                        onClick={() => {
+                          hapticFeedback && hapticFeedback('impact', 'medium');
+                          onDelete(task.id);
+                        }}
+                        className="flex-shrink-0 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-0.5"
+                        title="Удалить задачу"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                 </motion.div>
-              </motion.div>
+              </Reorder.Item>
             );
           })}
-        </div>
+        </Reorder.Group>
       )}
     </motion.div>
   );
