@@ -537,7 +537,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Profile Modal - User Mini-Profile Display"
+    - "Bottom Navigation - Section Switching (Tasks & Journal)"
   stuck_tasks:
     - "Language Switching - i18n Integration"
   test_all: false
@@ -551,6 +551,7 @@ test_plan:
     - "Analytics - Group Classes by Time Slot"
     - "GET /api/bot-info - Bot Information Endpoint"
     - "Profile Modal - User Mini-Profile Display"
+    - "Bottom Navigation - Section Switching (Tasks & Journal)"
 
 agent_communication:
     - agent: "main"
