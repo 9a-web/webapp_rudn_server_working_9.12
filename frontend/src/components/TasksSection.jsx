@@ -33,17 +33,19 @@ export const TasksSection = () => {
     }
   };
 
-  const handleAddTask = async () => {
-    if (!newTaskText.trim()) return;
-    
+  const handleAddTask = async (taskText) => {
     try {
-      hapticFeedback?.impactOccurred('medium');
-      const newTask = await tasksAPI.createTask(user.id, newTaskText.trim());
+      const newTask = await tasksAPI.createTask(user.id, taskText);
       setTasks([newTask, ...tasks]);
-      setNewTaskText('');
     } catch (error) {
       console.error('Error creating task:', error);
+      throw error; // Пробрасываем ошибку для обработки в модальном окне
     }
+  };
+
+  const handleOpenAddModal = () => {
+    hapticFeedback?.impactOccurred('light');
+    setIsAddModalOpen(true);
   };
 
   const toggleTask = async (taskId) => {
