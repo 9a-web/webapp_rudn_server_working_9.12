@@ -277,19 +277,6 @@ export const TasksSection = () => {
             </p>
           </div>
         </motion.div>
-
-        {/* Placeholder для остального контента справа */}
-        <div className="flex-1 flex flex-col items-center justify-center py-16">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-yellow-400/10 to-orange-400/10 flex items-center justify-center mb-4">
-            <ClipboardList className="w-12 h-12 text-yellow-500" strokeWidth={2} />
-          </div>
-          <h3 className="text-lg font-semibold text-[#1C1C1E] mb-2">
-            Раздел в разработке
-          </h3>
-          <p className="text-sm text-[#999999] text-center max-w-xs">
-            Здесь будет расширенный функционал списка дел
-          </p>
-        </div>
       </div>
 
       {/* Модальное окно добавления задачи */}
