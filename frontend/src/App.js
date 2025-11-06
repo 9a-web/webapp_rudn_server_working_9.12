@@ -17,7 +17,7 @@ import { JournalSection } from './components/JournalSection';
 import GroupSelector from './components/GroupSelector';
 import StatusTester from './StatusTester';
 import { TelegramProvider, useTelegram } from './contexts/TelegramContext';
-import { scheduleAPI, userAPI, achievementsAPI } from './services/api';
+import { scheduleAPI, userAPI, achievementsAPI, tasksAPI } from './services/api';
 import { getWeekNumberForDate } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
