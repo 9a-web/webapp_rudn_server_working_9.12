@@ -512,13 +512,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber }) => {
         </motion.div>
       )}
 
-      {/* Карточка с задачами на сегодня */}
-      <div className="flex gap-4">
+      {/* Карточка с задачами и группы по дедлайнам */}
+      <div className="space-y-4">
+        {/* Карточка "Сегодня" */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="w-[370px] h-[250px] rounded-3xl bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200/50 p-4 flex flex-col"
+          className="w-full max-w-2xl rounded-3xl bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200/50 p-4 flex flex-col"
           style={{
             boxShadow: '0 4px 16px rgba(251, 191, 36, 0.1)'
           }}
