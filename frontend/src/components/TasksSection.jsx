@@ -912,28 +912,23 @@ const TaskGroup = ({
 
       {/* Список задач */}
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-2">
-          {tasks.map((task) => {
+        <Reorder.Group 
+          axis="y" 
+          values={localTasks} 
+          onReorder={handleReorder}
+          className="px-4 pb-4 space-y-2"
+        >
+          {localTasks.map((task) => {
             const isEditing = editingTaskId === task.id;
             
             return (
-              <motion.div
+              <Reorder.Item
                 key={task.id}
-                drag="x"
-                dragConstraints={{ left: -80, right: 0 }}
-                dragElastic={0.2}
-                onDragEnd={(e, info) => {
-                  if (info.offset.x < -60 && window.innerWidth < 768) {
-                    onDelete(task.id);
-                  }
-                }}
+                value={task}
                 className="relative"
+                dragListener={false}
+                dragControls={undefined}
               >
-                {/* Фон для свайпа */}
-                <div className="absolute right-0 top-0 bottom-0 w-16 bg-red-500 rounded-lg flex items-center justify-center">
-                  <Trash2 className="w-4 h-4 text-white" />
-                </div>
-                
                 {/* Контент задачи */}
                 <motion.div
                   whileTap={{ scale: 0.98 }}
