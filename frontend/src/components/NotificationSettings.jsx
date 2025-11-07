@@ -239,10 +239,23 @@ export const NotificationSettings = ({
 
         {/* Info */}
         <div className="bg-blue-50 rounded-xl p-4 mb-6">
-          <p className="text-sm text-blue-900">
-            💡 <strong>Совет:</strong> Уведомления приходят в личные сообщения бота. 
-            Убедитесь, что вы не заблокировали бота.
+          <p className="text-sm text-blue-900 mb-2">
+            💡 <strong>Важно:</strong> Для получения уведомлений необходимо:
           </p>
+          <ol className="text-sm text-blue-900 list-decimal list-inside space-y-1">
+            <li>Начать диалог с ботом{' '}
+              <a 
+                href="https://t.me/rudn_pro_bot" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="font-semibold underline hover:text-blue-700"
+              >
+                @rudn_pro_bot
+              </a>
+            </li>
+            <li>Отправить команду <code className="bg-blue-100 px-1 rounded">/start</code></li>
+            <li>Включить уведомления в этом меню</li>
+          </ol>
         </div>
 
         {/* Action Buttons */}
