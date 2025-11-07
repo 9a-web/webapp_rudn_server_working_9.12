@@ -280,25 +280,33 @@ export const AddTaskModal = ({
                 </div>
               )}
 
-            {/* Buttons */}
-            <div className="flex gap-3">
+            </form>
+          </div>
+
+          {/* Footer с кнопками - фиксированный */}
+          <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-100 bg-white">
+            <div className="flex gap-2 sm:gap-3">
               <motion.button
                 type="button"
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleClose}
                 disabled={saving}
-                className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 sm:px-6 sm:py-3 bg-gray-100 active:bg-gray-200 text-gray-700 rounded-xl sm:rounded-2xl font-medium text-sm sm:text-base transition-colors disabled:opacity-50 touch-manipulation"
               >
                 Отмена
               </motion.button>
               <motion.button
-                type="submit"
-                whileTap={{ scale: 0.98 }}
+                type="button"
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
                 disabled={!taskText.trim() || saving}
                 className={`
-                  flex-1 px-6 py-3 rounded-2xl font-medium transition-all
+                  flex-1 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl font-medium text-sm sm:text-base transition-all touch-manipulation
                   ${taskText.trim() && !saving
-                    ? 'bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white shadow-lg shadow-yellow-500/50'
+                    ? 'bg-gradient-to-r from-yellow-400 to-orange-400 active:from-yellow-500 active:to-orange-500 text-white shadow-lg shadow-yellow-500/30'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }
                 `}
@@ -306,7 +314,7 @@ export const AddTaskModal = ({
                 {saving ? (
                   <span className="flex items-center justify-center gap-2">
                     <motion.div 
-                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full"
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     />
@@ -317,7 +325,7 @@ export const AddTaskModal = ({
                 )}
               </motion.button>
             </div>
-          </form>
+          </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
