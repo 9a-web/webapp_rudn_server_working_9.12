@@ -111,8 +111,8 @@ async def get_moscow_weather() -> Optional[WeatherResponse]:
                 )
     
     except aiohttp.ClientError as e:
-        logger.error(f"Network error fetching weather: {e}")
+        logger.error(f"Network error fetching weather: {e}", exc_info=True)
         return None
     except Exception as e:
-        logger.error(f"Error fetching weather: {e}")
+        logger.error(f"Error fetching weather: {e}", exc_info=True)
         return None
