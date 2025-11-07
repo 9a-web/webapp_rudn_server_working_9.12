@@ -367,17 +367,27 @@ async def update_notification_settings(telegram_id: int, settings: NotificationS
         )
         
         # Если уведомления включены, отправляем тестовое уведомление
+        test_notification_sent = None
+        test_notification_error = None
+        
         if settings.notifications_enabled:
             try:
                 notification_service = get_notification_service()
-                await notification_service.send_test_notification(telegram_id)
+                success = await notification_service.send_test_notification(telegram_id)
+                test_notification_sent = success
+                if not success:
+                    test_notification_error = "Не удалось отправить тестовое уведомление. Убедитесь, что вы начали диалог с ботом командой /start"
             except Exception as e:
                 logger.warning(f"Failed to send test notification: {e}")
+                test_notification_sent = False
+                test_notification_error = f"Ошибка: {str(e)}. Пожалуйста, начните диалог с ботом командой /start в Telegram"
         
         return NotificationSettingsResponse(
             notifications_enabled=settings.notifications_enabled,
             notification_time=settings.notification_time,
-            telegram_id=telegram_id
+            telegram_id=telegram_id,
+            test_notification_sent=test_notification_sent,
+            test_notification_error=test_notification_error
         )
     except HTTPException:
         raise
