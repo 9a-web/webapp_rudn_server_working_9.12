@@ -234,22 +234,24 @@ class NotificationScheduler:
                     minutes_before=notification_time
                 )
                 
+                # Сохраняем информацию о попытке отправки уведомления
+                # ВАЖНО: Сохраняем даже если отправка не удалась, чтобы избежать спама
+                await self.db.sent_notifications.insert_one({
+                    "notification_key": notification_key,
+                    "telegram_id": telegram_id,
+                    "class_discipline": discipline,
+                    "class_time": time_str,
+                    "notification_time_minutes": notification_time,
+                    "sent_at": now.replace(tzinfo=None),
+                    "date": today_date,
+                    "success": success,  # Добавляем статус отправки
+                    "expires_at": now.replace(tzinfo=None) + timedelta(days=2)
+                })
+                
                 if success:
-                    # Сохраняем информацию об отправленном уведомлении
-                    await self.db.sent_notifications.insert_one({
-                        "notification_key": notification_key,
-                        "telegram_id": telegram_id,
-                        "class_discipline": discipline,
-                        "class_time": time_str,
-                        "notification_time_minutes": notification_time,
-                        "sent_at": now.replace(tzinfo=None),
-                        "date": today_date,
-                        "expires_at": now.replace(tzinfo=None) + timedelta(days=2)
-                    })
-                    
                     logger.info(f"✅ Notification sent successfully to {telegram_id} for '{discipline}'")
                 else:
-                    logger.error(f"❌ Failed to send notification to {telegram_id} for '{discipline}'")
+                    logger.warning(f"⚠️ Failed to send notification to {telegram_id} for '{discipline}' (probably user hasn't started bot)")
             else:
                 # Логируем только если разница небольшая (для отладки)
                 if -5 <= time_diff_minutes < 5:
