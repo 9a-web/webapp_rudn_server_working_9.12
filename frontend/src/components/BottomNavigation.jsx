@@ -3,7 +3,7 @@ import { Home, ClipboardList, FileCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
-export const BottomNavigation = ({ activeTab = 'home', onTabChange, hapticFeedback }) => {
+export const BottomNavigation = ({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false }) => {
   const { t } = useTranslation();
 
   const tabs = [
