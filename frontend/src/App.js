@@ -520,6 +520,7 @@ const Home = () => {
               userSettings={userSettings}
               selectedDate={selectedDate}
               weekNumber={weekNumber}
+              onModalStateChange={setIsModalOpen}
             />
           </div>
         )}
