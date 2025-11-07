@@ -227,26 +227,42 @@ class NotificationScheduler:
                 
                 logger.info(f"Sending notification to {telegram_id} for '{discipline}' at {start_time_str} ({notification_time} min before)")
                 
-                # Отправляем уведомление
+                # Сначала создаем запись о попытке отправки уведомления
+                # ВАЖНО: Создаем ДО отправки, чтобы избежать повторных попыток даже если отправка упадет с ошибкой
+                try:
+                    await self.db.sent_notifications.insert_one({
+                        "notification_key": notification_key,
+                        "telegram_id": telegram_id,
+                        "class_discipline": discipline,
+                        "class_time": time_str,
+                        "notification_time_minutes": notification_time,
+                        "sent_at": now.replace(tzinfo=None),
+                        "date": today_date,
+                        "success": None,  # Изначально None, обновим после отправки
+                        "expires_at": now.replace(tzinfo=None) + timedelta(days=2)
+                    })
+                    logger.debug(f"Created sent_notifications record for {notification_key}")
+                except Exception as db_error:
+                    # Если не можем создать запись - логируем, но продолжаем
+                    logger.error(f"Failed to create sent_notifications record: {db_error}")
+                    # Не продолжаем отправку, чтобы не было спама
+                    return
+                
+                # Теперь отправляем уведомление
                 success = await self.notification_service.send_class_notification(
                     telegram_id=telegram_id,
                     class_info=class_event,
                     minutes_before=notification_time
                 )
                 
-                # Сохраняем информацию о попытке отправки уведомления
-                # ВАЖНО: Сохраняем даже если отправка не удалась, чтобы избежать спама
-                await self.db.sent_notifications.insert_one({
-                    "notification_key": notification_key,
-                    "telegram_id": telegram_id,
-                    "class_discipline": discipline,
-                    "class_time": time_str,
-                    "notification_time_minutes": notification_time,
-                    "sent_at": now.replace(tzinfo=None),
-                    "date": today_date,
-                    "success": success,  # Добавляем статус отправки
-                    "expires_at": now.replace(tzinfo=None) + timedelta(days=2)
-                })
+                # Обновляем статус отправки в записи
+                try:
+                    await self.db.sent_notifications.update_one(
+                        {"notification_key": notification_key},
+                        {"$set": {"success": success}}
+                    )
+                except Exception as update_error:
+                    logger.error(f"Failed to update notification status: {update_error}")
                 
                 if success:
                     logger.info(f"✅ Notification sent successfully to {telegram_id} for '{discipline}'")
