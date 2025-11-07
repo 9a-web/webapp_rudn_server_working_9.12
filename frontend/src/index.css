@@ -156,13 +156,17 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* Telegram Web App specific styles - FULLSCREEN MODE */
+/* ⭐️ Telegram Web App specific styles - FULLSCREEN MODE */
 .telegram-webapp {
   position: relative;
   height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--tg-viewport-height, 100vh); /* ⭐️ Используем Telegram viewport */
   min-height: 100vh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
+  min-height: var(--tg-viewport-height, 100vh);
   width: 100%;
   width: 100vw;
   max-width: 100vw;
