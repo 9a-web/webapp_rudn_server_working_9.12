@@ -582,8 +582,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                 axis="y" 
                 values={todayTasks} 
                 onReorder={handleReorderTasks}
-                className="space-y-2 min-h-[100px]"
-                as="div"
+                className="min-h-[100px]"
               >
                 {todayTasks.map((task) => (
                   <TodayTaskItem
