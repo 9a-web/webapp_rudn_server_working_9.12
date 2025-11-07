@@ -822,9 +822,11 @@ const TodayTaskItem = ({
               {/* Drag Handle (3 полоски) */}
               <div
                 onPointerDown={(e) => {
+                  console.log('👆 Drag handle clicked for task:', task.id, task.text);
                   e.stopPropagation();
                   if (hapticFeedback) hapticFeedback('impact', 'light');
                   dragControls.start(e);
+                  console.log('🚀 Drag controls started');
                 }}
                 className="flex-shrink-0 cursor-grab active:cursor-grabbing mt-0.5 touch-none select-none"
                 style={{ touchAction: 'none' }}
