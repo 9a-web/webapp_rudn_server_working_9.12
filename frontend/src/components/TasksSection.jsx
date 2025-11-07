@@ -544,33 +544,26 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber }) => {
             ) : todayTasks.length === 0 ? (
               <div className="text-xs text-[#999999] text-center py-4">Нет задач</div>
             ) : (
-              todayTasks.map((task) => {
-                const isEditing = editingTaskId === task.id;
-                
-                return (
-                  <motion.div
-                    key={task.id}
-                    drag="x"
-                    dragConstraints={{ left: -80, right: 0 }}
-                    dragElastic={0.2}
-                    onDragEnd={(e, info) => {
-                      // Свайп влево для удаления (только на мобильных)
-                      if (info.offset.x < -60 && window.innerWidth < 768) {
-                        handleDeleteTask(task.id);
-                      }
-                    }}
-                    className="relative"
-                  >
-                    {/* Фон для свайпа (кнопка удаления) */}
-                    <div className="absolute right-0 top-0 bottom-0 w-16 bg-red-500 rounded-lg flex items-center justify-center">
-                      <Trash2 className="w-4 h-4 text-white" />
-                    </div>
-                    
-                    {/* Контент задачи */}
-                    <motion.div
-                      whileTap={{ scale: 0.98 }}
-                      className="relative bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg p-2 group"
+              <Reorder.Group 
+                axis="y" 
+                values={todayTasks} 
+                onReorder={handleReorderTasks}
+              >
+                {todayTasks.map((task) => {
+                  const isEditing = editingTaskId === task.id;
+                  
+                  return (
+                    <Reorder.Item
+                      key={task.id}
+                      value={task}
+                      dragListener={false}
+                      className="relative mb-2"
                     >
+                      {/* Контент задачи */}
+                      <motion.div
+                        whileTap={{ scale: 0.98 }}
+                        className="relative bg-white rounded-lg p-2 group shadow-sm"
+                      >
                       {isEditing ? (
                         // Режим редактирования
                         <div className="flex items-center gap-2">
