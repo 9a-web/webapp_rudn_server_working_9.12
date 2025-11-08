@@ -441,6 +441,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         </div>
       </div>
 
+      {/* Селектор дней недели */}
+      <WeekDateSelector
+        selectedDate={tasksSelectedDate}
+        onDateSelect={handleDateSelect}
+        tasks={tasks}
+        hapticFeedback={hapticFeedback}
+      />
+
       {/* Панель фильтров */}
       {showFilters && (
         <motion.div
