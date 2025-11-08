@@ -197,4 +197,4 @@ export const WeekDaySelector = React.memo(({ selectedDate, onDateSelect, weekNum
       </motion.div>
     </div>
   );
-};
+});
