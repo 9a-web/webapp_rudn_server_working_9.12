@@ -157,3 +157,46 @@ export const quickConfetti = () => {
     zIndex: 9999
   });
 };
+
+/**
+ * Небольшое конфетти для завершения всех задач
+ * Используется когда пользователь выполнил все задачи за день
+ */
+export const tasksCompleteConfetti = () => {
+  const count = 80;
+  const defaults = {
+    origin: { y: 0.4 },
+    zIndex: 9999,
+    colors: ['#FCD34D', '#FBBF24', '#F59E0B', '#FB923C', '#F97316'] // Жёлто-оранжевые цвета как в Tasks
+  };
+
+  function fire(particleRatio, opts) {
+    confetti({
+      ...defaults,
+      ...opts,
+      particleCount: Math.floor(count * particleRatio)
+    });
+  }
+
+  // Первая волна - узкая
+  fire(0.3, {
+    spread: 40,
+    startVelocity: 45,
+    decay: 0.9
+  });
+  
+  // Вторая волна - широкая
+  fire(0.4, {
+    spread: 80,
+    startVelocity: 30,
+    decay: 0.92
+  });
+  
+  // Третья волна - медленная
+  fire(0.3, {
+    spread: 100,
+    startVelocity: 20,
+    decay: 0.95,
+    scalar: 0.8
+  });
+};
