@@ -493,6 +493,7 @@ async def mark_achievements_seen_endpoint(telegram_id: int):
 # ============ Эндпоинты для погоды ============
 
 @api_router.get("/weather", response_model=WeatherResponse)
+@cache(ttl=600)  # Кешируем на 10 минут
 async def get_weather_endpoint():
     """Получить текущую погоду в Москве"""
     try:
