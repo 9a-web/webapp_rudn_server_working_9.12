@@ -377,24 +377,44 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     return { today: allTasks };
   };
 
-  // Фильтруем задачи для выбранной даты
+  // Получаем все задачи для выбранной даты с сортировкой по приоритету
   const getTasksForSelectedDate = () => {
-    const selectedDateStr = tasksSelectedDate.toISOString().split('T')[0];
-    return getFilteredAndSortedTasks().filter(task => {
-      // Проверяем created_at
-      if (task.created_at) {
-        const taskCreatedDate = new Date(task.created_at).toISOString().split('T')[0];
-        if (taskCreatedDate === selectedDateStr) return true;
+    const filteredTasks = getFilteredAndSortedTasks();
+    
+    // Используем выбранную дату для фильтрации
+    const selectedDateStart = new Date(tasksSelectedDate);
+    selectedDateStart.setHours(0, 0, 0, 0);
+    
+    const selectedDateEnd = new Date(tasksSelectedDate);
+    selectedDateEnd.setHours(23, 59, 59, 999);
+    
+    const allTasks = [];
+    
+    filteredTasks.forEach(task => {
+      // Включаем задачи без дедлайна
+      if (!task.deadline) {
+        allTasks.push(task);
+        return;
       }
       
-      // Проверяем deadline
-      if (task.deadline) {
-        const taskDeadlineDate = new Date(task.deadline).toISOString().split('T')[0];
-        if (taskDeadlineDate === selectedDateStr) return true;
-      }
+      const deadline = new Date(task.deadline);
       
-      return false;
-    }).slice(0, 10);
+      // Показываем задачи с дедлайном на выбранную дату
+      if (deadline >= selectedDateStart && deadline <= selectedDateEnd) {
+        allTasks.push(task);
+      }
+    });
+    
+    // Сортируем все задачи по приоритету: high → medium → low
+    const priorityOrder = { high: 3, medium: 2, low: 1 };
+    allTasks.sort((a, b) => {
+      const priorityA = priorityOrder[a.priority] || 2;
+      const priorityB = priorityOrder[b.priority] || 2;
+      return priorityB - priorityA;
+    });
+    
+    // Возвращаем ВСЕ задачи без ограничения
+    return allTasks;
   };
   
   const todayTasks = getTasksForSelectedDate();
