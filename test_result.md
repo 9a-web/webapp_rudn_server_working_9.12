@@ -542,6 +542,14 @@ frontend:
     stuck_count: 0
     priority: "high"
     needs_retesting: true
+  
+  - task: "Tasks Priority Sorting - Remove 'No Deadline' Section"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/TasksSection.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
     status_history:
         - working: "NA"
           agent: "main"
