@@ -26,9 +26,9 @@
 
 ## Текущая реализация (v3)
 
-### Новая логика группировки задач
+### Упрощенная логика фильтрации
 
-Теперь группировка происходит относительно **выбранной даты**:
+Функция `groupTasksByDeadline()` теперь фильтрует задачи только для выбранной даты:
 
 ```javascript
 const selectedDateStart = new Date(tasksSelectedDate);
@@ -36,30 +36,37 @@ selectedDateStart.setHours(0, 0, 0, 0);
 
 const selectedDateEnd = new Date(tasksSelectedDate);
 selectedDateEnd.setHours(23, 59, 59, 999);
+
+const today = [];
+const noDeadline = [];
+
+filteredTasks.forEach(task => {
+  if (!task.deadline) {
+    noDeadline.push(task);
+    return;
+  }
+  
+  const deadline = new Date(task.deadline);
+  
+  // Показываем только задачи с дедлайном на выбранную дату
+  if (deadline >= selectedDateStart && deadline <= selectedDateEnd) {
+    today.push(task);
+  }
+});
+
+return { today, noDeadline };
 ```
 
-### Правила группировки:
+### Правила отображения:
 
-1. **Просроченные (overdue)**:
-   - Дедлайн раньше выбранной даты **И** раньше текущего момента
-   - `deadline < selectedDateStart && deadline < now`
-   - ✅ Показываются только когда действительно просрочены
-
-2. **На выбранную дату (today)**:
-   - Дедлайн в пределах выбранного дня (00:00 - 23:59)
+1. **На выбранную дату (today)**:
+   - Показываются только задачи с дедлайном строго на выбранную дату
    - `deadline >= selectedDateStart && deadline <= selectedDateEnd`
    - Заголовок меняется динамически: "Сегодня" / "Завтра" / "Вчера" / "На эту дату"
 
-3. **На этой неделе (thisWeek)**:
-   - Дедлайн в течение 7 дней от выбранной даты
-   - `0 < diffDays <= 7`
-
-4. **Позже (later)**:
-   - Дедлайн более чем через 7 дней от выбранной даты
-   - `diffDays > 7`
-
-5. **Без срока (noDeadline)**:
+2. **Без срока (noDeadline)**:
    - Задачи без установленного дедлайна
+   - Показываются всегда, независимо от выбранной даты
 
 ## Дополнительные улучшения
 
