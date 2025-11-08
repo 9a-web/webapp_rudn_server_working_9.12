@@ -339,13 +339,27 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     return { overdue, today, thisWeek, later, noDeadline };
   };
 
-  // Фильтруем задачи для карточки "на сегодня"
-  const todayTasks = getFilteredAndSortedTasks().slice(0, 10);
+  // Фильтруем задачи для выбранной даты
+  const getTasksForSelectedDate = () => {
+    const selectedDateStr = tasksSelectedDate.toISOString().split('T')[0];
+    return getFilteredAndSortedTasks().filter(task => {
+      if (!task.created_at) return false;
+      const taskDate = new Date(task.created_at).toISOString().split('T')[0];
+      return taskDate === selectedDateStr;
+    }).slice(0, 10);
+  };
+  
+  const todayTasks = getTasksForSelectedDate();
 
-  const currentDate = new Date().toLocaleDateString('ru-RU', {
+  const currentDate = tasksSelectedDate.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long'
   });
+  
+  // Обработчик выбора даты
+  const handleDateSelect = (date) => {
+    setTasksSelectedDate(date);
+  };
 
   const groupedTasks = groupTasksByDeadline();
   const categories = [
