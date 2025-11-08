@@ -9,10 +9,11 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   const [time, setTime] = useState(new Date());
   const { t, i18n } = useTranslation();
 
+  // Оптимизация: обновляем только каждые 10 секунд вместо каждой секунды
   useEffect(() => {
     const timer = setInterval(() => {
       setTime(new Date());
-    }, 1000);
+    }, 10000); // Обновление каждые 10 секунд
 
     return () => clearInterval(timer);
   }, []);
