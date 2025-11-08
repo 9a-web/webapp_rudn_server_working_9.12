@@ -893,6 +893,157 @@ const TodayTaskItem = ({
   );
 };
 
+// Компонент элемента задачи для TaskGroup с drag and drop
+const TaskGroupItem = ({ 
+  task, 
+  isEditing, 
+  editingText, 
+  setEditingText,
+  onToggle,
+  onSaveEdit,
+  onCancelEdit,
+  onDelete,
+  getCategoryEmoji,
+  getPriorityColor,
+  getDeadlineStatus,
+  hapticFeedback
+}) => {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item
+      key={task.id}
+      value={task}
+      dragListener={false}
+      dragControls={dragControls}
+      className="relative"
+    >
+      {/* Контент задачи */}
+      <motion.div
+        whileTap={{ scale: 0.98 }}
+        className="relative bg-white rounded-lg p-3 group shadow-sm"
+      >
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={editingText}
+              onChange={(e) => setEditingText(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  onSaveEdit(task.id);
+                } else if (e.key === 'Escape') {
+                  onCancelEdit();
+                }
+              }}
+              className="flex-1 text-sm bg-gray-50 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-yellow-400"
+              autoFocus
+            />
+            <button
+              onClick={() => onSaveEdit(task.id)}
+              className="p-1 text-green-600 hover:bg-green-100 rounded"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onCancelEdit}
+              className="p-1 text-red-600 hover:bg-red-100 rounded"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            {/* Drag Handle с правильным использованием dragControls */}
+            <div
+              onPointerDown={(e) => {
+                console.log('👆 TaskGroup drag handle clicked for task:', task.id, task.text);
+                e.stopPropagation();
+                if (hapticFeedback) hapticFeedback('impact', 'light');
+                dragControls.start(e);
+                console.log('🚀 TaskGroup drag controls started');
+              }}
+              className="flex-shrink-0 cursor-grab active:cursor-grabbing mt-0.5 touch-none select-none"
+              style={{ touchAction: 'none' }}
+            >
+              <GripVertical className="w-4 h-4 text-gray-400 hover:text-gray-600 transition-colors pointer-events-none" />
+            </div>
+
+            {/* Checkbox */}
+            <div 
+              onClick={() => onToggle(task.id)}
+              className={`
+                w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-all duration-200 mt-0.5 cursor-pointer
+                ${task.completed 
+                  ? 'bg-gradient-to-br from-yellow-400 to-orange-400' 
+                  : 'bg-white border-2 border-gray-300 group-hover:border-yellow-400'
+                }
+              `}
+            >
+              {task.completed && (
+                <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+              )}
+            </div>
+
+            {/* Текст и метаданные */}
+            <div className="flex-1 min-w-0">
+              <span 
+                className={`
+                  block text-sm leading-tight transition-all duration-200
+                  ${task.completed 
+                    ? 'text-gray-400 line-through' 
+                    : 'text-gray-800'
+                  }
+                `}
+              >
+                {task.text}
+              </span>
+              
+              {/* Метки */}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {task.category && (
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 rounded-full">
+                    {getCategoryEmoji(task.category)}
+                  </span>
+                )}
+                {task.priority && task.priority !== 'medium' && (
+                  <Flag className={`w-3 h-3 ${getPriorityColor(task.priority)}`} />
+                )}
+                {task.subject && (
+                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                    📖 {task.subject}
+                  </span>
+                )}
+                {task.deadline && (() => {
+                  const deadlineStatus = getDeadlineStatus(task.deadline);
+                  return deadlineStatus && (
+                    <div className={`flex items-center gap-1 text-xs ${deadlineStatus.color} ${deadlineStatus.bgColor} px-2 py-0.5 rounded-full`}>
+                      <Calendar className="w-3 h-3" />
+                      <span>{deadlineStatus.text}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            
+            {/* Кнопка удаления (всегда видна) */}
+            <button
+              onClick={() => {
+                hapticFeedback && hapticFeedback('impact', 'medium');
+                onDelete(task.id);
+              }}
+              className="flex-shrink-0 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-0.5"
+              title="Удалить задачу"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </Reorder.Item>
+  );
+};
+
 // Компонент группы задач
 const TaskGroup = ({ 
   title, 
