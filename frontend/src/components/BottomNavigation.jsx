@@ -150,4 +150,4 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       </div>
     </motion.nav>
   );
-};
+});
