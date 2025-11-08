@@ -780,30 +780,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           </div>
         </motion.div>
 
-        {/* Группы задач - показываем все задачи на выбранную дату (включая без дедлайна), отсортированные по приоритету */}
-        <div className="space-y-4 max-w-2xl">
-          {/* Все задачи (с дедлайном на дату + без дедлайна), отсортированные по приоритету */}
-          {groupedTasks.today.length > 0 && (
-            <TaskGroup
-              title={getTaskGroupTitle()}
-              icon={<Calendar className="w-5 h-5 text-orange-600" />}
-              tasks={groupedTasks.today}
-              accentColor="orange"
-              onToggle={toggleTask}
-              onEdit={handleStartEdit}
-              onDelete={handleDeleteTask}
-              editingTaskId={editingTaskId}
-              editingText={editingText}
-              setEditingText={setEditingText}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={handleCancelEdit}
-              getCategoryEmoji={getCategoryEmoji}
-              getPriorityColor={getPriorityColor}
-              getDeadlineStatus={getDeadlineStatus}
-              hapticFeedback={hapticFeedback}
-            />
-          )}
-        </div>
+        {/* Все задачи отображаются только в карточке выше */}
       </div>
 
       {/* Модальное окно добавления задачи */}
