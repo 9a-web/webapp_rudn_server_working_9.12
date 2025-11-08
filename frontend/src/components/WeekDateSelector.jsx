@@ -47,11 +47,22 @@ export const WeekDateSelector = ({
     if (!tasks || tasks.length === 0) return 0;
     
     // Фильтруем задачи для этого дня
+    // Учитываем как created_at, так и deadline для более точного подсчета
     const dateStr = date.toISOString().split('T')[0];
     const dayTasks = tasks.filter(task => {
-      if (!task.created_at) return false;
-      const taskDate = new Date(task.created_at).toISOString().split('T')[0];
-      return taskDate === dateStr;
+      // Проверяем created_at
+      if (task.created_at) {
+        const taskCreatedDate = new Date(task.created_at).toISOString().split('T')[0];
+        if (taskCreatedDate === dateStr) return true;
+      }
+      
+      // Проверяем deadline
+      if (task.deadline) {
+        const taskDeadlineDate = new Date(task.deadline).toISOString().split('T')[0];
+        if (taskDeadlineDate === dateStr) return true;
+      }
+      
+      return false;
     });
     
     if (dayTasks.length === 0) return 0;
