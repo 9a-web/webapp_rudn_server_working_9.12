@@ -88,7 +88,7 @@ const Home = () => {
     }
   }, [schedule]);
 
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     try {
       setLoading(true);
       const settings = await userAPI.getUserSettings(user.id);
@@ -104,7 +104,7 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const loadSchedule = async () => {
     try {
