@@ -760,37 +760,15 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           </div>
         </motion.div>
 
-        {/* Группы задач - показываем только задачи на выбранную дату */}
+        {/* Группы задач - показываем все задачи на выбранную дату (включая без дедлайна), отсортированные по приоритету */}
         <div className="space-y-4 max-w-2xl">
-          {/* Задачи на выбранную дату */}
+          {/* Все задачи (с дедлайном на дату + без дедлайна), отсортированные по приоритету */}
           {groupedTasks.today.length > 0 && (
             <TaskGroup
               title={getTaskGroupTitle()}
               icon={<Calendar className="w-5 h-5 text-orange-600" />}
               tasks={groupedTasks.today}
               accentColor="orange"
-              onToggle={toggleTask}
-              onEdit={handleStartEdit}
-              onDelete={handleDeleteTask}
-              editingTaskId={editingTaskId}
-              editingText={editingText}
-              setEditingText={setEditingText}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={handleCancelEdit}
-              getCategoryEmoji={getCategoryEmoji}
-              getPriorityColor={getPriorityColor}
-              getDeadlineStatus={getDeadlineStatus}
-              hapticFeedback={hapticFeedback}
-            />
-          )}
-
-          {/* Задачи без срока */}
-          {groupedTasks.noDeadline.length > 0 && (
-            <TaskGroup
-              title="Без срока"
-              icon={<Clock className="w-5 h-5 text-gray-600" />}
-              tasks={groupedTasks.noDeadline}
-              accentColor="gray"
               onToggle={toggleTask}
               onEdit={handleStartEdit}
               onDelete={handleDeleteTask}
