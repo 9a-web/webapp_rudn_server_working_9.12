@@ -472,6 +472,7 @@ const Home = () => {
           onAchievementsClick={user ? handleAchievementsClick : null}
           onNotificationsClick={user ? handleNotificationsClick : null}
           hapticFeedback={hapticFeedback}
+          onMenuStateChange={setIsMenuOpen}
         />
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
