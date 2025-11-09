@@ -432,9 +432,18 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       }
     });
     
-    // Сортируем все задачи по приоритету: high → medium → low
+    // Сортируем задачи: сначала по order (drag & drop), затем по приоритету
     const priorityOrder = { high: 3, medium: 2, low: 1 };
     allTasks.sort((a, b) => {
+      // Сначала по order (если установлен)
+      const orderA = a.order !== undefined ? a.order : 999999;
+      const orderB = b.order !== undefined ? b.order : 999999;
+      
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      
+      // Потом по приоритету
       const priorityA = priorityOrder[a.priority] || 2;
       const priorityB = priorityOrder[b.priority] || 2;
       return priorityB - priorityA;
