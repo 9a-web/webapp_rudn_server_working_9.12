@@ -100,9 +100,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   // Уведомляем родительский компонент об изменении состояния модальных окон
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(isAddModalOpen || isEditModalOpen);
+      onModalStateChange(isAddModalOpen || isEditModalOpen || isCreateRoomModalOpen || isRoomDetailModalOpen);
     }
-  }, [isAddModalOpen, isEditModalOpen, onModalStateChange]);
+  }, [isAddModalOpen, isEditModalOpen, isCreateRoomModalOpen, isRoomDetailModalOpen, onModalStateChange]);
+
+  // Загрузка комнат при монтировании
+  useEffect(() => {
+    if (userSettings?.telegram_id) {
+      loadRooms();
+    }
+  }, [userSettings]);
 
   const loadTasks = async () => {
     try {
