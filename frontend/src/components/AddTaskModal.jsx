@@ -92,6 +92,13 @@ export const AddTaskModal = ({
         subject: subject || null,
       };
       
+      console.log('📝 AddTaskModal - Creating task:', {
+        selectedDate,
+        target_date: taskData.target_date,
+        deadline: taskData.deadline,
+        text: taskData.text
+      });
+      
       await onAddTask(taskData);
       
       // Очищаем все поля и закрываем модальное окно
