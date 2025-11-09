@@ -832,10 +832,12 @@ const TodayTaskItem = ({
   return (
     <Reorder.Item
       value={task}
+      id={task.id}
       dragListener={false}
       dragControls={dragControls}
       className="mb-2"
       style={{ listStyle: 'none' }}
+      layout="position"
     >
       {/* Контент задачи */}
       <div className="relative bg-white rounded-lg p-2 group shadow-sm"
