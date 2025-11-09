@@ -43,7 +43,8 @@ export const WeekDateSelector = ({
   }, []);
   
   // Вычисляем процент выполненных задач для каждого дня
-  const getCompletionPercentage = (date) => {
+  // Используем useCallback для оптимизации и мemoization
+  const getCompletionPercentage = useCallback((date) => {
     if (!tasks || tasks.length === 0) return 0;
     
     // Фильтруем задачи для этого дня используя ту же логику, что и в TasksSection
@@ -79,7 +80,7 @@ export const WeekDateSelector = ({
     
     const completedTasks = dayTasks.filter(task => task.completed).length;
     return Math.round((completedTasks / dayTasks.length) * 100);
-  };
+  }, [tasks]); // Пересчитываем только когда tasks изменяются
   
   // Проверяем, является ли день прошедшим
   const isPastDay = (date) => {
