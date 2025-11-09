@@ -11,7 +11,7 @@ const CreateRoomModal = ({ isOpen, onClose, onCreateRoom }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const { webApp } = useContext(TelegramContext);
+  const { webApp } = useTelegram();
 
   useEffect(() => {
     if (isOpen) {
