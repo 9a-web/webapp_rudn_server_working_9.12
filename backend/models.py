@@ -315,6 +315,7 @@ class Task(BaseModel):
     deadline: Optional[datetime] = None  # Дедлайн задачи
     subject: Optional[str] = None  # Привязка к предмету из расписания
     discipline_id: Optional[str] = None  # ID дисциплины (для интеграции с расписанием)
+    order: int = 0  # Порядок задачи для drag & drop (меньше = выше в списке)
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
