@@ -45,6 +45,13 @@ export const LiveScheduleSection = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Уведомляем родительский компонент о состоянии ShareScheduleModal
+  useEffect(() => {
+    if (onShareModalStateChange) {
+      onShareModalStateChange(isShareModalOpen);
+    }
+  }, [isShareModalOpen, onShareModalStateChange]);
+
   // Определяем, к какой неделе относится выбранная дата
   const selectedWeekNumber = getWeekNumberForDate(selectedDate);
 
