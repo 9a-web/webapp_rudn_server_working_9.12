@@ -46,20 +46,30 @@ export const WeekDateSelector = ({
   const getCompletionPercentage = (date) => {
     if (!tasks || tasks.length === 0) return 0;
     
-    // Фильтруем задачи для этого дня
-    // Учитываем как created_at, так и deadline для более точного подсчета
+    // Фильтруем задачи для этого дня используя ту же логику, что и в TasksSection
     const dateStr = date.toISOString().split('T')[0];
+    
+    // Сегодняшняя дата для проверки задач без дат
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
     const dayTasks = tasks.filter(task => {
-      // Проверяем created_at
-      if (task.created_at) {
-        const taskCreatedDate = new Date(task.created_at).toISOString().split('T')[0];
-        if (taskCreatedDate === dateStr) return true;
+      // ПРИОРИТЕТ 1: Задачи с target_date
+      if (task.target_date) {
+        const targetDateStr = new Date(task.target_date).toISOString().split('T')[0];
+        return targetDateStr === dateStr;
       }
       
-      // Проверяем deadline
+      // ПРИОРИТЕТ 2: Задачи с deadline (но без target_date)
       if (task.deadline) {
-        const taskDeadlineDate = new Date(task.deadline).toISOString().split('T')[0];
-        if (taskDeadlineDate === dateStr) return true;
+        const deadlineStr = new Date(task.deadline).toISOString().split('T')[0];
+        return deadlineStr === dateStr;
+      }
+      
+      // ПРИОРИТЕТ 3: Задачи без target_date и без deadline - показываем только на сегодня
+      if (!task.target_date && !task.deadline) {
+        return dateStr === todayStr;
       }
       
       return false;
