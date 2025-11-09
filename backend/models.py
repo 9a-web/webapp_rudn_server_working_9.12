@@ -420,6 +420,7 @@ class GroupTaskCreate(BaseModel):
     category: Optional[str] = None
     priority: str = 'medium'
     telegram_id: int  # создатель
+    room_id: Optional[str] = None  # ID комнаты (если задача создается в комнате)
     invited_users: List[int] = []  # список telegram_id приглашённых
 
 
