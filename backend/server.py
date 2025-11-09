@@ -46,7 +46,9 @@ from models import (
     Task,
     TaskCreate,
     TaskUpdate,
-    TaskResponse
+    TaskResponse,
+    TaskReorderItem,
+    TaskReorderRequest
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler
