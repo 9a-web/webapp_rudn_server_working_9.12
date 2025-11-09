@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, PanInfo, Reorder, useDragControls } from 'framer-motion';
-import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, SortAsc, Zap, Bell, Star, Clock, ChevronDown, GripVertical } from 'lucide-react';
+import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, SortAsc, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users } from 'lucide-react';
 import { tasksAPI, scheduleAPI } from '../services/api';
+import { groupTasksAPI } from '../services/groupTasksAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 import { AddTaskModal } from './AddTaskModal';
 import { EditTaskModal } from './EditTaskModal';
 import { WeekDateSelector } from './WeekDateSelector';
 import { tasksCompleteConfetti } from '../utils/confetti';
+import { GroupTaskCard } from './GroupTaskCard';
+import { CreateGroupTaskModal } from './CreateGroupTaskModal';
+import { GroupTaskDetailModal } from './GroupTaskDetailModal';
 
 export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalStateChange }) => {
   const { user, hapticFeedback } = useTelegram();
