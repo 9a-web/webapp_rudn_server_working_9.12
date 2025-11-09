@@ -42,13 +42,6 @@ export const AddTaskModal = ({
       const selected = new Date(selectedDate);
       selected.setHours(0, 0, 0, 0);
       
-      console.log('📅 AddTaskModal useEffect - Setting deadline:', {
-        selectedDate: selectedDate,
-        now: now.toISOString(),
-        selected: selected.toISOString(),
-        isFuture: selected > now
-      });
-      
       // Устанавливаем deadline ТОЛЬКО если выбранная дата в будущем
       if (selected > now) {
         const deadlineDate = new Date(selectedDate);
@@ -56,11 +49,9 @@ export const AddTaskModal = ({
         
         // Форматируем для datetime-local input (YYYY-MM-DDTHH:mm)
         const formattedDeadline = deadlineDate.toISOString().slice(0, 16);
-        console.log('  ✅ Setting deadline for future date:', formattedDeadline);
         setDeadline(formattedDeadline);
       } else {
         // Для прошедших дат и сегодня - оставляем пустым
-        console.log('  ❌ Not setting deadline (past or today)');
         setDeadline('');
       }
     }
