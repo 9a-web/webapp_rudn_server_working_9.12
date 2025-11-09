@@ -661,6 +661,7 @@ test_plan:
     - "GET /api/bot-info - Bot Information Endpoint"
     - "Profile Modal - User Mini-Profile Display"
     - "Bottom Navigation - Section Switching (Tasks & Journal)"
+    - "Tasks API - Task Completion Functionality"
 
 agent_communication:
     - agent: "main"
