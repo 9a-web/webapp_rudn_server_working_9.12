@@ -147,5 +147,35 @@ class Task(BaseModel):
 ## Дата реализации
 2025-01-XX
 
+## Критическое исправление - Timezone Issue
+
+### Проблема с временными зонами
+После первой реализации обнаружена критическая проблема: при использовании `new Date().toISOString()` происходила конвертация локального времени в UTC, что приводило к смещению даты на один день назад.
+
+**Пример:**
+- Пользователь выбрал дату: 2 ноября 2025 (local time, timezone +03:00)
+- После `toISOString()`: 2025-11-01T21:00:00.000Z (минус 3 часа!)
+- В базе сохранялось: 1 ноября вместо 2 ноября
+
+### Решение
+Изменен способ формирования ISO строки для target_date - теперь используется форматирование без конвертации в UTC:
+
+```javascript
+// БЫЛО (неправильно):
+target_date: selectedDate ? new Date(selectedDate).toISOString() : null
+
+// СТАЛО (правильно):
+let targetDateISO = null;
+if (selectedDate) {
+  const targetDate = new Date(selectedDate);
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const day = String(targetDate.getDate()).padStart(2, '0');
+  targetDateISO = `${year}-${month}-${day}T00:00:00`;
+}
+```
+
+Теперь дата всегда сохраняется в формате `YYYY-MM-DDT00:00:00` без смещения timezone.
+
 ## Статус
-✅ Реализовано и готово к тестированию
+✅ Реализовано, исправлена проблема с timezone, готово к тестированию
