@@ -1775,14 +1775,6 @@ async def get_room_tasks(room_id: str):
         logger.error(f"Ошибка при получении задач комнаты: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-            comments.append(GroupTaskCommentResponse(**comment_doc))
-        
-        return comments
-    except Exception as e:
-        logger.error(f"Ошибка при получении комментариев: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 
 # Include the router in the main app
 app.include_router(api_router)
