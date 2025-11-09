@@ -396,12 +396,6 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     
-    console.log('🔍 Filtering tasks for date:', {
-      tasksSelectedDate: tasksSelectedDate.toISOString(),
-      selectedDateStart: selectedDateStart.toISOString(),
-      totalTasks: filteredTasks.length
-    });
-    
     const allTasks = [];
     
     filteredTasks.forEach(task => {
@@ -409,14 +403,6 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       if (task.target_date) {
         const targetDate = new Date(task.target_date);
         targetDate.setHours(0, 0, 0, 0);
-        
-        console.log('  Task with target_date:', {
-          text: task.text.substring(0, 20),
-          target_date: task.target_date,
-          targetDate: targetDate.toISOString(),
-          selectedDateStart: selectedDateStart.toISOString(),
-          matches: targetDate.getTime() === selectedDateStart.getTime()
-        });
         
         if (targetDate.getTime() === selectedDateStart.getTime()) {
           allTasks.push(task);
