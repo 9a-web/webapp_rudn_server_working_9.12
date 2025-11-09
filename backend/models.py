@@ -508,3 +508,83 @@ class GroupTaskCompleteRequest(BaseModel):
     task_id: str
     telegram_id: int
     completed: bool
+
+
+
+# ============ Модели для комнат (Rooms) ============
+
+class RoomParticipant(BaseModel):
+    """Участник комнаты"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    role: str = 'member'  # 'owner' или 'member'
+    referral_code: Optional[str] = None  # реферальный код, если пришел по ссылке
+
+
+class Room(BaseModel):
+    """Модель комнаты с групповыми задачами"""
+    room_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # Название комнаты (например, "Экзамен по математике")
+    description: Optional[str] = None
+    owner_id: int  # telegram_id владельца
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    participants: List[RoomParticipant] = []
+    invite_token: str = Field(default_factory=lambda: str(uuid.uuid4())[:12])  # короткий токен для ссылки
+    color: str = 'blue'  # цвет комнаты (для UI)
+
+
+class RoomCreate(BaseModel):
+    """Запрос создания комнаты"""
+    name: str
+    description: Optional[str] = None
+    telegram_id: int  # создатель
+    color: str = 'blue'
+
+
+class RoomResponse(BaseModel):
+    """Ответ с комнатой"""
+    room_id: str
+    name: str
+    description: Optional[str] = None
+    owner_id: int
+    created_at: datetime
+    updated_at: datetime
+    participants: List[RoomParticipant]
+    invite_token: str
+    color: str
+    total_participants: int = 0
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    completion_percentage: int = 0  # процент выполнения всех задач комнаты
+
+
+class RoomInviteLinkResponse(BaseModel):
+    """Ответ с ссылкой-приглашением в комнату"""
+    invite_link: str
+    invite_token: str
+    room_id: str
+    bot_username: str
+
+
+class RoomJoinRequest(BaseModel):
+    """Запрос на присоединение к комнате по токену"""
+    invite_token: str
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    referral_code: Optional[str] = None
+
+
+class RoomTaskCreate(BaseModel):
+    """Запрос создания задачи в комнате"""
+    room_id: str
+    title: str
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+    category: Optional[str] = None
+    priority: str = 'medium'
+    telegram_id: int  # создатель задачи
+
