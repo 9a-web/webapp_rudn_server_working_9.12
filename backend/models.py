@@ -341,6 +341,7 @@ class TaskUpdate(BaseModel):
     deadline: Optional[datetime] = None
     subject: Optional[str] = None
     discipline_id: Optional[str] = None
+    order: Optional[int] = None
 
 
 class TaskResponse(BaseModel):
