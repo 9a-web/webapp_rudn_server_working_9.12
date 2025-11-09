@@ -44,6 +44,12 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   // Шаблоны быстрых действий
   const [showQuickActions, setShowQuickActions] = useState(false);
   
+  // Комнаты (Rooms)
+  const [rooms, setRooms] = useState([]);
+  const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [isRoomDetailModalOpen, setIsRoomDetailModalOpen] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
