@@ -373,3 +373,138 @@ class TaskReorderItem(BaseModel):
 class TaskReorderRequest(BaseModel):
     """Запрос на изменение порядка задач"""
     tasks: List[TaskReorderItem]
+
+
+
+# ============ Модели для групповых задач ============
+
+class GroupTaskParticipant(BaseModel):
+    """Участник групповой задачи"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    completed: bool = False
+    completed_at: Optional[datetime] = None
+    role: str = 'member'  # 'owner' или 'member'
+
+
+class GroupTask(BaseModel):
+    """Модель групповой задачи"""
+    task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+    category: Optional[str] = None
+    priority: str = 'medium'  # 'low', 'medium', 'high'
+    owner_id: int  # telegram_id владельца
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    status: str = 'created'  # 'created', 'in_progress', 'completed', 'overdue'
+    participants: List[GroupTaskParticipant] = []
+    invite_token: str = Field(default_factory=lambda: str(uuid.uuid4())[:12])
+    notification_settings: dict = {
+        'enabled': True,
+        'notify_on_join': True,
+        'notify_on_complete': True,
+        'notify_on_comment': True
+    }
+
+
+class GroupTaskCreate(BaseModel):
+    """Запрос создания групповой задачи"""
+    title: str
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+    category: Optional[str] = None
+    priority: str = 'medium'
+    telegram_id: int  # создатель
+    invited_users: List[int] = []  # список telegram_id приглашённых
+
+
+class GroupTaskResponse(BaseModel):
+    """Ответ с групповой задачей"""
+    task_id: str
+    title: str
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+    category: Optional[str] = None
+    priority: str
+    owner_id: int
+    created_at: datetime
+    updated_at: datetime
+    status: str
+    participants: List[GroupTaskParticipant]
+    invite_token: str
+    completion_percentage: int = 0  # процент выполнения
+    total_participants: int = 0
+    completed_participants: int = 0
+
+
+class GroupTaskComment(BaseModel):
+    """Комментарий к групповой задаче"""
+    comment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_id: str
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    text: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    edited: bool = False
+    edited_at: Optional[datetime] = None
+
+
+class GroupTaskCommentCreate(BaseModel):
+    """Запрос создания комментария"""
+    task_id: str
+    telegram_id: int
+    text: str
+
+
+class GroupTaskCommentResponse(BaseModel):
+    """Ответ с комментарием"""
+    comment_id: str
+    task_id: str
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+    text: str
+    created_at: datetime
+    edited: bool
+    edited_at: Optional[datetime] = None
+
+
+class GroupTaskInvite(BaseModel):
+    """Приглашение в групповую задачу"""
+    invite_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_id: str
+    invited_by: int  # telegram_id пригласившего
+    invited_user: int  # telegram_id приглашённого
+    status: str = 'pending'  # 'pending', 'accepted', 'declined'
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    responded_at: Optional[datetime] = None
+
+
+class GroupTaskInviteCreate(BaseModel):
+    """Запрос приглашения пользователя"""
+    task_id: str
+    telegram_id: int  # кто приглашает
+    invited_user: int  # кого приглашают
+
+
+class GroupTaskInviteResponse(BaseModel):
+    """Ответ о приглашении"""
+    invite_id: str
+    task_id: str
+    task_title: str
+    invited_by: int
+    invited_by_name: str
+    status: str
+    created_at: datetime
+
+
+class GroupTaskCompleteRequest(BaseModel):
+    """Запрос на отметку выполнения"""
+    task_id: str
+    telegram_id: int
+    completed: bool
