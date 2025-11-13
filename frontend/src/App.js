@@ -625,6 +625,31 @@ const Home = () => {
           isHidden={isAnyModalOpen}
         />
       )}
+
+      {/* Admin Panel Button - видна только для admin ID: 765963392 */}
+      {user && user.id === 765963392 && !showGroupSelector && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={() => {
+              hapticFeedback?.('medium');
+              setIsAdminPanelOpen(true);
+            }}
+            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 backdrop-blur-sm"
+          >
+            📊 Админ панель
+          </button>
+        </div>
+      )}
+
+      {/* Admin Panel Modal */}
+      {isAdminPanelOpen && (
+        <Suspense fallback={null}>
+          <AdminPanel
+            isOpen={isAdminPanelOpen}
+            onClose={() => setIsAdminPanelOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };
