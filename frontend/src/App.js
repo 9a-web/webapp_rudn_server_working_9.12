@@ -521,6 +521,8 @@ const Home = () => {
                     hapticFeedback={hapticFeedback}
                     telegramId={user?.id}
                     onShareModalStateChange={setIsShareModalOpen}
+                    user={user}
+                    onAdminPanelOpen={() => setIsAdminPanelOpen(true)}
                   />
                 )}
               </div>
