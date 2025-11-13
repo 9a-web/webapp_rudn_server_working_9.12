@@ -375,9 +375,10 @@ def main() -> None:
     # Регистрируем обработчики команд
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("users", users_command))
+    application.add_handler(CommandHandler("clear_db", clear_db_command))
     
     logger.info("✅ Бот успешно запущен и готов к работе!")
-    logger.info("📝 Доступные команды: /start, /users (только для админов)")
+    logger.info("📝 Доступные команды: /start, /users (только для админов), /clear_db (только для админов)")
     
     # Запускаем бота
     application.run_polling(allowed_updates=Update.ALL_TYPES)
