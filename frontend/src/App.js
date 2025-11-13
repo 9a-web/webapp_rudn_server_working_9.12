@@ -118,14 +118,25 @@ const Home = () => {
       setLoading(true);
       const settings = await userAPI.getUserSettings(user.id);
       
-      if (settings) {
+      if (settings && settings.group_id && settings.facultet_id) {
+        // Пользователь имеет полные настройки
         setUserSettings(settings);
+      } else if (settings) {
+        // Пользователь существует, но у него неполные настройки
+        console.log('User has incomplete settings, showing group selector');
+        setShowGroupSelector(true);
       } else {
+        // Пользователь не найден
         setShowGroupSelector(true);
       }
     } catch (err) {
       console.error('Error loading user data:', err);
-      setError(err.message);
+      // Если пользователь не найден (404), показываем селектор группы
+      if (err.message === 'Пользователь не найден') {
+        setShowGroupSelector(true);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
