@@ -421,8 +421,129 @@ export const ShareScheduleModal = ({
               </div>
             </motion.div>
           </div>
+          
+          {/* Скрытый компонент для генерации изображения */}
+          <div className="fixed -left-[9999px] -top-[9999px]">
+            <ScheduleImageCard
+              ref={scheduleImageRef}
+              schedule={schedule}
+              selectedDate={selectedDate}
+              groupName={groupName}
+              formatDate={formatDate}
+            />
+          </div>
         </>
       )}
     </AnimatePresence>
   );
 };
+
+/**
+ * Компонент карточки расписания для генерации изображения
+ */
+const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName, formatDate }, ref) => {
+  const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
+  const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+  const todaySchedule = schedule.filter(item => item.day === formattedDayName);
+  
+  // Определяем эмодзи для типа занятия
+  const getClassTypeEmoji = (discipline) => {
+    const lower = discipline.toLowerCase();
+    if (lower.includes('лекция') || lower.includes('лекц')) return '📚';
+    if (lower.includes('практи') || lower.includes('практ')) return '✏️';
+    if (lower.includes('лаборат') || lower.includes('лабор')) return '🔬';
+    if (lower.includes('семинар')) return '💬';
+    if (lower.includes('физ') || lower.includes('спорт')) return '⚽';
+    return '📖';
+  };
+
+  return (
+    <div 
+      ref={ref}
+      className="w-[600px] bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-8 rounded-3xl shadow-2xl"
+      style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+    >
+      {/* Header */}
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 mb-6 shadow-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            📅 Расписание
+          </h1>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">RUDN Schedule</p>
+            <p className="text-xs text-gray-400">Telegram WebApp</p>
+          </div>
+        </div>
+        <div className="h-1 bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 rounded-full mb-3"></div>
+        <p className="text-lg font-semibold text-gray-800">{formatDate(selectedDate)}</p>
+        {groupName && (
+          <p className="text-sm text-gray-600 mt-1">👥 Группа: {groupName}</p>
+        )}
+      </div>
+
+      {/* Schedule Content */}
+      {todaySchedule.length === 0 ? (
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 text-center shadow-lg">
+          <div className="text-6xl mb-4">🎉</div>
+          <p className="text-2xl font-bold text-gray-800 mb-2">Свободный день!</p>
+          <p className="text-gray-600">Пар нет</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {todaySchedule.map((classItem, index) => (
+            <div 
+              key={index}
+              className="bg-white/95 backdrop-blur-sm rounded-2xl p-5 shadow-lg hover:shadow-xl transition-shadow"
+            >
+              <div className="flex items-start gap-4">
+                {/* Номер пары */}
+                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md">
+                  {index + 1}
+                </div>
+                
+                {/* Информация о паре */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2 mb-2">
+                    <span className="text-2xl flex-shrink-0">{getClassTypeEmoji(classItem.discipline)}</span>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                      {classItem.discipline}
+                    </h3>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <span className="text-base">⏰</span>
+                      <span className="font-semibold">{classItem.time}</span>
+                    </div>
+                    
+                    {classItem.auditory && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <span className="text-base">📍</span>
+                        <span className="text-sm">{classItem.auditory}</span>
+                      </div>
+                    )}
+                    
+                    {classItem.teacher && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <span className="text-base">👨‍🏫</span>
+                        <span className="text-sm">{classItem.teacher}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="mt-6 bg-white/90 backdrop-blur-sm rounded-2xl p-4 text-center shadow-lg">
+        <p className="text-sm text-gray-700 font-medium">
+          Создано в <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">RUDN Schedule</span>
+        </p>
+        <p className="text-xs text-gray-500 mt-1">@rudn_pro_bot • Telegram WebApp</p>
+      </div>
+    </div>
+  );
+});
