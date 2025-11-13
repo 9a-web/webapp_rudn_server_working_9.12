@@ -160,8 +160,21 @@ const Home = () => {
       hapticFeedback('notification', 'success');
     } catch (err) {
       console.error('Error loading schedule:', err);
-      setError(err.message);
-      showAlert(t('common.scheduleError', { message: err.message }));
+      
+      // Формируем читаемое сообщение об ошибке
+      let errorMessage = err.message || 'Неизвестная ошибка';
+      
+      // Если err.message является объектом или массивом, пытаемся его распарсить
+      if (typeof errorMessage === 'object') {
+        if (Array.isArray(errorMessage)) {
+          errorMessage = errorMessage.map(e => e.msg || JSON.stringify(e)).join(', ');
+        } else {
+          errorMessage = JSON.stringify(errorMessage);
+        }
+      }
+      
+      setError(errorMessage);
+      showAlert(t('common.scheduleError', { message: errorMessage }));
     } finally {
       setLoading(false);
     }
