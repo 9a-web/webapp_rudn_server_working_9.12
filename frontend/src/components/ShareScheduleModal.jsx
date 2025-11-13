@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Share2, Copy, Check, MessageCircle, Image as ImageIcon, X } from 'lucide-react';
+import { Share2, Copy, Check, MessageCircle, Image as ImageIcon, X, Download } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { botAPI } from '../services/api';
 import { achievementsAPI } from '../services/api';
 
