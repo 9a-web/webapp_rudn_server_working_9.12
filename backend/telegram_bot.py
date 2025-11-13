@@ -357,8 +357,8 @@ async def clear_db_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
 
 
-def main() -> None:
-    """Запуск бота"""
+async def main_async() -> None:
+    """Асинхронный запуск бота"""
     
     if not TELEGRAM_BOT_TOKEN:
         logger.error("❌ TELEGRAM_BOT_TOKEN не найден в .env файле!")
@@ -380,8 +380,39 @@ def main() -> None:
     logger.info("✅ Бот успешно запущен и готов к работе!")
     logger.info("📝 Доступные команды: /start, /users (только для админов), /clear_db (только для админов)")
     
-    # Запускаем бота
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Инициализируем и запускаем бота
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Держим бота активным
+    try:
+        # Запускаем бота бесконечно
+        import signal
+        stop_signal = asyncio.Event()
+        
+        def signal_handler(signum, frame):
+            stop_signal.set()
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        await stop_signal.wait()
+    finally:
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
+
+
+def main() -> None:
+    """Синхронная обертка для запуска асинхронного бота"""
+    import asyncio
+    try:
+        asyncio.run(main_async())
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен пользователем")
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
 
 
 if __name__ == '__main__':
