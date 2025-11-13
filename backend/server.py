@@ -2194,6 +2194,18 @@ async def startup_event():
     """Инициализация при запуске приложения"""
     logger.info("Starting RUDN Schedule API...")
     
+    # Создаем индексы для коллекций
+    try:
+        # Уникальный индекс для sent_notifications чтобы предотвратить дубликаты
+        await db.sent_notifications.create_index(
+            [("notification_key", 1)],
+            unique=True,
+            name="unique_notification_key"
+        )
+        logger.info("Database indexes created successfully")
+    except Exception as e:
+        logger.warning(f"Index creation warning (may already exist): {e}")
+    
     # Запускаем планировщик уведомлений
     try:
         scheduler = get_scheduler(db)
