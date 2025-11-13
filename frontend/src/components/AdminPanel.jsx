@@ -73,9 +73,18 @@ const AdminPanel = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
+      // Принудительная загрузка данных каждый раз при открытии
       fetchData();
     }
   }, [isOpen, selectedPeriod]);
+
+  // Дополнительно: перезагрузка при повторном открытии
+  useEffect(() => {
+    if (isOpen) {
+      // Сбрасываем состояние для индикации загрузки
+      setLoading(true);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
