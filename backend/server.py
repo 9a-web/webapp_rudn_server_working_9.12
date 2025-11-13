@@ -2221,18 +2221,42 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to start notification scheduler: {e}")
     
-    # Запускаем Telegram бота в отдельном потоке
+    # Запускаем Telegram бота как background task
     try:
-        def run_bot():
-            from telegram_bot import main as bot_main
-            # Запускаем синхронную обертку, которая создаст свой event loop
-            bot_main()
+        from telegram import Update
+        from telegram.ext import Application, CommandHandler
         
-        bot_thread = threading.Thread(target=run_bot, daemon=True, name="TelegramBot")
-        bot_thread.start()
-        logger.info("Telegram bot started successfully in separate thread")
+        # Импортируем обработчики команд
+        import sys
+        sys.path.insert(0, '/app/backend')
+        from telegram_bot import start_command, users_command, clear_db_command, TELEGRAM_BOT_TOKEN
+        
+        if TELEGRAM_BOT_TOKEN:
+            # Создаем приложение бота
+            bot_application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+            
+            # Регистрируем обработчики
+            bot_application.add_handler(CommandHandler("start", start_command))
+            bot_application.add_handler(CommandHandler("users", users_command))
+            bot_application.add_handler(CommandHandler("clear_db", clear_db_command))
+            
+            # Запускаем бота в фоне
+            async def start_bot():
+                await bot_application.initialize()
+                await bot_application.start()
+                await bot_application.updater.start_polling(
+                    allowed_updates=Update.ALL_TYPES,
+                    drop_pending_updates=True
+                )
+                logger.info("✅ Telegram bot polling started")
+            
+            # Создаем background task
+            asyncio.create_task(start_bot())
+            logger.info("Telegram bot initialization started as background task")
+        else:
+            logger.warning("TELEGRAM_BOT_TOKEN not found, bot not started")
     except Exception as e:
-        logger.error(f"Failed to start Telegram bot: {e}")
+        logger.error(f"Failed to start Telegram bot: {e}", exc_info=True)
 
 
 @app.on_event("shutdown")
