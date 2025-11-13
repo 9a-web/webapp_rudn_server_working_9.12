@@ -111,15 +111,16 @@ async def add_demo_data():
     print(f"✅ Добавлено {len(demo_tasks)} задач")
     
     # Создаем демо-достижения
-    from achievements import ACHIEVEMENTS
+    # Простой список ID достижений
+    achievement_ids = ["first_group", "analytics_viewer", "organizer", "settings_master", "sharer", "ambassador", "explorer", "first_week", "perfectionist"]
     demo_achievements = []
     for user in demo_users[:15]:  # Достижения для 15 пользователей
-        num_achievements = random.randint(1, 5)
-        for achievement in random.sample(ACHIEVEMENTS, num_achievements):
+        num_achievements = random.randint(1, min(5, len(achievement_ids)))
+        for achievement_id in random.sample(achievement_ids, num_achievements):
             user_achievement = {
                 "id": str(uuid.uuid4()),
                 "telegram_id": user["telegram_id"],
-                "achievement_id": achievement["id"],
+                "achievement_id": achievement_id,
                 "earned_at": datetime.utcnow() - timedelta(days=random.randint(0, 20)),
                 "seen": random.choice([True, False])
             }
