@@ -102,7 +102,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -112,16 +112,22 @@ const AdminPanel = ({ isOpen, onClose }) => {
           onClick={onClose}
         />
 
-        {/* Panel */}
+        {/* Panel - Mobile: full width bottom sheet, Desktop: centered modal */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-7xl max-h-[90vh] bg-gradient-to-br from-[#2B2B3A] to-[#1E1E28] rounded-3xl shadow-2xl border border-white/10 overflow-hidden"
+          initial={{ opacity: 0, y: '100%' }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="relative w-full sm:max-w-7xl h-[92vh] sm:max-h-[90vh] bg-gradient-to-br from-[#2B2B3A] to-[#1E1E28] rounded-t-[32px] sm:rounded-3xl shadow-2xl border-t border-white/10 sm:border overflow-hidden"
+          style={{ touchAction: 'none' }}
         >
+          {/* Drag Indicator (Mobile Only) */}
+          <div className="sm:hidden flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 bg-white/20 rounded-full"></div>
+          </div>
+
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-xl border-b border-white/10 p-6">
+          <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-xl border-b border-white/10 px-4 py-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
