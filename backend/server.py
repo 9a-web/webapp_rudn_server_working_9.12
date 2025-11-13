@@ -2226,6 +2226,7 @@ async def startup_event():
     
     # Запускаем Telegram бота как background task
     try:
+        global bot_application
         from telegram import Update
         from telegram.ext import Application, CommandHandler
         
@@ -2251,7 +2252,7 @@ async def startup_event():
                     allowed_updates=Update.ALL_TYPES,
                     drop_pending_updates=True
                 )
-                logger.info("✅ Telegram bot polling started")
+                logger.info("✅ Telegram bot polling started successfully")
             
             # Создаем background task
             asyncio.create_task(start_bot())
