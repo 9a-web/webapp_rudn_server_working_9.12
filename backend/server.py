@@ -1218,11 +1218,28 @@ async def complete_group_task(task_id: str, complete_data: GroupTaskCompleteRequ
         
         completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
         
+        # Логируем активность
+        if updated_task.room_id:
+            participant = next((p for p in updated_task.participants if p.telegram_id == complete_data.telegram_id), None)
+            activity = RoomActivity(
+                room_id=updated_task.room_id,
+                user_id=complete_data.telegram_id,
+                username=participant.username if participant else "",
+                first_name=participant.first_name if participant else "User",
+                action_type="task_completed" if complete_data.completed else "task_uncompleted",
+                action_details={"task_title": updated_task.title, "task_id": task_id}
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
+        # Подсчитываем количество комментариев
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
         return GroupTaskResponse(
             **updated_task.model_dump(),
             completion_percentage=completion_percentage,
             total_participants=total_participants,
-            completed_participants=completed_participants
+            completed_participants=completed_participants,
+            comments_count=comments_count
         )
     except HTTPException:
         raise
