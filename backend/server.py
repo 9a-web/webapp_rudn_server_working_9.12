@@ -1292,6 +1292,18 @@ async def delete_group_task(task_id: str, telegram_id: int = Body(..., embed=Tru
         if task.owner_id != telegram_id:
             raise HTTPException(status_code=403, detail="Только владелец может удалить задачу")
         
+        # Логируем активность перед удалением
+        if task.room_id:
+            activity = RoomActivity(
+                room_id=task.room_id,
+                user_id=telegram_id,
+                username="",
+                first_name="User",
+                action_type="task_deleted",
+                action_details={"task_title": task.title, "task_id": task_id}
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
         # Удаляем задачу
         await db.group_tasks.delete_one({"task_id": task_id})
         
