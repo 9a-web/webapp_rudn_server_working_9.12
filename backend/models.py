@@ -610,6 +610,81 @@ class RoomTaskCreate(BaseModel):
     category: Optional[str] = None
     priority: str = 'medium'
     telegram_id: int  # создатель задачи
+    tags: List[str] = []  # Теги для задачи
+    subtasks: List[str] = []  # Названия подзадач
+
+
+class SubtaskCreate(BaseModel):
+    """Запрос создания подзадачи"""
+    title: str
+
+
+class SubtaskUpdate(BaseModel):
+    """Запрос обновления подзадачи"""
+    subtask_id: str
+    title: Optional[str] = None
+    completed: Optional[bool] = None
+
+
+class GroupTaskUpdate(BaseModel):
+    """Запрос обновления групповой задачи"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    deadline: Optional[datetime] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class RoomActivity(BaseModel):
+    """Активность в комнате"""
+    activity_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    room_id: str
+    user_id: int
+    username: Optional[str] = None
+    first_name: str
+    action_type: str  # 'task_created', 'task_completed', 'task_deleted', 'comment_added', 'user_joined', 'user_left'
+    action_details: dict = {}  # Детали действия (название задачи, текст комментария и т.д.)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RoomActivityResponse(BaseModel):
+    """Ответ с активностью комнаты"""
+    activity_id: str
+    room_id: str
+    user_id: int
+    username: Optional[str]
+    first_name: str
+    action_type: str
+    action_details: dict
+    created_at: datetime
+
+
+class RoomStatsResponse(BaseModel):
+    """Статистика комнаты"""
+    room_id: str
+    total_tasks: int
+    completed_tasks: int
+    overdue_tasks: int
+    in_progress_tasks: int
+    completion_percentage: int
+    participants_stats: List[dict]  # Статистика по каждому участнику
+    activity_chart: List[dict]  # График активности по дням
+
+
+class ParticipantRoleUpdate(BaseModel):
+    """Запрос на изменение роли участника"""
+    room_id: str
+    telegram_id: int  # кого меняем
+    new_role: str  # новая роль
+    changed_by: int  # кто меняет
+
+
+class TaskReorderRequest(BaseModel):
+    """Запрос на изменение порядка задач"""
+    room_id: str
+    tasks: List[dict]  # [{"task_id": "...", "order": 0}, ...]
 
 
 # ============ Модели для админ панели ============
