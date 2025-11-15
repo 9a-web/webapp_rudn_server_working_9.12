@@ -212,7 +212,7 @@ export const WeekDateSelector = ({
                         : today 
                           ? 'text-orange-600' 
                           : future 
-                            ? 'text-gray-400' 
+                            ? 'text-blue-600' 
                             : 'text-gray-800'
                       }
                     `}
