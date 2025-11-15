@@ -178,6 +178,67 @@ const CreateRoomModal = ({ isOpen, onClose, onCreateRoom }) => {
                     </p>
                   </div>
 
+                  {/* Выбор цвета */}
+                  <div>
+                    <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-300 mb-3">
+                      <Palette className="w-4 h-4" />
+                      Цвет комнаты
+                    </label>
+                    <div className="grid grid-cols-4 gap-2 sm:gap-3">
+                      {ROOM_COLORS.map((color) => {
+                        const isSelected = selectedColor === color.id;
+                        const colorScheme = getRoomColor(color.id);
+                        
+                        return (
+                          <motion.button
+                            key={color.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedColor(color.id);
+                              if (webApp?.HapticFeedback) {
+                                webApp.HapticFeedback.impactOccurred('light');
+                              }
+                            }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`
+                              relative p-3 sm:p-4 rounded-xl sm:rounded-2xl
+                              bg-gradient-to-br ${colorScheme.cardGradient}
+                              border-2 transition-all touch-manipulation
+                              ${isSelected 
+                                ? `${colorScheme.borderColor} shadow-lg ${colorScheme.shadowColor}` 
+                                : 'border-transparent opacity-60 hover:opacity-80'
+                              }
+                            `}
+                          >
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-2xl">{color.emoji}</span>
+                              <span className={`
+                                text-xs font-medium
+                                ${isSelected ? 'text-gray-900' : 'text-gray-600'}
+                              `}>
+                                {color.name}
+                              </span>
+                            </div>
+                            
+                            {isSelected && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="absolute -top-1 -right-1 w-5 h-5 
+                                         bg-white rounded-full shadow-md
+                                         flex items-center justify-center"
+                              >
+                                <div className="w-2 h-2 rounded-full"
+                                     style={{ backgroundColor: colorScheme.accentColor }}
+                                />
+                              </motion.div>
+                            )}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Информация */}
                   <div className="bg-blue-500/10 border border-blue-500/20 
                                  rounded-xl sm:rounded-2xl p-3 sm:p-4">
