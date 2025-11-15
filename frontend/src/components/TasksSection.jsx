@@ -1072,9 +1072,8 @@ const TodayTaskItem = ({
               <div className="flex-1 min-w-0">
                 <span 
                   onDoubleClick={() => {
-                    if (!task.completed) {
-                      onSaveEdit && onSaveEdit(task.id); // Сохраняем текущую задачу если она редактировалась
-                      onEdit && onEdit(task); // Переключаемся в inline режим
+                    if (!task.completed && onStartEdit) {
+                      onStartEdit(task); // Переключаемся в inline режим редактирования
                       hapticFeedback && hapticFeedback('selection');
                     }
                   }}
@@ -1085,7 +1084,7 @@ const TodayTaskItem = ({
                       : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
                     }
                   `}
-                  title={!task.completed ? "Двойной клик для редактирования" : ""}
+                  title={!task.completed ? "Двойной клик для быстрого редактирования текста" : ""}
                 >
                   {task.text}
                 </span>
