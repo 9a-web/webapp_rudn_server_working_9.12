@@ -611,11 +611,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
 const TasksTab = ({
   tasks,
   isLoading,
-  showAddTask,
-  newTaskTitle,
-  setNewTaskTitle,
-  setShowAddTask,
-  handleAddTask,
+  onOpenAddModal,
   handleToggleTask,
   handleEditTask,
   handleDeleteTask,
@@ -639,61 +635,18 @@ const TasksTab = ({
   return (
     <div className="space-y-4">
       {/* Кнопка добавления задачи */}
-      {!showAddTask ? (
-        <button
-          onClick={() => {
-            console.log('Add task button clicked');
-            setShowAddTask(true);
-          }}
-          type="button"
-          className={`w-full px-4 py-3 rounded-xl border-2 border-dashed 
-                   ${colorScheme.borderColor} hover:bg-gray-800
-                   text-gray-400 hover:text-gray-300
-                   transition-all touch-manipulation active:scale-95
-                   flex items-center justify-center gap-2 cursor-pointer`}
-        >
-          <Plus className="w-5 h-5" />
-          <span className="font-medium">Добавить задачу</span>
-        </button>
-      ) : (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newTaskTitle}
-            onChange={(e) => setNewTaskTitle(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddTask()}
-            placeholder="Название задачи..."
-            autoFocus
-            className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl
-                     text-white placeholder-gray-500
-                     focus:outline-none focus:ring-2 focus:ring-blue-500
-                     text-sm touch-manipulation"
-          />
-          <button
-            onClick={() => {
-              console.log('Plus button clicked');
-              handleAddTask();
-            }}
-            disabled={!newTaskTitle.trim()}
-            type="button"
-            className={`px-4 py-3 rounded-xl bg-gradient-to-r ${colorScheme.buttonGradient}
-                     text-white font-medium disabled:opacity-30 disabled:cursor-not-allowed
-                     transition-all active:scale-95 touch-manipulation cursor-pointer`}
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => {
-              setShowAddTask(false);
-              setNewTaskTitle('');
-            }}
-            className="px-4 py-3 rounded-xl bg-gray-800 text-gray-400
-                     hover:bg-gray-750 transition-all active:scale-95 touch-manipulation"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+      <button
+        onClick={onOpenAddModal}
+        type="button"
+        className={`w-full px-4 py-3 rounded-xl border-2 border-dashed 
+                 ${colorScheme.borderColor} hover:bg-gray-800
+                 text-gray-400 hover:text-gray-300
+                 transition-all touch-manipulation active:scale-95
+                 flex items-center justify-center gap-2 cursor-pointer`}
+      >
+        <Plus className="w-5 h-5" />
+        <span className="font-medium">Добавить задачу</span>
+      </button>
 
       {/* Список задач */}
       {tasks.length === 0 ? (
