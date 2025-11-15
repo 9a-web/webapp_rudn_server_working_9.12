@@ -76,7 +76,7 @@ const RoomCard = ({ room, onClick }) => {
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-xs font-bold text-blue-600">
+              <span className="text-xs font-bold" style={{ color: colorScheme.accentColor }}>
                 {completion_percentage}%
               </span>
             </div>
