@@ -603,7 +603,6 @@ class RoomJoinRequest(BaseModel):
 
 class RoomTaskCreate(BaseModel):
     """Запрос создания задачи в комнате"""
-    room_id: str
     title: str
     description: Optional[str] = None
     deadline: Optional[datetime] = None
