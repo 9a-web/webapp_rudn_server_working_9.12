@@ -574,6 +574,14 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
         </div>
       </AnimatePresence>
 
+      {/* Add Room Task Modal */}
+      <AddRoomTaskModal
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        onAddTask={handleAddTask}
+        roomColor={room?.color}
+      />
+
       {/* Edit Task Modal */}
       {editingTask && (
         <EditRoomTaskModal
