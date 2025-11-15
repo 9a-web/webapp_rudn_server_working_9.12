@@ -204,29 +204,22 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
     }
   };
 
-  const handleAddTask = async () => {
-    console.log('handleAddTask called', { newTaskTitle, room, userSettings });
-    
-    if (!newTaskTitle.trim()) {
-      console.log('Task title is empty');
-      return;
-    }
+  const handleAddTask = async (taskData) => {
+    console.log('handleAddTask called', { taskData, room, userSettings });
     
     if (!room || !userSettings) {
       console.error('Missing room or userSettings', { room, userSettings });
-      return;
+      throw new Error('Отсутствуют данные комнаты или пользователя');
     }
 
     try {
       console.log('Creating room task...');
       const result = await createRoomTask(room.room_id, {
-        title: newTaskTitle.trim(),
+        ...taskData,
         telegram_id: userSettings.telegram_id
       });
       console.log('Task created successfully:', result);
 
-      setNewTaskTitle('');
-      setShowAddTask(false);
       await loadRoomTasks();
 
       if (webApp?.HapticFeedback) {
@@ -234,10 +227,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
       }
     } catch (error) {
       console.error('Error adding task:', error);
-      alert('Ошибка при создании задачи: ' + (error.response?.data?.detail || error.message));
-      if (webApp?.HapticFeedback) {
-        webApp.HapticFeedback.notificationOccurred('error');
-      }
+      throw error; // Пробрасываем ошибку в модальное окно
     }
   };
 
