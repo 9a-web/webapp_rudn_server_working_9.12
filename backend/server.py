@@ -1522,6 +1522,72 @@ async def get_room_detail(room_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def send_room_join_notifications_api(room_doc: dict, new_user_name: str, new_user_id: int):
+    """
+    Отправляет уведомления всем участникам комнаты и новому участнику о вступлении
+    """
+    try:
+        from telegram import Bot
+        
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        if not bot_token:
+            logger.warning("⚠️ TELEGRAM_BOT_TOKEN не настроен, уведомления не отправлены")
+            return
+        
+        bot = Bot(token=bot_token)
+        room_name = room_doc.get("name", "комнату")
+        participants = room_doc.get("participants", [])
+        
+        # Отправляем уведомление новому участнику
+        try:
+            new_member_message = f"""🎉 <b>Добро пожаловать в комнату!</b>
+
+📋 Комната: <b>{room_name}</b>
+👥 Участников: {len(participants)}
+
+✅ Вы успешно присоединились к командной комнате для совместного выполнения задач!
+
+<i>Откройте приложение, чтобы увидеть задачи комнаты 👇</i>"""
+            
+            await bot.send_message(
+                chat_id=new_user_id,
+                text=new_member_message,
+                parse_mode='HTML'
+            )
+            logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось отправить уведомление новому участнику {new_user_id}: {e}")
+        
+        # Отправляем уведомления всем существующим участникам (кроме нового)
+        for participant in participants:
+            participant_id = participant.get("telegram_id")
+            
+            # Пропускаем нового участника
+            if participant_id == new_user_id:
+                continue
+            
+            try:
+                existing_member_message = f"""👋 <b>Новый участник в комнате!</b>
+
+📋 Комната: <b>{room_name}</b>
+✨ К команде присоединился: <b>{new_user_name}</b>
+👥 Всего участников: {len(participants)}
+
+<i>Продолжайте выполнять задачи вместе! 💪</i>"""
+                
+                await bot.send_message(
+                    chat_id=participant_id,
+                    text=existing_member_message,
+                    parse_mode='HTML'
+                )
+                logger.info(f"✅ Отправлено уведомление участнику {participant_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось отправить уведомление участнику {participant_id}: {e}")
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке уведомлений о присоединении к комнате: {e}")
+
+
 @api_router.post("/rooms/{room_id}/invite-link", response_model=RoomInviteLinkResponse)
 async def generate_room_invite_link(room_id: str, telegram_id: int = Body(..., embed=True)):
     """Сгенерировать ссылку-приглашение в комнату"""
