@@ -116,9 +116,30 @@ export const LiveScheduleSection = ({
     return { status: t('classStatus.upcoming'), color: '#FF6B6B' };
   };
 
-  const toggleExpand = (index) => {
+  const toggleExpand = async (index) => {
     if (hapticFeedback) hapticFeedback('selection');
+    
+    const isExpanding = expandedIndex !== index;
     setExpandedIndex(expandedIndex === index ? null : index);
+    
+    // 🔍 ТРЕКИНГ ДЕТАЛЬНОГО ПРОСМОТРА
+    // Считаем только когда карточка разворачивается (не сворачивается)
+    if (isExpanding && telegramId) {
+      try {
+        const result = await achievementsAPI.trackAction(telegramId, 'detailed_view', {
+          schedule_index: index,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Если есть новые достижения, можно показать уведомление
+        // (обрабатывается в родительском компоненте через onNewAchievement)
+        if (result.new_achievements && result.new_achievements.length > 0) {
+          console.log('🎉 Новое достижение за детальный просмотр!', result.new_achievements[0]);
+        }
+      } catch (error) {
+        console.error('Ошибка трекинга детального просмотра:', error);
+      }
+    }
   };
   
   // Навигация между днями
