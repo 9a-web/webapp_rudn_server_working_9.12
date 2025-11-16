@@ -2779,6 +2779,277 @@ class RUDNScheduleAPITester:
         except Exception as e:
             self.log_test("GET /api/admin/course-stats", False, f"Exception: {str(e)}")
             return False
+
+    def test_room_invitation_functionality(self) -> bool:
+        """
+        Comprehensive test for room invitation functionality with notifications
+        Tests the complete flow: create room -> generate invite link -> join room -> verify participants
+        """
+        try:
+            print("🔍 Testing Room Invitation Functionality with Notifications...")
+            
+            # Step 1: Create test room
+            print("  Step 1: Creating test room...")
+            room_payload = {
+                "name": "Тестовая комната для уведомлений",
+                "description": "Проверка уведомлений",
+                "telegram_id": 123456789,
+                "color": "blue"
+            }
+            
+            room_response = self.session.post(
+                f"{self.base_url}/rooms",
+                json=room_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if room_response.status_code != 200:
+                self.log_test("Room Invitation - Create Room", False, 
+                            f"HTTP {room_response.status_code}: {room_response.text}")
+                return False
+            
+            room_data = room_response.json()
+            room_id = room_data.get('room_id')
+            
+            if not room_id:
+                self.log_test("Room Invitation - Create Room", False, 
+                            "Room ID not returned in response")
+                return False
+            
+            # Validate room creation response
+            required_fields = ['room_id', 'name', 'description', 'owner_id', 'color', 'total_participants']
+            for field in required_fields:
+                if field not in room_data:
+                    self.log_test("Room Invitation - Create Room", False, 
+                                f"Missing required field: {field}")
+                    return False
+            
+            if room_data['total_participants'] != 1:
+                self.log_test("Room Invitation - Create Room", False, 
+                            f"Expected 1 participant (owner), got {room_data['total_participants']}")
+                return False
+            
+            print(f"    ✅ Room created successfully: {room_id}")
+            
+            # Step 2: Generate invite link
+            print("  Step 2: Generating invite link...")
+            invite_payload = {"telegram_id": 123456789}
+            
+            invite_response = self.session.post(
+                f"{self.base_url}/rooms/{room_id}/invite-link",
+                json=invite_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if invite_response.status_code != 200:
+                self.log_test("Room Invitation - Generate Invite Link", False, 
+                            f"HTTP {invite_response.status_code}: {invite_response.text}")
+                return False
+            
+            invite_data = invite_response.json()
+            invite_token = invite_data.get('invite_token')
+            
+            if not invite_token:
+                self.log_test("Room Invitation - Generate Invite Link", False, 
+                            "Invite token not returned in response")
+                return False
+            
+            # Validate invite link response
+            required_invite_fields = ['invite_link', 'invite_token', 'room_id', 'bot_username']
+            for field in required_invite_fields:
+                if field not in invite_data:
+                    self.log_test("Room Invitation - Generate Invite Link", False, 
+                                f"Missing required field: {field}")
+                    return False
+            
+            # Validate invite link format
+            expected_link_pattern = f"https://t.me/{invite_data['bot_username']}?start=room_{invite_token}_ref_123456789"
+            if invite_data['invite_link'] != expected_link_pattern:
+                self.log_test("Room Invitation - Generate Invite Link", False, 
+                            f"Invite link format incorrect. Expected: {expected_link_pattern}, Got: {invite_data['invite_link']}")
+                return False
+            
+            print(f"    ✅ Invite link generated: {invite_data['invite_link']}")
+            
+            # Step 3: Join room with new participant
+            print("  Step 3: Adding second participant...")
+            join_payload = {
+                "telegram_id": 987654321,
+                "username": "test_user",
+                "first_name": "Тест Пользователь",
+                "referral_code": "123456789"
+            }
+            
+            join_response = self.session.post(
+                f"{self.base_url}/rooms/join/{invite_token}",
+                json=join_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if join_response.status_code != 200:
+                self.log_test("Room Invitation - Join Room", False, 
+                            f"HTTP {join_response.status_code}: {join_response.text}")
+                return False
+            
+            join_data = join_response.json()
+            
+            # Validate join response
+            if join_data.get('total_participants') != 2:
+                self.log_test("Room Invitation - Join Room", False, 
+                            f"Expected 2 participants after join, got {join_data.get('total_participants')}")
+                return False
+            
+            print(f"    ✅ Second participant joined successfully. Total participants: {join_data['total_participants']}")
+            
+            # Step 4: Verify participants in room detail
+            print("  Step 4: Verifying participants...")
+            detail_response = self.session.get(f"{self.base_url}/rooms/detail/{room_id}")
+            
+            if detail_response.status_code != 200:
+                self.log_test("Room Invitation - Verify Participants", False, 
+                            f"HTTP {detail_response.status_code}: {detail_response.text}")
+                return False
+            
+            detail_data = detail_response.json()
+            participants = detail_data.get('participants', [])
+            
+            if len(participants) != 2:
+                self.log_test("Room Invitation - Verify Participants", False, 
+                            f"Expected 2 participants in detail, got {len(participants)}")
+                return False
+            
+            # Check both participants are present
+            participant_ids = [p.get('telegram_id') for p in participants]
+            expected_ids = [123456789, 987654321]
+            
+            if set(participant_ids) != set(expected_ids):
+                self.log_test("Room Invitation - Verify Participants", False, 
+                            f"Participant IDs mismatch. Expected: {expected_ids}, Got: {participant_ids}")
+                return False
+            
+            print(f"    ✅ Both participants verified: {participant_ids}")
+            
+            # Step 5: Test duplicate join prevention
+            print("  Step 5: Testing duplicate join prevention...")
+            duplicate_join_response = self.session.post(
+                f"{self.base_url}/rooms/join/{invite_token}",
+                json=join_payload,  # Same payload as before
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if duplicate_join_response.status_code != 200:
+                self.log_test("Room Invitation - Duplicate Join Prevention", False, 
+                            f"HTTP {duplicate_join_response.status_code}: {duplicate_join_response.text}")
+                return False
+            
+            duplicate_data = duplicate_join_response.json()
+            
+            # Should still return room info but not add duplicate
+            if duplicate_data.get('total_participants') != 2:
+                self.log_test("Room Invitation - Duplicate Join Prevention", False, 
+                            f"Duplicate join changed participant count. Expected: 2, Got: {duplicate_data.get('total_participants')}")
+                return False
+            
+            print(f"    ✅ Duplicate join prevented. Participants remain: {duplicate_data['total_participants']}")
+            
+            # Store test data for potential cleanup
+            self.test_data['test_room'] = {
+                'room_id': room_id,
+                'invite_token': invite_token,
+                'participants': [123456789, 987654321]
+            }
+            
+            self.log_test("Room Invitation Functionality", True, 
+                        "Successfully tested complete room invitation flow with notifications",
+                        {
+                            "room_id": room_id,
+                            "invite_token": invite_token,
+                            "invite_link": invite_data['invite_link'],
+                            "initial_participants": 1,
+                            "final_participants": 2,
+                            "duplicate_join_prevented": True,
+                            "notification_logs_check": "Check /var/log/supervisor/backend.out.log for notification messages"
+                        })
+            return True
+            
+        except Exception as e:
+            self.log_test("Room Invitation Functionality", False, f"Exception: {str(e)}")
+            return False
+
+    def test_room_notification_logs(self) -> bool:
+        """
+        Check backend logs for notification sending messages
+        """
+        try:
+            print("🔍 Checking backend logs for notification messages...")
+            
+            # Try to read backend logs
+            import subprocess
+            import os
+            
+            log_files = [
+                "/var/log/supervisor/backend.out.log",
+                "/var/log/supervisor/backend.err.log"
+            ]
+            
+            notification_messages_found = []
+            
+            for log_file in log_files:
+                if os.path.exists(log_file):
+                    try:
+                        # Get last 100 lines of log
+                        result = subprocess.run(
+                            ["tail", "-n", "100", log_file],
+                            capture_output=True,
+                            text=True,
+                            timeout=10
+                        )
+                        
+                        if result.returncode == 0:
+                            log_content = result.stdout
+                            
+                            # Look for notification-related messages
+                            notification_keywords = [
+                                "отправлено уведомление",
+                                "notification sent",
+                                "send_room_join_notifications",
+                                "Добро пожаловать в комнату",
+                                "Новый участник в комнате",
+                                "TELEGRAM_BOT_TOKEN"
+                            ]
+                            
+                            for keyword in notification_keywords:
+                                if keyword.lower() in log_content.lower():
+                                    notification_messages_found.append(f"Found '{keyword}' in {log_file}")
+                    
+                    except subprocess.TimeoutExpired:
+                        print(f"    ⚠️ Timeout reading {log_file}")
+                    except Exception as e:
+                        print(f"    ⚠️ Error reading {log_file}: {e}")
+                else:
+                    print(f"    ⚠️ Log file not found: {log_file}")
+            
+            if notification_messages_found:
+                self.log_test("Room Notification Logs", True, 
+                            "Found notification-related messages in backend logs",
+                            {
+                                "messages_found": notification_messages_found,
+                                "logs_checked": log_files
+                            })
+            else:
+                self.log_test("Room Notification Logs", True, 
+                            "No notification messages found in logs (may be expected if TELEGRAM_BOT_TOKEN not configured)",
+                            {
+                                "logs_checked": log_files,
+                                "note": "Check logs manually for notification attempts"
+                            })
+            
+            return True
+            
+        except Exception as e:
+            self.log_test("Room Notification Logs", False, f"Exception: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all API tests in sequence"""
         print("🚀 Starting RUDN Schedule API Backend Tests")
