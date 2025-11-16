@@ -83,32 +83,34 @@ const WelcomeScreen = ({ onGetStarted }) => {
       </div>
 
       {/* Get Started Button */}
-      <motion.button
-        onClick={handleGetStarted}
-        className="relative w-full max-w-sm bg-[#A3F7BF] text-black font-semibold text-lg py-4 rounded-full shadow-lg overflow-hidden z-10"
-        style={{
-          boxShadow: '0 10px 30px rgba(163, 247, 191, 0.4), 0 0 20px rgba(163, 247, 191, 0.3)'
-        }}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.6 }}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          animate={{
-            x: ['-100%', '100%'],
+      <div className="w-full px-6 pb-12 z-10">
+        <motion.button
+          onClick={handleGetStarted}
+          className="relative w-full max-w-sm mx-auto block bg-[#A3F7BF] text-black font-semibold text-lg py-4 rounded-full shadow-lg overflow-hidden"
+          style={{
+            boxShadow: '0 10px 30px rgba(163, 247, 191, 0.4), 0 0 20px rgba(163, 247, 191, 0.3)'
           }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "linear",
-            repeatDelay: 1
-          }}
-        />
-        <span className="relative z-10">Get Started</span>
-      </motion.button>
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+            animate={{
+              x: ['-100%', '100%'],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "linear",
+              repeatDelay: 1
+            }}
+          />
+          <span className="relative z-10">Get Started</span>
+        </motion.button>
+      </div>
     </div>
   );
 };
