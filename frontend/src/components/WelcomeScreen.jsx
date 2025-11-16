@@ -49,7 +49,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
       </div>
 
       {/* Centered Content Container */}
-      <div className="flex flex-col items-center justify-center gap-6 sm:gap-8 md:gap-10 w-full max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl z-10">
+      <div className="flex flex-col items-center justify-center gap-6 sm:gap-8 md:gap-10 w-full max-w-[490px] sm:max-w-md md:max-w-lg lg:max-w-xl z-10">
         
         {/* Let's go logo - Fixed 470px on mobile, responsive on other devices */}
         <motion.div
