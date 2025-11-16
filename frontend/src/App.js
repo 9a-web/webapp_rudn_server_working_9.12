@@ -127,17 +127,17 @@ const Home = () => {
         setUserSettings(settings);
       } else if (settings) {
         // Пользователь существует, но у него неполные настройки
-        console.log('User has incomplete settings, showing group selector');
-        setShowGroupSelector(true);
+        console.log('User has incomplete settings, showing welcome screen');
+        setShowWelcomeScreen(true);
       } else {
         // Пользователь не найден
-        setShowGroupSelector(true);
+        setShowWelcomeScreen(true);
       }
     } catch (err) {
       console.error('Error loading user data:', err);
-      // Если пользователь не найден (404), показываем селектор группы
+      // Если пользователь не найден (404), показываем welcome screen
       if (err.message === 'Пользователь не найден') {
-        setShowGroupSelector(true);
+        setShowWelcomeScreen(true);
       } else {
         setError(err.message);
       }
