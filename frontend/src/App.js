@@ -456,6 +456,16 @@ const Home = () => {
     setActiveTab(newTab);
   };
 
+  const handleWelcomeGetStarted = () => {
+    setShowWelcomeScreen(false);
+    setShowGroupSelector(true);
+  };
+
+  // Показываем Welcome Screen
+  if (showWelcomeScreen) {
+    return <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />;
+  }
+
   // Показываем GroupSelector
   if (showGroupSelector) {
     return (
