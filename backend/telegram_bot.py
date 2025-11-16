@@ -334,6 +334,28 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Проверяем, существует ли пользователь в БД
         existing_user = await db.user_settings.find_one({"telegram_id": telegram_id})
         
+        # Обрабатываем приглашение в комнату (если есть)
+        room_join_data = None
+        if room_invite_token:
+            room_join_data = await join_user_to_room(
+                telegram_id=telegram_id,
+                username=username,
+                first_name=first_name,
+                invite_token=room_invite_token,
+                referrer_id=room_referrer_id
+            )
+            
+            if room_join_data and room_join_data.get("is_new_member"):
+                # Отправляем уведомления всем участникам комнаты
+                from telegram import Bot
+                bot = Bot(token=TELEGRAM_BOT_TOKEN)
+                await send_room_join_notifications(
+                    bot=bot,
+                    room_data=room_join_data,
+                    new_user_name=first_name,
+                    new_user_id=telegram_id
+                )
+        
         if not existing_user:
             # Создаем нового пользователя
             import uuid
