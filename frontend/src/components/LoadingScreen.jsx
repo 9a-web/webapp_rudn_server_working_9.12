@@ -48,7 +48,7 @@ export const LoadingScreen = ({ message = 'Загрузка...' }) => {
           
           {/* Логотип */}
           <motion.img
-            src="/LogoRudn.png"
+            src="/logorudn.svg"
             alt="RUDN Logo"
             className="relative w-24 h-24 md:w-32 md:h-32 object-contain"
             animate={{ 
