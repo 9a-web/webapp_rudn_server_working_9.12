@@ -111,6 +111,7 @@ class RoomInvitationTester:
             # Step 3: Add second participant (join room)
             print("👥 Step 3: Adding second participant...")
             join_payload = {
+                "invite_token": invite_token,
                 "telegram_id": 987654321,
                 "username": "test_user", 
                 "first_name": "Тест Пользователь",
