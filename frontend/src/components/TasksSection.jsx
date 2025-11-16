@@ -893,50 +893,52 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         {/* Все задачи отображаются только в карточке выше */}
       </div>
 
-      {/* Секция комнат */}
-      <div className="mt-6 space-y-4">
-        <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-          <Users className="w-5 h-5 text-blue-500" />
-          Комнаты
-        </h2>
-        
-        {/* Горизонтальный скролл с комнатами */}
-        <div className="flex gap-3 overflow-x-auto py-2 scrollbar-hide 
-                      -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory touch-pan-x">
-          {rooms.map((room) => (
-            <RoomCard
-              key={room.room_id}
-              room={room}
-              onClick={() => handleRoomClick(room)}
-            />
-          ))}
+      {/* Секция комнат (СКРЫТО: измените SHOW_ROOMS_FEATURE на true, чтобы показать) */}
+      {SHOW_ROOMS_FEATURE && (
+        <div className="mt-6 space-y-4">
+          <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <Users className="w-5 h-5 text-blue-500" />
+            Комнаты
+          </h2>
           
-          {/* Кнопка создания комнаты */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              setIsCreateRoomModalOpen(true);
-              hapticFeedback && hapticFeedback('impact', 'light');
-            }}
-            className="flex-shrink-0 w-[160px] h-[200px] bg-gradient-to-br from-gray-100 to-gray-50 
-                       rounded-[24px] p-4 cursor-pointer shadow-lg shadow-gray-500/10 
-                       border-2 border-dashed border-gray-300 hover:border-blue-400
-                       flex flex-col items-center justify-center gap-3 transition-colors snap-start"
-          >
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 
-                           rounded-full flex items-center justify-center shadow-lg">
-              <Plus className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-sm font-medium text-gray-600 text-center">
-              Создать<br />комнату
-            </span>
-          </motion.div>
+          {/* Горизонтальный скролл с комнатами */}
+          <div className="flex gap-3 overflow-x-auto py-2 scrollbar-hide 
+                        -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory touch-pan-x">
+            {rooms.map((room) => (
+              <RoomCard
+                key={room.room_id}
+                room={room}
+                onClick={() => handleRoomClick(room)}
+              />
+            ))}
+            
+            {/* Кнопка создания комнаты */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setIsCreateRoomModalOpen(true);
+                hapticFeedback && hapticFeedback('impact', 'light');
+              }}
+              className="flex-shrink-0 w-[160px] h-[200px] bg-gradient-to-br from-gray-100 to-gray-50 
+                         rounded-[24px] p-4 cursor-pointer shadow-lg shadow-gray-500/10 
+                         border-2 border-dashed border-gray-300 hover:border-blue-400
+                         flex flex-col items-center justify-center gap-3 transition-colors snap-start"
+            >
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 
+                             rounded-full flex items-center justify-center shadow-lg">
+                <Plus className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-sm font-medium text-gray-600 text-center">
+                Создать<br />комнату
+              </span>
+            </motion.div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Модальное окно добавления задачи */}
       <AddTaskModal
