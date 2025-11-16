@@ -756,3 +756,68 @@ class CourseStats(BaseModel):
     course: str
     users_count: int
 
+
+# ============ Модели для реферальной системы ============
+
+class ReferralUser(BaseModel):
+    """Информация о реферале"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    registered_at: datetime
+    level: int  # уровень в реферальной цепочке (1, 2, 3)
+    total_points: int = 0  # сколько баллов заработал сам реферал
+    points_earned_for_referrer: int = 0  # сколько баллов принёс пригласившему
+
+
+class ReferralStats(BaseModel):
+    """Статистика по рефералам"""
+    telegram_id: int
+    referral_code: str
+    referral_link: str
+    
+    # Статистика по уровням
+    level_1_count: int = 0  # прямые рефералы (50%)
+    level_2_count: int = 0  # рефералы второго уровня (25%)
+    level_3_count: int = 0  # рефералы третьего уровня (10%)
+    
+    # Заработанные баллы
+    total_referral_points: int = 0  # всего заработано баллов с рефералов
+    level_1_points: int = 0  # заработано с 1 уровня
+    level_2_points: int = 0  # заработано со 2 уровня
+    level_3_points: int = 0  # заработано с 3 уровня
+    
+    # Списки рефералов по уровням
+    level_1_referrals: List[ReferralUser] = []
+    level_2_referrals: List[ReferralUser] = []
+    level_3_referrals: List[ReferralUser] = []
+
+
+class ReferralTreeNode(BaseModel):
+    """Узел дерева рефералов"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    level: int
+    total_points: int
+    children: List['ReferralTreeNode'] = []
+    registered_at: datetime
+
+
+class ReferralCodeResponse(BaseModel):
+    """Ответ с реферальным кодом"""
+    referral_code: str
+    referral_link: str
+    bot_username: str
+
+
+class ReferralConnection(BaseModel):
+    """Связь между пользователем и пригласившим"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    referrer_telegram_id: int  # кто пригласил
+    referred_telegram_id: int  # кого пригласили
+    level: int  # уровень в цепочке от root referrer (1, 2, 3)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    points_earned: int = 0  # сколько баллов referrer заработал с этого реферала
+
