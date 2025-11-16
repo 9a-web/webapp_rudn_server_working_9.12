@@ -246,7 +246,7 @@ async def check_and_award_achievements(db, telegram_id: int, stats: UserStats) -
                     earned = True
         elif achievement_id == "perfectionist":
             # Проверяем, что получены все остальные достижения
-            if len(existing_ids) >= 14:  # Все кроме самого перфекциониста
+            if len(existing_ids) >= 15:  # Все кроме самого перфекциониста (16 - 1)
                 earned = True
         
         # Если заработано, добавляем
