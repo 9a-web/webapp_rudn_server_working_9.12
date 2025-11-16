@@ -64,6 +64,11 @@
     /* Эти переменные будут установлены из JavaScript (TelegramContext.js) */
     --tg-viewport-height: 100vh;  /* Фактическая высота viewport в Telegram */
     --tg-viewport-stable-height: 100vh;  /* Стабильная высота (не меняется при клавиатуре) */
+    
+    /* 📱 Safe Area для fullscreen mode (iOS notch, системные кнопки Telegram) */
+    --safe-area-top: env(safe-area-inset-top, 0px);  /* iOS notch/dynamic island */
+    --telegram-header-offset: 10px;  /* Дополнительный отступ для кнопок закрытия Telegram */
+    --header-safe-padding: calc(var(--safe-area-top) + var(--telegram-header-offset));
   }
 }
 
