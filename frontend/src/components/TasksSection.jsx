@@ -105,7 +105,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   // Уведомляем родительский компонент об изменении состояния модальных окон
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(isAddModalOpen || isEditModalOpen || isCreateRoomModalOpen || isRoomDetailModalOpen);
+      const roomModals = SHOW_ROOMS_FEATURE ? (isCreateRoomModalOpen || isRoomDetailModalOpen) : false;
+      onModalStateChange(isAddModalOpen || isEditModalOpen || roomModals);
     }
   }, [isAddModalOpen, isEditModalOpen, isCreateRoomModalOpen, isRoomDetailModalOpen, onModalStateChange]);
 
