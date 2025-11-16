@@ -48,22 +48,23 @@ const WelcomeScreen = ({ onGetStarted }) => {
         />
       </div>
 
+      {/* Let's go logo - Full width */}
+      <motion.div
+        className="w-full mb-8 z-10"
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      >
+        <img 
+          src="/letsgo.png"
+          alt="Let's go"
+          className="w-full h-auto object-cover"
+          style={{ maxHeight: '300px' }}
+        />
+      </motion.div>
+
       {/* Content Container */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md z-10">
-        {/* Let's go logo */}
-        <motion.div
-          className="w-full mb-12"
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        >
-          <img 
-            src="/letsgo.png"
-            alt="Let's go"
-            className="w-full h-auto object-contain"
-            style={{ maxHeight: '200px' }}
-          />
-        </motion.div>
 
         {/* Ready text image - Manage your RUDN schedule */}
         <motion.div
