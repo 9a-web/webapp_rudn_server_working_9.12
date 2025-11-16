@@ -50,6 +50,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     Обработчик команды /start
     - Проверяет наличие пользователя в БД
     - Создает нового пользователя при первом запуске
+    - Обрабатывает реферальные ссылки (ref_CODE)
     - Отправляет приветственное сообщение
     - Добавляет кнопку для открытия Web App
     """
@@ -63,6 +64,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     username = user.username
     first_name = user.first_name or ""
     last_name = user.last_name or ""
+    
+    # Проверяем наличие реферального кода в параметрах
+    referral_code = None
+    if context.args and len(context.args) > 0:
+        arg = context.args[0]
+        if arg.startswith("ref_"):
+            referral_code = arg[4:]  # Убираем префикс "ref_"
+            logger.info(f"🔗 Обнаружен реферальный код: {referral_code}")
     
     logger.info(f"Команда /start от пользователя: {telegram_id} (@{username})")
     
@@ -83,14 +92,58 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 "updated_at": datetime.utcnow(),
                 "last_activity": datetime.utcnow(),
                 "notifications_enabled": False,
-                "notification_time": 10
+                "notification_time": 10,
+                "referral_points_earned": 0
             }
+            
+            # Обрабатываем реферальный код если он есть
+            if referral_code:
+                # Ищем пользователя по реферальному коду
+                referrer = await db.user_settings.find_one({"referral_code": referral_code})
+                
+                if referrer and referrer["telegram_id"] != telegram_id:
+                    referrer_id = referrer["telegram_id"]
+                    new_user["referred_by"] = referrer_id
+                    logger.info(f"✅ Пользователь {telegram_id} приглашён пользователем {referrer_id}")
+                    
+                    # Создаём реферальные связи (до 3 уровней)
+                    await create_referral_connections(telegram_id, referrer_id)
+                    
+                    # Начисляем бонус за приглашение (базовое количество баллов)
+                    bonus_points = 100  # бонус за каждого нового реферала
+                    await award_referral_bonus(referrer_id, telegram_id, bonus_points, 1)
+                    
+                    # Уведомляем пригласившего (опционально)
+                    try:
+                        from telegram import Bot
+                        bot = Bot(token=TELEGRAM_BOT_TOKEN)
+                        referrer_name = f"{first_name} {last_name}".strip()
+                        await bot.send_message(
+                            chat_id=referrer_id,
+                            text=f"🎉 Отличные новости!\n\n<b>{referrer_name}</b> присоединился по вашей реферальной ссылке!\n\n💰 Вы получили <b>{bonus_points} баллов</b>",
+                            parse_mode='HTML'
+                        )
+                    except Exception as e:
+                        logger.warning(f"Не удалось отправить уведомление пригласившему: {e}")
+                else:
+                    logger.warning(f"⚠️ Реферальный код {referral_code} не найден или некорректен")
             
             await db.user_settings.insert_one(new_user)
             logger.info(f"✅ Создан новый пользователь: {telegram_id} (@{username})")
             
             # Приветственное сообщение для нового пользователя
-            welcome_text = f"""🎓 Привет, {first_name}! Добро пожаловать в <b>RUDN Go</b>!
+            if referral_code and new_user.get("referred_by"):
+                referrer_info = await db.user_settings.find_one({"telegram_id": new_user["referred_by"]})
+                referrer_name = referrer_info.get("first_name", "друг") if referrer_info else "друг"
+                welcome_text = f"""🎓 Привет, {first_name}! Добро пожаловать в <b>RUDN Go</b>!
+
+🎁 Вы присоединились по приглашению <b>{referrer_name}</b>!
+
+🚀 <b>Твой персональный помощник в учебе</b>
+
+<i>Нажимай кнопку ниже, чтобы начать! 👇</i>"""
+            else:
+                welcome_text = f"""🎓 Привет, {first_name}! Добро пожаловать в <b>RUDN Go</b>!
 
 🚀 <b>Твой персональный помощник в учебе</b>
 
