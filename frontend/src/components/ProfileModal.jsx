@@ -1,5 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link2, Copy, Users, TrendingUp, Award, ChevronRight } from 'lucide-react';
+import { getReferralCode, getReferralStats } from '../services/referralAPI';
+import { ReferralTree } from './ReferralTree';
 
 export const ProfileModal = ({ 
   isOpen, 
@@ -10,6 +13,11 @@ export const ProfileModal = ({
   hapticFeedback 
 }) => {
   const modalRef = useRef(null);
+  const [referralData, setReferralData] = useState(null);
+  const [referralStats, setReferralStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showReferrals, setShowReferrals] = useState(false);
 
   // Закрытие при клике вне модального окна
   useEffect(() => {
