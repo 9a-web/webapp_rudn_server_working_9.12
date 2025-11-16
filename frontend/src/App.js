@@ -269,12 +269,13 @@ const Home = () => {
     }
   };
 
-  // Отслеживание просмотра расписания при загрузке
-  useEffect(() => {
-    if (schedule.length > 0 && user) {
-      trackScheduleView();
-    }
-  }, [schedule]);
+  // ❌ УБРАНО: Автоматический подсчет просмотров при загрузке расписания
+  // Теперь просмотры считаются только при развертывании карточек (detailed_view)
+  // useEffect(() => {
+  //   if (schedule.length > 0 && user) {
+  //     trackScheduleView();
+  //   }
+  // }, [schedule]);
 
   const updateCurrentClass = useCallback(() => {
     const now = new Date();
