@@ -33,21 +33,126 @@
 - ✅ Весь код backend для комнат (/app/backend/models.py, /app/backend/server.py)
 - ✅ Все API endpoints комнат (POST /api/rooms, GET /api/rooms/{telegram_id}, etc.)
 
-### Как вернуть функцию комнат:
+### Как вернуть функцию комнат (БЕЗ ПОТЕРИ РАБОТОСПОСОБНОСТИ):
 
-Чтобы снова показать функцию комнат, нужно изменить **ОДНУ СТРОКУ** в файле:
-`/app/frontend/src/components/TasksSection.jsx`
+#### Шаг 1: Изменить константу-переключатель
+
+Откройте файл `/app/frontend/src/components/TasksSection.jsx` и найдите строку 21:
 
 ```javascript
-// Было:
+// БЫЛО (функция скрыта):
 const SHOW_ROOMS_FEATURE = false;
 
-// Изменить на:
+// ИЗМЕНИТЬ НА (функция включена):
 const SHOW_ROOMS_FEATURE = true;
 ```
 
-После изменения перезапустить frontend:
+#### Шаг 2: Проверить компиляцию frontend
+
 ```bash
+cd /app/frontend
+yarn build
+```
+
+✅ **Ожидаемый результат:** "Creating an optimized production build..." без ошибок
+
+❌ **Если есть ошибки:** Проверьте, что все импорты комнат на месте (строки 14-17):
+```javascript
+import RoomCard from './RoomCard';
+import CreateRoomModal from './CreateRoomModal';
+import RoomDetailModal from './RoomDetailModal';
+import * as roomsAPI from '../services/roomsAPI';
+```
+
+#### Шаг 3: Перезапустить frontend
+
+```bash
+sudo supervisorctl restart frontend
+```
+
+Подождите 5-10 секунд для запуска.
+
+#### Шаг 4: Проверить статус сервисов
+
+```bash
+sudo supervisorctl status
+```
+
+✅ **Все должно быть RUNNING:**
+- frontend - RUNNING
+- backend - RUNNING
+- mongodb - RUNNING
+
+#### Шаг 5: Проверить работоспособность в интерфейсе
+
+1. Откройте приложение в браузере
+2. Перейдите в раздел "Список дел" (вторая кнопка в нижнем меню)
+3. Прокрутите вниз - должна появиться секция **"Комнаты"**
+4. Проверьте наличие элементов:
+   - ✅ Заголовок "Комнаты" с иконкой Users (синяя)
+   - ✅ Кнопка "Создать комнату" (серая с пунктирной рамкой)
+   - ✅ Список существующих комнат (если они были созданы ранее)
+
+#### Шаг 6: Проверить функциональность
+
+**Тест 1: Создание комнаты**
+1. Нажмите "Создать комнату"
+2. Заполните название (обязательно)
+3. Добавьте описание (опционально)
+4. Выберите цвет
+5. Нажмите "Создать комнату"
+6. ✅ Комната должна появиться в списке
+
+**Тест 2: Открытие комнаты**
+1. Нажмите на карточку созданной комнаты
+2. ✅ Должно открыться модальное окно с деталями комнаты
+3. ✅ Видны участники, задачи комнаты, кнопка генерации ссылки-приглашения
+
+**Тест 3: Backend API (опционально)**
+```bash
+# Проверить доступность API комнат
+curl http://localhost:8001/api/rooms/123456789
+```
+✅ Должен вернуть JSON с комнатами или пустой массив
+
+#### Возможные проблемы и решения:
+
+**Проблема 1:** Frontend не компилируется
+- **Решение:** Проверьте, что все файлы компонентов комнат на месте:
+  - `/app/frontend/src/components/RoomCard.jsx`
+  - `/app/frontend/src/components/CreateRoomModal.jsx`
+  - `/app/frontend/src/components/RoomDetailModal.jsx`
+  - `/app/frontend/src/services/roomsAPI.js`
+
+**Проблема 2:** Секция комнат не появляется
+- **Решение 1:** Очистите кеш браузера (Ctrl+Shift+R или Cmd+Shift+R)
+- **Решение 2:** Проверьте консоль браузера на ошибки JavaScript
+- **Решение 3:** Убедитесь, что SHOW_ROOMS_FEATURE = true (проверьте файл еще раз)
+
+**Проблема 3:** Backend API не работает
+- **Решение:** Перезапустите backend
+  ```bash
+  sudo supervisorctl restart backend
+  ```
+
+**Проблема 4:** Модальные окна не открываются
+- **Решение:** Проверьте логи frontend
+  ```bash
+  tail -n 50 /var/log/supervisor/frontend.err.log
+  ```
+
+#### Откат изменений (если что-то пошло не так):
+
+Если после включения функции возникли проблемы, можно быстро вернуться к стабильному состоянию:
+
+```bash
+# Шаг 1: Откройте файл
+nano /app/frontend/src/components/TasksSection.jsx
+
+# Шаг 2: Измените обратно на false
+const SHOW_ROOMS_FEATURE = false;
+
+# Шаг 3: Перезапустите frontend
 sudo supervisorctl restart frontend
 ```
 
