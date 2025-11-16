@@ -11,8 +11,8 @@ import sys
 from typing import Dict, List, Optional
 
 # Configuration
-# Backend is accessible on localhost:8001 internally
-BACKEND_URL = "http://localhost:8001/api"
+# Use external backend URL from frontend .env for testing
+BACKEND_URL = "https://achievement-progress.preview.emergentagent.com/api"
 TIMEOUT = 30  # 30 seconds timeout for API calls
 
 class RUDNScheduleAPITester:
