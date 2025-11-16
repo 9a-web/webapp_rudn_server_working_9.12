@@ -263,6 +263,22 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       });
       
       setTasks([newTask, ...tasks]);
+      
+      // 🎯 ТРЕКИНГ СОЗДАНИЯ ЗАДАЧИ для достижения "Первая задача"
+      try {
+        const result = await achievementsAPI.trackAction(user.id, 'create_task', {
+          task_id: newTask.id,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Если есть новое достижение, можно показать уведомление
+        if (result.new_achievements && result.new_achievements.length > 0) {
+          console.log('🎉 Новое достижение за создание задачи!', result.new_achievements[0]);
+        }
+      } catch (trackError) {
+        console.error('Ошибка трекинга создания задачи:', trackError);
+        // Не прерываем основной процесс, если трекинг не удался
+      }
     } catch (error) {
       console.error('Error creating task:', error);
       throw error; // Пробрасываем ошибку для обработки в модальном окне
