@@ -203,6 +203,8 @@ async def check_and_award_achievements(db, telegram_id: int, stats: UserStats) -
             earned = True
         elif achievement_id == "schedule_gourmet" and stats.schedule_views >= 50:
             earned = True
+        elif achievement_id == "attentive_student" and stats.detailed_views >= 50:
+            earned = True
         elif achievement_id == "night_owl" and stats.night_usage_count >= 1:
             earned = True
         elif achievement_id == "early_bird" and stats.early_usage_count >= 1:
