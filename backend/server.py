@@ -739,7 +739,7 @@ async def create_task(task_data: TaskCreate):
         await db.tasks.insert_one(task_dict)
         
         # Отслеживаем создание задачи для достижений
-        await achievements.track_user_action(
+        await track_user_action(
             db, 
             task_data.telegram_id, 
             "create_task",
