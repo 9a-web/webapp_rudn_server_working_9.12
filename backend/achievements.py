@@ -152,7 +152,7 @@ ACHIEVEMENTS = [
         "emoji": "✨",
         "points": 50,
         "type": "perfectionist",
-        "requirement": 14  # Все остальные достижения (15 - 1)
+        "requirement": 15  # Все остальные достижения (16 - 1)
     }
 ]
 
