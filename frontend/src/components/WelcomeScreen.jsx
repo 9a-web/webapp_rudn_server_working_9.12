@@ -18,7 +18,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
   };
 
   return (
-    <div className="h-screen min-h-screen bg-[#1E1E1E] flex flex-col items-center justify-between px-6 py-12 overflow-hidden relative">
+    <div className="h-screen min-h-screen bg-[#1E1E1E] flex flex-col items-center justify-between overflow-hidden relative">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -50,7 +50,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
 
       {/* Let's go logo - Full width */}
       <motion.div
-        className="w-full mb-8 z-10"
+        className="w-full mt-12 mb-8 z-10"
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
@@ -64,7 +64,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
       </motion.div>
 
       {/* Content Container */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md z-10">
+      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md px-6 z-10">
 
         {/* Ready text image - Manage your RUDN schedule */}
         <motion.div
