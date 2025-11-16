@@ -263,7 +263,7 @@ export const ProfileModal = ({
 
             {/* Username и группа */}
             {isTelegramUser && (
-              <div className="flex items-center justify-center gap-2 w-full flex-wrap">
+              <div className="flex items-center justify-center gap-2 w-full flex-wrap mb-4">
                 {username && (
                   <span
                     className="text-sm font-medium"
@@ -294,6 +294,241 @@ export const ProfileModal = ({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Реферальная программа */}
+            {isTelegramUser && referralData && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                {/* Заголовок */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-sm font-semibold text-white">
+                    Реферальная программа
+                  </h3>
+                </div>
+
+                {/* Реферальный код */}
+                <div
+                  className="mb-3 p-3 rounded-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(196, 163, 255, 0.15) 100%)',
+                    border: '1px solid rgba(167, 139, 250, 0.3)',
+                  }}
+                >
+                  <p className="text-xs text-gray-400 mb-1">Ваш код</p>
+                  <p className="text-lg font-bold text-purple-300 font-mono">
+                    {referralData.referral_code}
+                  </p>
+                </div>
+
+                {/* Кнопка копирования ссылки */}
+                <button
+                  onClick={copyReferralLink}
+                  className="w-full p-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={{
+                    background: copiedLink 
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+                  }}
+                >
+                  {copiedLink ? (
+                    <>
+                      <Award className="w-4 h-4 text-white" />
+                      <span className="text-sm font-semibold text-white">Скопировано!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-white" />
+                      <span className="text-sm font-semibold text-white">Копировать ссылку</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Статистика */}
+                {referralStats && (
+                  <div className="mt-4 space-y-2">
+                    {/* Общая статистика */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                          border: '1px solid rgba(52, 211, 153, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Уровень 1</p>
+                        <p className="text-lg font-bold text-green-400">
+                          {referralStats.level_1_count}
+                        </p>
+                      </div>
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                          border: '1px solid rgba(96, 165, 250, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Уровень 2</p>
+                        <p className="text-lg font-bold text-blue-400">
+                          {referralStats.level_2_count}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(167, 139, 250, 0.1)',
+                          border: '1px solid rgba(167, 139, 250, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Уровень 3</p>
+                        <p className="text-lg font-bold text-purple-400">
+                          {referralStats.level_3_count}
+                        </p>
+                      </div>
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                          border: '1px solid rgba(251, 191, 36, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Заработано</p>
+                        <p className="text-lg font-bold text-yellow-400">
+                          {referralStats.total_referral_points}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Кнопка показать рефералов */}
+                    {(referralStats.level_1_count + referralStats.level_2_count + referralStats.level_3_count) > 0 && (
+                      <button
+                        onClick={() => {
+                          setShowReferrals(!showReferrals);
+                          if (hapticFeedback) hapticFeedback('impact', 'light');
+                        }}
+                        className="w-full p-2 rounded-lg flex items-center justify-between text-sm font-medium text-purple-300 hover:bg-purple-500/10 transition-colors"
+                      >
+                        <span>Мои рефералы</span>
+                        <ChevronRight
+                          className={`w-4 h-4 transition-transform ${showReferrals ? 'rotate-90' : ''}`}
+                        />
+                      </button>
+                    )}
+
+                    {/* Список рефералов */}
+                    <AnimatePresence>
+                      {showReferrals && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-2 space-y-2 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900/20"
+                        >
+                          {referralStats.level_1_referrals.length > 0 && (
+                            <div>
+                              <p className="text-xs text-green-400 font-semibold mb-1">
+                                Уровень 1 ({referralStats.level_1_referrals.length})
+                              </p>
+                              {referralStats.level_1_referrals.map((ref) => (
+                                <div
+                                  key={ref.telegram_id}
+                                  className="flex items-center justify-between p-2 rounded-lg mb-1"
+                                  style={{
+                                    backgroundColor: 'rgba(52, 211, 153, 0.08)',
+                                    border: '1px solid rgba(52, 211, 153, 0.15)',
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-xs font-bold text-white">
+                                      {ref.first_name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {ref.first_name || 'Пользователь'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-green-400 font-semibold">
+                                    +{ref.points_earned_for_referrer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {referralStats.level_2_referrals.length > 0 && (
+                            <div>
+                              <p className="text-xs text-blue-400 font-semibold mb-1">
+                                Уровень 2 ({referralStats.level_2_referrals.length})
+                              </p>
+                              {referralStats.level_2_referrals.map((ref) => (
+                                <div
+                                  key={ref.telegram_id}
+                                  className="flex items-center justify-between p-2 rounded-lg mb-1"
+                                  style={{
+                                    backgroundColor: 'rgba(96, 165, 250, 0.08)',
+                                    border: '1px solid rgba(96, 165, 250, 0.15)',
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-xs font-bold text-white">
+                                      {ref.first_name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {ref.first_name || 'Пользователь'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-blue-400 font-semibold">
+                                    +{ref.points_earned_for_referrer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {referralStats.level_3_referrals.length > 0 && (
+                            <div>
+                              <p className="text-xs text-purple-400 font-semibold mb-1">
+                                Уровень 3 ({referralStats.level_3_referrals.length})
+                              </p>
+                              {referralStats.level_3_referrals.map((ref) => (
+                                <div
+                                  key={ref.telegram_id}
+                                  className="flex items-center justify-between p-2 rounded-lg mb-1"
+                                  style={{
+                                    backgroundColor: 'rgba(167, 139, 250, 0.08)',
+                                    border: '1px solid rgba(167, 139, 250, 0.15)',
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-xs font-bold text-white">
+                                      {ref.first_name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {ref.first_name || 'Пользователь'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-purple-400 font-semibold">
+                                    +{ref.points_earned_for_referrer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </motion.div>
             )}
           </motion.div>
         </>
