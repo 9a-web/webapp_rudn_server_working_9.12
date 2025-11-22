@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from pathlib import Path
 from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+import io
+import math
 
 # Загрузка переменных окружения
 ROOT_DIR = Path(__file__).parent
