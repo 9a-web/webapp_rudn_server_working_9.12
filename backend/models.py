@@ -727,16 +727,11 @@ class AdminStatsResponse(BaseModel):
     """Общая статистика для админ панели"""
     total_users: int
     active_users_today: int
-    active_users_week: int
-    active_users_month: int
-    new_users_today: int
     new_users_week: int
-    new_users_month: int
     total_tasks: int
     total_completed_tasks: int
     total_achievements_earned: int
     total_rooms: int
-    total_schedule_views: int
 
 
 class UserActivityPoint(BaseModel):
