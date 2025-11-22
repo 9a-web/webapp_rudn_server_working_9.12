@@ -3613,10 +3613,8 @@ async def get_faculty_stats():
             },
             {
                 "$group": {
-                    "_id": {
-                        "name": "$facultet_name",
-                        "id": "$facultet_id"
-                    },
+                    "_id": "$facultet_name",
+                    "faculty_id_first": {"$first": "$facultet_id"},
                     "users_count": {"$sum": 1}
                 }
             },
@@ -3630,8 +3628,8 @@ async def get_faculty_stats():
         # Преобразуем результат
         faculty_stats = [
             FacultyStats(
-                faculty_name=result["_id"]["name"] if isinstance(result["_id"], dict) else result["_id"],
-                faculty_id=result["_id"].get("id") if isinstance(result["_id"], dict) else None,
+                faculty_name=result["_id"],
+                faculty_id=result.get("faculty_id_first"),
                 users_count=result["users_count"]
             )
             for result in results
