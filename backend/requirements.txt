@@ -39,3 +39,5 @@ apscheduler>=3.10.4
 httpx>=0.24.0
 httpcore>=0.18.0
 tzlocal>=5.0.0
+Pillow>=10.0.0
+matplotlib>=3.7.0
