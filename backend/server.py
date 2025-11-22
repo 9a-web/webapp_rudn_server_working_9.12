@@ -3218,6 +3218,471 @@ async def get_referral_tree(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Админ панель API ============
+
+@api_router.get("/admin/stats")
+async def get_admin_stats(days: Optional[int] = None):
+    """
+    Получить общую статистику для админ панели
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            date_filter = {"created_at": {"$gte": datetime.utcnow() - timedelta(days=days)}}
+        else:
+            date_filter = {}
+        
+        # Общая статистика пользователей
+        total_users = await db.user_settings.count_documents({})
+        
+        # Активные пользователи сегодня
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        active_users_today = await db.user_settings.count_documents({
+            "last_activity": {"$gte": today_start}
+        })
+        
+        # Новые пользователи за неделю
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        new_users_week = await db.user_settings.count_documents({
+            "created_at": {"$gte": week_ago}
+        })
+        
+        # Статистика задач
+        total_tasks = await db.tasks.count_documents(date_filter)
+        total_completed_tasks = await db.tasks.count_documents({
+            **date_filter,
+            "completed": True
+        })
+        
+        # Статистика достижений
+        total_achievements_earned = await db.user_achievements.count_documents(date_filter)
+        
+        # Статистика комнат
+        total_rooms = await db.rooms.count_documents(date_filter)
+        
+        return AdminStatsResponse(
+            total_users=total_users,
+            active_users_today=active_users_today,
+            new_users_week=new_users_week,
+            total_tasks=total_tasks,
+            total_completed_tasks=total_completed_tasks,
+            total_achievements_earned=total_achievements_earned,
+            total_rooms=total_rooms
+        )
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики админ панели: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/users-activity", response_model=List[UserActivityPoint])
+async def get_users_activity(days: Optional[int] = 30):
+    """
+    Получить активность регистраций пользователей по дням
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+        else:
+            # Если не указано, берем все записи
+            start_date = datetime(2020, 1, 1)
+        
+        # Агрегация по дням
+        pipeline = [
+            {
+                "$match": {
+                    "created_at": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$created_at"
+                        }
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        activity = [
+            UserActivityPoint(date=result["_id"], count=result["count"])
+            for result in results
+        ]
+        
+        return activity
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении активности пользователей: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/hourly-activity", response_model=List[HourlyActivityPoint])
+async def get_hourly_activity(days: Optional[int] = 30):
+    """
+    Получить активность пользователей по часам
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+        else:
+            start_date = datetime(2020, 1, 1)
+        
+        # Агрегация по часам (используем last_activity)
+        pipeline = [
+            {
+                "$match": {
+                    "last_activity": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$hour": "$last_activity"
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Заполняем все часы (0-23)
+        hourly_data = {i: 0 for i in range(24)}
+        for result in results:
+            hour = result["_id"]
+            if hour is not None:
+                hourly_data[hour] = result["count"]
+        
+        # Преобразуем результат
+        activity = [
+            HourlyActivityPoint(hour=f"{hour:02d}:00", count=count)
+            for hour, count in hourly_data.items()
+        ]
+        
+        return activity
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении почасовой активности: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/weekly-activity", response_model=List[dict])
+async def get_weekly_activity(days: Optional[int] = 30):
+    """
+    Получить активность пользователей по дням недели
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+        else:
+            start_date = datetime(2020, 1, 1)
+        
+        # Агрегация по дням недели (используем last_activity)
+        pipeline = [
+            {
+                "$match": {
+                    "last_activity": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$dayOfWeek": "$last_activity"
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Маппинг дней недели (MongoDB: 1=Воскресенье, 2=Понедельник, ...)
+        day_names = {
+            1: "Вс",
+            2: "Пн",
+            3: "Вт",
+            4: "Ср",
+            5: "Чт",
+            6: "Пт",
+            7: "Сб"
+        }
+        
+        # Заполняем все дни
+        weekly_data = {day: 0 for day in range(1, 8)}
+        for result in results:
+            day = result["_id"]
+            if day is not None:
+                weekly_data[day] = result["count"]
+        
+        # Преобразуем результат (начинаем с понедельника)
+        activity = []
+        for day_num in [2, 3, 4, 5, 6, 7, 1]:  # Пн-Вс
+            activity.append({
+                "day": day_names[day_num],
+                "count": weekly_data[day_num]
+            })
+        
+        return activity
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении недельной активности: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/feature-usage", response_model=FeatureUsageStats)
+async def get_feature_usage(days: Optional[int] = None):
+    """
+    Получить статистику использования функций
+    """
+    try:
+        # Определяем временной диапазон для новых пользователей
+        if days:
+            date_filter = {"created_at": {"$gte": datetime.utcnow() - timedelta(days=days)}}
+        else:
+            date_filter = {}
+        
+        # Получаем список telegram_id пользователей в заданном диапазоне
+        if days:
+            users_cursor = db.user_settings.find(date_filter, {"telegram_id": 1})
+            users = await users_cursor.to_list(length=None)
+            telegram_ids = [user["telegram_id"] for user in users]
+            stats_filter = {"telegram_id": {"$in": telegram_ids}}
+        else:
+            stats_filter = {}
+        
+        # Агрегация статистики
+        pipeline = [
+            {"$match": stats_filter},
+            {
+                "$group": {
+                    "_id": None,
+                    "schedule_views": {"$sum": "$schedule_views"},
+                    "analytics_views": {"$sum": "$analytics_views"},
+                    "calendar_opens": {"$sum": "$calendar_opens"},
+                    "notifications_configured": {"$sum": "$notifications_configured"},
+                    "schedule_shares": {"$sum": "$schedule_shares"},
+                    "tasks_created": {"$sum": {"$ifNull": ["$tasks_created", 0]}},
+                    "achievements_earned": {"$sum": "$achievements_count"}
+                }
+            }
+        ]
+        
+        results = await db.user_stats.aggregate(pipeline).to_list(length=None)
+        
+        if results:
+            data = results[0]
+            return FeatureUsageStats(
+                schedule_views=data.get("schedule_views", 0),
+                analytics_views=data.get("analytics_views", 0),
+                calendar_opens=data.get("calendar_opens", 0),
+                notifications_configured=data.get("notifications_configured", 0),
+                schedule_shares=data.get("schedule_shares", 0),
+                tasks_created=data.get("tasks_created", 0),
+                achievements_earned=data.get("achievements_earned", 0)
+            )
+        else:
+            # Возвращаем нули, если нет данных
+            return FeatureUsageStats(
+                schedule_views=0,
+                analytics_views=0,
+                calendar_opens=0,
+                notifications_configured=0,
+                schedule_shares=0,
+                tasks_created=0,
+                achievements_earned=0
+            )
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики функций: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/top-users", response_model=List[TopUser])
+async def get_top_users(
+    metric: str = "points",
+    limit: int = 10
+):
+    """
+    Получить топ пользователей по заданной метрике
+    """
+    try:
+        # Доступные метрики
+        valid_metrics = {
+            "points": "total_points",
+            "achievements": "achievements_count",
+            "tasks": "tasks_created",
+            "schedule_views": "schedule_views"
+        }
+        
+        if metric not in valid_metrics:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Недопустимая метрика. Доступные: {', '.join(valid_metrics.keys())}"
+            )
+        
+        field_name = valid_metrics[metric]
+        
+        # Агрегация для получения топа
+        pipeline = [
+            {
+                "$match": {
+                    field_name: {"$gt": 0}
+                }
+            },
+            {
+                "$sort": {field_name: -1}
+            },
+            {
+                "$limit": limit
+            },
+            {
+                "$lookup": {
+                    "from": "user_settings",
+                    "localField": "telegram_id",
+                    "foreignField": "telegram_id",
+                    "as": "user_info"
+                }
+            },
+            {
+                "$unwind": "$user_info"
+            },
+            {
+                "$project": {
+                    "telegram_id": 1,
+                    "value": f"${field_name}",
+                    "username": "$user_info.username",
+                    "first_name": "$user_info.first_name",
+                    "group_name": "$user_info.group_name"
+                }
+            }
+        ]
+        
+        results = await db.user_stats.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        top_users = [
+            TopUser(
+                telegram_id=result["telegram_id"],
+                value=result["value"],
+                username=result.get("username"),
+                first_name=result.get("first_name"),
+                group_name=result.get("group_name")
+            )
+            for result in results
+        ]
+        
+        return top_users
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении топа пользователей: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/faculty-stats", response_model=List[FacultyStats])
+async def get_faculty_stats():
+    """
+    Получить статистику по факультетам
+    """
+    try:
+        # Агрегация по факультетам
+        pipeline = [
+            {
+                "$match": {
+                    "facultet_name": {"$ne": None, "$exists": True}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$facultet_name",
+                    "users_count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"users_count": -1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        faculty_stats = [
+            FacultyStats(
+                faculty_name=result["_id"],
+                users_count=result["users_count"]
+            )
+            for result in results
+        ]
+        
+        return faculty_stats
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики факультетов: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/course-stats", response_model=List[CourseStats])
+async def get_course_stats():
+    """
+    Получить статистику по курсам
+    """
+    try:
+        # Агрегация по курсам
+        pipeline = [
+            {
+                "$match": {
+                    "kurs": {"$ne": None, "$exists": True}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$kurs",
+                    "users_count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        course_stats = [
+            CourseStats(
+                course=result["_id"],
+                users_count=result["users_count"]
+            )
+            for result in results
+        ]
+        
+        return course_stats
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики курсов: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # ============ Экспорт/Импорт базы данных ============
 
 @api_router.get("/export/database")
