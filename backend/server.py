@@ -3638,7 +3638,9 @@ async def get_faculty_stats():
         return faculty_stats
     
     except Exception as e:
+        import traceback
         logger.error(f"Ошибка при получении статистики факультетов: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
