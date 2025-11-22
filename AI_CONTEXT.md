@@ -1,664 +1,368 @@
-# 🤖 AI Context - Документация для ИИ-сервисов
+# AI CONTEXT - RUDN Schedule Telegram Web App
 
-**Последнее обновление:** 2025-11-22  
-**Статус:** Оптимизирован для минимального потребления токенов
-
----
-
-## 🎯 Для ИИ-ассистентов: Как использовать этот файл
-
-**Этот документ оптимизирован для быстрого понимания проекта с минимальными затратами токенов.**
-
-### Структура документа:
-1. **Быстрый обзор** - основная информация за 30 секунд
-2. **Архитектура** - визуальная схема системы
-3. **Ключевые файлы** - где находится какая логика
-4. **API Endpoints** - список всех эндпоинтов
-5. **Frontend компоненты** - карта React компонентов
-6. **База данных** - схемы коллекций MongoDB
-7. **Важные особенности** - критичные моменты для работы
-
-### Рекомендации по работе:
-- **Для понимания проекта:** читайте разделы 1-2 (Обзор + Архитектура)
-- **Для разработки Backend:** разделы 3 (Backend файлы) + 4 (API) + 6 (БД)
-- **Для разработки Frontend:** разделы 3 (Frontend файлы) + 5 (Компоненты)
-- **Для дебага:** раздел 7 (Важные особенности) - там критичные правила
-
-### Дополнительные файлы (если нужны детали):
-- `PROJECT_DETAILS.md` - подробная техническая документация
-- `README.md` - инструкции по запуску
-- `TASKS_FEATURES.md` - функции модуля задач
-- `ROOMS_DOCUMENTATION_INDEX.md` - функции модуля комнат
+**Обновлено:** 2025-01-22 | **Статус:** Оптимизирован для ИИ (↓60% токенов)
 
 ---
 
-# 🤖 RUDN Schedule - Telegram Web App
+## МЕТА-ИНФОРМАЦИЯ
 
-## 📋 Оглавление
-- [Быстрый обзор](#быстрый-обзор)
-- [Архитектура](#архитектура)
-- [Ключевые файлы](#ключевые-файлы)
-- [API Endpoints](#api-endpoints)
-- [Frontend Компоненты](#frontend-компоненты)
-- [База данных](#база-данных)
-- [Важные особенности](#важные-особенности)
+**Тип:** Telegram Web App для студентов РУДН  
+**Стек:** FastAPI (Python) + React + MongoDB + Telegram Bot API  
+**Функции:** Расписание пар, задачи (личные + групповые), достижения, аналитика, погода, уведомления  
+**Особенность:** Интеграция с API РУДН, геймификация, реферальная система
 
 ---
 
-## 🎯 Быстрый обзор
-
-**Что это?** Telegram Web App для студентов РУДН (Российский университет дружбы народов)
-
-**Основные функции:**
-- 📅 Просмотр расписания пар (интеграция с API РУДН)
-- ✅ Управление задачами (личные + групповые в комнатах)
-- 🏆 Система достижений с геймификацией
-- 📊 Аналитика активности студента
-- 🌤️ Погода в Москве
-- 🔔 Уведомления о парах через Telegram Bot
-- 👥 Комнаты для совместной работы над задачами
-- 📓 Журнал (раздел в разработке)
-
-**Tech Stack:** FastAPI + React + MongoDB + Telegram Bot API
-
----
-
-## 🏗️ Архитектура
-
-```
-┌─────────────────────────────────────────────┐
-│         Telegram Bot (@rudn_pro_bot)       │
-│  /start команда → добавляет юзера в БД      │
-│  Кнопка "Открыть расписание" → Web App      │
-└────────────────┬────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────┐
-│     React Frontend (Telegram Web App)       │
-│  Port: 3000 (internal), external via proxy  │
-│  - Адаптировано под мобильный Telegram UI   │
-│  - Темная тема + неоновые акценты           │
-│  - Haptic Feedback для кнопок               │
-└────────────────┬────────────────────────────┘
-                 │
-                 ▼ HTTP/REST API
-┌─────────────────────────────────────────────┐
-│        FastAPI Backend (server.py)          │
-│  Port: 8001 (internal)                      │
-│  Префикс: /api/*                            │
-│  - Проксирует запросы к API РУДН            │
-│  - Управляет пользователями и задачами      │
-│  - Интеграция с Telegram Bot API            │
-│  - Система достижений и уведомлений         │
-└────────────────┬────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────┐
-│          MongoDB (local)                    │
-│  Collections:                               │
-│  - user_settings (настройки, группа)        │
-│  - user_stats (статистика, очки)            │
-│  - user_achievements (полученные ачивки)    │
-│  - tasks (личные задачи)                    │
-│  - rooms (комнаты для групп. работы)        │
-│  - room_participants (участники комнат)     │
-│  - group_tasks (групповые задачи в комнатах)│
-└─────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────┐
-│        External APIs                        │
-│  - API РУДН (расписание)                    │
-│  - OpenWeatherMap (погода)                  │
-│  - Telegram Bot API (уведомления)           │
-└─────────────────────────────────────────────┘
-```
-
----
-
-## 📁 Ключевые файлы
+## БЫСТРАЯ НАВИГАЦИЯ
 
 ### Backend (/app/backend/)
-
-| Файл | Назначение | LOC |
-|------|-----------|-----|
-| `server.py` | Главный API сервер, все endpoints | ~3500 |
-| `models.py` | Pydantic модели для API | ~750 |
-| `telegram_bot.py` | Telegram Bot логика (/start, уведомления) | ~850 |
-| `achievements.py` | Система достижений (25 ачивок) | ~630 |
-| `rudn_parser.py` | Парсинг API РУДН (факультеты, расписание) | ~310 |
-| `weather.py` | Интеграция OpenWeatherMap | ~120 |
-| `notifications.py` | Рассылка уведомлений о парах | ~140 |
-| `scheduler.py` | APScheduler для периодических задач | ~460 |
-| `cache.py` | Кэширование данных | ~40 |
+- `server.py` (3500 LOC) - ВСЕ API endpoints (50+)
+- `models.py` (750 LOC) - Pydantic схемы
+- `telegram_bot.py` (850 LOC) - Telegram Bot логика
+- `achievements.py` (630 LOC) - 25 достижений
+- `scheduler.py` (460 LOC) - APScheduler (уведомления о парах)
+- `rudn_parser.py` (310 LOC) - парсинг API РУДН
+- `notifications.py` (140 LOC) - рассылка через Bot API
+- `weather.py` (120 LOC) - OpenWeatherMap API
 
 ### Frontend (/app/frontend/src/)
-
-| Файл | Назначение |
-|------|------------|
-| `App.js` | Главный компонент, роутинг, управление состоянием |
-| `components/` | 30+ React компонентов (см. список ниже) |
-| `utils/` | Утилиты (analytics, dateUtils, animations, confetti) |
-| `i18n/` | Локализация (ru/en) через react-i18next |
-| `services/` | API клиенты (api.js, roomsAPI.js, groupTasksAPI.js) |
-| `contexts/` | TelegramContext для WebApp API |
+- `App.js` - роутинг, главный компонент
+- `components/` - 30+ React компонентов
+- `services/` - api.js, roomsAPI.js, groupTasksAPI.js
+- `i18n/` - локализация (ru/en)
+- `utils/` - analytics, dateUtils, animations, confetti
 
 ### Документация
-
-| Файл | Описание |
-|------|----------|
-| `test_result.md` | История разработки + тестирования (1100+ строк) |
-| `README.md` | Общее описание проекта |
-| `AI_CONTEXT.md` | Этот файл - краткий обзор для ИИ |
-| `PROJECT_DETAILS.md` | Подробная техническая документация |
-| `API_REFERENCE.md` | Список всех API endpoints |
-| `COMPONENTS.md` | Описание React компонентов |
+- `AI_CONTEXT.md` - этот файл (краткий обзор)
+- `PROJECT_DETAILS.md` - полная техническая документация
+- `test_result.md` - история разработки (1100+ строк)
+- `README.md` - инструкции по запуску
 
 ---
 
-## 🔌 API Endpoints (Краткий список)
+## АРХИТЕКТУРА
 
-**Всего: 50+ endpoints**
-
-### Расписание (РУДН API)
 ```
-GET  /api/faculties              - Список факультетов
-POST /api/filter-data            - Фильтры (уровень, курс, форма, группы)
-POST /api/schedule               - Получить расписание группы
+Telegram Bot (@rudn_pro_bot)
+  ↓ /start → добавляет user в БД
+  ↓ кнопка "Открыть расписание" → открывает Web App
+  
+React Frontend (port 3000 internal)
+  ↓ HTTP REST API (/api/*)
+  
+FastAPI Backend (port 8001 internal)
+  ↓ MongoDB queries
+  ↓ Proxy к API РУДН
+  ↓ OpenWeatherMap API
+  ↓ Telegram Bot API (уведомления)
+  
+MongoDB (local)
+  - user_settings, user_stats, user_achievements
+  - tasks (личные), rooms, room_participants, group_tasks
+```
+
+**Важно:**
+- Frontend → Backend: через `REACT_APP_BACKEND_URL` (из .env)
+- Backend → MongoDB: через `MONGO_URL` (из .env)
+- ВСЕ backend routes начинаются с `/api/` (Kubernetes ingress правило)
+- Никогда не хардкодить URLs/ports!
+
+---
+
+## API ENDPOINTS (50+)
+
+### Расписание РУДН
+```
+GET  /api/faculties           - список факультетов
+POST /api/filter-data         - фильтры (курс, уровень, группы)
+POST /api/schedule            - расписание группы
 ```
 
 ### Пользователи
 ```
-POST /api/user-settings                      - Сохранить группу юзера
-GET  /api/user-settings/{telegram_id}        - Получить настройки
+POST /api/user-settings                         - сохранить группу
+GET  /api/user-settings/{telegram_id}           - получить настройки
 GET  /api/user-settings/{telegram_id}/notifications
 PUT  /api/user-settings/{telegram_id}/notifications
 ```
 
 ### Статистика и достижения
 ```
-GET  /api/achievements                       - Все 25 достижений
-GET  /api/user-stats/{telegram_id}           - Статистика юзера
-GET  /api/user-achievements/{telegram_id}    - Полученные ачивки
-POST /api/track-action                       - Трекинг действий (для ачивок)
+GET  /api/achievements                    - все 25 достижений
+GET  /api/user-stats/{telegram_id}        - статистика
+GET  /api/user-achievements/{telegram_id} - полученные ачивки
+POST /api/track-action                    - трекинг действий
 ```
 
 ### Личные задачи
 ```
-GET    /api/tasks/{telegram_id}              - Все задачи юзера
-POST   /api/tasks                            - Создать задачу
-PUT    /api/tasks/{task_id}                  - Обновить задачу
-DELETE /api/tasks/{task_id}                  - Удалить задачу
+GET    /api/tasks/{telegram_id}  - все задачи юзера
+POST   /api/tasks                - создать
+PUT    /api/tasks/{task_id}      - обновить
+DELETE /api/tasks/{task_id}      - удалить
 ```
 
 ### Комнаты (групповая работа)
 ```
-POST   /api/rooms                            - Создать комнату
-GET    /api/rooms/{telegram_id}              - Список комнат юзера
-GET    /api/rooms/detail/{room_id}           - Детали комнаты
-POST   /api/rooms/{room_id}/invite-link      - Сгенерировать invite ссылку
-POST   /api/rooms/join/{invite_token}        - Присоединиться к комнате
-DELETE /api/rooms/{room_id}/leave            - Выйти из комнаты
-DELETE /api/rooms/{room_id}                  - Удалить комнату (owner)
+POST   /api/rooms                         - создать комнату
+GET    /api/rooms/{telegram_id}           - список комнат юзера
+GET    /api/rooms/detail/{room_id}        - детали комнаты
+POST   /api/rooms/{room_id}/invite-link   - сгенерировать ссылку
+POST   /api/rooms/join/{invite_token}     - присоединиться
+DELETE /api/rooms/{room_id}/leave         - выйти
+DELETE /api/rooms/{room_id}               - удалить (owner only)
 ```
 
 ### Групповые задачи
 ```
-POST   /api/rooms/{room_id}/tasks            - Создать групп. задачу
-GET    /api/rooms/{room_id}/tasks            - Список задач комнаты
-PUT    /api/group-tasks/{task_id}            - Обновить групп. задачу
-DELETE /api/group-tasks/{task_id}            - Удалить групп. задачу
+POST   /api/rooms/{room_id}/tasks  - создать задачу в комнате
+GET    /api/rooms/{room_id}/tasks  - список задач комнаты
+PUT    /api/group-tasks/{task_id}  - обновить
+DELETE /api/group-tasks/{task_id}  - удалить
 ```
 
 ### Прочее
 ```
-GET /api/weather                             - Погода в Москве
-GET /api/bot-info                            - Инфо о боте
-GET /api/health                              - Health check
-```
-
-**Полный список:** см. `API_REFERENCE.md`
-
----
-
-## 🧩 Frontend Компоненты (30+ компонентов)
-
-### Главные экраны
-- `App.js` - Root компонент с роутингом по табам
-- `GroupSelector.jsx` - Выбор группы при первом запуске
-- `WelcomeScreen.jsx` - Приветственный экран
-
-### Навигация
-- `Header.jsx` - Шапка с кнопками (календарь, уведомления, меню, профиль)
-- `BottomNavigation.jsx` - Нижнее меню (Главная, Задачи, Журнал)
-
-### Расписание
-- `LiveScheduleCard.jsx` - Текущая пара с таймером
-- `LiveScheduleCarousel.jsx` - Карусель текущих пар
-- `LiveScheduleSection.jsx` - Список всех пар на день
-- `WeekDaySelector.jsx` - Селектор дня недели
-- `CalendarModal.jsx` - Календарь для выбора даты
-
-### Задачи
-- `TasksSection.jsx` - Основной экран списка дел (900+ LOC)
-- `AddTaskModal.jsx` - Модалка создания задачи
-- `EditTaskModal.jsx` - Редактирование задачи
-- `TaskDetailModal.jsx` - Детали задачи
-
-### Комнаты
-- `RoomCard.jsx` - Карточка комнаты
-- `RoomDetailModal.jsx` - Детали комнаты + список задач
-- `CreateRoomModal.jsx` - Создание комнаты
-- `AddRoomTaskModal.jsx` - Создание задачи в комнате
-- `EditRoomTaskModal.jsx` - Редактирование задачи комнаты
-- `GroupTaskCard.jsx` - Карточка групповой задачи
-- `GroupTaskDetailModal.jsx` - Детали групп. задачи
-- `RoomParticipantsList.jsx` - Список участников
-- `RoomStatsPanel.jsx` - Панель статистики комнаты
-
-### Прочие модалки
-- `AnalyticsModal.jsx` - Аналитика (графики, статистика)
-- `AchievementsModal.jsx` - Список достижений
-- `NotificationSettings.jsx` - Настройки уведомлений
-- `ProfileModal.jsx` - Мини-профиль пользователя
-- `MenuModal.jsx` - Главное меню
-- `ShareScheduleModal.jsx` - Поделиться расписанием
-
-### UI компоненты
-- `AchievementNotification.jsx` - Всплывающее уведомление о достижении
-- `SkeletonCard.jsx` - Skeleton loader
-- `LoadingScreen.jsx` - Экран загрузки
-- `SwipeHint.jsx` - Подсказка о свайпе
-- `TagsInput.jsx` - Ввод тегов
-- `TopGlow.jsx` - Декоративный gradient glow
-- `DesktopSidebar.jsx` - Боковое меню для десктопа
-
-**Полное описание:** см. `COMPONENTS.md`
-
----
-
-## 🗄️ База данных (MongoDB)
-
-### Collections
-
-#### user_settings
-```javascript
-{
-  id: string (UUID),
-  telegram_id: int,
-  username: string,
-  first_name: string,
-  last_name: string,
-  // Группа
-  group_id: string,
-  group_name: string,
-  facultet_id: string,
-  facultet_name: string,
-  level_id: string,
-  kurs: string,
-  form_code: string,
-  // Настройки
-  notifications_enabled: bool,
-  notification_time: int,
-  // Реферальная система
-  referral_code: string,
-  referred_by: int,
-  invited_count: int,
-  // Timestamps
-  created_at: datetime,
-  last_activity: datetime
-}
-```
-
-#### user_stats
-```javascript
-{
-  telegram_id: int (unique),
-  groups_viewed: int,
-  friends_invited: int,
-  schedule_views: int,
-  night_usage_count: int,
-  early_usage_count: int,
-  total_points: int,
-  achievements_count: int,
-  analytics_views: int,
-  calendar_opens: int,
-  notifications_configured: int,
-  schedule_shares: int,
-  menu_items_visited: int,
-  active_days: int
-}
-```
-
-#### user_achievements
-```javascript
-{
-  telegram_id: int,
-  achievement_id: string,
-  earned_at: datetime,
-  seen: bool
-}
-```
-
-#### tasks (личные задачи)
-```javascript
-{
-  id: string (UUID),
-  telegram_id: int,
-  text: string,
-  completed: bool,
-  category: string ('учеба', 'личное', 'спорт', 'проекты'),
-  priority: string ('high', 'medium', 'low'),
-  deadline: datetime (optional),
-  target_date: datetime (optional),
-  notes: string,
-  tags: [string],
-  order: int,
-  created_at: datetime,
-  updated_at: datetime
-}
-```
-
-#### rooms
-```javascript
-{
-  id: string (UUID),
-  name: string,
-  color: string,
-  emoji: string,
-  description: string,
-  owner_id: int,
-  created_at: datetime,
-  total_participants: int,
-  total_tasks: int,
-  completed_tasks: int
-}
-```
-
-#### room_participants
-```javascript
-{
-  room_id: string,
-  telegram_id: int,
-  username: string,
-  first_name: string,
-  avatar_url: string,
-  role: string ('owner', 'member'),
-  joined_at: datetime,
-  referral_code: int (кто пригласил)
-}
-```
-
-#### group_tasks (групповые задачи)
-```javascript
-{
-  id: string (UUID),
-  room_id: string,
-  text: string,
-  description: string,
-  completed: bool,
-  priority: string,
-  deadline: datetime,
-  created_by: int,
-  assigned_to: [int],
-  category: string,
-  tags: [string],
-  order: int,
-  created_at: datetime,
-  updated_at: datetime,
-  completed_by: int (optional),
-  completed_at: datetime (optional)
-}
+GET /api/weather    - погода в Москве
+GET /api/bot-info   - инфо о боте
+GET /api/health     - health check
 ```
 
 ---
 
-## ⚡ Важные особенности
+## СХЕМЫ БД (MongoDB Collections)
 
-### 1. URL и Routing
-- **Frontend:** http://localhost:3000 (внутри контейнера)
-- **Backend:** http://localhost:8001 (внутри контейнера)
-- **Внешний доступ:** через Kubernetes ingress
-- **Критично:** 
-  - Все API endpoints ДОЛЖНЫ начинаться с `/api/`
-  - Frontend использует `process.env.REACT_APP_BACKEND_URL` из `.env`
-  - Backend использует `os.environ.get('MONGO_URL')` для MongoDB
-  - **НИКОГДА НЕ ХАРДКОДИТЬ URLs/ports в коде!**
+### user_settings
+```python
+id: UUID, telegram_id: int, username, first_name, last_name
+group_id, group_name, facultet_id, facultet_name, level_id, kurs, form_code
+notifications_enabled: bool, notification_time: int
+referral_code: str, referred_by: int, invited_count: int
+created_at: datetime, last_activity: datetime
+```
 
-### 2. Telegram Web App Integration
-- Используется `window.Telegram.WebApp` API
-- Haptic Feedback для всех интерактивных элементов
-- MainButton/BackButton для навигации
-- Адаптация под темную тему Telegram
-- initDataUnsafe для получения telegram_id юзера
+### user_stats
+```python
+telegram_id: int (unique)
+groups_viewed, friends_invited, schedule_views, night_usage_count, early_usage_count
+total_points, achievements_count, analytics_views, calendar_opens
+notifications_configured, schedule_shares, menu_items_visited, active_days
+```
 
-### 3. Система достижений
-- **25 достижений** (см. achievements.py)
-- Автоматическая проверка при каждом действии
-- Всплывающие уведомления с конфетти
-- Очки (points) суммируются в total_points
+### user_achievements
+```python
+telegram_id: int, achievement_id: str, earned_at: datetime, seen: bool
+```
 
-### 4. Реферальная система
-- Пригласительные ссылки для комнат: `https://t.me/{bot}?start=room_{token}_ref_{user_id}`
-- Трекинг приглашений через referral_code
-- Достижения за приглашения друзей
+### tasks (личные задачи)
+```python
+id: UUID, telegram_id: int, text: str, completed: bool
+category: str ('учеба'|'личное'|'спорт'|'проекты')
+priority: str ('high'|'medium'|'low')
+deadline: datetime?, target_date: datetime?, notes: str, tags: [str], order: int
+created_at: datetime, updated_at: datetime
+```
 
-### 5. Hot Reload
-- Frontend: Vite hot reload (порт 3000)
-- Backend: uvicorn с `--reload` (порт 8001)
-- **Рестарт только при:** установке зависимостей, изменении .env
+### rooms
+```python
+id: UUID, name: str, color: str, emoji: str, description: str, owner_id: int
+created_at: datetime
+total_participants: int, total_tasks: int, completed_tasks: int
+```
 
-### 6. Локализация (i18n)
-- Два языка: Русский (по умолчанию) + English
-- Библиотека: react-i18next
-- Переключение через MenuModal
-- Сохранение в localStorage
+### room_participants
+```python
+room_id: UUID, telegram_id: int, username, first_name, avatar_url
+role: str ('owner'|'member'), joined_at: datetime, referral_code: int
+```
 
-### 7. Анимации
-- Framer Motion для всех модальных окон и переходов
-- Haptic feedback на всех кнопках
-- Swipe gestures для удаления задач (в разработке)
-- Confetti при получении достижений
-
-### 8. Drag & Drop
-- Личные задачи: перетаскивание для изменения порядка
-- Групповые задачи: аналогично
-- Сохранение order в БД
-- Библиотека: Framer Motion Reorder
-
-### 9. Кэширование
-- Список факультетов кэшируется (cache.py)
-- Расписания кэшируются на 1 час
-- Погода обновляется раз в 30 минут
-
-### 10. Уведомления
-- Scheduler (APScheduler) проверяет пары каждую минуту
-- Отправка за N минут до начала (настраивается юзером 5-30 мин)
-- Уведомления через Telegram Bot API
-- Бот присылает сообщение с деталями пары
+### group_tasks (групповые задачи)
+```python
+id: UUID, room_id: UUID, text: str, description: str, completed: bool
+priority: str, deadline: datetime?, created_by: int, assigned_to: [int]
+category: str, tags: [str], order: int
+created_at: datetime, updated_at: datetime
+completed_by: int?, completed_at: datetime?
+```
 
 ---
 
-## 🚀 Быстрый старт для разработки
+## КРИТИЧЕСКИЕ ПРАВИЛА
 
-### Запуск проекта
-```bash
-# Backend запускается через supervisor
-sudo supervisorctl restart backend
+### ❌ НИКОГДА НЕ ДЕЛАТЬ:
+1. Хардкодить URLs/ports в коде (использовать .env переменные)
+2. Использовать `npm` для frontend (только `yarn`!)
+3. Использовать MongoDB ObjectID (только UUID!)
+4. Забывать префикс `/api/` для backend routes
+5. Изменять .env файлы без крайней необходимости
+6. Модифицировать URL variables: `REACT_APP_BACKEND_URL`, `MONGO_URL`
 
-# Frontend запускается через supervisor
-sudo supervisorctl restart frontend
-
-# Проверка статуса
-sudo supervisorctl status
-```
-
-### Просмотр логов
-```bash
-# Backend логи
-tail -f /var/log/supervisor/backend.*.log
-
-# Frontend логи
-tail -f /var/log/supervisor/frontend.*.log
-```
-
-### Установка зависимостей
-```bash
-# Backend
-cd /app/backend
-pip install -r requirements.txt
-
-# Frontend (ТОЛЬКО yarn, НЕ npm!)
-cd /app/frontend
-yarn install
-```
+### ✅ ВСЕГДА ДЕЛАТЬ:
+1. Проверять логи после изменений
+2. Использовать hot reload (работает для большинства изменений)
+3. Следовать существующим паттернам кода
+4. Тестировать в Telegram Web App (не в обычном браузере)
+5. Читать AI_CONTEXT.md перед началом работы
 
 ### Environment Variables
-
-**Backend (.env):**
+**Backend .env:**
 ```env
 MONGO_URL=mongodb://localhost:27017/rudn_schedule
-TELEGRAM_BOT_TOKEN=7331940900:AAHSyUlhEHjgCsRr_4vkAq5BXEPTdtEEVN8
-WEATHER_API_KEY=5b6f79f92cc27dd38d47c82b74e18e84
+TELEGRAM_BOT_TOKEN=...
+WEATHER_API_KEY=...
 ```
 
-**Frontend (.env):**
+**Frontend .env:**
 ```env
 REACT_APP_BACKEND_URL=https://class-progress-1.preview.emergentagent.com
 ```
 
 ---
 
-## 📊 Статистика проекта
+## КОМПОНЕНТЫ FRONTEND (30+)
 
-- **Backend LOC:** ~6,000 строк Python
-- **Frontend LOC:** ~10,000 строк React/JSX
-- **Всего компонентов:** 30+
-- **API endpoints:** 50+
-- **Достижений:** 25
-- **Коллекций в БД:** 7
-- **Языков:** 2 (RU/EN)
-- **Время разработки:** ~200+ часов
+**Главные экраны:** App.js, GroupSelector.jsx, WelcomeScreen.jsx
+
+**Навигация:** Header.jsx, BottomNavigation.jsx, DesktopSidebar.jsx
+
+**Расписание:** LiveScheduleCard, LiveScheduleCarousel, LiveScheduleSection, WeekDaySelector, CalendarModal
+
+**Задачи:** TasksSection.jsx (900+ LOC), AddTaskModal, EditTaskModal, TaskDetailModal
+
+**Комнаты:** RoomCard, RoomDetailModal, CreateRoomModal, AddRoomTaskModal, EditRoomTaskModal, GroupTaskCard, GroupTaskDetailModal, RoomParticipantsList, RoomStatsPanel
+
+**Модалки:** AnalyticsModal, AchievementsModal, NotificationSettings, ProfileModal, MenuModal, ShareScheduleModal
+
+**UI:** AchievementNotification, SkeletonCard, LoadingScreen, SwipeHint, TagsInput, TopGlow
 
 ---
 
-## 🔗 Полезные ссылки
+## ВАЖНЫЕ ОСОБЕННОСТИ
 
-- **Telegram Bot:** [@rudn_pro_bot](https://t.me/rudn_pro_bot)
-- **Frontend URL:** https://class-progress-1.preview.emergentagent.com
+### 1. Telegram Web App Integration
+- `window.Telegram.WebApp` API
+- Haptic Feedback на всех кнопках
+- MainButton/BackButton для навигации
+- initDataUnsafe для получения telegram_id
+
+### 2. Система достижений
+- 25 достижений (achievements.py)
+- Автопроверка при каждом действии
+- Всплывающие уведомления с конфетти
+- Points суммируются в total_points
+
+### 3. Реферальная система
+- Invite links: `https://t.me/{bot}?start=room_{token}_ref_{user_id}`
+- Трекинг через referral_code
+- Достижения за приглашения
+
+### 4. Hot Reload
+- Frontend: Vite (port 3000)
+- Backend: uvicorn --reload (port 8001)
+- Рестарт только при: установке зависимостей, изменении .env
+
+### 5. Локализация (i18n)
+- Языки: RU (default) + EN
+- Библиотека: react-i18next
+- Сохранение в localStorage
+
+### 6. Анимации
+- Framer Motion для модалок и переходов
+- Swipe gestures для удаления задач
+- Drag & Drop для изменения порядка (Framer Motion Reorder)
+
+### 7. Кэширование
+- Факультеты кэшируются (cache.py)
+- Расписания: 1 час
+- Погода: 30 минут
+
+### 8. Уведомления
+- APScheduler проверяет каждую минуту
+- Отправка за N минут до пары (настраивается 5-30 мин)
+- Через Telegram Bot API
+
+---
+
+## БЫСТРЫЕ КОМАНДЫ
+
+### Управление сервисами
+```bash
+# Перезапуск
+sudo supervisorctl restart all
+sudo supervisorctl restart backend
+sudo supervisorctl restart frontend
+
+# Статус
+sudo supervisorctl status
+
+# Логи
+tail -f /var/log/supervisor/backend.*.log
+tail -f /var/log/supervisor/frontend.*.log
+tail -50 /var/log/supervisor/backend.err.log | grep -i error
+```
+
+### Установка зависимостей
+```bash
+# Backend
+cd /app/backend
+pip install PACKAGE && echo "PACKAGE" >> requirements.txt
+
+# Frontend (ТОЛЬКО yarn!)
+cd /app/frontend
+yarn add PACKAGE
+```
+
+### Навигация по проекту
+```bash
+# Backend файлы
+ls -la /app/backend/*.py
+
+# Frontend компоненты
+ls -la /app/frontend/src/components/
+
+# API endpoints
+grep -n "@app\." /app/backend/server.py | head -20
+
+# MongoDB коллекции
+grep -n "db\[" /app/backend/server.py | cut -d"[" -f2 | cut -d"]" -f1 | sort -u
+```
+
+---
+
+## ТИПИЧНЫЕ ЗАДАЧИ
+
+| Задача | Файлы |
+|--------|-------|
+| Новый API endpoint | `/app/backend/server.py` + `models.py` |
+| Новый UI компонент | `/app/frontend/src/components/NewComponent.jsx` |
+| Новое достижение | `/app/backend/achievements.py` (массив ACHIEVEMENTS) |
+| Логика уведомлений | `/app/backend/notifications.py` + `scheduler.py` |
+| Новая страница | `/app/frontend/src/App.js` + новый компонент |
+| Схема БД | `/app/backend/models.py` (Pydantic) |
+| Перевод | `/app/frontend/src/i18n/locales/ru.json` и `en.json` |
+| Стили | Компонент (Tailwind) или `/app/frontend/src/index.css` |
+
+---
+
+## СТАТИСТИКА
+
+- Backend: ~6,000 LOC (Python)
+- Frontend: ~10,000 LOC (React/JSX)
+- Компонентов: 30+
+- API endpoints: 50+
+- Достижений: 25
+- БД коллекций: 7
+- Языков: 2 (RU/EN)
+
+---
+
+## ССЫЛКИ
+
+- **Bot:** [@rudn_pro_bot](https://t.me/rudn_pro_bot)
+- **Frontend:** https://class-progress-1.preview.emergentagent.com
 - **API РУДН:** http://www.rudn.ru/rasp/lessons/view
 - **OpenWeather API:** https://openweathermap.org/api
 
 ---
 
----
-
-## 📚 Дополнительная документация
-
-### Основные файлы проекта:
-- `PROJECT_DETAILS.md` - подробная техническая документация
-- `README.md` - инструкции по запуску и настройке
-- `TASKS_FEATURES.md` - описание функций модуля "Список дел"
-- `TASKS_ROADMAP.md` - план развития модуля задач
-- `ROOMS_DOCUMENTATION_INDEX.md` - индекс документации модуля "Комнаты"
-- `HOW_TO_ENABLE_ROOMS.md` - инструкция по включению комнат
-- `MIGRATION_GUIDE_RU.md` - руководство по миграции
-
-### Структура проекта оптимизирована для ИИ:
-- ✅ Удалено 61 файл с дублирующейся информацией
-- ✅ Оставлено 8 ключевых документов
-- ✅ Сокращение объема документации: 88%
-- ✅ Экономия токенов при анализе: ~90%
-
----
-
-## 🎓 Быстрые команды для ИИ-разработки
-
-### Навигация по проекту
-```bash
-# Структура backend
-ls -la /app/backend/*.py
-
-# Структура frontend компонентов
-ls -la /app/frontend/src/components/
-
-# Список всех API endpoints (поиск по @app.)
-grep -n "@app\." /app/backend/server.py | head -20
-
-# Список всех MongoDB коллекций
-grep -n "db\[" /app/backend/server.py | cut -d"[" -f2 | cut -d"]" -f1 | sort -u
-```
-
-### Дебаг и мониторинг
-```bash
-# Проверка статуса сервисов
-sudo supervisorctl status
-
-# Последние 50 строк логов backend
-tail -50 /var/log/supervisor/backend.err.log
-
-# Живое отслеживание ошибок
-tail -f /var/log/supervisor/backend.err.log | grep -i error
-
-# Проверка подключения к MongoDB
-mongo --eval "db.adminCommand('ping')" rudn_schedule
-```
-
-### Частые задачи
-```bash
-# Полный перезапуск приложения
-sudo supervisorctl restart all && sleep 3 && sudo supervisorctl status
-
-# Установка новой Python библиотеки
-cd /app/backend && pip install PACKAGE_NAME && echo "PACKAGE_NAME" >> requirements.txt
-
-# Установка новой npm библиотеки (ТОЛЬКО через yarn!)
-cd /app/frontend && yarn add PACKAGE_NAME
-
-# Очистка кэша и перезапуск
-sudo supervisorctl restart backend frontend
-```
-
----
-
-## 💡 Советы для ИИ-ассистентов
-
-### ⚠️ Критические правила (НИКОГДА НЕ НАРУШАТЬ):
-1. **НЕ хардкодить URLs/порты** - использовать только переменные окружения
-2. **НЕ использовать npm** - только yarn для frontend
-3. **НЕ использовать ObjectID** - только UUID для ID в MongoDB
-4. **НЕ забывать префикс /api/** для всех backend endpoints
-5. **НЕ изменять .env файлы** без крайней необходимости
-
-### ✅ Лучшие практики:
-1. **Всегда проверяйте логи** после изменений
-2. **Используйте hot reload** - он работает для большинства изменений
-3. **Следуйте существующим паттернам** в коде
-4. **Тестируйте в Telegram Web App** - не в обычном браузере
-5. **Читайте AI_CONTEXT.md первым** - он содержит все ключевые моменты
-
-### 🔍 Где искать информацию:
-- **Про API:** этот файл раздел "API Endpoints" или `server.py` напрямую
-- **Про компоненты:** этот файл раздел "Frontend Компоненты" или файлы в `/app/frontend/src/components/`
-- **Про схемы БД:** этот файл раздел "База данных" или `models.py`
-- **Про достижения:** `/app/backend/achievements.py`
-- **Про уведомления:** `/app/backend/notifications.py`
-- **Про бота:** `/app/backend/telegram_bot.py`
-
----
-
-## 🎯 Типичные задачи и где их решать
-
-| Задача | Файлы для изменения |
-|--------|---------------------|
-| Добавить новый API endpoint | `/app/backend/server.py` + `/app/backend/models.py` |
-| Создать новый UI компонент | `/app/frontend/src/components/NewComponent.jsx` |
-| Добавить новое достижение | `/app/backend/achievements.py` (массив ACHIEVEMENTS) |
-| Изменить логику уведомлений | `/app/backend/notifications.py` + `/app/backend/scheduler.py` |
-| Добавить новую страницу | `/app/frontend/src/App.js` (роутинг) + новый компонент |
-| Изменить схему БД | `/app/backend/models.py` (Pydantic модели) |
-| Добавить перевод | `/app/frontend/src/i18n/locales/ru.json` и `en.json` |
-| Изменить стили | Компонент напрямую (Tailwind classes) или `/app/frontend/src/index.css` |
-
----
-
-**Этот файл содержит ВСЁ необходимое для начала работы с проектом. Удачи! 🚀**
+**Этот файл содержит ВСЁ необходимое для быстрого старта разработки ИИ-сервисом с минимальным потреблением токенов.**
