@@ -66,7 +66,7 @@ export const ShareScheduleModal = ({
     const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
     const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
     
-    const todaySchedule = schedule.filter(item => item.day === formattedDayName);
+    const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
 
     if (todaySchedule.length === 0) {
       return `📅 Расписание на ${dateStr}\n${groupName ? `Группа: ${groupName}\n` : ''}\n✨ Пар нет! Свободный день! 🎉`;
@@ -81,12 +81,18 @@ export const ShareScheduleModal = ({
     todaySchedule.forEach((classItem, index) => {
       text += `${index + 1}. ${classItem.discipline}\n`;
       text += `   ⏰ ${classItem.time}\n`;
-      if (classItem.auditory) {
-        text += `   📍 ${classItem.auditory}\n`;
+      
+      if (classItem.subItems) {
+        classItem.subItems.forEach((subItem) => {
+          if (subItem.auditory) {
+            text += `   📍 ${subItem.auditory}\n`;
+          }
+          if (subItem.teacher) {
+            text += `   👨‍🏫 ${subItem.teacher}\n`;
+          }
+        });
       }
-      if (classItem.teacher) {
-        text += `   👨‍🏫 ${classItem.teacher}\n`;
-      }
+      
       text += `\n`;
     });
 
