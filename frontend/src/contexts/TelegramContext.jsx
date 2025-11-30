@@ -199,12 +199,12 @@ export const TelegramProvider = ({ children }) => {
       };
     } else {
       console.warn('⚠️ Telegram WebApp API недоступен. Разработка вне Telegram.');
-      // Для разработки используем реальный admin ID для тестирования
+      // Mock user для разработки вне Telegram
       setUser({
-        id: 1311283832,
+        id: 999888777,
         first_name: 'Test',
-        last_name: 'Admin',
-        username: 'testadmin',
+        last_name: 'User',
+        username: 'testuser',
       });
       setIsReady(true);
     }
