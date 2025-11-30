@@ -25,7 +25,8 @@ MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 async def test_scheduler():
     client = AsyncIOMotorClient(MONGO_URL)
-    db = client.get_default_database()
+    db_name = os.environ.get("DB_NAME", "rudn_schedule")
+    db = client[db_name]
     
     now_msk = datetime.now(MOSCOW_TZ)
     today_str = now_msk.strftime('%Y-%m-%d')
