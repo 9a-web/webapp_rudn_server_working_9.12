@@ -15,7 +15,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from scheduler_v2 import get_scheduler_v2
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Конфигурация
