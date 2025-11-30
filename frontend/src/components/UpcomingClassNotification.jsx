@@ -64,13 +64,13 @@ export const UpcomingClassNotification = ({ schedule }) => {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ y: -100, opacity: 0, x: '-50%' }}
-        animate={{ y: 0, opacity: 1, x: '-50%' }}
-        exit={{ y: -100, opacity: 0, x: '-50%' }}
-        className="fixed top-4 left-1/2 z-50 w-[90%] max-w-sm"
-        style={{ translateX: '-50%' }}
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -100, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed top-4 left-0 right-0 mx-auto z-[100] w-[95%] md:w-auto md:max-w-md flex justify-center pointer-events-none"
       >
-        <div className="bg-black/80 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/10">
+        <div className="pointer-events-auto w-full max-w-sm bg-black/80 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/10">
           <div className="bg-blue-500/20 p-2 rounded-full flex-shrink-0">
             <Clock className="w-5 h-5 text-blue-400" />
           </div>
