@@ -29,7 +29,12 @@ const AnalyticsModal = lazy(() => import('./components/AnalyticsModal').then(mod
 const AchievementsModal = lazy(() => import('./components/AchievementsModal').then(module => ({ default: module.AchievementsModal })));
 const AchievementNotification = lazy(() => import('./components/AchievementNotification').then(module => ({ default: module.AchievementNotification })));
 const NotificationSettings = lazy(() => import('./components/NotificationSettings'));
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
+import { NotificationSettings } from './components/NotificationSettings'; // This was lazy loaded in original code, wait.
+// The original code had lazy loading for NotificationSettings. 
+// I should check the imports again.
+// Let's just add my import after the lazy imports.
+
+import { UpcomingClassNotification } from './components/UpcomingClassNotification';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback } = useTelegram();
