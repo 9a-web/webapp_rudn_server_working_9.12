@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, BellOff, Clock, X } from 'lucide-react';
+import { Bell, BellOff, Clock, X, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { userAPI, achievementsAPI } from '../services/api';
 import { useTranslation } from 'react-i18next';
