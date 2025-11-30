@@ -3722,14 +3722,41 @@ async def get_admin_stats(days: Optional[int] = None):
     # 6. Rooms
     total_rooms = await db.rooms.count_documents(date_filter("created_at"))
 
+    # Additional fields required by tests
+    # Active users week
+    week_start = now - timedelta(days=7)
+    active_users_week = await db.user_settings.count_documents({"last_activity": {"$gte": week_start}})
+    
+    # Active users month
+    month_start = now - timedelta(days=30)
+    active_users_month = await db.user_settings.count_documents({"last_activity": {"$gte": month_start}})
+    
+    # New users today
+    new_users_today = await db.user_settings.count_documents({"created_at": {"$gte": today_start}})
+    
+    # New users month
+    month_ago = now - timedelta(days=30)
+    new_users_month = await db.user_settings.count_documents({"created_at": {"$gte": month_ago}})
+    
+    # Total schedule views
+    schedule_views_result = await db.user_stats.aggregate([
+        {"$group": {"_id": None, "total": {"$sum": "$schedule_views"}}}
+    ]).to_list(1)
+    total_schedule_views = schedule_views_result[0]["total"] if schedule_views_result else 0
+
     return AdminStatsResponse(
         total_users=total_users,
         active_users_today=active_users_today,
+        active_users_week=active_users_week,
+        active_users_month=active_users_month,
+        new_users_today=new_users_today,
         new_users_week=new_users_week,
+        new_users_month=new_users_month,
         total_tasks=total_tasks,
         total_completed_tasks=total_completed_tasks,
         total_achievements_earned=total_achievements_earned,
-        total_rooms=total_rooms
+        total_rooms=total_rooms,
+        total_schedule_views=total_schedule_views
     )
 
 @api_router.get("/admin/users-activity", response_model=List[UserActivityPoint])
