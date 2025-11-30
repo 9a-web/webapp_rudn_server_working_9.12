@@ -256,6 +256,24 @@ export const NotificationSettings = ({
           </div>
         )}
 
+        {/* Test Notification Button */}
+        {enabled && (
+          <div className="mb-6">
+            <button
+              onClick={handleTestNotification}
+              disabled={testing}
+              className="w-full py-3 px-4 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium transition-colors flex items-center justify-center gap-2 border border-blue-100"
+            >
+              {testing ? (
+                <div className="w-4 h-4 border-2 border-blue-700 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              {testing ? 'Отправка...' : 'Проверить уведомление'}
+            </button>
+          </div>
+        )}
+
         {/* Info */}
         <div className="bg-blue-50 rounded-xl p-4 mb-6">
           <p className="text-sm text-blue-900 mb-2">
