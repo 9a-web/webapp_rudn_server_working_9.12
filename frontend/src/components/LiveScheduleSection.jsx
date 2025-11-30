@@ -29,6 +29,18 @@ export const LiveScheduleSection = ({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { t, i18n } = useTranslation();
   
+  // Debug: логируем user.id для проверки доступа к админ панели
+  useEffect(() => {
+    if (user) {
+      const isAdmin = String(user.id) === '765963392' || String(user.id) === '1311283832';
+      console.log('👤 Admin Panel Check:', { 
+        userId: user.id, 
+        userIdType: typeof user.id,
+        isAdmin 
+      });
+    }
+  }, [user]);
+  
   // Motion values для swipe индикатора
   const x = useMotionValue(0);
   const opacity = useTransform(x, [-100, 0, 100], [0.5, 0, 0.5]);
