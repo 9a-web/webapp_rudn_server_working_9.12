@@ -3338,6 +3338,72 @@ async def get_course_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/admin/stats", response_model=AdminStatsResponse)
+async def get_admin_stats(days: Optional[int] = None):
+    """Get general statistics for admin panel"""
+    now = datetime.utcnow()
+    start_date = None
+    if days:
+        start_date = now - timedelta(days=days)
+
+    # Helper to apply date filter
+    def date_filter(field_name="created_at"):
+        return {field_name: {"$gte": start_date}} if start_date else {}
+
+    # 1. Total Users
+    total_users = await db.user_settings.count_documents(date_filter("created_at"))
+    
+    # 2. Active Users Today
+    today_start = datetime(now.year, now.month, now.day)
+    active_users_today = await db.user_settings.count_documents({"last_activity": {"$gte": today_start}})
+    
+    # 3. New Users Week
+    week_ago = now - timedelta(days=7)
+    new_users_week = await db.user_settings.count_documents({"created_at": {"$gte": week_ago}})
+    
+    # 4. Tasks
+    total_tasks = await db.tasks.count_documents(date_filter("created_at"))
+    total_completed_tasks = await db.tasks.count_documents({"completed": True, **date_filter("created_at")})
+    
+    # 5. Achievements
+    total_achievements_earned = await db.user_achievements.count_documents(date_filter("earned_at"))
+    
+    # 6. Rooms
+    total_rooms = await db.rooms.count_documents(date_filter("created_at"))
+    
+    # Additional fields
+    week_start = now - timedelta(days=7)
+    active_users_week = await db.user_settings.count_documents({"last_activity": {"$gte": week_start}})
+    
+    month_start = now - timedelta(days=30)
+    active_users_month = await db.user_settings.count_documents({"last_activity": {"$gte": month_start}})
+    
+    new_users_today = await db.user_settings.count_documents({"created_at": {"$gte": today_start}})
+    
+    month_ago = now - timedelta(days=30)
+    new_users_month = await db.user_settings.count_documents({"created_at": {"$gte": month_ago}})
+    
+    # Total schedule views
+    schedule_views_result = await db.user_stats.aggregate([
+        {"$group": {"_id": None, "total": {"$sum": "$schedule_views"}}}
+    ]).to_list(1)
+    total_schedule_views = schedule_views_result[0]["total"] if schedule_views_result else 0
+
+    return AdminStatsResponse(
+        total_users=total_users,
+        active_users_today=active_users_today,
+        active_users_week=active_users_week,
+        active_users_month=active_users_month,
+        new_users_today=new_users_today,
+        new_users_week=new_users_week,
+        new_users_month=new_users_month,
+        total_tasks=total_tasks,
+        total_completed_tasks=total_completed_tasks,
+        total_achievements_earned=total_achievements_earned,
+        total_rooms=total_rooms,
+        total_schedule_views=total_schedule_views
+    )
+
 
 # ============ Экспорт/Импорт базы данных ============
 
