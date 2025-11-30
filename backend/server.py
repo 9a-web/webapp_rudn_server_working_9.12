@@ -3019,9 +3019,9 @@ async def get_hourly_activity(days: Optional[int] = 30):
             if hour is not None:
                 hourly_data[hour] = result["count"]
         
-        # Преобразуем результат
+        # Преобразуем результат (hour как integer 0-23)
         activity = [
-            HourlyActivityPoint(hour=f"{hour:02d}:00", count=count)
+            HourlyActivityPoint(hour=hour, count=count)
             for hour, count in hourly_data.items()
         ]
         
