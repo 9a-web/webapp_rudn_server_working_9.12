@@ -20,7 +20,8 @@
 - `models.py` (750 LOC) - Pydantic схемы
 - `telegram_bot.py` (850 LOC) - Telegram Bot логика
 - `achievements.py` (630 LOC) - 25 достижений
-- `scheduler.py` (460 LOC) - APScheduler (уведомления о парах)
+- `scheduler_v2.py` (720 LOC) - **НОВЫЙ** Улучшенный планировщик уведомлений V2
+- `scheduler.py` (460 LOC) - ⚠️ Старый планировщик (резерв)
 - `rudn_parser.py` (310 LOC) - парсинг API РУДН
 - `notifications.py` (140 LOC) - рассылка через Bot API
 - `weather.py` (120 LOC) - OpenWeatherMap API
