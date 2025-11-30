@@ -34,7 +34,7 @@ async def test_scheduler_v2():
     # Подключаемся к БД
     mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/rudn_schedule')
     client = AsyncIOMotorClient(mongo_url)
-    db = client.get_database()
+    db = client['rudn_schedule']
     
     print("✅ Подключение к MongoDB установлено")
     print()
