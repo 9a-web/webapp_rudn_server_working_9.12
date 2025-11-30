@@ -2,7 +2,7 @@
  * API для работы с групповыми задачами
  */
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 export const groupTasksAPI = {
   /**
