@@ -525,17 +525,20 @@ const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName,
                       <span className="font-semibold">{classItem.time}</span>
                     </div>
                     
-                    {classItem.auditory && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <span className="text-sm">{classItem.auditory}</span>
-                      </div>
-                    )}
-                    
-                    {classItem.teacher && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <span className="text-sm">{classItem.teacher}</span>
-                      </div>
-                    )}
+                    {classItem.subItems && classItem.subItems.map((subItem, idx) => (
+                        <div key={idx} className={idx > 0 ? "mt-2 pt-2 border-t border-gray-100" : ""}>
+                            {subItem.auditory && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <span className="text-sm">{subItem.auditory}</span>
+                              </div>
+                            )}
+                            {subItem.teacher && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <span className="text-sm">{subItem.teacher}</span>
+                              </div>
+                            )}
+                        </div>
+                    ))}
                   </div>
                 </div>
               </div>
