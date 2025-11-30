@@ -857,7 +857,8 @@ def main() -> None:
             poll_interval=2.0 # Увеличиваем интервал для снижения нагрузки
         )
     except Exception as e:
-        if "Conflict" in str(e):
+        error_msg = str(e)
+        if "Conflict" in error_msg:
              logger.error("❌ Ошибка Conflict: Бот уже запущен в другом месте. Polling отключен в этом процессе.")
              # В этом случае мы просто выходим, так как бот не может работать
              # Но если это supervisor, он попытается перезапустить. 
