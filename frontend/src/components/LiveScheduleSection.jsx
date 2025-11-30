@@ -222,7 +222,33 @@ export const LiveScheduleSection = ({
   // Фильтруем расписание по выбранному дню
   const currentDayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
   const formattedDayName = currentDayName.charAt(0).toUpperCase() + currentDayName.slice(1);
-  const todaySchedule = mockSchedule.filter(item => item.day === formattedDayName);
+  const rawTodaySchedule = mockSchedule.filter(item => item.day === formattedDayName);
+
+  // Группируем предметы с одинаковым названием и временем
+  const todaySchedule = useMemo(() => {
+    const groups = {};
+    
+    rawTodaySchedule.forEach(item => {
+      // Создаем уникальный ключ на основе названия и времени
+      const key = `${item.discipline?.trim()}-${item.time?.trim()}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          ...item,
+          subItems: [] // Массив для хранения деталей каждого под-предмета
+        };
+      }
+      
+      // Добавляем детали (преподаватель, аудитория) в subItems
+      groups[key].subItems.push({
+        teacher: item.teacher,
+        auditory: item.auditory,
+        raw: item
+      });
+    });
+    
+    return Object.values(groups);
+  }, [rawTodaySchedule]);
 
   return (
     <div className="bg-white rounded-t-[40px] mt-6 min-h-screen">
