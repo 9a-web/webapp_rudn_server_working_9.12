@@ -9,6 +9,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import pytz
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения
+load_dotenv('/app/backend/.env')
 
 # Добавляем backend в path
 sys.path.insert(0, '/app/backend')
