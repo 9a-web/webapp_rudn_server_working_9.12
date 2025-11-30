@@ -2927,10 +2927,7 @@ async def get_referral_tree(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============ Админ панель API ============
-
-@api_router.get("/admin/stats")
-async def get_admin_stats(days: Optional[int] = None):
+# Duplicate admin endpoints removed - using the improved implementation below
     """
     Получить общую статистику для админ панели
     """
