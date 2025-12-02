@@ -4248,6 +4248,48 @@ async def link_student(journal_id: str, student_id: str, data: JournalStudentLin
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/journals/{journal_id}/students/{student_id}/unlink")
+async def unlink_student(journal_id: str, student_id: str):
+    """Отвязать Telegram пользователя от ФИО в журнале"""
+    try:
+        student = await db.journal_students.find_one({"id": student_id, "journal_id": journal_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        if not student.get("is_linked"):
+            return {"status": "success", "message": "Student is not linked"}
+        
+        # Сохраняем telegram_id до отвязки
+        old_telegram_id = student.get("telegram_id")
+        
+        # Отвязать студента
+        await db.journal_students.update_one(
+            {"id": student_id},
+            {"$set": {
+                "telegram_id": None,
+                "username": None,
+                "first_name": None,
+                "is_linked": False,
+                "linked_at": None
+            }}
+        )
+        
+        # Удалить из pending members если там был
+        if old_telegram_id:
+            await db.journal_pending_members.delete_many({
+                "journal_id": journal_id,
+                "telegram_id": old_telegram_id
+            })
+        
+        logger.info(f"Student {student_id} unlinked from telegram")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unlinking student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/journals/{journal_id}/pending-members")
 async def get_pending_members(journal_id: str):
     """Получить список ожидающих привязки участников"""
