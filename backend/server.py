@@ -766,7 +766,7 @@ async def get_user_profile_photo_proxy(telegram_id: int):
     try:
         from telegram import Bot
         
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = get_telegram_bot_token()
         if not bot_token:
             raise HTTPException(status_code=404, detail="Bot token not configured")
         
