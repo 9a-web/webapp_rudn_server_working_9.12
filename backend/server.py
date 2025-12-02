@@ -4279,8 +4279,17 @@ async def process_journal_webapp_invite(data: ProcessJournalInviteRequest):
                 await db.journal_pending_members.delete_one({"_id": existing_pending["_id"]})
             
             # Создаем нового студента и сразу привязываем его
-            # Используем first_name из Telegram как ФИО (пользователь может изменить позже)
-            student_name = data.first_name or data.username or f"Студент {data.telegram_id}"
+            # Приоритет имени: @username, затем Имя Фамилия из Telegram
+            if data.username:
+                student_name = f"@{data.username}"
+            elif data.first_name:
+                # Собираем полное имя из first_name и last_name
+                name_parts = [data.first_name]
+                if data.last_name:
+                    name_parts.append(data.last_name)
+                student_name = " ".join(name_parts)
+            else:
+                student_name = f"Студент {data.telegram_id}"
             
             # Получаем максимальный order для новых студентов
             max_order_student = await db.journal_students.find_one(
