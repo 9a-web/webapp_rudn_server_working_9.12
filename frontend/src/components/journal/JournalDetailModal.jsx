@@ -434,7 +434,7 @@ export const JournalDetailModal = ({
                                   </span>
                                 )}
                                 {/* Кнопка копирования персональной ссылки */}
-                                {student.invite_link && (
+                                {(student.invite_link_webapp || student.invite_link) && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
