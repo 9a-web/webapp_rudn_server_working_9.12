@@ -4899,7 +4899,7 @@ class RUDNScheduleAPITester:
                 
                 if student_response.status_code != 200:
                     self.log_test("Student Invite Links - Add Students", False, 
-                                f"Failed to add student {student_data['name']}: HTTP {student_response.status_code}: {student_response.text}")
+                                f"Failed to add student {student_data['full_name']}: HTTP {student_response.status_code}: {student_response.text}")
                     return False
                 
                 student = student_response.json()
