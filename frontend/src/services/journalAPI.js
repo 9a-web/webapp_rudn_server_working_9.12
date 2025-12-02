@@ -285,3 +285,14 @@ export const getJournalStats = async (journalId) => {
     throw error;
   }
 };
+
+
+export const updateStudent = async (journalId, studentId, data) => {
+  const response = await api.put(`/journals/${journalId}/students/${studentId}`, data);
+  return response.data;
+};
+
+export const unlinkStudent = async (journalId, studentId) => {
+    const response = await api.post(`/journals/${journalId}/students/${studentId}/unlink`);
+    return response.data;
+};
