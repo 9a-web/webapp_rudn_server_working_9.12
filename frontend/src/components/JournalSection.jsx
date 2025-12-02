@@ -30,6 +30,30 @@ export const JournalSection = ({ telegramId, hapticFeedback, userSettings, pendi
     loadJournals();
   }, [loadJournals]);
 
+  // Автоматическое открытие журнала по pendingJournalId (после присоединения по ссылке)
+  useEffect(() => {
+    if (pendingJournalId && journals.length > 0 && !isLoading) {
+      console.log('📖 Ищем журнал для автооткрытия:', pendingJournalId);
+      const journalToOpen = journals.find(j => j.journal_id === pendingJournalId);
+      
+      if (journalToOpen) {
+        console.log('✅ Найден журнал, открываем:', journalToOpen.name);
+        setSelectedJournal(journalToOpen);
+        
+        // Сбрасываем pendingJournalId после открытия
+        if (onPendingJournalHandled) {
+          onPendingJournalHandled();
+        }
+      } else {
+        console.log('⚠️ Журнал не найден в списке, возможно ожидает привязки');
+        // Сбрасываем pendingJournalId даже если журнал не найден
+        if (onPendingJournalHandled) {
+          onPendingJournalHandled();
+        }
+      }
+    }
+  }, [pendingJournalId, journals, isLoading, onPendingJournalHandled]);
+
   const handleCreateJournal = async (journalData) => {
     try {
       await createJournal({
