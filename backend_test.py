@@ -5171,6 +5171,205 @@ class RUDNScheduleAPITester:
             self.log_test("Student Personal Invite Links - Complete Test", False, f"Exception: {str(e)}")
             return False
 
+    def test_journal_process_webapp_invite(self) -> bool:
+        """Test POST /api/journals/process-webapp-invite endpoint for processing journal invitations"""
+        try:
+            print("🔍 Testing POST /api/journals/process-webapp-invite...")
+            
+            # Step 1: Create a test journal
+            test_telegram_id = 123456789
+            journal_payload = {
+                "telegram_id": test_telegram_id,
+                "name": "Test Journal",
+                "group_name": "Test Group"
+            }
+            
+            journal_response = self.session.post(
+                f"{self.base_url}/journals",
+                json=journal_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if journal_response.status_code != 200:
+                self.log_test("POST /api/journals/process-webapp-invite - Create Journal", False, 
+                            f"Failed to create journal: HTTP {journal_response.status_code}: {journal_response.text}")
+                return False
+            
+            journal_data = journal_response.json()
+            
+            # Validate journal creation response
+            required_fields = ['journal_id', 'invite_token']
+            for field in required_fields:
+                if field not in journal_data:
+                    self.log_test("POST /api/journals/process-webapp-invite - Create Journal", False, 
+                                f"Journal creation response missing required field: {field}")
+                    return False
+            
+            journal_id = journal_data['journal_id']
+            invite_token = journal_data['invite_token']
+            
+            self.log_test("POST /api/journals/process-webapp-invite - Create Journal", True, 
+                        f"Successfully created test journal with ID: {journal_id}",
+                        {"journal_id": journal_id, "invite_token": invite_token})
+            
+            # Step 2: Process webapp invite for a different user
+            invite_user_id = 987654321
+            process_invite_payload = {
+                "telegram_id": invite_user_id,
+                "username": "test_user",
+                "first_name": "Test",
+                "invite_type": "journal",
+                "invite_code": invite_token
+            }
+            
+            process_response = self.session.post(
+                f"{self.base_url}/journals/process-webapp-invite",
+                json=process_invite_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if process_response.status_code != 200:
+                self.log_test("POST /api/journals/process-webapp-invite - Process Invite", False, 
+                            f"HTTP {process_response.status_code}: {process_response.text}")
+                return False
+            
+            process_result = process_response.json()
+            
+            # Validate process invite response
+            required_response_fields = ['success', 'journal_id', 'status']
+            for field in required_response_fields:
+                if field not in process_result:
+                    self.log_test("POST /api/journals/process-webapp-invite - Process Invite", False, 
+                                f"Process invite response missing required field: {field}")
+                    return False
+            
+            # Validate response values
+            if process_result['success'] != True:
+                self.log_test("POST /api/journals/process-webapp-invite - Process Invite", False, 
+                            f"Expected success=true, got {process_result['success']}")
+                return False
+            
+            if process_result['journal_id'] != journal_id:
+                self.log_test("POST /api/journals/process-webapp-invite - Process Invite", False, 
+                            f"Expected journal_id={journal_id}, got {process_result['journal_id']}")
+                return False
+            
+            # Status should be one of the expected values
+            expected_statuses = ["joined_pending", "already_linked", "owner"]
+            if process_result['status'] not in expected_statuses:
+                self.log_test("POST /api/journals/process-webapp-invite - Process Invite", False, 
+                            f"Unexpected status: {process_result['status']}, expected one of {expected_statuses}")
+                return False
+            
+            self.log_test("POST /api/journals/process-webapp-invite - Process Invite", True, 
+                        "Successfully processed webapp invite",
+                        {
+                            "success": process_result['success'],
+                            "journal_id": process_result['journal_id'],
+                            "status": process_result['status']
+                        })
+            
+            # Step 3: Verify that the user can access the journal
+            user_journals_response = self.session.get(f"{self.base_url}/journals/{invite_user_id}")
+            
+            if user_journals_response.status_code != 200:
+                self.log_test("POST /api/journals/process-webapp-invite - Verify Access", False, 
+                            f"HTTP {user_journals_response.status_code}: {user_journals_response.text}")
+                return False
+            
+            user_journals = user_journals_response.json()
+            
+            # Validate that the journal appears in user's journals list
+            if not isinstance(user_journals, list):
+                self.log_test("POST /api/journals/process-webapp-invite - Verify Access", False, 
+                            "User journals response is not a list")
+                return False
+            
+            # Find the journal in the user's list
+            found_journal = None
+            for journal in user_journals:
+                if journal.get('journal_id') == journal_id:
+                    found_journal = journal
+                    break
+            
+            if not found_journal:
+                self.log_test("POST /api/journals/process-webapp-invite - Verify Access", False, 
+                            "Journal not found in user's journals list after processing invite")
+                return False
+            
+            self.log_test("POST /api/journals/process-webapp-invite - Verify Access", True, 
+                        "Successfully verified user can access journal after processing invite",
+                        {
+                            "user_journals_count": len(user_journals),
+                            "found_journal_name": found_journal.get('name')
+                        })
+            
+            # Step 4: Test with invalid invite code
+            invalid_invite_payload = {
+                "telegram_id": 111222333,
+                "username": "invalid_user",
+                "first_name": "Invalid",
+                "invite_type": "journal",
+                "invite_code": "INVALID_TOKEN_123"
+            }
+            
+            invalid_response = self.session.post(
+                f"{self.base_url}/journals/process-webapp-invite",
+                json=invalid_invite_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            # Should return 404 for invalid invite code
+            if invalid_response.status_code != 404:
+                self.log_test("POST /api/journals/process-webapp-invite - Invalid Code", False, 
+                            f"Expected HTTP 404 for invalid invite code, got {invalid_response.status_code}")
+                return False
+            
+            self.log_test("POST /api/journals/process-webapp-invite - Invalid Code", True, 
+                        "Correctly returned 404 for invalid invite code")
+            
+            # Step 5: Test processing same invite again (should handle gracefully)
+            duplicate_response = self.session.post(
+                f"{self.base_url}/journals/process-webapp-invite",
+                json=process_invite_payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if duplicate_response.status_code != 200:
+                self.log_test("POST /api/journals/process-webapp-invite - Duplicate Invite", False, 
+                            f"HTTP {duplicate_response.status_code}: {duplicate_response.text}")
+                return False
+            
+            duplicate_result = duplicate_response.json()
+            
+            # Should still return success but with appropriate status
+            if duplicate_result['success'] != True:
+                self.log_test("POST /api/journals/process-webapp-invite - Duplicate Invite", False, 
+                            f"Expected success=true for duplicate invite, got {duplicate_result['success']}")
+                return False
+            
+            self.log_test("POST /api/journals/process-webapp-invite - Duplicate Invite", True, 
+                        "Successfully handled duplicate invite processing",
+                        {"status": duplicate_result.get('status')})
+            
+            # Final comprehensive test result
+            self.log_test("POST /api/journals/process-webapp-invite - Complete Test", True, 
+                        "Successfully completed all webapp invite processing tests",
+                        {
+                            "journal_created": True,
+                            "invite_processed": True,
+                            "user_access_verified": True,
+                            "invalid_code_handled": True,
+                            "duplicate_invite_handled": True,
+                            "all_required_fields_present": True
+                        })
+            
+            return True
+            
+        except Exception as e:
+            self.log_test("POST /api/journals/process-webapp-invite - Complete Test", False, f"Exception: {str(e)}")
+            return False
+
 def main():
     """Main test runner"""
     tester = RUDNScheduleAPITester()
