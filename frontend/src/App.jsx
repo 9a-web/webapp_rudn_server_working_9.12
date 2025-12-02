@@ -143,6 +143,50 @@ const Home = () => {
       trackTimeBasedAchievements();
     }
   }, [isReady, user]);
+  
+  // 🔗 Обработка реферального кода из Web App ссылки
+  useEffect(() => {
+    const processReferral = async () => {
+      // Проверяем условия: есть startParam, начинается с ref_, не обработан ещё
+      if (!startParam || !startParam.startsWith('ref_') || referralProcessed || !user) {
+        return;
+      }
+      
+      const referralCode = startParam.replace('ref_', '');
+      console.log('🔗 Обработка реферального кода из Web App:', referralCode);
+      
+      try {
+        const result = await processReferralWebApp({
+          telegram_id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          referral_code: referralCode
+        });
+        
+        setReferralProcessed(true);
+        
+        if (result.success) {
+          console.log('✅ Реферальный код обработан:', result.message);
+          hapticFeedback('success');
+          showAlert(result.message);
+        } else {
+          console.log('ℹ️ Реферальный код не применён:', result.message);
+          // Не показываем ошибку если пользователь уже был приглашён ранее
+          if (!result.message.includes('уже')) {
+            showAlert(result.message);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Ошибка обработки реферального кода:', error);
+        setReferralProcessed(true);
+      }
+    };
+    
+    if (isReady && user && startParam) {
+      processReferral();
+    }
+  }, [isReady, user, startParam, referralProcessed]);
 
   // Загрузка расписания при изменении настроек или недели
   useEffect(() => {
