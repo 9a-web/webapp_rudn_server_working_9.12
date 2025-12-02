@@ -152,3 +152,15 @@ agent_communication:
       - working: true
         agent: "testing"
         comment: "✅ Successfully tested all Student Personal Invite Links functionality. Verified: 1) GET/POST /api/journals/{journal_id}/students returns students with unique invite_code (8 chars) and invite_link (Telegram format), 2) POST /api/journals/join-student/{invite_code} handles all scenarios: valid code links student, invalid code returns 404, already linked returns success, different student returns already_linked, occupied student returns occupied, 3) POST /api/journals/{journal_id}/students/{student_id}/unlink successfully resets telegram fields and is_linked status. All test cases passed including edge cases."
+
+  - task: "POST /api/journals/process-webapp-invite - обработка приглашений в журнал"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested POST /api/journals/process-webapp-invite endpoint. Verified: 1) Creates test journal and returns journal_id and invite_token, 2) Processes webapp invite correctly returning success=true, journal_id, and status (joined_pending), 3) User can access journal after processing invite via GET /api/journals/{telegram_id}, 4) Handles invalid invite codes correctly (returns success=false, status=not_found), 5) Handles duplicate invites gracefully. All required response fields present and working as expected for journal auto-opening functionality."
