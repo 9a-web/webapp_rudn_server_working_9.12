@@ -112,6 +112,17 @@ export const joinJournal = async (inviteToken, userData) => {
   }
 };
 
+// Обработать приглашение в журнал через Web App (startapp параметр)
+export const processJournalWebAppInvite = async (data) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/journals/process-webapp-invite`, data);
+    return response.data;
+  } catch (error) {
+    console.error('Error processing journal webapp invite:', error);
+    throw error;
+  }
+};
+
 // ===== Студенты =====
 
 // Добавить студента
