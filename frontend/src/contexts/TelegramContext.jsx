@@ -19,7 +19,16 @@ export const TelegramProvider = ({ children }) => {
   const [webApp, setWebApp] = useState(null);
   const [user, setUser] = useState(null);
   const [isReady, setIsReady] = useState(false);
-  const [startParam, setStartParam] = useState(null); // Параметр startapp из ссылки
+  
+  // Получаем startParam сразу при инициализации (без useState чтобы избежать каскадных рендеров)
+  const [startParam] = useState(() => {
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
+      const param = window.Telegram.WebApp.initDataUnsafe.start_param;
+      console.log('🔗 Получен start_param при инициализации:', param);
+      return param;
+    }
+    return null;
+  });
 
   useEffect(() => {
     // Инициализация Telegram WebApp
