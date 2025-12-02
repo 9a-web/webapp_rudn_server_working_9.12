@@ -2713,14 +2713,18 @@ async def get_referral_code(telegram_id: int):
         
         # Получаем информацию о боте
         bot_info = await db.bot_info.find_one({})
-        bot_username = bot_info.get("username", "rudn_mosbot") if bot_info else "rudn_mosbot"
+        bot_username = bot_info.get("username", "rudn_pro_bot") if bot_info else "rudn_pro_bot"
         
-        # Формируем реферальную ссылку
+        # Формируем реферальные ссылки
+        # Старый формат через /start (для совместимости)
         referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
+        # Новый формат через Web App (рекомендуемый)
+        referral_link_webapp = f"https://t.me/{bot_username}/app?startapp=ref_{referral_code}"
         
         return ReferralCodeResponse(
             referral_code=referral_code,
             referral_link=referral_link,
+            referral_link_webapp=referral_link_webapp,
             bot_username=bot_username
         )
     
