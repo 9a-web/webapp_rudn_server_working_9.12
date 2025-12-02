@@ -108,6 +108,9 @@ const Home = () => {
   
   // Состояние для обработки приглашения в журнал
   const [journalInviteProcessed, setJournalInviteProcessed] = useState(false);
+  
+  // ID журнала для автоматического открытия после присоединения
+  const [pendingJournalId, setPendingJournalId] = useState(null);
 
   // Состояние для нижнего меню навигации (загружаем из localStorage)
   const [activeTab, setActiveTab] = useState(() => {
