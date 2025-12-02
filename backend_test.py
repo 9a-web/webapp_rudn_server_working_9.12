@@ -4906,7 +4906,7 @@ class RUDNScheduleAPITester:
                 created_students.append(student)
                 
                 # Validate that student has invite_code and invite_link
-                required_fields = ['id', 'name', 'student_id', 'invite_code', 'invite_link']
+                required_fields = ['id', 'full_name', 'invite_code', 'invite_link']
                 for field in required_fields:
                     if field not in student:
                         self.log_test("Student Invite Links - Validate Student Fields", False, 
