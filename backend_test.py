@@ -3589,7 +3589,9 @@ class RUDNScheduleAPITester:
             self.test_journal_crud_operations,
             self.test_journal_students_management,
             self.test_journal_sessions_management,
-            self.test_journal_attendance_operations
+            self.test_journal_attendance_operations,
+            # Student Personal Invite Links Tests
+            self.test_student_personal_invite_links
         ]
         
         passed = 0
