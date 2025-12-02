@@ -92,6 +92,8 @@ from models import (
     ReferralTreeNode,
     ReferralCodeResponse,
     ReferralConnection,
+    ProcessReferralRequest,
+    ProcessReferralResponse,
     # Модели для журнала посещений
     AttendanceJournal,
     JournalCreate,
