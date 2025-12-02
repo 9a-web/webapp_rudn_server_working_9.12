@@ -374,37 +374,62 @@ export const JournalDetailModal = ({
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.03 }}
-                            className="flex items-center justify-between bg-white/5 rounded-xl p-3"
+                            className="bg-white/5 rounded-xl p-3"
                           >
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-gray-500 w-6">{index + 1}.</span>
-                              <div>
-                                <p className="text-white font-medium">{student.full_name}</p>
-                                {student.is_linked ? (
-                                  <p className="text-xs text-green-400 flex items-center gap-1">
-                                    <Check className="w-3 h-3" />
-                                    {student.first_name || student.username}
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-gray-500">Не привязан</p>
-                                )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className="text-xs text-gray-500 w-6 flex-shrink-0">{index + 1}.</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white font-medium truncate">{student.full_name}</p>
+                                  {student.is_linked ? (
+                                    <p className="text-xs text-green-400 flex items-center gap-1">
+                                      <Check className="w-3 h-3" />
+                                      {student.first_name || student.username}
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-gray-500">Не привязан</p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {student.attendance_percent !== null && (
-                                <span className={`text-sm font-medium ${
-                                  student.attendance_percent >= 80 ? 'text-green-400' :
-                                  student.attendance_percent >= 50 ? 'text-yellow-400' : 'text-red-400'
-                                }`}>
-                                  {student.attendance_percent}%
-                                </span>
-                              )}
-                              <button
-                                onClick={() => setShowEditStudent(student)}
-                                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                              >
-                                <Settings className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {student.attendance_percent !== null && (
+                                  <span className={`text-sm font-medium ${
+                                    student.attendance_percent >= 80 ? 'text-green-400' :
+                                    student.attendance_percent >= 50 ? 'text-yellow-400' : 'text-red-400'
+                                  }`}>
+                                    {student.attendance_percent}%
+                                  </span>
+                                )}
+                                {/* Кнопка копирования персональной ссылки */}
+                                {student.invite_link && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopyStudentLink(student);
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      copiedStudentId === student.id
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : student.is_linked
+                                          ? 'hover:bg-white/10 text-gray-500 hover:text-gray-400'
+                                          : 'hover:bg-white/10 text-blue-400 hover:text-blue-300'
+                                    }`}
+                                    title={student.is_linked ? "Ссылка (место занято)" : "Скопировать ссылку"}
+                                  >
+                                    {copiedStudentId === student.id ? (
+                                      <Check className="w-4 h-4" />
+                                    ) : (
+                                      <Link2 className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setShowEditStudent(student)}
+                                  className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                                >
+                                  <Settings className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                           </motion.div>
                         ))}
