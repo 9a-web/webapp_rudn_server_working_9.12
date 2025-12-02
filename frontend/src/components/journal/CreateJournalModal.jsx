@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileCheck, Palette, Users, BookOpen } from 'lucide-react';
+import { X, FileCheck, Palette, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const COLORS = [
@@ -12,16 +12,22 @@ const COLORS = [
   { id: 'indigo', gradient: 'from-indigo-400 to-violet-400', bg: 'bg-indigo-500' },
 ];
 
-export const CreateJournalModal = ({ isOpen, onClose, onCreate, hapticFeedback }) => {
+export const CreateJournalModal = ({ isOpen, onClose, onCreate, hapticFeedback, defaultGroupName = '' }) => {
   const { t } = useTranslation();
-  const [name, setName] = useState('');
-  const [groupName, setGroupName] = useState('');
+  const [groupName, setGroupName] = useState(defaultGroupName);
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('purple');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Обновляем groupName при изменении defaultGroupName или открытии модалки
+  useEffect(() => {
+    if (isOpen && defaultGroupName) {
+      setGroupName(defaultGroupName);
+    }
+  }, [isOpen, defaultGroupName]);
+
   const handleCreate = async () => {
-    if (!name.trim() || !groupName.trim()) return;
+    if (!groupName.trim()) return;
     
     if (hapticFeedback?.impactOccurred) {
       hapticFeedback.impactOccurred('medium');
@@ -30,13 +36,12 @@ export const CreateJournalModal = ({ isOpen, onClose, onCreate, hapticFeedback }
     setIsLoading(true);
     try {
       await onCreate({
-        name: name.trim(),
+        name: groupName.trim(), // Используем название группы как название журнала
         group_name: groupName.trim(),
         description: description.trim() || null,
         color
       });
-      setName('');
-      setGroupName('');
+      setGroupName(defaultGroupName);
       setDescription('');
       setColor('purple');
       onClose();
