@@ -71,6 +71,7 @@ export const JournalDetailModal = ({
   const [showAttendance, setShowAttendance] = useState(null); // session_id
   const [showLinkStudent, setShowLinkStudent] = useState(null); // student to link
   const [showInviteLink, setShowInviteLink] = useState(false);
+  const [showEditStudent, setShowEditStudent] = useState(null); // student to edit
   const [inviteLink, setInviteLink] = useState('');
 
   const loadData = useCallback(async () => {
