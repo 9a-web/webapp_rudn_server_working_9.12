@@ -1663,9 +1663,9 @@ async def send_room_join_notifications_api(room_doc: dict, new_user_name: str, n
     try:
         from telegram import Bot
         
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = get_telegram_bot_token()
         if not bot_token:
-            logger.warning("⚠️ TELEGRAM_BOT_TOKEN не настроен, уведомления не отправлены")
+            logger.warning("⚠️ Токен бота не настроен, уведомления не отправлены")
             return
         
         bot = Bot(token=bot_token)
