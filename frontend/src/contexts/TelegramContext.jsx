@@ -19,6 +19,7 @@ export const TelegramProvider = ({ children }) => {
   const [webApp, setWebApp] = useState(null);
   const [user, setUser] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const [startParam, setStartParam] = useState(null); // Параметр startapp из ссылки
 
   useEffect(() => {
     // Инициализация Telegram WebApp
