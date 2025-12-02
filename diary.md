@@ -31,7 +31,6 @@
 - [x] MyAttendanceView (внутри JournalDetailModal)
 
 ### Фаза 6: Полировка
-- [ ] Локализация (i18n)
 - [x] Telegram Bot интеграция (приглашения через jstudent_{code})
 - [ ] Дополнительная статистика и аналитика
 
