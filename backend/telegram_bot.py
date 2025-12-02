@@ -542,6 +542,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 invite_token=journal_invite_token
             )
         
+        # Обрабатываем персональную ссылку студента (если есть)
+        student_join_data = None
+        if student_invite_code:
+            student_join_data = await join_user_to_journal_by_student_code(
+                telegram_id=telegram_id,
+                username=username,
+                first_name=first_name,
+                student_invite_code=student_invite_code
+            )
+        
         if not existing_user:
             # Создаем нового пользователя
             import uuid
