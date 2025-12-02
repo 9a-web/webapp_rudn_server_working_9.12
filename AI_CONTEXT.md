@@ -220,9 +220,20 @@ created_at: datetime, sent_at: datetime?
 **Backend .env:**
 ```env
 MONGO_URL=mongodb://localhost:27017/rudn_schedule
-TELEGRAM_BOT_TOKEN=...
+
+# Environment: "test" или "production"
+ENV=test
+
+# Токены Telegram ботов
+TELEGRAM_BOT_TOKEN=...           # Продакшн бот
+TEST_TELEGRAM_BOT_TOKEN=...      # Тестовый бот
+
 WEATHER_API_KEY=...
 ```
+
+**Переключение между ботами:**
+- `ENV=test` → используется `TEST_TELEGRAM_BOT_TOKEN`
+- `ENV=production` → используется `TELEGRAM_BOT_TOKEN`
 
 **Frontend .env:**
 ```env
