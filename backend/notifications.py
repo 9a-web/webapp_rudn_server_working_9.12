@@ -148,9 +148,12 @@ def get_notification_service() -> TelegramNotificationService:
     global notification_service
     
     if notification_service is None:
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = get_telegram_bot_token()
         if not bot_token:
-            raise ValueError("TELEGRAM_BOT_TOKEN not set in environment variables")
+            raise ValueError("Токен бота не настроен! Проверьте TELEGRAM_BOT_TOKEN и TEST_TELEGRAM_BOT_TOKEN в .env файле")
+        
+        env_mode = "TEST" if is_test_environment() else "PRODUCTION"
+        logger.info(f"🔔 Инициализация сервиса уведомлений в режиме {env_mode}")
         notification_service = TelegramNotificationService(bot_token)
     
     return notification_service
