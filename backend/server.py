@@ -4015,6 +4015,7 @@ async def get_journal_students(journal_id: str):
         total_sessions = await db.journal_sessions.count_documents({"journal_id": journal_id})
         
         result = []
+        bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "rudn_mosbot")
         for s in students:
             # Рассчитать статистику посещаемости
             present_count = await db.attendance_records.count_documents({
@@ -4035,6 +4036,17 @@ async def get_journal_students(journal_id: str):
                 attended = present_count + late_count
                 attendance_percent = round((attended / total_sessions) * 100, 1)
             
+            # Генерируем invite_code если его нет (для старых студентов)
+            invite_code = s.get("invite_code")
+            if not invite_code:
+                invite_code = str(uuid.uuid4())[:8]
+                await db.journal_students.update_one(
+                    {"id": s["id"]},
+                    {"$set": {"invite_code": invite_code}}
+                )
+            
+            invite_link = f"https://t.me/{bot_username}?start=jstudent_{invite_code}"
+            
             result.append(JournalStudentResponse(
                 id=s["id"],
                 journal_id=s["journal_id"],
@@ -4045,6 +4057,8 @@ async def get_journal_students(journal_id: str):
                 is_linked=s.get("is_linked", False),
                 linked_at=s.get("linked_at"),
                 order=s.get("order", 0),
+                invite_code=invite_code,
+                invite_link=invite_link,
                 attendance_percent=attendance_percent,
                 present_count=present_count,
                 absent_count=absent_count,
