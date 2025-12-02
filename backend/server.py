@@ -4217,6 +4217,199 @@ async def join_journal_by_student_link(invite_code: str, data: JoinStudentReques
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/journals/process-webapp-invite")
+async def process_journal_webapp_invite(data: ProcessJournalInviteRequest):
+    """
+    Обработать приглашение в журнал через Web App.
+    Вызывается при открытии приложения по ссылке:
+    - t.me/bot/app?startapp=journal_{invite_token}
+    - t.me/bot/app?startapp=jstudent_{invite_code}
+    """
+    try:
+        logger.info(f"📚 Обработка приглашения в журнал через Web App: type={data.invite_type}, code={data.invite_code}")
+        
+        if data.invite_type == "journal":
+            # Обработка общего приглашения в журнал
+            journal = await db.attendance_journals.find_one({"invite_token": data.invite_code})
+            if not journal:
+                return {
+                    "success": False,
+                    "status": "not_found",
+                    "message": "Журнал не найден или ссылка недействительна"
+                }
+            
+            journal_id = journal["journal_id"]
+            journal_name = journal.get("name", "Журнал")
+            
+            # Проверить, не владелец ли это
+            if journal["owner_id"] == data.telegram_id:
+                return {
+                    "success": True,
+                    "status": "owner",
+                    "message": f"Вы являетесь старостой журнала «{journal_name}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name
+                }
+            
+            # Проверить, не привязан ли уже
+            existing_link = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id,
+                "is_linked": True
+            })
+            if existing_link:
+                return {
+                    "success": True,
+                    "status": "already_linked",
+                    "message": f"Вы уже в журнале «{journal_name}» как «{existing_link['full_name']}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": existing_link['full_name']
+                }
+            
+            # Проверить, не в pending ли уже
+            existing_pending = await db.journal_pending_members.find_one({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id
+            })
+            if existing_pending:
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "message": f"Вы уже ожидаете привязки в журнале «{journal_name}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name
+                }
+            
+            # Добавить в pending
+            pending = JournalPendingMember(
+                journal_id=journal_id,
+                telegram_id=data.telegram_id,
+                username=data.username,
+                first_name=data.first_name
+            )
+            await db.journal_pending_members.insert_one(pending.model_dump())
+            
+            logger.info(f"✅ User {data.telegram_id} joined journal '{journal_name}' (pending)")
+            return {
+                "success": True,
+                "status": "joined_pending",
+                "message": f"Вы присоединились к журналу «{journal_name}»! Ожидайте, пока староста привяжет вас к вашему ФИО.",
+                "journal_id": journal_id,
+                "journal_name": journal_name
+            }
+        
+        elif data.invite_type == "jstudent":
+            # Обработка персональной ссылки студента
+            student = await db.journal_students.find_one({"invite_code": data.invite_code})
+            if not student:
+                return {
+                    "success": False,
+                    "status": "not_found",
+                    "message": "Персональная ссылка недействительна"
+                }
+            
+            journal_id = student["journal_id"]
+            journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+            if not journal:
+                return {
+                    "success": False,
+                    "status": "not_found",
+                    "message": "Журнал не найден"
+                }
+            
+            journal_name = journal.get("name", "Журнал")
+            student_name = student["full_name"]
+            
+            # Проверить, не владелец ли это
+            if journal["owner_id"] == data.telegram_id:
+                return {
+                    "success": False,
+                    "status": "owner",
+                    "message": f"Вы являетесь старостой журнала «{journal_name}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": student_name
+                }
+            
+            # Проверить, не занято ли место
+            if student.get("is_linked") and student.get("telegram_id") != data.telegram_id:
+                return {
+                    "success": False,
+                    "status": "occupied",
+                    "message": f"Место «{student_name}» уже занято другим пользователем",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": student_name
+                }
+            
+            # Проверить, не привязан ли пользователь к другому студенту
+            existing_link = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id,
+                "is_linked": True
+            })
+            if existing_link and existing_link["id"] != student["id"]:
+                return {
+                    "success": False,
+                    "status": "already_linked_other",
+                    "message": f"Вы уже привязаны как «{existing_link['full_name']}» в этом журнале",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": existing_link["full_name"]
+                }
+            
+            # Если уже привязан к этому студенту
+            if student.get("is_linked") and student.get("telegram_id") == data.telegram_id:
+                return {
+                    "success": True,
+                    "status": "already_linked",
+                    "message": f"Вы уже привязаны как «{student_name}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": student_name
+                }
+            
+            # Привязать пользователя к студенту
+            await db.journal_students.update_one(
+                {"id": student["id"]},
+                {"$set": {
+                    "telegram_id": data.telegram_id,
+                    "username": data.username,
+                    "first_name": data.first_name,
+                    "is_linked": True,
+                    "linked_at": datetime.utcnow()
+                }}
+            )
+            
+            # Удалить из pending если был там
+            await db.journal_pending_members.delete_many({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id
+            })
+            
+            logger.info(f"✅ User {data.telegram_id} linked to student '{student_name}' in journal '{journal_name}' via Web App")
+            return {
+                "success": True,
+                "status": "linked",
+                "message": f"Вы успешно привязаны как «{student_name}» в журнале «{journal_name}»!",
+                "journal_id": journal_id,
+                "journal_name": journal_name,
+                "student_name": student_name
+            }
+        
+        else:
+            return {
+                "success": False,
+                "status": "invalid_type",
+                "message": "Неизвестный тип приглашения"
+            }
+    
+    except Exception as e:
+        logger.error(f"❌ Error processing journal webapp invite: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ===== Студенты в журнале =====
 
 @api_router.post("/journals/{journal_id}/students", response_model=JournalStudentResponse)
