@@ -176,13 +176,6 @@ export const TelegramProvider = ({ children }) => {
       // Получаем данные пользователя
       const userData = tg.initDataUnsafe?.user;
       
-      // 🔗 Получаем startapp параметр (для реферальных ссылок через Web App)
-      const startParamValue = tg.initDataUnsafe?.start_param;
-      if (startParamValue) {
-        console.log('🔗 Получен start_param:', startParamValue);
-        setStartParam(startParamValue);
-      }
-      
       setWebApp(tg);
       
       if (userData) {
