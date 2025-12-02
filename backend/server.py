@@ -1740,7 +1740,7 @@ async def generate_room_invite_link(room_id: str, telegram_id: int = Body(..., e
         # Получаем информацию о боте
         from telegram import Bot
         
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = get_telegram_bot_token()
         if not bot_token:
             raise HTTPException(status_code=500, detail="Bot token не настроен")
         
