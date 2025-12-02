@@ -116,6 +116,7 @@ from models import (
     JournalInviteLinkResponse,
     StudentInviteLinkResponse,
     JoinStudentRequest,
+    ProcessJournalInviteRequest,
     MyAttendanceResponse,
     JournalSettings
 )
