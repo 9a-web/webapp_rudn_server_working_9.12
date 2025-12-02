@@ -4924,8 +4924,14 @@ async def create_session(journal_id: str, data: JournalSessionCreate):
         if not journal:
             raise HTTPException(status_code=404, detail="Journal not found")
         
+        # Проверяем существование предмета
+        subject = await db.journal_subjects.find_one({"subject_id": data.subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
         session = JournalSession(
             journal_id=journal_id,
+            subject_id=data.subject_id,
             date=data.date,
             title=data.title,
             description=data.description,
