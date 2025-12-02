@@ -4716,6 +4716,204 @@ async def get_pending_members(journal_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ===== Предметы (Subjects) =====
+
+@api_router.post("/journals/{journal_id}/subjects")
+async def create_subject(journal_id: str, data: JournalSubjectCreate):
+    """Создать предмет в журнале"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получаем максимальный order для нового предмета
+        max_order = await db.journal_subjects.find_one(
+            {"journal_id": journal_id},
+            sort=[("order", -1)]
+        )
+        new_order = (max_order["order"] + 1) if max_order else 0
+        
+        subject = JournalSubject(
+            journal_id=journal_id,
+            name=data.name,
+            description=data.description,
+            color=data.color,
+            order=new_order,
+            created_by=data.telegram_id
+        )
+        await db.journal_subjects.insert_one(subject.model_dump())
+        
+        logger.info(f"Subject created: {subject.subject_id} in journal {journal_id}")
+        
+        return {
+            "subject_id": subject.subject_id,
+            "journal_id": subject.journal_id,
+            "name": subject.name,
+            "description": subject.description,
+            "color": subject.color,
+            "order": subject.order,
+            "created_at": subject.created_at.isoformat(),
+            "sessions_count": 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating subject: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/subjects")
+async def get_journal_subjects(journal_id: str):
+    """Получить список предметов журнала"""
+    try:
+        subjects = await db.journal_subjects.find(
+            {"journal_id": journal_id}
+        ).sort("order", 1).to_list(100)
+        
+        result = []
+        for s in subjects:
+            # Считаем количество занятий для предмета
+            sessions_count = await db.journal_sessions.count_documents({
+                "subject_id": s["subject_id"]
+            })
+            
+            result.append({
+                "subject_id": s["subject_id"],
+                "journal_id": s["journal_id"],
+                "name": s["name"],
+                "description": s.get("description"),
+                "color": s.get("color", "blue"),
+                "order": s.get("order", 0),
+                "created_at": s["created_at"].isoformat() if isinstance(s["created_at"], datetime) else s["created_at"],
+                "sessions_count": sessions_count
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error getting subjects: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/subjects/{subject_id}")
+async def get_subject_detail(subject_id: str):
+    """Получить детали предмета с занятиями"""
+    try:
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        # Получаем занятия предмета
+        sessions = await db.journal_sessions.find(
+            {"subject_id": subject_id}
+        ).sort("date", -1).to_list(200)
+        
+        total_students = await db.journal_students.count_documents({
+            "journal_id": subject["journal_id"]
+        })
+        
+        sessions_list = []
+        for s in sessions:
+            attendance_filled = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": {"$ne": "unmarked"}
+            })
+            present_count = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": {"$in": ["present", "late"]}
+            })
+            
+            sessions_list.append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "description": s.get("description"),
+                "type": s.get("type", "lecture"),
+                "created_at": s["created_at"].isoformat() if isinstance(s["created_at"], datetime) else s["created_at"],
+                "attendance_filled": attendance_filled,
+                "total_students": total_students,
+                "present_count": present_count
+            })
+        
+        return {
+            "subject_id": subject["subject_id"],
+            "journal_id": subject["journal_id"],
+            "name": subject["name"],
+            "description": subject.get("description"),
+            "color": subject.get("color", "blue"),
+            "created_at": subject["created_at"].isoformat() if isinstance(subject["created_at"], datetime) else subject["created_at"],
+            "sessions": sessions_list,
+            "total_students": total_students
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting subject detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/journals/subjects/{subject_id}")
+async def update_subject(subject_id: str, data: dict = Body(...)):
+    """Обновить предмет"""
+    try:
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        update_data = {}
+        if "name" in data:
+            update_data["name"] = data["name"]
+        if "description" in data:
+            update_data["description"] = data["description"]
+        if "color" in data:
+            update_data["color"] = data["color"]
+        
+        if update_data:
+            await db.journal_subjects.update_one(
+                {"subject_id": subject_id},
+                {"$set": update_data}
+            )
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating subject: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/journals/subjects/{subject_id}")
+async def delete_subject(subject_id: str):
+    """Удалить предмет и все его занятия"""
+    try:
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        # Получаем все session_id для удаления записей посещаемости
+        sessions = await db.journal_sessions.find(
+            {"subject_id": subject_id}
+        ).to_list(1000)
+        session_ids = [s["session_id"] for s in sessions]
+        
+        # Удаляем записи посещаемости
+        if session_ids:
+            await db.attendance_records.delete_many({"session_id": {"$in": session_ids}})
+        
+        # Удаляем занятия
+        await db.journal_sessions.delete_many({"subject_id": subject_id})
+        
+        # Удаляем предмет
+        await db.journal_subjects.delete_one({"subject_id": subject_id})
+        
+        logger.info(f"Subject deleted: {subject_id}")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting subject: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ===== Занятия =====
 
 @api_router.post("/journals/{journal_id}/sessions", response_model=JournalSessionResponse)
