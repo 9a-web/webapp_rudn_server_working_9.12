@@ -1049,8 +1049,9 @@ class JournalStudentResponse(BaseModel):
     is_linked: bool
     linked_at: Optional[datetime]
     order: int
-    invite_code: str = ""                 # Код для персональной ссылки
-    invite_link: Optional[str] = None     # Полная ссылка для приглашения
+    invite_code: str = ""                      # Код для персональной ссылки
+    invite_link: Optional[str] = None          # Полная ссылка для приглашения (старый формат)
+    invite_link_webapp: Optional[str] = None   # Ссылка через Web App (новый формат)
     attendance_percent: Optional[float] = None
     present_count: int = 0
     absent_count: int = 0
