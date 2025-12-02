@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { getUserJournals, createJournal } from '../services/journalAPI';
 import { JournalCard, CreateJournalModal, JournalDetailModal } from './journal';
 
-export const JournalSection = ({ telegramId, hapticFeedback }) => {
+export const JournalSection = ({ telegramId, hapticFeedback, userSettings }) => {
   const { t } = useTranslation();
   const [journals, setJournals] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
