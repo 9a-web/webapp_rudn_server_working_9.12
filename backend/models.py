@@ -845,7 +845,25 @@ class ReferralCodeResponse(BaseModel):
     """Ответ с реферальным кодом"""
     referral_code: str
     referral_link: str
+    referral_link_webapp: str = ""  # Ссылка через Web App (t.me/bot/app?startapp=)
     bot_username: str
+
+
+class ProcessReferralRequest(BaseModel):
+    """Запрос на обработку реферального кода через Web App"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    referral_code: str  # Код без префикса ref_
+
+
+class ProcessReferralResponse(BaseModel):
+    """Ответ на обработку реферального кода"""
+    success: bool
+    message: str
+    referrer_name: Optional[str] = None
+    bonus_points: int = 0
 
 
 class ReferralConnection(BaseModel):
