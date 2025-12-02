@@ -4879,17 +4879,16 @@ class RUDNScheduleAPITester:
             
             # Step 2: Add students to journal and verify invite_code and invite_link fields
             students_to_add = [
-                {"name": "Иван Петров", "student_id": "ST001"},
-                {"name": "Мария Сидорова", "student_id": "ST002"},
-                {"name": "Алексей Козлов", "student_id": "ST003"}
+                {"full_name": "Иван Петров"},
+                {"full_name": "Мария Сидорова"},
+                {"full_name": "Алексей Козлов"}
             ]
             
             created_students = []
             
             for student_data in students_to_add:
                 student_payload = {
-                    "name": student_data["name"],
-                    "student_id": student_data["student_id"]
+                    "full_name": student_data["full_name"]
                 }
                 
                 student_response = self.session.post(
