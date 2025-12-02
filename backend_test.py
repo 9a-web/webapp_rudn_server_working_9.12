@@ -5319,14 +5319,29 @@ class RUDNScheduleAPITester:
                 headers={"Content-Type": "application/json"}
             )
             
-            # Should return 404 for invalid invite code
-            if invalid_response.status_code != 404:
+            # Should return 200 with success: false for invalid invite code
+            if invalid_response.status_code != 200:
                 self.log_test("POST /api/journals/process-webapp-invite - Invalid Code", False, 
-                            f"Expected HTTP 404 for invalid invite code, got {invalid_response.status_code}")
+                            f"Expected HTTP 200 for invalid invite code, got {invalid_response.status_code}")
+                return False
+            
+            invalid_result = invalid_response.json()
+            
+            # Validate that success is false for invalid code
+            if invalid_result.get('success') != False:
+                self.log_test("POST /api/journals/process-webapp-invite - Invalid Code", False, 
+                            f"Expected success=false for invalid invite code, got {invalid_result.get('success')}")
+                return False
+            
+            # Should have appropriate status
+            if invalid_result.get('status') != 'not_found':
+                self.log_test("POST /api/journals/process-webapp-invite - Invalid Code", False, 
+                            f"Expected status='not_found' for invalid invite code, got {invalid_result.get('status')}")
                 return False
             
             self.log_test("POST /api/journals/process-webapp-invite - Invalid Code", True, 
-                        "Correctly returned 404 for invalid invite code")
+                        "Correctly returned success=false with status='not_found' for invalid invite code",
+                        {"success": invalid_result.get('success'), "status": invalid_result.get('status')})
             
             # Step 5: Test processing same invite again (should handle gracefully)
             duplicate_response = self.session.post(
