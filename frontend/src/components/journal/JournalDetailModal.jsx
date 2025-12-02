@@ -543,8 +543,8 @@ export const JournalDetailModal = ({
                         <p className="text-sm text-gray-400">студентов</p>
                       </div>
                       <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-2xl font-bold text-white">{sessions.length}</p>
-                        <p className="text-sm text-gray-400">занятий</p>
+                        <p className="text-2xl font-bold text-white">{subjects.length}</p>
+                        <p className="text-sm text-gray-400">предметов</p>
                       </div>
                       <div className="bg-white/5 rounded-xl p-4">
                         <p className="text-2xl font-bold text-green-400">
