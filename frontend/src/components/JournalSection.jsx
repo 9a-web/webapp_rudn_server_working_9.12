@@ -61,6 +61,20 @@ export const JournalSection = ({ telegramId, hapticFeedback, userSettings, pendi
     }
   }, [pendingJournalId, journals, isLoading, onPendingJournalHandled]);
 
+  // Таймаут для очистки pendingJournalId если журнал не найден за 10 секунд
+  useEffect(() => {
+    if (pendingJournalId) {
+      const timeout = setTimeout(() => {
+        console.log('⏱️ Таймаут ожидания журнала, сбрасываем pendingJournalId');
+        if (onPendingJournalHandled) {
+          onPendingJournalHandled();
+        }
+      }, 10000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [pendingJournalId, onPendingJournalHandled]);
+
   const handleCreateJournal = async (journalData) => {
     try {
       await createJournal({
