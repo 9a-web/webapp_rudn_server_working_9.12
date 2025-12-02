@@ -699,7 +699,7 @@ async def get_bot_info():
     try:
         from telegram import Bot
         
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        bot_token = get_telegram_bot_token()
         if not bot_token:
             raise HTTPException(status_code=500, detail="Bot token не настроен")
         
