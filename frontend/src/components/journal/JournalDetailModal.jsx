@@ -200,6 +200,26 @@ export const JournalDetailModal = ({
     }
   };
 
+  const handleCreateSubject = async (subjectData) => {
+    try {
+      await createSubject(journalId, { ...subjectData, telegram_id: telegramId });
+      loadData();
+    } catch (error) {
+      console.error('Error creating subject:', error);
+    }
+  };
+
+  const handleDeleteSubject = async (subjectId) => {
+    if (!window.confirm('Удалить предмет и все его занятия?')) return;
+    
+    try {
+      await deleteSubject(subjectId);
+      loadData();
+    } catch (error) {
+      console.error('Error deleting subject:', error);
+    }
+  };
+
   const handleCreateSession = async (sessionData) => {
     try {
       await createSession(journalId, { ...sessionData, telegram_id: telegramId });
