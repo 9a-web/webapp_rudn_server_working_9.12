@@ -379,6 +379,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     referral_code = None
     room_invite_token = None
     room_referrer_id = None
+    journal_invite_token = None
     
     if context.args and len(context.args) > 0:
         arg = context.args[0]
@@ -394,6 +395,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 except ValueError:
                     logger.warning(f"⚠️ Некорректный ID пользователя в приглашении: {parts[3]}")
         
+        # Проверяем на приглашение в журнал: journal_{invite_token}
+        elif arg.startswith("journal_"):
+            journal_invite_token = arg[8:]  # Убираем префикс "journal_"
+            logger.info(f"📚 Обнаружено приглашение в журнал: token={journal_invite_token}")
+
         # Проверяем на обычный реферальный код: ref_CODE
         elif arg.startswith("ref_"):
             referral_code = arg[4:]  # Убираем префикс "ref_"
