@@ -507,6 +507,28 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 🚀 <b>Твой персональный помощник в учебе и командной работе</b>
 
 <i>Нажимай кнопку ниже, чтобы начать! 👇</i>"""
+            elif journal_join_data and journal_join_data.get("journal"):
+                # Приветствие при присоединении к журналу
+                journal = journal_join_data["journal"]
+                journal_name = journal.get("name", "Журнал")
+                group_name = journal.get("group_name", "")
+                
+                status = journal_join_data.get("status")
+                if status == "added_to_pending":
+                    status_text = "⏳ Ваш запрос на вступление отправлен старосте."
+                elif status == "already_linked":
+                    status_text = "✅ Вы уже являетесь участником этого журнала."
+                else:
+                    status_text = "✅ Вы успешно присоединились!"
+
+                welcome_text = f"""🎓 Привет, {first_name}! Добро пожаловать в <b>RUDN Go</b>!
+
+📚 Вы перешли по ссылке в журнал: <b>{journal_name}</b> ({group_name})
+{status_text}
+
+🚀 <b>Твой персональный помощник в учебе</b>
+
+<i>Нажимай кнопку ниже, чтобы начать! 👇</i>"""
             elif referral_code and new_user.get("referred_by"):
                 referrer_info = await db.user_settings.find_one({"telegram_id": new_user["referred_by"]})
                 referrer_name = referrer_info.get("first_name", "друг") if referrer_info else "друг"
