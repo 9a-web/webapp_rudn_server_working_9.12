@@ -433,6 +433,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     new_user_id=telegram_id
                 )
         
+        # Обрабатываем приглашение в журнал (если есть)
+        journal_join_data = None
+        if journal_invite_token:
+            journal_join_data = await join_user_to_journal(
+                telegram_id=telegram_id,
+                username=username,
+                first_name=first_name,
+                invite_token=journal_invite_token
+            )
+        
         if not existing_user:
             # Создаем нового пользователя
             import uuid
