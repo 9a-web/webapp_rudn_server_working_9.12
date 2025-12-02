@@ -1090,6 +1090,23 @@ class JournalInviteLinkResponse(BaseModel):
     bot_username: str
 
 
+class StudentInviteLinkResponse(BaseModel):
+    """Ответ со ссылкой приглашения для конкретного студента"""
+    invite_link: str
+    invite_code: str
+    student_id: str
+    student_name: str
+    journal_id: str
+    bot_username: str
+
+
+class JoinStudentRequest(BaseModel):
+    """Запрос на присоединение по персональной ссылке студента"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+
+
 class MyAttendanceResponse(BaseModel):
     """Мои посещения"""
     student_id: str
