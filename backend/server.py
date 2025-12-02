@@ -2935,6 +2935,60 @@ async def create_referral_connections(referred_id: int, referrer_id: int, db):
     return connections
 
 
+async def award_referral_bonus(referrer_id: int, referred_id: int, points: int, level: int, database):
+    """
+    Начисляет бонусные баллы пригласившему за регистрацию реферала
+    """
+    try:
+        # Обновляем статистику пригласившего
+        stats = await database.user_stats.find_one({"telegram_id": referrer_id})
+        
+        if not stats:
+            # Создаём статистику если её нет
+            stats = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": referrer_id,
+                "total_points": points,
+                "friends_invited": 1,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            await database.user_stats.insert_one(stats)
+        else:
+            # Обновляем существующую статистику
+            await database.user_stats.update_one(
+                {"telegram_id": referrer_id},
+                {
+                    "$inc": {
+                        "total_points": points,
+                        "friends_invited": 1
+                    },
+                    "$set": {"updated_at": datetime.utcnow()}
+                }
+            )
+        
+        # Обновляем заработанные баллы с рефералов в user_settings
+        await database.user_settings.update_one(
+            {"telegram_id": referrer_id},
+            {"$inc": {"referral_points_earned": points}}
+        )
+        
+        # Обновляем заработанные баллы в реферальной связи
+        await database.referral_connections.update_one(
+            {
+                "referrer_telegram_id": referrer_id,
+                "referred_telegram_id": referred_id,
+                "level": level
+            },
+            {"$inc": {"points_earned": points}}
+        )
+        
+        logger.info(f"💰 Начислено {points} баллов пользователю {referrer_id} за реферала {referred_id} (уровень {level})")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при начислении бонуса: {e}", exc_info=True)
+
+
 @api_router.get("/referral/stats/{telegram_id}", response_model=ReferralStats)
 async def get_referral_stats(telegram_id: int):
     """
