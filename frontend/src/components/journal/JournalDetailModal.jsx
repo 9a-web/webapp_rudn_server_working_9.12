@@ -379,10 +379,10 @@ export const JournalDetailModal = ({
                                 </span>
                               )}
                               <button
-                                onClick={() => handleDeleteStudent(student.id)}
-                                className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors"
+                                onClick={() => setShowEditStudent(student)}
+                                className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Settings className="w-4 h-4" />
                               </button>
                             </div>
                           </motion.div>
