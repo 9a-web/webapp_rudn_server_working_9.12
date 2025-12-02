@@ -452,6 +452,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     - Создает нового пользователя при первом запуске
     - Обрабатывает реферальные ссылки (ref_CODE)
     - Обрабатывает приглашения в комнаты (room_{token}_ref_{user_id})
+    - Обрабатывает приглашения в журнал (journal_{invite_token})
+    - Обрабатывает персональные ссылки студентов (jstudent_{invite_code})
     - Отправляет приветственное сообщение
     - Добавляет кнопку для открытия Web App
     """
@@ -471,6 +473,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     room_invite_token = None
     room_referrer_id = None
     journal_invite_token = None
+    student_invite_code = None  # Персональная ссылка студента
     
     if context.args and len(context.args) > 0:
         arg = context.args[0]
