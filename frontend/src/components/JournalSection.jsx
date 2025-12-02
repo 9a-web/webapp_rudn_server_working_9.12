@@ -178,6 +178,7 @@ export const JournalSection = ({ telegramId, hapticFeedback, userSettings }) => 
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateJournal}
         hapticFeedback={hapticFeedback}
+        defaultGroupName={userSettings?.group_name || ''}
       />
 
       {/* Detail Modal */}
