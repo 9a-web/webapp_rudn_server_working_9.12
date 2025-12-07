@@ -1742,16 +1742,9 @@ async def generate_room_invite_link(room_id: str, telegram_id: int = Body(..., e
         if not is_participant:
             raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
         
-        # Получаем информацию о боте
-        from telegram import Bot
-        
-        bot_token = get_telegram_bot_token()
-        if not bot_token:
-            raise HTTPException(status_code=500, detail="Bot token не настроен")
-        
-        bot = Bot(token=bot_token)
-        bot_info = await bot.get_me()
-        bot_username = bot_info.username
+        # Получаем имя бота из конфига (зависит от ENV)
+        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        bot_username = get_telegram_bot_username()
         
         # Формируем ссылку с реферальным кодом (Web App формат для прямого открытия приложения)
         invite_token = room_doc.get("invite_token")
