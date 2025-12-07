@@ -5465,6 +5465,119 @@ async def delete_session(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/journals/{journal_id}/sessions/from-schedule")
+async def create_sessions_from_schedule(journal_id: str, data: CreateSessionsFromScheduleRequest):
+    """
+    Создать занятия из расписания (массовое создание).
+    Принимает список занятий из расписания и создаёт соответствующие сессии.
+    """
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Проверяем существование предмета
+        subject = await db.journal_subjects.find_one({"subject_id": data.subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        total_students = await db.journal_students.count_documents({"journal_id": journal_id})
+        
+        # Маппинг типов занятий из расписания в типы сессий
+        lesson_type_map = {
+            "лекция": "lecture",
+            "лек": "lecture",
+            "лекции": "lecture",
+            "семинар": "seminar",
+            "сем": "seminar",
+            "практика": "seminar",
+            "практ": "seminar",
+            "практическое": "seminar",
+            "лабораторная": "lab",
+            "лаб": "lab",
+            "лабораторная работа": "lab",
+            "экзамен": "exam",
+            "зачёт": "exam",
+            "зачет": "exam",
+            "консультация": "lecture",
+            "конс": "lecture",
+        }
+        
+        created_sessions = []
+        skipped_count = 0
+        
+        for schedule_item in data.sessions:
+            # Проверяем, не существует ли уже такое занятие
+            existing = await db.journal_sessions.find_one({
+                "journal_id": journal_id,
+                "subject_id": data.subject_id,
+                "date": schedule_item.date,
+                "title": {"$regex": f"^{schedule_item.time}", "$options": "i"}
+            })
+            
+            if existing:
+                skipped_count += 1
+                continue
+            
+            # Определяем тип занятия
+            lesson_type_lower = schedule_item.lesson_type.lower().strip()
+            session_type = "lecture"  # по умолчанию
+            for key, value in lesson_type_map.items():
+                if key in lesson_type_lower:
+                    session_type = value
+                    break
+            
+            # Формируем название и описание
+            title = f"{schedule_item.time} — {schedule_item.lesson_type}"
+            
+            description_parts = []
+            if schedule_item.teacher:
+                description_parts.append(f"Преподаватель: {schedule_item.teacher}")
+            if schedule_item.auditory:
+                description_parts.append(f"Аудитория: {schedule_item.auditory}")
+            description = "; ".join(description_parts) if description_parts else None
+            
+            # Создаём сессию
+            session = JournalSession(
+                journal_id=journal_id,
+                subject_id=data.subject_id,
+                date=schedule_item.date,
+                title=title,
+                description=description,
+                type=session_type,
+                created_by=data.telegram_id
+            )
+            
+            await db.journal_sessions.insert_one(session.model_dump())
+            
+            created_sessions.append(JournalSessionResponse(
+                session_id=session.session_id,
+                journal_id=session.journal_id,
+                date=session.date,
+                title=session.title,
+                description=session.description,
+                type=session.type,
+                created_at=session.created_at,
+                created_by=session.created_by,
+                attendance_filled=0,
+                total_students=total_students
+            ))
+        
+        logger.info(f"Created {len(created_sessions)} sessions from schedule for journal {journal_id}, skipped {skipped_count}")
+        
+        return {
+            "status": "success",
+            "created_count": len(created_sessions),
+            "skipped_count": skipped_count,
+            "sessions": created_sessions
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating sessions from schedule: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ===== Посещаемость =====
 
 @api_router.post("/journals/sessions/{session_id}/attendance")
