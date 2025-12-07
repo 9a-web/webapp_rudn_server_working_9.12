@@ -4988,7 +4988,7 @@ async def get_journal_sessions(journal_id: str):
     try:
         sessions = await db.journal_sessions.find(
             {"journal_id": journal_id}
-        ).sort("created_at", -1).to_list(200)
+        ).sort([("date", -1), ("created_at", -1)]).to_list(200)
         
         total_students = await db.journal_students.count_documents({"journal_id": journal_id})
         
