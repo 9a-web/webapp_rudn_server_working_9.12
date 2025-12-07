@@ -3,6 +3,126 @@ import { X, Plus, Flag, BookOpen, Calendar, Clock, ChevronDown, ChevronRight } f
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 
+// Маппинг дней недели на числа (вынесено за компонент)
+const DAY_NAME_TO_NUMBER = {
+  'понедельник': 1,
+  'вторник': 2,
+  'среда': 3,
+  'четверг': 4,
+  'пятница': 5,
+  'суббота': 6,
+  'воскресенье': 0,
+};
+
+// Парсинг даты события (вынесено за компонент)
+const parseEventDate = (event) => {
+  try {
+    // event.date может быть в формате "2025-01-15"
+    if (event.date) {
+      const [year, month, day] = event.date.split('-').map(Number);
+      const timeMatch = event.time?.match(/(\d{1,2}):(\d{2})/);
+      const hours = timeMatch ? parseInt(timeMatch[1]) : 0;
+      const minutes = timeMatch ? parseInt(timeMatch[2]) : 0;
+      return new Date(year, month - 1, day, hours, minutes);
+    }
+    
+    // Если есть day (название дня недели на русском) - формат РУДН API
+    if (event.day) {
+      const dayLower = event.day.toLowerCase();
+      const targetDayNum = DAY_NAME_TO_NUMBER[dayLower];
+      
+      if (targetDayNum !== undefined) {
+        const today = new Date();
+        const currentDay = today.getDay();
+        
+        // Вычисляем разницу в днях
+        let daysUntil = targetDayNum - currentDay;
+        
+        // Если день уже прошел на этой неделе, берем следующую неделю
+        if (daysUntil < 0) {
+          daysUntil += 7;
+        }
+        
+        // Если сегодня, проверяем время
+        if (daysUntil === 0) {
+          const timeMatch = event.time?.match(/(\d{1,2}):(\d{2})/);
+          if (timeMatch) {
+            const eventHours = parseInt(timeMatch[1]);
+            const eventMinutes = parseInt(timeMatch[2]);
+            const eventTimeToday = new Date(today);
+            eventTimeToday.setHours(eventHours, eventMinutes, 0, 0);
+            
+            // Если время уже прошло, берем следующую неделю
+            if (eventTimeToday <= today) {
+              daysUntil += 7;
+            }
+          }
+        }
+        
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + daysUntil);
+        
+        // Устанавливаем время
+        const timeMatch = event.time?.match(/(\d{1,2}):(\d{2})/);
+        if (timeMatch) {
+          targetDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0, 0);
+        } else {
+          targetDate.setHours(9, 0, 0, 0); // По умолчанию 9:00
+        }
+        
+        return targetDate;
+      }
+    }
+    
+    // Если есть dayOfWeek, вычисляем ближайшую дату (старый формат)
+    if (event.dayOfWeek !== undefined) {
+      const today = new Date();
+      const currentDay = today.getDay();
+      const targetDay = event.dayOfWeek;
+      
+      let daysUntil = targetDay - currentDay;
+      if (daysUntil <= 0) daysUntil += 7;
+      
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + daysUntil);
+      
+      const timeMatch = event.time?.match(/(\d{1,2}):(\d{2})/);
+      if (timeMatch) {
+        targetDate.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0, 0);
+      }
+      
+      return targetDate;
+    }
+    
+    return null;
+  } catch (e) {
+    console.error('Error parsing event date:', e);
+    return null;
+  }
+};
+
+// Форматирование даты для отображения (вынесено за компонент)
+const formatClassDate = (date) => {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const dateStr = date.toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  
+  if (date.toDateString() === today.toDateString()) {
+    return `Сегодня, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return `Завтра, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  
+  return `${dateStr}, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+};
+
 /**
  * Специальное модальное окно для быстрой команды "Подготовиться к лекции"
  * Показывает:
