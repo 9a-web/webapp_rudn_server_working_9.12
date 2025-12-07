@@ -1181,3 +1181,57 @@ class MyAttendanceResponse(BaseModel):
     total_sessions: int
     records: List[AttendanceRecordResponse]
 
+
+# ============ Модели для отслеживания реферальных событий ============
+
+class ReferralEvent(BaseModel):
+    """Событие перехода по реферальной ссылке"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    event_type: str  # "room_join" | "journal_join"
+    telegram_id: int  # Кто перешел по ссылке
+    referrer_id: Optional[int] = None  # Кто пригласил (по чьей ссылке перешли)
+    target_id: str  # room_id или journal_id
+    target_name: str = ""  # Название комнаты или журнала
+    invite_token: str  # Токен приглашения
+    is_new_member: bool = True  # Новый участник или уже был
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ReferralEventResponse(BaseModel):
+    """Ответ события реферала"""
+    id: str
+    event_type: str
+    telegram_id: int
+    referrer_id: Optional[int]
+    target_id: str
+    target_name: str
+    invite_token: str
+    is_new_member: bool
+    created_at: datetime
+    # Дополнительная информация о пользователе
+    user_name: Optional[str] = None
+    referrer_name: Optional[str] = None
+
+
+class ReferralStatsDetailResponse(BaseModel):
+    """Детальная статистика реферальных событий"""
+    total_events: int
+    events_today: int
+    events_week: int
+    events_month: int
+    # По типам
+    room_joins_total: int
+    room_joins_today: int
+    room_joins_week: int
+    journal_joins_total: int
+    journal_joins_today: int
+    journal_joins_week: int
+    # Новые участники
+    new_members_total: int
+    new_members_today: int
+    new_members_week: int
+    # Топ приглашающих
+    top_referrers: List[dict] = []
+    # Последние события
+    recent_events: List[ReferralEventResponse] = []
+
