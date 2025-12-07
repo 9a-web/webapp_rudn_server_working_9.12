@@ -32,6 +32,7 @@ import { AttendanceModal } from './AttendanceModal';
 import { LinkStudentModal } from './LinkStudentModal';
 
 import { EditStudentModal } from './EditStudentModal';
+import { JournalStatsTab } from './JournalStatsTab';
 const COLORS = {
   purple: 'from-purple-400 to-pink-400',
   blue: 'from-blue-400 to-cyan-400',
