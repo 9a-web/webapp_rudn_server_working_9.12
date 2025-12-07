@@ -674,8 +674,10 @@ const TasksTab = ({
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ scale: 1.01 }}
                   className="p-4 bg-gray-800/50 border border-gray-700 rounded-xl
-                           hover:border-gray-600 transition-all group"
+                           hover:border-gray-600 hover:shadow-lg hover:shadow-indigo-500/10
+                           transition-all group"
                 >
                   <div className="flex items-start gap-3">
                     {/* Checkbox */}
