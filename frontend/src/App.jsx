@@ -266,6 +266,71 @@ const Home = () => {
     }
   }, [isReady, user, startParam, journalInviteProcessed]);
 
+  // 🚪 Обработка приглашения в комнату из Web App ссылки
+  useEffect(() => {
+    const processRoomInvite = async () => {
+      // Проверяем условия: есть startParam, содержит room_, не обработан ещё
+      if (!startParam || roomInviteProcessed || !user) {
+        return;
+      }
+      
+      // Формат: room_{invite_token}_ref_{telegram_id}
+      if (!startParam.startsWith('room_')) {
+        return; // Не наш параметр
+      }
+      
+      // Парсим параметры
+      const parts = startParam.split('_ref_');
+      if (parts.length !== 2) {
+        console.log('❌ Неверный формат приглашения в комнату:', startParam);
+        return;
+      }
+      
+      const inviteToken = parts[0].replace('room_', '');
+      const referralCode = parseInt(parts[1], 10);
+      
+      console.log('🚪 Обработка приглашения в комнату через Web App:', inviteToken, 'реферал:', referralCode);
+      
+      try {
+        const result = await joinRoomByToken(inviteToken, {
+          telegram_id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          referral_code: referralCode
+        });
+        
+        setRoomInviteProcessed(true);
+        
+        if (result && result.room_id) {
+          console.log('✅ Присоединился к комнате:', result.name);
+          hapticFeedback('success');
+          showAlert(`Вы присоединились к комнате "${result.name}"!`);
+          
+          // Переключаемся на вкладку "Задачи"
+          setActiveTab('tasks');
+          
+          // Сохраняем ID комнаты для автоматического открытия
+          console.log('🚪 Устанавливаем pendingRoomId:', result.room_id);
+          setPendingRoomId(result.room_id);
+        }
+      } catch (error) {
+        console.error('❌ Ошибка обработки приглашения в комнату:', error);
+        setRoomInviteProcessed(true);
+        
+        // Проверяем тип ошибки
+        if (error.response?.status === 404) {
+          showAlert('Комната не найдена или ссылка устарела');
+        } else {
+          showAlert('Ошибка при присоединении к комнате');
+        }
+      }
+    };
+    
+    if (isReady && user && startParam) {
+      processRoomInvite();
+    }
+  }, [isReady, user, startParam, roomInviteProcessed]);
+
   // Загрузка расписания при изменении настроек или недели
   useEffect(() => {
     // Проверяем, что у пользователя есть полные настройки группы
