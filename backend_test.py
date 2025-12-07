@@ -105,7 +105,7 @@ def test_add_participants_to_room(room_id):
     }
     
     response = make_request("POST", f"/rooms/join/{invite_token}", participant_2_data, 200)
-    if not response or not response.get("success"):
+    if not response or "room_id" not in response:
         log_test("Add participant 2", "FAIL", "Failed to add participant 2")
         return False
     
