@@ -69,7 +69,8 @@ export const AddRoomTaskModal = ({
         category: category,
         priority: priority,
         deadline: deadline ? new Date(deadline).toISOString() : null,
-        tags: tags
+        tags: tags,
+        assigned_to: assignToAll ? null : selectedParticipants  // null = все, массив = выбранные
       };
       
       await onAddTask(taskData);
