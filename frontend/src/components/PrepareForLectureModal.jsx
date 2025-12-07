@@ -299,7 +299,7 @@ export const PrepareForLectureModal = ({
     setSubject('');
     setPriority('medium');
     setDeadlineType('date');
-    setSelectedDate('');
+    setDeadlineDateInput('');
     setSelectedClass(null);
     setDragY(0);
     onClose();
