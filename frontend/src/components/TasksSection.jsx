@@ -997,6 +997,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         scheduleSubjects={scheduleSubjects}
         scheduleEvents={scheduleEvents}
         userSettings={userSettings}
+        selectedDate={tasksSelectedDate}
       />
 
       {/* Модальное окно редактирования задачи */}
