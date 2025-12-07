@@ -148,9 +148,20 @@ export const PrepareForLectureModal = ({
   const [saving, setSaving] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
+  const [useDeadlineAsTargetDate, setUseDeadlineAsTargetDate] = useState(false); // Привязать к дате/паре вместо сегодня
   
   const modalRef = useRef(null);
   const dropdownRef = useRef(null);
+  
+  // Проверяем, является ли выбранный день сегодняшним
+  const isToday = useMemo(() => {
+    if (!taskSelectedDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(taskSelectedDate);
+    selected.setHours(0, 0, 0, 0);
+    return today.getTime() === selected.getTime();
+  }, [taskSelectedDate]);
   
   // Блокируем скролл страницы при открытии модального окна
   useEffect(() => {
@@ -172,6 +183,7 @@ export const PrepareForLectureModal = ({
       setDeadlineType('date');
       setDeadlineDateInput('');
       setSelectedClass(null);
+      setUseDeadlineAsTargetDate(false);
     }
   }, [isOpen]);
   
