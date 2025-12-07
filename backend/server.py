@@ -1820,6 +1820,19 @@ async def join_room_by_token(invite_token: str, join_data: RoomJoinRequest):
             }
         )
         
+        # Логируем реферальное событие (новый участник)
+        referral_event = ReferralEvent(
+            event_type="room_join",
+            telegram_id=join_data.telegram_id,
+            referrer_id=join_data.referral_code,
+            target_id=room_doc["room_id"],
+            target_name=room_doc.get("name", ""),
+            invite_token=invite_token,
+            is_new_member=True
+        )
+        await db.referral_events.insert_one(referral_event.model_dump())
+        logger.info(f"Referral event logged: room_join, user={join_data.telegram_id}, referrer={join_data.referral_code}, room={room_doc['room_id']}")
+        
         # Автоматически добавляем пользователя во все групповые задачи комнаты
         tasks_cursor = db.group_tasks.find({"room_id": room_doc["room_id"]})
         async for task_doc in tasks_cursor:
