@@ -238,6 +238,7 @@ export const JournalSection = ({ telegramId, hapticFeedback, userSettings, pendi
           telegramId={telegramId}
           hapticFeedback={hapticFeedback}
           onJournalUpdated={loadJournals}
+          userSettings={userSettings}
         />
       )}
     </motion.div>
