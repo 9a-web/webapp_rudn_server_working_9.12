@@ -191,7 +191,7 @@ def test_referral_event_tracking():
         # Check for referrer in top_referrers
         referrer_found = False
         for referrer in top_referrers:
-            if referrer.get("referrer_id") == creator_telegram_id:
+            if referrer.get("telegram_id") == creator_telegram_id:
                 referrer_found = True
                 log_test("Top Referrers Validation", "PASS", f"Found referrer {creator_telegram_id} in top_referrers: {referrer}")
                 break
