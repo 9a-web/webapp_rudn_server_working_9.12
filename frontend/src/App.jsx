@@ -834,6 +834,8 @@ const Home = () => {
               selectedDate={selectedDate}
               weekNumber={weekNumber}
               onModalStateChange={setIsAddTaskModalOpen}
+              pendingRoomId={pendingRoomId}
+              onPendingRoomHandled={() => setPendingRoomId(null)}
             />
           </div>
         )}
