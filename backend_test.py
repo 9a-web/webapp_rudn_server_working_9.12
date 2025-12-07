@@ -22,10 +22,10 @@ def log_test(test_name, status, details=""):
     if details:
         print(f"    {details}")
     print()
-def test_sessions_from_schedule():
-    """Test the new sessions/from-schedule endpoint as requested in review"""
+def test_journal_statistics_api():
+    """Test the Journal Statistics API as requested in review"""
     print("=" * 80)
-    print("🔍 TESTING SESSIONS FROM SCHEDULE ENDPOINT")
+    print("🔍 TESTING JOURNAL STATISTICS API")
     print("=" * 80)
     
     # Test data as specified in review request
@@ -37,8 +37,8 @@ def test_sessions_from_schedule():
         
         journal_data = {
             "telegram_id": telegram_id,
-            "name": "Тестовый журнал",
-            "group_name": "ИВТ-101"
+            "name": "Тестовый журнал статистики",
+            "group_name": "ИВТ-102"
         }
         
         response = requests.post(f"{API_BASE}/journals", json=journal_data, timeout=10)
@@ -56,13 +56,34 @@ def test_sessions_from_schedule():
             
         log_test("POST /api/journals", "PASS", f"Journal created successfully. ID: {journal_id}")
         
-        # Step 2: Create subject in journal (POST /api/journals/{journal_id}/subjects)
-        log_test("Step 2: Creating subject in journal", "INFO", f"Creating subject for journal {journal_id}")
+        # Step 2: Add students in bulk (POST /api/journals/{journal_id}/students/bulk)
+        log_test("Step 2: Adding students in bulk", "INFO", f"Adding 5 students to journal {journal_id}")
+        
+        students_data = {
+            "names": ["Иванов Иван", "Петров Петр", "Сидорова Анна", "Козлов Дмитрий", "Николаева Мария"]
+        }
+        
+        response = requests.post(f"{API_BASE}/journals/{journal_id}/students/bulk", json=students_data, timeout=10)
+        
+        if response.status_code != 200:
+            log_test("POST /api/journals/{journal_id}/students/bulk", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        students_response = response.json()
+        students = students_response.get("students", [])
+        
+        if len(students) != 5:
+            log_test("Students Bulk Create Validation", "FAIL", f"Expected 5 students, got {len(students)}")
+            return False
+            
+        student_ids = [student["id"] for student in students]
+        log_test("POST /api/journals/{journal_id}/students/bulk", "PASS", f"5 students added successfully. IDs: {student_ids}")
+        
+        # Step 3: Create subject (POST /api/journals/{journal_id}/subjects)
+        log_test("Step 3: Creating subject", "INFO", f"Creating subject for journal {journal_id}")
         
         subject_data = {
-            "name": "Математический анализ",
-            "description": "Тестовый предмет",
-            "color": "blue",
+            "name": "Математика",
             "telegram_id": telegram_id
         }
         
@@ -81,149 +102,245 @@ def test_sessions_from_schedule():
             
         log_test("POST /api/journals/{journal_id}/subjects", "PASS", f"Subject created successfully. ID: {subject_id}")
         
-        # Step 3: Test sessions/from-schedule endpoint with 3 different lesson types
-        log_test("Step 3: Testing sessions/from-schedule endpoint", "INFO", f"Creating sessions from schedule")
+        # Step 4: Create several sessions (POST /api/journals/{journal_id}/sessions)
+        log_test("Step 4: Creating multiple sessions", "INFO", f"Creating 4 sessions for journal {journal_id}")
         
-        sessions_data = {
-            "subject_id": subject_id,
-            "telegram_id": telegram_id,
-            "sessions": [
-                {
-                    "date": "2025-01-20",
-                    "time": "09:00-10:30",
-                    "discipline": "Математика",
-                    "lesson_type": "Лекция",
-                    "teacher": "Иванов И.И.",
-                    "auditory": "101"
-                },
-                {
-                    "date": "2025-01-21",
-                    "time": "11:00-12:30",
-                    "discipline": "Математика",
-                    "lesson_type": "Семинар",
-                    "teacher": "Петров П.П.",
-                    "auditory": "102"
-                },
-                {
-                    "date": "2025-01-22",
-                    "time": "14:00-15:30",
-                    "discipline": "Математика",
-                    "lesson_type": "Лабораторная",
-                    "teacher": "Сидоров С.С.",
-                    "auditory": "103"
-                }
-            ]
+        session_dates = ["2025-01-20", "2025-01-21", "2025-01-22", "2025-01-23"]
+        session_titles = ["Лекция 1", "Лекция 2", "Семинар 1", "Лабораторная 1"]
+        session_types = ["lecture", "lecture", "seminar", "lab"]
+        session_ids = []
+        
+        for i, (date, title, session_type) in enumerate(zip(session_dates, session_titles, session_types)):
+            session_data = {
+                "title": title,
+                "type": session_type,
+                "date": date,
+                "subject_id": subject_id,
+                "telegram_id": telegram_id
+            }
+            
+            response = requests.post(f"{API_BASE}/journals/{journal_id}/sessions", json=session_data, timeout=10)
+            
+            if response.status_code != 200:
+                log_test(f"POST /api/journals/{journal_id}/sessions (Session {i+1})", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+            session_response = response.json()
+            session_id = session_response.get("session_id")
+            
+            if not session_id:
+                log_test(f"Session {i+1} Creation", "FAIL", "No session_id in response")
+                return False
+                
+            session_ids.append(session_id)
+            
+        log_test("POST /api/journals/{journal_id}/sessions", "PASS", f"4 sessions created successfully. IDs: {session_ids}")
+        
+        # Step 5: Mark attendance on sessions (POST /api/journals/sessions/{session_id}/attendance)
+        log_test("Step 5: Marking attendance on sessions", "INFO", f"Setting attendance for all sessions")
+        
+        # Different attendance patterns for each session
+        attendance_patterns = [
+            # Session 1: Most present
+            [{"student_id": student_ids[0], "status": "present"},
+             {"student_id": student_ids[1], "status": "present"},
+             {"student_id": student_ids[2], "status": "present"},
+             {"student_id": student_ids[3], "status": "late"},
+             {"student_id": student_ids[4], "status": "absent"}],
+            
+            # Session 2: Mixed attendance
+            [{"student_id": student_ids[0], "status": "present"},
+             {"student_id": student_ids[1], "status": "absent"},
+             {"student_id": student_ids[2], "status": "present"},
+             {"student_id": student_ids[3], "status": "present"},
+             {"student_id": student_ids[4], "status": "late"}],
+            
+            # Session 3: Some absences
+            [{"student_id": student_ids[0], "status": "absent"},
+             {"student_id": student_ids[1], "status": "present"},
+             {"student_id": student_ids[2], "status": "absent"},
+             {"student_id": student_ids[3], "status": "present"},
+             {"student_id": student_ids[4], "status": "present"}],
+            
+            # Session 4: Mixed with excused
+            [{"student_id": student_ids[0], "status": "present"},
+             {"student_id": student_ids[1], "status": "present"},
+             {"student_id": student_ids[2], "status": "excused"},
+             {"student_id": student_ids[3], "status": "absent"},
+             {"student_id": student_ids[4], "status": "late"}]
+        ]
+        
+        for i, (session_id, records) in enumerate(zip(session_ids, attendance_patterns)):
+            attendance_data = {
+                "records": records,
+                "telegram_id": telegram_id
+            }
+            
+            response = requests.post(f"{API_BASE}/journals/sessions/{session_id}/attendance", json=attendance_data, timeout=10)
+            
+            if response.status_code != 200:
+                log_test(f"POST /api/journals/sessions/{session_id}/attendance (Session {i+1})", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+                return False
+                
+        log_test("POST /api/journals/sessions/{session_id}/attendance", "PASS", f"Attendance marked for all 4 sessions")
+        
+        # Step 6: Check statistics API (GET /api/journals/{journal_id}/stats)
+        log_test("Step 6: Testing statistics API", "INFO", f"Getting statistics for journal {journal_id}")
+        
+        response = requests.get(f"{API_BASE}/journals/{journal_id}/stats", timeout=10)
+        
+        if response.status_code != 200:
+            log_test("GET /api/journals/{journal_id}/stats", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        stats_response = response.json()
+        
+        # Validate response structure and data
+        log_test("Step 6.1: Validating basic statistics", "INFO", "Checking journal_id, total_students, total_sessions")
+        
+        # Check journal_id
+        if stats_response.get("journal_id") != journal_id:
+            log_test("Journal ID Validation", "FAIL", f"Expected journal_id={journal_id}, got {stats_response.get('journal_id')}")
+            return False
+            
+        # Check total_students
+        if stats_response.get("total_students") != 5:
+            log_test("Total Students Validation", "FAIL", f"Expected total_students=5, got {stats_response.get('total_students')}")
+            return False
+            
+        # Check linked_students
+        linked_students = stats_response.get("linked_students")
+        if linked_students is None or not isinstance(linked_students, int):
+            log_test("Linked Students Validation", "FAIL", f"Expected linked_students as integer, got {linked_students}")
+            return False
+            
+        # Check total_sessions
+        if stats_response.get("total_sessions") != 4:
+            log_test("Total Sessions Validation", "FAIL", f"Expected total_sessions=4, got {stats_response.get('total_sessions')}")
+            return False
+            
+        # Check overall_attendance_percent
+        overall_percent = stats_response.get("overall_attendance_percent")
+        if overall_percent is None or not isinstance(overall_percent, (int, float)):
+            log_test("Overall Attendance Percent Validation", "FAIL", f"Expected overall_attendance_percent as number, got {overall_percent}")
+            return False
+            
+        log_test("Basic Statistics Validation", "PASS", f"journal_id={journal_id}, total_students=5, linked_students={linked_students}, total_sessions=4, overall_attendance_percent={overall_percent}")
+        
+        # Validate students_stats array
+        log_test("Step 6.2: Validating students statistics", "INFO", "Checking students_stats array")
+        
+        students_stats = stats_response.get("students_stats", [])
+        if len(students_stats) != 5:
+            log_test("Students Stats Array Validation", "FAIL", f"Expected 5 students in stats, got {len(students_stats)}")
+            return False
+            
+        required_student_fields = ["id", "full_name", "attendance_percent", "present_count", "absent_count", "excused_count", "late_count", "total_sessions"]
+        
+        for i, student_stat in enumerate(students_stats):
+            for field in required_student_fields:
+                if field not in student_stat:
+                    log_test("Student Stats Field Validation", "FAIL", f"Student {i}: Missing field '{field}'")
+                    return False
+                    
+            # Validate data types
+            if not isinstance(student_stat.get("present_count"), int):
+                log_test("Student Stats Type Validation", "FAIL", f"Student {i}: present_count should be integer")
+                return False
+                
+            if not isinstance(student_stat.get("absent_count"), int):
+                log_test("Student Stats Type Validation", "FAIL", f"Student {i}: absent_count should be integer")
+                return False
+                
+            if not isinstance(student_stat.get("excused_count"), int):
+                log_test("Student Stats Type Validation", "FAIL", f"Student {i}: excused_count should be integer")
+                return False
+                
+            if not isinstance(student_stat.get("late_count"), int):
+                log_test("Student Stats Type Validation", "FAIL", f"Student {i}: late_count should be integer")
+                return False
+                
+            if student_stat.get("total_sessions") != 4:
+                log_test("Student Stats Sessions Validation", "FAIL", f"Student {i}: Expected total_sessions=4, got {student_stat.get('total_sessions')}")
+                return False
+                
+        log_test("Students Statistics Validation", "PASS", f"All 5 students have correct stats structure and data types")
+        
+        # Validate sessions_stats array
+        log_test("Step 6.3: Validating sessions statistics", "INFO", "Checking sessions_stats array")
+        
+        sessions_stats = stats_response.get("sessions_stats", [])
+        if len(sessions_stats) != 4:
+            log_test("Sessions Stats Array Validation", "FAIL", f"Expected 4 sessions in stats, got {len(sessions_stats)}")
+            return False
+            
+        required_session_fields = ["session_id", "date", "title", "type", "present_count", "absent_count", "attendance_filled", "total_students"]
+        
+        for i, session_stat in enumerate(sessions_stats):
+            for field in required_session_fields:
+                if field not in session_stat:
+                    log_test("Session Stats Field Validation", "FAIL", f"Session {i}: Missing field '{field}'")
+                    return False
+                    
+            # Validate data types and values
+            if not isinstance(session_stat.get("present_count"), int):
+                log_test("Session Stats Type Validation", "FAIL", f"Session {i}: present_count should be integer")
+                return False
+                
+            if not isinstance(session_stat.get("absent_count"), int):
+                log_test("Session Stats Type Validation", "FAIL", f"Session {i}: absent_count should be integer")
+                return False
+                
+            if not isinstance(session_stat.get("attendance_filled"), int):
+                log_test("Session Stats Type Validation", "FAIL", f"Session {i}: attendance_filled should be integer")
+                return False
+                
+            if session_stat.get("total_students") != 5:
+                log_test("Session Stats Students Validation", "FAIL", f"Session {i}: Expected total_students=5, got {session_stat.get('total_students')}")
+                return False
+                
+        log_test("Sessions Statistics Validation", "PASS", f"All 4 sessions have correct stats structure and data types")
+        
+        # Validate attendance calculations
+        log_test("Step 6.4: Validating attendance calculations", "INFO", "Checking attendance math")
+        
+        # Calculate expected values based on our attendance patterns
+        expected_student_stats = {
+            student_ids[0]: {"present": 3, "absent": 1, "late": 0, "excused": 0},  # Иванов Иван
+            student_ids[1]: {"present": 3, "absent": 1, "late": 0, "excused": 0},  # Петров Петр  
+            student_ids[2]: {"present": 2, "absent": 1, "late": 0, "excused": 1},  # Сидорова Анна
+            student_ids[3]: {"present": 2, "absent": 1, "late": 1, "excused": 0},  # Козлов Дмитрий
+            student_ids[4]: {"present": 2, "absent": 1, "late": 2, "excused": 0},  # Николаева Мария
         }
         
-        response = requests.post(f"{API_BASE}/journals/{journal_id}/sessions/from-schedule", json=sessions_data, timeout=10)
-        
-        if response.status_code != 200:
-            log_test("POST /api/journals/{journal_id}/sessions/from-schedule", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            return False
-            
-        sessions_response = response.json()
-        
-        # Verify response structure
-        if sessions_response.get("status") != "success":
-            log_test("Sessions Response Validation", "FAIL", f"Expected status=success, got {sessions_response.get('status')}")
-            return False
-            
-        created_count = sessions_response.get("created_count", 0)
-        skipped_count = sessions_response.get("skipped_count", 0)
-        created_sessions = sessions_response.get("sessions", [])
-        
-        if created_count != 3:
-            log_test("Sessions Count Validation", "FAIL", f"Expected created_count=3, got {created_count}")
-            return False
-            
-        if len(created_sessions) != 3:
-            log_test("Sessions Array Validation", "FAIL", f"Expected 3 sessions in array, got {len(created_sessions)}")
-            return False
-            
-        log_test("POST /api/journals/{journal_id}/sessions/from-schedule", "PASS", f"Sessions created successfully. Count: {created_count}, Skipped: {skipped_count}")
-        
-        # Step 4: Verify session types and content
-        log_test("Step 4: Verifying session types and content", "INFO", "Checking session details")
-        
-        expected_types = ["lecture", "seminar", "lab"]
-        expected_times = ["09:00-10:30", "11:00-12:30", "14:00-15:30"]
-        expected_teachers = ["Иванов И.И.", "Петров П.П.", "Сидоров С.С."]
-        expected_auditories = ["101", "102", "103"]
-        
-        for i, session in enumerate(created_sessions):
-            # Check session type mapping
-            if session.get("type") != expected_types[i]:
-                log_test("Session Type Validation", "FAIL", f"Session {i}: Expected type={expected_types[i]}, got {session.get('type')}")
-                return False
+        for student_stat in students_stats:
+            student_id = student_stat["id"]
+            if student_id in expected_student_stats:
+                expected = expected_student_stats[student_id]
                 
-            # Check title contains time and type
-            title = session.get("title", "")
-            if expected_times[i] not in title:
-                log_test("Session Title Validation", "FAIL", f"Session {i}: Time {expected_times[i]} not found in title: {title}")
-                return False
+                # Check present count (including late as present for attendance percentage)
+                expected_present_total = expected["present"] + expected["late"]
+                actual_present = student_stat["present_count"]
                 
-            # Check description contains teacher and auditory
-            description = session.get("description", "")
-            if expected_teachers[i] not in description:
-                log_test("Session Description Validation", "FAIL", f"Session {i}: Teacher {expected_teachers[i]} not found in description: {description}")
-                return False
-                
-            if expected_auditories[i] not in description:
-                log_test("Session Description Validation", "FAIL", f"Session {i}: Auditory {expected_auditories[i]} not found in description: {description}")
-                return False
-                
-        log_test("Session Content Validation", "PASS", "All sessions have correct types, titles, and descriptions")
+                if actual_present != expected_present_total:
+                    log_test("Attendance Calculation Validation", "FAIL", f"Student {student_id}: Expected present_count={expected_present_total}, got {actual_present}")
+                    return False
+                    
+                if student_stat["absent_count"] != expected["absent"]:
+                    log_test("Attendance Calculation Validation", "FAIL", f"Student {student_id}: Expected absent_count={expected['absent']}, got {student_stat['absent_count']}")
+                    return False
+                    
+                if student_stat["late_count"] != expected["late"]:
+                    log_test("Attendance Calculation Validation", "FAIL", f"Student {student_id}: Expected late_count={expected['late']}, got {student_stat['late_count']}")
+                    return False
+                    
+                if student_stat["excused_count"] != expected["excused"]:
+                    log_test("Attendance Calculation Validation", "FAIL", f"Student {student_id}: Expected excused_count={expected['excused']}, got {student_stat['excused_count']}")
+                    return False
+                    
+        log_test("Attendance Calculations Validation", "PASS", "All attendance counts match expected values")
         
-        # Step 5: Test duplicate prevention
-        log_test("Step 5: Testing duplicate prevention", "INFO", "Sending same sessions again")
-        
-        response = requests.post(f"{API_BASE}/journals/{journal_id}/sessions/from-schedule", json=sessions_data, timeout=10)
-        
-        if response.status_code != 200:
-            log_test("Duplicate Prevention Test", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            return False
-            
-        duplicate_response = response.json()
-        
-        duplicate_created = duplicate_response.get("created_count", 0)
-        duplicate_skipped = duplicate_response.get("skipped_count", 0)
-        
-        if duplicate_created != 0:
-            log_test("Duplicate Prevention Validation", "FAIL", f"Expected created_count=0 for duplicates, got {duplicate_created}")
-            return False
-            
-        if duplicate_skipped != 3:
-            log_test("Duplicate Prevention Validation", "FAIL", f"Expected skipped_count=3 for duplicates, got {duplicate_skipped}")
-            return False
-            
-        log_test("Duplicate Prevention Test", "PASS", f"Duplicates correctly prevented. Skipped: {duplicate_skipped}")
-        
-        # Step 6: Verify sessions via GET endpoint
-        log_test("Step 6: Verifying sessions via GET endpoint", "INFO", f"Getting sessions for journal {journal_id}")
-        
-        response = requests.get(f"{API_BASE}/journals/{journal_id}/sessions", timeout=10)
-        
-        if response.status_code != 200:
-            log_test("GET /api/journals/{journal_id}/sessions", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            return False
-            
-        get_sessions_response = response.json()
-        
-        if len(get_sessions_response) < 3:
-            log_test("GET Sessions Validation", "FAIL", f"Expected at least 3 sessions, got {len(get_sessions_response)}")
-            return False
-            
-        # Verify that our created sessions are in the list
-        our_session_ids = {session.get("session_id") for session in created_sessions}
-        retrieved_session_ids = {session.get("session_id") for session in get_sessions_response}
-        
-        if not our_session_ids.issubset(retrieved_session_ids):
-            log_test("GET Sessions Validation", "FAIL", "Not all created sessions found in GET response")
-            return False
-            
-        log_test("GET /api/journals/{journal_id}/sessions", "PASS", f"All sessions retrieved successfully. Total: {len(get_sessions_response)}")
-        
-        log_test("Sessions From Schedule Endpoint", "PASS", "All functionality working correctly!")
+        log_test("Journal Statistics API", "PASS", "All functionality working correctly!")
         
         return True
         
