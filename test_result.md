@@ -194,3 +194,15 @@ agent_communication:
       - working: true
         agent: "testing"
         comment: "✅ Successfully tested new assigned_to functionality for group tasks as requested in review. ALL 7 test scenarios passed: 1) Created test room with 3 participants (creator + 2 participants), 2) Task creation with assigned_to: null correctly adds ALL room participants, 3) Task creation with specific assigned_to only adds specified participants + creator, 4) Task update with assigned_to: [] reassigns to ALL participants, 5) Task update with specific assigned_to removes unassigned participants while keeping creator. Creator/owner is always included regardless of assigned_to value. Backend URL: http://localhost:8001 - All functionality working as expected."
+
+  - task: "Referral Event Tracking System"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested new referral event tracking system as requested in review. ALL 5 test steps passed: 1) POST /api/rooms creates room with telegram_id=123456789, name='Тестовая комната', first_name='Тестер', 2) POST /api/rooms/{room_id}/invite-link generates invite link with proper token, 3) POST /api/rooms/join/{invite_token} successfully joins user 987654321 with referral_code=123456789, 4) GET /api/admin/stats shows total_room_joins >= 1 and room_joins_today >= 1, 5) GET /api/admin/referral-stats shows total_events >= 1, recent_events contains room_join event with correct referrer_id, and top_referrers contains referrer 123456789. Referral event logging working correctly for room joins. Backend URL: http://localhost:8001"
