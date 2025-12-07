@@ -78,7 +78,7 @@ def test_add_participants_to_room(room_id):
     print("🧪 Test 2: Add participants to room")
     
     # First, get room invite token
-    response = make_request("POST", f"/rooms/{room_id}/invite-link", {}, 200)
+    response = make_request("POST", f"/rooms/{room_id}/invite-link", {"telegram_id": TEST_CREATOR_ID}, 200)
     if not response or "invite_token" not in response:
         log_test("Get room invite token", "FAIL", "Failed to get invite token")
         return False
