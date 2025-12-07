@@ -102,11 +102,19 @@ def test_referral_event_tracking():
             
         join_response = response.json()
         
-        if not join_response.get("success"):
-            log_test("POST /api/rooms/join/{invite_token}", "FAIL", f"Join failed: {join_response}")
+        # Check if the user was successfully added to participants
+        participants = join_response.get("participants", [])
+        user_found = False
+        for participant in participants:
+            if participant.get("telegram_id") == joiner_telegram_id:
+                user_found = True
+                break
+        
+        if not user_found:
+            log_test("POST /api/rooms/join/{invite_token}", "FAIL", f"User not found in participants: {join_response}")
             return False
             
-        log_test("POST /api/rooms/join/{invite_token}", "PASS", f"Successfully joined room. Response: {join_response}")
+        log_test("POST /api/rooms/join/{invite_token}", "PASS", f"Successfully joined room. User added to participants.")
         
         # Wait a moment for the referral event to be processed
         time.sleep(1)
