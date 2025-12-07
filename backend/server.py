@@ -3745,7 +3745,7 @@ async def get_admin_stats(days: Optional[int] = None):
 
 
 @api_router.get("/admin/referral-stats", response_model=ReferralStatsDetailResponse)
-async def get_referral_stats(days: Optional[int] = 30, limit: int = 10):
+async def get_admin_referral_stats(days: Optional[int] = 30, limit: int = 10):
     """
     Получить детальную статистику реферальных событий.
     
