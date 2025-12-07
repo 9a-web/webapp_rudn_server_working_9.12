@@ -112,6 +112,12 @@ const Home = () => {
   
   // ID журнала для автоматического открытия после присоединения
   const [pendingJournalId, setPendingJournalId] = useState(null);
+  
+  // Состояние для обработки приглашения в комнату
+  const [roomInviteProcessed, setRoomInviteProcessed] = useState(false);
+  
+  // ID комнаты для автоматического открытия после присоединения
+  const [pendingRoomId, setPendingRoomId] = useState(null);
 
   // Состояние для нижнего меню навигации (загружаем из localStorage)
   const [activeTab, setActiveTab] = useState(() => {
