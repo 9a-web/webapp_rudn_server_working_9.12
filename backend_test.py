@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 # Backend URL from review request
 BACKEND_URL = "https://class-progress-1.preview.emergentagent.com"
-API_BASE = f"{BACKEND_URL}/api"
+API_BASE = f"{BACKEND_URL}/backend/api"
 
 # Test data
 TEST_CREATOR_ID = 123456789
