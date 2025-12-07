@@ -1903,17 +1903,28 @@ async def create_task_in_room(room_id: str, task_data: RoomTaskCreate):
             role='owner'
         )
         
-        # Автоматически добавляем всех участников комнаты как участников задачи
+        # Определяем список участников задачи
         participants = [owner_participant]
+        
+        # Если assigned_to не указан или пустой - добавляем всех участников комнаты
+        # Если assigned_to указан - добавляем только выбранных участников
+        assigned_ids = task_data.assigned_to if task_data.assigned_to else None
+        
         for room_participant in room_doc.get("participants", []):
-            if room_participant["telegram_id"] != task_data.telegram_id:
-                task_participant = GroupTaskParticipant(
-                    telegram_id=room_participant["telegram_id"],
-                    username=room_participant.get("username"),
-                    first_name=room_participant.get("first_name", "User"),
-                    role='member'
-                )
-                participants.append(task_participant)
+            participant_id = room_participant["telegram_id"]
+            # Пропускаем создателя (он уже добавлен как owner)
+            if participant_id == task_data.telegram_id:
+                continue
+            # Если есть список assigned_to, добавляем только выбранных
+            if assigned_ids is not None and participant_id not in assigned_ids:
+                continue
+            task_participant = GroupTaskParticipant(
+                telegram_id=participant_id,
+                username=room_participant.get("username"),
+                first_name=room_participant.get("first_name", "User"),
+                role='member'
+            )
+            participants.append(task_participant)
         
         # Создаем подзадачи из списка строк
         subtasks = []
