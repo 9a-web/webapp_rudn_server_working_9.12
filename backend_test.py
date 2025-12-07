@@ -20,28 +20,40 @@ TEST_PARTICIPANT_2 = 555666777
 TEST_ROOM_NAME = "Test Room for assigned_to functionality"
 TEST_ROOM_COLOR = "blue"
 
-class RUDNScheduleAPITester:
-    def __init__(self):
-        self.base_url = BACKEND_URL
-        self.session = requests.Session()
-        self.session.timeout = TIMEOUT
-        self.test_results = []
-        self.test_data = {}
+def log_test(test_name, status, details=""):
+    """Log test results"""
+    status_symbol = "✅" if status == "PASS" else "❌"
+    print(f"{status_symbol} {test_name}")
+    if details:
+        print(f"   {details}")
+    print()
+
+def make_request(method, endpoint, data=None, expected_status=200):
+    """Make HTTP request and handle errors"""
+    url = f"{API_BASE}{endpoint}"
+    try:
+        if method == "GET":
+            response = requests.get(url)
+        elif method == "POST":
+            response = requests.post(url, json=data)
+        elif method == "PUT":
+            response = requests.put(url, json=data)
+        elif method == "DELETE":
+            response = requests.delete(url, json=data)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
         
-    def log_test(self, test_name: str, success: bool, message: str, details: Optional[Dict] = None):
-        """Log test result"""
-        result = {
-            "test": test_name,
-            "success": success,
-            "message": message,
-            "details": details or {}
-        }
-        self.test_results.append(result)
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} {test_name}: {message}")
-        if details:
-            print(f"   Details: {json.dumps(details, indent=2, ensure_ascii=False)}")
-        print()
+        print(f"   {method} {endpoint} -> {response.status_code}")
+        
+        if response.status_code != expected_status:
+            print(f"   Expected {expected_status}, got {response.status_code}")
+            print(f"   Response: {response.text}")
+            return None
+        
+        return response.json() if response.content else {}
+    except Exception as e:
+        print(f"   Request failed: {e}")
+        return None
     
     def test_faculties_endpoint(self) -> bool:
         """Test GET /api/faculties endpoint"""
