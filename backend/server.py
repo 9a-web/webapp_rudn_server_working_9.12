@@ -2246,7 +2246,7 @@ async def get_room_tasks(room_id: str):
 
 @api_router.put("/group-tasks/{task_id}/update", response_model=GroupTaskResponse)
 async def update_group_task(task_id: str, update_data: GroupTaskUpdate):
-    """Обновить групповую задачу (название, описание, дедлайн, категорию, приоритет, теги)"""
+    """Обновить групповую задачу (название, описание, дедлайн, категорию, приоритет, теги, участников)"""
     try:
         task_doc = await db.group_tasks.find_one({"task_id": task_id})
         
@@ -2269,6 +2269,60 @@ async def update_group_task(task_id: str, update_data: GroupTaskUpdate):
             update_fields["status"] = update_data.status
         if update_data.tags is not None:
             update_fields["tags"] = update_data.tags
+        
+        # Обработка изменения участников задачи
+        if update_data.assigned_to is not None:
+            room_id = task_doc.get("room_id")
+            if room_id:
+                room_doc = await db.rooms.find_one({"room_id": room_id})
+                if room_doc:
+                    owner_id = task_doc.get("owner_id")
+                    current_participants = task_doc.get("participants", [])
+                    
+                    # Сохраняем информацию о выполнении для текущих участников
+                    completion_status = {p["telegram_id"]: p.get("completed", False) for p in current_participants}
+                    completion_times = {p["telegram_id"]: p.get("completed_at") for p in current_participants}
+                    
+                    # Создаем новый список участников
+                    new_participants = []
+                    
+                    # Добавляем владельца задачи
+                    owner_info = next(
+                        (p for p in room_doc.get("participants", []) if p["telegram_id"] == owner_id),
+                        None
+                    )
+                    if owner_info:
+                        new_participants.append({
+                            "telegram_id": owner_id,
+                            "username": owner_info.get("username"),
+                            "first_name": owner_info.get("first_name", "User"),
+                            "role": "owner",
+                            "completed": completion_status.get(owner_id, False),
+                            "completed_at": completion_times.get(owner_id),
+                            "joined_at": datetime.utcnow()
+                        })
+                    
+                    # Если assigned_to пустой список - добавляем всех участников комнаты
+                    # Если assigned_to заполнен - добавляем только выбранных
+                    assigned_ids = update_data.assigned_to if update_data.assigned_to else None
+                    
+                    for room_participant in room_doc.get("participants", []):
+                        participant_id = room_participant["telegram_id"]
+                        if participant_id == owner_id:
+                            continue
+                        if assigned_ids is not None and len(assigned_ids) > 0 and participant_id not in assigned_ids:
+                            continue
+                        new_participants.append({
+                            "telegram_id": participant_id,
+                            "username": room_participant.get("username"),
+                            "first_name": room_participant.get("first_name", "User"),
+                            "role": "member",
+                            "completed": completion_status.get(participant_id, False),
+                            "completed_at": completion_times.get(participant_id),
+                            "joined_at": datetime.utcnow()
+                        })
+                    
+                    update_fields["participants"] = new_participants
         
         update_fields["updated_at"] = datetime.utcnow()
         
