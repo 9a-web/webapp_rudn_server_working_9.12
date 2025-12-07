@@ -240,17 +240,37 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     if (!userSettings) return;
     
     try {
-      const scheduleData = await scheduleAPI.getSchedule({
-        facultet_id: userSettings.facultet_id,
-        level_id: userSettings.level_id,
-        kurs: userSettings.kurs,
-        form_code: userSettings.form_code,
-        group_id: userSettings.group_id,
-        week_number: weekNumber || 1,
-      });
+      // Загружаем расписание для обеих недель, чтобы получить больше предметов и пар
+      const [scheduleWeek1, scheduleWeek2] = await Promise.all([
+        scheduleAPI.getSchedule({
+          facultet_id: userSettings.facultet_id,
+          level_id: userSettings.level_id,
+          kurs: userSettings.kurs,
+          form_code: userSettings.form_code,
+          group_id: userSettings.group_id,
+          week_number: 1,
+        }),
+        scheduleAPI.getSchedule({
+          facultet_id: userSettings.facultet_id,
+          level_id: userSettings.level_id,
+          kurs: userSettings.kurs,
+          form_code: userSettings.form_code,
+          group_id: userSettings.group_id,
+          week_number: 2,
+        }),
+      ]);
+      
+      // Объединяем события обеих недель
+      const allEvents = [
+        ...(scheduleWeek1.events || []),
+        ...(scheduleWeek2.events || []),
+      ];
+      
+      // Сохраняем все события для поиска ближайших пар
+      setScheduleEvents(allEvents);
       
       // Извлекаем уникальные предметы
-      const subjects = [...new Set(scheduleData.events?.map(e => e.discipline) || [])];
+      const subjects = [...new Set(allEvents.map(e => e.discipline).filter(Boolean))];
       setScheduleSubjects(subjects);
     } catch (error) {
       console.error('Error loading schedule subjects:', error);
