@@ -3744,6 +3744,139 @@ async def get_admin_stats(days: Optional[int] = None):
     )
 
 
+@api_router.get("/admin/referral-stats", response_model=ReferralStatsDetailResponse)
+async def get_referral_stats(days: Optional[int] = 30, limit: int = 10):
+    """
+    Получить детальную статистику реферальных событий.
+    
+    - **days**: Количество дней для анализа (по умолчанию 30)
+    - **limit**: Количество записей в топах и последних событиях (по умолчанию 10)
+    """
+    try:
+        now = datetime.utcnow()
+        today_start = datetime(now.year, now.month, now.day)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=days)
+        
+        # Общая статистика
+        total_events = await db.referral_events.count_documents({})
+        events_today = await db.referral_events.count_documents({"created_at": {"$gte": today_start}})
+        events_week = await db.referral_events.count_documents({"created_at": {"$gte": week_ago}})
+        events_month = await db.referral_events.count_documents({"created_at": {"$gte": month_ago}})
+        
+        # По типам - комнаты
+        room_joins_total = await db.referral_events.count_documents({"event_type": "room_join"})
+        room_joins_today = await db.referral_events.count_documents({
+            "event_type": "room_join",
+            "created_at": {"$gte": today_start}
+        })
+        room_joins_week = await db.referral_events.count_documents({
+            "event_type": "room_join",
+            "created_at": {"$gte": week_ago}
+        })
+        
+        # По типам - журналы
+        journal_joins_total = await db.referral_events.count_documents({"event_type": "journal_join"})
+        journal_joins_today = await db.referral_events.count_documents({
+            "event_type": "journal_join",
+            "created_at": {"$gte": today_start}
+        })
+        journal_joins_week = await db.referral_events.count_documents({
+            "event_type": "journal_join",
+            "created_at": {"$gte": week_ago}
+        })
+        
+        # Новые участники
+        new_members_total = await db.referral_events.count_documents({"is_new_member": True})
+        new_members_today = await db.referral_events.count_documents({
+            "is_new_member": True,
+            "created_at": {"$gte": today_start}
+        })
+        new_members_week = await db.referral_events.count_documents({
+            "is_new_member": True,
+            "created_at": {"$gte": week_ago}
+        })
+        
+        # Топ приглашающих (referrers)
+        top_referrers_pipeline = [
+            {"$match": {"referrer_id": {"$ne": None}, "is_new_member": True}},
+            {"$group": {
+                "_id": "$referrer_id",
+                "count": {"$sum": 1},
+                "room_joins": {"$sum": {"$cond": [{"$eq": ["$event_type", "room_join"]}, 1, 0]}},
+                "journal_joins": {"$sum": {"$cond": [{"$eq": ["$event_type", "journal_join"]}, 1, 0]}}
+            }},
+            {"$sort": {"count": -1}},
+            {"$limit": limit}
+        ]
+        top_referrers_cursor = db.referral_events.aggregate(top_referrers_pipeline)
+        top_referrers_raw = await top_referrers_cursor.to_list(limit)
+        
+        # Добавляем имена пользователей к топ-приглашающим
+        top_referrers = []
+        for ref in top_referrers_raw:
+            user_doc = await db.user_settings.find_one({"telegram_id": ref["_id"]})
+            user_name = user_doc.get("first_name", "Пользователь") if user_doc else "Пользователь"
+            top_referrers.append({
+                "telegram_id": ref["_id"],
+                "user_name": user_name,
+                "total_invites": ref["count"],
+                "room_joins": ref["room_joins"],
+                "journal_joins": ref["journal_joins"]
+            })
+        
+        # Последние события
+        recent_events_cursor = db.referral_events.find({}).sort("created_at", -1).limit(limit)
+        recent_events_raw = await recent_events_cursor.to_list(limit)
+        
+        recent_events = []
+        for event in recent_events_raw:
+            # Получаем имя пользователя
+            user_doc = await db.user_settings.find_one({"telegram_id": event["telegram_id"]})
+            user_name = user_doc.get("first_name") if user_doc else None
+            
+            # Получаем имя приглашающего
+            referrer_name = None
+            if event.get("referrer_id"):
+                referrer_doc = await db.user_settings.find_one({"telegram_id": event["referrer_id"]})
+                referrer_name = referrer_doc.get("first_name") if referrer_doc else None
+            
+            recent_events.append(ReferralEventResponse(
+                id=event["id"],
+                event_type=event["event_type"],
+                telegram_id=event["telegram_id"],
+                referrer_id=event.get("referrer_id"),
+                target_id=event["target_id"],
+                target_name=event.get("target_name", ""),
+                invite_token=event["invite_token"],
+                is_new_member=event["is_new_member"],
+                created_at=event["created_at"],
+                user_name=user_name,
+                referrer_name=referrer_name
+            ))
+        
+        return ReferralStatsDetailResponse(
+            total_events=total_events,
+            events_today=events_today,
+            events_week=events_week,
+            events_month=events_month,
+            room_joins_total=room_joins_total,
+            room_joins_today=room_joins_today,
+            room_joins_week=room_joins_week,
+            journal_joins_total=journal_joins_total,
+            journal_joins_today=journal_joins_today,
+            journal_joins_week=journal_joins_week,
+            new_members_total=new_members_total,
+            new_members_today=new_members_today,
+            new_members_week=new_members_week,
+            top_referrers=top_referrers,
+            recent_events=recent_events
+        )
+    except Exception as e:
+        logger.error(f"Error getting referral stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ Экспорт/Импорт базы данных ============
 
 @api_router.get("/export/database")
