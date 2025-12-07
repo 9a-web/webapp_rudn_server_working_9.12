@@ -61,7 +61,8 @@ export const JournalDetailModal = ({
   journalId, 
   telegramId, 
   hapticFeedback,
-  onJournalUpdated 
+  onJournalUpdated,
+  userSettings
 }) => {
   const [journal, setJournal] = useState(null);
   const [students, setStudents] = useState([]);
