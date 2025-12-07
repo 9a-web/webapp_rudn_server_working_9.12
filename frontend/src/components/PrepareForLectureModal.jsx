@@ -516,14 +516,13 @@ export const PrepareForLectureModal = ({
                       setDeadlineDateInput('');
                       hapticFeedback && hapticFeedback('selection');
                     }}
-                    disabled={saving || !subject}
+                    disabled={saving}
                     className={`
                       flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5
                       ${deadlineType === 'class' 
                         ? 'bg-white shadow-sm text-[#1C1C1E]' 
                         : 'text-gray-500'
                       }
-                      ${!subject ? 'opacity-50' : ''}
                     `}
                   >
                     <BookOpen className="w-4 h-4" />
