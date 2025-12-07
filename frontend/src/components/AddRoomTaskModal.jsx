@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Calendar, Flag, Tag, AlignLeft, List } from 'lucide-react';
+import { X, Plus, Calendar, Flag, Tag, AlignLeft, List, Users, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTelegram } from '../contexts/TelegramContext';
 
@@ -7,7 +7,8 @@ export const AddRoomTaskModal = ({
   isOpen, 
   onClose, 
   onAddTask,
-  roomColor = 'blue'
+  roomColor = 'blue',
+  participants = []  // Список участников комнаты
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -18,8 +19,10 @@ export const AddRoomTaskModal = ({
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [dragY, setDragY] = useState(0);
+  const [assignToAll, setAssignToAll] = useState(true);  // По умолчанию для всех
+  const [selectedParticipants, setSelectedParticipants] = useState([]);  // Выбранные участники
   
-  const { webApp } = useTelegram();
+  const { webApp, user } = useTelegram();
   const modalRef = useRef(null);
   
   // Блокируем скролл страницы при открытии модального окна
