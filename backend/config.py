@@ -70,6 +70,22 @@ def is_production_environment() -> bool:
     return ENV == "production"
 
 
+def get_telegram_bot_username() -> str:
+    """
+    Возвращает username Telegram бота в зависимости от ENV.
+    
+    - ENV=test -> rudn_pro_bot (тестовый бот)
+    - ENV=production -> rudn_mosbot (основной бот)
+    
+    Returns:
+        str: Username бота для текущего окружения
+    """
+    if ENV == "production":
+        return "rudn_mosbot"
+    else:
+        return "rudn_pro_bot"
+
+
 # Экспортируем активный токен для обратной совместимости
 TELEGRAM_BOT_TOKEN = get_telegram_bot_token()
 
