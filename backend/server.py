@@ -134,7 +134,7 @@ from achievements import (
     mark_achievements_as_seen
 )
 from weather import get_moscow_weather
-from config import get_telegram_bot_token, is_test_environment, ENV
+from config import get_telegram_bot_token, get_telegram_bot_username, is_test_environment, ENV
 
 
 ROOT_DIR = Path(__file__).parent
