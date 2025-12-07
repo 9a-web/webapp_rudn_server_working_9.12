@@ -576,7 +576,7 @@ class RoomParticipant(BaseModel):
     first_name: str
     joined_at: datetime = Field(default_factory=datetime.utcnow)
     role: str = 'member'  # 'owner', 'admin', 'moderator', 'member', 'viewer'
-    referral_code: Optional[str] = None  # реферальный код, если пришел по ссылке
+    referral_code: Optional[int] = None  # ID пользователя, который пригласил
     tasks_completed: int = 0  # Количество выполненных задач
     tasks_created: int = 0  # Количество созданных задач
     last_activity: Optional[datetime] = None  # Последняя активность
