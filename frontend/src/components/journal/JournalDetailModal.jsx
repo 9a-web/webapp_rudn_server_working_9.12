@@ -541,63 +541,13 @@ export const JournalDetailModal = ({
 
                 {/* Stats Tab */}
                 {activeTab === 'stats' && isOwner && (
-                  <div>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-2xl font-bold text-white">{students.length}</p>
-                        <p className="text-sm text-gray-400">студентов</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-2xl font-bold text-white">{subjects.length}</p>
-                        <p className="text-sm text-gray-400">предметов</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-2xl font-bold text-green-400">
-                          {students.filter(s => s.is_linked).length}
-                        </p>
-                        <p className="text-sm text-gray-400">привязано</p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-2xl font-bold text-yellow-400">
-                          {pendingMembers.length}
-                        </p>
-                        <p className="text-sm text-gray-400">ожидают</p>
-                      </div>
-                    </div>
-
-                    {/* Top students by attendance */}
-                    <h3 className="text-lg font-semibold text-white mb-3">Рейтинг посещаемости</h3>
-                    <div className="space-y-2">
-                      {students
-                        .filter(s => s.attendance_percent !== null)
-                        .sort((a, b) => (b.attendance_percent || 0) - (a.attendance_percent || 0))
-                        .slice(0, 10)
-                        .map((student, index) => (
-                          <div
-                            key={student.id}
-                            className="flex items-center justify-between bg-white/5 rounded-xl p-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                index === 0 ? 'bg-yellow-500 text-black' :
-                                index === 1 ? 'bg-gray-400 text-black' :
-                                index === 2 ? 'bg-orange-600 text-white' :
-                                'bg-white/10 text-gray-400'
-                              }`}>
-                                {index + 1}
-                              </span>
-                              <span className="text-white">{student.full_name}</span>
-                            </div>
-                            <span className={`font-semibold ${
-                              student.attendance_percent >= 80 ? 'text-green-400' :
-                              student.attendance_percent >= 50 ? 'text-yellow-400' : 'text-red-400'
-                            }`}>
-                              {student.attendance_percent}%
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
+                  <JournalStatsTab
+                    journalId={journalId}
+                    students={students}
+                    subjects={subjects}
+                    pendingMembers={pendingMembers}
+                    gradient={gradient}
+                  />
                 )}
 
                 {/* Non-owner view - My Attendance */}
