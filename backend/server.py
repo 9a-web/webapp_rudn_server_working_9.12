@@ -4451,7 +4451,8 @@ async def add_student(journal_id: str, data: JournalStudentCreate):
         await db.journal_students.insert_one(student.model_dump())
         
         # Генерируем ссылки для студента
-        bot_username = "rudn_pro_bot"
+        # Получаем имя бота из конфига (зависит от ENV)
+        bot_username = get_telegram_bot_username()
         invite_link = f"https://t.me/{bot_username}?start=jstudent_{student.invite_code}"
         invite_link_webapp = f"https://t.me/{bot_username}/app?startapp=jstudent_{student.invite_code}"
         
