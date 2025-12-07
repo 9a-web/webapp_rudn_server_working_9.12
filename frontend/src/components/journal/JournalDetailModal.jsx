@@ -712,6 +712,7 @@ export const JournalDetailModal = ({
             telegramId={telegramId}
             hapticFeedback={hapticFeedback}
             onSubjectUpdated={loadData}
+            userSettings={userSettings}
           />
         )}
       </motion.div>
