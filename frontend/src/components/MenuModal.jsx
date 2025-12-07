@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const MenuModal = React.memo(({ 
   isOpen, 
   onClose, 
-  onCalendarClick, 
   onNotificationsClick, 
   onAnalyticsClick, 
   onAchievementsClick,
