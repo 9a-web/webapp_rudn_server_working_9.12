@@ -208,3 +208,15 @@ agent_communication:
       - working: true
         agent: "testing"
         comment: "✅ Successfully tested new referral event tracking system as requested in review. ALL 5 test steps passed: 1) POST /api/rooms creates room with telegram_id=123456789, name='Тестовая комната', first_name='Тестер', 2) POST /api/rooms/{room_id}/invite-link generates invite link with proper token, 3) POST /api/rooms/join/{invite_token} successfully joins user 987654321 with referral_code=123456789, 4) GET /api/admin/stats shows total_room_joins >= 1 and room_joins_today >= 1, 5) GET /api/admin/referral-stats shows total_events >= 1, recent_events contains room_join event with correct referrer_id, and top_referrers contains referrer 123456789. Referral event logging working correctly for room joins. Backend URL: http://localhost:8001"
+
+  - task: "POST /api/journals/{journal_id}/sessions/from-schedule - создание занятий из расписания"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested new sessions/from-schedule endpoint as requested in review. ALL 6 test steps passed: 1) POST /api/journals creates test journal with telegram_id=123456789, name='Тестовый журнал', group_name='ИВТ-101', 2) POST /api/journals/{journal_id}/subjects creates subject 'Математический анализ', 3) POST /api/journals/{journal_id}/sessions/from-schedule creates 3 sessions with different types (Лекция→lecture, Семинар→seminar, Лабораторная→lab), 4) Verified session titles contain time and type, descriptions contain teacher and auditory, 5) Duplicate prevention works correctly (skipped_count=3 on repeat), 6) GET /api/journals/{journal_id}/sessions retrieves all created sessions. Session type mapping, title formatting, and duplicate prevention all working as expected. Backend URL: http://localhost:8001"
