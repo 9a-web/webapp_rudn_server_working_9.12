@@ -335,6 +335,7 @@ export const PrepareForLectureModal = ({
     setDeadlineType('date');
     setDeadlineDateInput('');
     setSelectedClass(null);
+    setUseDeadlineAsTargetDate(false);
     setDragY(0);
     onClose();
   };
