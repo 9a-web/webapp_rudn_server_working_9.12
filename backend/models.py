@@ -670,6 +670,7 @@ class GroupTaskUpdate(BaseModel):
     priority: Optional[str] = None
     status: Optional[str] = None
     tags: Optional[List[str]] = None
+    assigned_to: Optional[List[int]] = None  # Список telegram_id участников (None = не менять, [] = все участники)
 
 
 class RoomActivity(BaseModel):
