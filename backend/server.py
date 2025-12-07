@@ -3006,9 +3006,9 @@ async def get_referral_stats(telegram_id: int):
                 {"$set": {"referral_code": referral_code}}
             )
         
-        # Получаем информацию о боте для ссылки
-        bot_info = await db.bot_info.find_one({})
-        bot_username = bot_info.get("username", "rudn_mosbot") if bot_info else "rudn_mosbot"
+        # Получаем имя бота из конфига (зависит от ENV)
+        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        bot_username = get_telegram_bot_username()
         referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
         
         # Получаем все реферальные связи пользователя
