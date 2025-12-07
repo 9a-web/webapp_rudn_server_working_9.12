@@ -536,7 +536,174 @@ export const ProfileModal = ({
                 )}
               </motion.div>
             )}
+
+            {/* Кнопка настроек */}
+            {isTelegramUser && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    setShowSettings(true);
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={{
+                    backgroundColor: 'rgba(75, 85, 99, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  <Settings className="w-4 h-4 text-gray-300" />
+                  <span className="text-sm font-medium text-gray-300">Настройки</span>
+                </button>
+              </motion.div>
+            )}
           </motion.div>
+
+          {/* Модальное окно настроек */}
+          <AnimatePresence>
+            {showSettings && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[102]"
+                  style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+                  onClick={() => setShowSettings(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="fixed z-[103] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] p-6 rounded-3xl"
+                  style={{
+                    backgroundColor: 'rgba(42, 42, 42, 0.95)',
+                    backdropFilter: 'blur(40px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
+                  }}
+                >
+                  {/* Заголовок */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-gray-400" />
+                      Настройки
+                    </h3>
+                    <button
+                      onClick={() => setShowSettings(false)}
+                      className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <X className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Опции настроек */}
+                  <div className="space-y-3">
+                    {/* Удаление аккаунта */}
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(true);
+                        if (hapticFeedback) hapticFeedback('impact', 'medium');
+                      }}
+                      className="w-full p-4 rounded-xl flex items-center gap-3 transition-all active:scale-95"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                      }}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                        <Trash2 className="w-5 h-5 text-red-400" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-red-400">Удалить аккаунт</p>
+                        <p className="text-xs text-gray-500">Все данные будут удалены</p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Подтверждение удаления */}
+                  <AnimatePresence>
+                    {showDeleteConfirm && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="mt-4 p-4 rounded-xl"
+                        style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                        }}
+                      >
+                        <div className="flex items-start gap-3 mb-4">
+                          <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-semibold text-red-400 mb-1">
+                              Вы уверены?
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              Это действие необратимо. Все ваши данные, задачи, достижения и статистика будут удалены навсегда.
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-300 transition-all active:scale-95"
+                            style={{
+                              backgroundColor: 'rgba(75, 85, 99, 0.4)',
+                            }}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id) return;
+                              setDeleteLoading(true);
+                              try {
+                                const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+                                const response = await fetch(`${backendUrl}/api/user/${user.id}`, {
+                                  method: 'DELETE',
+                                });
+                                if (response.ok) {
+                                  if (hapticFeedback) hapticFeedback('notification', 'success');
+                                  // Закрываем все модалки
+                                  setShowDeleteConfirm(false);
+                                  setShowSettings(false);
+                                  onClose();
+                                  // Перезагружаем страницу для очистки состояния
+                                  window.location.reload();
+                                } else {
+                                  throw new Error('Ошибка удаления');
+                                }
+                              } catch (error) {
+                                console.error('Ошибка удаления аккаунта:', error);
+                                if (hapticFeedback) hapticFeedback('notification', 'error');
+                              } finally {
+                                setDeleteLoading(false);
+                              }
+                            }}
+                            disabled={deleteLoading}
+                            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+                            style={{
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            }}
+                          >
+                            {deleteLoading ? 'Удаление...' : 'Удалить'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </>
       )}
     </AnimatePresence>
