@@ -440,7 +440,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="flex-1 overflow-y-auto overflow-x-visible overscroll-contain">
               <div className="px-4 py-4 sm:px-6 sm:py-6">
                 {activeTab === 'tasks' && (
                   <TasksTab
