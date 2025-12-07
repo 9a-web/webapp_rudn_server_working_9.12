@@ -9,9 +9,9 @@ import json
 import sys
 from datetime import datetime, timedelta
 
-# Backend URL from review request
-BACKEND_URL = "https://class-progress-1.preview.emergentagent.com"
-API_BASE = f"{BACKEND_URL}/backend/api"
+# Backend URL - using local backend since external URL is not accessible
+BACKEND_URL = "http://localhost:8001"
+API_BASE = f"{BACKEND_URL}/api"
 
 # Test data
 TEST_CREATOR_ID = 123456789
