@@ -2707,9 +2707,9 @@ async def get_referral_code(telegram_id: int):
             )
             logger.info(f"✅ Создан реферальный код для пользователя {telegram_id}: {referral_code}")
         
-        # Получаем информацию о боте
-        bot_info = await db.bot_info.find_one({})
-        bot_username = bot_info.get("username", "rudn_pro_bot") if bot_info else "rudn_pro_bot"
+        # Получаем имя бота из конфига (зависит от ENV)
+        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        bot_username = get_telegram_bot_username()
         
         # Формируем реферальные ссылки
         # Старый формат через /start (для совместимости)
