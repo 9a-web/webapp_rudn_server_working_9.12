@@ -4525,7 +4525,8 @@ async def get_journal_students(journal_id: str):
         total_sessions = await db.journal_sessions.count_documents({"journal_id": journal_id})
         
         result = []
-        bot_username = "rudn_pro_bot"
+        # Получаем имя бота из конфига (зависит от ENV)
+        bot_username = get_telegram_bot_username()
         for s in students:
             # Рассчитать статистику посещаемости
             present_count = await db.attendance_records.count_documents({
