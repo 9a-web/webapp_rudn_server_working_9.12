@@ -248,26 +248,22 @@ export const PrepareForLectureModal = ({
       // Формируем текст задачи
       const taskText = `Подготовиться к лекции: ${subject}`;
       
-      // Определяем target_date и deadline
+      // target_date ВСЕГДА берется из выбранного дня в селекторе задач
       let targetDateISO = null;
-      let deadlineISO = null;
+      if (taskSelectedDate) {
+        const targetDate = new Date(taskSelectedDate);
+        const year = targetDate.getFullYear();
+        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const day = String(targetDate.getDate()).padStart(2, '0');
+        targetDateISO = `${year}-${month}-${day}T00:00:00`;
+      }
       
-      if (deadlineType === 'date' && selectedDate) {
-        // Выбрана конкретная дата
-        const date = new Date(selectedDate);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        targetDateISO = `${year}-${month}-${day}T00:00:00`;
-        deadlineISO = new Date(selectedDate).toISOString();
+      // deadline определяется выбором пользователя (дата или пара)
+      let deadlineISO = null;
+      if (deadlineType === 'date' && deadlineDateInput) {
+        deadlineISO = new Date(deadlineDateInput).toISOString();
       } else if (deadlineType === 'class' && selectedClass) {
-        // Выбрана пара - устанавливаем дедлайн на начало пары
-        const classDate = selectedClass.parsedDate;
-        const year = classDate.getFullYear();
-        const month = String(classDate.getMonth() + 1).padStart(2, '0');
-        const day = String(classDate.getDate()).padStart(2, '0');
-        targetDateISO = `${year}-${month}-${day}T00:00:00`;
-        deadlineISO = classDate.toISOString();
+        deadlineISO = selectedClass.parsedDate.toISOString();
       }
       
       const taskData = {
@@ -285,7 +281,7 @@ export const PrepareForLectureModal = ({
       setSubject('');
       setPriority('medium');
       setDeadlineType('date');
-      setSelectedDate('');
+      setDeadlineDateInput('');
       setSelectedClass(null);
       onClose();
     } catch (error) {
