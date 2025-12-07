@@ -580,6 +580,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
         onClose={() => setIsAddTaskModalOpen(false)}
         onAddTask={handleAddTask}
         roomColor={room?.color}
+        participants={room?.participants || []}
       />
 
       {/* Edit Task Modal */}
@@ -589,6 +590,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
           onClose={() => setEditingTask(null)}
           task={editingTask}
           onSave={handleSaveTask}
+          roomParticipants={room?.participants || []}
         />
       )}
 
