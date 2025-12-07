@@ -34,7 +34,10 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
   const { webApp, user } = useTelegram();
 
   // Получаем участников кроме владельца задачи
-  const otherParticipants = roomParticipants.filter(p => p.telegram_id !== task?.owner_id);
+  const otherParticipants = React.useMemo(() => 
+    roomParticipants.filter(p => p.telegram_id !== task?.owner_id),
+    [roomParticipants, task?.owner_id]
+  );
 
   useEffect(() => {
     if (isOpen && task) {
@@ -58,7 +61,9 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
       const currentParticipantIds = (task.participants || [])
         .filter(p => p.role !== 'owner')
         .map(p => p.telegram_id);
-      const allOtherIds = otherParticipants.map(p => p.telegram_id);
+      const allOtherIds = roomParticipants
+        .filter(p => p.telegram_id !== task?.owner_id)
+        .map(p => p.telegram_id);
       
       // Если все участники комнаты есть в задаче - режим "Для всех"
       const isAllAssigned = allOtherIds.every(id => currentParticipantIds.includes(id));
@@ -73,6 +78,7 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
     return () => {
       document.body.style.overflow = '';
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, task, roomParticipants.length]);
 
   const handleSubmit = async (e) => {
