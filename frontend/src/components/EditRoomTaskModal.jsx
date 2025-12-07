@@ -94,7 +94,8 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
         deadline: deadline ? new Date(deadline).toISOString() : null,
         category: category || null,
         priority: priority,
-        tags: tags
+        tags: tags,
+        assigned_to: assignToAll ? [] : selectedParticipants  // [] = все, массив = выбранные
       };
 
       await onSave(task.task_id, updateData);
@@ -122,6 +123,20 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
       webApp.HapticFeedback.impactOccurred('light');
     }
     onClose();
+  };
+
+  // Переключение выбора участника
+  const toggleParticipant = (participantId) => {
+    if (webApp?.HapticFeedback) {
+      webApp.HapticFeedback.selectionChanged();
+    }
+    setSelectedParticipants(prev => {
+      if (prev.includes(participantId)) {
+        return prev.filter(id => id !== participantId);
+      } else {
+        return [...prev, participantId];
+      }
+    });
   };
 
   if (!isOpen || !task) return null;
