@@ -272,7 +272,6 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
       <MenuModal
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
-        onCalendarClick={onCalendarClick}
         onNotificationsClick={onNotificationsClick}
         onAnalyticsClick={onAnalyticsClick}
         onAchievementsClick={onAchievementsClick}
