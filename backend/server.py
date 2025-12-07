@@ -4054,7 +4054,9 @@ async def generate_journal_invite_link(journal_id: str):
         if not journal:
             raise HTTPException(status_code=404, detail="Journal not found")
         
-        bot_username = "rudn_pro_bot"
+        # Получаем имя бота из конфига (зависит от ENV)
+        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        bot_username = get_telegram_bot_username()
         # Старый формат через /start
         invite_link = f"https://t.me/{bot_username}?start=journal_{journal['invite_token']}"
         # Новый формат через Web App
