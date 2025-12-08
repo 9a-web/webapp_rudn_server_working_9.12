@@ -8,14 +8,16 @@ from datetime import datetime, timedelta
 import uuid
 import random
 
-MONGO_URL = "mongodb://localhost:27017/rudn_schedule"
+# Correct DB settings matching backend/.env
+MONGO_URL = "mongodb://localhost:27017"
+DB_NAME = "test_database"
 
 async def create_test_data():
     """Создать тестовые данные"""
     client = AsyncIOMotorClient(MONGO_URL)
-    db = client.rudn_schedule
+    db = client[DB_NAME]
     
-    print("🚀 Создание тестовых данных...")
+    print(f"🚀 Создание тестовых данных в {DB_NAME}...")
     
     # Очистка для чистого теста (опционально раскомментировать)
     # await db.user_settings.delete_many({})

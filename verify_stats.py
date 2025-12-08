@@ -3,11 +3,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import httpx
 import sys
 
-MONGO_URL = "mongodb://localhost:27017/rudn_schedule"
+MONGO_URL = "mongodb://localhost:27017"
+DB_NAME = "test_database"
 
 async def verify():
     client = AsyncIOMotorClient(MONGO_URL)
-    db = client.rudn_schedule
+    db = client[DB_NAME]
     
     # 1. Check server health
     print("🏥 Checking API health...")
@@ -15,8 +16,6 @@ async def verify():
         try:
             resp = await client.get("http://localhost:8001/api/status")
             print(f"Health check: {resp.status_code}")
-            if resp.status_code != 200:
-                print(f"Health response: {resp.text}")
         except Exception as e:
             print(f"Health check failed: {e}")
             
