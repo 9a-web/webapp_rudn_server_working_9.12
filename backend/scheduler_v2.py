@@ -455,15 +455,32 @@ class NotificationSchedulerV2:
             
             # Обновляем статус
             if success:
+                now_utc = datetime.utcnow()
                 await self.db.scheduled_notifications.update_one(
                     {"id": notification_id},
                     {
                         "$set": {
                             "status": "sent",
-                            "sent_at": datetime.utcnow()
+                            "sent_at": now_utc
                         }
                     }
                 )
+                
+                # === HISTORY: Сохраняем в вечную историю ===
+                try:
+                    history_item = {
+                        "id": str(uuid.uuid4()),
+                        "telegram_id": telegram_id,
+                        "title": class_info['discipline'],
+                        "message": f"{class_info['lessonType']} • {class_info['time']} • {class_info['auditory']}",
+                        "sent_at": now_utc,
+                        "read": False
+                    }
+                    await self.db.notification_history.insert_one(history_item)
+                except Exception as hist_e:
+                    logger.error(f"Failed to save notification history: {hist_e}")
+                # ===========================================
+
                 logger.info(f"✅ Notification {notification_id} sent successfully")
             else:
                 await self.db.scheduled_notifications.update_one(
