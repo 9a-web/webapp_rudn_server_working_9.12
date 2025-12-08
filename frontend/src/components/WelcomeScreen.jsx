@@ -84,6 +84,23 @@ const WelcomeScreen = ({ onGetStarted }) => {
           className="object-contain"
         />
       </motion.div>
+
+      {/* Get Started Button */}
+      <motion.button
+        onClick={handleGetStarted}
+        className="mt-8 cursor-pointer active:scale-95 transition-transform"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.9, ease: "easeOut" }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <img 
+          src="/button-rudn-go.png"
+          alt="Погрузиться в RUDN GO"
+          style={{ width: '320px', height: 'auto' }}
+          className="object-contain"
+        />
+      </motion.button>
     </div>
   );
 };
