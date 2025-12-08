@@ -101,8 +101,9 @@ export const CreateSessionModal = ({
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState(null);
   const [selectedEvents, setSelectedEvents] = useState(new Set());
-  const [selectedWeek, setSelectedWeek] = useState(1); // 1 = текущая, 2 = следующая
+  const [weekOffset, setWeekOffset] = useState(0); // -N = прошлые, 0 = текущая, +N = будущие
   const [creatingFromSchedule, setCreatingFromSchedule] = useState(false);
+  const [showPastWeeks, setShowPastWeeks] = useState(false); // Показывать ли прошлые недели
 
   // Загружаем расписание при открытии вкладки
   useEffect(() => {
