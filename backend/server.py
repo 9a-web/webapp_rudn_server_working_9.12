@@ -5747,9 +5747,11 @@ async def get_journal_stats(journal_id: str):
     ОПТИМИЗИРОВАНО: Uses Aggregation Pipeline + Smart Logic
     """
     try:
+        logger.info(f"DEBUG: Searching for journal_id={journal_id}")
         # 1. Проверяем существование журнала
         journal = await db.attendance_journals.find_one({"journal_id": journal_id})
         if not journal:
+            logger.error(f"DEBUG: Journal {journal_id} NOT FOUND in DB")
             raise HTTPException(status_code=404, detail="Journal not found")
         
         # 2. Получаем всех студентов и занятия одним запросом (без лимитов для точности)
