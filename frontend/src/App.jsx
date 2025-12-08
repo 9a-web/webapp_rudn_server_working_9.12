@@ -149,7 +149,8 @@ const Home = () => {
     isMenuOpen ||
     isProfileOpen ||
     isShareModalOpen ||
-    isAddTaskModalOpen; // from TasksSection's AddTaskModal
+    isAddTaskModalOpen || // from TasksSection's AddTaskModal
+    isJournalModalOpen; // from JournalSection
 
   // Загрузка данных пользователя при монтировании
   useEffect(() => {
