@@ -206,6 +206,22 @@ class NotificationStatsResponse(BaseModel):
     cancelled: int
 
 
+
+class NotificationHistoryItem(BaseModel):
+    """Элемент истории уведомлений"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    telegram_id: int
+    title: str  # Заголовок (например, название предмета)
+    message: str  # Текст (время, аудитория)
+    sent_at: datetime = Field(default_factory=datetime.utcnow)
+    read: bool = False  # Прочитано ли (на будущее)
+
+
+class NotificationHistoryResponse(BaseModel):
+    """Ответ с историей"""
+    history: List[NotificationHistoryItem]
+    count: int
+
 # ============ Модели для достижений ============
 
 class Achievement(BaseModel):
