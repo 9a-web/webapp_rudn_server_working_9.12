@@ -75,7 +75,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
 
       {/* Shapes Image */}
       <motion.div
-        className="mt-6"
+        className="mt-3"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.7, ease: "easeOut" }}
@@ -91,7 +91,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
       {/* Get Started Button */}
       <motion.button
         onClick={handleGetStarted}
-        className="mt-8 cursor-pointer active:scale-95 transition-transform"
+        className="mt-4 cursor-pointer active:scale-95 transition-transform"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.9, ease: "easeOut" }}
