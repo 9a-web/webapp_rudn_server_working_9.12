@@ -126,7 +126,10 @@ from models import (
     # Модели для отслеживания реферальных событий
     ReferralEvent,
     ReferralEventResponse,
-    ReferralStatsDetailResponse
+    ReferralStatsDetailResponse,
+    # Модели для истории уведомлений
+    NotificationHistoryItem,
+    NotificationHistoryResponse
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
