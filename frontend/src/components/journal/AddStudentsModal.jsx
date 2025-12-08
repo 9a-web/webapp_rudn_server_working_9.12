@@ -141,7 +141,10 @@ export const AddStudentsModal = ({ isOpen, onClose, onAddSingle, onAddBulk, hapt
               <textarea
                 value={bulkNames}
                 onChange={(e) => setBulkNames(e.target.value)}
-                placeholder="Иванов Иван Иванович\nПетров Пётр Петрович\nСидорова Мария Сергеевна"
+                placeholder="Касымова Камилла Алишеровна
+Морозов Артём Анатольевич
+Анисимов Дмитрий Владимирович
+Шкаралевич Никита Витальевич"
                 rows={8}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors resize-none"
               />
