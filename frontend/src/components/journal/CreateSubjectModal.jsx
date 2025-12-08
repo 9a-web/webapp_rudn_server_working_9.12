@@ -393,7 +393,7 @@ export const CreateSubjectModal = ({
           )}
 
           {/* Schedule Tab */}
-          {activeTab === 'schedule' && (
+          {activeTab === 'schedule' && step === 'select' && (
             <div className="space-y-4">
               {/* Loading */}
               {loadingSchedule && (
@@ -492,30 +492,165 @@ export const CreateSubjectModal = ({
                         })}
                       </div>
 
-                      {/* Create Button */}
+                      {/* Continue to Confirm Button */}
                       <motion.button
                         whileTap={{ scale: 0.98 }}
                         onClick={handleCreateFromSchedule}
-                        disabled={selectedSubjects.size === 0 || creatingFromSchedule}
+                        disabled={selectedSubjects.size === 0}
                         className={`w-full py-4 rounded-2xl font-semibold text-white transition-all ${
-                          selectedSubjects.size > 0 && !creatingFromSchedule
+                          selectedSubjects.size > 0
                             ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
                             : 'bg-white/10 text-gray-500'
                         }`}
                       >
-                        {creatingFromSchedule ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Создание...
-                          </span>
-                        ) : (
-                          `Добавить выбранные (${selectedSubjects.size})`
-                        )}
+                        Далее ({selectedSubjects.size})
                       </motion.button>
                     </>
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {/* Confirmation Step */}
+          {activeTab === 'schedule' && step === 'confirm' && (
+            <div className="space-y-4">
+              {/* Back button and title */}
+              <div className="flex items-center gap-3 mb-2">
+                <button
+                  onClick={handleBackToSelect}
+                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4 text-gray-400" />
+                </button>
+                <div>
+                  <h3 className="text-white font-medium">Подтверждение</h3>
+                  <p className="text-xs text-gray-500">Проверьте и отредактируйте данные</p>
+                </div>
+              </div>
+
+              {/* Subjects to confirm */}
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {subjectsToConfirm.map((subject, index) => {
+                  const subjectColor = SUBJECT_COLORS.find(c => c.id === subject.color) || SUBJECT_COLORS[0];
+                  const isEditing = editingSubjectIndex === index;
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`bg-white/5 rounded-xl p-4 border transition-all ${
+                        isEditing ? 'border-blue-500/50' : 'border-white/10'
+                      }`}
+                    >
+                      {/* Subject header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-4 h-4 rounded-full bg-gradient-to-br ${subjectColor.gradient}`} />
+                          <span className="text-white font-medium">{subject.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setEditingSubjectIndex(isEditing ? null : index)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              isEditing 
+                                ? 'bg-blue-500/20 text-blue-400' 
+                                : 'hover:bg-white/10 text-gray-500 hover:text-gray-300'
+                            }`}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          {subjectsToConfirm.length > 1 && (
+                            <button
+                              onClick={() => removeSubjectFromConfirm(index)}
+                              className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Description field */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-gray-500">Преподаватель / Описание</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={subject.description}
+                            onChange={(e) => updateSubjectToConfirm(index, 'description', e.target.value)}
+                            placeholder="Преподаватель: Иванов И.И."
+                            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors"
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="text-sm text-gray-400 bg-white/5 rounded-lg px-3 py-2">
+                            {subject.description || <span className="text-gray-600 italic">Не указано</span>}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Color picker (when editing) */}
+                      {isEditing && (
+                        <div className="mt-3">
+                          <label className="text-xs text-gray-500 mb-2 block">Цвет</label>
+                          <div className="flex gap-2">
+                            {SUBJECT_COLORS.map((c) => (
+                              <button
+                                key={c.id}
+                                onClick={() => updateSubjectToConfirm(index, 'color', c.id)}
+                                className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.gradient} transition-all ${
+                                  subject.color === c.id 
+                                    ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1C1C1E] scale-110' 
+                                    : 'opacity-50 hover:opacity-100'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Info badges */}
+                      {!isEditing && subject.lessonsCount > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-gray-600 bg-white/5 px-2 py-0.5 rounded">
+                            {subject.lessonsCount} занятий в расписании
+                          </span>
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Confirm Button */}
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={handleConfirmCreate}
+                disabled={subjectsToConfirm.length === 0 || creatingFromSchedule}
+                className={`w-full py-4 rounded-2xl font-semibold text-white transition-all ${
+                  subjectsToConfirm.length > 0 && !creatingFromSchedule
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                    : 'bg-white/10 text-gray-500'
+                }`}
+              >
+                {creatingFromSchedule ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Создание...
+                  </span>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 inline mr-2" />
+                    Добавить {subjectsToConfirm.length} {
+                      subjectsToConfirm.length === 1 ? 'предмет' :
+                      subjectsToConfirm.length >= 2 && subjectsToConfirm.length <= 4 ? 'предмета' : 'предметов'
+                    }
+                  </>
+                )}
+              </motion.button>
             </div>
           )}
         </motion.div>
