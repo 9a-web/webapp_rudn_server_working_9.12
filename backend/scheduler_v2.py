@@ -116,19 +116,14 @@ class NotificationSchedulerV2:
     async def prepare_daily_schedule(self):
         """
         Подготовить расписание уведомлений на текущий день
-        
-        Алгоритм:
-        1. Получить всех пользователей с включенными уведомлениями
-        2. Для каждого пользователя получить расписание на сегодня
-        3. Создать записи в scheduled_notifications
-        4. Создать задачи в APScheduler для точного времени отправки
+        OPTIMIZED: Batch processing for scalability (chunks of 50 users)
         """
         try:
             now = datetime.now(MOSCOW_TZ)
             today = now.strftime('%Y-%m-%d')
             current_day = now.strftime('%A')
             
-            logger.info(f"📅 Starting daily schedule preparation for {today}")
+            logger.info(f"📅 Starting daily schedule preparation for {today} (Optimized)")
             
             # Переводим день недели на русский
             day_mapping = {
@@ -145,31 +140,63 @@ class NotificationSchedulerV2:
             # Определяем номер недели
             week_number = self._get_week_number(now)
             
-            # Получаем всех пользователей с включенными уведомлениями
-            users = await self.db.user_settings.find({
+            # Используем курсор вместо загрузки всех пользователей сразу
+            cursor = self.db.user_settings.find({
                 "notifications_enabled": True,
                 "group_id": {"$exists": True, "$ne": None}
-            }).to_list(None)
-            
-            logger.info(f"👥 Found {len(users)} users with notifications enabled")
+            })
             
             total_notifications_created = 0
             total_jobs_scheduled = 0
+            processed_users = 0
             
-            # Для каждого пользователя создаем план уведомлений
-            for user in users:
-                created, scheduled = await self._prepare_user_schedule(
+            # Параметры пакетной обработки
+            batch_size = 50
+            batch_tasks = []
+            
+            async for user in cursor:
+                # Добавляем задачу в пакет
+                task = self._prepare_user_schedule(
                     user, 
                     russian_day, 
                     week_number, 
                     today, 
                     now
                 )
-                total_notifications_created += created
-                total_jobs_scheduled += scheduled
+                batch_tasks.append(task)
+                
+                # Если пакет заполнен, обрабатываем его параллельно
+                if len(batch_tasks) >= batch_size:
+                    results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                    
+                    for res in results:
+                        if isinstance(res, tuple):
+                            created, scheduled = res
+                            total_notifications_created += created
+                            total_jobs_scheduled += scheduled
+                        elif isinstance(res, Exception):
+                            logger.error(f"Error in batch processing: {res}")
+                    
+                    processed_users += len(batch_tasks)
+                    batch_tasks = []
+                    
+                    # Небольшая пауза, чтобы не блокировать event loop полностью
+                    await asyncio.sleep(0.01)
+            
+            # Обрабатываем остаток
+            if batch_tasks:
+                results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                for res in results:
+                    if isinstance(res, tuple):
+                        created, scheduled = res
+                        total_notifications_created += created
+                        total_jobs_scheduled += scheduled
+                    elif isinstance(res, Exception):
+                        logger.error(f"Error in final batch processing: {res}")
+                processed_users += len(batch_tasks)
             
             logger.info(
-                f"✅ Daily schedule prepared: "
+                f"✅ Daily schedule prepared for {processed_users} users: "
                 f"{total_notifications_created} notifications created, "
                 f"{total_jobs_scheduled} jobs scheduled"
             )
