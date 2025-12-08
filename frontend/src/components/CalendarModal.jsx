@@ -147,7 +147,7 @@ export const CalendarModal = ({ isOpen, onClose, onDateSelect }) => {
                 key={day}
                 onClick={() => handleDateClick(day)}
                 className={`
-                  aspect-square rounded-full text-sm md:text-base font-medium transition-all duration-200
+                  aspect-square rounded-2xl text-sm md:text-base font-medium transition-all duration-200
                   ${
                     isSelected(day)
                       ? 'bg-gradient-live text-card shadow-glow scale-105'
