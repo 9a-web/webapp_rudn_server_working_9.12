@@ -352,19 +352,19 @@ def test_journal_statistics_api():
         return False
 def main():
     """Main test execution"""
-    print("🚀 Starting Backend API Testing for Sessions From Schedule Endpoint")
+    print("🚀 Starting Backend API Testing for Journal Statistics API")
     print(f"Backend URL: {BACKEND_URL}")
     print(f"Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     
-    # Test sessions from schedule endpoint
-    success = test_sessions_from_schedule()
+    # Test journal statistics API
+    success = test_journal_statistics_api()
     
     print("=" * 80)
     if success:
-        print("🎉 ALL TESTS PASSED - Sessions From Schedule Endpoint Working Correctly!")
+        print("🎉 ALL TESTS PASSED - Journal Statistics API Working Correctly!")
     else:
-        print("💥 TESTS FAILED - Issues found in Sessions From Schedule Endpoint")
+        print("💥 TESTS FAILED - Issues found in Journal Statistics API")
     print("=" * 80)
     
     return 0 if success else 1
