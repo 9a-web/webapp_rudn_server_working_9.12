@@ -18,7 +18,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
   };
 
   return (
-    <div className="h-screen min-h-screen bg-black flex items-center justify-center overflow-hidden">
+    <div className="h-screen min-h-screen bg-black flex flex-col items-center justify-center overflow-hidden">
       {/* Centered Logo */}
       <motion.div
         className="flex items-center justify-center"
@@ -31,6 +31,27 @@ const WelcomeScreen = ({ onGetStarted }) => {
           alt="RUDN Logo"
           className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 object-contain"
         />
+      </motion.div>
+
+      {/* Welcome Text */}
+      <motion.div
+        className="mt-8 text-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+      >
+        <h1 
+          className="text-white text-[32px] leading-tight"
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}
+        >
+          Welcome
+        </h1>
+        <h2 
+          className="text-white text-[32px] leading-tight"
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}
+        >
+          to RUDN GO
+        </h2>
       </motion.div>
     </div>
   );
