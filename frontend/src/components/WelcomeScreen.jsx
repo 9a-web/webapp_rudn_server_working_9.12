@@ -29,7 +29,8 @@ const WelcomeScreen = ({ onGetStarted }) => {
         <img 
           src="/retro-logo-rudn.png"
           alt="RUDN Logo"
-          className="w-14 h-14 object-contain"
+          style={{ width: '65px', height: '65px' }}
+          className="object-contain"
         />
       </motion.div>
 
