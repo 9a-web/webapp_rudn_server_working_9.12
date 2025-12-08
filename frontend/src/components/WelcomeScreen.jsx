@@ -53,6 +53,21 @@ const WelcomeScreen = ({ onGetStarted }) => {
           to RUDN GO
         </h2>
       </motion.div>
+
+      {/* Bot Username */}
+      <motion.p
+        className="mt-4 text-[13px]"
+        style={{ 
+          fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif", 
+          fontWeight: 500,
+          color: '#B9B9B9'
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+      >
+        @rudn_mosbot
+      </motion.p>
     </div>
   );
 };
