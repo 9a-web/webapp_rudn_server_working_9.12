@@ -69,6 +69,21 @@ const WelcomeScreen = ({ onGetStarted }) => {
       >
         @rudn_mosbot
       </motion.p>
+
+      {/* Shapes Image */}
+      <motion.div
+        className="mt-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.7, ease: "easeOut" }}
+      >
+        <img 
+          src="/shapes-rudn-go.png"
+          alt="RUDN GO Shapes"
+          style={{ width: '350px', height: '157px' }}
+          className="object-contain"
+        />
+      </motion.div>
     </div>
   );
 };
