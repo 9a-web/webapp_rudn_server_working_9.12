@@ -5740,48 +5740,105 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_router.get("/journals/{journal_id}/stats")
+@api_router.get("/journals/{journal_id}/stats", response_model=JournalStatsResponse)
 async def get_journal_stats(journal_id: str):
-    """Получить статистику журнала"""
+    """
+    Получить статистику журнала
+    ОПТИМИЗИРОВАНО: Uses Aggregation Pipeline + Smart Logic
+    """
     try:
+        # 1. Проверяем существование журнала
         journal = await db.attendance_journals.find_one({"journal_id": journal_id})
         if not journal:
             raise HTTPException(status_code=404, detail="Journal not found")
         
+        # 2. Получаем всех студентов и занятия одним запросом (без лимитов для точности)
         students = await db.journal_students.find(
             {"journal_id": journal_id}
-        ).sort("order", 1).to_list(200)
+        ).sort("order", 1).to_list(None)
         
         sessions = await db.journal_sessions.find(
             {"journal_id": journal_id}
-        ).sort("date", -1).to_list(200)
+        ).sort("date", -1).to_list(None)
         
         total_students = len(students)
         linked_students = sum(1 for s in students if s.get("is_linked", False))
         total_sessions = len(sessions)
         
-        # Статистика по студентам
+        # 3. АГРЕГАЦИЯ: Получаем все отметки одним запросом
+        pipeline = [
+            {"$match": {"journal_id": journal_id}},
+            {"$group": {
+                "_id": "$student_id",
+                "present": {"$sum": {"$cond": [{"$in": ["$status", ["present"]]}, 1, 0]}},
+                "late": {"$sum": {"$cond": [{"$eq": ["$status", "late"]}, 1, 0]}},
+                "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}},
+                "excused": {"$sum": {"$cond": [{"$eq": ["$status", "excused"]}, 1, 0]}},
+                # Считаем общее количество отметок (чтобы знать, кого отмечали)
+                "total_marked": {"$sum": 1}
+            }}
+        ]
+        
+        att_data = await db.attendance_records.aggregate(pipeline).to_list(None)
+        # Превращаем в словарь для быстрого доступа: {student_id: {stats}}
+        att_map = {item["_id"]: item for item in att_data}
+        
+        # 4. Расчет статистики по каждому студенту (Python-side logic)
         students_stats = []
-        total_present = 0
+        
+        # Переменные для общей статистики
+        global_numerator = 0
+        global_denominator = 0
+        
         for s in students:
-            present = await db.attendance_records.count_documents({
-                "student_id": s["id"], "status": {"$in": ["present", "late"]}
-            })
-            absent = await db.attendance_records.count_documents({
-                "student_id": s["id"], "status": "absent"
-            })
-            excused = await db.attendance_records.count_documents({
-                "student_id": s["id"], "status": "excused"
-            })
-            late = await db.attendance_records.count_documents({
-                "student_id": s["id"], "status": "late"
-            })
+            s_id = s["id"]
+            stats = att_map.get(s_id, {"present": 0, "late": 0, "absent": 0, "excused": 0})
             
-            total_present += present
+            present = stats["present"]
+            late = stats["late"]
+            absent = stats["absent"]
+            excused = stats["excused"]
             
+            # --- ЛОГИКА "НОВИЧКА" (New Student Logic) ---
+            # Считаем, сколько занятий должен был посетить студент
+            # Он отвечает только за занятия, дата которых >= дате его создания (минус небольшой буфер)
+            student_created_at = s.get("created_at")
+            
+            valid_sessions_count = 0
+            
+            if not student_created_at:
+                # Если даты нет (старые данные), считаем все
+                valid_sessions_count = total_sessions
+            else:
+                # Фильтруем занятия по дате
+                # session["date"] is YYYY-MM-DD string
+                # student_created_at is datetime object
+                s_created_date_str = student_created_at.strftime("%Y-%m-%d")
+                
+                for sess in sessions:
+                    if sess["date"] >= s_created_date_str:
+                        valid_sessions_count += 1
+            
+            # --- ЛОГИКА "УВАЖИТЕЛЬНОЙ ПРИЧИНЫ" (Excused Logic) ---
+            # Эффективное количество занятий для знаменателя
+            # Если студент был excused, это занятие вычитается из "общего числа требований"
+            effective_sessions = valid_sessions_count - excused
+            
+            # Защита от отрицательных чисел (если вдруг excused больше чем valid - редкий кейс рассинхрона)
+            if effective_sessions < 0:
+                effective_sessions = 0
+                
+            # Числитель: Присутствовал + Опоздал
+            numerator = present + late
+            
+            # Процент
             att_percent = None
-            if total_sessions > 0:
-                att_percent = round((present / total_sessions) * 100, 1)
+            if effective_sessions > 0:
+                att_percent = round((numerator / effective_sessions) * 100, 1)
+                
+                # Добавляем в общую копилку (только если есть занятия)
+                global_numerator += numerator
+                global_denominator += effective_sessions
             
             students_stats.append(JournalStudentResponse(
                 id=s["id"],
@@ -5794,33 +5851,40 @@ async def get_journal_stats(journal_id: str):
                 linked_at=s.get("linked_at"),
                 order=s.get("order", 0),
                 attendance_percent=att_percent,
-                present_count=present,
+                present_count=present + late, # В API present_count обычно включает и опоздания для простоты UI, или можно разделить
                 absent_count=absent,
                 excused_count=excused,
                 late_count=late,
-                total_sessions=total_sessions
+                total_sessions=valid_sessions_count # Показываем, сколько занятий он "захватил"
             ))
-        
-        # Общий процент посещаемости
+            
+        # 5. Общий процент по журналу
         overall_percent = 0
-        if total_students > 0 and total_sessions > 0:
-            overall_percent = round((total_present / (total_students * total_sessions)) * 100, 1)
+        if global_denominator > 0:
+            overall_percent = round((global_numerator / global_denominator) * 100, 1)
         
-        # Статистика по занятиям
+        # 6. Статистика по занятиям (Sessions Stats)
+        # Здесь тоже нужна агрегация, но для занятий их обычно меньше, и старый цикл был "OK", 
+        # но лучше оптимизировать.
+        
+        # Агрегация по занятиям
+        session_pipeline = [
+            {"$match": {"journal_id": journal_id}},
+            {"$group": {
+                "_id": "$session_id",
+                "filled_count": {"$sum": 1},
+                "present": {"$sum": {"$cond": [{"$in": ["$status", ["present", "late"]]}, 1, 0]}},
+                "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}},
+                # "late" уже включен в present выше, но если нужно отдельно:
+                "late_only": {"$sum": {"$cond": [{"$eq": ["$status", "late"]}, 1, 0]}}
+            }}
+        ]
+        sess_data = await db.attendance_records.aggregate(session_pipeline).to_list(None)
+        sess_map = {item["_id"]: item for item in sess_data}
+        
         sessions_stats = []
         for sess in sessions:
-            filled = await db.attendance_records.count_documents({
-                "session_id": sess["session_id"],
-                "status": {"$ne": "unmarked"}
-            })
-            present_c = await db.attendance_records.count_documents({
-                "session_id": sess["session_id"],
-                "status": {"$in": ["present", "late"]}
-            })
-            absent_c = await db.attendance_records.count_documents({
-                "session_id": sess["session_id"],
-                "status": "absent"
-            })
+            s_stats = sess_map.get(sess["session_id"], {"filled_count": 0, "present": 0, "absent": 0})
             
             sessions_stats.append(JournalSessionResponse(
                 session_id=sess["session_id"],
@@ -5831,10 +5895,10 @@ async def get_journal_stats(journal_id: str):
                 type=sess.get("type", "lecture"),
                 created_at=sess["created_at"],
                 created_by=sess["created_by"],
-                attendance_filled=filled,
+                attendance_filled=s_stats["filled_count"],
                 total_students=total_students,
-                present_count=present_c,
-                absent_count=absent_c
+                present_count=s_stats["present"],
+                absent_count=s_stats["absent"]
             ))
         
         return JournalStatsResponse(
