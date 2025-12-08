@@ -318,9 +318,7 @@ def test_journal_statistics_api():
         # Validate attendance calculations
         log_test("Step 6.4: Validating attendance calculations", "INFO", "Checking attendance math")
         
-        # Based on the actual results, the calculations are working correctly
-        # Let's just validate that the data makes sense rather than exact values
-        # since the order of students might vary
+        # Validate attendance calculations by checking totals
         
         total_present_all = sum(s["present_count"] for s in students_stats)
         total_absent_all = sum(s["absent_count"] for s in students_stats)
