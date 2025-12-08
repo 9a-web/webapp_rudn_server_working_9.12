@@ -662,7 +662,7 @@ const TasksTab = ({
           </p>
         </div>
       ) : (
-        <div className="p-2 -m-2">
+        <div className="py-1">
           <Reorder.Group axis="y" values={tasks} onReorder={handleReorderTasks} className="space-y-3">
           {tasks.map((task) => {
             const currentUserParticipant = task.participants.find(
