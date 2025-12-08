@@ -57,7 +57,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
 
       {/* Bot Username */}
       <motion.p
-        className="mt-4 text-[13px]"
+        className="mt-4 text-[16px]"
         style={{ 
           fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif", 
           fontWeight: 500,
