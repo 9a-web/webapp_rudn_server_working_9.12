@@ -263,6 +263,9 @@ async def startup_event():
     # Start background tasks
     asyncio.create_task(create_indexes())
 
+        # Notification History
+        await db.notification_history.create_index([("telegram_id", 1), ("sent_at", -1)])
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
