@@ -124,6 +124,17 @@ frontend:
     stuck_count: 0
     priority: "medium"
     needs_retesting: false
+  - task: "Journal: Update bulk add students placeholder"
+    implemented: true
+    working: true
+    file: "frontend/src/components/journal/AddStudentsModal.jsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented: Updated the placeholder text in the bulk add students modal with the requested list of names."
     status_history:
       - working: true
         agent: "main"
