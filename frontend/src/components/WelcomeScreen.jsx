@@ -1,6 +1,6 @@
 /**
- * Welcome Screen - Первый экран приветствия при регистрации
- * Дизайн: темный фон с неоновым зеленым акцентом
+ * Welcome Screen - Приветственный экран
+ * Новый ретро-дизайн
  */
 
 import React from 'react';
@@ -18,106 +18,20 @@ const WelcomeScreen = ({ onGetStarted }) => {
   };
 
   return (
-    <div className="h-screen min-h-screen bg-[#1E1E1E] flex flex-col items-center justify-center overflow-hidden relative px-4 sm:px-6 md:px-8">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-1/4 right-5 sm:right-10 w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 bg-[#A3F7BF]/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
+    <div className="h-screen min-h-screen bg-black flex items-center justify-center overflow-hidden">
+      {/* Centered Logo */}
+      <motion.div
+        className="flex items-center justify-center"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      >
+        <img 
+          src="/retro-logo-rudn.png"
+          alt="RUDN Logo"
+          className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 object-contain"
         />
-        <motion.div
-          className="absolute bottom-1/4 left-5 sm:left-10 w-28 h-28 sm:w-40 sm:h-40 md:w-48 md:h-48 bg-[#A3F7BF]/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 1
-          }}
-        />
-      </div>
-
-      {/* Centered Content Container */}
-      <div className="flex flex-col items-center justify-center gap-6 sm:gap-8 md:gap-10 w-full max-w-[490px] sm:max-w-md md:max-w-lg lg:max-w-xl z-10">
-        
-        {/* Let's go logo - Fixed 470x470px on mobile, responsive on other devices */}
-        <motion.div
-          className="w-full flex justify-center"
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        >
-          <div 
-            className="aspect-square sm:w-[400px] md:w-[450px] lg:w-[500px]"
-            style={{ width: 'min(470px, calc(100vw - 32px))' }}
-          >
-            <img 
-              src="/letsgo.png"
-              alt="Let's go"
-              className="w-full h-full object-contain"
-            />
-          </div>
-        </motion.div>
-
-        {/* Ready text image - Overlaps logo slightly */}
-        <motion.div
-          className="w-full px-2 sm:px-4 -mt-8 sm:-mt-12 md:-mt-16"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          <img 
-            src="/ready_text.png"
-            alt="Manage your RUDN schedule - Store and view your schedule on your phone"
-            className="w-full h-auto object-contain mx-auto"
-            style={{ 
-              maxHeight: 'clamp(120px, 20vh, 250px)',
-              maxWidth: '100%'
-            }}
-          />
-        </motion.div>
-
-        {/* Get Started Button - Rounded 16px with SF Pro Display Bold */}
-        <motion.button
-          onClick={handleGetStarted}
-          className="relative w-full max-w-xs sm:max-w-sm bg-[#29F99F] text-black text-base sm:text-lg md:text-xl py-3 sm:py-4 md:py-5 px-6 rounded-2xl shadow-lg overflow-hidden"
-          style={{
-            fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif",
-            fontWeight: 700,
-            boxShadow: '0 10px 30px rgba(41, 249, 159, 0.4), 0 0 20px rgba(41, 249, 159, 0.3)'
-          }}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-          whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-          whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
-        >
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-            animate={{
-              x: ['-200%', '200%'],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut",
-              repeatDelay: 0.5
-            }}
-          />
-          <span className="relative z-10">Погрузиться в RUDN GO</span>
-        </motion.button>
-      </div>
+      </motion.div>
     </div>
   );
 };
