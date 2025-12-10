@@ -1109,12 +1109,14 @@ class JournalResponse(BaseModel):
     color: str
     invite_token: str
     settings: JournalSettings
+    stats_viewers: List[int] = []        # Кто может смотреть статистику
     created_at: datetime
     updated_at: datetime
     total_students: int = 0
     linked_students: int = 0
     total_sessions: int = 0
     is_owner: bool = False
+    can_view_stats: bool = False         # Может ли текущий пользователь видеть статистику
     my_attendance_percent: Optional[float] = None
 
 
