@@ -862,7 +862,8 @@ const Home = () => {
         )}
       </AnimatePresence>
       
-      {/* Dev Tools for Testing Greetings */}
+      {/* Dev Tools for Testing Greetings - Hidden */}
+      {/* 
       <div className="fixed top-20 right-4 z-[90] flex flex-col gap-2 opacity-50 hover:opacity-100 transition-opacity">
         <button 
           onClick={() => testGreeting(8)}
@@ -877,6 +878,7 @@ const Home = () => {
           🌙 Test Night
         </button>
       </div>
+      */}
       
       {/* Adaptive container with responsive max-width */}
       <div className="relative mx-auto max-w-[430px] md:max-w-3xl lg:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
