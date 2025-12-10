@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { 
   Users, TrendingUp, Calendar, Award, 
-  UserCheck, UserX, Clock, AlertCircle, ChevronDown, ChevronUp
+  UserCheck, UserX, Clock, AlertCircle, ChevronDown, ChevronUp,
+  Shield, ShieldCheck, X, Plus
 } from 'lucide-react';
 import { getJournalStats } from '../../services/journalAPI';
 
@@ -59,15 +60,20 @@ const PieTooltip = ({ active, payload }) => {
 
 export const JournalStatsTab = ({ 
   journalId, 
+  telegramId,
   students, 
   subjects, 
   pendingMembers,
-  gradient = 'from-purple-400 to-pink-400'
+  gradient = 'from-purple-400 to-pink-400',
+  isOwner = false,
+  statsViewers = [],
+  onUpdateStatsViewers
 }) => {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [sortBy, setSortBy] = useState('attendance'); // 'attendance' | 'name' | 'present'
+  const [showAccessModal, setShowAccessModal] = useState(false);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -75,7 +81,7 @@ export const JournalStatsTab = ({
       
       setIsLoading(true);
       try {
-        const data = await getJournalStats(journalId);
+        const data = await getJournalStats(journalId, telegramId);
         setStats(data);
       } catch (error) {
         console.error('Error loading journal stats:', error);
