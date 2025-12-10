@@ -220,6 +220,37 @@ export const MyAttendanceStats = ({
         </div>
       </motion.div>
 
+
+      {/* Стрик посещений */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4 relative overflow-hidden"
+      >
+        {/* Фоновый эффект */}
+        <div className="absolute -right-4 -top-4 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl" />
+        
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <Trophy className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-2xl font-bold text-white">
+                {stats.current_streak || 0}
+              </h3>
+              <span className="text-sm font-medium text-yellow-200/80">
+                {getNoun(stats.current_streak || 0, 'пара', 'пары', 'пар')} подряд
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Лучший результат: <span className="text-yellow-400">{stats.best_streak || 0}</span>
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Карточки статистики */}
       <div className="grid grid-cols-2 gap-3">
         <motion.div 
