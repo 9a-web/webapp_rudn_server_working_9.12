@@ -763,6 +763,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         hapticFeedback={hapticFeedback}
       />
 
+      {/* Статистика продуктивности */}
+      <ProductivityStats stats={productivityStats} loading={statsLoading} />
+
       {/* Панель фильтров */}
       {showFilters && (
         <motion.div
