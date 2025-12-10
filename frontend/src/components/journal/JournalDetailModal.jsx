@@ -117,6 +117,22 @@ export const JournalDetailModal = ({
     }
   }, [isOpen, journalId, loadData]);
 
+  // Set initial tab based on permissions
+  useEffect(() => {
+    if (journal) {
+      const isOwner = journal.is_owner;
+      const canViewStats = journal.can_view_stats;
+      
+      // If user can only view stats (not owner), switch to stats tab
+      if (!isOwner && canViewStats) {
+        setActiveTab('stats');
+      } else if (isOwner) {
+        // Owner defaults to students tab
+        setActiveTab('students');
+      }
+    }
+  }, [journal]);
+
   const handleGenerateInviteLink = async () => {
     try {
       const result = await generateJournalInviteLink(journalId);
