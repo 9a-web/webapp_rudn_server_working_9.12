@@ -6209,6 +6209,57 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
                 absent_count=s_stats["absent"]
             ))
         
+        # 7. Статистика по предметам (Subjects Stats) - НОВАЯ СЕКЦИЯ
+        # Получаем все предметы журнала
+        subjects = await db.journal_subjects.find({"journal_id": journal_id}).to_list(None)
+        subjects_map = {s["subject_id"]: s for s in subjects}
+        
+        # Создаем маппинг session_id -> subject_id
+        session_to_subject = {sess["session_id"]: sess.get("subject_id") for sess in sessions}
+        
+        # Агрегируем посещаемость по предметам
+        subjects_stats_dict = {}
+        for subject in subjects:
+            subject_id = subject["subject_id"]
+            subjects_stats_dict[subject_id] = {
+                "subject_id": subject_id,
+                "subject_name": subject.get("name", "Без названия"),
+                "subject_color": subject.get("color", "blue"),
+                "total_sessions": 0,
+                "total_records": 0,
+                "present_count": 0,
+                "absent_count": 0,
+                "late_count": 0,
+                "excused_count": 0,
+                "attendance_percent": 0.0
+            }
+        
+        # Считаем занятия по каждому предмету
+        for sess in sessions:
+            subject_id = sess.get("subject_id")
+            if subject_id and subject_id in subjects_stats_dict:
+                subjects_stats_dict[subject_id]["total_sessions"] += 1
+                # Добавляем статистику из отмеченных посещений
+                s_stats = sess_map.get(sess["session_id"], {"present": 0, "absent": 0, "late_only": 0, "filled_count": 0})
+                subjects_stats_dict[subject_id]["present_count"] += s_stats.get("present", 0)
+                subjects_stats_dict[subject_id]["absent_count"] += s_stats.get("absent", 0)
+                subjects_stats_dict[subject_id]["late_count"] += s_stats.get("late_only", 0)
+                subjects_stats_dict[subject_id]["total_records"] += s_stats.get("filled_count", 0)
+        
+        # Вычисляем проценты посещаемости по каждому предмету
+        subjects_stats_list = []
+        for subject_id, s_data in subjects_stats_dict.items():
+            total_possible = s_data["total_sessions"] * total_students
+            if total_possible > 0 and s_data["total_records"] > 0:
+                # present_count уже включает late (present + late)
+                s_data["attendance_percent"] = round(
+                    (s_data["present_count"] / s_data["total_records"]) * 100, 1
+                )
+            subjects_stats_list.append(SubjectStatsResponse(**s_data))
+        
+        # Сортируем по имени предмета
+        subjects_stats_list.sort(key=lambda x: x.subject_name)
+        
         return JournalStatsResponse(
             journal_id=journal_id,
             total_students=total_students,
@@ -6216,7 +6267,8 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
             total_sessions=total_sessions,
             overall_attendance_percent=overall_percent,
             students_stats=students_stats,
-            sessions_stats=sessions_stats
+            sessions_stats=sessions_stats,
+            subjects_stats=subjects_stats_list
         )
     except HTTPException:
         raise
