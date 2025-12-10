@@ -16,6 +16,7 @@ import RoomCard from './RoomCard';
 import CreateRoomModal from './CreateRoomModal';
 import RoomDetailModal from './RoomDetailModal';
 import * as roomsAPI from '../services/roomsAPI';
+import { ProductivityStats } from './ProductivityStats';
 
 // 🔧 FEATURE FLAG: Показать/скрыть функцию комнат
 // Измените на false, чтобы скрыть комнаты
