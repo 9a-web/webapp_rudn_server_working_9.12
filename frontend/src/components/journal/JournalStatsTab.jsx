@@ -299,6 +299,109 @@ export const JournalStatsTab = ({
         </motion.div>
       )}
 
+      {/* Посещаемость по предметам */}
+      {stats.subjects_stats && stats.subjects_stats.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22 }}
+          className="bg-white/5 rounded-xl p-4"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="w-5 h-5 text-purple-400" />
+            <h3 className="text-sm font-medium text-white">Посещаемость по предметам</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {stats.subjects_stats.map((subject, index) => {
+              const getColorClass = (color) => {
+                const colorMap = {
+                  blue: 'from-blue-500 to-blue-600',
+                  purple: 'from-purple-500 to-purple-600',
+                  green: 'from-green-500 to-green-600',
+                  red: 'from-red-500 to-red-600',
+                  yellow: 'from-yellow-500 to-yellow-600',
+                  orange: 'from-orange-500 to-orange-600',
+                  pink: 'from-pink-500 to-pink-600',
+                  cyan: 'from-cyan-500 to-cyan-600',
+                  indigo: 'from-indigo-500 to-indigo-600',
+                };
+                return colorMap[color] || colorMap.purple;
+              };
+              
+              const getAttendanceColor = (percent) => {
+                if (percent >= 80) return 'text-green-400';
+                if (percent >= 50) return 'text-yellow-400';
+                return 'text-red-400';
+              };
+              
+              return (
+                <motion.div
+                  key={subject.subject_id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.22 + index * 0.05 }}
+                  className="bg-white/5 rounded-xl p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getColorClass(subject.subject_color)} flex items-center justify-center`}>
+                        <BookOpen className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-medium text-sm">{subject.subject_name}</h4>
+                        <p className="text-xs text-gray-500">{subject.total_sessions} занятий</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-xl font-bold ${getAttendanceColor(subject.attendance_percent)}`}>
+                        {subject.attendance_percent}%
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Прогресс-бар */}
+                  <div className="w-full bg-white/10 rounded-full h-2 mb-3">
+                    <div 
+                      className={`h-2 rounded-full bg-gradient-to-r ${getColorClass(subject.subject_color)}`}
+                      style={{ width: `${Math.min(subject.attendance_percent, 100)}%` }}
+                    />
+                  </div>
+                  
+                  {/* Детальная статистика */}
+                  <div className="flex justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-gray-400">Присут.</span>
+                      <span className="text-white font-medium">{subject.present_count}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                      <span className="text-gray-400">Отсут.</span>
+                      <span className="text-white font-medium">{subject.absent_count}</span>
+                    </div>
+                    {subject.late_count > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                        <span className="text-gray-400">Опозд.</span>
+                        <span className="text-white font-medium">{subject.late_count}</span>
+                      </div>
+                    )}
+                    {subject.excused_count > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-gray-500" />
+                        <span className="text-gray-400">Уваж.</span>
+                        <span className="text-white font-medium">{subject.excused_count}</span>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* График посещаемости по студентам */}
       {studentsChartData.length > 0 && (
         <motion.div 
