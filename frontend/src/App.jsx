@@ -139,7 +139,7 @@ const Home = () => {
     });
   }, []);
   
-  // Обработка очереди уведомлений
+  // Обработка очереди уведомлений - берём следующее из очереди
   useEffect(() => {
     if (activeQueueNotification || notificationQueue.length === 0) {
       return;
@@ -149,14 +149,21 @@ const Home = () => {
     const next = notificationQueue[0];
     setNotificationQueue(prev => prev.slice(1));
     setActiveQueueNotification(next);
+  }, [notificationQueue, activeQueueNotification]);
+  
+  // Автозакрытие активного уведомления
+  useEffect(() => {
+    if (!activeQueueNotification) {
+      return;
+    }
     
-    // Автоматически закрываем через указанное время
+    const duration = activeQueueNotification.duration || 6000;
     const timer = setTimeout(() => {
       setActiveQueueNotification(null);
-    }, next.duration || 6000);
+    }, duration);
     
     return () => clearTimeout(timer);
-  }, [notificationQueue, activeQueueNotification]);
+  }, [activeQueueNotification]);
   
   // Задержка перед показом следующего уведомления
   useEffect(() => {
