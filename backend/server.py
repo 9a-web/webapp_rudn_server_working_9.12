@@ -6003,7 +6003,9 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
                 "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}},
                 "excused": {"$sum": {"$cond": [{"$eq": ["$status", "excused"]}, 1, 0]}},
                 # Считаем общее количество отметок (чтобы знать, кого отмечали)
-                "total_marked": {"$sum": 1}
+                "total_marked": {"$sum": 1},
+                # Собираем ID посещенных занятий для корректного расчета статистики новичков
+                "attended_sessions": {"$addToSet": "$session_id"}
             }}
         ]
         
