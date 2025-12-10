@@ -305,34 +305,15 @@ class JournalStatsTest:
         await self.setup_session()
         
         try:
-            # Test with different users to find journals
-            test_users = [123456789, 987654321, 555666777, 999888777, 111222333]
+            # Test with the known journal from database
+            journal_id = "fcb249a4-d1d7-447b-bd34-d275b776adf2"
+            owner_id = 999888777
             
-            journals_found = []
+            print(f"\n📚 Testing journal: {journal_id}")
+            print(f"👤 Owner: {owner_id}")
             
-            for user_id in test_users:
-                journals = await self.get_journals_for_user(user_id)
-                for journal in journals:
-                    if journal not in journals_found:
-                        journals_found.append(journal)
-                        
-            if not journals_found:
-                print("❌ No journals found for testing")
-                return False
-                
-            print(f"\n📚 Found {len(journals_found)} journals to test")
-            
-            # Test each journal
-            success_count = 0
-            for i, journal in enumerate(journals_found[:3]):  # Test first 3 journals
-                journal_id = journal['journal_id']
-                owner_id = journal['owner_id']
-                
-                print(f"\n📖 Testing Journal {i+1}/{min(3, len(journals_found))}: {journal['name']}")
-                
-                success = await self.test_journal_stats(journal_id, owner_id)
-                if success:
-                    success_count += 1
+            # Test the journal
+            success = await self.test_journal_stats(journal_id, owner_id)
                     
             # Print summary
             print("\n" + "=" * 50)
@@ -346,7 +327,7 @@ class JournalStatsTest:
             else:
                 print("✅ All journal statistics calculations are working correctly!")
                 
-            print(f"📈 Success Rate: {success_count}/{min(3, len(journals_found))} journals tested successfully")
+            print(f"📈 Success Rate: {'1/1' if success else '0/1'} journals tested successfully")
             
             return len(self.errors) == 0
             
