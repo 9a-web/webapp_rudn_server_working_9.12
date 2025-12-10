@@ -23,17 +23,17 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
     >
       <div 
         onClick={onClose}
-        className={`cursor-pointer active:scale-95 transition-transform pointer-events-auto w-full max-w-sm backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border 
+        className={`cursor-pointer active:scale-95 transition-transform pointer-events-auto w-full max-w-sm px-4 py-3 rounded-2xl shadow-2xl border backdrop-blur-xl backdrop-saturate-150
         ${isMorning 
-          ? 'bg-gradient-to-r from-orange-500/90 to-amber-500/90 border-orange-200/20 text-white' 
-          : 'bg-gradient-to-r from-indigo-900/90 to-blue-900/90 border-indigo-200/20 text-white'
+          ? 'bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 border-orange-300/30 text-white shadow-orange-500/25' 
+          : 'bg-gradient-to-br from-indigo-800 via-blue-900 to-slate-900 border-indigo-400/30 text-white shadow-indigo-500/25'
         }`}
       >
         {/* Header row */}
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full flex-shrink-0 ${isMorning ? 'bg-white/20' : 'bg-white/10'}`}>
+          <div className={`p-2 rounded-full flex-shrink-0 ${isMorning ? 'bg-white/25' : 'bg-white/15'}`}>
             {isMorning ? (
-              <Sun className="w-6 h-6 text-yellow-200" />
+              <Sun className="w-6 h-6 text-yellow-100" />
             ) : (
               <Moon className="w-6 h-6 text-blue-200" />
             )}
@@ -49,9 +49,9 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
           </div>
         </div>
 
-        {/* Weather info - only for morning */}
-        {isMorning && weather && (
-          <div className="mt-3 pt-3 border-t border-white/20">
+        {/* Weather info - for both morning and night */}
+        {weather && (
+          <div className={`mt-3 pt-3 border-t ${isMorning ? 'border-white/25' : 'border-white/20'}`}>
             <div className="flex items-center justify-between">
               {/* Temperature with icon */}
               <div className="flex items-center gap-2">
@@ -109,13 +109,6 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
         type = 'morning';
         title = userFirstName ? `Доброе утро, ${userFirstName}!` : 'Доброе утро!';
         message = 'Желаем продуктивного дня и отличного настроения ✨';
-        
-        // Fetch weather for morning greeting
-        try {
-          weather = await weatherAPI.getWeather();
-        } catch (error) {
-          console.warn('Failed to fetch weather:', error);
-        }
       } 
       // Night: 22:00 - 04:59
       else if (hour >= 22 || hour < 4) {
@@ -124,7 +117,14 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
         message = 'Пора отдыхать и набираться сил перед завтрашним днем 🌙';
       }
 
+      // Fetch weather for both morning and night greetings
       if (type) {
+        try {
+          weather = await weatherAPI.getWeather();
+        } catch (error) {
+          console.warn('Failed to fetch weather:', error);
+        }
+
         const greetingData = { type, title, message, weather };
         
         if (!testHour) {
@@ -139,7 +139,7 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
           setGreeting(greetingData);
           setTimeout(() => {
             setGreeting(null);
-          }, weather ? 8000 : 6000); // Longer display time if weather is shown
+          }, 10000); // 10 seconds display time
         }
       }
     };
