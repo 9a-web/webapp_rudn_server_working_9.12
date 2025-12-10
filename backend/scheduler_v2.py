@@ -254,13 +254,17 @@ class NotificationSchedulerV2:
             notifications_created = 0
             jobs_scheduled = 0
             
+            # Получаем название группы пользователя
+            group_name = user.get('group_name', '')
+            
             for class_event in today_classes:
                 created, scheduled = await self._create_scheduled_notification(
                     telegram_id,
                     class_event,
                     notification_time,
                     today,
-                    now
+                    now,
+                    group_name
                 )
                 notifications_created += created
                 jobs_scheduled += scheduled
