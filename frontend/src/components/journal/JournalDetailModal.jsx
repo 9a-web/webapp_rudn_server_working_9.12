@@ -124,13 +124,17 @@ export const JournalDetailModal = ({
     if (journal) {
       const isOwner = journal.is_owner;
       const canViewStats = journal.can_view_stats;
+      const isLinked = journal.is_linked;
       
-      // If user can only view stats (not owner), switch to stats tab
-      if (!isOwner && canViewStats) {
-        setActiveTab('stats');
-      } else if (isOwner) {
+      if (isOwner) {
         // Owner defaults to students tab
         setActiveTab('students');
+      } else if (isLinked) {
+        // Linked student sees their own stats first
+        setActiveTab('my-stats');
+      } else if (canViewStats) {
+        // Stats viewer sees general stats
+        setActiveTab('stats');
       }
     }
   }, [journal]);
