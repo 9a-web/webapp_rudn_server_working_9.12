@@ -363,15 +363,7 @@ export const MyAttendanceStats = ({
                   dataKey="attendance" 
                   stroke="#a855f7" 
                   strokeWidth={2}
-                  dot={({ cx, cy, payload }) => {
-                    const color = payload.status === 'present' ? COLORS.present :
-                                 payload.status === 'late' ? COLORS.late :
-                                 payload.status === 'absent' ? COLORS.absent :
-                                 payload.status === 'excused' ? COLORS.excused : COLORS.unmarked;
-                    return (
-                      <circle cx={cx} cy={cy} r={4} fill={color} stroke="none" />
-                    );
-                  }}
+                  dot={<CustomDot />}
                   activeDot={{ r: 6, fill: '#ec4899' }}
                 />
               </LineChart>
