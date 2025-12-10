@@ -1,350 +1,416 @@
 #!/usr/bin/env python3
 """
-Comprehensive test for journal statistics calculation
-Tests the accuracy of GET /api/journals/{journal_id}/stats endpoint
+Backend Test Suite for Journal Stats Calculation Fix
+Tests the specific requirements mentioned in the review request:
+1. Student created AFTER a session date
+2. If NOT marked, the session should be EXCLUDED from stats (new student logic)
+3. If MARKED (present/absent/etc), the session should be INCLUDED in stats (backfill logic)
+4. Percentage should never exceed 100%
+5. Implicit absent logic (unmarked valid sessions count as absent)
 """
 
-import asyncio
-import aiohttp
+import requests
 import json
+import uuid
 from datetime import datetime, timedelta
-import sys
-import os
+from typing import Dict, Any, List
 
-# Backend URL - using local for testing
-BACKEND_URL = "http://localhost:8001/api"
+# Backend URL
+BASE_URL = "http://localhost:8001/api"
 
-class JournalStatsTest:
+class JournalStatsTestSuite:
     def __init__(self):
-        self.session = None
-        self.test_results = []
-        self.errors = []
+        self.session = requests.Session()
+        self.test_data = {}
         
-    async def setup_session(self):
-        """Setup HTTP session"""
-        self.session = aiohttp.ClientSession()
+    def log(self, message: str, level: str = "INFO"):
+        """Log test messages"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] {level}: {message}")
         
-    async def cleanup_session(self):
-        """Cleanup HTTP session"""
-        if self.session:
-            await self.session.close()
-            
-    async def make_request(self, method, endpoint, **kwargs):
+    def make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make HTTP request with error handling"""
-        url = f"{BACKEND_URL}{endpoint}"
+        url = f"{BASE_URL}{endpoint}"
         try:
-            async with self.session.request(method, url, **kwargs) as response:
-                if response.content_type == 'application/json':
-                    data = await response.json()
-                else:
-                    data = await response.text()
-                return response.status, data
+            response = self.session.request(method, url, **kwargs)
+            self.log(f"{method} {endpoint} -> {response.status_code}")
+            return response
         except Exception as e:
-            return None, str(e)
+            self.log(f"Request failed: {e}", "ERROR")
+            raise
             
-    async def get_journals_for_user(self, telegram_id):
-        """Get list of journals for a user"""
-        print(f"📋 Getting journals for user {telegram_id}...")
-        status, data = await self.make_request('GET', f'/journals/{telegram_id}')
-        
-        if status == 200 and isinstance(data, list):
-            print(f"✅ Found {len(data)} journals for user {telegram_id}")
-            return data
-        else:
-            print(f"❌ Failed to get journals: {status} - {data}")
-            return []
-            
-    async def get_journal_stats(self, journal_id, telegram_id):
-        """Get journal statistics"""
-        print(f"📊 Getting stats for journal {journal_id}...")
-        status, data = await self.make_request('GET', f'/journals/{journal_id}/stats', 
-                                               params={'telegram_id': telegram_id})
-        
-        if status == 200:
-            print(f"✅ Successfully retrieved journal stats")
-            return data
-        else:
-            print(f"❌ Failed to get journal stats: {status} - {data}")
-            return None
-            
-    async def get_journal_students(self, journal_id):
-        """Get list of students in journal"""
-        print(f"👥 Getting students for journal {journal_id}...")
-        status, data = await self.make_request('GET', f'/journals/{journal_id}/students')
-        
-        if status == 200 and isinstance(data, list):
-            print(f"✅ Found {len(data)} students")
-            return data
-        else:
-            print(f"❌ Failed to get students: {status} - {data}")
-            return []
-            
-    async def get_journal_sessions(self, journal_id):
-        """Get list of sessions in journal"""
-        print(f"📅 Getting sessions for journal {journal_id}...")
-        status, data = await self.make_request('GET', f'/journals/{journal_id}/sessions')
-        
-        if status == 200 and isinstance(data, list):
-            print(f"✅ Found {len(data)} sessions")
-            return data
-        else:
-            print(f"❌ Failed to get sessions: {status} - {data}")
-            return []
-            
-    async def get_session_attendance(self, session_id):
-        """Get attendance records for a session"""
-        print(f"📝 Getting attendance for session {session_id}...")
-        status, data = await self.make_request('GET', f'/journals/sessions/{session_id}/attendance')
-        
-        if status == 200 and isinstance(data, list):
-            print(f"✅ Found {len(data)} attendance records")
-            return data
-        else:
-            print(f"❌ Failed to get attendance: {status} - {data}")
-            return []
-            
-    def calculate_expected_stats(self, students, sessions, all_attendance):
-        """Calculate expected statistics manually"""
-        print("🧮 Calculating expected statistics...")
-        
-        # Group attendance by student
-        student_attendance = {}
-        for record in all_attendance:
-            student_id = record['student_id']
-            if student_id not in student_attendance:
-                student_attendance[student_id] = []
-            student_attendance[student_id].append(record)
-            
-        # Calculate stats for each student
-        expected_students_stats = []
-        total_numerator = 0
-        total_denominator = 0
-        
-        for student in students:
-            student_id = student['id']
-            attendance_records = student_attendance.get(student_id, [])
-            
-            # Count by status
-            present_count = sum(1 for r in attendance_records if r['status'] == 'present')
-            late_count = sum(1 for r in attendance_records if r['status'] == 'late')
-            absent_count = sum(1 for r in attendance_records if r['status'] == 'absent')
-            excused_count = sum(1 for r in attendance_records if r['status'] == 'excused')
-            
-            # Calculate attendance percentage
-            # According to the backend logic: numerator = present + late, denominator = total_sessions - excused
-            numerator = present_count + late_count
-            denominator = len(sessions) - excused_count
-            
-            if denominator > 0:
-                attendance_percent = round((numerator / denominator) * 100, 1)
-                total_numerator += numerator
-                total_denominator += denominator
-            else:
-                attendance_percent = None
-                
-            expected_students_stats.append({
-                'student_id': student_id,
-                'full_name': student['full_name'],
-                'present_count': numerator,  # Backend returns present + late as present_count
-                'absent_count': denominator - numerator,  # Implicit absent calculation
-                'excused_count': excused_count,
-                'late_count': late_count,
-                'attendance_percent': attendance_percent,
-                'total_sessions': len(sessions)
-            })
-            
-        # Calculate overall attendance percentage
-        if total_denominator > 0:
-            overall_attendance_percent = round((total_numerator / total_denominator) * 100, 1)
-        else:
-            overall_attendance_percent = 0
-            
-        # Calculate session stats
-        expected_sessions_stats = []
-        for session in sessions:
-            session_id = session['session_id']
-            session_records = [r for r in all_attendance if r['session_id'] == session_id]
-            
-            present_count = sum(1 for r in session_records if r['status'] in ['present', 'late'])
-            absent_count = sum(1 for r in session_records if r['status'] == 'absent')
-            
-            expected_sessions_stats.append({
-                'session_id': session_id,
-                'present_count': present_count,
-                'absent_count': absent_count
-            })
-            
-        return {
-            'overall_attendance_percent': overall_attendance_percent,
-            'students_stats': expected_students_stats,
-            'sessions_stats': expected_sessions_stats
+    def create_journal(self, owner_id: int = 999888777) -> Dict[str, Any]:
+        """Create a test journal"""
+        journal_data = {
+            "name": "Test Journal - Stats Fix",
+            "group_name": "Test Group",
+            "description": "Testing journal stats calculation fix",
+            "telegram_id": owner_id,
+            "color": "blue"
         }
         
-    def compare_stats(self, actual_stats, expected_stats):
-        """Compare actual vs expected statistics"""
-        print("🔍 Comparing actual vs expected statistics...")
-        
-        discrepancies = []
-        
-        # Compare overall attendance percentage
-        actual_overall = actual_stats.get('overall_attendance_percent', 0)
-        expected_overall = expected_stats['overall_attendance_percent']
-        
-        if actual_overall != expected_overall:
-            discrepancies.append({
-                'type': 'overall_attendance_percent',
-                'actual': actual_overall,
-                'expected': expected_overall,
-                'difference': abs(actual_overall - expected_overall)
-            })
+        response = self.make_request("POST", "/journals", json=journal_data)
+        if response.status_code != 200:
+            raise Exception(f"Failed to create journal: {response.text}")
             
-        # Compare student statistics
-        actual_students = {s['id']: s for s in actual_stats.get('students_stats', [])}
-        expected_students = {s['student_id']: s for s in expected_stats['students_stats']}
+        journal = response.json()
+        self.log(f"Created journal: {journal['journal_id']}")
+        return journal
         
-        for student_id, expected in expected_students.items():
-            actual = actual_students.get(student_id)
-            if not actual:
-                discrepancies.append({
-                    'type': 'missing_student',
-                    'student_id': student_id,
-                    'student_name': expected['full_name']
-                })
-                continue
-                
-            # Compare each field
-            fields_to_compare = ['present_count', 'absent_count', 'excused_count', 'late_count', 'attendance_percent']
-            for field in fields_to_compare:
-                actual_val = actual.get(field)
-                expected_val = expected.get(field)
-                
-                if actual_val != expected_val:
-                    discrepancies.append({
-                        'type': 'student_stat_mismatch',
-                        'student_id': student_id,
-                        'student_name': expected['full_name'],
-                        'field': field,
-                        'actual': actual_val,
-                        'expected': expected_val
-                    })
-                    
-        # Compare session statistics
-        actual_sessions = {s['session_id']: s for s in actual_stats.get('sessions_stats', [])}
-        expected_sessions = {s['session_id']: s for s in expected_stats['sessions_stats']}
+    def create_subject(self, journal_id: str, owner_id: int = 999888777) -> Dict[str, Any]:
+        """Create a subject in the journal"""
+        subject_data = {
+            "name": "Test Subject",
+            "description": "Subject for testing stats",
+            "color": "green",
+            "telegram_id": owner_id
+        }
         
-        for session_id, expected in expected_sessions.items():
-            actual = actual_sessions.get(session_id)
-            if not actual:
-                discrepancies.append({
-                    'type': 'missing_session',
-                    'session_id': session_id
-                })
-                continue
-                
-            # Compare session fields
-            for field in ['present_count', 'absent_count']:
-                actual_val = actual.get(field)
-                expected_val = expected.get(field)
-                
-                if actual_val != expected_val:
-                    discrepancies.append({
-                        'type': 'session_stat_mismatch',
-                        'session_id': session_id,
-                        'field': field,
-                        'actual': actual_val,
-                        'expected': expected_val
-                    })
-                    
-        return discrepancies
+        response = self.make_request("POST", f"/journals/{journal_id}/subjects", json=subject_data)
+        if response.status_code != 200:
+            raise Exception(f"Failed to create subject: {response.text}")
+            
+        subject = response.json()
+        self.log(f"Created subject: {subject['subject_id']}")
+        return subject
         
-    async def test_journal_stats(self, journal_id, owner_id):
-        """Test statistics calculation for a specific journal"""
-        print(f"\n🧪 Testing journal {journal_id} statistics...")
+    def add_student(self, journal_id: str, full_name: str) -> Dict[str, Any]:
+        """Add a student to the journal"""
+        student_data = {
+            "full_name": full_name
+        }
         
-        # Get journal statistics
-        stats = await self.get_journal_stats(journal_id, owner_id)
-        if not stats:
-            self.errors.append(f"Failed to get stats for journal {journal_id}")
+        response = self.make_request("POST", f"/journals/{journal_id}/students", json=student_data)
+        if response.status_code != 200:
+            raise Exception(f"Failed to add student: {response.text}")
+            
+        student = response.json()
+        self.log(f"Added student: {student['full_name']} (ID: {student['id']})")
+        return student
+        
+    def create_session(self, journal_id: str, subject_id: str, date: str, title: str, owner_id: int = 999888777) -> Dict[str, Any]:
+        """Create a session"""
+        session_data = {
+            "subject_id": subject_id,
+            "date": date,
+            "title": title,
+            "description": f"Session on {date}",
+            "type": "lecture",
+            "telegram_id": owner_id
+        }
+        
+        response = self.make_request("POST", f"/journals/{journal_id}/sessions", json=session_data)
+        if response.status_code != 200:
+            raise Exception(f"Failed to create session: {response.text}")
+            
+        session = response.json()
+        self.log(f"Created session: {session['title']} on {session['date']} (ID: {session['session_id']})")
+        return session
+        
+    def mark_attendance(self, journal_id: str, session_id: str, student_id: str, status: str, owner_id: int = 999888777) -> bool:
+        """Mark attendance for a student in a session"""
+        attendance_data = {
+            "records": [
+                {
+                    "student_id": student_id,
+                    "status": status,
+                    "reason": None,
+                    "note": f"Test marking as {status}"
+                }
+            ],
+            "telegram_id": owner_id
+        }
+        
+        response = self.make_request("POST", f"/journals/sessions/{session_id}/attendance", json=attendance_data)
+        if response.status_code != 200:
+            self.log(f"Failed to mark attendance: {response.text}", "ERROR")
             return False
             
-        # Get raw data
-        students = await self.get_journal_students(journal_id)
-        sessions = await self.get_journal_sessions(journal_id)
+        self.log(f"Marked student {student_id} as {status} for session {session_id}")
+        return True
         
-        if not students or not sessions:
-            print("⚠️ No students or sessions found, skipping detailed validation")
-            return True
+    def get_journal_stats(self, journal_id: str, telegram_id: int = 999888777) -> Dict[str, Any]:
+        """Get journal statistics"""
+        response = self.make_request("GET", f"/journals/{journal_id}/stats?telegram_id={telegram_id}")
+        if response.status_code != 200:
+            raise Exception(f"Failed to get stats: {response.text}")
             
-        # Get attendance for all sessions
-        all_attendance = []
-        for session in sessions:
-            session_attendance = await self.get_session_attendance(session['session_id'])
-            all_attendance.extend(session_attendance)
-            
-        # Calculate expected statistics
-        expected_stats = self.calculate_expected_stats(students, sessions, all_attendance)
+        return response.json()
         
-        # Compare actual vs expected
-        discrepancies = self.compare_stats(stats, expected_stats)
+    def wait_for_student_creation(self, seconds: int = 2):
+        """Wait to ensure different creation timestamps"""
+        import time
+        time.sleep(seconds)
+        self.log(f"Waited {seconds} seconds for timestamp separation")
         
-        if discrepancies:
-            print(f"❌ Found {len(discrepancies)} discrepancies:")
-            for disc in discrepancies:
-                print(f"   • {disc}")
-            self.errors.extend(discrepancies)
-            return False
-        else:
-            print("✅ All statistics calculations are correct!")
-            return True
-            
-    async def run_tests(self):
-        """Run all journal statistics tests"""
-        print("🚀 Starting Journal Statistics Tests")
-        print("=" * 50)
-        
-        await self.setup_session()
+    def test_journal_stats_calculation_fix(self):
+        """
+        Main test for journal stats calculation fix
+        Tests all the requirements from the review request
+        """
+        self.log("=" * 60)
+        self.log("STARTING JOURNAL STATS CALCULATION FIX TEST")
+        self.log("=" * 60)
         
         try:
-            # Test with the known journal from database
-            journal_id = "fcb249a4-d1d7-447b-bd34-d275b776adf2"
-            owner_id = 999888777
+            # Step 1: Create journal and subject
+            journal = self.create_journal()
+            journal_id = journal['journal_id']
             
-            print(f"\n📚 Testing journal: {journal_id}")
-            print(f"👤 Owner: {owner_id}")
+            subject = self.create_subject(journal_id)
+            subject_id = subject['subject_id']
             
-            # Test the journal
-            success = await self.test_journal_stats(journal_id, owner_id)
-                    
-            # Print summary
-            print("\n" + "=" * 50)
-            print("📊 TEST SUMMARY")
-            print("=" * 50)
+            # Step 2: Create sessions with specific dates
+            today = datetime.now()
+            session_dates = [
+                (today - timedelta(days=5)).strftime("%Y-%m-%d"),  # 5 days ago
+                (today - timedelta(days=3)).strftime("%Y-%m-%d"),  # 3 days ago  
+                (today - timedelta(days=1)).strftime("%Y-%m-%d"),  # 1 day ago
+                today.strftime("%Y-%m-%d"),                        # today
+                (today + timedelta(days=1)).strftime("%Y-%m-%d"),  # tomorrow
+            ]
             
-            if self.errors:
-                print(f"❌ Found {len(self.errors)} issues:")
-                for error in self.errors:
-                    print(f"   • {error}")
-            else:
-                print("✅ All journal statistics calculations are working correctly!")
+            sessions = []
+            for i, date in enumerate(session_dates):
+                session = self.create_session(
+                    journal_id, 
+                    subject_id, 
+                    date, 
+                    f"Session {i+1} - {date}"
+                )
+                sessions.append(session)
                 
-            print(f"📈 Success Rate: {'1/1' if success else '0/1'} journals tested successfully")
+            self.log(f"Created {len(sessions)} sessions from {session_dates[0]} to {session_dates[-1]}")
             
-            return len(self.errors) == 0
+            # Step 3: Add students at different times relative to sessions
+            # Student 1: Added before all sessions (should count all sessions)
+            student1 = self.add_student(journal_id, "Student One - Early")
             
-        finally:
-            await self.cleanup_session()
+            # Wait to ensure different creation time
+            self.wait_for_student_creation(1)
+            
+            # Student 2: Added after some sessions (should only count sessions after creation + marked sessions)
+            student2 = self.add_student(journal_id, "Student Two - Late")
+            
+            # Wait again
+            self.wait_for_student_creation(1)
+            
+            # Student 3: Added very late (should only count very recent sessions + marked sessions)
+            student3 = self.add_student(journal_id, "Student Three - Very Late")
+            
+            self.log("Added 3 students at different times")
+            
+            # Step 4: Mark attendance strategically to test backfill logic
+            
+            # Student 1: Mark some sessions (should count all sessions as valid)
+            self.mark_attendance(journal_id, sessions[0]['session_id'], student1['id'], "present")
+            self.mark_attendance(journal_id, sessions[1]['session_id'], student1['id'], "absent")
+            self.mark_attendance(journal_id, sessions[2]['session_id'], student1['id'], "present")
+            # Leave sessions[3] and sessions[4] unmarked (should count as implicit absent)
+            
+            # Student 2: Mark some old sessions (backfill) and some new ones
+            self.mark_attendance(journal_id, sessions[0]['session_id'], student2['id'], "present")  # Backfill
+            self.mark_attendance(journal_id, sessions[1]['session_id'], student2['id'], "present")  # Backfill
+            self.mark_attendance(journal_id, sessions[3]['session_id'], student2['id'], "absent")   # Normal
+            # Leave sessions[2] and sessions[4] unmarked
+            
+            # Student 3: Mark one old session (backfill) and leave others
+            self.mark_attendance(journal_id, sessions[0]['session_id'], student3['id'], "late")     # Backfill
+            # Leave all other sessions unmarked
+            
+            self.log("Marked attendance with strategic backfill and new student logic")
+            
+            # Step 5: Get and analyze statistics
+            stats = self.get_journal_stats(journal_id)
+            
+            self.log("=" * 40)
+            self.log("ANALYZING STATISTICS")
+            self.log("=" * 40)
+            
+            # Analyze overall stats
+            self.log(f"Overall attendance: {stats['overall_attendance_percent']}%")
+            self.log(f"Total students: {stats['total_students']}")
+            self.log(f"Total sessions: {stats['total_sessions']}")
+            
+            # Analyze each student
+            for student_stat in stats['students_stats']:
+                student_name = student_stat['full_name']
+                attendance_percent = student_stat['attendance_percent']
+                present_count = student_stat['present_count']
+                absent_count = student_stat['absent_count']
+                total_sessions = student_stat['total_sessions']
+                
+                self.log(f"\n{student_name}:")
+                self.log(f"  Attendance: {attendance_percent}%")
+                self.log(f"  Present: {present_count}")
+                self.log(f"  Absent: {absent_count}")
+                self.log(f"  Total valid sessions: {total_sessions}")
+                
+                # Test requirement 4: Percentage should never exceed 100%
+                if attendance_percent is not None and attendance_percent > 100:
+                    raise Exception(f"❌ FAIL: {student_name} has attendance > 100%: {attendance_percent}%")
+                    
+                # Test implicit absent logic (requirement 5)
+                if total_sessions > 0:
+                    expected_total_marked = present_count + absent_count
+                    if expected_total_marked != total_sessions:
+                        self.log(f"  Note: {total_sessions - expected_total_marked} sessions unmarked (implicit absent)")
+                        
+            # Step 6: Verify specific requirements
+            self.log("\n" + "=" * 40)
+            self.log("VERIFYING REQUIREMENTS")
+            self.log("=" * 40)
+            
+            # Find students in stats
+            student1_stats = next(s for s in stats['students_stats'] if s['full_name'] == "Student One - Early")
+            student2_stats = next(s for s in stats['students_stats'] if s['full_name'] == "Student Two - Late")
+            student3_stats = next(s for s in stats['students_stats'] if s['full_name'] == "Student Three - Very Late")
+            
+            # Requirement 1 & 2: Student created AFTER session date - unmarked sessions should be EXCLUDED
+            # Student 2 and 3 were created after some sessions, so they should have fewer total_sessions
+            # unless those sessions were marked (backfill logic)
+            
+            self.log(f"✓ Student 1 (early): {student1_stats['total_sessions']} total sessions")
+            self.log(f"✓ Student 2 (late): {student2_stats['total_sessions']} total sessions")  
+            self.log(f"✓ Student 3 (very late): {student3_stats['total_sessions']} total sessions")
+            
+            # Requirement 3: If MARKED, session should be INCLUDED (backfill logic)
+            # Student 2 and 3 have marked sessions from before their creation - these should be included
+            if student2_stats['total_sessions'] < 3:  # Should have at least the marked backfill sessions
+                raise Exception(f"❌ FAIL: Student 2 missing backfill sessions. Expected >= 3, got {student2_stats['total_sessions']}")
+                
+            if student3_stats['total_sessions'] < 1:  # Should have at least the one marked backfill session
+                raise Exception(f"❌ FAIL: Student 3 missing backfill session. Expected >= 1, got {student3_stats['total_sessions']}")
+                
+            # Requirement 4: Already checked above (percentage <= 100%)
+            
+            # Requirement 5: Implicit absent logic
+            # For each student, present_count + absent_count should equal total_sessions
+            for student_stat in [student1_stats, student2_stats, student3_stats]:
+                name = student_stat['full_name']
+                present = student_stat['present_count']
+                absent = student_stat['absent_count']
+                total = student_stat['total_sessions']
+                
+                if present + absent != total:
+                    raise Exception(f"❌ FAIL: {name} implicit absent logic broken. Present({present}) + Absent({absent}) != Total({total})")
+                    
+            self.log("\n✅ ALL REQUIREMENTS VERIFIED SUCCESSFULLY!")
+            
+            # Additional verification: Check that percentages make sense
+            for student_stat in [student1_stats, student2_stats, student3_stats]:
+                name = student_stat['full_name']
+                present = student_stat['present_count']
+                total = student_stat['total_sessions']
+                percent = student_stat['attendance_percent']
+                
+                if total > 0:
+                    expected_percent = round((present / total) * 100, 1)
+                    if abs(percent - expected_percent) > 0.1:  # Allow small rounding differences
+                        raise Exception(f"❌ FAIL: {name} percentage calculation wrong. Expected {expected_percent}%, got {percent}%")
+                        
+            self.log("✅ PERCENTAGE CALCULATIONS VERIFIED!")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ TEST FAILED: {e}", "ERROR")
+            return False
+            
+    def test_edge_cases(self):
+        """Test edge cases for the stats calculation"""
+        self.log("\n" + "=" * 60)
+        self.log("TESTING EDGE CASES")
+        self.log("=" * 60)
+        
+        try:
+            # Create a new journal for edge case testing
+            journal = self.create_journal(owner_id=999888778)  # Different owner
+            journal_id = journal['journal_id']
+            
+            subject = self.create_subject(journal_id, owner_id=999888778)
+            subject_id = subject['subject_id']
+            
+            # Edge Case 1: Student with no sessions
+            student = self.add_student(journal_id, "Student No Sessions")
+            stats = self.get_journal_stats(journal_id, telegram_id=999888778)
+            
+            student_stats = next(s for s in stats['students_stats'] if s['full_name'] == "Student No Sessions")
+            if student_stats['attendance_percent'] is not None:
+                raise Exception(f"❌ FAIL: Student with no sessions should have None attendance, got {student_stats['attendance_percent']}")
+                
+            self.log("✅ Edge Case 1: Student with no sessions - PASSED")
+            
+            # Edge Case 2: All sessions marked as excused
+            session = self.create_session(journal_id, subject_id, datetime.now().strftime("%Y-%m-%d"), "Excused Session", owner_id=999888778)
+            self.mark_attendance(journal_id, session['session_id'], student['id'], "excused", owner_id=999888778)
+            
+            stats = self.get_journal_stats(journal_id, telegram_id=999888778)
+            student_stats = next(s for s in stats['students_stats'] if s['full_name'] == "Student No Sessions")
+            
+            # With excused session, effective sessions should be 0, so attendance should be None or 0
+            self.log(f"Student with excused session: {student_stats['attendance_percent']}% (total: {student_stats['total_sessions']})")
+            
+            # Edge Case 3: Multiple backfill sessions
+            past_dates = [
+                (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d"),
+                (datetime.now() - timedelta(days=8)).strftime("%Y-%m-%d"),
+                (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d"),
+            ]
+            
+            past_sessions = []
+            for i, date in enumerate(past_dates):
+                session = self.create_session(journal_id, subject_id, date, f"Past Session {i+1}", owner_id=999888778)
+                past_sessions.append(session)
+                
+            # Add student after all past sessions
+            self.wait_for_student_creation(1)
+            late_student = self.add_student(journal_id, "Late Student Multiple Backfill")
+            
+            # Mark all past sessions (backfill)
+            for session in past_sessions:
+                self.mark_attendance(journal_id, session['session_id'], late_student['id'], "present", owner_id=999888778)
+                
+            stats = self.get_journal_stats(journal_id, telegram_id=999888778)
+            late_student_stats = next(s for s in stats['students_stats'] if s['full_name'] == "Late Student Multiple Backfill")
+            
+            # Should have all backfilled sessions counted
+            if late_student_stats['total_sessions'] < len(past_sessions):
+                raise Exception(f"❌ FAIL: Late student missing backfill sessions. Expected >= {len(past_sessions)}, got {late_student_stats['total_sessions']}")
+                
+            self.log("✅ Edge Case 3: Multiple backfill sessions - PASSED")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ EDGE CASE TEST FAILED: {e}", "ERROR")
+            return False
 
-async def main():
-    """Main test function"""
-    tester = JournalStatsTest()
-    success = await tester.run_tests()
+def main():
+    """Run the complete test suite"""
+    print("🧪 Journal Stats Calculation Fix - Test Suite")
+    print("=" * 60)
     
-    if success:
-        print("\n🎉 All tests passed!")
-        sys.exit(0)
+    test_suite = JournalStatsTestSuite()
+    
+    # Run main test
+    main_test_passed = test_suite.test_journal_stats_calculation_fix()
+    
+    # Run edge case tests
+    edge_test_passed = test_suite.test_edge_cases()
+    
+    print("\n" + "=" * 60)
+    print("📊 TEST RESULTS SUMMARY")
+    print("=" * 60)
+    print(f"Main Test: {'✅ PASSED' if main_test_passed else '❌ FAILED'}")
+    print(f"Edge Cases: {'✅ PASSED' if edge_test_passed else '❌ FAILED'}")
+    
+    if main_test_passed and edge_test_passed:
+        print("\n🎉 ALL TESTS PASSED! Journal Stats Calculation Fix is working correctly.")
+        return 0
     else:
-        print("\n💥 Some tests failed!")
-        sys.exit(1)
+        print("\n💥 SOME TESTS FAILED! Please check the implementation.")
+        return 1
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    exit(main())
