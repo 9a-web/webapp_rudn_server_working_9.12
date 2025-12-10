@@ -260,6 +260,7 @@ export const JournalDetailModal = ({
 
   const gradient = journal ? COLORS[journal.color] || COLORS.purple : COLORS.purple;
   const isOwner = journal?.is_owner;
+  const canViewStats = journal?.can_view_stats; // Новое поле - может ли пользователь видеть статистику
   const unlinkedStudents = students.filter(s => !s.is_linked);
 
   return (
