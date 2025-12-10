@@ -944,6 +944,7 @@ class AttendanceJournal(BaseModel):
     color: str = "purple"                # Цвет для UI
     invite_token: str = Field(default_factory=lambda: str(uuid.uuid4())[:12])
     settings: JournalSettings = Field(default_factory=JournalSettings)
+    stats_viewers: List[int] = []        # Telegram ID пользователей с доступом к статистике (кроме owner)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
