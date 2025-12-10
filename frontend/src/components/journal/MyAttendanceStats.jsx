@@ -8,7 +8,7 @@ import {
   TrendingUp, Calendar, Award, 
   UserCheck, UserX, Clock, AlertCircle, 
   BookOpen, GraduationCap, FlaskConical, FileText,
-  CheckCircle, XCircle, AlertTriangle
+  CheckCircle, XCircle, AlertTriangle,
   Trophy,
 } from 'lucide-react';
 import { getMyAttendance } from '../../services/journalAPI';
