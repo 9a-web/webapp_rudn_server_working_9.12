@@ -1117,6 +1117,7 @@ class JournalResponse(BaseModel):
     total_sessions: int = 0
     is_owner: bool = False
     can_view_stats: bool = False         # Может ли текущий пользователь видеть статистику
+    is_linked: bool = False              # Привязан ли текущий пользователь как студент
     my_attendance_percent: Optional[float] = None
 
 
