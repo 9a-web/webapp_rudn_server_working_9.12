@@ -744,20 +744,6 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             whileTap={{ scale: 0.95 }}
             onClick={() => {
               hapticFeedback && hapticFeedback('impact', 'light');
-              const sortOptions = ['created', 'priority', 'deadline'];
-              const currentIndex = sortOptions.indexOf(sortBy);
-              setSortBy(sortOptions[(currentIndex + 1) % sortOptions.length]);
-            }}
-            className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-            title={`Сортировка: ${sortBy === 'created' ? 'По дате' : sortBy === 'priority' ? 'По приоритету' : 'По дедлайну'}`}
-          >
-            <SortAsc className="w-5 h-5" />
-          </motion.button>
-          
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              hapticFeedback && hapticFeedback('impact', 'light');
               setShowQuickActions(!showQuickActions);
             }}
             className={`p-2 rounded-xl transition-colors ${
