@@ -655,7 +655,7 @@ const Home = () => {
           await achievementsAPI.trackAction(user.id, 'view_group', { group_id: groupData.group_id });
           
           if (result.new_achievements && result.new_achievements.length > 0) {
-            setNewAchievement(result.new_achievements[0]);
+            showAchievementInQueue(result.new_achievements[0]);
             loadAchievementsData();
           }
         } catch (err) {
