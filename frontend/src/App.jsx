@@ -1033,15 +1033,7 @@ const Home = () => {
           </Suspense>
         )}
 
-        {newAchievement && (
-          <Suspense fallback={null}>
-            <AchievementNotification
-              achievement={newAchievement}
-              onClose={handleAchievementNotificationClose}
-              hapticFeedback={hapticFeedback}
-            />
-          </Suspense>
-        )}
+        {/* AchievementNotification теперь отображается через очередь выше */}
         
         {/* Swipe hint - показывается один раз, скрывается через 10 секунд или при первом свайпе */}
         {!showGroupSelector && schedule.length > 0 && (
