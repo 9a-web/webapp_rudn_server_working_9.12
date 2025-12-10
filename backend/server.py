@@ -118,6 +118,7 @@ from models import (
     JournalSessionResponse,
     AttendanceRecordResponse,
     JournalStatsResponse,
+    SubjectStatsResponse,
     JournalInviteLinkResponse,
     StudentInviteLinkResponse,
     JoinStudentRequest,
