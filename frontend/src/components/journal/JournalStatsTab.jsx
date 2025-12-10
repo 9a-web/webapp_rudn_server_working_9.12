@@ -591,6 +591,150 @@ export const JournalStatsTab = ({
           <p className="text-gray-500 text-sm mt-1">Добавьте занятия и отметьте посещаемость</p>
         </div>
       )}
+
+      {/* Управление доступом к статистике - только для владельца */}
+      {isOwner && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/5 rounded-xl p-4 mt-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-purple-400" />
+              <h3 className="text-sm font-medium text-white">Доступ к статистике</h3>
+            </div>
+            <button
+              onClick={() => setShowAccessModal(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
+            >
+              <Plus className="w-4 h-4" />
+              Добавить
+            </button>
+          </div>
+          
+          <p className="text-xs text-gray-400 mb-3">
+            Выберите студентов, которые могут просматривать статистику журнала
+          </p>
+
+          {statsViewers.length === 0 ? (
+            <div className="text-center py-4 bg-white/5 rounded-lg">
+              <ShieldCheck className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">Только вы можете видеть статистику</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {statsViewers.map((viewerId) => {
+                const student = students.find(s => s.telegram_id === viewerId);
+                return (
+                  <div
+                    key={viewerId}
+                    className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-lg p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-purple-400" />
+                      <span className="text-white text-sm">
+                        {student ? student.full_name : `ID: ${viewerId}`}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleToggleStatsViewer(viewerId)}
+                      className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Модал выбора студентов для доступа к статистике */}
+      <AnimatePresence>
+        {showAccessModal && isOwner && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAccessModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1C1C1E] rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                  <Shield className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Доступ к статистике</h3>
+                  <p className="text-xs text-gray-400">Выберите студентов</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                {students.filter(s => s.is_linked && s.telegram_id).length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+                    <p className="text-gray-400 text-sm">Нет привязанных студентов</p>
+                    <p className="text-gray-500 text-xs mt-1">Студенты должны привязаться к журналу</p>
+                  </div>
+                ) : (
+                  students
+                    .filter(s => s.is_linked && s.telegram_id)
+                    .map((student) => {
+                      const hasAccess = statsViewers.includes(student.telegram_id);
+                      return (
+                        <button
+                          key={student.id}
+                          onClick={() => handleToggleStatsViewer(student.telegram_id)}
+                          className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
+                            hasAccess 
+                              ? 'bg-purple-500/20 border border-purple-500/30' 
+                              : 'bg-white/5 border border-transparent hover:border-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              hasAccess ? 'bg-purple-500/30' : 'bg-white/10'
+                            }`}>
+                              {hasAccess ? (
+                                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                              ) : (
+                                <Shield className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="text-left">
+                              <p className="text-white text-sm font-medium">{student.full_name}</p>
+                              {student.username && (
+                                <p className="text-xs text-gray-500">@{student.username}</p>
+                              )}
+                            </div>
+                          </div>
+                          {hasAccess && (
+                            <div className="px-2 py-1 bg-purple-500/30 rounded-full">
+                              <span className="text-xs text-purple-300">Доступ</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowAccessModal(false)}
+                className={`w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r ${gradient}`}
+              >
+                Готово
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
