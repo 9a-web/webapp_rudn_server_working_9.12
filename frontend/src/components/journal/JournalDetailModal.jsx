@@ -618,9 +618,22 @@ export const JournalDetailModal = ({
                   />
                 )}
 
-                {/* Non-owner view - My Attendance (only if can't view stats) */}
-                {!isOwner && !canViewStats && journal && (
-                  <MyAttendanceView journal={journal} telegramId={telegramId} />
+                {/* My Stats Tab - for linked students */}
+                {activeTab === 'my-stats' && isLinked && (
+                  <MyAttendanceStats
+                    journalId={journalId}
+                    telegramId={telegramId}
+                    gradient={gradient}
+                  />
+                )}
+
+                {/* Waiting for link - not linked and not owner */}
+                {!isOwner && !isLinked && availableTabs.length === 0 && journal && (
+                  <div className="text-center py-10">
+                    <Clock className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+                    <p className="text-white font-medium">Ожидание привязки</p>
+                    <p className="text-gray-400 text-sm mt-1">Староста ещё не привязал вас к имени в журнале</p>
+                  </div>
                 )}
               </div>
             </>
