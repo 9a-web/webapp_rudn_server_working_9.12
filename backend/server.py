@@ -4501,6 +4501,8 @@ async def get_journal_detail(journal_id: str, telegram_id: int = 0):
         total_sessions = await db.journal_sessions.count_documents({"journal_id": journal_id})
         
         is_owner = journal["owner_id"] == telegram_id
+        stats_viewers = journal.get("stats_viewers", [])
+        can_view_stats = is_owner or telegram_id in stats_viewers
         my_attendance = None
         
         if not is_owner and telegram_id > 0:
@@ -4521,12 +4523,14 @@ async def get_journal_detail(journal_id: str, telegram_id: int = 0):
             color=journal.get("color", "purple"),
             invite_token=journal["invite_token"],
             settings=JournalSettings(**journal.get("settings", {})),
+            stats_viewers=stats_viewers,
             created_at=journal["created_at"],
             updated_at=journal["updated_at"],
             total_students=total_students,
             linked_students=linked_students,
             total_sessions=total_sessions,
             is_owner=is_owner,
+            can_view_stats=can_view_stats,
             my_attendance_percent=my_attendance
         )
     except HTTPException:
