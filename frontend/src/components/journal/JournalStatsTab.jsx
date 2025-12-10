@@ -91,7 +91,18 @@ export const JournalStatsTab = ({
     };
 
     loadStats();
-  }, [journalId]);
+  }, [journalId, telegramId]);
+
+  // Функция для добавления/удаления пользователя из списка просмотра статистики
+  const handleToggleStatsViewer = async (studentTelegramId) => {
+    if (!onUpdateStatsViewers || !studentTelegramId) return;
+    
+    const newViewers = statsViewers.includes(studentTelegramId)
+      ? statsViewers.filter(id => id !== studentTelegramId)
+      : [...statsViewers, studentTelegramId];
+    
+    await onUpdateStatsViewers(newViewers);
+  };
 
   if (isLoading) {
     return (
