@@ -278,8 +278,35 @@ export const JournalDetailModal = ({
 
   const gradient = journal ? COLORS[journal.color] || COLORS.purple : COLORS.purple;
   const isOwner = journal?.is_owner;
-  const canViewStats = journal?.can_view_stats; // Новое поле - может ли пользователь видеть статистику
+  const canViewStats = journal?.can_view_stats; // Может ли пользователь видеть общую статистику
+  const isLinked = journal?.is_linked; // Привязан ли как студент
   const unlinkedStudents = students.filter(s => !s.is_linked);
+
+  // Определяем какие табы показывать
+  const getTabs = () => {
+    const tabs = [];
+    
+    // Owner видит все табы
+    if (isOwner) {
+      tabs.push({ id: 'students', label: 'Студенты', icon: Users });
+      tabs.push({ id: 'sessions', label: 'Занятия', icon: Calendar });
+      tabs.push({ id: 'stats', label: 'Статистика', icon: BarChart3 });
+    } else {
+      // Не-owner
+      // Если привязан - показываем "Моя статистика"
+      if (isLinked) {
+        tabs.push({ id: 'my-stats', label: 'Моя статистика', icon: TrendingUp });
+      }
+      // Если может видеть общую статистику (stats_viewer)
+      if (canViewStats) {
+        tabs.push({ id: 'stats', label: 'Общая статистика', icon: BarChart3 });
+      }
+    }
+    
+    return tabs;
+  };
+  
+  const availableTabs = getTabs();
 
   return (
     <AnimatePresence>
@@ -337,18 +364,10 @@ export const JournalDetailModal = ({
             </div>
           ) : (
             <>
-              {/* Tabs - show for owner OR if user can view stats */}
-              {(isOwner || canViewStats) && (
+              {/* Tabs - show if there are tabs to show */}
+              {availableTabs.length > 0 && (
                 <div className="flex gap-2 p-4 bg-[#0D0D0D] sticky top-[140px] z-10">
-                  {[
-                    // Owner sees all tabs
-                    ...(isOwner ? [
-                      { id: 'students', label: 'Студенты', icon: Users },
-                      { id: 'sessions', label: 'Занятия', icon: Calendar },
-                    ] : []),
-                    // Stats tab for owner and stats_viewers
-                    ...(canViewStats ? [{ id: 'stats', label: 'Статистика', icon: BarChart3 }] : []),
-                  ].map((tab) => {
+                  {availableTabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
                       <button
