@@ -661,7 +661,6 @@ class JournalStatsTestSuite:
                 subject_name = subject_stat['subject_name']
                 self.log(f"\n📊 Subject: {subject_name}")
                 self.log(f"   Total sessions: {subject_stat['total_sessions']}")
-                self.log(f"   Total records: {subject_stat['total_records']}")
                 self.log(f"   Present: {subject_stat['present_count']}")
                 self.log(f"   Absent: {subject_stat['absent_count']}")
                 self.log(f"   Late: {subject_stat['late_count']}")
