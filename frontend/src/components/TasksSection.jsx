@@ -163,6 +163,18 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     }
   };
 
+  const loadProductivityStats = async () => {
+    try {
+      setStatsLoading(true);
+      const stats = await tasksAPI.getProductivityStats(user.id);
+      setProductivityStats(stats);
+    } catch (error) {
+      console.error('Error loading productivity stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const loadRooms = async () => {
     try {
       const userRooms = await roomsAPI.getUserRooms(userSettings.telegram_id);
