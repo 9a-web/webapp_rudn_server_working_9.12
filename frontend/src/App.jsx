@@ -677,7 +677,7 @@ const Home = () => {
       try {
         const result = await achievementsAPI.trackAction(user.id, 'open_calendar');
         if (result.new_achievements && result.new_achievements.length > 0) {
-          setNewAchievement(result.new_achievements[0]);
+          showAchievementInQueue(result.new_achievements[0]);
           loadAchievementsData();
         }
       } catch (err) {
@@ -696,7 +696,7 @@ const Home = () => {
         const result = await achievementsAPI.trackAction(user.id, 'view_analytics');
         await achievementsAPI.trackAction(user.id, 'visit_menu_item', { menu_item: 'analytics' });
         if (result.new_achievements && result.new_achievements.length > 0) {
-          setNewAchievement(result.new_achievements[0]);
+          showAchievementInQueue(result.new_achievements[0]);
           loadAchievementsData();
         }
       } catch (err) {
