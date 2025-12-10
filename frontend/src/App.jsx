@@ -738,6 +738,7 @@ const Home = () => {
     <div className="h-full min-h-screen bg-background telegram-webapp relative">
       <TopGlow />
       <UpcomingClassNotification schedule={schedule} />
+      <GreetingNotification userFirstName={user?.first_name} />
       
       {/* Adaptive container with responsive max-width */}
       <div className="relative mx-auto max-w-[430px] md:max-w-3xl lg:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
