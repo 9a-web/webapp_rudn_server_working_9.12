@@ -360,6 +360,7 @@ class Task(BaseModel):
     telegram_id: int
     text: str
     completed: bool = False
+    completed_at: Optional[datetime] = None  # Дата и время выполнения задачи
     
     # Новые поля
     category: Optional[str] = None  # Категория: 'study', 'personal', 'sport', 'project'
