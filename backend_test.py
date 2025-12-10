@@ -470,24 +470,133 @@ def test_study_streaks_functionality():
                 except:
                     pass  # Ignore cleanup errors
 
+def test_notification_history_system():
+    """Test Notification History System as it needs retesting"""
+    print("=" * 80)
+    print("📋 TESTING NOTIFICATION HISTORY SYSTEM")
+    print("=" * 80)
+    
+    test_telegram_id = 999888777
+    
+    try:
+        # Test 1: Get notification history for user
+        log_test("Test 1: Getting notification history", "INFO", f"telegram_id: {test_telegram_id}")
+        
+        response = requests.get(f"{API_BASE}/user-settings/{test_telegram_id}/history", timeout=10)
+        
+        if response.status_code != 200:
+            log_test("GET /api/user-settings/{telegram_id}/history", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        history_response = response.json()
+        
+        # Validate response structure
+        required_fields = ["history", "count"]
+        for field in required_fields:
+            if field not in history_response:
+                log_test("History Response Structure", "FAIL", f"Missing field '{field}' in response")
+                return False
+        
+        # Validate data types
+        history = history_response.get("history")
+        count = history_response.get("count")
+        
+        if not isinstance(history, list):
+            log_test("History Response Validation", "FAIL", f"history should be a list, got {type(history)}")
+            return False
+            
+        if not isinstance(count, int) or count < 0:
+            log_test("History Response Validation", "FAIL", f"count should be non-negative integer, got {count} ({type(count)})")
+            return False
+        
+        log_test("Test 1: Notification history retrieval", "PASS", f"Retrieved {count} history items successfully")
+        
+        # Test 2: Test with pagination parameters
+        log_test("Test 2: Testing pagination parameters", "INFO", "limit=5, offset=0")
+        
+        response = requests.get(f"{API_BASE}/user-settings/{test_telegram_id}/history?limit=5&offset=0", timeout=10)
+        
+        if response.status_code != 200:
+            log_test("GET /api/user-settings/{telegram_id}/history (with params)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        paginated_response = response.json()
+        
+        # Validate pagination works
+        paginated_history = paginated_response.get("history", [])
+        if len(paginated_history) > 5:
+            log_test("Pagination Validation", "FAIL", f"Expected max 5 items with limit=5, got {len(paginated_history)}")
+            return False
+        
+        log_test("Test 2: Pagination parameters", "PASS", f"Pagination working correctly, returned {len(paginated_history)} items")
+        
+        # Test 3: Validate history item structure (if any items exist)
+        if history:
+            log_test("Test 3: Validating history item structure", "INFO", "Checking first history item")
+            
+            first_item = history[0]
+            expected_item_fields = ["telegram_id", "notification_type", "message", "sent_at", "status"]
+            
+            for field in expected_item_fields:
+                if field not in first_item:
+                    log_test("History Item Structure", "FAIL", f"Missing field '{field}' in history item")
+                    return False
+            
+            # Validate data types
+            if first_item.get("telegram_id") != test_telegram_id:
+                log_test("History Item Validation", "FAIL", f"Wrong telegram_id in history item: expected {test_telegram_id}, got {first_item.get('telegram_id')}")
+                return False
+                
+            if not isinstance(first_item.get("message"), str):
+                log_test("History Item Validation", "FAIL", f"message should be string, got {type(first_item.get('message'))}")
+                return False
+                
+            if not isinstance(first_item.get("sent_at"), str):
+                log_test("History Item Validation", "FAIL", f"sent_at should be string (ISO datetime), got {type(first_item.get('sent_at'))}")
+                return False
+            
+            log_test("Test 3: History item structure", "PASS", "History item structure is valid")
+        else:
+            log_test("Test 3: History item structure", "PASS", "No history items to validate (empty history)")
+        
+        log_test("Notification History System", "PASS", "All test scenarios completed successfully!")
+        
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        log_test("Network Error", "FAIL", f"Request failed: {str(e)}")
+        return False
+    except Exception as e:
+        log_test("Unexpected Error", "FAIL", f"Error: {str(e)}")
+        return False
+
 def main():
     """Main test execution"""
-    print("🚀 Starting Backend API Testing for Study Streaks (Стрик-режим)")
+    print("🚀 Starting Backend API Testing for Study Streaks (Стрик-режим) and Notification History")
     print(f"Backend URL: {BACKEND_URL}")
     print(f"Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     
     # Test Study Streaks functionality as requested
-    success = test_study_streaks_functionality()
+    streaks_success = test_study_streaks_functionality()
+    
+    # Test Notification History System (needs retesting)
+    history_success = test_notification_history_system()
+    
+    overall_success = streaks_success and history_success
     
     print("=" * 80)
-    if success:
-        print("🎉 ALL TESTS PASSED - Study Streaks Functionality Working Correctly!")
+    if overall_success:
+        print("🎉 ALL TESTS PASSED - Both Study Streaks and Notification History Working Correctly!")
     else:
-        print("💥 TESTS FAILED - Issues found in Study Streaks Functionality")
+        print("💥 SOME TESTS FAILED - Issues found in backend functionality")
+        if not streaks_success:
+            print("   ❌ Study Streaks functionality has issues")
+        if not history_success:
+            print("   ❌ Notification History system has issues")
     print("=" * 80)
     
-    return 0 if success else 1
+    return 0 if overall_success else 1
 
 if __name__ == "__main__":
     sys.exit(main())
