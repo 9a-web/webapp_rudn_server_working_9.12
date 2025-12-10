@@ -1173,6 +1173,19 @@ class AttendanceRecordResponse(BaseModel):
     marked_at: datetime
 
 
+class SubjectStatsResponse(BaseModel):
+    """Статистика по предмету"""
+    subject_id: str
+    subject_name: str
+    subject_color: str
+    total_sessions: int
+    present_count: int
+    absent_count: int
+    late_count: int
+    excused_count: int
+    attendance_percent: float
+
+
 class JournalStatsResponse(BaseModel):
     """Статистика журнала"""
     journal_id: str
@@ -1182,6 +1195,7 @@ class JournalStatsResponse(BaseModel):
     overall_attendance_percent: float
     students_stats: List[JournalStudentResponse]
     sessions_stats: List[JournalSessionResponse]
+    subjects_stats: List[SubjectStatsResponse] = []  # Статистика по предметам
 
 
 class JournalStatsViewersUpdate(BaseModel):
