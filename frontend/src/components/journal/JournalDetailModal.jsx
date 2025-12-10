@@ -73,6 +73,7 @@ export const JournalDetailModal = ({
   const [activeTab, setActiveTab] = useState('students');
   const [isLoading, setIsLoading] = useState(true);
   const [copiedStudentId, setCopiedStudentId] = useState(null); // ID студента, чья ссылка скопирована
+  const [showStatsAccessModal, setShowStatsAccessModal] = useState(false); // Модал управления доступом к статистике
   
   // Modals
   const [showAddStudents, setShowAddStudents] = useState(false);
