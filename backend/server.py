@@ -6030,9 +6030,10 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
             excused = stats["excused"]
             
             # --- ЛОГИКА "НОВИЧКА" (New Student Logic) ---
-            # Считаем, сколько занятий должен был посетить студент
-            # Он отвечает только за занятия, дата которых >= дате его создания (минус небольшой буфер)
+            # Студент отвечает за занятия, которые произошли после его добавления
+            # ИЛИ за те занятия, где он был отмечен (даже если это было "в прошлом")
             student_created_at = s.get("created_at")
+            attended_sessions = set(stats.get("attended_sessions", []))
             
             valid_sessions_count = 0
             
@@ -6040,13 +6041,15 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
                 # Если даты нет (старые данные), считаем все
                 valid_sessions_count = total_sessions
             else:
-                # Фильтруем занятия по дате
-                # session["date"] is YYYY-MM-DD string
-                # student_created_at is datetime object
                 s_created_date_str = student_created_at.strftime("%Y-%m-%d")
                 
                 for sess in sessions:
-                    if sess["date"] >= s_created_date_str:
+                    # Учитываем занятие, если оно было после создания студента
+                    # ИЛИ если студент был отмечен на этом занятии (даже если оно было раньше)
+                    is_after_creation = sess["date"] >= s_created_date_str
+                    is_marked = sess["session_id"] in attended_sessions
+                    
+                    if is_after_creation or is_marked:
                         valid_sessions_count += 1
             
             # --- ЛОГИКА "УВАЖИТЕЛЬНОЙ ПРИЧИНЫ" (Excused Logic) ---
