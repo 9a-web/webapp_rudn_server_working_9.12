@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Comprehensive Backend API Testing Script for РУДН Schedule App
-Testing Journal Statistics API as requested in review
+Testing Productivity Stats API as requested in review
 """
 
 import requests
