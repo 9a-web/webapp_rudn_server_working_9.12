@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, ArrowLeft, Users, Calendar, BarChart3, Share2, Settings, 
   UserPlus, Plus, Check, Clock, Link2, Crown, Trash2,
-  BookOpen, GraduationCap, FlaskConical, FileText, Copy, ExternalLink
+  BookOpen, GraduationCap, FlaskConical, FileText, Copy, ExternalLink,
+  TrendingUp
 } from 'lucide-react';
 import {
   getJournalDetail,
@@ -33,6 +34,7 @@ import { LinkStudentModal } from './LinkStudentModal';
 
 import { EditStudentModal } from './EditStudentModal';
 import { JournalStatsTab } from './JournalStatsTab';
+import { MyAttendanceStats } from './MyAttendanceStats';
 const COLORS = {
   purple: 'from-purple-400 to-pink-400',
   blue: 'from-blue-400 to-cyan-400',
