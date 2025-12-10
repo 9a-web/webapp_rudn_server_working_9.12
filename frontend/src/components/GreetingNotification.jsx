@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Moon } from 'lucide-react';
 
-export const GreetingNotification = ({ userFirstName }) => {
+export const GreetingNotification = ({ userFirstName, testHour = null }) => {
   const [greeting, setGreeting] = useState(null);
 
   useEffect(() => {
-    // Check if we already showed greeting this session
-    if (sessionStorage.getItem('greetingShown')) return;
+    // Check if we already showed greeting this session (skip check if testing)
+    if (!testHour && sessionStorage.getItem('greetingShown')) return;
 
     const checkTime = () => {
       const now = new Date();
-      const hour = now.getHours();
+      const hour = testHour !== null ? testHour : now.getHours();
       
       let type = null;
       let title = "";
@@ -32,7 +32,9 @@ export const GreetingNotification = ({ userFirstName }) => {
 
       if (type) {
         setGreeting({ type, title, message });
-        sessionStorage.setItem('greetingShown', 'true');
+        if (!testHour) {
+          sessionStorage.setItem('greetingShown', 'true');
+        }
         
         // Hide after 6 seconds
         setTimeout(() => {
@@ -42,9 +44,11 @@ export const GreetingNotification = ({ userFirstName }) => {
     };
 
     // Small delay to ensure app is loaded and transition is smooth
-    const timer = setTimeout(checkTime, 1000);
+    // If testing, run immediately
+    const delay = testHour !== null ? 100 : 1000;
+    const timer = setTimeout(checkTime, delay);
     return () => clearTimeout(timer);
-  }, [userFirstName]);
+  }, [userFirstName, testHour]);
 
   if (!greeting) return null;
 
