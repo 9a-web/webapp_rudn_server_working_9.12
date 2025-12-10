@@ -199,21 +199,292 @@ def test_productivity_stats_api():
     except Exception as e:
         log_test("Unexpected Error", "FAIL", f"Error: {str(e)}")
         return False
+def test_study_streaks_functionality():
+    """Test Study Streaks (Стрик-режим) functionality as requested in review"""
+    print("=" * 80)
+    print("🔥 TESTING STUDY STREAKS (СТРИК-РЕЖИМ) FUNCTIONALITY")
+    print("=" * 80)
+    
+    test_telegram_id = 999888777
+    created_task_ids = []
+    
+    try:
+        # Step 1: Create a task for test user
+        log_test("Step 1: Creating task for test user", "INFO", f"telegram_id: {test_telegram_id}")
+        
+        task_data = {
+            "telegram_id": test_telegram_id,
+            "text": "Тестовая задача для streak",
+            "category": "study"
+        }
+        
+        response = requests.post(f"{API_BASE}/tasks", json=task_data, timeout=10)
+        
+        if response.status_code != 200:
+            log_test("POST /api/tasks", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        task_response = response.json()
+        task_id = task_response.get("id")
+        created_task_ids.append(task_id)
+        
+        # Validate task creation response
+        if not task_id:
+            log_test("Task Creation Validation", "FAIL", "No task ID returned")
+            return False
+            
+        if task_response.get("telegram_id") != test_telegram_id:
+            log_test("Task Creation Validation", "FAIL", f"Wrong telegram_id: expected {test_telegram_id}, got {task_response.get('telegram_id')}")
+            return False
+            
+        if task_response.get("text") != "Тестовая задача для streak":
+            log_test("Task Creation Validation", "FAIL", f"Wrong text: expected 'Тестовая задача для streak', got {task_response.get('text')}")
+            return False
+            
+        if task_response.get("category") != "study":
+            log_test("Task Creation Validation", "FAIL", f"Wrong category: expected 'study', got {task_response.get('category')}")
+            return False
+            
+        if task_response.get("completed") != False:
+            log_test("Task Creation Validation", "FAIL", f"Task should be incomplete initially, got {task_response.get('completed')}")
+            return False
+            
+        log_test("Step 1: Task creation", "PASS", f"Task created successfully with ID: {task_id}")
+        
+        # Step 2: Complete the created task
+        log_test("Step 2: Completing the created task", "INFO", f"task_id: {task_id}")
+        
+        update_data = {"completed": True}
+        response = requests.put(f"{API_BASE}/tasks/{task_id}", json=update_data, timeout=10)
+        
+        if response.status_code != 200:
+            log_test("PUT /api/tasks/{task_id}", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        updated_task = response.json()
+        
+        # Validate task completion
+        if updated_task.get("completed") != True:
+            log_test("Task Completion Validation", "FAIL", f"Task should be completed, got {updated_task.get('completed')}")
+            return False
+            
+        # Check that completed_at field is set
+        completed_at = updated_task.get("completed_at")
+        if not completed_at:
+            log_test("Task Completion Validation", "FAIL", "completed_at field should be set when task is completed")
+            return False
+            
+        log_test("Step 2: Task completion", "PASS", f"Task completed successfully at {completed_at}")
+        
+        # Step 3: Check productivity stats
+        log_test("Step 3: Checking productivity stats", "INFO", "Should show current_streak >= 1 and completed_today >= 1")
+        
+        response = requests.get(f"{API_BASE}/tasks/{test_telegram_id}/productivity-stats", timeout=10)
+        
+        if response.status_code != 200:
+            log_test("GET /api/tasks/{telegram_id}/productivity-stats", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        stats = response.json()
+        
+        # Validate productivity stats structure
+        required_fields = ["total_completed", "completed_today", "completed_this_week", "completed_this_month", 
+                          "current_streak", "best_streak", "streak_dates", "daily_stats"]
+        
+        for field in required_fields:
+            if field not in stats:
+                log_test("Productivity Stats Structure", "FAIL", f"Missing field '{field}' in response")
+                return False
+        
+        # Check that current_streak >= 1 (if task completed today)
+        current_streak = stats.get("current_streak")
+        if current_streak < 1:
+            log_test("Current Streak Validation", "FAIL", f"Expected current_streak >= 1, got {current_streak}")
+            return False
+            
+        # Check that completed_today >= 1
+        completed_today = stats.get("completed_today")
+        if completed_today < 1:
+            log_test("Completed Today Validation", "FAIL", f"Expected completed_today >= 1, got {completed_today}")
+            return False
+            
+        # Check daily_stats shows has_completed: true for today
+        daily_stats = stats.get("daily_stats", [])
+        if len(daily_stats) != 7:
+            log_test("Daily Stats Length", "FAIL", f"Expected 7 elements in daily_stats, got {len(daily_stats)}")
+            return False
+            
+        # Find today's entry (should be the last one in the array)
+        today_entry = daily_stats[-1]  # Last entry should be today
+        if not today_entry.get("has_completed"):
+            log_test("Today's Completion Status", "FAIL", f"Today's entry should show has_completed: true, got {today_entry.get('has_completed')}")
+            return False
+            
+        log_test("Step 3: Productivity stats check", "PASS", 
+                f"Stats validated - current_streak: {current_streak}, completed_today: {completed_today}, today_has_completed: {today_entry.get('has_completed')}")
+        
+        # Step 4: Create and complete another task to test counter increment
+        log_test("Step 4: Creating and completing second task", "INFO", "Testing counter increments")
+        
+        task_data_2 = {
+            "telegram_id": test_telegram_id,
+            "text": "Вторая тестовая задача для streak",
+            "category": "study"
+        }
+        
+        response = requests.post(f"{API_BASE}/tasks", json=task_data_2, timeout=10)
+        
+        if response.status_code != 200:
+            log_test("POST /api/tasks (second)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        task_response_2 = response.json()
+        task_id_2 = task_response_2.get("id")
+        created_task_ids.append(task_id_2)
+        
+        # Complete the second task
+        update_data_2 = {"completed": True}
+        response = requests.put(f"{API_BASE}/tasks/{task_id_2}", json=update_data_2, timeout=10)
+        
+        if response.status_code != 200:
+            log_test("PUT /api/tasks/{task_id} (second)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        # Check updated stats
+        response = requests.get(f"{API_BASE}/tasks/{test_telegram_id}/productivity-stats", timeout=10)
+        
+        if response.status_code != 200:
+            log_test("GET /api/tasks/{telegram_id}/productivity-stats (after second task)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        updated_stats = response.json()
+        
+        # Validate that counters increased
+        new_completed_today = updated_stats.get("completed_today")
+        if new_completed_today <= completed_today:
+            log_test("Counter Increment Validation", "FAIL", f"completed_today should have increased from {completed_today} to at least {completed_today + 1}, got {new_completed_today}")
+            return False
+            
+        log_test("Step 4: Second task completion", "PASS", 
+                f"Counters incremented correctly - completed_today: {completed_today} → {new_completed_today}")
+        
+        # Step 5: Test uncompleting a task (set completed: false)
+        log_test("Step 5: Testing task uncompletion", "INFO", "Setting completed: false and checking stats update")
+        
+        uncomplete_data = {"completed": False}
+        response = requests.put(f"{API_BASE}/tasks/{task_id}", json=uncomplete_data, timeout=10)
+        
+        if response.status_code != 200:
+            log_test("PUT /api/tasks/{task_id} (uncomplete)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        uncompleted_task = response.json()
+        
+        # Validate task is now incomplete
+        if uncompleted_task.get("completed") != False:
+            log_test("Task Uncompletion Validation", "FAIL", f"Task should be incomplete, got {uncompleted_task.get('completed')}")
+            return False
+            
+        # Check that completed_at field is cleared
+        completed_at_after_uncomplete = uncompleted_task.get("completed_at")
+        if completed_at_after_uncomplete is not None:
+            log_test("Task Uncompletion Validation", "FAIL", f"completed_at should be None after uncompleting, got {completed_at_after_uncomplete}")
+            return False
+            
+        # Check updated stats after uncompleting
+        response = requests.get(f"{API_BASE}/tasks/{test_telegram_id}/productivity-stats", timeout=10)
+        
+        if response.status_code != 200:
+            log_test("GET /api/tasks/{telegram_id}/productivity-stats (after uncomplete)", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            return False
+            
+        final_stats = response.json()
+        
+        # Validate that stats updated correctly
+        final_completed_today = final_stats.get("completed_today")
+        if final_completed_today >= new_completed_today:
+            log_test("Uncompletion Stats Validation", "FAIL", f"completed_today should have decreased from {new_completed_today}, got {final_completed_today}")
+            return False
+            
+        log_test("Step 5: Task uncompletion", "PASS", 
+                f"Stats updated correctly after uncompleting - completed_today: {new_completed_today} → {final_completed_today}")
+        
+        # Final validation: Check all required fields are present and valid
+        log_test("Final Validation: Complete stats structure", "INFO", "Validating all fields and data types")
+        
+        # Validate all numeric fields are non-negative integers
+        numeric_fields = ["total_completed", "completed_today", "completed_this_week", "completed_this_month", "current_streak", "best_streak"]
+        for field in numeric_fields:
+            value = final_stats.get(field)
+            if not isinstance(value, int) or value < 0:
+                log_test("Final Stats Validation", "FAIL", f"Field '{field}' should be non-negative integer, got {value} ({type(value)})")
+                return False
+        
+        # Validate streak_dates is a list
+        streak_dates = final_stats.get("streak_dates")
+        if not isinstance(streak_dates, list):
+            log_test("Final Stats Validation", "FAIL", f"streak_dates should be a list, got {type(streak_dates)}")
+            return False
+            
+        # Validate daily_stats structure
+        daily_stats = final_stats.get("daily_stats", [])
+        if len(daily_stats) != 7:
+            log_test("Final Stats Validation", "FAIL", f"daily_stats should have 7 elements, got {len(daily_stats)}")
+            return False
+            
+        for i, day_stat in enumerate(daily_stats):
+            required_day_fields = ["date", "day_name", "count", "has_completed"]
+            for field in required_day_fields:
+                if field not in day_stat:
+                    log_test("Final Stats Validation", "FAIL", f"Day {i}: Missing field '{field}'")
+                    return False
+                    
+            # Validate data types
+            if not isinstance(day_stat.get("count"), int) or day_stat.get("count") < 0:
+                log_test("Final Stats Validation", "FAIL", f"Day {i}: count should be non-negative integer, got {day_stat.get('count')}")
+                return False
+                
+            if not isinstance(day_stat.get("has_completed"), bool):
+                log_test("Final Stats Validation", "FAIL", f"Day {i}: has_completed should be boolean, got {type(day_stat.get('has_completed'))}")
+                return False
+        
+        log_test("Final Validation: Complete stats structure", "PASS", "All fields validated successfully")
+        
+        log_test("Study Streaks Functionality", "PASS", "All test scenarios completed successfully!")
+        
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        log_test("Network Error", "FAIL", f"Request failed: {str(e)}")
+        return False
+    except Exception as e:
+        log_test("Unexpected Error", "FAIL", f"Error: {str(e)}")
+        return False
+    finally:
+        # Cleanup: Delete created test tasks
+        if created_task_ids:
+            log_test("Cleanup: Deleting test tasks", "INFO", f"Deleting {len(created_task_ids)} test tasks")
+            for task_id in created_task_ids:
+                try:
+                    requests.delete(f"{API_BASE}/tasks/{task_id}", timeout=5)
+                except:
+                    pass  # Ignore cleanup errors
+
 def main():
     """Main test execution"""
-    print("🚀 Starting Backend API Testing for Productivity Stats API")
+    print("🚀 Starting Backend API Testing for Study Streaks (Стрик-режим)")
     print(f"Backend URL: {BACKEND_URL}")
     print(f"Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     
-    # Test productivity statistics API
-    success = test_productivity_stats_api()
+    # Test Study Streaks functionality as requested
+    success = test_study_streaks_functionality()
     
     print("=" * 80)
     if success:
-        print("🎉 ALL TESTS PASSED - Productivity Stats API Working Correctly!")
+        print("🎉 ALL TESTS PASSED - Study Streaks Functionality Working Correctly!")
     else:
-        print("💥 TESTS FAILED - Issues found in Productivity Stats API")
+        print("💥 TESTS FAILED - Issues found in Study Streaks Functionality")
     print("=" * 80)
     
     return 0 if success else 1
