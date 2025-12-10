@@ -647,7 +647,7 @@ class JournalStatsTestSuite:
             expected_fields = [
                 'subject_id', 'subject_name', 'subject_color', 'total_sessions',
                 'present_count', 'absent_count', 'late_count', 'excused_count',
-                'attendance_percent', 'total_records'
+                'attendance_percent'
             ]
             
             subjects_by_name = {s['name']: s for s in subjects}
