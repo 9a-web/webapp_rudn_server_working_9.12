@@ -242,27 +242,33 @@ frontend:
 
   - task: "Journal Stats Access Control (Доступ к статистике журнала)"
     implemented: true
-    working: needs_testing
+    working: true
     file: "backend/server.py, backend/models.py, frontend/src/components/journal/JournalDetailModal.jsx, frontend/src/components/journal/JournalStatsTab.jsx, frontend/src/services/journalAPI.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: needs_testing
         agent: "main"
         comment: "Implemented: 1) Added stats_viewers field to AttendanceJournal model - list of telegram_ids with stats access. 2) Added can_view_stats to JournalResponse. 3) Protected /api/journals/{journal_id}/stats endpoint - only owner or stats_viewers can access. 4) Frontend shows stats tab only to authorized users. 5) Owner can manage stats_viewers via UI in Stats tab - select linked students to grant access."
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested Journal Stats Access Control and is_linked field functionality. All test scenarios passed: 1) Created journal with owner_id=123456, 2) Verified owner access (is_owner=true, is_linked=false), 3) Verified non-owner/non-linked access (is_owner=false, is_linked=false), 4) Added and linked student to telegram_id=999999, 5) Verified linked student access (is_owner=false, is_linked=true), 6) Confirmed my_attendance_percent field is available for linked students. The is_linked field correctly distinguishes between owners (always false), non-linked users (false), and linked students (true). Backend API /api/journals/detail/{journal_id} working correctly with proper access control."
 
   - task: "Journal Stats Calculation Fix (Correct percentage & backfill)"
     implemented: true
-    working: needs_testing
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "critical"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: needs_testing
         agent: "main"
         comment: "Fixed calculation logic: 1) Include sessions marked as attended even if they are before student creation date (backfill fix). 2) Ensure percentage doesn't exceed 100%. 3) Implicit absent logic remains consistent."
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested Journal Stats Calculation Fix. All requirements verified: 1) Students created AFTER session dates have unmarked sessions EXCLUDED from stats (new student logic working), 2) Sessions marked as attended even before student creation are INCLUDED in stats (backfill logic working), 3) Percentage calculations never exceed 100% (verified), 4) Implicit absent logic working correctly (present + absent = total sessions), 5) Edge cases tested including students with no sessions, excused sessions, and multiple backfill scenarios. Statistics calculation is mathematically correct and handles all edge cases properly."
 
 metadata:
   created_by: "testing_agent"
