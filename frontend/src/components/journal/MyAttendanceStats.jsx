@@ -52,6 +52,38 @@ const PieTooltip = ({ active, payload }) => {
   return null;
 };
 
+// Кастомный тултип для Line chart
+const LineTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const statusConfig = STATUS_CONFIG[data.status] || STATUS_CONFIG.unmarked;
+    return (
+      <div className="bg-[#1C1C1E] border border-white/10 rounded-lg p-3 shadow-xl">
+        <p className="text-white font-medium text-sm">{data.title}</p>
+        <p className="text-xs text-gray-400 mb-1">{data.name}</p>
+        <p className={`text-xs ${statusConfig.color}`}>
+          {statusConfig.label}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Накопительно: <span className="text-white font-medium">{data.attendance}%</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Кастомный dot для Line chart
+const CustomDot = ({ cx, cy, payload }) => {
+  const color = payload.status === 'present' ? COLORS.present :
+               payload.status === 'late' ? COLORS.late :
+               payload.status === 'absent' ? COLORS.absent :
+               payload.status === 'excused' ? COLORS.excused : COLORS.unmarked;
+  return (
+    <circle cx={cx} cy={cy} r={4} fill={color} stroke="none" />
+  );
+};
+
 export const MyAttendanceStats = ({ 
   journalId, 
   telegramId,
