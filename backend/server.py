@@ -5960,10 +5960,11 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
 
 
 @api_router.get("/journals/{journal_id}/stats", response_model=JournalStatsResponse)
-async def get_journal_stats(journal_id: str):
+async def get_journal_stats(journal_id: str, telegram_id: int = 0):
     """
     Получить статистику журнала
     ОПТИМИЗИРОВАНО: Uses Aggregation Pipeline + Smart Logic
+    ДОСТУП: Только owner или пользователи из stats_viewers
     """
     try:
         # 1. Проверяем существование журнала
@@ -5971,7 +5972,15 @@ async def get_journal_stats(journal_id: str):
         if not journal:
             raise HTTPException(status_code=404, detail="Journal not found")
         
-        # 2. Получаем всех студентов и занятия одним запросом (без лимитов для точности)
+        # 2. Проверяем права доступа к статистике
+        is_owner = journal["owner_id"] == telegram_id
+        stats_viewers = journal.get("stats_viewers", [])
+        can_view_stats = is_owner or telegram_id in stats_viewers
+        
+        if not can_view_stats:
+            raise HTTPException(status_code=403, detail="Access denied. Only owner or authorized users can view stats.")
+        
+        # 3. Получаем всех студентов и занятия одним запросом (без лимитов для точности)
         students = await db.journal_students.find(
             {"journal_id": journal_id}
         ).sort("order", 1).to_list(None)
@@ -5984,7 +5993,7 @@ async def get_journal_stats(journal_id: str):
         linked_students = sum(1 for s in students if s.get("is_linked", False))
         total_sessions = len(sessions)
         
-        # 3. АГРЕГАЦИЯ: Получаем все отметки одним запросом
+        # 4. АГРЕГАЦИЯ: Получаем все отметки одним запросом
         pipeline = [
             {"$match": {"journal_id": journal_id}},
             {"$group": {
@@ -6002,7 +6011,7 @@ async def get_journal_stats(journal_id: str):
         # Превращаем в словарь для быстрого доступа: {student_id: {stats}}
         att_map = {item["_id"]: item for item in att_data}
         
-        # 4. Расчет статистики по каждому студенту (Python-side logic)
+        # 5. Расчет статистики по каждому студенту (Python-side logic)
         students_stats = []
         
         # Переменные для общей статистики
