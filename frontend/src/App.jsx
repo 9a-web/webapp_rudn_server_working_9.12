@@ -829,11 +829,31 @@ const Home = () => {
     <div className="h-full min-h-screen bg-background telegram-webapp relative">
       <TopGlow />
       <UpcomingClassNotification schedule={schedule} />
+      
+      {/* Greeting Notification через очередь */}
       <GreetingNotification 
           key={greetingKey}
           userFirstName={user?.first_name} 
           testHour={testGreetingHour}
+          onRequestShow={handleGreetingRequest}
       />
+      
+      {/* Очередь уведомлений (greeting + achievements) */}
+      <AnimatePresence>
+        {activeQueueNotification && activeQueueNotification.type === 'greeting' && (
+          <GreetingNotificationContent 
+            greeting={activeQueueNotification.data}
+            onClose={closeQueueNotification}
+          />
+        )}
+        {activeQueueNotification && activeQueueNotification.type === 'achievement' && (
+          <AchievementNotificationContent 
+            achievement={activeQueueNotification.data}
+            onClose={closeQueueNotification}
+            hapticFeedback={hapticFeedback}
+          />
+        )}
+      </AnimatePresence>
       
       {/* Dev Tools for Testing Greetings */}
       <div className="fixed top-20 right-4 z-[90] flex flex-col gap-2 opacity-50 hover:opacity-100 transition-opacity">
