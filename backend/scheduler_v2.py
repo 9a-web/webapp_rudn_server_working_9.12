@@ -281,7 +281,8 @@ class NotificationSchedulerV2:
         class_event: Dict,
         notification_time: int,
         today: str,
-        now: datetime
+        now: datetime,
+        group_name: str = ""
     ) -> tuple[int, int]:
         """
         Создать запись о запланированном уведомлении и задачу в scheduler
@@ -292,6 +293,7 @@ class NotificationSchedulerV2:
             notification_time: За сколько минут уведомлять
             today: Дата (YYYY-MM-DD)
             now: Текущее время
+            group_name: Название группы пользователя
             
         Returns:
             (1, 1) если успешно создано, (0, 0) если нет
