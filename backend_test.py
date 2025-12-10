@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 import sys
 import os
 
-# Backend URL from CORS_ORIGINS
-BACKEND_URL = "https://rudn-schedule.ru/api"
+# Backend URL - using local for testing
+BACKEND_URL = "http://localhost:8001/api"
 
 class JournalStatsTest:
     def __init__(self):
