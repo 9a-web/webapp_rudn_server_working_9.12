@@ -4068,6 +4068,89 @@ async def get_admin_referral_stats(days: Optional[int] = 30, limit: int = 10):
         room_joins_total = await db.referral_events.count_documents({"event_type": "room_join"})
         room_joins_today = await db.referral_events.count_documents({
             "event_type": "room_join",
+            "created_at": {"$gte": today_start}
+        })
+        room_joins_week = await db.referral_events.count_documents({
+            "event_type": "room_join", 
+            "created_at": {"$gte": week_ago}
+        })
+
+        # По типам - журналы
+        journal_joins_total = await db.referral_events.count_documents({"event_type": "journal_join"})
+        journal_joins_today = await db.referral_events.count_documents({
+            "event_type": "journal_join",
+            "created_at": {"$gte": today_start}
+        })
+        journal_joins_week = await db.referral_events.count_documents({
+            "event_type": "journal_join",
+            "created_at": {"$gte": week_ago}
+        })
+
+        # Новые участники
+        new_members_total = await db.referral_events.count_documents({"is_new_member": True})
+        new_members_today = await db.referral_events.count_documents({
+            "is_new_member": True,
+            "created_at": {"$gte": today_start}
+        })
+        new_members_week = await db.referral_events.count_documents({
+            "is_new_member": True,
+            "created_at": {"$gte": week_ago}
+        })
+
+        # Топ приглашающих
+        pipeline = [
+            {"$group": {"_id": "$referrer_id", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": limit}
+        ]
+        top_referrers_data = await db.referral_events.aggregate(pipeline).to_list(length=limit)
+        
+        top_referrers = []
+        for item in top_referrers_data:
+            if item["_id"]:
+                user = await db.user_settings.find_one({"telegram_id": item["_id"]})
+                name = "Unknown"
+                if user:
+                    name = user.get("first_name", "") + " " + (user.get("last_name", "") or "")
+                    if user.get("username"):
+                        name += f" (@{user['username']})"
+                
+                top_referrers.append({
+                    "referrer_id": item["_id"],
+                    "count": item["count"],
+                    "name": name.strip()
+                })
+
+        # Последние события
+        cursor = db.referral_events.find({}).sort("created_at", -1).limit(limit)
+        recent_events_data = await cursor.to_list(length=limit)
+        recent_events = []
+        for event in recent_events_data:
+            # Преобразуем ObjectId в str если нужно
+            event["id"] = str(event["_id"])
+            recent_events.append(event)
+
+        return {
+            "total_events": total_events,
+            "events_today": events_today,
+            "events_week": events_week,
+            "events_month": events_month,
+            "room_joins_total": room_joins_total,
+            "room_joins_today": room_joins_today,
+            "room_joins_week": room_joins_week,
+            "journal_joins_total": journal_joins_total,
+            "journal_joins_today": journal_joins_today,
+            "journal_joins_week": journal_joins_week,
+            "new_members_total": new_members_total,
+            "new_members_today": new_members_today,
+            "new_members_week": new_members_week,
+            "top_referrers": top_referrers,
+            "recent_events": recent_events
+        }
+    except Exception as e:
+        logger.error(f"Error getting referral stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @api_router.get("/admin/users", response_model=List[UserSettingsResponse])
 async def get_admin_users(limit: int = 50, skip: int = 0, search: Optional[str] = None):
