@@ -6046,6 +6046,8 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
             "excused_count": excused_count,
             "late_count": late_count,
             "total_sessions": total_sessions,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
             "subjects_stats": subjects_list,  # Статистика по предметам
             "records": attendance_records
         }
