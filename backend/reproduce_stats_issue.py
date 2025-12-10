@@ -78,6 +78,17 @@ async def reproduce():
         "marked_by": owner_id,
         "marked_at": now
     })
+
+    # Mark Session 2 (Old) as PRESENT to test > 100% bug
+    await db.attendance_records.insert_one({
+        "id": str(uuid.uuid4()),
+        "journal_id": journal_id,
+        "session_id": session2_id,
+        "student_id": student_id,
+        "status": "present",
+        "marked_by": owner_id,
+        "marked_at": now
+    })
     
     # Session 2 is UNMARKED.
     
