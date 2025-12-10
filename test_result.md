@@ -233,6 +233,9 @@ frontend:
       - working: true
         agent: "main"
         comment: "Implemented: GreetingNotification component that shows 'Good Morning' (04-12) or 'Good Night' (22-04) based on local time. Uses sessionStorage to show only once per session."
+      - working: true
+        agent: "main"
+        comment: "Enhanced: Morning greeting now includes weather info from /api/weather - temperature, icon, feels_like, humidity, wind_speed. Weather card shows Moscow weather with description."
 metadata:
   created_by: "testing_agent"
   version: "1.2"
