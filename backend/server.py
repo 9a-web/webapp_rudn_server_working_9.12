@@ -4559,6 +4559,9 @@ async def update_journal(journal_id: str, data: dict = Body(...)):
             update_data["color"] = data["color"]
         if "settings" in data:
             update_data["settings"] = data["settings"]
+        if "stats_viewers" in data:
+            # stats_viewers - список telegram_id пользователей с правом видеть статистику
+            update_data["stats_viewers"] = data["stats_viewers"]
         
         await db.attendance_journals.update_one(
             {"journal_id": journal_id},
