@@ -236,6 +236,22 @@ frontend:
       - working: true
         agent: "main"
         comment: "Enhanced: Morning greeting now includes weather info from /api/weather - temperature, icon, feels_like, humidity, wind_speed. Weather card shows Moscow weather with description."
+      - working: true
+        agent: "main"
+        comment: "Updated: 1) Glassmorphism solid background for greetings. 2) Weather info now shows in both morning AND night greetings. 3) Auto-close timeout increased to 10 seconds."
+
+  - task: "Journal Stats Access Control (Доступ к статистике журнала)"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py, backend/models.py, frontend/src/components/journal/JournalDetailModal.jsx, frontend/src/components/journal/JournalStatsTab.jsx, frontend/src/services/journalAPI.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Implemented: 1) Added stats_viewers field to AttendanceJournal model - list of telegram_ids with stats access. 2) Added can_view_stats to JournalResponse. 3) Protected /api/journals/{journal_id}/stats endpoint - only owner or stats_viewers can access. 4) Frontend shows stats tab only to authorized users. 5) Owner can manage stats_viewers via UI in Stats tab - select linked students to grant access."
+
 metadata:
   created_by: "testing_agent"
   version: "1.2"
