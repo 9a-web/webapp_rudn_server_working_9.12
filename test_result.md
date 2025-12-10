@@ -226,3 +226,5 @@ agent_communication:
     message: "✅ COMPLETED: Notification History feature. History persists forever in DB, visible in UI when notifications enabled."
   - agent: "testing"
     message: "✅ PRODUCTIVITY STATS API TESTING COMPLETED: GET /api/tasks/{telegram_id}/productivity-stats endpoint fully tested and working correctly. All test scenarios passed including non-existent user handling, daily_stats structure (7 elements), Russian day names validation, and numeric field validation. Ready for production use."
+  - agent: "testing"
+    message: "✅ STUDY STREAKS TESTING COMPLETED: Comprehensive testing of Study Streaks (Стрик-режим) functionality completed successfully. All APIs working correctly: task creation, completion with completed_at timestamp, productivity stats with proper streak calculations, counter increments, and task uncompletion. Notification History System also retested and confirmed working. Both systems ready for production use."
