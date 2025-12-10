@@ -386,12 +386,113 @@ class JournalStatsTestSuite:
             self.log(f"❌ EDGE CASE TEST FAILED: {e}", "ERROR")
             return False
 
+    def test_is_linked_field(self):
+        """
+        Test the new is_linked field in journal detail endpoint
+        Tests the specific requirements from the review request:
+        1. Create journal with owner_id = 123456
+        2. Get journal details as owner (should have is_linked = false, is_owner = true)
+        3. Get journal details as non-owner, non-linked user (should have is_linked = false, is_owner = false)
+        4. Add student and link to telegram_id = 999999
+        5. Get journal details as linked student (should have is_linked = true, is_owner = false)
+        """
+        self.log("=" * 60)
+        self.log("STARTING IS_LINKED FIELD TEST")
+        self.log("=" * 60)
+        
+        try:
+            # Step 1: Create journal with owner_id = 123456
+            owner_id = 123456
+            journal = self.create_journal(owner_id=owner_id)
+            journal_id = journal['journal_id']
+            self.log(f"✅ Step 1: Created journal {journal_id} with owner_id = {owner_id}")
+            
+            # Step 2: Get journal details as owner (telegram_id = 123456)
+            response = self.make_request("GET", f"/journals/detail/{journal_id}?telegram_id={owner_id}")
+            if response.status_code != 200:
+                raise Exception(f"Failed to get journal details as owner: {response.text}")
+                
+            owner_details = response.json()
+            
+            # Verify owner details
+            if not owner_details.get('is_owner'):
+                raise Exception(f"❌ FAIL: Owner should have is_owner = true, got {owner_details.get('is_owner')}")
+            if owner_details.get('is_linked'):
+                raise Exception(f"❌ FAIL: Owner should have is_linked = false, got {owner_details.get('is_linked')}")
+                
+            self.log(f"✅ Step 2: Owner details correct - is_owner: {owner_details['is_owner']}, is_linked: {owner_details['is_linked']}")
+            
+            # Step 3: Get journal details as non-owner, non-linked user (telegram_id = 999999)
+            non_owner_id = 999999
+            response = self.make_request("GET", f"/journals/detail/{journal_id}?telegram_id={non_owner_id}")
+            if response.status_code != 200:
+                raise Exception(f"Failed to get journal details as non-owner: {response.text}")
+                
+            non_owner_details = response.json()
+            
+            # Verify non-owner details
+            if non_owner_details.get('is_owner'):
+                raise Exception(f"❌ FAIL: Non-owner should have is_owner = false, got {non_owner_details.get('is_owner')}")
+            if non_owner_details.get('is_linked'):
+                raise Exception(f"❌ FAIL: Non-linked user should have is_linked = false, got {non_owner_details.get('is_linked')}")
+                
+            self.log(f"✅ Step 3: Non-owner details correct - is_owner: {non_owner_details['is_owner']}, is_linked: {non_owner_details['is_linked']}")
+            
+            # Step 4: Add student with full_name="Test Student"
+            student = self.add_student(journal_id, "Test Student")
+            student_id = student['id']
+            self.log(f"✅ Step 4: Added student 'Test Student' with ID: {student_id}")
+            
+            # Step 5: Link student to telegram_id = 999999
+            link_data = {
+                "telegram_id": non_owner_id,
+                "username": "test_user",
+                "first_name": "Test"
+            }
+            
+            response = self.make_request("POST", f"/journals/{journal_id}/students/{student_id}/link", json=link_data)
+            if response.status_code != 200:
+                raise Exception(f"Failed to link student: {response.text}")
+                
+            self.log(f"✅ Step 5: Linked student {student_id} to telegram_id = {non_owner_id}")
+            
+            # Step 6: Get journal details as linked student (telegram_id = 999999)
+            response = self.make_request("GET", f"/journals/detail/{journal_id}?telegram_id={non_owner_id}")
+            if response.status_code != 200:
+                raise Exception(f"Failed to get journal details as linked student: {response.text}")
+                
+            linked_details = response.json()
+            
+            # Verify linked student details
+            if linked_details.get('is_owner'):
+                raise Exception(f"❌ FAIL: Linked student should have is_owner = false, got {linked_details.get('is_owner')}")
+            if not linked_details.get('is_linked'):
+                raise Exception(f"❌ FAIL: Linked student should have is_linked = true, got {linked_details.get('is_linked')}")
+                
+            self.log(f"✅ Step 6: Linked student details correct - is_owner: {linked_details['is_owner']}, is_linked: {linked_details['is_linked']}")
+            
+            # Additional verification: Check my_attendance_percent is present for linked student
+            if 'my_attendance_percent' not in linked_details:
+                self.log("⚠️  Warning: my_attendance_percent not present for linked student (expected if no sessions exist)")
+            else:
+                self.log(f"✅ Linked student has my_attendance_percent: {linked_details['my_attendance_percent']}")
+            
+            self.log("\n✅ ALL IS_LINKED FIELD TESTS PASSED!")
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ IS_LINKED FIELD TEST FAILED: {e}", "ERROR")
+            return False
+
 def main():
     """Run the complete test suite"""
-    print("🧪 Journal Stats Calculation Fix - Test Suite")
+    print("🧪 Journal Backend Test Suite")
     print("=" * 60)
     
     test_suite = JournalStatsTestSuite()
+    
+    # Run is_linked field test (new requirement)
+    is_linked_test_passed = test_suite.test_is_linked_field()
     
     # Run main test
     main_test_passed = test_suite.test_journal_stats_calculation_fix()
@@ -402,11 +503,12 @@ def main():
     print("\n" + "=" * 60)
     print("📊 TEST RESULTS SUMMARY")
     print("=" * 60)
+    print(f"Is_Linked Field Test: {'✅ PASSED' if is_linked_test_passed else '❌ FAILED'}")
     print(f"Main Test: {'✅ PASSED' if main_test_passed else '❌ FAILED'}")
     print(f"Edge Cases: {'✅ PASSED' if edge_test_passed else '❌ FAILED'}")
     
-    if main_test_passed and edge_test_passed:
-        print("\n🎉 ALL TESTS PASSED! Journal Stats Calculation Fix is working correctly.")
+    if is_linked_test_passed and main_test_passed and edge_test_passed:
+        print("\n🎉 ALL TESTS PASSED! Journal backend is working correctly.")
         return 0
     else:
         print("\n💥 SOME TESTS FAILED! Please check the implementation.")
