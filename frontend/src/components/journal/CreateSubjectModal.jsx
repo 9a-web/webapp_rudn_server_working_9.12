@@ -302,17 +302,6 @@ export const CreateSubjectModal = ({
           {/* Tabs */}
           <div className="flex gap-2 mb-5 bg-white/5 p-1 rounded-xl">
             <button
-              onClick={() => setActiveTab('manual')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all ${
-                activeTab === 'manual'
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              <span className="text-sm font-medium">Вручную</span>
-            </button>
-            <button
               onClick={() => setActiveTab('schedule')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all ${
                 activeTab === 'schedule'
@@ -322,6 +311,17 @@ export const CreateSubjectModal = ({
             >
               <CalendarRange className="w-4 h-4" />
               <span className="text-sm font-medium">Из расписания</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('manual')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all ${
+                activeTab === 'manual'
+                  ? 'bg-white/10 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="text-sm font-medium">Вручную</span>
             </button>
           </div>
 
