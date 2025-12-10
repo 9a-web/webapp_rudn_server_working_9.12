@@ -1076,6 +1076,7 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         # Проверяем, если задача отмечается как выполненная
         was_incomplete = not existing_task.get("completed", False)
         is_completing = task_update.completed is True and was_incomplete
+        is_uncompleting = task_update.completed is False and existing_task.get("completed", False)
         
         # Обновляем только переданные поля
         update_data = {}
@@ -1083,6 +1084,12 @@ async def update_task(task_id: str, task_update: TaskUpdate):
             update_data["text"] = task_update.text
         if task_update.completed is not None:
             update_data["completed"] = task_update.completed
+            # Если задача выполняется - записываем время выполнения
+            if is_completing:
+                update_data["completed_at"] = datetime.utcnow()
+            # Если задача снимается с выполнения - очищаем время
+            elif is_uncompleting:
+                update_data["completed_at"] = None
         if task_update.category is not None:
             update_data["category"] = task_update.category
         if task_update.priority is not None:
