@@ -1183,6 +1183,11 @@ class JournalStatsResponse(BaseModel):
     sessions_stats: List[JournalSessionResponse]
 
 
+class JournalStatsViewersUpdate(BaseModel):
+    """Обновление списка пользователей с доступом к статистике"""
+    stats_viewers: List[int]  # Список telegram_id
+
+
 class JournalInviteLinkResponse(BaseModel):
     """Ответ со ссылкой приглашения"""
     invite_link: str
