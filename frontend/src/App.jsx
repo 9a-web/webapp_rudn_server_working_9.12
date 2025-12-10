@@ -123,6 +123,79 @@ const Home = () => {
   const [userStats, setUserStats] = useState(null);
   const [newAchievement, setNewAchievement] = useState(null); // Для показа уведомления
   
+  // Очередь уведомлений (greeting, achievement и т.д.)
+  const [notificationQueue, setNotificationQueue] = useState([]);
+  const [activeQueueNotification, setActiveQueueNotification] = useState(null);
+  
+  // Функция для добавления уведомления в очередь
+  const addToNotificationQueue = useCallback((notification) => {
+    setNotificationQueue(prev => {
+      // Проверяем, нет ли уже такого уведомления
+      if (prev.some(n => n.id === notification.id)) {
+        return prev;
+      }
+      // Добавляем и сортируем по приоритету (выше = важнее)
+      return [...prev, notification].sort((a, b) => b.priority - a.priority);
+    });
+  }, []);
+  
+  // Обработка очереди уведомлений
+  useEffect(() => {
+    if (activeQueueNotification || notificationQueue.length === 0) {
+      return;
+    }
+    
+    // Берем первое уведомление из очереди
+    const next = notificationQueue[0];
+    setNotificationQueue(prev => prev.slice(1));
+    setActiveQueueNotification(next);
+    
+    // Автоматически закрываем через указанное время
+    const timer = setTimeout(() => {
+      setActiveQueueNotification(null);
+    }, next.duration || 6000);
+    
+    return () => clearTimeout(timer);
+  }, [notificationQueue, activeQueueNotification]);
+  
+  // Задержка перед показом следующего уведомления
+  useEffect(() => {
+    if (!activeQueueNotification && notificationQueue.length > 0) {
+      const delay = setTimeout(() => {
+        // Триггерим обновление
+        setNotificationQueue(prev => [...prev]);
+      }, 500);
+      return () => clearTimeout(delay);
+    }
+  }, [activeQueueNotification, notificationQueue.length]);
+  
+  // Callback для greeting notification
+  const handleGreetingRequest = useCallback((greetingData) => {
+    addToNotificationQueue({
+      id: `greeting-${greetingData.type}`,
+      type: 'greeting',
+      data: greetingData,
+      priority: 1, // Низкий приоритет
+      duration: 6000,
+    });
+  }, [addToNotificationQueue]);
+  
+  // Обновленная функция для показа достижения через очередь
+  const showAchievementInQueue = useCallback((achievement) => {
+    addToNotificationQueue({
+      id: `achievement-${achievement.id}-${Date.now()}`,
+      type: 'achievement',
+      data: achievement,
+      priority: 10, // Высокий приоритет (достижения важнее приветствий)
+      duration: 7000,
+    });
+  }, [addToNotificationQueue]);
+  
+  // Закрытие текущего уведомления из очереди
+  const closeQueueNotification = useCallback(() => {
+    setActiveQueueNotification(null);
+  }, []);
+  
   // Состояние для реферальной системы Web App
   const [referralProcessed, setReferralProcessed] = useState(false);
   
