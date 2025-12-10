@@ -484,6 +484,223 @@ class JournalStatsTestSuite:
             self.log(f"❌ IS_LINKED FIELD TEST FAILED: {e}", "ERROR")
             return False
 
+    def test_subjects_stats_field(self):
+        """
+        Test the subjects_stats field in GET /api/journals/{journal_id}/stats endpoint
+        Tests the specific requirements from the review request:
+        1. Create test journal with POST /api/journals
+        2. Add several subjects through POST /api/journals/{journal_id}/subjects 
+        3. Add several students through POST /api/journals/{journal_id}/students
+        4. Create several sessions for different subjects through POST /api/journals/{journal_id}/sessions
+        5. Mark attendance for sessions through POST /api/journals/sessions/{session_id}/attendance
+        6. Get journal stats through GET /api/journals/{journal_id}/stats with telegram_id=12345 (owner)
+        7. Verify that the response has subjects_stats field with statistics for each subject
+        """
+        self.log("=" * 60)
+        self.log("STARTING SUBJECTS_STATS FIELD TEST")
+        self.log("=" * 60)
+        
+        try:
+            # Step 1: Create test journal with owner telegram_id = 12345
+            owner_id = 12345
+            journal_data = {
+                "name": "Test Journal - Subjects Stats",
+                "group_name": "Test Group Stats",
+                "description": "Testing subjects_stats field in journal stats",
+                "telegram_id": owner_id,
+                "color": "purple"
+            }
+            
+            response = self.make_request("POST", "/journals", json=journal_data)
+            if response.status_code != 200:
+                raise Exception(f"Failed to create journal: {response.text}")
+                
+            journal = response.json()
+            journal_id = journal['journal_id']
+            self.log(f"✅ Step 1: Created journal {journal_id} with owner_id = {owner_id}")
+            
+            # Step 2: Add several subjects
+            subjects_data = [
+                {"name": "Математика", "description": "Высшая математика", "color": "blue"},
+                {"name": "Физика", "description": "Общая физика", "color": "green"},
+                {"name": "Программирование", "description": "Основы программирования", "color": "red"}
+            ]
+            
+            subjects = []
+            for subject_data in subjects_data:
+                subject_data["telegram_id"] = owner_id
+                response = self.make_request("POST", f"/journals/{journal_id}/subjects", json=subject_data)
+                if response.status_code != 200:
+                    raise Exception(f"Failed to create subject {subject_data['name']}: {response.text}")
+                subjects.append(response.json())
+                
+            self.log(f"✅ Step 2: Added {len(subjects)} subjects: {[s['name'] for s in subjects]}")
+            
+            # Step 3: Add several students
+            students_names = ["Иванов Иван", "Петров Петр", "Сидоров Сидор", "Козлова Анна"]
+            students = []
+            for name in students_names:
+                student_data = {"full_name": name}
+                response = self.make_request("POST", f"/journals/{journal_id}/students", json=student_data)
+                if response.status_code != 200:
+                    raise Exception(f"Failed to add student {name}: {response.text}")
+                students.append(response.json())
+                
+            self.log(f"✅ Step 3: Added {len(students)} students: {[s['full_name'] for s in students]}")
+            
+            # Step 4: Create several sessions for different subjects
+            today = datetime.now()
+            sessions_data = [
+                # Математика sessions
+                {"subject_id": subjects[0]['subject_id'], "date": (today - timedelta(days=7)).strftime("%Y-%m-%d"), "title": "Математика - Лекция 1"},
+                {"subject_id": subjects[0]['subject_id'], "date": (today - timedelta(days=5)).strftime("%Y-%m-%d"), "title": "Математика - Семинар 1"},
+                {"subject_id": subjects[0]['subject_id'], "date": (today - timedelta(days=3)).strftime("%Y-%m-%d"), "title": "Математика - Лекция 2"},
+                
+                # Физика sessions
+                {"subject_id": subjects[1]['subject_id'], "date": (today - timedelta(days=6)).strftime("%Y-%m-%d"), "title": "Физика - Лекция 1"},
+                {"subject_id": subjects[1]['subject_id'], "date": (today - timedelta(days=4)).strftime("%Y-%m-%d"), "title": "Физика - Лабораторная 1"},
+                
+                # Программирование sessions
+                {"subject_id": subjects[2]['subject_id'], "date": (today - timedelta(days=2)).strftime("%Y-%m-%d"), "title": "Программирование - Лекция 1"},
+                {"subject_id": subjects[2]['subject_id'], "date": (today - timedelta(days=1)).strftime("%Y-%m-%d"), "title": "Программирование - Практика 1"},
+            ]
+            
+            sessions = []
+            for session_data in sessions_data:
+                session_data.update({
+                    "description": f"Занятие по предмету",
+                    "type": "lecture",
+                    "telegram_id": owner_id
+                })
+                response = self.make_request("POST", f"/journals/{journal_id}/sessions", json=session_data)
+                if response.status_code != 200:
+                    raise Exception(f"Failed to create session {session_data['title']}: {response.text}")
+                sessions.append(response.json())
+                
+            self.log(f"✅ Step 4: Created {len(sessions)} sessions for different subjects")
+            
+            # Step 5: Mark attendance for sessions
+            # Mark attendance strategically to create meaningful statistics
+            attendance_patterns = [
+                # Session 0 (Математика): 3 present, 1 absent
+                {"session_idx": 0, "attendances": [("present", 0), ("present", 1), ("present", 2), ("absent", 3)]},
+                # Session 1 (Математика): 2 present, 1 late, 1 excused
+                {"session_idx": 1, "attendances": [("present", 0), ("late", 1), ("present", 2), ("excused", 3)]},
+                # Session 2 (Математика): 4 present
+                {"session_idx": 2, "attendances": [("present", 0), ("present", 1), ("present", 2), ("present", 3)]},
+                
+                # Session 3 (Физика): 2 present, 2 absent
+                {"session_idx": 3, "attendances": [("present", 0), ("absent", 1), ("present", 2), ("absent", 3)]},
+                # Session 4 (Физика): 1 present, 2 late, 1 absent
+                {"session_idx": 4, "attendances": [("late", 0), ("late", 1), ("present", 2), ("absent", 3)]},
+                
+                # Session 5 (Программирование): 3 present, 1 late
+                {"session_idx": 5, "attendances": [("present", 0), ("present", 1), ("late", 2), ("present", 3)]},
+                # Session 6 (Программирование): 2 present, 2 absent
+                {"session_idx": 6, "attendances": [("present", 0), ("absent", 1), ("present", 2), ("absent", 3)]},
+            ]
+            
+            for pattern in attendance_patterns:
+                session = sessions[pattern["session_idx"]]
+                records = []
+                for status, student_idx in pattern["attendances"]:
+                    records.append({
+                        "student_id": students[student_idx]["id"],
+                        "status": status,
+                        "reason": None,
+                        "note": f"Test attendance - {status}"
+                    })
+                
+                attendance_data = {
+                    "records": records,
+                    "telegram_id": owner_id
+                }
+                
+                response = self.make_request("POST", f"/journals/sessions/{session['session_id']}/attendance", json=attendance_data)
+                if response.status_code != 200:
+                    raise Exception(f"Failed to mark attendance for session {session['title']}: {response.text}")
+                    
+            self.log(f"✅ Step 5: Marked attendance for all {len(sessions)} sessions")
+            
+            # Step 6: Get journal statistics with telegram_id=12345 (owner)
+            response = self.make_request("GET", f"/journals/{journal_id}/stats?telegram_id={owner_id}")
+            if response.status_code != 200:
+                raise Exception(f"Failed to get journal stats: {response.text}")
+                
+            stats = response.json()
+            self.log(f"✅ Step 6: Retrieved journal statistics")
+            
+            # Step 7: Verify subjects_stats field exists and has correct structure
+            if 'subjects_stats' not in stats:
+                raise Exception("❌ FAIL: subjects_stats field is missing from response")
+                
+            subjects_stats = stats['subjects_stats']
+            if not isinstance(subjects_stats, list):
+                raise Exception(f"❌ FAIL: subjects_stats should be a list, got {type(subjects_stats)}")
+                
+            if len(subjects_stats) != len(subjects):
+                raise Exception(f"❌ FAIL: Expected {len(subjects)} subjects in stats, got {len(subjects_stats)}")
+                
+            self.log(f"✅ Step 7: subjects_stats field exists and contains {len(subjects_stats)} subjects")
+            
+            # Verify each subject's statistics structure and data
+            expected_fields = [
+                'subject_id', 'subject_name', 'subject_color', 'total_sessions',
+                'present_count', 'absent_count', 'late_count', 'excused_count',
+                'attendance_percent', 'total_records'
+            ]
+            
+            subjects_by_name = {s['name']: s for s in subjects}
+            
+            for subject_stat in subjects_stats:
+                # Check all required fields are present
+                for field in expected_fields:
+                    if field not in subject_stat:
+                        raise Exception(f"❌ FAIL: Missing field '{field}' in subject stats")
+                        
+                subject_name = subject_stat['subject_name']
+                self.log(f"\n📊 Subject: {subject_name}")
+                self.log(f"   Total sessions: {subject_stat['total_sessions']}")
+                self.log(f"   Total records: {subject_stat['total_records']}")
+                self.log(f"   Present: {subject_stat['present_count']}")
+                self.log(f"   Absent: {subject_stat['absent_count']}")
+                self.log(f"   Late: {subject_stat['late_count']}")
+                self.log(f"   Excused: {subject_stat['excused_count']}")
+                self.log(f"   Attendance: {subject_stat['attendance_percent']}%")
+                
+                # Verify data types
+                if not isinstance(subject_stat['total_sessions'], int):
+                    raise Exception(f"❌ FAIL: total_sessions should be int, got {type(subject_stat['total_sessions'])}")
+                if not isinstance(subject_stat['attendance_percent'], (int, float)):
+                    raise Exception(f"❌ FAIL: attendance_percent should be number, got {type(subject_stat['attendance_percent'])}")
+                    
+                # Verify logical consistency
+                if subject_stat['total_sessions'] < 0:
+                    raise Exception(f"❌ FAIL: total_sessions cannot be negative: {subject_stat['total_sessions']}")
+                if subject_stat['attendance_percent'] < 0 or subject_stat['attendance_percent'] > 100:
+                    raise Exception(f"❌ FAIL: attendance_percent should be 0-100, got {subject_stat['attendance_percent']}")
+                    
+                # Verify subject-specific expected values based on our test data
+                if subject_name == "Математика":
+                    if subject_stat['total_sessions'] != 3:
+                        raise Exception(f"❌ FAIL: Математика should have 3 sessions, got {subject_stat['total_sessions']}")
+                elif subject_name == "Физика":
+                    if subject_stat['total_sessions'] != 2:
+                        raise Exception(f"❌ FAIL: Физика should have 2 sessions, got {subject_stat['total_sessions']}")
+                elif subject_name == "Программирование":
+                    if subject_stat['total_sessions'] != 2:
+                        raise Exception(f"❌ FAIL: Программирование should have 2 sessions, got {subject_stat['total_sessions']}")
+                        
+            self.log("\n✅ ALL SUBJECTS_STATS FIELD TESTS PASSED!")
+            self.log("✅ subjects_stats field contains correct structure and data for each subject")
+            self.log("✅ All attendance statistics are properly calculated per subject")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ SUBJECTS_STATS FIELD TEST FAILED: {e}", "ERROR")
+            return False
+
 def main():
     """Run the complete test suite"""
     print("🧪 Journal Backend Test Suite")
@@ -491,7 +708,10 @@ def main():
     
     test_suite = JournalStatsTestSuite()
     
-    # Run is_linked field test (new requirement)
+    # Run subjects_stats field test (new requirement from review request)
+    subjects_stats_test_passed = test_suite.test_subjects_stats_field()
+    
+    # Run is_linked field test (previous requirement)
     is_linked_test_passed = test_suite.test_is_linked_field()
     
     # Run main test
@@ -503,11 +723,12 @@ def main():
     print("\n" + "=" * 60)
     print("📊 TEST RESULTS SUMMARY")
     print("=" * 60)
+    print(f"Subjects Stats Field Test: {'✅ PASSED' if subjects_stats_test_passed else '❌ FAILED'}")
     print(f"Is_Linked Field Test: {'✅ PASSED' if is_linked_test_passed else '❌ FAILED'}")
     print(f"Main Test: {'✅ PASSED' if main_test_passed else '❌ FAILED'}")
     print(f"Edge Cases: {'✅ PASSED' if edge_test_passed else '❌ FAILED'}")
     
-    if is_linked_test_passed and main_test_passed and edge_test_passed:
+    if subjects_stats_test_passed and is_linked_test_passed and main_test_passed and edge_test_passed:
         print("\n🎉 ALL TESTS PASSED! Journal backend is working correctly.")
         return 0
     else:
