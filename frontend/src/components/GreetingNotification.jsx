@@ -57,10 +57,15 @@ export const GreetingNotification = ({ userFirstName, testHour = null }) => {
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: -100, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        initial={{ y: -100, opacity: 0, scale: 0.9 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ 
+          opacity: 0, 
+          scale: 0.95,
+          y: -20,
+          transition: { duration: 0.2, ease: "easeOut" } 
+        }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
         className="fixed top-4 left-0 right-0 mx-auto z-[90] w-[95%] md:w-auto md:max-w-md flex justify-center pointer-events-none"
       >
         <div 
