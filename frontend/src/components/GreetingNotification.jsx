@@ -79,7 +79,7 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
             
             {/* Weather description */}
             <div className="mt-2 text-xs text-white/80 text-center">
-              {weather.description} • Москва
+              Москва
             </div>
           </div>
         )}
