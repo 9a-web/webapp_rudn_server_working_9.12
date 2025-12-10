@@ -129,11 +129,14 @@ backend:
     file: "backend/server.py, backend/scheduler_v2.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Implemented: 1) NotificationHistoryItem model, 2) Scheduler saves sent notifications to history, 3) History API endpoint, 4) Frontend component."
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested Notification History System. API endpoint GET /api/user-settings/{telegram_id}/history working correctly with proper response structure (history array, count field), pagination parameters (limit, offset) functioning properly, and all data types validated. Empty history returns correct structure with count=0."
 
 frontend:
   - task: "Admin Panel Frontend Integration"
