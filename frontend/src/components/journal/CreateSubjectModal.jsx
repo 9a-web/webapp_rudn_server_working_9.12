@@ -26,7 +26,7 @@ export const CreateSubjectModal = ({
   userSettings,
   existingSubjects = []
 }) => {
-  const [activeTab, setActiveTab] = useState('manual'); // 'manual' | 'schedule'
+  const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'manual'
   const [step, setStep] = useState('select'); // 'select' | 'confirm' - для вкладки расписания
   
   // Manual tab state
