@@ -138,6 +138,18 @@ backend:
         agent: "testing"
         comment: "✅ Successfully tested Notification History System. API endpoint GET /api/user-settings/{telegram_id}/history working correctly with proper response structure (history array, count field), pagination parameters (limit, offset) functioning properly, and all data types validated. Empty history returns correct structure with count=0."
 
+  - task: "Study Streaks (Стрик-режим) for Tasks - Complete Workflow"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested complete Study Streaks functionality. All test scenarios passed: 1) Task creation (POST /api/tasks) with telegram_id 999888777, 2) Task completion (PUT /api/tasks/{task_id} with completed: true) correctly sets completed_at timestamp, 3) Productivity stats (GET /api/tasks/{telegram_id}/productivity-stats) shows current_streak >= 1 and completed_today >= 1, 4) Counter increments work correctly when completing additional tasks, 5) Task uncompletion (completed: false) properly clears completed_at and updates statistics, 6) All data validation passed including streak calculations, daily_stats structure (7 elements with Russian day names), and proper data types. Study Streaks system is fully functional."
+
 frontend:
   - task: "Admin Panel Frontend Integration"
     implemented: true
