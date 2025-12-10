@@ -1,6 +1,6 @@
 # AI CONTEXT - RUDN Schedule Telegram Web App
 
-**Обновлено:** 2025-01-22 | **Статус:** Оптимизирован для ИИ (↓60% токенов)
+**Обновлено:** 2025-07-10 | **Статус:** Оптимизирован для ИИ (↓60% токенов)
 
 ---
 
@@ -8,7 +8,7 @@
 
 **Тип:** Telegram Web App для студентов РУДН  
 **Стек:** FastAPI (Python) + React + MongoDB + Telegram Bot API  
-**Функции:** Расписание пар, задачи (личные + групповые), достижения, аналитика, погода, уведомления  
+**Функции:** Расписание пар, задачи (личные + групповые), достижения, аналитика, погода, уведомления, журнал посещений  
 **Особенность:** Интеграция с API РУДН, геймификация, реферальная система
 
 ---
@@ -16,28 +16,31 @@
 ## БЫСТРАЯ НАВИГАЦИЯ
 
 ### Backend (/app/backend/)
-- `server.py` (3500 LOC) - ВСЕ API endpoints (50+)
-- `models.py` (750 LOC) - Pydantic схемы
-- `telegram_bot.py` (850 LOC) - Telegram Bot логика
-- `achievements.py` (630 LOC) - 25 достижений
-- `scheduler_v2.py` (720 LOC) - **НОВЫЙ** Улучшенный планировщик уведомлений V2
-- `scheduler.py` (460 LOC) - ⚠️ Старый планировщик (резерв)
-- `rudn_parser.py` (310 LOC) - парсинг API РУДН
-- `notifications.py` (140 LOC) - рассылка через Bot API
-- `weather.py` (120 LOC) - OpenWeatherMap API
+- `server.py` (6300 LOC) - ВСЕ API endpoints (109)
+- `models.py` (1293 LOC) - Pydantic схемы
+- `telegram_bot.py` (1204 LOC) - Telegram Bot логика
+- `achievements.py` (632 LOC) - 24 достижения
+- `scheduler_v2.py` (828 LOC) - **Улучшенный планировщик уведомлений V2**
+- `scheduler.py` (383 LOC) - ⚠️ Старый планировщик (резерв)
+- `rudn_parser.py` (311 LOC) - парсинг API РУДН
+- `notifications.py` (165 LOC) - рассылка через Bot API
+- `weather.py` (118 LOC) - OpenWeatherMap API
+- `config.py` - конфигурация ENV/токенов
+- `cache.py` - кэширование данных
 
 ### Frontend (/app/frontend/src/)
 - `App.js` - роутинг, главный компонент
-- `components/` - 30+ React компонентов
-- `services/` - api.js, roomsAPI.js, groupTasksAPI.js
+- `components/` - 50 React компонентов (основные)
+- `components/journal/` - 11 компонентов журнала посещений
+- `services/` - api.js, roomsAPI.js, groupTasksAPI.js, journalAPI.js, referralAPI.js
 - `i18n/` - локализация (ru/en)
 - `utils/` - analytics, dateUtils, animations, confetti
 
 ### Документация
 - `AI_CONTEXT.md` - этот файл (краткий обзор)
-- `NOTIFICATION_SYSTEM_V2.md` - **НОВОЕ** Документация улучшенной системы уведомлений
+- `NOTIFICATION_SYSTEM_V2.md` - Документация улучшенной системы уведомлений
 - `PROJECT_DETAILS.md` - полная техническая документация
-- `test_result.md` - история разработки (1100+ строк)
+- `test_result.md` - история разработки и тестирования
 - `README.md` - инструкции по запуску
 
 ---
@@ -45,7 +48,7 @@
 ## АРХИТЕКТУРА
 
 ```
-Telegram Bot (@rudn_pro_bot)
+Telegram Bot (@rudn_pro_bot / @test_rudn_bot)
   ↓ /start → добавляет user в БД
   ↓ кнопка "Открыть расписание" → открывает Web App
   
@@ -59,8 +62,7 @@ FastAPI Backend (port 8001 internal)
   ↓ Telegram Bot API (уведомления)
   
 MongoDB (local)
-  - user_settings, user_stats, user_achievements
-  - tasks (личные), rooms, room_participants, group_tasks
+  - 24 коллекции (см. раздел СХЕМЫ БД)
 ```
 
 **Важно:**
@@ -71,37 +73,46 @@ MongoDB (local)
 
 ---
 
-## API ENDPOINTS (50+)
+## API ENDPOINTS (109)
 
 ### Расписание РУДН
 ```
 GET  /api/faculties           - список факультетов
 POST /api/filter-data         - фильтры (курс, уровень, группы)
 POST /api/schedule            - расписание группы
+GET  /api/schedule-cached/{group_id}/{week_number} - кэшированное расписание
 ```
 
 ### Пользователи
 ```
 POST /api/user-settings                         - сохранить группу
 GET  /api/user-settings/{telegram_id}           - получить настройки
+DELETE /api/user-settings/{telegram_id}         - удалить настройки
+DELETE /api/user/{telegram_id}                  - удалить аккаунт полностью
 GET  /api/user-settings/{telegram_id}/notifications
 PUT  /api/user-settings/{telegram_id}/notifications
+GET  /api/user-settings/{telegram_id}/history   - история уведомлений
+GET  /api/user-profile-photo/{telegram_id}      - фото профиля
+GET  /api/user-profile-photo-proxy/{telegram_id}
 ```
 
 ### Статистика и достижения
 ```
-GET  /api/achievements                    - все 25 достижений
+GET  /api/achievements                    - все 24 достижения
 GET  /api/user-stats/{telegram_id}        - статистика
 GET  /api/user-achievements/{telegram_id} - полученные ачивки
 POST /api/track-action                    - трекинг действий
+POST /api/user-achievements/{telegram_id}/mark-seen
 ```
 
 ### Личные задачи
 ```
-GET    /api/tasks/{telegram_id}  - все задачи юзера
-POST   /api/tasks                - создать
-PUT    /api/tasks/{task_id}      - обновить
-DELETE /api/tasks/{task_id}      - удалить
+GET    /api/tasks/{telegram_id}           - все задачи юзера
+POST   /api/tasks                         - создать
+PUT    /api/tasks/{task_id}               - обновить
+DELETE /api/tasks/{task_id}               - удалить
+PUT    /api/tasks/reorder                 - изменить порядок
+GET    /api/tasks/{telegram_id}/productivity-stats - статистика продуктивности
 ```
 
 ### Комнаты (групповая работа)
@@ -113,14 +124,70 @@ POST   /api/rooms/{room_id}/invite-link   - сгенерировать ссыл�
 POST   /api/rooms/join/{invite_token}     - присоединиться
 DELETE /api/rooms/{room_id}/leave         - выйти
 DELETE /api/rooms/{room_id}               - удалить (owner only)
+PUT    /api/rooms/{room_id}               - обновить
+PUT    /api/rooms/{room_id}/participant-role - изменить роль
+GET    /api/rooms/{room_id}/activity      - активность
+GET    /api/rooms/{room_id}/stats         - статистика
+PUT    /api/rooms/{room_id}/tasks-reorder - порядок задач
 ```
 
-### Групповые задачи
+### Групповые задачи (в комнатах)
 ```
-POST   /api/rooms/{room_id}/tasks  - создать задачу в комнате
-GET    /api/rooms/{room_id}/tasks  - список задач комнаты
-PUT    /api/group-tasks/{task_id}  - обновить
-DELETE /api/group-tasks/{task_id}  - удалить
+POST   /api/rooms/{room_id}/tasks         - создать задачу в комнате
+GET    /api/rooms/{room_id}/tasks         - список задач комнаты
+PUT    /api/group-tasks/{task_id}/update  - обновить
+DELETE /api/group-tasks/{task_id}         - удалить
+PUT    /api/group-tasks/{task_id}/complete - завершить
+POST   /api/group-tasks/{task_id}/subtasks - добавить подзадачу
+PUT    /api/group-tasks/{task_id}/subtasks/{subtask_id}
+DELETE /api/group-tasks/{task_id}/subtasks/{subtask_id}
+POST   /api/group-tasks/{task_id}/comments
+GET    /api/group-tasks/{task_id}/comments
+```
+
+### Журнал посещений (NEW!)
+```
+POST   /api/journals                      - создать журнал
+GET    /api/journals/{telegram_id}        - список журналов
+GET    /api/journals/detail/{journal_id}  - детали журнала
+PUT    /api/journals/{journal_id}         - обновить
+DELETE /api/journals/{journal_id}         - удалить
+POST   /api/journals/{journal_id}/invite-link - ссылка приглашения
+POST   /api/journals/join/{invite_token}  - присоединиться по ссылке
+POST   /api/journals/join-student/{invite_code} - присоединиться как студент
+POST   /api/journals/process-webapp-invite - обработка webapp ссылки
+# Студенты
+POST   /api/journals/{journal_id}/students
+POST   /api/journals/{journal_id}/students/bulk
+GET    /api/journals/{journal_id}/students
+PUT    /api/journals/{journal_id}/students/{student_id}
+DELETE /api/journals/{journal_id}/students/{student_id}
+POST   /api/journals/{journal_id}/students/{student_id}/link
+POST   /api/journals/{journal_id}/students/{student_id}/unlink
+GET    /api/journals/{journal_id}/pending-members
+# Предметы
+POST   /api/journals/{journal_id}/subjects
+GET    /api/journals/{journal_id}/subjects
+GET    /api/journals/subjects/{subject_id}
+PUT    /api/journals/subjects/{subject_id}
+DELETE /api/journals/subjects/{subject_id}
+# Занятия и посещаемость
+POST   /api/journals/{journal_id}/sessions
+GET    /api/journals/{journal_id}/sessions
+PUT    /api/journals/sessions/{session_id}
+DELETE /api/journals/sessions/{session_id}
+POST   /api/journals/sessions/{session_id}/attendance
+GET    /api/journals/sessions/{session_id}/attendance
+GET    /api/journals/{journal_id}/stats   - статистика посещаемости
+GET    /api/journals/{journal_id}/my-attendance - моя посещаемость
+```
+
+### Реферальная система
+```
+GET  /api/referral/code/{telegram_id}     - получить реф. код
+POST /api/referral/process-webapp         - обработка реф. ссылки
+GET  /api/referral/stats/{telegram_id}    - статистика рефералов
+GET  /api/referral/tree/{telegram_id}     - дерево рефералов
 ```
 
 ### Админ статистика
@@ -136,18 +203,29 @@ GET /api/admin/faculty-stats    - статистика по факультета
 GET /api/admin/course-stats     - статистика по курсам
 ```
 
+### Бэкапы и экспорт
+```
+GET /api/export/database        - экспорт всей БД
+GET /api/export/collection/{collection_name}
+GET /api/backup/stats           - статистика бэкапов
+```
+
 ### Прочее
 ```
-GET /api/weather    - погода в Москве
-GET /api/bot-info   - инфо о боте
-GET /api/health     - health check
+GET  /api/weather               - погода в Москве
+GET  /api/bot-info              - инфо о боте
+GET  /api/notifications/stats   - статистика уведомлений
+POST /api/notifications/test    - тестовое уведомление
+GET  /api/health                - health check
 ```
 
 ---
 
-## СХЕМЫ БД (MongoDB Collections)
+## СХЕМЫ БД (MongoDB Collections - 24)
 
-### user_settings
+### Основные коллекции
+
+**user_settings**
 ```python
 id: UUID, telegram_id: int, username, first_name, last_name
 group_id, group_name, facultet_id, facultet_name, level_id, kurs, form_code
@@ -156,7 +234,7 @@ referral_code: str, referred_by: int, invited_count: int
 created_at: datetime, last_activity: datetime
 ```
 
-### user_stats
+**user_stats**
 ```python
 telegram_id: int (unique)
 groups_viewed, friends_invited, schedule_views, night_usage_count, early_usage_count
@@ -164,43 +242,91 @@ total_points, achievements_count, analytics_views, calendar_opens
 notifications_configured, schedule_shares, menu_items_visited, active_days
 ```
 
-### user_achievements
+**user_achievements**
 ```python
 telegram_id: int, achievement_id: str, earned_at: datetime, seen: bool
 ```
 
-### tasks (личные задачи)
+### Задачи
+
+**tasks** (личные задачи)
 ```python
 id: UUID, telegram_id: int, text: str, completed: bool
 category: str ('учеба'|'личное'|'спорт'|'проекты')
 priority: str ('high'|'medium'|'low')
 deadline: datetime?, target_date: datetime?, notes: str, tags: [str], order: int
-created_at: datetime, updated_at: datetime
+created_at: datetime, updated_at: datetime, completed_at: datetime?
 ```
 
-### rooms
-```python
-id: UUID, name: str, color: str, emoji: str, description: str, owner_id: int
-created_at: datetime
-total_participants: int, total_tasks: int, completed_tasks: int
-```
-
-### room_participants
-```python
-room_id: UUID, telegram_id: int, username, first_name, avatar_url
-role: str ('owner'|'member'), joined_at: datetime, referral_code: int
-```
-
-### group_tasks (групповые задачи)
+**group_tasks** (групповые задачи)
 ```python
 id: UUID, room_id: UUID, text: str, description: str, completed: bool
 priority: str, deadline: datetime?, created_by: int, assigned_to: [int]
 category: str, tags: [str], order: int
+subtasks: [Subtask], comments_count: int
 created_at: datetime, updated_at: datetime
 completed_by: int?, completed_at: datetime?
 ```
 
-### scheduled_notifications (NEW! система V2)
+**group_task_comments**, **group_task_invites**
+
+### Комнаты
+
+**rooms**
+```python
+id: UUID, name: str, color: str, emoji: str, description: str, owner_id: int
+invite_token: str, created_at: datetime
+total_participants: int, total_tasks: int, completed_tasks: int
+```
+
+**room_participants**, **room_activities**
+
+### Журнал посещений (NEW!)
+
+**attendance_journals**
+```python
+id: UUID, name: str, owner_id: int, group_name: str
+invite_token: str?, student_invite_code: str?
+allow_self_join: bool, show_attendance_stats: bool
+stats_viewers: [int]  # telegram_ids с доступом к статистике
+created_at: datetime
+```
+
+**journal_students**
+```python
+id: UUID, journal_id: UUID, full_name: str
+linked_telegram_id: int?, invite_link: str?
+created_at: datetime
+```
+
+**journal_subjects**
+```python
+id: UUID, journal_id: UUID, name: str, teacher: str?
+color: str?, hours_per_week: int?
+created_at: datetime
+```
+
+**journal_sessions** (занятия)
+```python
+id: UUID, journal_id: UUID, subject_id: UUID
+date: str, time_start: str, time_end: str
+auditory: str?, type: str ('lecture'|'practice'|'lab')
+topic: str?, notes: str?, teacher: str?
+created_at: datetime
+```
+
+**attendance_records** (посещаемость)
+```python
+id: UUID, session_id: UUID, student_id: UUID
+status: str ('present'|'absent'|'late'|'excused')
+comment: str?, marked_by: int?, marked_at: datetime?
+```
+
+**journal_pending_members**
+
+### Уведомления и история
+
+**scheduled_notifications** (V2)
 ```python
 id: UUID, notification_key: str (unique), telegram_id: int, date: str
 class_info: {discipline, time, teacher, auditory, lessonType}
@@ -210,17 +336,26 @@ attempts: int, last_attempt_at: datetime?, error_message: str?
 created_at: datetime, sent_at: datetime?
 ```
 
-### referral_events (NEW! отслеживание реферальных переходов)
+**notification_history**, **sent_notifications**
+
+### Реферальная система
+
+**referral_connections**
 ```python
-id: UUID, event_type: str ('room_join'|'journal_join')
-telegram_id: int,  # Кто перешел по ссылке
-referrer_id: int?,  # Кто пригласил (по чьей ссылке)
-target_id: str,  # room_id или journal_id
-target_name: str,  # Название комнаты/журнала
-invite_token: str,  # Токен приглашения
-is_new_member: bool,  # Новый участник или уже был
+telegram_id: int, referrer_id: int, level: int (1-3)
 created_at: datetime
 ```
+
+**referral_events**
+```python
+id: UUID, event_type: str ('room_join'|'journal_join')
+telegram_id: int, referrer_id: int?, target_id: str, target_name: str
+invite_token: str, is_new_member: bool, created_at: datetime
+```
+
+### Кэш и прочее
+
+**schedule_cache**, **status_checks**
 
 ---
 
@@ -242,18 +377,21 @@ created_at: datetime
 5. Читать AI_CONTEXT.md перед началом работы
 
 ### Environment Variables
+
 **Backend .env:**
 ```env
-MONGO_URL=mongodb://localhost:27017/rudn_schedule
+MONGO_URL="mongodb://localhost:27017"
+DB_NAME="test_database"
 
 # Environment: "test" или "production"
-ENV=test
+ENV="test"
 
 # Токены Telegram ботов
 TELEGRAM_BOT_TOKEN=...           # Продакшн бот
 TEST_TELEGRAM_BOT_TOKEN=...      # Тестовый бот
 
 WEATHER_API_KEY=...
+DB_CLEAR_PASSWORD=...
 ```
 
 **Переключение между ботами:**
@@ -262,26 +400,37 @@ WEATHER_API_KEY=...
 
 **Frontend .env:**
 ```env
-REACT_APP_BACKEND_URL=https://class-progress-1.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://...
 ```
 
 ---
 
-## КОМПОНЕНТЫ FRONTEND (30+)
+## КОМПОНЕНТЫ FRONTEND (61)
 
-**Главные экраны:** App.js, GroupSelector.jsx, WelcomeScreen.jsx
+### Главные (50 в components/)
+**Экраны:** App.js, GroupSelector.jsx, WelcomeScreen.jsx
 
-**Навигация:** Header.jsx, BottomNavigation.jsx, DesktopSidebar.jsx
+**Навигация:** Header.jsx, BottomNavigation.jsx, DesktopSidebar.jsx, MenuModal.jsx
 
-**Расписание:** LiveScheduleCard, LiveScheduleCarousel, LiveScheduleSection, WeekDaySelector, CalendarModal
+**Расписание:** LiveScheduleCard, LiveScheduleCarousel, LiveScheduleSection, WeekDaySelector, CalendarModal, PrepareForLectureModal, ShareScheduleModal
 
-**Задачи:** TasksSection.jsx (900+ LOC), AddTaskModal, EditTaskModal, TaskDetailModal
+**Задачи:** TasksSection.jsx (61KB!), AddTaskModal, EditTaskModal, TaskDetailModal, SubtasksList, ProductivityStats
 
-**Комнаты:** RoomCard, RoomDetailModal, CreateRoomModal, AddRoomTaskModal, EditRoomTaskModal, GroupTaskCard, GroupTaskDetailModal, RoomParticipantsList, RoomStatsPanel
+**Комнаты:** RoomCard, RoomDetailModal, CreateRoomModal, AddRoomTaskModal, EditRoomTaskModal, CreateGroupTaskModal, GroupTaskCard, GroupTaskDetailModal, RoomParticipantsList, RoomStatsPanel, RoomActivityFeed
 
-**Модалки:** AnalyticsModal, AchievementsModal, NotificationSettings, ProfileModal, MenuModal, ShareScheduleModal
+**Профиль:** ProfileModal, AnalyticsModal, AchievementsModal, AchievementNotification, NotificationSettings, NotificationHistory, NotificationQueue, ReferralTree
 
-**UI:** AchievementNotification, SkeletonCard, LoadingScreen, SwipeHint, TagsInput, TopGlow
+**UI:** SkeletonCard, LoadingScreen, SwipeHint, TagsInput, TopGlow, GreetingNotification, UpcomingClassNotification, RippleEffect
+
+**Админка:** AdminPanel.jsx
+
+### Журнал посещений (11 в components/journal/)
+- JournalSection.jsx (главный)
+- JournalCard.jsx, JournalDetailModal.jsx
+- CreateJournalModal.jsx, CreateSessionModal.jsx, CreateSubjectModal.jsx
+- SubjectDetailModal.jsx, AttendanceModal.jsx
+- AddStudentsModal.jsx, EditStudentModal.jsx, LinkStudentModal.jsx
+- JournalStatsTab.jsx
 
 ---
 
@@ -294,13 +443,14 @@ REACT_APP_BACKEND_URL=https://class-progress-1.preview.emergentagent.com
 - initDataUnsafe для получения telegram_id
 
 ### 2. Система достижений
-- 25 достижений (achievements.py)
+- 24 достижения (achievements.py)
 - Автопроверка при каждом действии
 - Всплывающие уведомления с конфетти
 - Points суммируются в total_points
 
 ### 3. Реферальная система
 - Invite links: `https://t.me/{bot}?start=room_{token}_ref_{user_id}`
+- 3-уровневая система (referral_connections)
 - Трекинг через referral_code
 - Достижения за приглашения
 
@@ -321,20 +471,25 @@ REACT_APP_BACKEND_URL=https://class-progress-1.preview.emergentagent.com
 
 ### 7. Кэширование
 - Факультеты кэшируются (cache.py)
-- Расписания: 1 час
+- Расписания: 1 час (schedule_cache)
 - Погода: 30 минут
 
-### 8. Уведомления V2 (NEW!) 🚀
+### 8. Уведомления V2
 - **Трехуровневая архитектура:**
   - Уровень 1: Daily Planner (06:00) - подготовка расписания на день
   - Уровень 2: Notification Executor (точное время) - отправка
   - Уровень 3: Retry Handler (каждые 2 мин) - повтор неудачных
 - **Точность:** ±10 секунд (было ±5 минут)
 - **Retry механизм:** 3 попытки с интервалами 1, 3, 5 минут
-- **Коллекция:** `scheduled_notifications` (новая)
+- **Коллекция:** `scheduled_notifications`
 - **API:** `/api/notifications/stats` - статистика за день
-- Через Telegram Bot API
-- Настройка: 5-30 минут до пары
+
+### 9. Журнал посещений (NEW!)
+- Преподаватели создают журналы для групп
+- Студенты могут присоединяться по ссылке
+- Привязка telegram аккаунтов к записям
+- Статистика посещаемости
+- Контроль доступа к статистике (stats_viewers)
 
 ---
 
@@ -374,12 +529,13 @@ ls -la /app/backend/*.py
 
 # Frontend компоненты
 ls -la /app/frontend/src/components/
+ls -la /app/frontend/src/components/journal/
 
-# API endpoints
-grep -n "@app\." /app/backend/server.py | head -20
+# API endpoints (109 штук)
+grep -c "@api_router\." /app/backend/server.py
 
-# MongoDB коллекции
-grep -n "db\[" /app/backend/server.py | cut -d"[" -f2 | cut -d"]" -f1 | sort -u
+# MongoDB коллекции (24 штуки)
+grep -E "db\." /app/backend/server.py | grep -oP "db\.\K\w+" | sort -u
 ```
 
 ---
@@ -396,25 +552,35 @@ grep -n "db\[" /app/backend/server.py | cut -d"[" -f2 | cut -d"]" -f1 | sort -u
 | Схема БД | `/app/backend/models.py` (Pydantic) |
 | Перевод | `/app/frontend/src/i18n/locales/ru.json` и `en.json` |
 | Стили | Компонент (Tailwind) или `/app/frontend/src/index.css` |
+| Журнал посещений | `/app/frontend/src/components/journal/` |
 
 ---
 
 ## СТАТИСТИКА
 
-- Backend: ~6,000 LOC (Python)
-- Frontend: ~10,000 LOC (React/JSX)
-- Компонентов: 30+
-- API endpoints: 50+
-- Достижений: 25
-- БД коллекций: 7
+- Backend: ~11,000 LOC (Python)
+- Frontend: ~15,000+ LOC (React/JSX)
+- Компонентов: 61 (50 основных + 11 journal)
+- API endpoints: 109
+- Достижений: 24
+- БД коллекций: 24
 - Языков: 2 (RU/EN)
+
+---
+
+## ТЕКУЩЕЕ ОКРУЖЕНИЕ
+
+- **ENV:** `test` (используется TEST_TELEGRAM_BOT_TOKEN)
+- **DB_NAME:** `test_database`
+- **Backend:** port 8001
+- **Frontend:** port 3000
 
 ---
 
 ## ССЫЛКИ
 
-- **Bot:** [@rudn_mosbot](https://t.me/rudn_mosbot)
-- **Frontend:** https://rudn-schedule.ru
+- **Продакшн Bot:** [@rudn_mosbot](https://t.me/rudn_mosbot)
+- **Тестовый Bot:** Настроен через TEST_TELEGRAM_BOT_TOKEN
 - **API РУДН:** http://www.rudn.ru/rasp/lessons/view
 - **OpenWeather API:** https://openweathermap.org/api
 
