@@ -50,13 +50,7 @@ async def reproduce():
         "created_by": owner_id
     })
     
-    # Create Session 2 (YESTERDAY - Before student created? Check logic)
-    # If student created NOW, yesterday is BEFORE created_at.
-    # Logic: sess["date"] >= s_created_date_str
-    # If created_at = 2025-07-15 10:00:00. s_created_date_str = "2025-07-15".
-    # Session yesterday = "2025-07-14".
-    # "2025-07-14" >= "2025-07-15" -> FALSE.
-    # So Session 2 should be EXCLUDED.
+    # Create Session 2 (YESTERDAY - Before student created)
     yesterday = now - timedelta(days=1)
     session2_id = str(uuid.uuid4())
     await db.journal_sessions.insert_one({
@@ -78,8 +72,8 @@ async def reproduce():
         "marked_by": owner_id,
         "marked_at": now
     })
-
-    # Mark Session 2 (Old) as PRESENT to test > 100% bug
+    
+    # Mark Session 2 (Old) as PRESENT
     await db.attendance_records.insert_one({
         "id": str(uuid.uuid4()),
         "journal_id": journal_id,
@@ -90,11 +84,9 @@ async def reproduce():
         "marked_at": now
     })
     
-    # Session 2 is UNMARKED.
+    print("Data prepared. Calculating stats with NEW logic...")
     
-    print("Data prepared. Calculating stats...")
-    
-    # --- SIMULATE SERVER LOGIC ---
+    # --- SIMULATE NEW SERVER LOGIC ---
     students = [await db.journal_students.find_one({"id": student_id})]
     sessions = await db.journal_sessions.find({"journal_id": journal_id}).to_list(None)
     
@@ -106,14 +98,16 @@ async def reproduce():
             "late": {"$sum": {"$cond": [{"$eq": ["$status", "late"]}, 1, 0]}},
             "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}},
             "excused": {"$sum": {"$cond": [{"$eq": ["$status", "excused"]}, 1, 0]}},
+            "attended_sessions": {"$addToSet": "$session_id"}  # NEW FIELD
         }}
     ]
     att_data = await db.attendance_records.aggregate(pipeline).to_list(None)
     att_map = {item["_id"]: item for item in att_data}
     
     for s in students:
-        stats = att_map.get(s["id"], {"present": 0, "late": 0, "absent": 0, "excused": 0})
-        print(f"Raw DB Stats: {stats}")
+        stats = att_map.get(s["id"], {"present": 0, "late": 0, "absent": 0, "excused": 0, "attended_sessions": []})
+        attended_sessions = set(stats.get("attended_sessions", []))
+        print(f"Attended Sessions: {attended_sessions}")
         
         student_created_at = s.get("created_at")
         s_created_date_str = student_created_at.strftime("%Y-%m-%d")
@@ -121,8 +115,12 @@ async def reproduce():
         
         valid_sessions_count = 0
         for sess in sessions:
-            print(f"Checking Session: {sess['date']} >= {s_created_date_str} ? {sess['date'] >= s_created_date_str}")
-            if sess["date"] >= s_created_date_str:
+            is_after = sess["date"] >= s_created_date_str
+            is_marked = sess["session_id"] in attended_sessions
+            
+            print(f"Session {sess['date']}: After={is_after}, Marked={is_marked} -> {is_after or is_marked}")
+            
+            if is_after or is_marked:
                 valid_sessions_count += 1
                 
         print(f"Valid Sessions Count: {valid_sessions_count}")
@@ -135,12 +133,9 @@ async def reproduce():
         else:
             att_percent = 0
             
-        implicit_absent = effective_sessions - numerator
-        
         print(f"--- RESULT ---")
         print(f"Attendance Percent: {att_percent}%")
         print(f"Present: {numerator}")
-        print(f"Absent (Implicit): {implicit_absent}")
         print(f"Total Valid Sessions: {valid_sessions_count}")
 
     # Cleanup
