@@ -39,6 +39,21 @@ import { GreetingNotification } from './components/GreetingNotification';
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
   const { t } = useTranslation();
+  // TEST: Greeting Notification
+  const [testGreetingHour, setTestGreetingHour] = useState(null);
+  const [greetingKey, setGreetingKey] = useState(0);
+
+  const testGreeting = (hour) => {
+      setTestGreetingHour(hour);
+      setGreetingKey(prev => prev + 1);
+      hapticFeedback('success');
+      showAlert(hour === 8 ? "Testing Morning Greeting" : "Testing Night Greeting");
+      
+      // Reset after 7 seconds to allow re-testing
+      setTimeout(() => {
+          setTestGreetingHour(null);
+      }, 7000);
+  };
   // TEST: Добавляем тестовое состояние для проверки уведомления
   const [testNotification, setTestNotification] = useState(false);
   
