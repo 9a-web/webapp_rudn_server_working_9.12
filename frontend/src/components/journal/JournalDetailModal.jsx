@@ -554,19 +554,31 @@ export const JournalDetailModal = ({
                   </div>
                 )}
 
-                {/* Stats Tab */}
-                {activeTab === 'stats' && isOwner && (
+                {/* Stats Tab - visible to owner and stats_viewers */}
+                {activeTab === 'stats' && canViewStats && (
                   <JournalStatsTab
                     journalId={journalId}
+                    telegramId={telegramId}
                     students={students}
                     subjects={subjects}
                     pendingMembers={pendingMembers}
                     gradient={gradient}
+                    isOwner={isOwner}
+                    statsViewers={journal?.stats_viewers || []}
+                    onUpdateStatsViewers={async (newViewers) => {
+                      try {
+                        const { updateJournal } = await import('../../services/journalAPI');
+                        await updateJournal(journalId, { stats_viewers: newViewers });
+                        loadData(); // Reload to get updated data
+                      } catch (error) {
+                        console.error('Error updating stats viewers:', error);
+                      }
+                    }}
                   />
                 )}
 
-                {/* Non-owner view - My Attendance */}
-                {!isOwner && journal && (
+                {/* Non-owner view - My Attendance (only if can't view stats) */}
+                {!isOwner && !canViewStats && journal && (
                   <MyAttendanceView journal={journal} telegramId={telegramId} />
                 )}
               </div>
