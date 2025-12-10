@@ -587,7 +587,7 @@ const Home = () => {
         classes_count: classesCount
       });
       if (result.new_achievements && result.new_achievements.length > 0) {
-        setNewAchievement(result.new_achievements[0]);
+        showAchievementInQueue(result.new_achievements[0]);
         loadAchievementsData();
       }
     } catch (err) {
