@@ -5938,6 +5938,35 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
         if total_sessions > 0:
             attendance_percent = round((present_count / total_sessions) * 100, 1)
         
+        # Расчет стрика (серии посещений)
+        current_streak = 0
+        best_streak = 0
+        temp_streak = 0
+        is_current_streak_active = True
+        
+        # Проходим по занятиям от новых к старым
+        for s in sessions:
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            
+            # Пропускаем неотмеченные занятия (например, будущие)
+            if status == "unmarked":
+                continue
+                
+            if status in ["present", "late"]:
+                # Посещение (или опоздание)
+                if is_current_streak_active:
+                    current_streak += 1
+                
+                temp_streak += 1
+                if temp_streak > best_streak:
+                    best_streak = temp_streak
+            else:
+                # Пропуск (absent или excused)
+                # Уважительная причина тоже прерывает стрик посещений "подряд"
+                is_current_streak_active = False
+                temp_streak = 0
+                
         # Статистика по предметам
         subjects_stats = {}
         for s in sessions:
