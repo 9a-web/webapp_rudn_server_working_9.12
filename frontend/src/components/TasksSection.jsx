@@ -712,6 +712,22 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             whileTap={{ scale: 0.95 }}
             onClick={() => {
               hapticFeedback && hapticFeedback('impact', 'light');
+              setShowStats(!showStats);
+            }}
+            className={`p-2 rounded-xl transition-colors ${
+              showStats
+                ? 'bg-purple-100 text-purple-600'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            title="Статистика продуктивности"
+          >
+            <TrendingUp className="w-5 h-5" />
+          </motion.button>
+          
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              hapticFeedback && hapticFeedback('impact', 'light');
               setShowFilters(!showFilters);
             }}
             className={`p-2 rounded-xl transition-colors ${
