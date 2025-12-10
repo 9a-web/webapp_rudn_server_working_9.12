@@ -7,7 +7,7 @@ import {
 import { 
   Users, TrendingUp, Calendar, Award, 
   UserCheck, UserX, Clock, AlertCircle, ChevronDown, ChevronUp,
-  Shield, ShieldCheck, X, Plus
+  Shield, ShieldCheck, X, Plus, BookOpen
 } from 'lucide-react';
 import { getJournalStats } from '../../services/journalAPI';
 
