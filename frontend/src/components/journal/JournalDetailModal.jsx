@@ -319,13 +319,17 @@ export const JournalDetailModal = ({
             </div>
           ) : (
             <>
-              {/* Tabs */}
-              {isOwner && (
+              {/* Tabs - show for owner OR if user can view stats */}
+              {(isOwner || canViewStats) && (
                 <div className="flex gap-2 p-4 bg-[#0D0D0D] sticky top-[140px] z-10">
                   {[
-                    { id: 'students', label: 'Студенты', icon: Users },
-                    { id: 'sessions', label: 'Занятия', icon: Calendar },
-                    { id: 'stats', label: 'Статистика', icon: BarChart3 },
+                    // Owner sees all tabs
+                    ...(isOwner ? [
+                      { id: 'students', label: 'Студенты', icon: Users },
+                      { id: 'sessions', label: 'Занятия', icon: Calendar },
+                    ] : []),
+                    // Stats tab for owner and stats_viewers
+                    ...(canViewStats ? [{ id: 'stats', label: 'Статистика', icon: BarChart3 }] : []),
                   ].map((tab) => {
                     const Icon = tab.icon;
                     return (
