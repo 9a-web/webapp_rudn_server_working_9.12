@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Droplets, Wind } from 'lucide-react';
+import { weatherAPI } from '../services/api';
 
 // Standalone версия компонента для показа в очереди
 export const GreetingNotificationContent = ({ greeting, onClose }) => {
+  const weather = greeting.weather;
+  const isMorning = greeting.type === 'morning';
+  
   return (
     <motion.div
       key={greeting.type}
@@ -19,28 +23,66 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
     >
       <div 
         onClick={onClose}
-        className={`cursor-pointer active:scale-95 transition-transform pointer-events-auto w-full max-w-sm backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 border 
-        ${greeting.type === 'morning' 
+        className={`cursor-pointer active:scale-95 transition-transform pointer-events-auto w-full max-w-sm backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border 
+        ${isMorning 
           ? 'bg-gradient-to-r from-orange-500/90 to-amber-500/90 border-orange-200/20 text-white' 
           : 'bg-gradient-to-r from-indigo-900/90 to-blue-900/90 border-indigo-200/20 text-white'
         }`}
       >
-        <div className={`p-2 rounded-full flex-shrink-0 ${greeting.type === 'morning' ? 'bg-white/20' : 'bg-white/10'}`}>
-          {greeting.type === 'morning' ? (
-            <Sun className="w-6 h-6 text-yellow-200" />
-          ) : (
-            <Moon className="w-6 h-6 text-blue-200" />
-          )}
+        {/* Header row */}
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full flex-shrink-0 ${isMorning ? 'bg-white/20' : 'bg-white/10'}`}>
+            {isMorning ? (
+              <Sun className="w-6 h-6 text-yellow-200" />
+            ) : (
+              <Moon className="w-6 h-6 text-blue-200" />
+            )}
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-sm truncate">
+              {greeting.title}
+            </h3>
+            <p className="text-xs text-white/90 leading-tight mt-0.5">
+              {greeting.message}
+            </p>
+          </div>
         </div>
-        
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-sm truncate">
-            {greeting.title}
-          </h3>
-          <p className="text-xs text-white/90 leading-tight mt-0.5">
-            {greeting.message}
-          </p>
-        </div>
+
+        {/* Weather info - only for morning */}
+        {isMorning && weather && (
+          <div className="mt-3 pt-3 border-t border-white/20">
+            <div className="flex items-center justify-between">
+              {/* Temperature with icon */}
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{weather.icon}</span>
+                <div>
+                  <div className="text-xl font-bold">{weather.temperature}°C</div>
+                  <div className="text-xs text-white/80">
+                    ощущается {weather.feels_like}°C
+                  </div>
+                </div>
+              </div>
+              
+              {/* Humidity and wind */}
+              <div className="flex flex-col gap-1 text-xs text-white/90">
+                <div className="flex items-center gap-1.5">
+                  <Droplets className="w-3.5 h-3.5" />
+                  <span>{weather.humidity}%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Wind className="w-3.5 h-3.5" />
+                  <span>{weather.wind_speed} км/ч</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Weather description */}
+            <div className="mt-2 text-xs text-white/80 text-center">
+              {weather.description}
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -53,19 +95,27 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
     // Check if we already showed greeting this session (skip check if testing)
     if (!testHour && sessionStorage.getItem('greetingShown')) return;
 
-    const checkTime = () => {
+    const checkTime = async () => {
       const now = new Date();
       const hour = testHour !== null ? testHour : now.getHours();
       
       let type = null;
       let title = "";
       let message = "";
+      let weather = null;
 
       // Morning: 04:00 - 11:59
       if (hour >= 4 && hour < 12) {
         type = 'morning';
         title = userFirstName ? `Доброе утро, ${userFirstName}!` : 'Доброе утро!';
         message = 'Желаем продуктивного дня и отличного настроения ✨';
+        
+        // Fetch weather for morning greeting
+        try {
+          weather = await weatherAPI.getWeather();
+        } catch (error) {
+          console.warn('Failed to fetch weather:', error);
+        }
       } 
       // Night: 22:00 - 04:59
       else if (hour >= 22 || hour < 4) {
@@ -75,7 +125,7 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
       }
 
       if (type) {
-        const greetingData = { type, title, message };
+        const greetingData = { type, title, message, weather };
         
         if (!testHour) {
           sessionStorage.setItem('greetingShown', 'true');
@@ -89,7 +139,7 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
           setGreeting(greetingData);
           setTimeout(() => {
             setGreeting(null);
-          }, 6000);
+          }, weather ? 8000 : 6000); // Longer display time if weather is shown
         }
       }
     };
