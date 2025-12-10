@@ -282,6 +282,18 @@ frontend:
         agent: "testing"
         comment: "✅ Successfully tested new is_linked field in GET /api/journals/detail/{journal_id} endpoint. All test scenarios passed: 1) Created journal with owner_id=123456, 2) GET /api/journals/detail/{journal_id}?telegram_id=123456 (owner) returns is_linked=false, is_owner=true, 3) GET /api/journals/detail/{journal_id}?telegram_id=999999 (non-owner, non-linked) returns is_linked=false, is_owner=false, 4) Added student with full_name='Test Student', 5) Linked student to telegram_id=999999, 6) GET /api/journals/detail/{journal_id}?telegram_id=999999 (linked student) returns is_linked=true, is_owner=false. The is_linked field correctly identifies linked students vs owners vs non-linked users. Backend API working as expected."
 
+  - task: "Journal Stats subjects_stats Field Testing"
+    implemented: true
+    working: true
+    file: "backend/server.py, backend/models.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested subjects_stats field in GET /api/journals/{journal_id}/stats endpoint. All test scenarios passed: 1) Created journal with owner telegram_id=12345, 2) Added 3 subjects (Математика, Физика, Программирование), 3) Added 4 students, 4) Created 7 sessions across different subjects, 5) Marked attendance strategically to create meaningful statistics, 6) Retrieved stats with telegram_id=12345, 7) Verified subjects_stats field exists and contains correct structure with all required fields (subject_id, subject_name, subject_color, total_sessions, present_count, absent_count, late_count, excused_count, attendance_percent). Statistics properly calculated per subject: Математика (3 sessions, 83.3% attendance), Физика (2 sessions, 62.5% attendance), Программирование (2 sessions, 75.0% attendance). All data types and logical consistency verified. subjects_stats field working correctly."
+
 metadata:
   created_by: "testing_agent"
   version: "1.2"
