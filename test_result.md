@@ -26,6 +26,45 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ Successfully tested admin stats endpoint. Returns total_users, active_users_today, total_tasks with correct data types and non-negative values. Tested with different parameter variations."
+      - working: true
+        agent: "testing"
+        comment: "✅ RETESTED: Admin stats endpoint confirmed working correctly. All required fields present (total_users, active_users_today, total_tasks, total_journals, etc.), proper data types (integers), non-negative values, and parameter variations (days=30, days=7) working correctly. Current data: 1 user, 0 active today, 0 tasks, 1 journal."
+
+  - task: "GET /api/admin/referral-stats - реферальная статистика"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested admin referral stats endpoint. Returns comprehensive referral statistics including total_events, events_today/week/month, room_joins_total/today/week, journal_joins_total/today/week, top_referrers list, and recent_events list. All fields have correct data types (integers for counts, lists for collections). Tested with default parameters and custom parameters (days=7, limit=5). Empty lists handled correctly for empty database."
+
+  - task: "GET /api/admin/users - список пользователей для админ панели"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested admin users endpoint. Returns list of users with proper structure including telegram_id, username, first_name fields. Pagination works correctly (limit, skip parameters). Search functionality working (searches by username, first_name, last_name, group_name, and telegram_id). Empty results handled properly. Current data: 1 user found (telegram_id=999888777, username=testuser)."
+
+  - task: "GET /api/admin/journals - список журналов для админ панели"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested admin journals endpoint. Returns list of journals with proper structure including journal_id, name, owner_id fields. Calculated fields (total_students, total_sessions) are properly computed and added. Pagination works correctly (limit, skip parameters). Search functionality working (searches by name, group_name, description). Empty results handled properly. Current data: 1 journal found with 0 students and 0 sessions."
 
   - task: "GET /api/admin/users-activity?days=30 - регистрации по дням"
     implemented: true
