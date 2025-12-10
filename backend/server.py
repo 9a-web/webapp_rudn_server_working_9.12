@@ -5895,7 +5895,7 @@ async def get_session_attendance(session_id: str):
 
 @api_router.get("/journals/{journal_id}/my-attendance/{telegram_id}")
 async def get_my_attendance(journal_id: str, telegram_id: int):
-    """Получить мою посещаемость"""
+    """Получить мою посещаемость с разбивкой по предметам"""
     try:
         # Найти студента
         student = await db.journal_students.find_one({
@@ -5907,19 +5907,25 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
         if not student:
             raise HTTPException(status_code=404, detail="Not linked to any student")
         
+        # Получить все предметы журнала
+        subjects = await db.journal_subjects.find(
+            {"journal_id": journal_id}
+        ).to_list(100)
+        subjects_map = {s["subject_id"]: s for s in subjects}
+        
         # Получить все занятия
         sessions = await db.journal_sessions.find(
             {"journal_id": journal_id}
-        ).sort("date", -1).to_list(200)
+        ).sort("date", -1).to_list(500)
         
         # Получить записи посещаемости
         records = await db.attendance_records.find(
             {"student_id": student["id"]}
-        ).to_list(200)
+        ).to_list(500)
         
         records_map = {r["session_id"]: r for r in records}
         
-        # Статистика
+        # Общая статистика
         present_count = sum(1 for r in records if r["status"] in ["present", "late"])
         absent_count = sum(1 for r in records if r["status"] == "absent")
         excused_count = sum(1 for r in records if r["status"] == "excused")
@@ -5930,15 +5936,71 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
         if total_sessions > 0:
             attendance_percent = round((present_count / total_sessions) * 100, 1)
         
-        # Формируем записи
+        # Статистика по предметам
+        subjects_stats = {}
+        for s in sessions:
+            subject_id = s.get("subject_id")
+            if subject_id not in subjects_stats:
+                subject = subjects_map.get(subject_id, {})
+                subjects_stats[subject_id] = {
+                    "subject_id": subject_id,
+                    "subject_name": subject.get("name", "Без предмета"),
+                    "subject_color": subject.get("color", "blue"),
+                    "total_sessions": 0,
+                    "present_count": 0,
+                    "absent_count": 0,
+                    "late_count": 0,
+                    "excused_count": 0,
+                    "attendance_percent": 0,
+                    "sessions": []
+                }
+            
+            subjects_stats[subject_id]["total_sessions"] += 1
+            
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            
+            if status in ["present", "late"]:
+                subjects_stats[subject_id]["present_count"] += 1
+            if status == "absent":
+                subjects_stats[subject_id]["absent_count"] += 1
+            if status == "late":
+                subjects_stats[subject_id]["late_count"] += 1
+            if status == "excused":
+                subjects_stats[subject_id]["excused_count"] += 1
+            
+            subjects_stats[subject_id]["sessions"].append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "status": status
+            })
+        
+        # Вычисляем процент по каждому предмету
+        subjects_list = []
+        for subject_id, stats in subjects_stats.items():
+            if stats["total_sessions"] > 0:
+                stats["attendance_percent"] = round(
+                    (stats["present_count"] / stats["total_sessions"]) * 100, 1
+                )
+            subjects_list.append(stats)
+        
+        # Сортируем предметы по имени
+        subjects_list.sort(key=lambda x: x["subject_name"])
+        
+        # Формируем общие записи (для совместимости)
         attendance_records = []
         for s in sessions:
             record = records_map.get(s["session_id"])
+            subject = subjects_map.get(s.get("subject_id"), {})
             attendance_records.append({
                 "session_id": s["session_id"],
                 "date": s["date"],
                 "title": s["title"],
                 "type": s.get("type", "lecture"),
+                "subject_id": s.get("subject_id"),
+                "subject_name": subject.get("name", ""),
                 "status": record["status"] if record else "unmarked",
                 "reason": record.get("reason") if record else None,
                 "note": record.get("note") if record else None
@@ -5953,6 +6015,7 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
             "excused_count": excused_count,
             "late_count": late_count,
             "total_sessions": total_sessions,
+            "subjects_stats": subjects_list,  # Статистика по предметам
             "records": attendance_records
         }
     except HTTPException:
