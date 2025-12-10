@@ -4504,6 +4504,7 @@ async def get_journal_detail(journal_id: str, telegram_id: int = 0):
         stats_viewers = journal.get("stats_viewers", [])
         can_view_stats = is_owner or telegram_id in stats_viewers
         my_attendance = None
+        is_linked = False
         
         if not is_owner and telegram_id > 0:
             student = await db.journal_students.find_one({
@@ -4512,6 +4513,7 @@ async def get_journal_detail(journal_id: str, telegram_id: int = 0):
                 "is_linked": True
             })
             if student:
+                is_linked = True
                 my_attendance = await calculate_student_attendance(student["id"], journal_id)
         
         return JournalResponse(
@@ -4531,6 +4533,7 @@ async def get_journal_detail(journal_id: str, telegram_id: int = 0):
             total_sessions=total_sessions,
             is_owner=is_owner,
             can_view_stats=can_view_stats,
+            is_linked=is_linked,
             my_attendance_percent=my_attendance
         )
     except HTTPException:
