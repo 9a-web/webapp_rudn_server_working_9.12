@@ -34,7 +34,10 @@ const AchievementNotification = lazy(() => import('./components/AchievementNotif
 const NotificationSettings = lazy(() => import('./components/NotificationSettings'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 import { UpcomingClassNotification } from './components/UpcomingClassNotification';
-import { GreetingNotification } from './components/GreetingNotification';
+import { GreetingNotification, GreetingNotificationContent } from './components/GreetingNotification';
+import { AchievementNotificationContent } from './components/AchievementNotification';
+import { NotificationQueueProvider, useNotificationQueue } from './components/NotificationQueue';
+import { AnimatePresence } from 'framer-motion';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
