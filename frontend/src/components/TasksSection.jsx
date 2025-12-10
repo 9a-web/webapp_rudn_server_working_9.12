@@ -376,6 +376,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       const updatedTasks = tasks.map(t => t.id === taskId ? updatedTask : t);
       setTasks(updatedTasks);
       
+      // Обновляем статистику продуктивности при изменении статуса задачи
+      loadProductivityStats();
+      
       // Проверяем, завершены ли все задачи на выбранную дату
       if (!wasCompleted && updatedTask.completed) {
         // Получаем задачи для выбранной даты
