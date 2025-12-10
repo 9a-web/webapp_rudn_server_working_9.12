@@ -781,7 +781,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       />
 
       {/* Статистика продуктивности */}
-      <ProductivityStats stats={productivityStats} loading={statsLoading} />
+      {showStats && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ProductivityStats stats={productivityStats} loading={statsLoading} />
+        </motion.div>
+      )}
 
       {/* Панель фильтров */}
       {showFilters && (
