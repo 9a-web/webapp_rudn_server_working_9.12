@@ -252,6 +252,18 @@ frontend:
         agent: "main"
         comment: "Implemented: 1) Added stats_viewers field to AttendanceJournal model - list of telegram_ids with stats access. 2) Added can_view_stats to JournalResponse. 3) Protected /api/journals/{journal_id}/stats endpoint - only owner or stats_viewers can access. 4) Frontend shows stats tab only to authorized users. 5) Owner can manage stats_viewers via UI in Stats tab - select linked students to grant access."
 
+  - task: "Journal Stats Calculation Fix (Correct percentage & backfill)"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Fixed calculation logic: 1) Include sessions marked as attended even if they are before student creation date (backfill fix). 2) Ensure percentage doesn't exceed 100%. 3) Implicit absent logic remains consistent."
+
 metadata:
   created_by: "testing_agent"
   version: "1.2"
