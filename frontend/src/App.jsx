@@ -753,7 +753,27 @@ const Home = () => {
     <div className="h-full min-h-screen bg-background telegram-webapp relative">
       <TopGlow />
       <UpcomingClassNotification schedule={schedule} />
-      <GreetingNotification userFirstName={user?.first_name} />
+      <GreetingNotification 
+          key={greetingKey}
+          userFirstName={user?.first_name} 
+          testHour={testGreetingHour}
+      />
+      
+      {/* Dev Tools for Testing Greetings */}
+      <div className="fixed top-20 right-4 z-[90] flex flex-col gap-2 opacity-50 hover:opacity-100 transition-opacity">
+        <button 
+          onClick={() => testGreeting(8)}
+          className="bg-orange-500/80 text-white text-[10px] px-2 py-1 rounded-full shadow-lg backdrop-blur"
+        >
+          ☀️ Test Morning
+        </button>
+        <button 
+          onClick={() => testGreeting(23)}
+          className="bg-indigo-900/80 text-white text-[10px] px-2 py-1 rounded-full shadow-lg backdrop-blur"
+        >
+          🌙 Test Night
+        </button>
+      </div>
       
       {/* Adaptive container with responsive max-width */}
       <div className="relative mx-auto max-w-[430px] md:max-w-3xl lg:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
