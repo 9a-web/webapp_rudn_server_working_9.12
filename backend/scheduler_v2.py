@@ -354,7 +354,8 @@ class NotificationSchedulerV2:
                     "time": time_str,
                     "teacher": class_event.get('teacher', ''),
                     "auditory": class_event.get('auditory', ''),
-                    "lessonType": class_event.get('lessonType', '')
+                    "lessonType": class_event.get('lessonType', ''),
+                    "group_name": group_name
                 },
                 "scheduled_time": notification_datetime.replace(tzinfo=None),
                 "notification_time_minutes": notification_time,
