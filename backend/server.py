@@ -4068,6 +4068,62 @@ async def get_admin_referral_stats(days: Optional[int] = 30, limit: int = 10):
         room_joins_total = await db.referral_events.count_documents({"event_type": "room_join"})
         room_joins_today = await db.referral_events.count_documents({
             "event_type": "room_join",
+
+@api_router.get("/admin/users", response_model=List[UserSettingsResponse])
+async def get_admin_users(limit: int = 50, skip: int = 0, search: Optional[str] = None):
+    """Get list of users for admin panel with search capability"""
+    query = {}
+    if search:
+        # Case-insensitive search by name, username, or group
+        query["$or"] = [
+            {"username": {"$regex": search, "$options": "i"}},
+            {"first_name": {"$regex": search, "$options": "i"}},
+            {"last_name": {"$regex": search, "$options": "i"}},
+            {"group_name": {"$regex": search, "$options": "i"}}
+        ]
+        # Check if search is a number (telegram_id)
+        if search.isdigit():
+            query["$or"].append({"telegram_id": int(search)})
+
+    cursor = db.user_settings.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    users = await cursor.to_list(length=limit)
+    return users
+
+@api_router.get("/admin/journals", response_model=List[JournalResponse])
+async def get_admin_journals(limit: int = 50, skip: int = 0, search: Optional[str] = None):
+    """Get list of journals (classes) for admin panel"""
+    query = {}
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"group_name": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+
+    cursor = db.attendance_journals.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    journals = await cursor.to_list(length=limit)
+    
+    # Enrich with counts if needed, but the model has defaults. 
+    # The model expects some calculated fields like 'total_students', 'total_sessions'.
+    # We might need to compute them or ensure they are in the DB.
+    # Looking at the model, these are fields.
+    
+    result = []
+    for journal in journals:
+        # Calculate stats for accurate display
+        j_id = str(journal["journal_id"]) if "journal_id" in journal else str(journal["_id"])
+        
+        # Ensure journal_id is set (sometimes it's _id in mongo)
+        if "journal_id" not in journal:
+             journal["journal_id"] = str(journal["_id"])
+             
+        journal["total_students"] = await db.journal_students.count_documents({"journal_id": j_id})
+        journal["total_sessions"] = await db.journal_sessions.count_documents({"journal_id": j_id})
+        
+        result.append(journal)
+        
+    return result
+
             "created_at": {"$gte": today_start}
         })
         room_joins_week = await db.referral_events.count_documents({
