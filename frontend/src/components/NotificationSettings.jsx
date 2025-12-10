@@ -125,166 +125,195 @@ export const NotificationSettings = ({
 
   if (loading) {
     return (
-      <motion.div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={backdropVariants}
-      >
-        <motion.div 
-          className="bg-white rounded-3xl p-6 w-full max-w-md"
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          variants={modalVariants}
+      <AnimatePresence>
+        {/* Backdrop */}
+        <motion.div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        />
+        
+        {/* Modal Container */}
+        <motion.div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
         >
-          <div className="flex items-center justify-center py-8">
-            <motion.div 
-              className="rounded-full h-12 w-12 border-b-2 border-black"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            />
-          </div>
+          <motion.div 
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-hidden shadow-2xl"
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          >
+            <div className="flex items-center justify-center py-8">
+              <motion.div 
+                className="rounded-full h-12 w-12 border-b-2 border-black"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
+      </AnimatePresence>
     );
   }
 
   return (
-    <motion.div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={backdropVariants}
-    >
-      <motion.div 
-        className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={modalVariants}
+    <AnimatePresence>
+      {/* Backdrop */}
+      <motion.div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
+      
+      {/* Modal Container */}
+      <motion.div
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center">
-              {enabled ? (
-                <Bell className="w-5 h-5 text-black" />
-              ) : (
-                <BellOff className="w-5 h-5 text-gray-400" />
-              )}
-            </div>
-            <h2 className="text-xl font-bold text-black">Уведомления</h2>
+        <motion.div 
+          className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Drag Handle for Mobile */}
+          <div className="sm:hidden flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 bg-gray-300 rounded-full" />
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-
-        {/* Toggle Switch */}
-        <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-black">Получать уведомления</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Напоминания о предстоящих парах
-              </p>
+          
+          <div className="p-4 sm:p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center">
+                  {enabled ? (
+                    <Bell className="w-5 h-5 text-black" />
+                  ) : (
+                    <BellOff className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-black">Уведомления</h2>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
-            <button
-              onClick={handleToggle}
-              className={`relative w-14 h-8 rounded-full transition-colors ${
-                enabled ? 'bg-black' : 'bg-gray-300'
-              }`}
-            >
-              <div
-                className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${
-                  enabled ? 'translate-x-6' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
 
-        {/* Time Selection */}
-        {enabled && (
-          <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Clock className="w-5 h-5 text-gray-600" />
-              <p className="font-medium text-black">За сколько уведомлять?</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {timeOptions.map((option) => (
+            {/* Toggle Switch */}
+            <div className="bg-gray-50 rounded-2xl p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 mr-4">
+                  <p className="font-medium text-black text-sm sm:text-base">Получать уведомления</p>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                    Напоминания о предстоящих парах
+                  </p>
+                </div>
                 <button
-                  key={option.value}
-                  onClick={() => handleTimeChange(option.value)}
-                  className={`py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-                    notificationTime === option.value
-                      ? 'bg-black text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  onClick={handleToggle}
+                  className={`relative w-14 h-8 rounded-full transition-colors flex-shrink-0 ${
+                    enabled ? 'bg-black' : 'bg-gray-300'
                   }`}
                 >
-                  {option.label}
+                  <div
+                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${
+                      enabled ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
                 </button>
-              ))}
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              Вы получите уведомление за {notificationTime} {pluralizeMinutes(notificationTime)} до начала каждой пары
-            </p>
-          </div>
-        )}
 
-        {/* История уведомлений */}
-        {enabled && (
-          <div className="bg-gray-900 rounded-2xl p-4 mb-6">
-            <NotificationHistory telegramId={telegramId} />
-          </div>
-        )}
+            {/* Time Selection */}
+            {enabled && (
+              <div className="bg-gray-50 rounded-2xl p-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-5 h-5 text-gray-600" />
+                  <p className="font-medium text-black text-sm sm:text-base">За сколько уведомлять?</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {timeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleTimeChange(option.value)}
+                      className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-medium transition-all ${
+                        notificationTime === option.value
+                          ? 'bg-black text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Вы получите уведомление за {notificationTime} {pluralizeMinutes(notificationTime)} до начала каждой пары
+                </p>
+              </div>
+            )}
 
+            {/* История уведомлений */}
+            {enabled && (
+              <div className="bg-gray-900 rounded-2xl p-4 mb-4">
+                <NotificationHistory telegramId={telegramId} />
+              </div>
+            )}
 
-        {/* Info */}
-        <div className="bg-blue-50 rounded-xl p-4 mb-6">
-          <p className="text-sm text-blue-900 mb-2">
-            💡 <strong>Важно:</strong> Для получения уведомлений необходимо:
-          </p>
-          <ol className="text-sm text-blue-900 list-decimal list-inside space-y-1">
-            <li>Начать диалог с ботом{' '}
-              <a 
-                href="https://t.me/rudn_mosbot" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="font-semibold underline hover:text-blue-700"
+            {/* Info */}
+            <div className="bg-blue-50 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+              <p className="text-xs sm:text-sm text-blue-900 mb-2">
+                💡 <strong>Важно:</strong> Для получения уведомлений необходимо:
+              </p>
+              <ol className="text-xs sm:text-sm text-blue-900 list-decimal list-inside space-y-1">
+                <li>Начать диалог с ботом{' '}
+                  <a 
+                    href="https://t.me/rudn_mosbot" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="font-semibold underline hover:text-blue-700"
+                  >
+                    @rudn_mosbot
+                  </a>
+                </li>
+                <li>Отправить команду <code className="bg-blue-100 px-1 rounded">/start</code></li>
+                <li>Включить уведомления в этом меню</li>
+              </ol>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 px-4 rounded-xl text-black bg-gray-100 hover:bg-gray-200 font-medium transition-colors text-sm sm:text-base"
               >
-                @rudn_mosbot
-              </a>
-            </li>
-            <li>Отправить команду <code className="bg-blue-100 px-1 rounded">/start</code></li>
-            <li>Включить уведомления в этом меню</li>
-          </ol>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 px-4 rounded-xl text-black bg-gray-100 hover:bg-gray-200 font-medium transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 py-3 px-4 rounded-xl text-white bg-black hover:bg-gray-800 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-        </div>
+                Отмена
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 py-3 px-4 rounded-xl text-white bg-black hover:bg-gray-800 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+              >
+                {saving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
-    </motion.div>
+    </AnimatePresence>
   );
 };
 
