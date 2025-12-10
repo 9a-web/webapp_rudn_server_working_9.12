@@ -270,6 +270,18 @@ frontend:
         agent: "testing"
         comment: "✅ Successfully tested Journal Stats Calculation Fix. All requirements verified: 1) Students created AFTER session dates have unmarked sessions EXCLUDED from stats (new student logic working), 2) Sessions marked as attended even before student creation are INCLUDED in stats (backfill logic working), 3) Percentage calculations never exceed 100% (verified), 4) Implicit absent logic working correctly (present + absent = total sessions), 5) Edge cases tested including students with no sessions, excused sessions, and multiple backfill scenarios. Statistics calculation is mathematically correct and handles all edge cases properly."
 
+  - task: "Journal Detail API is_linked Field Testing"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Successfully tested new is_linked field in GET /api/journals/detail/{journal_id} endpoint. All test scenarios passed: 1) Created journal with owner_id=123456, 2) GET /api/journals/detail/{journal_id}?telegram_id=123456 (owner) returns is_linked=false, is_owner=true, 3) GET /api/journals/detail/{journal_id}?telegram_id=999999 (non-owner, non-linked) returns is_linked=false, is_owner=false, 4) Added student with full_name='Test Student', 5) Linked student to telegram_id=999999, 6) GET /api/journals/detail/{journal_id}?telegram_id=999999 (linked student) returns is_linked=true, is_owner=false. The is_linked field correctly identifies linked students vs owners vs non-linked users. Backend API working as expected."
+
 metadata:
   created_by: "testing_agent"
   version: "1.2"
