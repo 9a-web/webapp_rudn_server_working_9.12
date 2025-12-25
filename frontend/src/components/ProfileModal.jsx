@@ -664,6 +664,50 @@ export const ProfileModal = ({
 
                   {/* Опции настроек */}
                   <div className="space-y-3">
+                    {/* Новогодняя тема */}
+                    <div
+                      className="w-full p-4 rounded-xl flex items-center justify-between"
+                      style={{
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                          <Snowflake className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-semibold text-purple-300">Новогодняя тема</p>
+                          <p className="text-xs text-gray-500">Снежинки и праздничный декор</p>
+                        </div>
+                      </div>
+                      
+                      {/* Toggle переключатель */}
+                      <button
+                        onClick={toggleNewYearTheme}
+                        disabled={themeLoading}
+                        className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
+                          newYearThemeEnabled ? 'bg-purple-500' : 'bg-gray-600'
+                        } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        style={{
+                          boxShadow: newYearThemeEnabled 
+                            ? '0 0 10px rgba(139, 92, 246, 0.5)' 
+                            : 'none',
+                        }}
+                      >
+                        <div
+                          className={`absolute top-0.5 ${
+                            newYearThemeEnabled ? 'right-0.5' : 'left-0.5'
+                          } w-6 h-6 bg-white rounded-full transition-all duration-300 flex items-center justify-center`}
+                          style={{
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                          }}
+                        >
+                          {newYearThemeEnabled ? '❄️' : '🔒'}
+                        </div>
+                      </button>
+                    </div>
+
                     {/* Удаление аккаунта */}
                     <button
                       onClick={() => {
