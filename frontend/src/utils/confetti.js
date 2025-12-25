@@ -1,12 +1,17 @@
 import confetti from 'canvas-confetti';
 
 /**
- * Конфетти для достижений
+ * Конфетти для достижений (Новогодняя версия 🎄)
+ * Снежинки (белый/голубой) + Мандарины (оранжевый) + Золото
  */
 export const celebrateAchievement = () => {
   const duration = 3000;
   const animationEnd = Date.now() + duration;
   const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+  
+  // Winter & Mandarin Palette
+  // #FFFFFF (Snow), #A5F3FC (Ice), #FB923C (Mandarin), #FFD700 (Gold)
+  const winterColors = ['#FFFFFF', '#A5F3FC', '#FB923C', '#FFD700'];
 
   function randomInRange(min, max) {
     return Math.random() * (max - min) + min;
@@ -25,14 +30,20 @@ export const celebrateAchievement = () => {
     confetti({
       ...defaults,
       particleCount,
-      origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+      origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+      colors: winterColors,
+      shapes: ['circle', 'square', 'star'], // Звезды для праздника
+      scalar: 1.2 // Чуть крупнее
     });
     
     // Конфетти справа
     confetti({
       ...defaults,
       particleCount,
-      origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+      origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+      colors: winterColors,
+      shapes: ['circle', 'square', 'star'],
+      scalar: 1.2
     });
   }, 250);
 };
@@ -44,7 +55,8 @@ export const confettiExplosion = () => {
   const count = 200;
   const defaults = {
     origin: { y: 0.5 },
-    zIndex: 9999
+    zIndex: 9999,
+    colors: ['#FFFFFF', '#7DD3FC', '#FDBA74', '#FDE047'] // Светлее
   };
 
   function fire(particleRatio, opts) {
@@ -58,6 +70,7 @@ export const confettiExplosion = () => {
   fire(0.25, {
     spread: 26,
     startVelocity: 55,
+    shapes: ['star']
   });
   
   fire(0.2, {
@@ -74,7 +87,8 @@ export const confettiExplosion = () => {
     spread: 120,
     startVelocity: 25,
     decay: 0.92,
-    scalar: 1.2
+    scalar: 1.2,
+    shapes: ['star']
   });
   
   fire(0.1, {
@@ -108,17 +122,19 @@ export const confettiFireworks = () => {
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.1, 0.9), y: randomInRange(0.1, 0.5) },
-      colors: ['#A3F7BF', '#FFE66D', '#FFB4D1', '#C4A3FF', '#80E8FF']
+      colors: ['#FFFFFF', '#38BDF8', '#FB923C', '#F472B6', '#C084FC'],
+      shapes: ['star', 'circle']
     });
   }, 250);
 };
 
 /**
- * Радужное конфетти (для пасхалки)
+ * Радужное конфетти (для пасхалки) - Теперь "Северное сияние"
  */
 export const rainbowConfetti = () => {
   const end = Date.now() + (3 * 1000);
-  const colors = ['#A3F7BF', '#FFE66D', '#FFB4D1', '#C4A3FF', '#80E8FF', '#FF6B6B'];
+  // Aurora Borealis colors
+  const colors = ['#6EE7B7', '#3B82F6', '#9333EA', '#FFFFFF'];
 
   (function frame() {
     confetti({
@@ -127,7 +143,8 @@ export const rainbowConfetti = () => {
       spread: 55,
       origin: { x: 0 },
       colors: colors,
-      zIndex: 9999
+      zIndex: 9999,
+      shapes: ['star']
     });
     
     confetti({
@@ -136,7 +153,8 @@ export const rainbowConfetti = () => {
       spread: 55,
       origin: { x: 1 },
       colors: colors,
-      zIndex: 9999
+      zIndex: 9999,
+      shapes: ['star']
     });
 
     if (Date.now() < end) {
@@ -153,8 +171,10 @@ export const quickConfetti = () => {
     particleCount: 100,
     spread: 70,
     origin: { y: 0.6 },
-    colors: ['#A3F7BF', '#FFE66D', '#FFB4D1', '#C4A3FF', '#80E8FF'],
-    zIndex: 9999
+    colors: ['#FFFFFF', '#BAE6FD', '#FDBA74'],
+    zIndex: 9999,
+    shapes: ['circle', 'square'],
+    scalar: 0.9
   });
 };
 
@@ -167,7 +187,7 @@ export const tasksCompleteConfetti = () => {
   const defaults = {
     origin: { y: 0.4 },
     zIndex: 9999,
-    colors: ['#FCD34D', '#FBBF24', '#F59E0B', '#FB923C', '#F97316'] // Жёлто-оранжевые цвета как в Tasks
+    colors: ['#FCD34D', '#FBBF24', '#F59E0B', '#FFFFFF', '#E0F2FE'] // Золото + Снег
   };
 
   function fire(particleRatio, opts) {
@@ -182,7 +202,8 @@ export const tasksCompleteConfetti = () => {
   fire(0.3, {
     spread: 40,
     startVelocity: 45,
-    decay: 0.9
+    decay: 0.9,
+    shapes: ['star']
   });
   
   // Вторая волна - широкая
