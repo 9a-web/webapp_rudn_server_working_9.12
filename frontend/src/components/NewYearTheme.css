@@ -1,0 +1,57 @@
+/* Новогодняя тема - стили для снежинок */
+
+.new-year-theme {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.snowflakes-container {
+  position: absolute;
+  top: -50px;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.snowflake {
+  position: absolute;
+  top: -50px;
+  color: #ffffff;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+  animation: snowfall linear infinite, swing ease-in-out infinite alternate;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Анимация падения снежинки */
+@keyframes snowfall {
+  0% {
+    transform: translateY(-50px);
+  }
+  100% {
+    transform: translateY(calc(100vh + 50px));
+  }
+}
+
+/* Анимация раскачивания снежинки */
+@keyframes swing {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(var(--swing-amount, 40px));
+  }
+}
+
+/* Адаптация под мобильные устройства */
+@media (max-width: 768px) {
+  .snowflake {
+    font-size: 0.8em;
+  }
+}
