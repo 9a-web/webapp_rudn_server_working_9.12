@@ -501,8 +501,8 @@ const Home = () => {
   }, [user]);
 
   // Обработчик изменения настройки новогодней темы
-  const handleThemeChange = useCallback((enabled) => {
-    setNewYearThemeEnabled(enabled);
+  const handleThemeChange = useCallback((mode) => {
+    setNewYearThemeMode(mode);
   }, []);
 
   const loadSchedule = async () => {
