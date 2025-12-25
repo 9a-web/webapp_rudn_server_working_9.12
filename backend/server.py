@@ -733,13 +733,13 @@ async def update_theme_settings(telegram_id: int, settings: ThemeSettingsUpdate)
         await db.user_settings.update_one(
             {"telegram_id": telegram_id},
             {"$set": {
-                "new_year_theme_enabled": settings.new_year_theme_enabled,
+                "new_year_theme_mode": settings.new_year_theme_mode.value,
                 "updated_at": datetime.utcnow()
             }}
         )
         
         return ThemeSettingsResponse(
-            new_year_theme_enabled=settings.new_year_theme_enabled,
+            new_year_theme_mode=settings.new_year_theme_mode.value,
             telegram_id=telegram_id
         )
     except HTTPException:
@@ -758,8 +758,20 @@ async def get_theme_settings(telegram_id: int):
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
+        # Миграция старых данных: если есть old boolean поле, конвертируем
+        theme_mode = user.get("new_year_theme_mode")
+        if theme_mode is None:
+            # Миграция: boolean -> enum
+            old_enabled = user.get("new_year_theme_enabled", True)
+            theme_mode = "always" if old_enabled else "off"
+            # Сохраняем новое значение
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"new_year_theme_mode": theme_mode}}
+            )
+        
         return ThemeSettingsResponse(
-            new_year_theme_enabled=user.get("new_year_theme_enabled", True),
+            new_year_theme_mode=theme_mode,
             telegram_id=telegram_id
         )
     except HTTPException:
