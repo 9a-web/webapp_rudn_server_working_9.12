@@ -812,40 +812,79 @@ const Home = () => {
     setShowGroupSelector(true);
   };
 
+  // Рендерим новогоднюю тему для всех экранов
+  const renderNewYearTheme = () => {
+    // Определяем, показывать ли снег
+    let showSnow = false;
+    
+    if (newYearThemeMode === 'always') {
+      // Режим "Всегда" - показываем круглый год
+      console.log('🎄 NewYear Theme Mode: always - showing snow');
+      showSnow = true;
+    } else if (newYearThemeMode === 'auto') {
+      // Режим "Авто" - показываем только зимой (Dec/Jan/Feb)
+      const isWinter = isWinterSeason();
+      console.log('🎄 NewYear Theme Mode: auto - isWinter:', isWinter);
+      showSnow = isWinter;
+    } else {
+      console.log('🎄 NewYear Theme Mode:', newYearThemeMode, '- snow disabled');
+    }
+    // Режим "off" - не показываем (showSnow остаётся false)
+    
+    console.log('🎄 Final decision: showSnow =', showSnow);
+    return showSnow ? <NewYearTheme enabled={true} /> : null;
+  };
+
   // Показываем Welcome Screen
   if (showWelcomeScreen) {
-    return <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />;
+    return (
+      <>
+        {renderNewYearTheme()}
+        <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />
+      </>
+    );
   }
 
   // Показываем GroupSelector
   if (showGroupSelector) {
     return (
-      <GroupSelector
-        onGroupSelected={handleGroupSelected}
-        onCancel={userSettings ? () => setShowGroupSelector(false) : null}
-      />
+      <>
+        {renderNewYearTheme()}
+        <GroupSelector
+          onGroupSelected={handleGroupSelected}
+          onCancel={userSettings ? () => setShowGroupSelector(false) : null}
+        />
+      </>
     );
   }
 
   // Показываем экран загрузки
   if (loading && !userSettings) {
-    return <LoadingScreen message={t('common.loading')} />;
+    return (
+      <>
+        {renderNewYearTheme()}
+        <LoadingScreen message={t('common.loading')} />
+      </>
+    );
   }
 
   // Показываем ошибку
   if (error && !userSettings) {
     return (
-      <div className="h-full min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
-          <button
-            onClick={loadUserData}
-            className="bg-white text-black px-6 py-3 rounded-full font-medium"
-          >
-            {t('common.retry')}
-          </button>
+      <>
+        {renderNewYearTheme()}
+        <div className="h-full min-h-screen bg-background flex items-center justify-center p-4">
+          <div className="text-center">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button
+              onClick={loadUserData}
+              className="bg-white text-black px-6 py-3 rounded-full font-medium"
+            >
+              {t('common.retry')}
+            </button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -855,27 +894,7 @@ const Home = () => {
       <UpcomingClassNotification schedule={schedule} />
       
       {/* Новогодняя тема с тремя режимами */}
-      {(() => {
-        // Определяем, показывать ли снег
-        let showSnow = false;
-        
-        if (newYearThemeMode === 'always') {
-          // Режим "Всегда" - показываем круглый год
-          console.log('🎄 NewYear Theme Mode: always - showing snow');
-          showSnow = true;
-        } else if (newYearThemeMode === 'auto') {
-          // Режим "Авто" - показываем только зимой (Dec/Jan/Feb)
-          const isWinter = isWinterSeason();
-          console.log('🎄 NewYear Theme Mode: auto - isWinter:', isWinter);
-          showSnow = isWinter;
-        } else {
-          console.log('🎄 NewYear Theme Mode:', newYearThemeMode, '- snow disabled');
-        }
-        // Режим "off" - не показываем (showSnow остаётся false)
-        
-        console.log('🎄 Final decision: showSnow =', showSnow);
-        return showSnow ? <NewYearTheme enabled={true} /> : null;
-      })()}
+      {renderNewYearTheme()}
       
       {/* Greeting Notification через очередь */}
       <GreetingNotification 
