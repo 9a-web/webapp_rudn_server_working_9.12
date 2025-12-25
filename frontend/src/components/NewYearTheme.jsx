@@ -8,8 +8,6 @@ export const NewYearTheme = ({ enabled = true }) => {
   const [snowflakes, setSnowflakes] = useState([]);
 
   useEffect(() => {
-    console.log('🎄 NewYearTheme: enabled =', enabled);
-    
     if (!enabled) {
       setSnowflakes([]);
       return;
@@ -26,14 +24,10 @@ export const NewYearTheme = ({ enabled = true }) => {
       swingAmount: 30 + Math.random() * 40, // амплитуда раскачивания (px)
     }));
 
-    console.log('❄️ NewYearTheme: Created', flakes.length, 'snowflakes');
     setSnowflakes(flakes);
   }, [enabled]);
 
-  if (!enabled) {
-    console.log('🚫 NewYearTheme: Not rendering (disabled)');
-    return null;
-  }
+  if (!enabled) return null;
 
   return (
     <div className="new-year-theme">
