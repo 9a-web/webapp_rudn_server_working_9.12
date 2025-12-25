@@ -23,7 +23,7 @@ import { scheduleAPI, userAPI, achievementsAPI, tasksAPI } from './services/api'
 import { processReferralWebApp } from './services/referralAPI';
 import { processJournalWebAppInvite } from './services/journalAPI';
 import { joinRoomByToken } from './services/roomsAPI';
-import { getWeekNumberForDate } from './utils/dateUtils';
+import { getWeekNumberForDate, isWinterSeason } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
 import SnowfallBackground from './components/SnowfallBackground';
