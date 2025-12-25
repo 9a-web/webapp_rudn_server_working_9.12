@@ -22,7 +22,7 @@ export const ProfileModal = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [newYearThemeEnabled, setNewYearThemeEnabled] = useState(true);
+  const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
   const [themeLoading, setThemeLoading] = useState(false);
 
   // Загрузка реферальных данных при открытии
