@@ -38,6 +38,8 @@ from models import (
     NotificationSettingsUpdate,
     NotificationSettingsResponse,
     NotificationStatsResponse,
+    ThemeSettingsUpdate,
+    ThemeSettingsResponse,
     Achievement,
     UserAchievement,
     UserAchievementResponse,
