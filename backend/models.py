@@ -97,6 +97,9 @@ class UserSettings(BaseModel):
     notifications_enabled: bool = False
     notification_time: int = Field(default=10, ge=5, le=30)  # минут до начала пары
     
+    # Настройки темы
+    new_year_theme_enabled: bool = True  # новогодняя тема (снежинки и декор)
+    
     # Реферальная система
     referral_code: Optional[str] = None  # уникальный реферальный код пользователя
     referred_by: Optional[int] = None  # telegram_id пригласившего
