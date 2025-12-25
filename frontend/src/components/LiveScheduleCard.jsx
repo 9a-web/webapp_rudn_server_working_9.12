@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { liveCardVariants, fadeInScale } from '../utils/animations';
 import { pluralizeMinutes } from '../utils/pluralize';
 import { translateDiscipline } from '../i18n/subjects';
+import { Snowflake } from 'lucide-react';
 
 export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   const [time, setTime] = useState(new Date());
@@ -45,17 +46,18 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
         animate="animate"
         variants={liveCardVariants}
       >
-        {/* 3-я карточка - самая маленькая и дальняя с параллакс эффектом */}
+        {/* 3-я карточка - самая маленькая и дальняя с "Морозным" эффектом */}
         <motion.div 
-          className="absolute rounded-3xl mx-auto left-0 right-0 border border-white/5"
+          className="absolute rounded-3xl mx-auto left-0 right-0 border border-sky-300/10"
           style={{ 
-            backgroundColor: 'rgba(33, 33, 33, 0.6)',
+            backgroundColor: 'rgba(30, 41, 59, 0.5)', // Slate-900 transparent
             backdropFilter: 'blur(20px) saturate(150%)',
             WebkitBackdropFilter: 'blur(20px) saturate(150%)',
             width: '83.4%', // 311/373
             height: '140px',
             top: '38px', // 25px от 2-й карточки (13 + 25 = 38)
-            zIndex: 1
+            zIndex: 1,
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)'
           }}
           initial={{ opacity: 0, y: 15, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -65,17 +67,18 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
             ease: [0.25, 0.1, 0.25, 1]
           }}
         ></motion.div>
-        {/* 2-я карточка - средняя с параллакс эффектом */}
+        {/* 2-я карточка - средняя с "Морозным" эффектом */}
         <motion.div 
-          className="absolute rounded-3xl mx-auto left-0 right-0 border border-white/5"
+          className="absolute rounded-3xl mx-auto left-0 right-0 border border-sky-300/15"
           style={{ 
-            backgroundColor: 'rgba(44, 44, 44, 0.65)',
+            backgroundColor: 'rgba(30, 41, 59, 0.6)', // Slate-900
             backdropFilter: 'blur(30px) saturate(160%)',
             WebkitBackdropFilter: 'blur(30px) saturate(160%)',
             width: '93%', // 347/373
             height: '156px',
             top: '13px', // 13px от 1-й карточки
-            zIndex: 2
+            zIndex: 2,
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.2)'
           }}
           initial={{ opacity: 0, y: 10, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -86,15 +89,16 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           }}
         ></motion.div>
         
-        {/* 1-я карточка - основная (самая большая) */}
+        {/* 1-я карточка - основная (самая большая) - ICE GLASS */}
         <motion.div 
-          className="relative rounded-3xl p-6 md:p-8 lg:p-10 shadow-card overflow-hidden border border-white/10"
+          className="relative rounded-3xl p-6 md:p-8 lg:p-10 shadow-card overflow-hidden border border-sky-200/20"
           style={{ 
-            backgroundColor: 'rgba(52, 52, 52, 0.7)',
+            background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))',
             backdropFilter: 'blur(40px) saturate(180%)',
             WebkitBackdropFilter: 'blur(40px) saturate(180%)',
             width: '100%',
-            zIndex: 3
+            zIndex: 3,
+            boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 0 32px 0 rgba(56, 189, 248, 0.05)'
           }}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -104,14 +108,19 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
             ease: [0.25, 0.1, 0.25, 1]
           }}
         >
-          {/* Subtle background gradient с пульсацией */}
+          {/* Frosty patterns decoration (top right) */}
+          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+             <Snowflake className="w-16 h-16 text-sky-200" />
+          </div>
+
+          {/* Subtle background gradient с пульсацией (Blue/Ice) */}
           <motion.div 
-            className="absolute inset-0 bg-gradient-to-br from-accent/20 to-transparent"
+            className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-transparent"
             animate={{ 
-              opacity: [0.3, 0.5, 0.3]
+              opacity: [0.3, 0.6, 0.3]
             }}
             transition={{
-              duration: 3,
+              duration: 4,
               repeat: Infinity,
               ease: "easeInOut"
             }}
@@ -131,12 +140,12 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                 >
                   <motion.p 
                     className="font-bold text-base md:text-lg lg:text-xl break-words" 
-                    style={{ color: '#FFFFFF' }}
+                    style={{ color: '#E0F2FE' }} // Sky-100
                     animate={currentClass ? {
                       textShadow: [
-                        '0 0 0px rgba(163, 247, 191, 0)',
-                        '0 0 10px rgba(163, 247, 191, 0.5)',
-                        '0 0 0px rgba(163, 247, 191, 0)'
+                        '0 0 0px rgba(186, 230, 253, 0)',
+                        '0 0 10px rgba(186, 230, 253, 0.5)',
+                        '0 0 0px rgba(186, 230, 253, 0)'
                       ]
                     } : {}}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -160,7 +169,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                 <motion.p 
                   key={minutesLeft}
                   className="font-medium text-sm md:text-base lg:text-lg break-words" 
-                  style={{ color: '#999999' }}
+                  style={{ color: '#94A3B8' }} // Slate-400
                   initial={{ opacity: 0, x: -5 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 5 }}
@@ -196,16 +205,16 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                 }
               }}
             >
-              {/* Glowing background effect */}
+              {/* Glowing background effect - Winter colors */}
               <motion.div
                 className="absolute w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full"
                 style={{
-                  background: 'radial-gradient(circle, rgba(163, 247, 191, 0.6) 0%, rgba(255, 230, 109, 0.5) 25%, rgba(255, 180, 209, 0.5) 50%, rgba(196, 163, 255, 0.5) 75%, rgba(128, 232, 255, 0.6) 100%)',
-                  filter: 'blur(25px)'
+                  background: 'radial-gradient(circle, rgba(125, 211, 252, 0.5) 0%, rgba(56, 189, 248, 0.4) 50%, rgba(14, 165, 233, 0.3) 100%)', // Sky colors
+                  filter: 'blur(20px)'
                 }}
                 animate={{ 
-                  scale: [1, 1.15, 1],
-                  opacity: [0.6, 0.9, 0.6]
+                  scale: [1, 1.1, 1],
+                  opacity: [0.5, 0.8, 0.5]
                 }}
                 transition={{ 
                   duration: 3,
@@ -220,14 +229,12 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                 style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
                 viewBox="0 0 120 120"
               >
-                {/* Gradient definitions */}
+                {/* Winter Gradient definitions */}
                 <defs>
                   <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#A3F7BF" />
-                    <stop offset="25%" stopColor="#FFE66D" />
-                    <stop offset="50%" stopColor="#FFB4D1" />
-                    <stop offset="75%" stopColor="#C4A3FF" />
-                    <stop offset="100%" stopColor="#80E8FF" />
+                    <stop offset="0%" stopColor="#E0F2FE" /> {/* Sky-100 */}
+                    <stop offset="50%" stopColor="#38BDF8" /> {/* Sky-400 */}
+                    <stop offset="100%" stopColor="#0EA5E9" /> {/* Sky-500 */}
                   </linearGradient>
                   <filter id="glowFilter" x="-50%" y="-50%" width="200%" height="200%">
                     <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -243,7 +250,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   cx="60"
                   cy="60"
                   r={circleRadius}
-                  stroke="url(#progressGradient)"
+                  stroke="rgba(56, 189, 248, 0.2)" // Sky-400/20
                   strokeWidth="14"
                   fill="none"
                   strokeLinecap="round"
@@ -261,7 +268,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   }}
                 />
                 
-                {/* Progress circle - яркое кольцо, заполняется во время пары */}
+                {/* Progress circle - ледяное кольцо */}
                 <motion.circle
                   cx="60"
                   cy="60"
@@ -285,7 +292,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   }}
                   style={{
                     filter: currentClass 
-                      ? 'drop-shadow(0 0 12px rgba(163, 247, 191, 0.8)) drop-shadow(0 0 20px rgba(163, 247, 191, 0.5))' 
+                      ? 'drop-shadow(0 0 12px rgba(56, 189, 248, 0.6)) drop-shadow(0 0 20px rgba(56, 189, 248, 0.3))' 
                       : 'url(#glowFilter)'
                   }}
                   opacity={1}
@@ -294,23 +301,23 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               
               {/* Center content with time */}
               <motion.div 
-                className="relative w-20 h-20 md:w-22 md:h-22 lg:w-24 lg:h-24 rounded-full flex items-center justify-center z-10 border border-white/10" 
+                className="relative w-20 h-20 md:w-22 md:h-22 lg:w-24 lg:h-24 rounded-full flex items-center justify-center z-10 border border-sky-300/20" 
                 style={{ 
-                  backgroundColor: 'rgba(52, 52, 52, 0.8)',
+                  backgroundColor: 'rgba(30, 41, 59, 0.7)',
                   backdropFilter: 'blur(30px) saturate(180%)',
                   WebkitBackdropFilter: 'blur(30px) saturate(180%)'
                 }}
                 animate={{ 
                   boxShadow: currentClass 
                     ? [
-                        '0 0 0 rgba(163, 247, 191, 0)',
-                        '0 0 20px rgba(163, 247, 191, 0.3)',
-                        '0 0 0 rgba(163, 247, 191, 0)'
+                        '0 0 0 rgba(56, 189, 248, 0)',
+                        '0 0 20px rgba(56, 189, 248, 0.3)',
+                        '0 0 0 rgba(56, 189, 248, 0)'
                       ]
                     : [
-                        '0 0 0 rgba(128, 232, 255, 0)',
-                        '0 0 15px rgba(128, 232, 255, 0.2)',
-                        '0 0 0 rgba(128, 232, 255, 0)'
+                        '0 0 0 rgba(14, 165, 233, 0)',
+                        '0 0 15px rgba(14, 165, 233, 0.2)',
+                        '0 0 0 rgba(14, 165, 233, 0)'
                       ]
                 }}
                 transition={{ 
@@ -323,7 +330,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   <motion.span 
                     key={formatTime(time)}
                     className="text-lg md:text-xl lg:text-2xl font-bold" 
-                    style={{ color: '#FFFFFF' }}
+                    style={{ color: '#F0F9FF' }} // Sky-50
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
