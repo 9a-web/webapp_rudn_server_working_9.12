@@ -225,6 +225,20 @@ class NotificationHistoryResponse(BaseModel):
     history: List[NotificationHistoryItem]
     count: int
 
+
+# ============ Модели для настроек темы ============
+
+class ThemeSettingsUpdate(BaseModel):
+    """Обновление настроек темы"""
+    new_year_theme_enabled: bool
+
+
+class ThemeSettingsResponse(BaseModel):
+    """Ответ с настройками темы"""
+    new_year_theme_enabled: bool
+    telegram_id: int
+
+
 # ============ Модели для достижений ============
 
 class Achievement(BaseModel):
