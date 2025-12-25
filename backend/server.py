@@ -38,6 +38,7 @@ from models import (
     NotificationSettingsUpdate,
     NotificationSettingsResponse,
     NotificationStatsResponse,
+    ThemeMode,
     ThemeSettingsUpdate,
     ThemeSettingsResponse,
     Achievement,
