@@ -24,28 +24,27 @@
   top: -50px;
   color: #ffffff;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-  animation: snowfall linear infinite, swing ease-in-out infinite alternate;
+  animation: snowfall-combined linear infinite;
   user-select: none;
   pointer-events: none;
 }
 
-/* Анимация падения снежинки */
-@keyframes snowfall {
+/* Объединённая анимация падения и раскачивания снежинки */
+@keyframes snowfall-combined {
   0% {
-    transform: translateY(-50px);
+    transform: translateY(-50px) translateX(0);
+  }
+  25% {
+    transform: translateY(calc(25vh + 12.5px)) translateX(var(--swing-amount, 40px));
+  }
+  50% {
+    transform: translateY(calc(50vh + 25px)) translateX(0);
+  }
+  75% {
+    transform: translateY(calc(75vh + 37.5px)) translateX(calc(-1 * var(--swing-amount, 40px)));
   }
   100% {
-    transform: translateY(calc(100vh + 50px));
-  }
-}
-
-/* Анимация раскачивания снежинки */
-@keyframes swing {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(var(--swing-amount, 40px));
+    transform: translateY(calc(100vh + 50px)) translateX(0);
   }
 }
 
