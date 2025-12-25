@@ -717,6 +717,56 @@ async def get_notification_settings(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.put("/user-settings/{telegram_id}/theme", response_model=ThemeSettingsResponse)
+async def update_theme_settings(telegram_id: int, settings: ThemeSettingsUpdate):
+    """Обновить настройки темы пользователя"""
+    try:
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Обновляем настройки темы
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {
+                "new_year_theme_enabled": settings.new_year_theme_enabled,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        return ThemeSettingsResponse(
+            new_year_theme_enabled=settings.new_year_theme_enabled,
+            telegram_id=telegram_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении настроек темы: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user-settings/{telegram_id}/theme", response_model=ThemeSettingsResponse)
+async def get_theme_settings(telegram_id: int):
+    """Получить настройки темы пользователя"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return ThemeSettingsResponse(
+            new_year_theme_enabled=user.get("new_year_theme_enabled", True),
+            telegram_id=telegram_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении настроек темы: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/notifications/stats", response_model=NotificationStatsResponse)
 async def get_notification_stats(date: Optional[str] = None):
     """
