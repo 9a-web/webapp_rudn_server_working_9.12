@@ -38,6 +38,7 @@ import { GreetingNotification, GreetingNotificationContent } from './components/
 import { AchievementNotificationContent } from './components/AchievementNotification';
 import { NotificationQueueProvider, useNotificationQueue } from './components/NotificationQueue';
 import { AnimatePresence } from 'framer-motion';
+import SnowfallBackground from './components/SnowfallBackground';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
