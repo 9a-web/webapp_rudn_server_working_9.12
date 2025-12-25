@@ -464,6 +464,20 @@ const Home = () => {
       if (settings && settings.group_id && settings.facultet_id) {
         // Пользователь имеет полные настройки
         setUserSettings(settings);
+        
+        // Загружаем настройки темы
+        try {
+          const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+          const themeResponse = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
+          if (themeResponse.ok) {
+            const themeData = await themeResponse.json();
+            setNewYearThemeEnabled(themeData.new_year_theme_enabled);
+          }
+        } catch (themeError) {
+          console.error('Error loading theme settings:', themeError);
+          // Используем значение по умолчанию
+          setNewYearThemeEnabled(true);
+        }
       } else if (settings) {
         // Пользователь существует, но у него неполные настройки
         console.log('User has incomplete settings, showing welcome screen');
