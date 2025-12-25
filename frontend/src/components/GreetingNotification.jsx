@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Droplets, Wind } from 'lucide-react';
+import { Sun, Moon, Droplets, Wind, Snowflake } from 'lucide-react';
 import { weatherAPI } from '../services/api';
 
 // Standalone версия компонента для показа в очереди
 export const GreetingNotificationContent = ({ greeting, onClose }) => {
   const weather = greeting.weather;
   const isMorning = greeting.type === 'morning';
+  const isWinter = greeting.isWinter;
   
   return (
     <motion.div
@@ -24,15 +25,19 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
       <div 
         onClick={onClose}
         className={`cursor-pointer active:scale-95 transition-transform pointer-events-auto w-full max-w-sm px-4 py-3 rounded-2xl shadow-2xl border backdrop-blur-xl backdrop-saturate-150
-        ${isMorning 
-          ? 'bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 border-orange-300/30 text-white shadow-orange-500/25' 
-          : 'bg-gradient-to-br from-indigo-800 via-blue-900 to-slate-900 border-indigo-400/30 text-white shadow-indigo-500/25'
+        ${isWinter 
+            ? 'bg-gradient-to-br from-blue-900 via-sky-800 to-indigo-900 border-sky-300/30 text-white shadow-sky-500/25'
+            : isMorning 
+              ? 'bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 border-orange-300/30 text-white shadow-orange-500/25' 
+              : 'bg-gradient-to-br from-indigo-800 via-blue-900 to-slate-900 border-indigo-400/30 text-white shadow-indigo-500/25'
         }`}
       >
         {/* Header row */}
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-full flex-shrink-0 ${isMorning ? 'bg-white/25' : 'bg-white/15'}`}>
-            {isMorning ? (
+            {isWinter ? (
+               <Snowflake className="w-6 h-6 text-sky-100 animate-pulse" />
+            ) : isMorning ? (
               <Sun className="w-6 h-6 text-yellow-100" />
             ) : (
               <Moon className="w-6 h-6 text-blue-200" />
@@ -79,7 +84,7 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
             
             {/* Weather description */}
             <div className="mt-2 text-xs text-white/80 text-center">
-              Москва
+              Москва • {isWinter ? "С наступающим! 🎄" : "Хорошего дня!"}
             </div>
           </div>
         )}
@@ -98,6 +103,13 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
     const checkTime = async () => {
       const now = new Date();
       const hour = testHour !== null ? testHour : now.getHours();
+      const month = now.getMonth(); // 0-11
+      // Winter: December (11), January (0), February (1)
+      // Festive logic specifically for Dec/Jan
+      const isWinter = month === 11 || month === 0 || month === 1;
+      // Is it near New Year? (Dec 20 - Jan 10)
+      const day = now.getDate();
+      const isNewYearTime = (month === 11 && day >= 20) || (month === 0 && day <= 10);
       
       let type = null;
       let title = "";
@@ -107,14 +119,24 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
       // Morning: 04:00 - 11:59
       if (hour >= 4 && hour < 12) {
         type = 'morning';
-        title = userFirstName ? `Доброе утро, ${userFirstName}!` : 'Доброе утро!';
-        message = 'Желаем продуктивного дня и отличного настроения ✨';
+        if (isNewYearTime) {
+             title = userFirstName ? `🎄 Волшебного утра, ${userFirstName}!` : '🎄 Волшебного утра!';
+             message = 'Пусть этот день будет полон чудес и продуктивности! 🎁';
+        } else {
+             title = userFirstName ? `Доброе утро, ${userFirstName}!` : 'Доброе утро!';
+             message = 'Желаем продуктивного дня и отличного настроения ✨';
+        }
       } 
       // Night: 22:00 - 04:59
       else if (hour >= 22 || hour < 4) {
         type = 'night';
-        title = userFirstName ? `Доброй ночи, ${userFirstName}!` : 'Доброй ночи!';
-        message = 'Пора отдыхать и набираться сил перед завтрашним днем 🌙';
+        if (isNewYearTime) {
+            title = userFirstName ? `🎅 Уютной ночи, ${userFirstName}!` : '🎅 Уютной ночи!';
+            message = 'Время загадывать желания и отдыхать. Сладких снов! ❄️';
+        } else {
+            title = userFirstName ? `Доброй ночи, ${userFirstName}!` : 'Доброй ночи!';
+            message = 'Пора отдыхать и набираться сил перед завтрашним днем 🌙';
+        }
       }
 
       // Fetch weather for both morning and night greetings
@@ -125,7 +147,7 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
           console.warn('Failed to fetch weather:', error);
         }
 
-        const greetingData = { type, title, message, weather };
+        const greetingData = { type, title, message, weather, isWinter: isNewYearTime || isWinter };
         
         if (!testHour) {
           sessionStorage.setItem('greetingShown', 'true');
