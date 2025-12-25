@@ -976,7 +976,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleOpenAddModal}
-              className="w-full py-2 bg-gradient-to-br from-red-500 to-rose-600 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-xs shadow-sm hover:shadow-md transition-shadow"
+              className="w-full py-2 bg-gradient-to-br from-yellow-400 to-orange-400 text-white rounded-lg flex items-center justify-center gap-2 font-medium text-xs shadow-sm hover:shadow-md transition-shadow"
             >
               <Plus className="w-4 h-4" strokeWidth={2.5} />
               Добавить задачу
