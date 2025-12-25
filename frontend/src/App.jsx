@@ -119,6 +119,9 @@ const Home = () => {
   const [userSettings, setUserSettings] = useState(null);
   const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
   const [showGroupSelector, setShowGroupSelector] = useState(false);
+  
+  // Состояние для новогодней темы
+  const [newYearThemeEnabled, setNewYearThemeEnabled] = useState(true);
 
   // Состояния для достижений
   const [allAchievements, setAllAchievements] = useState([]);
