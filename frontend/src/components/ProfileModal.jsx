@@ -60,7 +60,7 @@ export const ProfileModal = ({
         
         if (response.ok) {
           const data = await response.json();
-          setNewYearThemeEnabled(data.new_year_theme_enabled);
+          setNewYearThemeMode(data.new_year_theme_mode || 'auto');
         }
       } catch (error) {
         console.error('Ошибка загрузки настроек темы:', error);
@@ -70,12 +70,11 @@ export const ProfileModal = ({
     loadThemeSettings();
   }, [isOpen, user]);
 
-  // Переключение новогодней темы
-  const toggleNewYearTheme = async () => {
+  // Изменение режима новогодней темы
+  const changeNewYearThemeMode = async (mode) => {
     if (!user?.id || themeLoading) return;
 
     setThemeLoading(true);
-    const newValue = !newYearThemeEnabled;
 
     try {
       const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
@@ -85,14 +84,14 @@ export const ProfileModal = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          new_year_theme_enabled: newValue
+          new_year_theme_mode: mode
         })
       });
 
       if (response.ok) {
-        setNewYearThemeEnabled(newValue);
+        setNewYearThemeMode(mode);
         if (onThemeChange) {
-          onThemeChange(newValue);
+          onThemeChange(mode);
         }
         if (hapticFeedback) hapticFeedback('impact', 'medium');
       } else {
