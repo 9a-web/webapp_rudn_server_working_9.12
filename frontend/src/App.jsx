@@ -836,6 +836,7 @@ const Home = () => {
   return (
     <div className="h-full min-h-screen bg-background telegram-webapp relative">
       <TopGlow />
+      <SnowfallBackground />
       <UpcomingClassNotification schedule={schedule} />
       
       {/* Greeting Notification через очередь */}
