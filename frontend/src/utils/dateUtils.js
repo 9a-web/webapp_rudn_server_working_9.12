@@ -133,3 +133,26 @@ export const formatWeekRange = (weekNumber) => {
     return `${mondayDay} ${mondayMonth} - ${sundayDay} ${sundayMonth}`;
   }
 };
+
+/**
+ * Проверить, является ли текущий период зимним сезоном
+ * Зимний сезон: декабрь, январь, февраль
+ * @returns {boolean} - true если сейчас зима (Dec/Jan/Feb)
+ */
+export const isWinterSeason = () => {
+  const month = new Date().getMonth(); // 0-11
+  return month === 11 || month === 0 || month === 1; // December, January, February
+};
+
+/**
+ * Проверить, является ли текущий период новогодним временем
+ * Новогоднее время: с 20 декабря по 10 января
+ * @returns {boolean} - true если сейчас новогодний период
+ */
+export const isNewYearPeriod = () => {
+  const now = new Date();
+  const month = now.getMonth(); // 0-11
+  const day = now.getDate();
+  
+  return (month === 11 && day >= 20) || (month === 0 && day <= 10);
+};
