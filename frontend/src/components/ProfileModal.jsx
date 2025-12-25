@@ -49,6 +49,63 @@ export const ProfileModal = ({
     loadReferralData();
   }, [isOpen, user]);
 
+  // Загрузка настроек темы при открытии
+  useEffect(() => {
+    const loadThemeSettings = async () => {
+      if (!isOpen || !user?.id) return;
+
+      try {
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+        const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setNewYearThemeEnabled(data.new_year_theme_enabled);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки настроек темы:', error);
+      }
+    };
+
+    loadThemeSettings();
+  }, [isOpen, user]);
+
+  // Переключение новогодней темы
+  const toggleNewYearTheme = async () => {
+    if (!user?.id || themeLoading) return;
+
+    setThemeLoading(true);
+    const newValue = !newYearThemeEnabled;
+
+    try {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+      const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          new_year_theme_enabled: newValue
+        })
+      });
+
+      if (response.ok) {
+        setNewYearThemeEnabled(newValue);
+        if (onThemeChange) {
+          onThemeChange(newValue);
+        }
+        if (hapticFeedback) hapticFeedback('impact', 'medium');
+      } else {
+        throw new Error('Ошибка при сохранении настроек темы');
+      }
+    } catch (error) {
+      console.error('Ошибка при обновлении настроек темы:', error);
+      if (hapticFeedback) hapticFeedback('notification', 'error');
+    } finally {
+      setThemeLoading(false);
+    }
+  };
+
   // Закрытие при клике вне модального окна
   useEffect(() => {
     const handleClickOutside = (event) => {
