@@ -117,7 +117,7 @@ export const JournalSection = ({ telegramId, hapticFeedback, userSettings, pendi
       {/* Header секции */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
             <FileCheck className="w-6 h-6 text-white" strokeWidth={2.5} />
           </div>
           <div>
