@@ -855,11 +855,22 @@ const Home = () => {
       <TopGlow />
       <UpcomingClassNotification schedule={schedule} />
       
-      {/* Show Snowfall only if theme is winter */}
-      {theme === 'winter' && <SnowfallBackground />}
-      
-      {/* New Year Theme - падающие снежинки */}
-      <NewYearTheme enabled={newYearThemeEnabled} />
+      {/* Новогодняя тема с тремя режимами */}
+      {(() => {
+        // Определяем, показывать ли снег
+        let showSnow = false;
+        
+        if (newYearThemeMode === 'always') {
+          // Режим "Всегда" - показываем круглый год
+          showSnow = true;
+        } else if (newYearThemeMode === 'auto') {
+          // Режим "Авто" - показываем только зимой (Dec/Jan/Feb)
+          showSnow = isWinterSeason();
+        }
+        // Режим "off" - не показываем (showSnow остаётся false)
+        
+        return showSnow ? <NewYearTheme enabled={true} /> : null;
+      })()}
       
       {/* Greeting Notification через очередь */}
       <GreetingNotification 
