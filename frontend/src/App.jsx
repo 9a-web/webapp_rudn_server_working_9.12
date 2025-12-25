@@ -861,13 +861,19 @@ const Home = () => {
         
         if (newYearThemeMode === 'always') {
           // Режим "Всегда" - показываем круглый год
+          console.log('🎄 NewYear Theme Mode: always - showing snow');
           showSnow = true;
         } else if (newYearThemeMode === 'auto') {
           // Режим "Авто" - показываем только зимой (Dec/Jan/Feb)
-          showSnow = isWinterSeason();
+          const isWinter = isWinterSeason();
+          console.log('🎄 NewYear Theme Mode: auto - isWinter:', isWinter);
+          showSnow = isWinter;
+        } else {
+          console.log('🎄 NewYear Theme Mode:', newYearThemeMode, '- snow disabled');
         }
         // Режим "off" - не показываем (showSnow остаётся false)
         
+        console.log('🎄 Final decision: showSnow =', showSnow);
         return showSnow ? <NewYearTheme enabled={true} /> : null;
       })()}
       
