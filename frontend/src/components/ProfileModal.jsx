@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake } from 'lucide-react';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { ReferralTree } from './ReferralTree';
 
@@ -10,7 +10,8 @@ export const ProfileModal = ({
   user, 
   userSettings,
   profilePhoto,
-  hapticFeedback 
+  hapticFeedback,
+  onThemeChange
 }) => {
   const modalRef = useRef(null);
   const [referralData, setReferralData] = useState(null);
@@ -21,6 +22,8 @@ export const ProfileModal = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [newYearThemeEnabled, setNewYearThemeEnabled] = useState(true);
+  const [themeLoading, setThemeLoading] = useState(false);
 
   // Загрузка реферальных данных при открытии
   useEffect(() => {
