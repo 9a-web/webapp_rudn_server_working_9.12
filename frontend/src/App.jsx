@@ -26,7 +26,6 @@ import { joinRoomByToken } from './services/roomsAPI';
 import { getWeekNumberForDate, isWinterSeason } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
-import SnowfallBackground from './components/SnowfallBackground';
 import { NewYearTheme } from './components/NewYearTheme';
 
 // Lazy load модальных окон для уменьшения начального bundle
