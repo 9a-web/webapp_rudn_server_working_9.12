@@ -18,6 +18,7 @@ import GroupSelector from './components/GroupSelector';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusTester from './StatusTester';
 import { TelegramProvider, useTelegram } from './contexts/TelegramContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Import ThemeProvider
 import { scheduleAPI, userAPI, achievementsAPI, tasksAPI } from './services/api';
 import { processReferralWebApp } from './services/referralAPI';
 import { processJournalWebAppInvite } from './services/journalAPI';
@@ -25,6 +26,7 @@ import { joinRoomByToken } from './services/roomsAPI';
 import { getWeekNumberForDate } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
+import SnowfallBackground from './components/SnowfallBackground';
 
 // Lazy load модальных окон для уменьшения начального bundle
 const CalendarModal = lazy(() => import('./components/CalendarModal').then(module => ({ default: module.CalendarModal })));
@@ -38,10 +40,10 @@ import { GreetingNotification, GreetingNotificationContent } from './components/
 import { AchievementNotificationContent } from './components/AchievementNotification';
 import { NotificationQueueProvider, useNotificationQueue } from './components/NotificationQueue';
 import { AnimatePresence } from 'framer-motion';
-import SnowfallBackground from './components/SnowfallBackground';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
+  const { theme } = useTheme(); // Use Theme Context
   const { t } = useTranslation();
   // TEST: Greeting Notification
   const [testGreetingHour, setTestGreetingHour] = useState(null);
@@ -603,14 +605,6 @@ const Home = () => {
     }
   };
 
-  // ❌ УБРАНО: Автоматический подсчет просмотров при загрузке расписания
-  // Теперь просмотры считаются только при развертывании карточек (detailed_view)
-  // useEffect(() => {
-  //   if (schedule.length > 0 && user) {
-  //     trackScheduleView();
-  //   }
-  // }, [schedule]);
-
   const updateCurrentClass = useCallback(() => {
     const now = new Date();
     const currentDay = now.toLocaleDateString('ru-RU', { weekday: 'long' });
@@ -836,8 +830,10 @@ const Home = () => {
   return (
     <div className="h-full min-h-screen bg-background telegram-webapp relative">
       <TopGlow />
-      <SnowfallBackground />
       <UpcomingClassNotification schedule={schedule} />
+      
+      {/* Show Snowfall only if theme is winter */}
+      {theme === 'winter' && <SnowfallBackground />}
       
       {/* Greeting Notification через очередь */}
       <GreetingNotification 
@@ -864,24 +860,6 @@ const Home = () => {
         )}
       </AnimatePresence>
       
-      {/* Dev Tools for Testing Greetings - Hidden */}
-      {/* 
-      <div className="fixed top-20 right-4 z-[90] flex flex-col gap-2 opacity-50 hover:opacity-100 transition-opacity">
-        <button 
-          onClick={() => testGreeting(8)}
-          className="bg-orange-500/80 text-white text-[10px] px-2 py-1 rounded-full shadow-lg backdrop-blur"
-        >
-          ☀️ Test Morning
-        </button>
-        <button 
-          onClick={() => testGreeting(23)}
-          className="bg-indigo-900/80 text-white text-[10px] px-2 py-1 rounded-full shadow-lg backdrop-blur"
-        >
-          🌙 Test Night
-        </button>
-      </div>
-      */}
-      
       {/* Adaptive container with responsive max-width */}
       <div className="relative mx-auto max-w-[430px] md:max-w-3xl lg:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
         {/* Header - full width */}
@@ -895,18 +873,6 @@ const Home = () => {
           onMenuStateChange={setIsMenuOpen}
           onProfileStateChange={setIsProfileOpen}
         />
-        
-        {/* Hidden Test Trigger removed */}
-        {/*
-        <div className="px-6 mt-2 flex justify-center opacity-50 hover:opacity-100 transition-opacity">
-            <button 
-                onClick={toggleTestNotification} 
-                className="text-xs text-white/50 bg-white/10 border border-white/20 px-3 py-1 rounded-full"
-            >
-                {testNotification ? "❌ Remove Test Class" : "🔔 Test Notification (+10m)"}
-            </button>
-        </div>
-        */}
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
         {activeTab === 'home' && (
@@ -1078,14 +1044,16 @@ const Home = () => {
 function App() {
   return (
     <div className="App">
-      <TelegramProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/status-tester" element={<StatusTester />} />
-          </Routes>
-        </BrowserRouter>
-      </TelegramProvider>
+      <ThemeProvider>
+        <TelegramProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/status-tester" element={<StatusTester />} />
+            </Routes>
+          </BrowserRouter>
+        </TelegramProvider>
+      </ThemeProvider>
     </div>
   );
 }
