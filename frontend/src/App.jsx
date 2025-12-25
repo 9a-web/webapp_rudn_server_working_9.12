@@ -472,12 +472,12 @@ const Home = () => {
           const themeResponse = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
           if (themeResponse.ok) {
             const themeData = await themeResponse.json();
-            setNewYearThemeEnabled(themeData.new_year_theme_enabled);
+            setNewYearThemeMode(themeData.new_year_theme_mode || 'auto');
           }
         } catch (themeError) {
           console.error('Error loading theme settings:', themeError);
           // Используем значение по умолчанию
-          setNewYearThemeEnabled(true);
+          setNewYearThemeMode('auto');
         }
       } else if (settings) {
         // Пользователь существует, но у него неполные настройки
