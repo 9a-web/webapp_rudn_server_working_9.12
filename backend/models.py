@@ -229,14 +229,20 @@ class NotificationHistoryResponse(BaseModel):
 
 # ============ Модели для настроек темы ============
 
+class ThemeMode(str, Enum):
+    """Режимы новогодней темы"""
+    AUTO = "auto"      # Автоматически (только зимой: Dec/Jan/Feb)
+    ALWAYS = "always"  # Всегда (круглый год)
+    OFF = "off"        # Выключено
+
 class ThemeSettingsUpdate(BaseModel):
     """Обновление настроек темы"""
-    new_year_theme_enabled: bool
+    new_year_theme_mode: ThemeMode = ThemeMode.AUTO
 
 
 class ThemeSettingsResponse(BaseModel):
     """Ответ с настройками темы"""
-    new_year_theme_enabled: bool
+    new_year_theme_mode: str
     telegram_id: int
 
 
