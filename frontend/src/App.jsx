@@ -122,7 +122,7 @@ const Home = () => {
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   
   // Состояние для новогодней темы
-  const [newYearThemeEnabled, setNewYearThemeEnabled] = useState(true);
+  const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
 
   // Состояния для достижений
   const [allAchievements, setAllAchievements] = useState([]);
