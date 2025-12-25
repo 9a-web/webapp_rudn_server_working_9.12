@@ -663,9 +663,9 @@ export const ProfileModal = ({
 
                   {/* Опции настроек */}
                   <div className="space-y-3">
-                    {/* Новогодняя тема */}
-                    <div
-                      className="w-full p-4 rounded-xl flex items-center justify-between"
+                    {/* Новогодняя тема - три режима */}
+                    <div 
+                      className="w-full p-4 rounded-xl transition-all flex flex-col gap-3"
                       style={{
                         backgroundColor: 'rgba(139, 92, 246, 0.1)',
                         border: '1px solid rgba(139, 92, 246, 0.3)',
@@ -675,36 +675,69 @@ export const ProfileModal = ({
                         <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
                           <Snowflake className="w-5 h-5 text-purple-400" />
                         </div>
-                        <div className="text-left">
+                        <div className="text-left flex-1">
                           <p className="text-sm font-semibold text-purple-300">Новогодняя тема</p>
                           <p className="text-xs text-gray-500">Снежинки и праздничный декор</p>
                         </div>
                       </div>
                       
-                      {/* Toggle переключатель */}
-                      <button
-                        onClick={toggleNewYearTheme}
-                        disabled={themeLoading}
-                        className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
-                          newYearThemeEnabled ? 'bg-purple-500' : 'bg-gray-600'
-                        } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                        style={{
-                          boxShadow: newYearThemeEnabled 
-                            ? '0 0 10px rgba(139, 92, 246, 0.5)' 
-                            : 'none',
-                        }}
-                      >
-                        <div
-                          className={`absolute top-0.5 ${
-                            newYearThemeEnabled ? 'right-0.5' : 'left-0.5'
-                          } w-6 h-6 bg-white rounded-full transition-all duration-300 flex items-center justify-center`}
-                          style={{
-                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                          }}
+                      {/* Три кнопки выбора режима */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* Авто */}
+                        <button
+                          onClick={() => changeNewYearThemeMode('auto')}
+                          disabled={themeLoading}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                            newYearThemeMode === 'auto'
+                              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
                         >
-                          {newYearThemeEnabled ? '❄️' : '🔒'}
-                        </div>
-                      </button>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-base">🌙</span>
+                            <span>Авто</span>
+                          </div>
+                        </button>
+
+                        {/* Всегда */}
+                        <button
+                          onClick={() => changeNewYearThemeMode('always')}
+                          disabled={themeLoading}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                            newYearThemeMode === 'always'
+                              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-base">❄️</span>
+                            <span>Всегда</span>
+                          </div>
+                        </button>
+
+                        {/* Выкл */}
+                        <button
+                          onClick={() => changeNewYearThemeMode('off')}
+                          disabled={themeLoading}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                            newYearThemeMode === 'off'
+                              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-base">🔒</span>
+                            <span>Выкл</span>
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Подсказка по текущему режиму */}
+                      <div className="text-xs text-gray-500 text-center px-2">
+                        {newYearThemeMode === 'auto' && '⚡ Автоматически зимой (дек/янв/фев)'}
+                        {newYearThemeMode === 'always' && '🎄 Снег падает круглый год'}
+                        {newYearThemeMode === 'off' && '🚫 Тема отключена'}
+                      </div>
                     </div>
 
                     {/* Удаление аккаунта */}
