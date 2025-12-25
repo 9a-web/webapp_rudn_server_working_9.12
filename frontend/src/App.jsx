@@ -858,6 +858,9 @@ const Home = () => {
       {/* Show Snowfall only if theme is winter */}
       {theme === 'winter' && <SnowfallBackground />}
       
+      {/* New Year Theme - падающие снежинки */}
+      <NewYearTheme enabled={newYearThemeEnabled} />
+      
       {/* Greeting Notification через очередь */}
       <GreetingNotification 
           key={greetingKey}
