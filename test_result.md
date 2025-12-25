@@ -271,6 +271,18 @@ frontend:
     status_history:
       - working: true
         agent: "main"
+  - task: "Magic Winter UI (Part 2: Frosty Cards & Festive Buttons)"
+    implemented: true
+    working: true
+    file: "frontend/src/utils/confetti.js, frontend/src/components/LiveScheduleCard.jsx, frontend/src/components/TasksSection.jsx, frontend/src/components/JournalSection.jsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implemented: 1) Updated confetti with Winter/New Year palette (White, Ice, Gold, Orange) and shapes (Star, Circle, Square) for 'Easter Egg' effect. 2) 'Frosty Glass' effect for LiveScheduleCard (Slate background, Sky border, Snowflake icon). 3) Updated main action buttons: 'Add Task' is now Santa Red, 'Create Journal' is Metallic Gold."
+
         comment: "Implemented: 1) SnowfallBackground component using framer-motion for atmospheric background. 2) Updated GreetingNotification with festive logic (Dec/Jan detection), snowflake icons, and winter-themed gradients. 3) Integrated into App.jsx."
 
   - task: "Smart Greetings (Morning/Night)"
