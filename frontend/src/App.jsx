@@ -894,6 +894,7 @@ const Home = () => {
           hapticFeedback={hapticFeedback}
           onMenuStateChange={setIsMenuOpen}
           onProfileStateChange={setIsProfileOpen}
+          onThemeChange={handleThemeChange}
         />
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
