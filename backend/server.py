@@ -1673,7 +1673,10 @@ async def get_planner_day_events(telegram_id: int, date: str):
                 origin=task.get("origin", "user"),
                 order=task.get("order", 0),
                 created_at=task["created_at"],
-                updated_at=task["updated_at"]
+                updated_at=task["updated_at"],
+                teacher=task.get("teacher"),
+                auditory=task.get("auditory"),
+                lessonType=task.get("lessonType")
             )
             events.append(task_response)
         
