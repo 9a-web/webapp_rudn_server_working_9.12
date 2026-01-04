@@ -99,6 +99,9 @@ from models import (
     ReferralConnection,
     ProcessReferralRequest,
     PlannerSyncRequest,
+    PlannerSyncResponse,
+    PlannerDayRequest,
+    PlannerDayResponse,
     ProcessReferralResponse,
     # Модели для журнала посещений
     AttendanceJournal,
