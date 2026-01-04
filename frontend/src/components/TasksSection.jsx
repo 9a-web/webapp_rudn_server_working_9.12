@@ -1453,6 +1453,15 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         scheduleSubjects={scheduleSubjects}
       />
 
+      {/* Модальное окно создания события для планировщика */}
+      <CreateEventModal
+        isOpen={isCreateEventModalOpen}
+        onClose={() => setIsCreateEventModalOpen(false)}
+        onCreateEvent={handleCreateEvent}
+        hapticFeedback={hapticFeedback}
+        selectedDate={tasksSelectedDate}
+      />
+
       {/* Модальные окна комнат (СКРЫТО: измените SHOW_ROOMS_FEATURE на true, чтобы показать) */}
       {SHOW_ROOMS_FEATURE && (
         <>
