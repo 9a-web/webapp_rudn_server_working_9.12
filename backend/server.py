@@ -1447,6 +1447,257 @@ async def get_productivity_stats(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Эндпоинты для планировщика (Planner) ============
+
+@api_router.post("/planner/sync", response_model=PlannerSyncResponse)
+async def sync_schedule_to_planner(request: PlannerSyncRequest):
+    """
+    Синхронизировать расписание в планировщик на конкретную дату.
+    Создает/обновляет Task записи для каждой пары из расписания.
+    """
+    try:
+        telegram_id = request.telegram_id
+        target_date_str = request.date  # YYYY-MM-DD
+        week_number = request.week_number
+        
+        # Проверяем существование пользователя и получаем его группу
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        group_id = user.get("group_id")
+        if not group_id:
+            raise HTTPException(status_code=400, detail="У пользователя не выбрана группа")
+        
+        # Получаем расписание из кэша или парсим
+        cached = await db.schedule_cache.find_one({
+            "group_id": group_id,
+            "week_number": week_number,
+            "expires_at": {"$gt": datetime.utcnow()}
+        })
+        
+        if not cached:
+            # Если кэш отсутствует, получаем расписание
+            try:
+                events = await get_schedule(
+                    facultet_id=user.get("facultet_id"),
+                    level_id=user.get("level_id"),
+                    kurs=user.get("kurs"),
+                    form_code=user.get("form_code"),
+                    group_id=group_id,
+                    week_number=week_number
+                )
+                # Кэшируем
+                cache_data = {
+                    "id": str(uuid.uuid4()),
+                    "group_id": group_id,
+                    "week_number": week_number,
+                    "events": [event for event in events],
+                    "cached_at": datetime.utcnow(),
+                    "expires_at": datetime.utcnow() + timedelta(hours=1)
+                }
+                await db.schedule_cache.update_one(
+                    {"group_id": group_id, "week_number": week_number},
+                    {"$set": cache_data},
+                    upsert=True
+                )
+                schedule_events = events
+            except Exception as e:
+                logger.error(f"Не удалось получить расписание: {e}")
+                raise HTTPException(status_code=500, detail="Не удалось получить расписание")
+        else:
+            schedule_events = cached.get("events", [])
+        
+        # Парсим дату для фильтрации по дню недели
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        # Определяем день недели на русском (для фильтрации)
+        day_names_ru = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        target_day_name = day_names_ru[target_date.weekday()]
+        
+        # Фильтруем события по дню недели и неделе
+        filtered_events = [
+            event for event in schedule_events
+            if event.get("day") == target_day_name and event.get("week") == week_number
+        ]
+        
+        # Создаем уникальные идентификаторы для каждого события (чтобы избежать дублей)
+        synced_tasks = []
+        synced_count = 0
+        
+        for event in filtered_events:
+            # Создаем уникальный идентификатор события на основе дня, времени и дисциплины
+            event_key = f"{target_date_str}_{event.get('time')}_{event.get('discipline')}"
+            
+            # Проверяем, существует ли уже такое событие
+            existing_task = await db.tasks.find_one({
+                "telegram_id": telegram_id,
+                "origin": "schedule",
+                "target_date": target_date,
+                "time_start": event.get("time").split("-")[0].strip() if "-" in event.get("time", "") else event.get("time"),
+                "text": event.get("discipline")
+            })
+            
+            if existing_task:
+                # Событие уже существует, пропускаем
+                continue
+            
+            # Парсим время (формат: "10:00-11:30")
+            time_parts = event.get("time", "").split("-")
+            time_start = time_parts[0].strip() if len(time_parts) > 0 else ""
+            time_end = time_parts[1].strip() if len(time_parts) > 1 else ""
+            
+            # Создаем новую задачу-событие
+            new_task = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": telegram_id,
+                "text": event.get("discipline", ""),
+                "completed": False,
+                "completed_at": None,
+                "category": "study",
+                "priority": "medium",
+                "deadline": None,
+                "target_date": target_date,
+                "subject": event.get("discipline"),
+                "discipline_id": None,
+                "time_start": time_start,
+                "time_end": time_end,
+                "is_fixed": True,  # Пары - жесткие события
+                "origin": "schedule",
+                "order": 0,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                # Дополнительные поля для отображения
+                "teacher": event.get("teacher", ""),
+                "auditory": event.get("auditory", ""),
+                "lessonType": event.get("lessonType", "")
+            }
+            
+            await db.tasks.insert_one(new_task)
+            synced_count += 1
+            
+            # Формируем ответ
+            task_response = TaskResponse(
+                id=new_task["id"],
+                telegram_id=new_task["telegram_id"],
+                text=new_task["text"],
+                completed=new_task["completed"],
+                completed_at=new_task.get("completed_at"),
+                category=new_task.get("category"),
+                priority=new_task.get("priority"),
+                deadline=new_task.get("deadline"),
+                target_date=new_task.get("target_date"),
+                subject=new_task.get("subject"),
+                discipline_id=new_task.get("discipline_id"),
+                time_start=new_task.get("time_start"),
+                time_end=new_task.get("time_end"),
+                is_fixed=new_task.get("is_fixed", False),
+                origin=new_task.get("origin", "user"),
+                order=new_task.get("order", 0),
+                created_at=new_task["created_at"],
+                updated_at=new_task["updated_at"]
+            )
+            synced_tasks.append(task_response)
+        
+        return PlannerSyncResponse(
+            success=True,
+            synced_count=synced_count,
+            events=synced_tasks,
+            message=f"Синхронизировано {synced_count} событий на {target_date_str}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при синхронизации расписания в планировщик: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/planner/{telegram_id}/{date}", response_model=PlannerDayResponse)
+async def get_planner_day_events(telegram_id: int, date: str):
+    """
+    Получить все события (пары + пользовательские задачи) на конкретную дату.
+    Возвращает отсортированный по времени список.
+    """
+    try:
+        # Парсим дату
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        # Получаем все задачи/события на эту дату
+        # Условия:
+        # 1. target_date совпадает с датой
+        # 2. ИЛИ задача без target_date, но не завершена (задачи из общего списка)
+        
+        tasks_cursor = db.tasks.find({
+            "telegram_id": telegram_id,
+            "$or": [
+                # События и задачи с target_date на эту дату
+                {
+                    "target_date": {
+                        "$gte": target_date,
+                        "$lt": target_date + timedelta(days=1)
+                    }
+                }
+            ]
+        })
+        
+        tasks = await tasks_cursor.to_list(length=None)
+        
+        # Формируем ответ
+        events = []
+        for task in tasks:
+            task_response = TaskResponse(
+                id=task["id"],
+                telegram_id=task["telegram_id"],
+                text=task["text"],
+                completed=task.get("completed", False),
+                completed_at=task.get("completed_at"),
+                category=task.get("category"),
+                priority=task.get("priority", "medium"),
+                deadline=task.get("deadline"),
+                target_date=task.get("target_date"),
+                subject=task.get("subject"),
+                discipline_id=task.get("discipline_id"),
+                time_start=task.get("time_start"),
+                time_end=task.get("time_end"),
+                is_fixed=task.get("is_fixed", False),
+                origin=task.get("origin", "user"),
+                order=task.get("order", 0),
+                created_at=task["created_at"],
+                updated_at=task["updated_at"]
+            )
+            events.append(task_response)
+        
+        # Сортируем события по времени начала
+        # События без времени идут в конец
+        events_with_time = [e for e in events if e.time_start]
+        events_without_time = [e for e in events if not e.time_start]
+        
+        # Сортируем по времени
+        events_with_time.sort(key=lambda x: x.time_start)
+        
+        # Объединяем
+        sorted_events = events_with_time + events_without_time
+        
+        return PlannerDayResponse(
+            date=date,
+            events=sorted_events,
+            total_count=len(sorted_events)
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении событий планировщика: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ API для групповых задач ============
 
 @api_router.post("/group-tasks", response_model=GroupTaskResponse)
