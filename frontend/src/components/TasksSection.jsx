@@ -197,6 +197,127 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     }
   };
 
+  // ============ Функции для планировщика ============
+
+  /**
+   * Загрузить события планировщика для выбранной даты
+   */
+  const loadPlannerEvents = async (date) => {
+    if (!user?.id) return;
+    
+    try {
+      setPlannerLoading(true);
+      const dateString = formatDateToYYYYMMDD(date);
+      const response = await plannerAPI.getDayEvents(user.id, dateString);
+      setPlannerEvents(response.events || []);
+    } catch (error) {
+      console.error('Error loading planner events:', error);
+    } finally {
+      setPlannerLoading(false);
+    }
+  };
+
+  /**
+   * Синхронизировать расписание в планировщик
+   */
+  const handleSyncSchedule = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setSyncingSchedule(true);
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      
+      // Определяем номер недели для выбранной даты
+      const weekNum = getWeekNumberForDate(tasksSelectedDate);
+      const parity = (weekNum % 2) === 0 ? 2 : 1;
+      
+      const dateString = formatDateToYYYYMMDD(tasksSelectedDate);
+      
+      const response = await plannerAPI.syncSchedule(user.id, dateString, parity);
+      
+      if (response.success) {
+        // Перезагружаем события после синхронизации
+        await loadPlannerEvents(tasksSelectedDate);
+        await loadTasks(); // Обновляем также общий список задач
+        
+        const message = response.synced_count > 0 
+          ? `Синхронизировано ${response.synced_count} пар`
+          : 'На этот день нет пар в расписании';
+        
+        hapticFeedback && hapticFeedback('notification', 'success');
+        
+        // Показываем уведомление
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert(message);
+        } else {
+          alert(message);
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing schedule:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+      
+      const errorMessage = error?.message || 'Не удалось синхронизировать расписание';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(errorMessage);
+      } else {
+        alert(errorMessage);
+      }
+    } finally {
+      setSyncingSchedule(false);
+    }
+  };
+
+  /**
+   * Создать пользовательское событие
+   */
+  const handleCreateEvent = async (eventData) => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await plannerAPI.createEvent(
+        user.id,
+        eventData.text,
+        eventData.time_start,
+        eventData.time_end,
+        eventData.target_date,
+        {
+          category: eventData.category,
+          notes: eventData.notes,
+          is_fixed: eventData.is_fixed,
+        }
+      );
+      
+      // Перезагружаем события
+      await loadPlannerEvents(tasksSelectedDate);
+      await loadTasks();
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Форматировать дату в YYYY-MM-DD
+   */
+  const formatDateToYYYYMMDD = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Загружать события планировщика при изменении даты или переключении в режим планировщика
+  useEffect(() => {
+    if (activeView === 'schedule' && tasksSelectedDate) {
+      loadPlannerEvents(tasksSelectedDate);
+    }
+  }, [activeView, tasksSelectedDate, user]);
+
+  // ============ Конец функций планировщика ============
+
   const handleCreateRoom = async (roomData) => {
     console.log('handleCreateRoom called', { roomData, userSettings });
     
