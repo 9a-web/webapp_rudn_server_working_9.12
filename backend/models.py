@@ -417,6 +417,7 @@ class TaskCreate(BaseModel):
     target_date: Optional[datetime] = None
     subject: Optional[str] = None
     discipline_id: Optional[str] = None
+    notes: Optional[str] = None
     time_start: Optional[str] = None
     time_end: Optional[str] = None
     is_fixed: bool = False
