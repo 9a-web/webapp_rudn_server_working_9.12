@@ -1198,23 +1198,25 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           <div className="flex justify-end gap-2 mb-2">
              <motion.button
               whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                hapticFeedback && hapticFeedback('impact', 'light');
-                // TODO: Логика синхронизации с расписанием
-                console.log('Sync schedule');
-              }}
-              className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center gap-2"
+              onClick={handleSyncSchedule}
+              disabled={syncingSchedule || !userSettings?.group_id}
+              className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Link2 className="w-4 h-4" />
-              <span className="text-xs font-medium">Пары</span>
+              {syncingSchedule ? (
+                <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+              ) : (
+                <Link2 className="w-4 h-4" />
+              )}
+              <span className="text-xs font-medium">
+                {syncingSchedule ? 'Синхронизация...' : 'Синхронизировать пары'}
+              </span>
             </motion.button>
 
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 hapticFeedback && hapticFeedback('impact', 'light');
-                // TODO: Логика создания события
-                console.log('Create event');
+                setIsCreateEventModalOpen(true);
               }}
               className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm flex items-center gap-2"
             >
@@ -1223,15 +1225,24 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             </motion.button>
           </div>
 
-          {scheduleForDate.length === 0 ? (
+          {/* Отображение событий */}
+          {plannerLoading ? (
+            <div className="text-center py-8">
+              <div className="inline-block w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin mb-2" />
+              <p className="text-gray-500 text-sm">Загрузка...</p>
+            </div>
+          ) : plannerEvents.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-center py-8"
             >
               <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">
-                На {currentDate} нет занятий
+              <p className="text-gray-500 text-sm mb-2">
+                На {currentDate} нет событий
+              </p>
+              <p className="text-gray-400 text-xs">
+                Нажмите "Синхронизировать пары" или "Событие"
               </p>
             </motion.div>
           ) : (
@@ -1240,52 +1251,117 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               animate={{ opacity: 1, y: 0 }}
               className="space-y-3"
             >
-              {scheduleForDate.map((event, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                        <Clock className="w-6 h-6 text-white" />
+              {plannerEvents.map((event, index) => {
+                const isScheduleEvent = event.origin === 'schedule';
+                const isCompleted = event.completed;
+                
+                return (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`rounded-2xl p-4 shadow-sm border ${
+                      isScheduleEvent 
+                        ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100'
+                        : 'bg-white border-gray-100'
+                    } ${isCompleted ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          isScheduleEvent
+                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                            : 'bg-gradient-to-br from-purple-500 to-pink-500'
+                        }`}>
+                          <Clock className="w-6 h-6 text-white" />
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-blue-600">
-                          {event.time}
-                        </span>
-                        {event.type && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                            {event.type}
-                          </span>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {event.time_start && event.time_end && (
+                            <span className={`text-sm font-semibold ${
+                              isScheduleEvent ? 'text-blue-600' : 'text-purple-600'
+                            }`}>
+                              {event.time_start} - {event.time_end}
+                            </span>
+                          )}
+                          {isScheduleEvent && (
+                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                              Пара
+                            </span>
+                          )}
+                          {event.is_fixed && (
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                              Фиксир.
+                            </span>
+                          )}
+                          {event.category && (
+                            <span className="text-lg">{getCategoryEmoji(event.category)}</span>
+                          )}
+                        </div>
+                        
+                        <h3 className={`text-base font-bold mb-1 ${
+                          isCompleted ? 'line-through text-gray-500' : 'text-gray-900'
+                        }`}>
+                          {event.text}
+                        </h3>
+                        
+                        {event.teacher && (
+                          <p className="text-sm text-gray-600 mb-1">
+                            👨‍🏫 {event.teacher}
+                          </p>
+                        )}
+                        
+                        {event.auditory && (
+                          <p className="text-sm text-gray-600">
+                            🏢 {event.auditory}
+                          </p>
+                        )}
+                        
+                        {event.subject && !isScheduleEvent && (
+                          <p className="text-sm text-gray-600">
+                            📚 {event.subject}
+                          </p>
                         )}
                       </div>
                       
-                      <h3 className="text-base font-bold text-gray-900 mb-1">
-                        {event.discipline}
-                      </h3>
-                      
-                      {event.teacher && (
-                        <p className="text-sm text-gray-600 mb-1">
-                          👨‍🏫 {event.teacher}
-                        </p>
-                      )}
-                      
-                      {event.room && (
-                        <p className="text-sm text-gray-600">
-                          🏢 {event.room}
-                        </p>
+                      {/* Кнопки действий */}
+                      {!isScheduleEvent && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={async () => {
+                              hapticFeedback && hapticFeedback('impact', 'light');
+                              await toggleTask(event.id);
+                              await loadPlannerEvents(tasksSelectedDate);
+                            }}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isCompleted 
+                                ? 'bg-green-100 text-green-600' 
+                                : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-600'
+                            }`}
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              hapticFeedback && hapticFeedback('impact', 'medium');
+                              if (window.confirm('Удалить это событие?')) {
+                                await handleDeleteTask(event.id);
+                                await loadPlannerEvents(tasksSelectedDate);
+                              }
+                            }}
+                            className="p-2 rounded-lg bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           )}
         </div>
