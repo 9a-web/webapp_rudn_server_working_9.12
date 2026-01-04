@@ -49,8 +49,7 @@ class EventPlannerTester:
                 "time_end": "11:00",
                 "target_date": TEST_DATE,
                 "category": "meeting",
-                "notes": "Обсудить курсовую работу",
-                "origin": "user"
+                "notes": "Обсудить курсовую работу"
             }
             
             response = await self.client.post(
