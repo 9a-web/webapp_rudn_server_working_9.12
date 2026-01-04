@@ -1066,6 +1066,35 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       ) : (
         /* Планировщик */
         <div className="space-y-4">
+          {/* Кнопки управления планировщиком */}
+          <div className="flex justify-end gap-2 mb-2">
+             <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                hapticFeedback && hapticFeedback('impact', 'light');
+                // TODO: Логика синхронизации с расписанием
+                console.log('Sync schedule');
+              }}
+              className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="text-xs font-medium">Пары</span>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                hapticFeedback && hapticFeedback('impact', 'light');
+                // TODO: Логика создания события
+                console.log('Create event');
+              }}
+              className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <span className="text-xs font-medium">Событие</span>
+            </motion.button>
+          </div>
+
           {scheduleForDate.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
