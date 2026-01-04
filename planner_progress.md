@@ -16,8 +16,8 @@
   - `target_date` (Optional[datetime]) - дата события
 
 ### 1.2 API Endpoints
-- [ ] **POST /api/planner/sync** - Синхронизация расписания на день
-- [ ] **GET /api/planner/{telegram_id}/{date}** - Получение всех событий дня
+- ✅ **POST /api/planner/sync** - Синхронизация расписания на день
+- ✅ **GET /api/planner/{telegram_id}/{date}** - Получение всех событий дня
 
 ---
 
