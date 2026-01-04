@@ -1077,7 +1077,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               }}
               className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center gap-2"
             >
-              <RefreshCw className="w-4 h-4" />
+              <Link2 className="w-4 h-4" />
               <span className="text-xs font-medium">Пары</span>
             </motion.button>
 
