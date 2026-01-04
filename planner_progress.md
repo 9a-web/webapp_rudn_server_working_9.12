@@ -24,7 +24,7 @@
 ## Этап 2: Фронтенд - Логика (Frontend Logic) 🎯
 
 ### 2.1 API Integration
-- [ ] Обновить `/app/frontend/src/services/api.js` - добавить plannerAPI методы
+- ✅ Обновить `/app/frontend/src/services/api.js` - добавить plannerAPI методы
 
 ### 2.2 Логика синхронизации
 - [ ] Обновить `/app/frontend/src/components/TasksSection.jsx`:
