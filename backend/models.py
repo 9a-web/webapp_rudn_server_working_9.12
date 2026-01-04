@@ -393,6 +393,7 @@ class Task(BaseModel):
     target_date: Optional[datetime] = None  # Целевая дата задачи (день, к которому привязана задача)
     subject: Optional[str] = None  # Привязка к предмету из расписания
     discipline_id: Optional[str] = None  # ID дисциплины (для интеграции с расписанием)
+    notes: Optional[str] = None  # Заметки/описание
     
     # Planner fields
     time_start: Optional[str] = None  # HH:MM
