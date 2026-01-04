@@ -832,7 +832,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Распорядок дня
+          Планировщик
         </button>
       </div>
 
