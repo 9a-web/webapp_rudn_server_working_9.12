@@ -1135,7 +1135,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       )}
 
       {/* Секция комнат (СКРЫТО: измените SHOW_ROOMS_FEATURE на true, чтобы показать) */}
-      {SHOW_ROOMS_FEATURE && (
+      {activeView === 'todo' && SHOW_ROOMS_FEATURE && (
         <div className="mt-6 space-y-4">
           <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-500" />
