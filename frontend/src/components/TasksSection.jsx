@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, Reorder, useDragControls } from 'framer-motion';
 import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users, TrendingUp, Link2 } from 'lucide-react';
-import { tasksAPI, scheduleAPI, achievementsAPI } from '../services/api';
+import { tasksAPI, scheduleAPI, achievementsAPI, plannerAPI } from '../services/api';
 import { groupTasksAPI } from '../services/groupTasksAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 import { AddTaskModal } from './AddTaskModal';
 import { EditTaskModal } from './EditTaskModal';
 import { PrepareForLectureModal } from './PrepareForLectureModal';
+import { CreateEventModal } from './CreateEventModal';
 import { WeekDateSelector } from './WeekDateSelector';
 import { tasksCompleteConfetti } from '../utils/confetti';
 import { GroupTaskCard } from './GroupTaskCard';
