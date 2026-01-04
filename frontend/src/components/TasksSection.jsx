@@ -18,6 +18,7 @@ import RoomDetailModal from './RoomDetailModal';
 import * as roomsAPI from '../services/roomsAPI';
 import { ProductivityStats } from './ProductivityStats';
 
+import { getWeekNumberForDate } from '../utils/dateUtils';
 // 🔧 FEATURE FLAG: Показать/скрыть функцию комнат
 // Измените на false, чтобы скрыть комнаты
 const SHOW_ROOMS_FEATURE = true;
