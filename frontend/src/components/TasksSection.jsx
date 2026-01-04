@@ -695,6 +695,35 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     { id: 'project', label: 'Проекты', emoji: '💼', color: 'from-purple-400 to-purple-500' },
   ];
 
+  // Получение событий расписания для выбранной даты
+  const getScheduleForSelectedDate = () => {
+    if (!tasksSelectedDate) return [];
+    
+    // Определяем день недели (название)
+    const dayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    const currentDayName = dayNames[tasksSelectedDate.getDay()];
+    
+    // Определяем номер недели (1 или 2)
+    const weekNum = getWeekNumberForDate(tasksSelectedDate);
+    const parity = (weekNum % 2) === 0 ? 2 : 1;
+    
+    // Получаем события для нужной недели
+    const weekEvents = scheduleData[parity] || [];
+    
+    // Фильтруем по дню недели
+    // Примечание: в API дни обычно с большой буквы, например "Понедельник"
+    const dayEvents = weekEvents.filter(event => event.day === currentDayName);
+    
+    // Сортируем по времени
+    return dayEvents.sort((a, b) => {
+      const timeA = a.time.split('-')[0].trim();
+      const timeB = b.time.split('-')[0].trim();
+      return timeA.localeCompare(timeB);
+    });
+  };
+
+  const scheduleForDate = getScheduleForSelectedDate();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
