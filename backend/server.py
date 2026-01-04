@@ -1642,10 +1642,10 @@ async def create_planner_event(task_data: TaskCreate):
         
         # Создаем событие (не задачу)
         # order не важен для событий, они сортируются по времени
+        # origin уже есть в task_data (по умолчанию "user")
         task = Task(
             **task_data.dict(),
-            order=0,  # События не участвуют в drag&drop
-            origin="user"  # Пользовательское событие
+            order=0  # События не участвуют в drag&drop
         )
         task_dict = task.dict()
         
