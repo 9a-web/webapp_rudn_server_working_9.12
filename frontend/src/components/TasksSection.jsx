@@ -1064,7 +1064,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         {/* Все задачи отображаются только в карточке выше */}
       </div>
       ) : (
-        /* Распорядок дня */
+        /* Планировщик */
         <div className="space-y-4">
           {scheduleForDate.length === 0 ? (
             <motion.div
