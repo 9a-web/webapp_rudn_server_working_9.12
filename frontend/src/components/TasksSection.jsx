@@ -1063,6 +1063,76 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
 
         {/* Все задачи отображаются только в карточке выше */}
       </div>
+      ) : (
+        /* Распорядок дня */
+        <div className="space-y-4">
+          {scheduleForDate.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-8"
+            >
+              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">
+                На {currentDate} нет занятий
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-3"
+            >
+              {scheduleForDate.map((event, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <Clock className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-blue-600">
+                          {event.time}
+                        </span>
+                        {event.type && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                            {event.type}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <h3 className="text-base font-bold text-gray-900 mb-1">
+                        {event.discipline}
+                      </h3>
+                      
+                      {event.teacher && (
+                        <p className="text-sm text-gray-600 mb-1">
+                          👨‍🏫 {event.teacher}
+                        </p>
+                      )}
+                      
+                      {event.room && (
+                        <p className="text-sm text-gray-600">
+                          🏢 {event.room}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </div>
+      )}
 
       {/* Секция комнат (СКРЫТО: измените SHOW_ROOMS_FEATURE на true, чтобы показать) */}
       {SHOW_ROOMS_FEATURE && (
