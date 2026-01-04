@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 import os
 import sys
 
-# Backend URL from production environment
-BACKEND_URL = "https://rudn-schedule.ru/api"
+# Backend URL - using local backend for testing
+BACKEND_URL = "http://localhost:8001/api"
 
 # Test data
 TEST_TELEGRAM_ID = 123456789
