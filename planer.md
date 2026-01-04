@@ -26,7 +26,7 @@
 ## Этап 2: Фронтенд - Логика и API (`frontend/src/services`)
 
 ### 2.1. Обновление API сервиса (`api.js`)
-- [ ] Добавить методы:
+- ✅ Добавить методы:
     - `plannerAPI.syncSchedule(date)`
     - `plannerAPI.createEvent(eventData)`
 
