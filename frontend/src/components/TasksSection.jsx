@@ -985,8 +985,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         </motion.div>
       )}
 
-      {/* Карточка с задачами и группы по дедлайнам */}
-      <div className="space-y-4">
+      {/* Контент в зависимости от выбранного вида */}
+      {activeView === 'todo' ? (
+        /* Карточка с задачами и группы по дедлайнам */
+        <div className="space-y-4">
         {/* Карточка "Сегодня" */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
