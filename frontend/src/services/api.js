@@ -473,4 +473,68 @@ export const tasksAPI = {
   },
 };
 
+/**
+ * API методы для планировщика (Planner)
+ */
+export const plannerAPI = {
+  /**
+   * Синхронизировать расписание в планировщик на конкретную дату
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} date - Дата в формате YYYY-MM-DD
+   * @param {number} weekNumber - Номер недели (1 или 2)
+   */
+  syncSchedule: async (telegramId, date, weekNumber = 1) => {
+    try {
+      const response = await api.post('/planner/sync', {
+        telegram_id: telegramId,
+        date: date,
+        week_number: weekNumber,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Получить все события (пары + задачи) на конкретную дату
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} date - Дата в формате YYYY-MM-DD
+   */
+  getDayEvents: async (telegramId, date) => {
+    try {
+      const response = await api.get(`/planner/${telegramId}/${date}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Создать пользовательское событие с временем
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} text - Текст события
+   * @param {string} timeStart - Время начала (HH:MM)
+   * @param {string} timeEnd - Время окончания (HH:MM)
+   * @param {string} targetDate - Дата в формате YYYY-MM-DD
+   * @param {Object} additionalData - Дополнительные поля
+   */
+  createEvent: async (telegramId, text, timeStart, timeEnd, targetDate, additionalData = {}) => {
+    try {
+      const response = await api.post('/tasks', {
+        telegram_id: telegramId,
+        text,
+        time_start: timeStart,
+        time_end: timeEnd,
+        target_date: targetDate,
+        origin: 'user',
+        ...additionalData,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+};
+
 export default api;
