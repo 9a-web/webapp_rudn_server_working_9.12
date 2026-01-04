@@ -1098,6 +1098,93 @@ async def create_task(task_data: TaskCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@api_router.post("/planner/sync", response_model=List[TaskResponse])
+async def sync_schedule_to_planner(request: PlannerSyncRequest):
+    """Синхронизировать расписания в планировщик"""
+    try:
+        created_tasks = []
+        try:
+            target_date = datetime.strptime(request.date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+            
+        for event in request.events:
+            # Parse time "09:00 - 10:30"
+            start_time = None
+            end_time = None
+            if event.time:
+                times = event.time.split("-") # Usually "09:00-10:30" or "09:00 - 10:30"
+                if len(times) == 1:
+                     times = event.time.split(" - ")
+                
+                if len(times) >= 2:
+                    start_time = times[0].strip()
+                    end_time = times[1].strip()
+                elif len(times) == 1:
+                    start_time = times[0].strip()
+            
+            # Check duplicate
+            # We look for a fixed task on this date with same start time and subject
+            existing = await db.tasks.find_one({
+                "telegram_id": request.telegram_id,
+                "target_date": target_date,
+                "time_start": start_time,
+                "origin": "schedule",
+                "subject": event.discipline
+            })
+            
+            if existing:
+                continue
+                
+            # Create task
+            task_data = Task(
+                telegram_id=request.telegram_id,
+                text=f"{event.discipline} ({event.lessonType})" if event.lessonType else event.discipline,
+                category="study",
+                priority="high",
+                target_date=target_date,
+                subject=event.discipline,
+                discipline_id=None, # Could add hash here
+                time_start=start_time,
+                time_end=end_time,
+                is_fixed=True,
+                origin="schedule",
+                order=0 
+            )
+            
+            await db.tasks.insert_one(task_data.dict())
+            created_tasks.append(task_data)
+            
+        return [TaskResponse(**t.dict()) for t in created_tasks]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing planner: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/planner/{telegram_id}/{date}", response_model=List[TaskResponse])
+async def get_planner_tasks(telegram_id: int, date: str):
+    """Получить задачи на день"""
+    try:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        tasks = await db.tasks.find({
+            "telegram_id": telegram_id,
+            "target_date": target_date
+        }).sort("time_start", 1).to_list(1000)
+        
+        return [TaskResponse(**t) for t in tasks]
+    except HTTPException:
+        raise
+    except Exception as e:
+         logger.error(f"Error getting planner tasks: {e}")
+         raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.put("/tasks/reorder", response_model=SuccessResponse)
 async def reorder_tasks(request: TaskReorderRequest):
     """
