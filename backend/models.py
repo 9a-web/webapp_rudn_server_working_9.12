@@ -484,6 +484,35 @@ class TaskReorderRequest(BaseModel):
     tasks: List[TaskReorderItem]
 
 
+# ============ Модели для планировщика ============
+
+class PlannerSyncRequest(BaseModel):
+    """Запрос синхронизации расписания в планировщик"""
+    telegram_id: int
+    date: str  # YYYY-MM-DD
+    week_number: int = 1  # Номер недели (1 или 2)
+
+
+class PlannerSyncResponse(BaseModel):
+    """Ответ синхронизации планировщика"""
+    success: bool
+    synced_count: int  # Количество добавленных событий
+    events: List[TaskResponse]  # Список добавленных событий
+    message: str
+
+
+class PlannerDayRequest(BaseModel):
+    """Запрос событий дня"""
+    telegram_id: int
+    date: str  # YYYY-MM-DD
+
+
+class PlannerDayResponse(BaseModel):
+    """Ответ со списком событий дня"""
+    date: str
+    events: List[TaskResponse]  # Все события (пары + пользовательские) отсортированные по времени
+    total_count: int
+
 
 # ============ Модели для групповых задач ============
 
