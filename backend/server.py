@@ -1598,7 +1598,10 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
                 origin=new_task.get("origin", "user"),
                 order=new_task.get("order", 0),
                 created_at=new_task["created_at"],
-                updated_at=new_task["updated_at"]
+                updated_at=new_task["updated_at"],
+                teacher=new_task.get("teacher"),
+                auditory=new_task.get("auditory"),
+                lessonType=new_task.get("lessonType")
             )
             synced_tasks.append(task_response)
         
