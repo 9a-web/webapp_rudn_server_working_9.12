@@ -798,7 +798,7 @@ class RoomUpdate(BaseModel):
     color: Optional[str] = None
 
 
-class TaskReorderRequest(BaseModel):
+class RoomTaskReorderRequest(BaseModel):
     """Запрос на изменение порядка задач"""
     room_id: str
     tasks: List[dict]  # [{"task_id": "...", "order": 0}, ...]
