@@ -35,6 +35,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [editingText, setEditingText] = useState('');
   const [scheduleSubjects, setScheduleSubjects] = useState([]);
   const [scheduleEvents, setScheduleEvents] = useState([]); // Все события расписания для поиска ближайших пар
+  const [scheduleData, setScheduleData] = useState({ 1: [], 2: [] }); // Расписание по неделям (1 и 2)
   
   // Выбранная дата для отображения задач (по умолчанию - сегодня)
   const [tasksSelectedDate, setTasksSelectedDate] = useState(() => {
