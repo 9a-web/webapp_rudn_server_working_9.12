@@ -1619,6 +1619,48 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/planner/events", response_model=TaskResponse)
+async def create_planner_event(task_data: TaskCreate):
+    """
+    Создать новое событие в планировщике (не задачу в списке дел).
+    События всегда имеют time_start и time_end.
+    """
+    try:
+        # Валидация: события должны иметь время
+        if not task_data.time_start or not task_data.time_end:
+            raise HTTPException(
+                status_code=400, 
+                detail="События должны иметь время начала и окончания"
+            )
+        
+        # Валидация: события должны иметь target_date
+        if not task_data.target_date:
+            raise HTTPException(
+                status_code=400, 
+                detail="События должны иметь дату (target_date)"
+            )
+        
+        # Создаем событие (не задачу)
+        # order не важен для событий, они сортируются по времени
+        task = Task(
+            **task_data.dict(),
+            order=0,  # События не участвуют в drag&drop
+            origin="user"  # Пользовательское событие
+        )
+        task_dict = task.dict()
+        
+        await db.tasks.insert_one(task_dict)
+        
+        logger.info(f"Создано событие для пользователя {task_data.telegram_id}: {task_data.text}")
+        
+        return TaskResponse(**task_dict)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании события: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/planner/{telegram_id}/{date}", response_model=PlannerDayResponse)
 async def get_planner_day_events(telegram_id: int, date: str):
     """
