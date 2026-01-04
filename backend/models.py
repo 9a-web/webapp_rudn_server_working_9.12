@@ -452,6 +452,10 @@ class TaskResponse(BaseModel):
     target_date: Optional[datetime] = None
     subject: Optional[str] = None
     discipline_id: Optional[str] = None
+    time_start: Optional[str] = None
+    time_end: Optional[str] = None
+    is_fixed: bool = False
+    origin: str = "user"
     order: int = 0
     created_at: datetime
     updated_at: datetime
