@@ -72,6 +72,12 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   // Переключатель вида (Список дел / Распорядок дня)
   const [activeView, setActiveView] = useState('todo');
   
+  // Планировщик (Planner)
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [plannerEvents, setPlannerEvents] = useState([]); // События планировщика (пары + пользовательские)
+  const [plannerLoading, setPlannerLoading] = useState(false);
+  const [syncingSchedule, setSyncingSchedule] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
