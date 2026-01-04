@@ -1179,27 +1179,6 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_router.get("/planner/{telegram_id}/{date}", response_model=List[TaskResponse])
-async def get_planner_tasks(telegram_id: int, date: str):
-    """Получить задачи на день"""
-    try:
-        try:
-            target_date = datetime.strptime(date, "%Y-%m-%d")
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        tasks = await db.tasks.find({
-            "telegram_id": telegram_id,
-            "target_date": target_date
-        }).sort("time_start", 1).to_list(1000)
-        
-        return [TaskResponse(**t) for t in tasks]
-    except HTTPException:
-        raise
-    except Exception as e:
-         logger.error(f"Error getting planner tasks: {e}")
-         raise HTTPException(status_code=500, detail=str(e))
-
 @api_router.put("/tasks/reorder", response_model=SuccessResponse)
 async def reorder_tasks(request: TaskReorderRequest):
     """
