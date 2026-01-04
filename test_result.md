@@ -369,6 +369,18 @@ frontend:
         agent: "main"
         comment: "Implemented: 1) Backend: Calculated current_streak (consecutive present/late) and best_streak in get_my_attendance. Skips unmarked sessions. 2) Frontend: Added a visual 'Streak Card' with Trophy icon to MyAttendanceStats.jsx showing current streak and best record."
 
+  - task: "Planner Events API - Events Separation from Tasks"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "✅ PLANNER EVENTS TESTING COMPLETED: Successfully fixed and tested Planner Events functionality. Fixed duplicate endpoint issue where two GET /api/planner/{telegram_id}/{date} endpoints existed (removed old one returning List[TaskResponse], kept new one returning PlannerDayResponse). All 5 test scenarios passed: 1) Validation works - events without time_start AND time_end are rejected with 400 error, 2) Event creation successful with POST /api/planner/events (requires time_start, time_end, target_date), 3) Events correctly excluded from GET /api/tasks/{telegram_id} (tasks query excludes records with both time_start AND time_end), 4) Events retrieved via GET /api/planner/{telegram_id}/{date} with proper PlannerDayResponse structure (date, events array, total_count), 5) Multiple events created and sorted by time_start. Frontend API methods (createEvent, getDayEvents) already implemented in services/api.js. System ready for production use."
+
 metadata:
   created_by: "testing_agent"
   version: "1.2"
