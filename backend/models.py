@@ -393,6 +393,13 @@ class Task(BaseModel):
     target_date: Optional[datetime] = None  # Целевая дата задачи (день, к которому привязана задача)
     subject: Optional[str] = None  # Привязка к предмету из расписания
     discipline_id: Optional[str] = None  # ID дисциплины (для интеграции с расписанием)
+    
+    # Planner fields
+    time_start: Optional[str] = None  # HH:MM
+    time_end: Optional[str] = None    # HH:MM
+    is_fixed: bool = False            # Жесткое событие (нельзя двигать)
+    origin: str = "user"              # 'user', 'schedule'
+    
     order: int = 0  # Порядок задачи для drag & drop (меньше = выше в списке)
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
