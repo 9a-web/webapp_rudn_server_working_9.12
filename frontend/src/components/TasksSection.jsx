@@ -322,6 +322,12 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       // Сохраняем все события для поиска ближайших пар
       setScheduleEvents(allEvents);
       
+      // Сохраняем расписание по неделям для отображения в "Распорядке дня"
+      setScheduleData({
+        1: scheduleWeek1.events || [],
+        2: scheduleWeek2.events || []
+      });
+      
       // Извлекаем уникальные предметы
       const subjects = [...new Set(allEvents.map(e => e.discipline).filter(Boolean))];
       setScheduleSubjects(subjects);
