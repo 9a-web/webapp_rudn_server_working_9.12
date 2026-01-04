@@ -6,25 +6,6 @@ import axios from 'axios';
 
 // Определяем URL backend в зависимости от окружения
 const getBackendURL = () => {
-  // Безопасно получаем переменную окружения
-  let envBackendUrl = '';
-  
-  try {
-    if (typeof process !== 'undefined' && process.env && import.meta.env.VITE_BACKEND_URL) {
-      envBackendUrl = import.meta.env.VITE_BACKEND_URL;
-    } else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.REACT_APP_BACKEND_URL) {
-      envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL;
-    }
-  } catch (error) {
-    console.warn('Could not access environment variables:', error);
-  }
-  
-  // Если есть значение и оно не пустое
-  if (envBackendUrl && envBackendUrl.trim() !== '') {
-    console.log('🌐 Using environment backend URL:', envBackendUrl);
-    return envBackendUrl;
-  }
-  
   // Если запущено локально (localhost:3000), используем локальный backend
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     console.log('🔧 Development mode: using local backend');
