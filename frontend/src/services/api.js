@@ -511,17 +511,17 @@ export const plannerAPI = {
   },
 
   /**
-   * Создать пользовательское событие с временем
-   * @param {number} telegramId - Telegram ID пользователя
-   * @param {string} text - Текст события
-   * @param {string} timeStart - Время начала (HH:MM)
-   * @param {string} timeEnd - Время окончания (HH:MM)
-   * @param {string} targetDate - Дата в формате YYYY-MM-DD
+   * Создать событие в планировщике (НЕ задачу в списке дел)
+   * @param {number} telegramId
+   * @param {string} text
+   * @param {string} timeStart - HH:MM
+   * @param {string} timeEnd - HH:MM
+   * @param {string} targetDate - ISO date string
    * @param {Object} additionalData - Дополнительные поля
    */
   createEvent: async (telegramId, text, timeStart, timeEnd, targetDate, additionalData = {}) => {
     try {
-      const response = await api.post('/tasks', {
+      const response = await api.post('/planner/events', {
         telegram_id: telegramId,
         text,
         time_start: timeStart,
