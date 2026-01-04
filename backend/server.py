@@ -1059,10 +1059,22 @@ async def get_user_profile_photo_proxy(telegram_id: int):
 
 @api_router.get("/tasks/{telegram_id}", response_model=List[TaskResponse])
 async def get_user_tasks(telegram_id: int):
-    """Получить все задачи пользователя"""
+    """Получить все задачи пользователя (исключая события планировщика)"""
     try:
+        # Исключаем события планировщика (задачи с time_start И time_end)
+        # События планировщика получаются через /api/planner/{telegram_id}/{date}
+        query = {
+            "telegram_id": telegram_id,
+            "$or": [
+                {"time_start": {"$exists": False}},
+                {"time_start": None},
+                {"time_end": {"$exists": False}},
+                {"time_end": None}
+            ]
+        }
+        
         # Сортируем по order (порядок drag & drop), затем по created_at
-        tasks = await db.tasks.find({"telegram_id": telegram_id}).sort([("order", 1), ("created_at", -1)]).to_list(1000)
+        tasks = await db.tasks.find(query).sort([("order", 1), ("created_at", -1)]).to_list(1000)
         return [TaskResponse(**task) for task in tasks]
     except Exception as e:
         logger.error(f"Ошибка при получении задач: {e}")
