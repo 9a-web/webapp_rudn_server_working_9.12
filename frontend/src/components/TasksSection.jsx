@@ -769,6 +769,36 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         hapticFeedback={hapticFeedback}
       />
 
+      {/* Переключатель вида (Список дел / Распорядок дня) */}
+      <div className="flex bg-gray-100 p-1 rounded-xl mb-6 mt-4">
+        <button
+          onClick={() => {
+            setActiveView('todo');
+            hapticFeedback && hapticFeedback('selection');
+          }}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+            activeView === 'todo'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Список дел
+        </button>
+        <button
+          onClick={() => {
+            setActiveView('schedule');
+            hapticFeedback && hapticFeedback('selection');
+          }}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+            activeView === 'schedule'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Распорядок дня
+        </button>
+      </div>
+
       {/* Статистика продуктивности */}
       {showStats && (
         <motion.div
