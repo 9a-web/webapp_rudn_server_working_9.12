@@ -216,8 +216,7 @@ class EventPlannerTester:
                 "time_start": "14:00",
                 "time_end": "15:30",
                 "target_date": TEST_DATE,
-                "category": "work",
-                "origin": "user"
+                "category": "work"
             }
             
             response = await self.client.post(
