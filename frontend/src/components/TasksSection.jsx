@@ -65,6 +65,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [productivityStats, setProductivityStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [showStats, setShowStats] = useState(false);
+
+  // Переключатель вида (Список дел / Распорядок дня)
+  const [activeView, setActiveView] = useState('todo');
   
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
