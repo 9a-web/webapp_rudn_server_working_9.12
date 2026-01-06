@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
+import { musicAPI } from '../../services/musicAPI';
 
 const PlayerContext = createContext();
 
@@ -7,6 +8,7 @@ export const PlayerProvider = ({ children }) => {
   const audioRef = useRef(typeof Audio !== 'undefined' ? new Audio() : null);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Новое состояние загрузки
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [queue, setQueue] = useState([]);
@@ -31,10 +33,35 @@ export const PlayerProvider = ({ children }) => {
     };
   }, []);
 
+  /**
+   * Получение прямой ссылки на трек
+   * Если url уже есть (например, из избранного) - используем его
+   * Иначе запрашиваем через API
+   */
+  const getTrackUrl = useCallback(async (track) => {
+    // Если URL уже есть и он валидный - используем его
+    if (track.url && track.url.startsWith('http')) {
+      console.log('🔗 Using existing URL:', track.url.substring(0, 60) + '...');
+      return track.url;
+    }
+    
+    // Иначе запрашиваем через API
+    console.log('🔄 Fetching stream URL for track:', track.id);
+    try {
+      const response = await musicAPI.getStreamUrl(track.id);
+      console.log('✅ Got stream URL:', response.url?.substring(0, 60) + '...');
+      return response.url;
+    } catch (err) {
+      console.error('❌ Failed to get stream URL:', err);
+      throw err;
+    }
+  }, []);
+
   // Воспроизведение трека
-  const play = useCallback((track, trackList = []) => {
+  const play = useCallback(async (track, trackList = []) => {
     console.log('🎵 Play called:', { track: track?.title, hasUrl: !!track?.url });
     setError(null);
+    setIsLoading(true);
     
     // Создаем audio если его нет
     if (!audioRef.current && typeof Audio !== 'undefined') {
@@ -45,6 +72,7 @@ export const PlayerProvider = ({ children }) => {
     if (!audioRef.current) {
       console.error('❌ Audio API not available');
       setError('Audio не поддерживается');
+      setIsLoading(false);
       return;
     }
     
@@ -61,15 +89,25 @@ export const PlayerProvider = ({ children }) => {
     
     setCurrentTrack(track);
     
-    if (track.url) {
-      console.log('🔗 Setting audio src:', track.url.substring(0, 80) + '...');
+    try {
+      // Получаем URL (из кэша трека или через API)
+      const url = await getTrackUrl(track);
+      
+      if (!url) {
+        console.error('❌ No URL available for track:', track.id);
+        setError('Трек недоступен');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('🔗 Setting audio src:', url.substring(0, 80) + '...');
       
       // Останавливаем текущее воспроизведение
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       
       // Устанавливаем новый источник
-      audioRef.current.src = track.url;
+      audioRef.current.src = url;
       audioRef.current.load(); // Явно загружаем аудио
       
       // Воспроизводим
@@ -80,11 +118,16 @@ export const PlayerProvider = ({ children }) => {
           .then(() => {
             console.log('✅ Playback started successfully');
             setIsPlaying(true);
+            setIsLoading(false);
             setError(null);
+            
+            // Обновляем URL в треке для будущего использования
+            track.url = url;
           })
           .catch(err => {
             console.error('❌ Play error:', err.name, err.message);
             setIsPlaying(false);
+            setIsLoading(false);
             
             // Обработка различных ошибок
             if (err.name === 'NotAllowedError') {
@@ -99,11 +142,18 @@ export const PlayerProvider = ({ children }) => {
             }
           });
       }
-    } else {
-      console.error('❌ Track has no URL:', track);
-      setError('Трек недоступен');
+    } catch (err) {
+      console.error('❌ Error getting track URL:', err);
+      setIsLoading(false);
+      
+      // Проверяем тип ошибки
+      if (err.response?.status === 404) {
+        setError('Трек заблокирован правообладателем');
+      } else {
+        setError('Не удалось загрузить трек');
+      }
     }
-  }, [volume]);
+  }, [volume, getTrackUrl]);
 
   // Пауза
   const pause = useCallback(() => {
@@ -130,7 +180,7 @@ export const PlayerProvider = ({ children }) => {
   }, [isPlaying, pause]);
 
   // Следующий трек
-  const next = useCallback(() => {
+  const next = useCallback(async () => {
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
@@ -138,19 +188,14 @@ export const PlayerProvider = ({ children }) => {
     if (queue.length > 0 && queueIndex < queue.length - 1) {
       const nextTrack = queue[queueIndex + 1];
       setQueueIndex(queueIndex + 1);
-      setCurrentTrack(nextTrack);
       
-      if (audioRef.current && nextTrack.url) {
-        audioRef.current.src = nextTrack.url;
-        audioRef.current.play()
-          .then(() => setIsPlaying(true))
-          .catch(err => console.error('Next track error:', err));
-      }
+      // Используем play для загрузки URL
+      await play(nextTrack, queue);
     }
-  }, [queue, queueIndex]);
+  }, [queue, queueIndex, play]);
 
   // Предыдущий трек
-  const prev = useCallback(() => {
+  const prev = useCallback(async () => {
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
@@ -158,16 +203,11 @@ export const PlayerProvider = ({ children }) => {
     if (queue.length > 0 && queueIndex > 0) {
       const prevTrack = queue[queueIndex - 1];
       setQueueIndex(queueIndex - 1);
-      setCurrentTrack(prevTrack);
       
-      if (audioRef.current && prevTrack.url) {
-        audioRef.current.src = prevTrack.url;
-        audioRef.current.play()
-          .then(() => setIsPlaying(true))
-          .catch(err => console.error('Prev track error:', err));
-      }
+      // Используем play для загрузки URL
+      await play(prevTrack, queue);
     }
-  }, [queue, queueIndex]);
+  }, [queue, queueIndex, play]);
 
   // Перемотка
   const seek = useCallback((time) => {
@@ -206,6 +246,7 @@ export const PlayerProvider = ({ children }) => {
         src: audio.src?.substring(0, 80)
       });
       setIsPlaying(false);
+      setIsLoading(false);
       
       // Более детальная обработка ошибок
       if (audio.error) {
@@ -220,30 +261,39 @@ export const PlayerProvider = ({ children }) => {
             setError('Ошибка декодирования');
             break;
           case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            setError('Формат не поддерживается');
+            setError('Трек недоступен');
             break;
           default:
             setError('Ошибка воспроизведения');
         }
       }
     };
+    
+    // Событие начала загрузки
+    const onLoadStart = () => setIsLoading(true);
+    const onCanPlay = () => setIsLoading(false);
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
+    audio.addEventListener('loadstart', onLoadStart);
+    audio.addEventListener('canplay', onCanPlay);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('loadstart', onLoadStart);
+      audio.removeEventListener('canplay', onCanPlay);
     };
   }, [next, queue, queueIndex]);
 
   const value = {
     currentTrack,
     isPlaying,
+    isLoading, // Новое состояние
     progress,
     duration,
     queue,
