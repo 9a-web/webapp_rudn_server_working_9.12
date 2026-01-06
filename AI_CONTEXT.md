@@ -1,14 +1,14 @@
 # AI CONTEXT - RUDN Schedule Telegram Web App
 
-**Обновлено:** 2025-12-25 | **Статус:** Оптимизирован для ИИ (↓60% токенов) | Новогодняя тема исправлена ✅
+**Обновлено:** 2025-07-06 | **Статус:** Актуализирован для ИИ | **ENV:** test ✅
 
 ---
 
 ## МЕТА-ИНФОРМАЦИЯ
 
 **Тип:** Telegram Web App для студентов РУДН  
-**Стек:** FastAPI (Python) + React + MongoDB + Telegram Bot API  
-**Функции:** Расписание пар, задачи (личные + групповые), достижения, аналитика, погода, уведомления, журнал посещений  
+**Стек:** FastAPI (Python) + React 19 + MongoDB + Telegram Bot API  
+**Функции:** Расписание пар, задачи (личные + групповые), планировщик событий, достижения, аналитика, погода, уведомления V2, журнал посещений  
 **Особенность:** Интеграция с API РУДН, геймификация, реферальная система
 
 ---
@@ -16,32 +16,42 @@
 ## БЫСТРАЯ НАВИГАЦИЯ
 
 ### Backend (/app/backend/)
-- `server.py` (6300 LOC) - ВСЕ API endpoints (109)
-- `models.py` (1293 LOC) - Pydantic схемы
-- `telegram_bot.py` (1204 LOC) - Telegram Bot логика
-- `achievements.py` (632 LOC) - 24 достижения
-- `scheduler_v2.py` (828 LOC) - **Улучшенный планировщик уведомлений V2**
-- `scheduler.py` (383 LOC) - ⚠️ Старый планировщик (резерв)
-- `rudn_parser.py` (311 LOC) - парсинг API РУДН
-- `notifications.py` (165 LOC) - рассылка через Bot API
-- `weather.py` (118 LOC) - OpenWeatherMap API
-- `config.py` - конфигурация ENV/токенов
-- `cache.py` - кэширование данных
+| Файл | LOC | Описание |
+|------|-----|----------|
+| `server.py` | 6928 | ВСЕ API endpoints (117) |
+| `models.py` | 1393 | Pydantic схемы |
+| `telegram_bot.py` | 1204 | Telegram Bot логика |
+| `achievements.py` | 632 | 24 достижения |
+| `scheduler_v2.py` | 828 | **Планировщик уведомлений V2** |
+| `scheduler.py` | 383 | ⚠️ Старый планировщик (резерв) |
+| `rudn_parser.py` | 311 | Парсинг API РУДН |
+| `notifications.py` | 165 | Рассылка через Bot API |
+| `weather.py` | 118 | OpenWeatherMap API |
+| `config.py` | - | Конфигурация ENV/токенов |
+| `cache.py` | - | Кэширование данных |
 
 ### Frontend (/app/frontend/src/)
-- `App.js` - роутинг, главный компонент
-- `components/` - 50 React компонентов (основные)
-- `components/journal/` - 11 компонентов журнала посещений
-- `services/` - api.js, roomsAPI.js, groupTasksAPI.js, journalAPI.js, referralAPI.js
-- `i18n/` - локализация (ru/en)
-- `utils/` - analytics, dateUtils, animations, confetti
+| Директория/Файл | Количество | Описание |
+|-----------------|------------|----------|
+| `App.jsx` | 1 | Роутинг, главный компонент (43KB) |
+| `components/` | 55 | React компоненты (основные) |
+| `components/journal/` | 12 | Компоненты журнала посещений |
+| `services/` | 5 | api.js, roomsAPI.js, groupTasksAPI.js, journalAPI.js, referralAPI.js |
+| `contexts/` | 2 | TelegramContext.jsx, ThemeContext.jsx |
+| `hooks/` | 1 | useRipple.js |
+| `i18n/locales/` | 2 | Локализация (ru.json, en.json) |
+| `utils/` | 7 | analytics, dateUtils, animations, confetti, gestures, pluralize, scheduleUtils |
+| `constants/` | 1 | roomColors.js |
 
-### Документация
-- `AI_CONTEXT.md` - этот файл (краткий обзор)
-- `NOTIFICATION_SYSTEM_V2.md` - Документация улучшенной системы уведомлений
-- `PROJECT_DETAILS.md` - полная техническая документация
-- `test_result.md` - история разработки и тестирования
-- `README.md` - инструкции по запуску
+### Документация (в /app/)
+| Файл | Описание |
+|------|----------|
+| `AI_CONTEXT.md` | **Этот файл** - краткий обзор для ИИ |
+| `PROJECT_DETAILS.md` | Полная техническая документация (50KB) |
+| `NOTIFICATION_SYSTEM_V2.md` | Документация системы уведомлений V2 |
+| `PLANNER_EVENTS_DOCS.md` | Документация планировщика событий |
+| `ROOMS_DOCUMENTATION_INDEX.md` | Индекс документации комнат |
+| `README.md` | Инструкции по запуску |
 
 ---
 
@@ -62,18 +72,18 @@ FastAPI Backend (port 8001 internal)
   ↓ Telegram Bot API (уведомления)
   
 MongoDB (local)
-  - 24 коллекции (см. раздел СХЕМЫ БД)
+  - 23 коллекции (см. раздел СХЕМЫ БД)
 ```
 
 **Важно:**
-- Frontend → Backend: через `REACT_APP_BACKEND_URL` (из .env)
+- Frontend → Backend: через `REACT_APP_BACKEND_URL` или автоопределение домена
 - Backend → MongoDB: через `MONGO_URL` (из .env)
 - ВСЕ backend routes начинаются с `/api/` (Kubernetes ingress правило)
 - Никогда не хардкодить URLs/ports!
 
 ---
 
-## API ENDPOINTS (109)
+## API ENDPOINTS (117)
 
 ### Расписание РУДН
 ```
@@ -81,6 +91,13 @@ GET  /api/faculties           - список факультетов
 POST /api/filter-data         - фильтры (курс, уровень, группы)
 POST /api/schedule            - расписание группы
 GET  /api/schedule-cached/{group_id}/{week_number} - кэшированное расписание
+```
+
+### Планировщик событий (NEW!)
+```
+POST /api/planner/sync        - синхронизация событий с расписанием
+POST /api/planner/events      - создание события планировщика
+GET  /api/planner/{telegram_id}/{date} - события на день
 ```
 
 ### Пользователи
@@ -145,7 +162,7 @@ POST   /api/group-tasks/{task_id}/comments
 GET    /api/group-tasks/{task_id}/comments
 ```
 
-### Журнал посещений (NEW!)
+### Журнал посещений
 ```
 POST   /api/journals                      - создать журнал
 GET    /api/journals/{telegram_id}        - список журналов
@@ -221,7 +238,7 @@ GET  /api/health                - health check
 
 ---
 
-## СХЕМЫ БД (MongoDB Collections - 24)
+## СХЕМЫ БД (MongoDB Collections - 23)
 
 ### Основные коллекции
 
@@ -275,13 +292,18 @@ completed_by: int?, completed_at: datetime?
 **rooms**
 ```python
 id: UUID, name: str, color: str, emoji: str, description: str, owner_id: int
+participants: [{telegram_id, role, joined_at}]  # встроенные участники
 invite_token: str, created_at: datetime
 total_participants: int, total_tasks: int, completed_tasks: int
 ```
 
-**room_participants**, **room_activities**
+**room_activities**
+```python
+id: UUID, room_id: UUID, action_type: str, actor_id: int
+details: dict, created_at: datetime
+```
 
-### Журнал посещений (NEW!)
+### Журнал посещений
 
 **attendance_journals**
 ```python
@@ -382,6 +404,7 @@ invite_token: str, is_new_member: bool, created_at: datetime
 ```env
 MONGO_URL="mongodb://localhost:27017"
 DB_NAME="test_database"
+CORS_ORIGINS="*"
 
 # Environment: "test" или "production"
 ENV="test"
@@ -400,37 +423,49 @@ DB_CLEAR_PASSWORD=...
 
 **Frontend .env:**
 ```env
-REACT_APP_BACKEND_URL=https://...
+VITE_ENABLE_VISUAL_EDITS=false
+ENABLE_HEALTH_CHECK=false
+# REACT_APP_BACKEND_URL определяется автоматически в api.js
 ```
 
 ---
 
-## КОМПОНЕНТЫ FRONTEND (61)
+## КОМПОНЕНТЫ FRONTEND (67 + 4 в src)
 
-### Главные (50 в components/)
-**Экраны:** App.js, GroupSelector.jsx, WelcomeScreen.jsx
+### Главные компоненты (55 в components/)
+**Экраны:** App.jsx, GroupSelector.jsx, WelcomeScreen.jsx
 
 **Навигация:** Header.jsx, BottomNavigation.jsx, DesktopSidebar.jsx, MenuModal.jsx
 
-**Расписание:** LiveScheduleCard, LiveScheduleCarousel, LiveScheduleSection, WeekDaySelector, CalendarModal, PrepareForLectureModal, ShareScheduleModal
+**Расписание:** LiveScheduleCard, LiveScheduleCarousel, LiveScheduleSection, WeekDaySelector, WeekDateSelector, CalendarModal, PrepareForLectureModal, ShareScheduleModal
 
-**Задачи:** TasksSection.jsx (61KB!), AddTaskModal, EditTaskModal, TaskDetailModal, SubtasksList, ProductivityStats
+**Планировщик:** PlannerTimeline.jsx, PlannerEventCard.jsx, CreateEventModal.jsx
+
+**Задачи:** TasksSection.jsx (большой!), AddTaskModal, EditTaskModal, TaskDetailModal, SubtasksList, ProductivityStats
 
 **Комнаты:** RoomCard, RoomDetailModal, CreateRoomModal, AddRoomTaskModal, EditRoomTaskModal, CreateGroupTaskModal, GroupTaskCard, GroupTaskDetailModal, RoomParticipantsList, RoomStatsPanel, RoomActivityFeed
 
 **Профиль:** ProfileModal, AnalyticsModal, AchievementsModal, AchievementNotification, NotificationSettings, NotificationHistory, NotificationQueue, ReferralTree
 
-**UI:** SkeletonCard, LoadingScreen, SwipeHint, TagsInput, TopGlow, GreetingNotification, UpcomingClassNotification, RippleEffect
+**UI:** SkeletonCard, LoadingScreen, SwipeHint, TagsInput, TopGlow, GreetingNotification, UpcomingClassNotification, RippleEffect, WeatherWidget
+
+**Темы:** NewYearTheme.jsx, NewYearTheme.css, SnowfallBackground.jsx
 
 **Админка:** AdminPanel.jsx
 
-### Журнал посещений (11 в components/journal/)
-- JournalSection.jsx (главный)
+### Журнал посещений (12 в components/journal/)
+- JournalSection.jsx (главный, в components/)
 - JournalCard.jsx, JournalDetailModal.jsx
 - CreateJournalModal.jsx, CreateSessionModal.jsx, CreateSubjectModal.jsx
 - SubjectDetailModal.jsx, AttendanceModal.jsx
 - AddStudentsModal.jsx, EditStudentModal.jsx, LinkStudentModal.jsx
-- JournalStatsTab.jsx
+- JournalStatsTab.jsx, MyAttendanceStats.jsx
+
+### Файлы в src/
+- App.jsx (главный компонент)
+- index.jsx (точка входа)
+- AnimationDemo.jsx (демо анимаций)
+- StatusTester.jsx (тестер статусов)
 
 ---
 
@@ -484,12 +519,18 @@ REACT_APP_BACKEND_URL=https://...
 - **Коллекция:** `scheduled_notifications`
 - **API:** `/api/notifications/stats` - статистика за день
 
-### 9. Журнал посещений (NEW!)
+### 9. Журнал посещений
 - Преподаватели создают журналы для групп
 - Студенты могут присоединяться по ссылке
 - Привязка telegram аккаунтов к записям
 - Статистика посещаемости
 - Контроль доступа к статистике (stats_viewers)
+
+### 10. Планировщик событий (NEW!)
+- Создание событий на день
+- Синхронизация с расписанием пар
+- Визуальная timeline с временной шкалой
+- Компоненты: PlannerTimeline, PlannerEventCard, CreateEventModal
 
 ---
 
@@ -531,11 +572,11 @@ ls -la /app/backend/*.py
 ls -la /app/frontend/src/components/
 ls -la /app/frontend/src/components/journal/
 
-# API endpoints (109 штук)
+# API endpoints (117 штук)
 grep -c "@api_router\." /app/backend/server.py
 
-# MongoDB коллекции (24 штуки)
-grep -E "db\." /app/backend/server.py | grep -oP "db\.\K\w+" | sort -u
+# MongoDB коллекции (23 штуки)
+grep -oP 'db\.\K[a-zA-Z_]+' /app/backend/server.py | sort -u
 ```
 
 ---
@@ -548,23 +589,26 @@ grep -E "db\." /app/backend/server.py | grep -oP "db\.\K\w+" | sort -u
 | Новый UI компонент | `/app/frontend/src/components/NewComponent.jsx` |
 | Новое достижение | `/app/backend/achievements.py` (массив ACHIEVEMENTS) |
 | Логика уведомлений V2 | `/app/backend/scheduler_v2.py` + `notifications.py` |
-| Новая страница | `/app/frontend/src/App.js` + новый компонент |
+| Новая страница | `/app/frontend/src/App.jsx` + новый компонент |
 | Схема БД | `/app/backend/models.py` (Pydantic) |
 | Перевод | `/app/frontend/src/i18n/locales/ru.json` и `en.json` |
 | Стили | Компонент (Tailwind) или `/app/frontend/src/index.css` |
 | Журнал посещений | `/app/frontend/src/components/journal/` |
+| Планировщик | `/app/frontend/src/components/Planner*.jsx` |
 
 ---
 
-## СТАТИСТИКА
+## СТАТИСТИКА (актуально на 2025-07-06)
 
-- Backend: ~11,000 LOC (Python)
-- Frontend: ~15,000+ LOC (React/JSX)
-- Компонентов: 61 (50 основных + 11 journal)
-- API endpoints: 109
-- Достижений: 24
-- БД коллекций: 24
-- Языков: 2 (RU/EN)
+- **Backend:** ~11,000 LOC (Python)
+- **Frontend:** ~15,000+ LOC (React/JSX)
+- **Компонентов:** 71 всего (55 основных + 12 journal + 4 в src/)
+- **API endpoints:** 117
+- **Достижений:** 24
+- **БД коллекций:** 23
+- **Языков:** 2 (RU/EN)
+- **Services:** 5 (api, rooms, groupTasks, journal, referral)
+- **Contexts:** 2 (Telegram, Theme)
 
 ---
 
@@ -574,6 +618,29 @@ grep -E "db\." /app/backend/server.py | grep -oP "db\.\K\w+" | sort -u
 - **DB_NAME:** `test_database`
 - **Backend:** port 8001
 - **Frontend:** port 3000
+- **Статус:** Сервисы остановлены (требуется `sudo supervisorctl restart all`)
+
+---
+
+## КЛЮЧЕВЫЕ ЗАВИСИМОСТИ
+
+### Backend (requirements.txt)
+- fastapi==0.110.1, uvicorn==0.25.0
+- pymongo==4.5.0, motor==3.3.1
+- pydantic>=2.6.4
+- requests>=2.31.0, aiohttp>=3.9.0
+- beautifulsoup4>=4.12.0, lxml>=4.9.0
+
+### Frontend (package.json)
+- react: ^19.0.0
+- framer-motion: ^12.23.24
+- axios: ^1.12.2
+- @twa-dev/sdk: ^8.0.2
+- lucide-react: ^0.546.0
+- recharts: ^3.4.1
+- i18next: ^25.6.0
+- vite: ^7.2.2
+- tailwindcss: ^3.4.17
 
 ---
 
