@@ -107,7 +107,8 @@ class VKMusicService:
             "owner_id": playlist.owner_id,
             "title": playlist.title,
             "count": getattr(playlist, 'count', 0),
-            "cover": getattr(playlist, 'photo', None)
+            "cover": getattr(playlist, 'photo', None),
+            "access_key": getattr(playlist, 'access_key', "")
         }
 
 # Singleton instance
