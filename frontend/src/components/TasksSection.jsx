@@ -1268,7 +1268,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           </h2>
           
           {/* Горизонтальный скролл с комнатами */}
-          <div className="flex gap-3 overflow-x-auto py-2 scrollbar-hide 
+          <div className="flex gap-3 overflow-x-auto overflow-y-visible py-4 scrollbar-hide 
                         -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory touch-pan-x">
             {rooms.map((room) => (
               <RoomCard
