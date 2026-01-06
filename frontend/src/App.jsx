@@ -1024,6 +1024,15 @@ const Home = () => {
             />
           </div>
         )}
+
+        {/* Раздел "Музыка" */}
+        {activeTab === 'music' && (
+          <div className="px-4">
+            <MusicSection 
+              telegramId={user?.id}
+            />
+          </div>
+        )}
         
         <Suspense fallback={null}>
           <CalendarModal
