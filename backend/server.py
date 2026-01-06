@@ -6794,12 +6794,64 @@ from music_service import music_service
 
 @api_router.get("/music/search")
 async def music_search(q: str, count: int = 20):
-    """Поиск музыки по запросу"""
+    """
+    Асинхронный поиск музыки по запросу.
+    Возвращает треки с метаданными. Прямая ссылка может быть пустой -
+    используйте /api/music/stream/{track_id} для получения URL при воспроизведении.
+    """
     try:
-        tracks = music_service.search(q, count)
+        tracks = await music_service.search(q, count)
         return {"tracks": tracks, "count": len(tracks)}
     except Exception as e:
         logger.error(f"Music search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/stream/{track_id}")
+async def music_stream(track_id: str):
+    """
+    Получение прямой ссылки на трек для воспроизведения.
+    Вызывается frontend'ом при нажатии play.
+    Возвращает JSON с url или редирект на прямую ссылку.
+    """
+    try:
+        url = await music_service.get_track_url(track_id)
+        
+        if not url:
+            raise HTTPException(
+                status_code=404, 
+                detail="Трек недоступен или заблокирован правообладателем"
+            )
+        
+        # Возвращаем JSON с URL (frontend сам установит src)
+        return {"url": url, "track_id": track_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music stream error for {track_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/redirect/{track_id}")
+async def music_redirect(track_id: str):
+    """
+    Альтернативный endpoint - редирект на прямую ссылку.
+    Полезен для <audio src="/api/music/redirect/...">
+    """
+    try:
+        url = await music_service.get_track_url(track_id)
+        
+        if not url:
+            raise HTTPException(
+                status_code=404, 
+                detail="Трек недоступен"
+            )
+        
+        return RedirectResponse(url=url)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music redirect error for {track_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/music/my")
