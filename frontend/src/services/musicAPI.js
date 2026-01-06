@@ -15,6 +15,16 @@ export const musicAPI = {
   },
 
   /**
+   * Получить прямую ссылку на трек для воспроизведения
+   * @param {string} trackId - ID трека в формате "owner_id_song_id"
+   * @returns {Promise<{url: string, track_id: string}>}
+   */
+  getStreamUrl: async (trackId) => {
+    const response = await api.get(`/music/stream/${trackId}`);
+    return response.data;
+  },
+
+  /**
    * Получить мои аудиозаписи
    * @param {number} count - Количество треков
    */
