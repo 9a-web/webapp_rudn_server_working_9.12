@@ -203,8 +203,32 @@ export const PlayerProvider = ({ children }) => {
       }
     };
     const onError = (e) => {
-      console.error('Audio error:', e);
+      console.error('❌ Audio error event:', {
+        code: audio.error?.code,
+        message: audio.error?.message,
+        src: audio.src?.substring(0, 80)
+      });
       setIsPlaying(false);
+      
+      // Более детальная обработка ошибок
+      if (audio.error) {
+        switch (audio.error.code) {
+          case MediaError.MEDIA_ERR_ABORTED:
+            setError('Загрузка прервана');
+            break;
+          case MediaError.MEDIA_ERR_NETWORK:
+            setError('Ошибка сети');
+            break;
+          case MediaError.MEDIA_ERR_DECODE:
+            setError('Ошибка декодирования');
+            break;
+          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+            setError('Формат не поддерживается');
+            break;
+          default:
+            setError('Ошибка воспроизведения');
+        }
+      }
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
