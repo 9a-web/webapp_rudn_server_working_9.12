@@ -869,7 +869,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             <ClipboardList className="w-6 h-6 text-white" strokeWidth={2.5} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-[#1C1C1E]">Список дел</h2>
+            <h2 className="text-2xl font-bold text-[#1C1C1E]">{activeView === 'schedule' ? 'Планировщик' : 'Список дел'}</h2>
             <p className="text-sm text-[#999999]">
               {todayTasks.length} задач · {todayTasks.filter(t => t.completed).length} выполнено
             </p>
