@@ -65,23 +65,18 @@ export const TrackCard = ({
       }`}
     >
       {/* Cover */}
-      <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
-        {track.cover ? (
-          <img 
-            src={track.cover} 
-            alt="" 
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center">
-            <Music className="w-5 h-5 text-purple-400" />
-          </div>
-        )}
+      <div className="relative w-12 h-12 flex-shrink-0">
+        <TrackCover 
+          cover={track.cover} 
+          artist={track.artist} 
+          title={track.title}
+          size="md"
+          className="rounded-lg"
+        />
         
         {/* Play/Pause overlay */}
         <motion.div 
-          className="absolute inset-0 flex items-center justify-center bg-black/50"
+          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg"
           initial={{ opacity: 0 }}
           animate={{ opacity: isHovered || isCurrentTrack ? 1 : 0 }}
         >
