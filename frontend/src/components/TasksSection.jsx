@@ -936,16 +936,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                 whileTap={{ scale: 0.95 }}
                 onClick={handleSyncSchedule}
                 disabled={syncingSchedule || !userSettings?.group_id}
-                className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Синхронизировать пары"
               >
                 {syncingSchedule ? (
                   <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
                 ) : (
                   <Link2 className="w-4 h-4" />
                 )}
-                <span className="text-xs font-medium">
-                  {syncingSchedule ? 'Синхронизация...' : 'Синхронизировать пары'}
-                </span>
               </motion.button>
 
               <motion.button
