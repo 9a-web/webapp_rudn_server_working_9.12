@@ -114,14 +114,14 @@ const TimelineEventCard = ({
           
           {/* Время (если высота позволяет) */}
           {style.height >= 40 && (
-            <div className={`text-[10px] ${colors.text} opacity-80 mt-auto`}>
+            <div className={`text-[10px] ${colors.accent} mt-auto`}>
               {event.time_start} - {event.time_end}
             </div>
           )}
         </div>
         
         {/* Индикатор раскрытия */}
-        <div className={`absolute bottom-1 right-1 ${colors.text} opacity-60`}>
+        <div className={`absolute bottom-1 right-1 ${colors.accent} opacity-60`}>
           <Info className="w-3 h-3" />
         </div>
       </motion.div>
