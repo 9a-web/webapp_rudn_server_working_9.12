@@ -101,7 +101,11 @@ export const MusicSection = ({ telegramId }) => {
     setLoading(true);
     
     try {
-      const result = await musicAPI.getPlaylistTracks(playlist.owner_id, playlist.id);
+      const result = await musicAPI.getPlaylistTracks(
+        playlist.owner_id, 
+        playlist.id,
+        playlist.access_key || ''
+      );
       setTracks(result.tracks || []);
     } catch (error) {
       console.error('Load playlist tracks error:', error);
