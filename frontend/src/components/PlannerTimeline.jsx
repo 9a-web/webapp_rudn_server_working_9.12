@@ -385,9 +385,9 @@ export const PlannerTimeline = ({
   }, [events]);
 
   return (
-    <div className="relative bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+    <div className="relative bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
       {/* Заголовок с датой */}
-      <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 px-4 py-3">
+      <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-100 to-gray-50 border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-gray-600" />
@@ -404,7 +404,7 @@ export const PlannerTimeline = ({
       {/* Timeline контейнер */}
       <div 
         ref={timelineRef}
-        className="relative overflow-y-auto scrollbar-hide"
+        className="relative overflow-y-auto scrollbar-hide bg-gray-50/50"
         style={{ height: '400px' }}
       >
         <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
@@ -412,7 +412,7 @@ export const PlannerTimeline = ({
           {HOURS.map((hour) => (
             <div
               key={hour}
-              className="absolute left-0 right-0 flex border-t border-gray-100"
+              className="absolute left-0 right-0 flex border-t border-gray-200/70"
               style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
             >
               {/* Время слева */}
