@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Home, ClipboardList, FileCheck } from 'lucide-react';
+import { Home, ClipboardList, FileCheck, Music } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
