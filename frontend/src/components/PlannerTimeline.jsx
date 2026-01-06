@@ -1,0 +1,489 @@
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Clock, ChevronDown, ChevronUp, Check, Trash2, MapPin, User, 
+  BookOpen, Info, X, GripVertical 
+} from 'lucide-react';
+
+/**
+ * Timeline-вид планировщика с часами слева
+ * События отображаются как блоки на временной шкале
+ */
+
+const HOUR_HEIGHT = 60; // Высота одного часа в пикселях
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23
+
+// Парсинг времени HH:MM в минуты от начала дня
+const parseTime = (timeStr) => {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + (minutes || 0);
+};
+
+// Форматирование часа
+const formatHour = (hour) => {
+  return `${hour.toString().padStart(2, '0')}:00`;
+};
+
+// Компонент карточки события на timeline
+const TimelineEventCard = ({ 
+  event, 
+  style, 
+  onToggleComplete, 
+  onDelete, 
+  hapticFeedback,
+  isOverlapping,
+  overlapIndex,
+  totalOverlaps
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const isScheduleEvent = event.origin === 'schedule';
+  const isCompleted = event.completed;
+  const isUserEvent = event.origin === 'user';
+  
+  // Цвета в зависимости от типа события
+  const getEventColors = () => {
+    if (isScheduleEvent) {
+      return {
+        bg: 'bg-blue-500',
+        bgLight: 'bg-blue-100',
+        border: 'border-blue-600',
+        text: 'text-white',
+        textDark: 'text-blue-800',
+      };
+    }
+    
+    const categoryColors = {
+      'study': { bg: 'bg-purple-500', bgLight: 'bg-purple-100', border: 'border-purple-600', text: 'text-white', textDark: 'text-purple-800' },
+      'personal': { bg: 'bg-green-500', bgLight: 'bg-green-100', border: 'border-green-600', text: 'text-white', textDark: 'text-green-800' },
+      'sport': { bg: 'bg-red-500', bgLight: 'bg-red-100', border: 'border-red-600', text: 'text-white', textDark: 'text-red-800' },
+      'work': { bg: 'bg-orange-500', bgLight: 'bg-orange-100', border: 'border-orange-600', text: 'text-white', textDark: 'text-orange-800' },
+      'meeting': { bg: 'bg-pink-500', bgLight: 'bg-pink-100', border: 'border-pink-600', text: 'text-white', textDark: 'text-pink-800' },
+    };
+    
+    return categoryColors[event.category] || categoryColors['personal'];
+  };
+  
+  const colors = getEventColors();
+  
+  const getCategoryLabel = (category) => {
+    const labels = {
+      'study': 'Учеба',
+      'personal': 'Личное',
+      'sport': 'Спорт',
+      'work': 'Работа',
+      'meeting': 'Встреча',
+    };
+    return labels[category] || category;
+  };
+
+  // Вычисляем ширину и позицию при наложении событий
+  const overlapStyle = isOverlapping ? {
+    width: `calc((100% - 8px) / ${totalOverlaps})`,
+    left: `calc(${overlapIndex} * (100% - 8px) / ${totalOverlaps})`,
+  } : {};
+
+  return (
+    <>
+      {/* Карточка события на timeline */}
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        style={{ ...style, ...overlapStyle }}
+        onClick={() => {
+          hapticFeedback && hapticFeedback('selection');
+          setIsExpanded(true);
+        }}
+        className={`
+          absolute rounded-lg cursor-pointer overflow-hidden
+          border-l-4 ${colors.border} ${colors.bg}
+          shadow-md hover:shadow-lg transition-shadow
+          ${isCompleted ? 'opacity-50' : ''}
+          ${isOverlapping ? '' : 'left-0 right-2'}
+        `}
+      >
+        <div className="p-2 h-full flex flex-col">
+          {/* Название события */}
+          <h4 className={`text-xs font-semibold ${colors.text} leading-tight line-clamp-2`}>
+            {event.text}
+          </h4>
+          
+          {/* Время (если высота позволяет) */}
+          {style.height >= 40 && (
+            <div className={`text-[10px] ${colors.text} opacity-80 mt-auto`}>
+              {event.time_start} - {event.time_end}
+            </div>
+          )}
+        </div>
+        
+        {/* Индикатор раскрытия */}
+        <div className={`absolute bottom-1 right-1 ${colors.text} opacity-60`}>
+          <Info className="w-3 h-3" />
+        </div>
+      </motion.div>
+
+      {/* Модальное окно с подробной информацией */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setIsExpanded(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`
+                w-full max-w-sm bg-white rounded-2xl overflow-hidden shadow-2xl
+              `}
+            >
+              {/* Заголовок */}
+              <div className={`${colors.bg} p-4`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className={`text-lg font-bold ${colors.text} leading-tight`}>
+                      {event.text}
+                    </h3>
+                    <div className={`flex items-center gap-2 mt-2 ${colors.text} opacity-90`}>
+                      <Clock className="w-4 h-4" />
+                      <span className="text-sm font-medium">
+                        {event.time_start} — {event.time_end}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsExpanded(false)}
+                    className={`p-1 rounded-full ${colors.text} opacity-80 hover:opacity-100 hover:bg-white/20`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                {/* Бейджи */}
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {isScheduleEvent && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
+                      📚 Пара
+                    </span>
+                  )}
+                  {event.category && isUserEvent && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
+                      {getCategoryLabel(event.category)}
+                    </span>
+                  )}
+                  {event.lessonType && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
+                      {event.lessonType}
+                    </span>
+                  )}
+                  {isCompleted && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-green-400/30 text-white font-medium">
+                      ✓ Выполнено
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Детали */}
+              <div className="p-4 space-y-3">
+                {event.teacher && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <User className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 font-medium">Преподаватель</div>
+                      <div className="text-sm text-gray-800 font-medium">{event.teacher}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {event.auditory && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <MapPin className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 font-medium">Аудитория</div>
+                      <div className="text-sm text-gray-800 font-medium">{event.auditory}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {event.subject && isUserEvent && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <BookOpen className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 font-medium">Предмет</div>
+                      <div className="text-sm text-gray-800 font-medium">{event.subject}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {event.notes && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <Info className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500 font-medium">Заметки</div>
+                      <div className="text-sm text-gray-700">{event.notes}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Если нет дополнительной информации */}
+                {!event.teacher && !event.auditory && !event.subject && !event.notes && (
+                  <div className="text-center py-4 text-gray-400 text-sm">
+                    Нет дополнительной информации
+                  </div>
+                )}
+              </div>
+              
+              {/* Кнопки действий (только для пользовательских событий) */}
+              {isUserEvent && (
+                <div className="p-4 pt-0 flex gap-2">
+                  <button
+                    onClick={() => {
+                      hapticFeedback && hapticFeedback('impact', 'light');
+                      onToggleComplete && onToggleComplete(event.id);
+                      setIsExpanded(false);
+                    }}
+                    className={`
+                      flex-1 py-3 px-4 rounded-xl font-medium text-sm
+                      transition-all active:scale-95 flex items-center justify-center gap-2
+                      ${isCompleted 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }
+                    `}
+                  >
+                    <Check className="w-4 h-4" />
+                    {isCompleted ? 'Выполнено' : 'Отметить'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      hapticFeedback && hapticFeedback('impact', 'medium');
+                      onDelete && onDelete(event.id);
+                      setIsExpanded(false);
+                    }}
+                    className="py-3 px-4 rounded-xl font-medium text-sm bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
+// Главный компонент Timeline
+export const PlannerTimeline = ({ 
+  events = [], 
+  onToggleComplete, 
+  onDelete, 
+  hapticFeedback,
+  currentDate 
+}) => {
+  const timelineRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Обновление текущего времени каждую минуту
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Автопрокрутка к текущему времени или первому событию
+  useEffect(() => {
+    if (timelineRef.current) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      
+      // Если есть события, прокрутка к первому событию
+      if (events.length > 0) {
+        const firstEventTime = Math.min(...events.map(e => parseTime(e.time_start)));
+        const scrollTarget = Math.max(0, (firstEventTime / 60 - 1)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      } else {
+        // Иначе прокрутка к текущему времени
+        const scrollTarget = Math.max(0, (currentMinutes / 60 - 2)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      }
+    }
+  }, [events]);
+  
+  // Вычисление позиции текущего времени
+  const currentTimePosition = useMemo(() => {
+    const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    return (minutes / 60) * HOUR_HEIGHT;
+  }, [currentTime]);
+  
+  // Проверка, является ли сегодняшний день выбранным
+  const isToday = useMemo(() => {
+    if (!currentDate) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return currentDate === today;
+  }, [currentDate]);
+  
+  // Обработка наложения событий
+  const processedEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => parseTime(a.time_start) - parseTime(b.time_start));
+    const result = [];
+    
+    sorted.forEach(event => {
+      const startMinutes = parseTime(event.time_start);
+      const endMinutes = parseTime(event.time_end) || startMinutes + 60;
+      
+      // Находим пересекающиеся события
+      const overlapping = result.filter(e => {
+        const eStart = parseTime(e.time_start);
+        const eEnd = parseTime(e.time_end) || eStart + 60;
+        return startMinutes < eEnd && endMinutes > eStart;
+      });
+      
+      const overlapGroup = overlapping.length > 0 ? overlapping[0].overlapGroup : result.length;
+      const overlapIndex = overlapping.length;
+      
+      result.push({
+        ...event,
+        overlapGroup,
+        overlapIndex,
+        startMinutes,
+        endMinutes,
+      });
+    });
+    
+    // Обновляем totalOverlaps для каждой группы
+    const groups = {};
+    result.forEach(e => {
+      if (!groups[e.overlapGroup]) groups[e.overlapGroup] = [];
+      groups[e.overlapGroup].push(e);
+    });
+    
+    return result.map(e => ({
+      ...e,
+      totalOverlaps: groups[e.overlapGroup].length,
+      isOverlapping: groups[e.overlapGroup].length > 1,
+    }));
+  }, [events]);
+
+  return (
+    <div className="relative bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+      {/* Заголовок с датой */}
+      <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Расписание дня</span>
+          </div>
+          {events.length > 0 && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+              {events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}
+            </span>
+          )}
+        </div>
+      </div>
+      
+      {/* Timeline контейнер */}
+      <div 
+        ref={timelineRef}
+        className="relative overflow-y-auto"
+        style={{ height: '400px' }}
+      >
+        <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
+          {/* Часовые линии */}
+          {HOURS.map((hour) => (
+            <div
+              key={hour}
+              className="absolute left-0 right-0 flex border-t border-gray-100"
+              style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+            >
+              {/* Время слева */}
+              <div className="w-14 flex-shrink-0 pr-2 -mt-2.5">
+                <span className="text-xs text-gray-400 font-medium">
+                  {formatHour(hour)}
+                </span>
+              </div>
+              
+              {/* Разделительная линия */}
+              <div className="flex-1 border-l border-gray-100" />
+            </div>
+          ))}
+          
+          {/* Индикатор текущего времени (только для сегодня) */}
+          {isToday && (
+            <div
+              className="absolute left-14 right-0 z-20 flex items-center"
+              style={{ top: `${currentTimePosition}px` }}
+            >
+              <div className="w-2.5 h-2.5 bg-red-500 rounded-full -ml-1.5 shadow-md" />
+              <div className="flex-1 h-0.5 bg-red-500 shadow-sm" />
+            </div>
+          )}
+          
+          {/* События */}
+          <div className="absolute left-14 right-0 top-0 bottom-0">
+            <AnimatePresence>
+              {processedEvents.map((event) => {
+                const top = (event.startMinutes / 60) * HOUR_HEIGHT;
+                const height = Math.max(
+                  ((event.endMinutes - event.startMinutes) / 60) * HOUR_HEIGHT,
+                  30 // Минимальная высота
+                );
+                
+                return (
+                  <TimelineEventCard
+                    key={event.id}
+                    event={event}
+                    style={{ top: `${top}px`, height: `${height}px` }}
+                    onToggleComplete={onToggleComplete}
+                    onDelete={onDelete}
+                    hapticFeedback={hapticFeedback}
+                    isOverlapping={event.isOverlapping}
+                    overlapIndex={event.overlapIndex}
+                    totalOverlaps={event.totalOverlaps}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+      
+      {/* Пустое состояние */}
+      {events.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-5">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Clock className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-gray-500 text-sm font-medium">
+              Нет событий на этот день
+            </p>
+            <p className="text-gray-400 text-xs mt-1">
+              Синхронизируйте пары или добавьте событие
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PlannerTimeline;
