@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 # Configuration
-BACKEND_URL = "https://rudn-schedule.ru/api"
+BACKEND_URL = "http://localhost:8001/api"
 TEST_TELEGRAM_ID = 888777666  # For favorites testing as specified
 
 class MusicAPITester:
