@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart, Music, MoreVertical } from 'lucide-react';
+import { Play, Pause, Heart } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
+import { TrackCover } from './TrackCover';
 
 export const TrackCard = ({ 
   track, 
