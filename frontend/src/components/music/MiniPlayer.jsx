@@ -5,7 +5,7 @@ import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
 export const MiniPlayer = ({ onExpand, onClose }) => {
-  const { currentTrack, isPlaying, progress, duration, toggle, next, prev, pause } = usePlayer();
+  const { currentTrack, isPlaying, progress, duration, toggle, next, prev, pause, error, clearError } = usePlayer();
 
   if (!currentTrack) return null;
 
@@ -21,6 +21,7 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
   const handleClose = (e) => {
     e.stopPropagation();
     pause();
+    clearError();
     if (onClose) onClose();
   };
 
