@@ -33,7 +33,7 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
         className="fixed bottom-20 left-0 right-0 z-40 flex justify-center px-3"
       >
         <div
-          className="rounded-2xl border border-white/10 p-3 relative overflow-hidden"
+          className="w-full max-w-[420px] rounded-2xl border border-white/10 p-3 relative overflow-hidden"
           style={{
             backgroundColor: 'rgba(28, 28, 30, 0.95)',
             backdropFilter: 'blur(20px)',
