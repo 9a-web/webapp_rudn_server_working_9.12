@@ -46,20 +46,21 @@ const TimelineEventCard = ({
   const getEventColors = () => {
     if (isScheduleEvent) {
       return {
-        bg: 'bg-blue-500',
+        bg: 'bg-white',
         bgLight: 'bg-blue-100',
-        border: 'border-blue-600',
-        text: 'text-white',
+        border: 'border-blue-500',
+        text: 'text-gray-800',
         textDark: 'text-blue-800',
+        accent: 'text-blue-600',
       };
     }
     
     const categoryColors = {
-      'study': { bg: 'bg-purple-500', bgLight: 'bg-purple-100', border: 'border-purple-600', text: 'text-white', textDark: 'text-purple-800' },
-      'personal': { bg: 'bg-green-500', bgLight: 'bg-green-100', border: 'border-green-600', text: 'text-white', textDark: 'text-green-800' },
-      'sport': { bg: 'bg-red-500', bgLight: 'bg-red-100', border: 'border-red-600', text: 'text-white', textDark: 'text-red-800' },
-      'work': { bg: 'bg-orange-500', bgLight: 'bg-orange-100', border: 'border-orange-600', text: 'text-white', textDark: 'text-orange-800' },
-      'meeting': { bg: 'bg-pink-500', bgLight: 'bg-pink-100', border: 'border-pink-600', text: 'text-white', textDark: 'text-pink-800' },
+      'study': { bg: 'bg-white', bgLight: 'bg-purple-100', border: 'border-purple-500', text: 'text-gray-800', textDark: 'text-purple-800', accent: 'text-purple-600' },
+      'personal': { bg: 'bg-white', bgLight: 'bg-green-100', border: 'border-green-500', text: 'text-gray-800', textDark: 'text-green-800', accent: 'text-green-600' },
+      'sport': { bg: 'bg-white', bgLight: 'bg-red-100', border: 'border-red-500', text: 'text-gray-800', textDark: 'text-red-800', accent: 'text-red-600' },
+      'work': { bg: 'bg-white', bgLight: 'bg-orange-100', border: 'border-orange-500', text: 'text-gray-800', textDark: 'text-orange-800', accent: 'text-orange-600' },
+      'meeting': { bg: 'bg-white', bgLight: 'bg-pink-100', border: 'border-pink-500', text: 'text-gray-800', textDark: 'text-pink-800', accent: 'text-pink-600' },
     };
     
     return categoryColors[event.category] || categoryColors['personal'];
