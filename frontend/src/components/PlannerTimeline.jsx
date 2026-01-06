@@ -403,8 +403,7 @@ export const PlannerTimeline = ({
       {/* Timeline контейнер */}
       <div 
         ref={timelineRef}
-        className="relative overflow-y-auto"
-        style={{ height: '400px' }}
+        className="relative"
       >
         <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
           {/* Часовые линии */}
