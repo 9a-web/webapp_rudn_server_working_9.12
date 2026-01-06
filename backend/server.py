@@ -6833,10 +6833,10 @@ async def music_playlists():
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/music/playlist/{owner_id}/{playlist_id}")
-async def music_playlist_tracks(owner_id: int, playlist_id: int, count: int = 100):
+async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str = "", count: int = 100):
     """Треки конкретного плейлиста"""
     try:
-        tracks = music_service.get_playlist_tracks(owner_id, playlist_id, count)
+        tracks = music_service.get_playlist_tracks(owner_id, playlist_id, access_key, count)
         return {"tracks": tracks, "count": len(tracks)}
     except Exception as e:
         logger.error(f"Music playlist tracks error: {e}")
