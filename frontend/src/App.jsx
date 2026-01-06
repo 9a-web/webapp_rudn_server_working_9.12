@@ -1085,6 +1085,11 @@ const Home = () => {
         )}
       </div>
 
+      {/* Mini Player - показывается над BottomNavigation */}
+      {!showGroupSelector && userSettings && (
+        <MiniPlayer />
+      )}
+
       {/* Bottom Navigation */}
       {!showGroupSelector && userSettings && (
         <BottomNavigation 
