@@ -252,6 +252,7 @@ export const PlayerProvider = ({ children }) => {
     queue,
     queueIndex,
     volume,
+    error,
     play,
     pause,
     toggle,
@@ -260,6 +261,7 @@ export const PlayerProvider = ({ children }) => {
     seek,
     changeVolume,
     setQueue,
+    clearError: () => setError(null),
   };
 
   return (
