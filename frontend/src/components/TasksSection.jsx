@@ -1227,50 +1227,28 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             </motion.button>
           </div>
 
-          {/* Отображение событий */}
+          {/* Timeline-вид планировщика */}
           {plannerLoading ? (
             <div className="text-center py-8">
               <div className="inline-block w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin mb-2" />
               <p className="text-gray-500 text-sm">Загрузка...</p>
             </div>
-          ) : plannerEvents.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-8"
-            >
-              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm mb-2">
-                На {currentDate} нет событий
-              </p>
-              <p className="text-gray-400 text-xs">
-                Нажмите "Синхронизировать пары" или "Событие"
-              </p>
-            </motion.div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-3"
-            >
-              {plannerEvents.map((event, index) => (
-                <PlannerEventCard
-                  key={event.id}
-                  event={event}
-                  onToggleComplete={async (eventId) => {
-                    await toggleTask(eventId);
-                    await loadPlannerEvents(tasksSelectedDate);
-                  }}
-                  onDelete={async (eventId) => {
-                    if (window.confirm('Удалить это событие?')) {
-                      await handleDeleteTask(eventId);
-                      await loadPlannerEvents(tasksSelectedDate);
-                    }
-                  }}
-                  hapticFeedback={hapticFeedback}
-                />
-              ))}
-            </motion.div>
+            <PlannerTimeline
+              events={plannerEvents}
+              currentDate={tasksSelectedDate}
+              onToggleComplete={async (eventId) => {
+                await toggleTask(eventId);
+                await loadPlannerEvents(tasksSelectedDate);
+              }}
+              onDelete={async (eventId) => {
+                if (window.confirm('Удалить это событие?')) {
+                  await handleDeleteTask(eventId);
+                  await loadPlannerEvents(tasksSelectedDate);
+                }
+              }}
+              hapticFeedback={hapticFeedback}
+            />
           )}
         </div>
       )}
