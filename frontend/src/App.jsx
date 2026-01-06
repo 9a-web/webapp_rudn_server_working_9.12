@@ -1104,12 +1104,14 @@ function App() {
     <div className="App">
       <ThemeProvider>
         <TelegramProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/status-tester" element={<StatusTester />} />
-            </Routes>
-          </BrowserRouter>
+          <PlayerProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/status-tester" element={<StatusTester />} />
+              </Routes>
+            </BrowserRouter>
+          </PlayerProvider>
         </TelegramProvider>
       </ThemeProvider>
     </div>
