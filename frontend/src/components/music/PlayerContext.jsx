@@ -21,8 +21,6 @@ export const PlayerProvider = ({ children }) => {
     }
     if (audioRef.current) {
       audioRef.current.volume = volume;
-      // Важно: устанавливаем crossOrigin для CORS
-      audioRef.current.crossOrigin = 'anonymous';
     }
     
     return () => {
