@@ -1232,37 +1232,6 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       ) : (
         /* Планировщик */
         <div className="space-y-4">
-          {/* Кнопки управления планировщиком */}
-          <div className="flex justify-end gap-2 mb-2">
-             <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSyncSchedule}
-              disabled={syncingSchedule || !userSettings?.group_id}
-              className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {syncingSchedule ? (
-                <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-              ) : (
-                <Link2 className="w-4 h-4" />
-              )}
-              <span className="text-xs font-medium">
-                {syncingSchedule ? 'Синхронизация...' : 'Синхронизировать пары'}
-              </span>
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                hapticFeedback && hapticFeedback('impact', 'light');
-                setIsCreateEventModalOpen(true);
-              }}
-              className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" strokeWidth={2.5} />
-              <span className="text-xs font-medium">Событие</span>
-            </motion.button>
-          </div>
-
           {/* Timeline-вид планировщика */}
           {plannerLoading ? (
             <div className="text-center py-8">
