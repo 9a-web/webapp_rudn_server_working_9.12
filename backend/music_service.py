@@ -5,6 +5,12 @@ from vkpymusic import Service
 from typing import List, Optional
 import os
 import logging
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Загрузка переменных окружения
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +28,11 @@ class VKMusicService:
         if self._service is None:
             if not self.token:
                 raise ValueError("VK_MUSIC_TOKEN not configured")
-            self._service = Service.parse_config()
-            # Установка токена напрямую
-            self._service._session.headers["Authorization"] = f"Bearer {self.token}"
+            # Инициализация с user_agent и токеном напрямую
+            self._service = Service(
+                user_agent="KateMobileAndroid/93 lite-530 (Android 10; SDK 29; arm64-v8a; Xiaomi Redmi Note 8 Pro; ru)",
+                token=self.token
+            )
         return self._service
     
     def search(self, query: str, count: int = 20) -> List[dict]:
