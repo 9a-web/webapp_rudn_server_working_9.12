@@ -53,17 +53,13 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
 
           <div className="flex items-center gap-3 pt-1">
             {/* Cover/Icon */}
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0">
-              {currentTrack.cover ? (
-                <img 
-                  src={currentTrack.cover} 
-                  alt="cover" 
-                  className="w-full h-full rounded-xl object-cover"
-                />
-              ) : (
-                <Music className="w-6 h-6 text-purple-400" />
-              )}
-            </div>
+            <TrackCover 
+              cover={currentTrack.cover}
+              artist={currentTrack.artist}
+              title={currentTrack.title}
+              size="md"
+              className="rounded-xl"
+            />
 
             {/* Track info */}
             <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
