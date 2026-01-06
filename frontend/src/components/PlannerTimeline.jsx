@@ -309,24 +309,7 @@ export const PlannerTimeline = ({
     return () => clearInterval(interval);
   }, []);
   
-  // Автопрокрутка к текущему времени или первому событию
-  useEffect(() => {
-    if (timelineRef.current) {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      
-      // Если есть события, прокрутка к первому событию
-      if (events.length > 0) {
-        const firstEventTime = Math.min(...events.map(e => parseTime(e.time_start)));
-        const scrollTarget = Math.max(0, (firstEventTime / 60 - 1)) * HOUR_HEIGHT;
-        timelineRef.current.scrollTop = scrollTarget;
-      } else {
-        // Иначе прокрутка к текущему времени
-        const scrollTarget = Math.max(0, (currentMinutes / 60 - 2)) * HOUR_HEIGHT;
-        timelineRef.current.scrollTop = scrollTarget;
-      }
-    }
-  }, [events]);
+  // Автопрокрутка отключена - таймлайн отображается полностью без скролла
   
   // Вычисление позиции текущего времени
   const currentTimePosition = useMemo(() => {
