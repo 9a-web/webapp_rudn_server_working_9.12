@@ -43,3 +43,4 @@ Pillow>=10.0.0
 matplotlib>=3.7.0
 pytz
 vkpymusic
+vkpymusic
