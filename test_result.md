@@ -388,10 +388,83 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus: 
+    - "Music API - Full Testing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+  - task: "Music Search API - GET /api/music/search"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py, backend/music_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Реализован endpoint для поиска треков через VK Music API. Параметры: q (запрос), count (количество). Возвращает массив треков с полями: id, owner_id, song_id, artist, title, duration, url, cover."
+
+  - task: "Music My Audio API - GET /api/music/my"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py, backend/music_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Реализован endpoint для получения аудиозаписей пользователя VK. Параметр: count. Использует VK_USER_ID из .env."
+
+  - task: "Music Popular API - GET /api/music/popular"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py, backend/music_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Реализован endpoint для получения популярных треков. Параметр: count."
+
+  - task: "Music Playlists API - GET /api/music/playlists"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py, backend/music_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Реализован endpoint для получения плейлистов пользователя VK. Возвращает массив плейлистов с полями: id, owner_id, title, count, cover, access_key."
+
+  - task: "Music Playlist Tracks API - GET /api/music/playlist/{owner_id}/{playlist_id}"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py, backend/music_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Реализован endpoint для получения треков плейлиста. Параметры: owner_id, playlist_id, access_key, count."
+
+  - task: "Music Favorites CRUD - Full Workflow"
+    implemented: true
+    working: needs_testing
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: needs_testing
+        agent: "main"
+        comment: "Реализованы endpoints для избранных треков: GET /api/music/favorites/{telegram_id}, POST /api/music/favorites/{telegram_id}, DELETE /api/music/favorites/{telegram_id}/{track_id}. Данные хранятся в коллекции music_favorites MongoDB."
 
 agent_communication:
   - agent: "main"
