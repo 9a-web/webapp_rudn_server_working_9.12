@@ -40,7 +40,6 @@ export const PlayerProvider = ({ children }) => {
     if (!audioRef.current && typeof Audio !== 'undefined') {
       audioRef.current = new Audio();
       audioRef.current.volume = volume;
-      audioRef.current.crossOrigin = 'anonymous';
     }
     
     if (!audioRef.current) {
