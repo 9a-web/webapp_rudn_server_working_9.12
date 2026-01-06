@@ -101,7 +101,7 @@ const TimelineEventCard = ({
         className={`
           absolute rounded-lg cursor-pointer overflow-hidden
           border-l-4 ${colors.border} ${colors.bg}
-          shadow-md hover:shadow-lg transition-shadow
+          shadow-sm hover:shadow-md transition-shadow
           ${isCompleted ? 'opacity-50' : ''}
           ${isOverlapping ? '' : 'left-0 right-2'}
         `}
