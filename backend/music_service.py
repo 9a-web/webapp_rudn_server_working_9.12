@@ -98,11 +98,11 @@ class VKMusicService:
     def _playlist_to_dict(self, playlist) -> dict:
         """Преобразование плейлиста в словарь"""
         return {
-            "id": playlist.id,
+            "id": getattr(playlist, 'playlist_id', 0),
             "owner_id": playlist.owner_id,
             "title": playlist.title,
             "count": getattr(playlist, 'count', 0),
-            "cover": getattr(playlist, 'photo', {}).get('photo_300') if hasattr(playlist, 'photo') else None
+            "cover": getattr(playlist, 'photo', None)
         }
 
 # Singleton instance
