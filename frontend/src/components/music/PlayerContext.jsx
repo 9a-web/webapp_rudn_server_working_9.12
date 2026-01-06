@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, useRef, useCallback, useEff
 const PlayerContext = createContext();
 
 export const PlayerProvider = ({ children }) => {
-  const audioRef = useRef(null);
+  // Создаем Audio объект сразу (не в useEffect) для избежания race condition
+  const audioRef = useRef(typeof Audio !== 'undefined' ? new Audio() : null);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -11,11 +12,18 @@ export const PlayerProvider = ({ children }) => {
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [error, setError] = useState(null);
 
-  // Инициализация Audio элемента
+  // Инициализация Audio элемента и установка громкости
   useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.volume = volume;
+    if (!audioRef.current && typeof Audio !== 'undefined') {
+      audioRef.current = new Audio();
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+      // Важно: устанавливаем crossOrigin для CORS
+      audioRef.current.crossOrigin = 'anonymous';
+    }
     
     return () => {
       if (audioRef.current) {
@@ -27,7 +35,21 @@ export const PlayerProvider = ({ children }) => {
 
   // Воспроизведение трека
   const play = useCallback((track, trackList = []) => {
-    if (!audioRef.current) return;
+    console.log('🎵 Play called:', { track: track?.title, hasUrl: !!track?.url });
+    setError(null);
+    
+    // Создаем audio если его нет
+    if (!audioRef.current && typeof Audio !== 'undefined') {
+      audioRef.current = new Audio();
+      audioRef.current.volume = volume;
+      audioRef.current.crossOrigin = 'anonymous';
+    }
+    
+    if (!audioRef.current) {
+      console.error('❌ Audio API not available');
+      setError('Audio не поддерживается');
+      return;
+    }
     
     // Telegram haptic feedback
     if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -43,12 +65,48 @@ export const PlayerProvider = ({ children }) => {
     setCurrentTrack(track);
     
     if (track.url) {
+      console.log('🔗 Setting audio src:', track.url.substring(0, 80) + '...');
+      
+      // Останавливаем текущее воспроизведение
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      
+      // Устанавливаем новый источник
       audioRef.current.src = track.url;
-      audioRef.current.play()
-        .then(() => setIsPlaying(true))
-        .catch(err => console.error('Play error:', err));
+      audioRef.current.load(); // Явно загружаем аудио
+      
+      // Воспроизводим
+      const playPromise = audioRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('✅ Playback started successfully');
+            setIsPlaying(true);
+            setError(null);
+          })
+          .catch(err => {
+            console.error('❌ Play error:', err.name, err.message);
+            setIsPlaying(false);
+            
+            // Обработка различных ошибок
+            if (err.name === 'NotAllowedError') {
+              setError('Нажмите еще раз для воспроизведения');
+            } else if (err.name === 'NotSupportedError') {
+              setError('Формат не поддерживается');
+            } else if (err.name === 'AbortError') {
+              // Игнорируем - это нормально при быстром переключении треков
+              console.log('⚠️ Playback aborted (normal during quick track changes)');
+            } else {
+              setError('Ошибка воспроизведения');
+            }
+          });
+      }
+    } else {
+      console.error('❌ Track has no URL:', track);
+      setError('Трек недоступен');
     }
-  }, []);
+  }, [volume]);
 
   // Пауза
   const pause = useCallback(() => {
