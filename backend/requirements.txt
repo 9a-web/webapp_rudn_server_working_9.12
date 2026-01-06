@@ -44,3 +44,4 @@ matplotlib>=3.7.0
 pytz
 vkpymusic
 vkpymusic
+aiofiles
