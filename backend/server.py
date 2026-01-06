@@ -6788,6 +6788,114 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ MUSIC API ENDPOINTS ============
+
+from music_service import music_service
+
+@api_router.get("/music/search")
+async def music_search(q: str, count: int = 20):
+    """Поиск музыки по запросу"""
+    try:
+        tracks = music_service.search(q, count)
+        return {"tracks": tracks, "count": len(tracks)}
+    except Exception as e:
+        logger.error(f"Music search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/my")
+async def music_my_audio(count: int = 50):
+    """Мои аудиозаписи VK"""
+    try:
+        tracks = music_service.get_my_audio(count)
+        return {"tracks": tracks, "count": len(tracks)}
+    except Exception as e:
+        logger.error(f"Music my audio error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/popular")
+async def music_popular(count: int = 30):
+    """Популярные треки"""
+    try:
+        tracks = music_service.get_popular(count)
+        return {"tracks": tracks, "count": len(tracks)}
+    except Exception as e:
+        logger.error(f"Music popular error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/playlists")
+async def music_playlists():
+    """Плейлисты пользователя VK"""
+    try:
+        playlists = music_service.get_playlists()
+        return {"playlists": playlists}
+    except Exception as e:
+        logger.error(f"Music playlists error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/playlist/{owner_id}/{playlist_id}")
+async def music_playlist_tracks(owner_id: int, playlist_id: int, count: int = 100):
+    """Треки конкретного плейлиста"""
+    try:
+        tracks = music_service.get_playlist_tracks(owner_id, playlist_id, count)
+        return {"tracks": tracks, "count": len(tracks)}
+    except Exception as e:
+        logger.error(f"Music playlist tracks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Избранные треки (хранятся в MongoDB)
+@api_router.get("/music/favorites/{telegram_id}")
+async def get_music_favorites(telegram_id: int):
+    """Получить избранные треки пользователя"""
+    try:
+        favorites = await db.music_favorites.find(
+            {"telegram_id": telegram_id}
+        ).sort("added_at", -1).to_list(500)
+        
+        # Убираем _id из ответа
+        for f in favorites:
+            f.pop("_id", None)
+        
+        return {"tracks": favorites, "count": len(favorites)}
+    except Exception as e:
+        logger.error(f"Get music favorites error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/music/favorites/{telegram_id}")
+async def add_music_favorite(telegram_id: int, track: dict):
+    """Добавить трек в избранное"""
+    try:
+        # Проверяем, не добавлен ли уже
+        existing = await db.music_favorites.find_one({
+            "telegram_id": telegram_id,
+            "id": track.get("id")
+        })
+        
+        if existing:
+            return {"success": False, "message": "Track already in favorites"}
+        
+        track["telegram_id"] = telegram_id
+        track["added_at"] = datetime.utcnow()
+        
+        await db.music_favorites.insert_one(track)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Add music favorite error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/music/favorites/{telegram_id}/{track_id}")
+async def remove_music_favorite(telegram_id: int, track_id: str):
+    """Удалить трек из избранного"""
+    try:
+        result = await db.music_favorites.delete_one({
+            "telegram_id": telegram_id,
+            "id": track_id
+        })
+        return {"success": result.deleted_count > 0}
+    except Exception as e:
+        logger.error(f"Remove music favorite error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
