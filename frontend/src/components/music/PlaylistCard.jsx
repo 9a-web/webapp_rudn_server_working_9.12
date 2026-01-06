@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ListMusic, Play } from 'lucide-react';
 
@@ -12,6 +12,40 @@ export const PlaylistCard = ({ playlist, onClick }) => {
       onClick(playlist);
     }
   };
+
+  // Генерация уникального градиента для плейлиста
+  const gradient = useMemo(() => {
+    const str = playlist.title || '';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    
+    const gradients = [
+      'from-purple-600 via-purple-500 to-pink-500',
+      'from-blue-600 via-blue-500 to-purple-500',
+      'from-green-600 via-emerald-500 to-teal-500',
+      'from-orange-600 via-orange-500 to-red-500',
+      'from-pink-600 via-pink-500 to-rose-500',
+      'from-cyan-600 via-cyan-500 to-blue-500',
+      'from-violet-600 via-violet-500 to-purple-500',
+      'from-amber-600 via-amber-500 to-orange-500',
+      'from-indigo-600 via-indigo-500 to-violet-500',
+      'from-fuchsia-600 via-fuchsia-500 to-pink-500',
+    ];
+    
+    return gradients[Math.abs(hash) % gradients.length];
+  }, [playlist.title]);
+
+  // Получение первой буквы названия
+  const initial = useMemo(() => {
+    if (playlist.title && playlist.title.length > 0) {
+      return playlist.title.charAt(0).toUpperCase();
+    }
+    return '♪';
+  }, [playlist.title]);
 
   return (
     <motion.div
