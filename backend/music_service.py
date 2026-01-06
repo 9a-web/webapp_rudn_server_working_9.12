@@ -83,10 +83,11 @@ class VKMusicService:
     
     def _track_to_dict(self, track) -> dict:
         """Преобразование трека в словарь"""
+        track_id = getattr(track, 'track_id', 0)
         return {
-            "id": f"{track.owner_id}_{track.id}",
+            "id": f"{track.owner_id}_{track_id}",
             "owner_id": track.owner_id,
-            "song_id": track.id,
+            "song_id": track_id,
             "artist": track.artist,
             "title": track.title,
             "duration": track.duration,
