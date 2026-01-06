@@ -44,10 +44,11 @@ export const musicAPI = {
    * Получить треки плейлиста
    * @param {number} ownerId - ID владельца плейлиста
    * @param {number} playlistId - ID плейлиста
+   * @param {string} accessKey - Ключ доступа плейлиста
    * @param {number} count - Количество треков
    */
-  getPlaylistTracks: async (ownerId, playlistId, count = 100) => {
-    const response = await api.get(`/music/playlist/${ownerId}/${playlistId}?count=${count}`);
+  getPlaylistTracks: async (ownerId, playlistId, accessKey = '', count = 100) => {
+    const response = await api.get(`/music/playlist/${ownerId}/${playlistId}?access_key=${accessKey}&count=${count}`);
     return response.data;
   },
 
