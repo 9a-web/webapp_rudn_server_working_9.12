@@ -72,10 +72,15 @@ class VKMusicService:
             logger.error(f"Get playlists error: {e}")
             return []
     
-    def get_playlist_tracks(self, owner_id: int, playlist_id: int, count: int = 100) -> List[dict]:
+    def get_playlist_tracks(self, owner_id: int, playlist_id: int, access_key: str = "", count: int = 100) -> List[dict]:
         """Получение треков плейлиста"""
         try:
-            tracks = self.service.get_songs_by_playlist(owner_id, playlist_id, count=count)
+            tracks = self.service.get_songs_by_playlist_id(
+                user_id=owner_id,
+                playlist_id=playlist_id,
+                access_key=access_key,
+                count=count
+            )
             return [self._track_to_dict(t) for t in tracks]
         except Exception as e:
             logger.error(f"Get playlist tracks error: {e}")
