@@ -67,9 +67,15 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
               <p className="text-white font-medium truncate text-sm">
                 {currentTrack.title}
               </p>
-              <p className="text-white/60 text-xs truncate">
-                {currentTrack.artist}
-              </p>
+              {error ? (
+                <p className="text-red-400 text-xs truncate">
+                  {error}
+                </p>
+              ) : (
+                <p className="text-white/60 text-xs truncate">
+                  {currentTrack.artist}
+                </p>
+              )}
             </div>
 
             {/* Controls */}
