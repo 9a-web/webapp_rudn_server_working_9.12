@@ -30,14 +30,7 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed z-40"
-        style={{
-          bottom: '80px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 'calc(100% - 24px)',
-          maxWidth: '420px'
-        }}
+        className="fixed bottom-20 left-0 right-0 z-40 flex justify-center px-3"
       >
         <div
           className="rounded-2xl border border-white/10 p-3 relative overflow-hidden"
