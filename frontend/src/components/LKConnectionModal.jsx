@@ -154,6 +154,12 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4"
         onClick={onClose}
+        onTouchStart={(e) => {
+          // Предотвращаем закрытие при касании overlay, если цель - не сам overlay
+          if (e.target !== e.currentTarget) {
+            e.stopPropagation();
+          }
+        }}
       >
         <motion.div
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -170,6 +176,8 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
             boxShadow: '0 24px 48px rgba(0, 0, 0, 0.5)',
           }}
           onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
         >
           {/* Header */}
           <div 
