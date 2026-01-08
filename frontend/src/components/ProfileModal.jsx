@@ -74,6 +74,32 @@ export const ProfileModal = ({
     loadThemeSettings();
   }, [isOpen, user]);
 
+  // Проверка статуса ЛК РУДН при открытии
+  useEffect(() => {
+    const checkLKStatus = async () => {
+      if (!isOpen || !user?.id) return;
+
+      try {
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+        const response = await fetch(`${backendUrl}/api/lk/data/${user.id}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setLkConnected(true);
+          setLkData(data.personal_data);
+        } else {
+          setLkConnected(false);
+          setLkData(null);
+        }
+      } catch (error) {
+        setLkConnected(false);
+        setLkData(null);
+      }
+    };
+
+    checkLKStatus();
+  }, [isOpen, user]);
+
   // Изменение режима новогодней темы
   const changeNewYearThemeMode = async (mode) => {
     if (!user?.id || themeLoading) return;
