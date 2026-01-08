@@ -360,6 +360,10 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                       className="w-full text-white rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -367,6 +371,7 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
                       }}
                       placeholder="email@example.com"
                       required
+                      autoComplete="email"
                     />
                   </div>
                 </div>
@@ -381,6 +386,10 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                       className="w-full text-white rounded-xl pl-11 pr-4 py-3.5 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -388,6 +397,7 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
                       }}
                       placeholder="••••••••"
                       required
+                      autoComplete="current-password"
                     />
                   </div>
                 </div>
