@@ -47,3 +47,4 @@ vkpymusic
 aiofiles
 playwright
 pyee
+greenlet
