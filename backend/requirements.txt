@@ -45,3 +45,4 @@ pytz
 vkpymusic
 vkpymusic
 aiofiles
+playwright
