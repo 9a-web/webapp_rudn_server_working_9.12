@@ -26,10 +26,21 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
         const response = await fetch(`${backendUrl}/api/lk/data/${telegramId}`);
         
         if (response.ok) {
-          const data = await response.json();
+          // Читаем тело ответа безопасно
+          const responseText = await response.text();
+          let data = {};
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            data = {};
+          }
           setIsConnected(true);
           setLkData(data.personal_data);
         } else if (response.status === 404) {
+          setIsConnected(false);
+          setLkData(null);
+        } else {
           setIsConnected(false);
           setLkData(null);
         }
