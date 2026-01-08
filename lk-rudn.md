@@ -902,7 +902,8 @@ async def test_get_personal_data():
 **Прогресс реализации:**
 1. ✅ Установить зависимости (`playwright`, `cryptography`) - ГОТОВО
 2. ✅ Добавить `LK_ENCRYPTION_KEY` в `.env` - ГОТОВО
-3. ⏳ Реализовать парсер в `backend/rudn_lk_parser.py` - В ПРОЦЕССЕ
-4. ⬜ Добавить API endpoints в `server.py`
-5. ⬜ Создать frontend компонент
-6. ⬜ Протестировать со студенческим аккаунтом (не гостевым)
+3. ✅ Реализовать парсер в `backend/lk_parser.py` - ГОТОВО
+4. ⏳ Добавить модели в `models.py` - В ПРОЦЕССЕ
+5. ⬜ Добавить API endpoints в `server.py`
+6. ⬜ Создать frontend компонент
+7. ⬜ Протестировать со студенческим аккаунтом (не гостевым)
