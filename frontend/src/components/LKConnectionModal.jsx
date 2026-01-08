@@ -72,7 +72,17 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
         })
       });
 
-      const data = await response.json();
+      // Читаем тело ответа как текст сначала
+      const responseText = await response.text();
+      let data = {};
+      
+      // Пробуем распарсить JSON
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        data = { detail: 'Ошибка обработки ответа сервера' };
+      }
 
       if (response.ok) {
         setSuccess(true);
