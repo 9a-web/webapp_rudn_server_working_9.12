@@ -4661,6 +4661,187 @@ async def get_admin_journals(limit: int = 50, skip: int = 0, search: Optional[st
     return result
 
 
+# ============ API для ЛК РУДН (lk.rudn.ru) ============
+
+@api_router.post("/lk/connect", response_model=LKConnectionResponse)
+async def connect_lk(data: LKCredentialsRequest):
+    """
+    Подключение личного кабинета РУДН к аккаунту пользователя
+    
+    - Авторизуется через OAuth RUDN ID
+    - Парсит персональные данные из профиля
+    - Сохраняет зашифрованный пароль в БД для последующей синхронизации
+    """
+    logger.info(f"LK connect request for telegram_id={data.telegram_id}")
+    
+    parser = RUDNLKParser()
+    
+    try:
+        async with parser:
+            # Проверяем авторизацию
+            success = await parser.login(data.email, data.password)
+            
+            if not success:
+                logger.warning(f"LK login failed for {data.email}")
+                raise HTTPException(
+                    status_code=401, 
+                    detail="Неверный логин или пароль ЛК РУДН"
+                )
+            
+            # Получаем персональные данные
+            personal_data = await parser.get_personal_data()
+            
+            # Шифруем пароль для хранения
+            encrypted_password = parser.encrypt_password(data.password)
+            
+            # Сохраняем в БД
+            await db.user_settings.update_one(
+                {"telegram_id": data.telegram_id},
+                {
+                    "$set": {
+                        "lk_email": data.email,
+                        "lk_password_encrypted": encrypted_password,
+                        "lk_connected": True,
+                        "lk_last_sync": datetime.utcnow().isoformat(),
+                        "lk_personal_data": personal_data
+                    }
+                },
+                upsert=True
+            )
+            
+            logger.info(f"LK connected successfully for telegram_id={data.telegram_id}")
+            
+            return LKConnectionResponse(
+                success=True,
+                message="ЛК РУДН успешно подключен",
+                personal_data=LKPersonalData(**personal_data) if personal_data else None
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LK connect error: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка подключения ЛК: {str(e)}")
+
+
+@api_router.get("/lk/data/{telegram_id}", response_model=LKDataResponse)
+async def get_lk_data(telegram_id: int, refresh: bool = False):
+    """
+    Получение данных из ЛК РУДН
+    
+    - refresh=False: возвращает кэшированные данные из БД
+    - refresh=True: заново авторизуется и парсит актуальные данные
+    """
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    
+    if not user or not user.get("lk_connected"):
+        return LKDataResponse(
+            personal_data=None,
+            last_sync=None,
+            cached=False,
+            lk_connected=False
+        )
+    
+    if not refresh and user.get("lk_personal_data"):
+        return LKDataResponse(
+            personal_data=LKPersonalData(**user["lk_personal_data"]),
+            last_sync=user.get("lk_last_sync"),
+            cached=True,
+            lk_connected=True
+        )
+    
+    # Обновляем данные с сайта
+    parser = RUDNLKParser()
+    
+    try:
+        async with parser:
+            password = parser.decrypt_password(user["lk_password_encrypted"])
+            success = await parser.login(user["lk_email"], password)
+            
+            if not success:
+                # Пароль изменился или сессия истекла
+                await db.user_settings.update_one(
+                    {"telegram_id": telegram_id},
+                    {"$set": {"lk_connected": False}}
+                )
+                raise HTTPException(
+                    status_code=401, 
+                    detail="Сессия ЛК истекла. Переподключите аккаунт."
+                )
+            
+            personal_data = await parser.get_personal_data()
+            
+            # Обновляем кэш
+            now = datetime.utcnow().isoformat()
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {
+                    "$set": {
+                        "lk_last_sync": now,
+                        "lk_personal_data": personal_data
+                    }
+                }
+            )
+            
+            return LKDataResponse(
+                personal_data=LKPersonalData(**personal_data) if personal_data else None,
+                last_sync=now,
+                cached=False,
+                lk_connected=True
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LK refresh error: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка обновления данных ЛК: {str(e)}")
+
+
+@api_router.get("/lk/status/{telegram_id}", response_model=LKStatusResponse)
+async def get_lk_status(telegram_id: int):
+    """
+    Проверка статуса подключения ЛК РУДН
+    """
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    
+    if not user:
+        return LKStatusResponse(lk_connected=False)
+    
+    return LKStatusResponse(
+        lk_connected=user.get("lk_connected", False),
+        lk_email=user.get("lk_email"),
+        lk_last_sync=user.get("lk_last_sync")
+    )
+
+
+@api_router.delete("/lk/disconnect/{telegram_id}")
+async def disconnect_lk(telegram_id: int):
+    """
+    Отключение ЛК РУДН от аккаунта
+    
+    Удаляет сохранённые учётные данные и персональные данные
+    """
+    result = await db.user_settings.update_one(
+        {"telegram_id": telegram_id},
+        {
+            "$unset": {
+                "lk_email": "",
+                "lk_password_encrypted": "",
+                "lk_personal_data": ""
+            },
+            "$set": {
+                "lk_connected": False
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    logger.info(f"LK disconnected for telegram_id={telegram_id}")
+    
+    return {"success": True, "message": "ЛК РУДН отключен"}
+
 
 # ============ Экспорт/Импорт базы данных ============
 
