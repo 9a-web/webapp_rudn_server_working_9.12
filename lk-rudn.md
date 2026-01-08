@@ -903,7 +903,7 @@ async def test_get_personal_data():
 1. ✅ Установить зависимости (`playwright`, `cryptography`) - ГОТОВО
 2. ✅ Добавить `LK_ENCRYPTION_KEY` в `.env` - ГОТОВО
 3. ✅ Реализовать парсер в `backend/lk_parser.py` - ГОТОВО
-4. ⏳ Добавить модели в `models.py` - В ПРОЦЕССЕ
-5. ⬜ Добавить API endpoints в `server.py`
-6. ⬜ Создать frontend компонент
+4. ✅ Добавить модели в `models.py` - ГОТОВО
+5. ✅ Добавить API endpoints в `server.py` - ГОТОВО
+6. ⏳ Создать frontend компонент - В ПРОЦЕССЕ
 7. ⬜ Протестировать со студенческим аккаунтом (не гостевым)
