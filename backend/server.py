@@ -139,7 +139,13 @@ from models import (
     ReferralStatsDetailResponse,
     # Модели для истории уведомлений
     NotificationHistoryItem,
-    NotificationHistoryResponse
+    NotificationHistoryResponse,
+    # Модели для ЛК РУДН
+    LKCredentialsRequest,
+    LKPersonalData,
+    LKConnectionResponse,
+    LKDataResponse,
+    LKStatusResponse
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
