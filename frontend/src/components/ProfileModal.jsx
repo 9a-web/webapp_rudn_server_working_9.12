@@ -670,6 +670,7 @@ export const ProfileModal = ({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="fixed z-[103] inset-0 flex items-center justify-center p-4"
+                  onClick={() => setShowSettings(false)}
                 >
                   <motion.div
                     className="w-full max-w-[320px] p-4 sm:p-6 rounded-3xl max-h-[85vh] overflow-y-auto"
@@ -680,6 +681,7 @@ export const ProfileModal = ({
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   >
                   {/* Заголовок */}
                   <div className="flex items-center justify-between mb-6">
