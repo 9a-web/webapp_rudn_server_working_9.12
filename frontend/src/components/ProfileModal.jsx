@@ -913,6 +913,18 @@ export const ProfileModal = ({
               </>
             )}
           </AnimatePresence>
+
+          {/* Модальное окно подключения ЛК РУДН */}
+          <LKConnectionModal
+            isOpen={showLKModal}
+            onClose={() => setShowLKModal(false)}
+            telegramId={user?.id}
+            hapticFeedback={hapticFeedback}
+            onConnectionChange={(connected, data) => {
+              setLkConnected(connected);
+              setLkData(data);
+            }}
+          />
         </>
       )}
     </AnimatePresence>
