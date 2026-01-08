@@ -914,6 +914,7 @@ export const ProfileModal = ({
                     )}
                   </AnimatePresence>
                 </motion.div>
+                </motion.div>
               </>
             )}
           </AnimatePresence>
