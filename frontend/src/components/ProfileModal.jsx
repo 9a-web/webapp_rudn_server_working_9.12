@@ -664,6 +664,12 @@ export const ProfileModal = ({
                   className="fixed inset-0 z-[102]"
                   style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
                   onClick={() => setShowSettings(false)}
+                  onTouchStart={(e) => {
+                    // Закрываем только если касание было на самом overlay
+                    if (e.target === e.currentTarget) {
+                      setShowSettings(false);
+                    }
+                  }}
                 />
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -671,6 +677,12 @@ export const ProfileModal = ({
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="fixed z-[103] inset-0 flex items-center justify-center p-4"
                   onClick={() => setShowSettings(false)}
+                  onTouchStart={(e) => {
+                    // Предотвращаем закрытие при касании модалки
+                    if (e.target !== e.currentTarget) {
+                      e.stopPropagation();
+                    }
+                  }}
                 >
                   <motion.div
                     className="w-full max-w-[320px] p-4 sm:p-6 rounded-3xl max-h-[85vh] overflow-y-auto"
@@ -682,6 +694,8 @@ export const ProfileModal = ({
                       boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
                     }}
                     onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
                   >
                   {/* Заголовок */}
                   <div className="flex items-center justify-between mb-6">
