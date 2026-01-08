@@ -25,6 +25,9 @@ export const ProfileModal = ({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
   const [themeLoading, setThemeLoading] = useState(false);
+  const [showLKModal, setShowLKModal] = useState(false);
+  const [lkConnected, setLkConnected] = useState(false);
+  const [lkData, setLkData] = useState(null);
 
   // Загрузка реферальных данных при открытии
   useEffect(() => {
