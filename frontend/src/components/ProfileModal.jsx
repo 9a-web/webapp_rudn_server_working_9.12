@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake } from 'lucide-react';
+import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle } from 'lucide-react';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { ReferralTree } from './ReferralTree';
+import LKConnectionModal from './LKConnectionModal';
 
 export const ProfileModal = ({ 
   isOpen, 
