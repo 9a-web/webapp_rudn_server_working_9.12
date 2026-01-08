@@ -119,7 +119,14 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
         if (hapticFeedback) hapticFeedback('notification', 'success');
         if (onConnectionChange) onConnectionChange(false, null);
       } else {
-        const data = await response.json();
+        // Читаем тело ответа безопасно
+        const responseText = await response.text();
+        let data = {};
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          data = { detail: 'Ошибка отключения' };
+        }
         throw new Error(data.detail || 'Ошибка отключения');
       }
     } catch (err) {
@@ -137,14 +144,21 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
     try {
       const response = await fetch(`${backendUrl}/api/lk/data/${telegramId}?refresh=true`);
 
+      // Читаем тело ответа безопасно
+      const responseText = await response.text();
+      let data = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        data = { detail: 'Ошибка обработки ответа' };
+      }
+
       if (response.ok) {
-        const data = await response.json();
         setLkData(data.personal_data);
         if (hapticFeedback) hapticFeedback('impact', 'medium');
         if (onConnectionChange) onConnectionChange(true, data.personal_data);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка обновления');
+        throw new Error(data.detail || 'Ошибка обновления');
       }
     } catch (err) {
       setError(err.message);
