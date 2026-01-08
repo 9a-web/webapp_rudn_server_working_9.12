@@ -108,8 +108,10 @@ class RUDNLKParser:
             )
             
             logger.debug(f"Переход на OAuth URL: {oauth_url}")
-            await self.page.goto(oauth_url, wait_until="networkidle", timeout=30000)
-            await self.page.wait_for_timeout(2000)
+            await self.page.goto(oauth_url, wait_until="networkidle", timeout=60000)
+            await self.page.wait_for_timeout(3000)
+            
+            logger.debug(f"Текущий URL: {self.page.url}")
             
             # Шаг 2: Клик на "Продолжить" (если есть welcome-страница)
             try:
@@ -117,45 +119,87 @@ class RUDNLKParser:
                 if await continue_btn.count() > 0:
                     logger.debug("Найдена кнопка 'Продолжить', кликаем")
                     await continue_btn.click()
-                    await self.page.wait_for_timeout(2000)
+                    await self.page.wait_for_timeout(5000)
+                    await self.page.wait_for_load_state("networkidle", timeout=30000)
+                    logger.debug(f"URL после клика Продолжить: {self.page.url}")
             except Exception as e:
                 logger.debug(f"Кнопка 'Продолжить' не найдена или ошибка: {e}")
             
             # Шаг 3: Заполнение формы логина
             logger.debug("Заполнение формы логина")
             
-            # Ищем поля ввода
-            email_field = self.page.locator('input[type="text"], input[type="email"]').first
+            # Ищем поля ввода с обновленными селекторами
+            # id.rudn.ru использует класс .loginNameInput для email
+            email_selectors = [
+                'input.loginNameInput',
+                'input[placeholder*="почта"]',
+                'input[placeholder*="телефон"]',
+                'input[type="email"]',
+                'input[type="text"]'
+            ]
+            
+            email_field = None
+            for selector in email_selectors:
+                locator = self.page.locator(selector).first
+                if await locator.count() > 0:
+                    email_field = locator
+                    logger.debug(f"Найдено поле email с селектором: {selector}")
+                    break
+            
+            if not email_field:
+                logger.error("Поле email не найдено!")
+                return False
+            
             await email_field.fill(email)
             await self.page.wait_for_timeout(500)
             
+            # Поле пароля
             password_field = self.page.locator('input[type="password"]').first
+            if await password_field.count() == 0:
+                logger.error("Поле пароля не найдено!")
+                return False
+                
             await password_field.fill(password)
             await self.page.wait_for_timeout(500)
             
             # Шаг 4: Клик "Войти"
             logger.debug("Клик на кнопку 'Войти'")
-            login_btn = self.page.locator('button:has-text("Войти"), button[type="submit"]').first
+            login_btn = self.page.locator('button:has-text("Войти")').first
+            if await login_btn.count() == 0:
+                login_btn = self.page.locator('button[type="submit"]').first
+            
             await login_btn.click()
             
-            # Ожидаем редирект
-            await self.page.wait_for_timeout(5000)
-            await self.page.wait_for_load_state("networkidle", timeout=30000)
+            # Ожидаем редирект (может занять время)
+            await self.page.wait_for_timeout(7000)
+            
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=30000)
+            except Exception:
+                pass  # Может быть таймаут, но страница уже загружена
             
             # Проверка успешности авторизации
             current_url = self.page.url
             logger.info(f"Текущий URL после логина: {current_url}")
             
-            # Проверяем, что мы на lk.rudn.ru или id.rudn.ru (залогинены)
+            # Проверяем, что мы на lk.rudn.ru
             if "lk.rudn.ru" in current_url:
                 logger.info("Авторизация успешна - на lk.rudn.ru")
                 return True
             
             # Проверяем на ошибки авторизации
-            error_elem = self.page.locator('[class*="error"], [class*="alert-danger"], :has-text("Неверный")')
-            if await error_elem.count() > 0:
-                error_text = await error_elem.first.inner_text()
-                logger.error(f"Ошибка авторизации: {error_text}")
+            try:
+                error_elem = self.page.locator('[class*="error"], [class*="Error"], :text("неверн")')
+                if await error_elem.count() > 0:
+                    error_text = await error_elem.first.inner_text()
+                    logger.error(f"Ошибка авторизации: {error_text}")
+                    return False
+            except Exception:
+                pass
+            
+            # Если URL содержит id.rudn.ru, возможно еще идет редирект
+            if "id.rudn.ru" in current_url:
+                logger.warning("Остались на id.rudn.ru - возможно неверные данные")
                 return False
             
             return False
