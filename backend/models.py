@@ -1391,3 +1391,59 @@ class PlannerSyncRequest(BaseModel):
     telegram_id: int
     date: str  # YYYY-MM-DD
     events: List[ScheduleEvent]
+
+
+
+# ============ Модели для ЛК РУДН (lk.rudn.ru) ============
+
+class LKCredentialsRequest(BaseModel):
+    """Запрос на подключение ЛК РУДН"""
+    telegram_id: int
+    email: str
+    password: str
+
+
+class LKPersonalData(BaseModel):
+    """Персональные данные из ЛК РУДН"""
+    full_name: Optional[str] = None
+    last_name: Optional[str] = None
+    first_name: Optional[str] = None
+    patronymic: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    citizenship: Optional[str] = None
+    
+    # Студенческие данные (для полных аккаунтов)
+    student_id: Optional[str] = None
+    faculty: Optional[str] = None
+    faculty_id: Optional[str] = None
+    group_name: Optional[str] = None
+    group_id: Optional[str] = None
+    course: Optional[int] = None
+    level: Optional[str] = None  # Бакалавриат/Магистратура
+    form: Optional[str] = None   # Очная/Заочная
+    speciality: Optional[str] = None
+
+
+class LKConnectionResponse(BaseModel):
+    """Ответ на подключение ЛК"""
+    success: bool
+    message: str
+    personal_data: Optional[LKPersonalData] = None
+
+
+class LKDataResponse(BaseModel):
+    """Ответ с данными из ЛК"""
+    personal_data: Optional[LKPersonalData] = None
+    last_sync: Optional[str] = None
+    cached: bool = False
+    lk_connected: bool = False
+
+
+class LKStatusResponse(BaseModel):
+    """Статус подключения ЛК"""
+    lk_connected: bool
+    lk_email: Optional[str] = None
+    lk_last_sync: Optional[str] = None
