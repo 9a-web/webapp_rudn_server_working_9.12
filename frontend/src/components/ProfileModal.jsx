@@ -666,18 +666,21 @@ export const ProfileModal = ({
                   onClick={() => setShowSettings(false)}
                 />
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                  className="fixed z-[103] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-32px)] max-w-[320px] p-4 sm:p-6 rounded-3xl max-h-[85vh] overflow-y-auto"
-                  style={{
-                    backgroundColor: 'rgba(42, 42, 42, 0.95)',
-                    backdropFilter: 'blur(40px)',
-                    WebkitBackdropFilter: 'blur(40px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
-                  }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="fixed z-[103] inset-0 flex items-center justify-center p-4"
                 >
+                  <motion.div
+                    className="w-full max-w-[320px] p-4 sm:p-6 rounded-3xl max-h-[85vh] overflow-y-auto"
+                    style={{
+                      backgroundColor: 'rgba(42, 42, 42, 0.95)',
+                      backdropFilter: 'blur(40px)',
+                      WebkitBackdropFilter: 'blur(40px)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
+                    }}
+                  >
                   {/* Заголовок */}
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
