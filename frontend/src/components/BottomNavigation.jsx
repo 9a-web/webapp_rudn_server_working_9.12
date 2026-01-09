@@ -20,16 +20,16 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       gradient: 'from-yellow-400 to-orange-400'
     },
     {
-      id: 'music',
-      icon: Music,
-      label: t('bottomNav.music', 'Музыка'),
-      gradient: 'from-purple-400 to-pink-400'
-    },
-    {
       id: 'journal',
       icon: FileCheck,
       label: t('bottomNav.journal', 'Журнал'),
       gradient: 'from-blue-400 to-indigo-400'
+    },
+    {
+      id: 'music',
+      icon: Music,
+      label: t('bottomNav.music', 'Музыка'),
+      gradient: 'from-purple-400 to-pink-400'
     }
   ];
 
