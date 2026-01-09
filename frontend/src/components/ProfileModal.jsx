@@ -1,9 +1,29 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle } from 'lucide-react';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { ReferralTree } from './ReferralTree';
 import LKConnectionModal from './LKConnectionModal';
+
+// Функция для получения корректного ФИО
+// Если full_name содержит "Персональные данные" (ошибка парсинга), 
+// используем отдельные поля last_name, first_name, patronymic
+const getDisplayName = (lkData) => {
+  if (!lkData) return null;
+  
+  // Если full_name корректное (не содержит "Персональные данные")
+  if (lkData.full_name && !lkData.full_name.includes('Персональные данные')) {
+    return lkData.full_name;
+  }
+  
+  // Собираем ФИО из отдельных полей
+  const nameParts = [];
+  if (lkData.last_name) nameParts.push(lkData.last_name);
+  if (lkData.first_name) nameParts.push(lkData.first_name);
+  if (lkData.patronymic) nameParts.push(lkData.patronymic);
+  
+  return nameParts.length > 0 ? nameParts.join(' ') : null;
+};
 
 export const ProfileModal = ({ 
   isOpen, 
