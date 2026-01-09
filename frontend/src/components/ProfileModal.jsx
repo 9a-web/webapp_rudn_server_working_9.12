@@ -126,7 +126,9 @@ export const ProfileModal = ({
         const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
         const response = await fetch(`${backendUrl}/api/lk/data/${user.id}`);
         
-        if (isCancelled) return;
+        // ВАЖНО: Проверяем ПОСЛЕ получения ответа, не были ли данные обновлены через callback
+        // во время ожидания ответа (race condition fix)
+        if (isCancelled || lkDataUpdatedRef.current) return;
         
         if (response.ok) {
           // Читаем тело ответа безопасно через text() + JSON.parse()
@@ -139,19 +141,22 @@ export const ProfileModal = ({
             data = {};
           }
           
-          if (!isCancelled) {
+          // Повторная проверка перед обновлением состояния
+          if (!isCancelled && !lkDataUpdatedRef.current) {
             setLkConnected(data.lk_connected || false);
             setLkData(data.personal_data || null);
           }
         } else {
-          if (!isCancelled) {
+          // Повторная проверка перед обновлением состояния
+          if (!isCancelled && !lkDataUpdatedRef.current) {
             setLkConnected(false);
             setLkData(null);
           }
         }
       } catch (error) {
         console.error('Ошибка проверки статуса ЛК:', error);
-        if (!isCancelled) {
+        // Повторная проверка перед обновлением состояния
+        if (!isCancelled && !lkDataUpdatedRef.current) {
           setLkConnected(false);
           setLkData(null);
         }
