@@ -192,7 +192,7 @@ export const ProfileModal = ({
     setThemeLoading(true);
 
     try {
-      const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+      const backendUrl = getBackendURL();
       const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`, {
         method: 'PUT',
         headers: {
