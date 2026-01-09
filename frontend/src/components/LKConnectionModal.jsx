@@ -1,6 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Mail, CheckCircle, AlertCircle, Loader2, Link2, Unlink, RefreshCw, User, Phone, Calendar, Building2 } from 'lucide-react';
+
+// Определяем URL backend в зависимости от окружения (аналогично api.js)
+const getBackendURL = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:8001';
+  }
+  return window.location.origin;
+};
 
 const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConnectionChange }) => {
   const [email, setEmail] = useState('');
@@ -14,7 +22,7 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
   const [disconnecting, setDisconnecting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+  const backendUrl = useMemo(() => getBackendURL(), []);
 
   // Проверка статуса подключения при открытии
   useEffect(() => {
