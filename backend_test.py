@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive Backend Testing for Music API
-Testing all Music API endpoints with ENV=test
+Comprehensive Backend Testing for LK RUDN API
+Testing LK RUDN (Личный Кабинет РУДН) API endpoints with ENV=test
 """
 
 import requests
@@ -9,9 +9,9 @@ import json
 import sys
 from datetime import datetime
 
-# Configuration
-BACKEND_URL = "http://localhost:8001/api"
-TEST_TELEGRAM_ID = 888777666  # For favorites testing as specified
+# Configuration - Using production URL as specified in review request
+BACKEND_URL = "https://rudn-schedule.ru/api"
+TEST_TELEGRAM_ID = 123456789  # Non-existent user for testing as specified
 
 class MusicAPITester:
     def __init__(self):
