@@ -164,65 +164,87 @@ class LKRUDNTester:
             )
     
     def test_post_lk_connect(self):
-        """Test POST /api/lk/connect - Connect LK account"""
+        """Test POST /api/lk/connect - Attempt connection with invalid credentials"""
         print("🔗 Testing POST /api/lk/connect...")
         
+        # Using exact credentials from review request
         payload = {
-            "telegram_id": TEST_TELEGRAM_ID,
-            "email": "test@rudn.ru",
+            "telegram_id": 123456789,
+            "email": "test@student.rudn.ru",
             "password": "testpassword"
         }
         
         try:
             response = self.session.post(f"{BACKEND_URL}/lk/connect", json=payload)
             
-            # Should NOT return 404 (endpoint should exist)
-            if response.status_code == 404:
+            if response.status_code == 401:
+                # Expected response for invalid credentials
+                try:
+                    data = response.json()
+                    if "message" in data and "Неверный логин или пароль ЛК РУДН" in data["message"]:
+                        self.log_result(
+                            "POST /api/lk/connect - Invalid credentials (401)",
+                            True,
+                            "✅ Correct 401 response with expected error message",
+                            data
+                        )
+                    else:
+                        self.log_result(
+                            "POST /api/lk/connect - Invalid credentials (401)",
+                            True,
+                            f"✅ 401 response received, message: {data.get('message', 'No message')}",
+                            data
+                        )
+                except:
+                    self.log_result(
+                        "POST /api/lk/connect - Invalid credentials (401)",
+                        True,
+                        "✅ 401 response received (no JSON body)"
+                    )
+            elif response.status_code == 404:
                 self.log_result(
                     "POST /api/lk/connect - Endpoint existence",
                     False,
-                    "Endpoint returns 404 - endpoint not found",
+                    "❌ Endpoint returns 404 - endpoint not found",
                     response.text
                 )
-            else:
-                # Any other status code means endpoint exists
+            elif response.status_code == 500:
                 try:
                     data = response.json()
                 except:
                     data = response.text
-                
-                if response.status_code == 401:
-                    self.log_result(
-                        "POST /api/lk/connect - Endpoint existence",
-                        True,
-                        "Endpoint exists, authentication failed as expected (401)",
-                        data
-                    )
-                elif response.status_code == 500:
-                    self.log_result(
-                        "POST /api/lk/connect - Endpoint existence",
-                        True,
-                        "Endpoint exists, server error (500) - likely RUDN connection issue",
-                        data
-                    )
-                elif response.status_code == 200:
-                    self.log_result(
-                        "POST /api/lk/connect - Endpoint existence",
-                        True,
-                        "Endpoint exists and working (200) - unexpected success",
-                        data
-                    )
-                else:
-                    self.log_result(
-                        "POST /api/lk/connect - Endpoint existence",
-                        True,
-                        f"Endpoint exists, status: {response.status_code}",
-                        data
-                    )
+                self.log_result(
+                    "POST /api/lk/connect - Server error",
+                    True,
+                    "⚠️ Endpoint exists, server error (500) - likely RUDN connection issue",
+                    data
+                )
+            elif response.status_code == 200:
+                try:
+                    data = response.json()
+                except:
+                    data = response.text
+                self.log_result(
+                    "POST /api/lk/connect - Unexpected success",
+                    False,
+                    "❌ Unexpected 200 response for invalid credentials",
+                    data
+                )
+            else:
+                try:
+                    data = response.json()
+                except:
+                    data = response.text
+                self.log_result(
+                    "POST /api/lk/connect - Other response",
+                    True,
+                    f"Endpoint exists, status: {response.status_code}",
+                    data
+                )
                 
         except Exception as e:
             self.log_result(
-                "POST /api/lk/connect - Endpoint existence",
+                "POST /api/lk/connect - Request",
                 False,
                 f"Request failed: {str(e)}"
             )
