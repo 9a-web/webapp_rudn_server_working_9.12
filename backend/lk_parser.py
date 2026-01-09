@@ -285,6 +285,18 @@ class RUDNLKParser:
             except Exception:
                 pass
             
+            # Собираем full_name из отдельных полей (Фамилия Имя Отчество)
+            if data.get("last_name") or data.get("first_name"):
+                name_parts = []
+                if data.get("last_name"):
+                    name_parts.append(data["last_name"])
+                if data.get("first_name"):
+                    name_parts.append(data["first_name"])
+                if data.get("patronymic"):
+                    name_parts.append(data["patronymic"])
+                if name_parts:
+                    data["full_name"] = " ".join(name_parts)
+            
             # Данные студента (для полных аккаунтов)
             await self._parse_student_data(data)
             
