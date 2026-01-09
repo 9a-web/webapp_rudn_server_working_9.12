@@ -90,7 +90,7 @@ export const ProfileModal = ({
       if (!isOpen || !user?.id) return;
 
       try {
-        const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+        const backendUrl = getBackendURL();
         const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
         
         if (isCancelled) return;
@@ -131,7 +131,7 @@ export const ProfileModal = ({
       if (!isOpen || !user?.id || lkDataUpdatedRef.current) return;
 
       try {
-        const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+        const backendUrl = getBackendURL();
         const response = await fetch(`${backendUrl}/api/lk/data/${user.id}`);
         
         // ВАЖНО: Проверяем ПОСЛЕ получения ответа, не были ли данные обновлены через callback
