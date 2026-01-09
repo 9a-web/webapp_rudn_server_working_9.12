@@ -13,12 +13,12 @@ from datetime import datetime
 BACKEND_URL = "https://rudn-schedule.ru/api"
 TEST_TELEGRAM_ID = 123456789  # Non-existent user for testing as specified
 
-class MusicAPITester:
+class LKRUDNTester:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': 'Music-API-Tester/1.0'
+            'User-Agent': 'LK-RUDN-API-Tester/1.0'
         })
         self.results = []
         
