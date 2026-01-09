@@ -106,7 +106,14 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
           setSuccess(false);
         }, 2000);
       } else {
-        throw new Error(data.detail || 'Ошибка подключения');
+        // Укорачиваем длинные сообщения об ошибках
+        let errorMessage = data.detail || 'Ошибка подключения';
+        if (errorMessage.length > 100) {
+          // Извлекаем первую строку или первые 100 символов
+          const firstLine = errorMessage.split('\n')[0];
+          errorMessage = firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+        }
+        throw new Error(errorMessage);
       }
     } catch (err) {
       setError(err.message || 'Ошибка подключения');
