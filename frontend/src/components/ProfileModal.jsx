@@ -113,12 +113,13 @@ export const ProfileModal = ({
     };
   }, [isOpen, user]);
 
-  // Проверка статуса ЛК РУДН при открытии
+  // Проверка статуса ЛК РУДН при открытии (только если ЛК модалка закрыта)
   useEffect(() => {
     let isCancelled = false;
     
     const checkLKStatus = async () => {
-      if (!isOpen || !user?.id) return;
+      // Не запрашиваем статус если модалка ЛК открыта - данные придут через onConnectionChange
+      if (!isOpen || !user?.id || showLKModal) return;
 
       try {
         const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
