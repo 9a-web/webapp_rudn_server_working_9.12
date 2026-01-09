@@ -18,12 +18,16 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
 
   // Проверка статуса подключения при открытии
   useEffect(() => {
+    let isCancelled = false;
+    
     const checkConnectionStatus = async () => {
       if (!isOpen || !telegramId) return;
       
       setCheckingStatus(true);
       try {
         const response = await fetch(`${backendUrl}/api/lk/data/${telegramId}`);
+        
+        if (isCancelled) return;
         
         if (response.ok) {
           // Читаем тело ответа безопасно
@@ -35,24 +39,41 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
             console.error('JSON parse error:', parseError);
             data = {};
           }
-          setIsConnected(true);
-          setLkData(data.personal_data);
+          
+          if (!isCancelled) {
+            // Проверяем поле lk_connected из ответа API
+            const isLkConnected = data.lk_connected === true;
+            setIsConnected(isLkConnected);
+            setLkData(isLkConnected ? data.personal_data : null);
+          }
         } else if (response.status === 404) {
-          setIsConnected(false);
-          setLkData(null);
+          if (!isCancelled) {
+            setIsConnected(false);
+            setLkData(null);
+          }
         } else {
-          setIsConnected(false);
-          setLkData(null);
+          if (!isCancelled) {
+            setIsConnected(false);
+            setLkData(null);
+          }
         }
       } catch (err) {
         console.error('Ошибка проверки статуса ЛК:', err);
-        setIsConnected(false);
+        if (!isCancelled) {
+          setIsConnected(false);
+        }
       } finally {
-        setCheckingStatus(false);
+        if (!isCancelled) {
+          setCheckingStatus(false);
+        }
       }
     };
 
     checkConnectionStatus();
+    
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, telegramId, backendUrl]);
 
   // Сброс состояния при закрытии
