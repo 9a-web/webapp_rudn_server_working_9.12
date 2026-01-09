@@ -989,7 +989,7 @@ export const ProfileModal = ({
                               if (!user?.id) return;
                               setDeleteLoading(true);
                               try {
-                                const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+                                const backendUrl = getBackendURL();
                                 const response = await fetch(`${backendUrl}/api/user/${user.id}`, {
                                   method: 'DELETE',
                                 });
