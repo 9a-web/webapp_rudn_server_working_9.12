@@ -339,12 +339,12 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
 
                 {/* Персональные данные */}
                 <div className="space-y-2">
-                  {lkData.full_name && (
+                  {displayName && (
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
                       <User className="w-4 h-4 text-indigo-400" />
                       <div>
                         <p className="text-xs text-gray-500">ФИО</p>
-                        <p className="text-sm text-white font-medium">{lkData.full_name}</p>
+                        <p className="text-sm text-white font-medium">{displayName}</p>
                       </div>
                     </div>
                   )}
