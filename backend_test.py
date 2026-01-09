@@ -2,6 +2,7 @@
 """
 Comprehensive Backend Testing for LK RUDN API
 Testing LK RUDN (Личный Кабинет РУДН) API endpoints with ENV=test
+Based on review request requirements
 """
 
 import requests
@@ -11,7 +12,7 @@ from datetime import datetime
 
 # Configuration - Using production URL as specified in review request
 BACKEND_URL = "https://rudn-schedule.ru/api"
-TEST_TELEGRAM_ID = 123456789  # Non-existent user for testing as specified
+TEST_TELEGRAM_ID = 999777888  # Specific telegram_id from review request
 
 class LKRUDNTester:
     def __init__(self):
