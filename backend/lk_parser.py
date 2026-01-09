@@ -247,17 +247,7 @@ class RUDNLKParser:
             # Парсинг данных
             data = {}
             
-            # ФИО из заголовка или других элементов
-            try:
-                full_name_elem = self.page.locator('h1, h2, [class*="name"], [class*="title"]').first
-                if await full_name_elem.count() > 0:
-                    full_name = await full_name_elem.inner_text()
-                    if full_name and len(full_name) > 3:
-                        data["full_name"] = full_name.strip()
-            except Exception:
-                pass
-            
-            # Поля формы
+            # Поля формы (парсим сначала для сборки ФИО)
             inputs = await self.page.locator('input').all()
             for inp in inputs:
                 try:
