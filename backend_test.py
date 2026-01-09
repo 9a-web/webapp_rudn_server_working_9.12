@@ -42,8 +42,62 @@ class LKRUDNTester:
             print(f"    Response: {response_data}")
         print()
     
+    def test_get_lk_status(self):
+        """Test GET /api/lk/status/{telegram_id} - Check LK connection status"""
+        print("📊 Testing GET /api/lk/status/{telegram_id}...")
+        
+        try:
+            response = self.session.get(f"{BACKEND_URL}/lk/status/{TEST_TELEGRAM_ID}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check response structure - should have lk_connected field
+                if "lk_connected" in data:
+                    # For new user (telegram_id=999777888), should return lk_connected=false
+                    expected_connected = False
+                    if data["lk_connected"] == expected_connected:
+                        self.log_result(
+                            "GET /api/lk/status/{telegram_id} - New user status",
+                            True,
+                            f"✅ Correct: lk_connected={data['lk_connected']} for new user",
+                            data
+                        )
+                    else:
+                        self.log_result(
+                            "GET /api/lk/status/{telegram_id} - New user status",
+                            False,
+                            f"❌ Expected lk_connected={expected_connected}, got {data['lk_connected']}",
+                            data
+                        )
+                else:
+                    self.log_result(
+                        "GET /api/lk/status/{telegram_id} - Response structure",
+                        False,
+                        "Missing required field: lk_connected",
+                        data
+                    )
+            else:
+                try:
+                    data = response.json()
+                except:
+                    data = response.text
+                self.log_result(
+                    "GET /api/lk/status/{telegram_id} - Response",
+                    False,
+                    f"Unexpected status code: {response.status_code}",
+                    data
+                )
+                
+        except Exception as e:
+            self.log_result(
+                "GET /api/lk/status/{telegram_id} - Request",
+                False,
+                f"Request failed: {str(e)}"
+            )
+
     def test_get_lk_data(self):
-        """Test GET /api/lk/data/{telegram_id} - Check connection status"""
+        """Test GET /api/lk/data/{telegram_id} - Get LK data for user without connection"""
         print("🔍 Testing GET /api/lk/data/{telegram_id}...")
         
         try:
@@ -52,48 +106,43 @@ class LKRUDNTester:
             if response.status_code == 200:
                 data = response.json()
                 
-                # Check response structure
-                required_fields = ["lk_connected", "personal_data", "last_sync", "cached"]
+                # Check response structure according to review request
+                required_fields = ["personal_data", "last_sync", "cached", "lk_connected"]
                 missing_fields = [field for field in required_fields if field not in data]
                 
                 if not missing_fields:
-                    # For non-existent user, lk_connected should be False
-                    if data["lk_connected"] == False:
-                        self.log_result(
-                            "GET /api/lk/data/{telegram_id} - Non-existent user",
-                            True,
-                            f"Correct response structure, lk_connected=False for non-existent user",
-                            data
-                        )
-                    else:
-                        self.log_result(
-                            "GET /api/lk/data/{telegram_id} - Non-existent user",
-                            True,
-                            f"Response structure correct, lk_connected={data['lk_connected']}",
-                            data
-                        )
+                    # Expected response for user without connection
+                    expected_response = {
+                        "personal_data": None,
+                        "last_sync": None,
+                        "cached": False,
+                        "lk_connected": False
+                    }
+                    
+                    # Check each field
+                    all_correct = True
+                    details = []
+                    
+                    for field, expected_value in expected_response.items():
+                        actual_value = data.get(field)
+                        if actual_value == expected_value:
+                            details.append(f"✅ {field}: {actual_value}")
+                        else:
+                            details.append(f"❌ {field}: expected {expected_value}, got {actual_value}")
+                            all_correct = False
+                    
+                    self.log_result(
+                        "GET /api/lk/data/{telegram_id} - User without connection",
+                        all_correct,
+                        "; ".join(details),
+                        data
+                    )
                 else:
                     self.log_result(
-                        "GET /api/lk/data/{telegram_id} - Non-existent user",
+                        "GET /api/lk/data/{telegram_id} - Response structure",
                         False,
                         f"Missing required fields: {missing_fields}",
                         data
-                    )
-            elif response.status_code == 404:
-                # 404 is acceptable for non-existent user
-                try:
-                    data = response.json()
-                    self.log_result(
-                        "GET /api/lk/data/{telegram_id} - Non-existent user",
-                        True,
-                        "404 response is acceptable for non-existent user",
-                        data
-                    )
-                except:
-                    self.log_result(
-                        "GET /api/lk/data/{telegram_id} - Non-existent user",
-                        True,
-                        "404 response (no JSON body)"
                     )
             else:
                 try:
@@ -101,7 +150,7 @@ class LKRUDNTester:
                 except:
                     data = response.text
                 self.log_result(
-                    "GET /api/lk/data/{telegram_id} - Non-existent user",
+                    "GET /api/lk/data/{telegram_id} - Response",
                     False,
                     f"Unexpected status code: {response.status_code}",
                     data
@@ -109,7 +158,7 @@ class LKRUDNTester:
                 
         except Exception as e:
             self.log_result(
-                "GET /api/lk/data/{telegram_id} - Non-existent user",
+                "GET /api/lk/data/{telegram_id} - Request",
                 False,
                 f"Request failed: {str(e)}"
             )
