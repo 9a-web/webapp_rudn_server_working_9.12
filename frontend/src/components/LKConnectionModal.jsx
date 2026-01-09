@@ -154,9 +154,10 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
         if (hapticFeedback) hapticFeedback('notification', 'success');
         if (onConnectionChange) onConnectionChange(true, data.personal_data);
         
+        // Автоматически закрываем модальное окно после успешного подключения
         setTimeout(() => {
-          setSuccess(false);
-        }, 2000);
+          onClose();
+        }, 1500);
       } else {
         // Укорачиваем длинные сообщения об ошибках
         let errorMessage = data.detail || 'Ошибка подключения';
