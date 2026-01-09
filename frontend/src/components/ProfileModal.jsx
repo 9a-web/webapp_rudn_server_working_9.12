@@ -885,49 +885,6 @@ export const ProfileModal = ({
                       </div>
                     </div>
 
-                    {/* Подключение ЛК РУДН */}
-                    <button
-                      onClick={() => {
-                        setShowLKModal(true);
-                        if (hapticFeedback) hapticFeedback('impact', 'light');
-                      }}
-                      className="w-full p-4 rounded-xl flex items-center gap-3 transition-all active:scale-95"
-                      style={{
-                        backgroundColor: lkConnected 
-                          ? 'rgba(34, 197, 94, 0.1)' 
-                          : 'rgba(99, 102, 241, 0.1)',
-                        border: lkConnected 
-                          ? '1px solid rgba(34, 197, 94, 0.3)' 
-                          : '1px solid rgba(99, 102, 241, 0.3)',
-                      }}
-                    >
-                      <div 
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{
-                          backgroundColor: lkConnected 
-                            ? 'rgba(34, 197, 94, 0.2)' 
-                            : 'rgba(99, 102, 241, 0.2)',
-                        }}
-                      >
-                        {lkConnected ? (
-                          <CheckCircle className="w-5 h-5 text-green-400" />
-                        ) : (
-                          <Link2 className="w-5 h-5 text-indigo-400" />
-                        )}
-                      </div>
-                      <div className="text-left flex-1">
-                        <p className={`text-sm font-semibold ${lkConnected ? 'text-green-400' : 'text-indigo-300'}`}>
-                          {lkConnected ? 'ЛК РУДН подключён' : 'Подключить ЛК РУДН'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {lkConnected 
-                            ? (lkData?.full_name || 'lk.rudn.ru') 
-                            : 'Синхронизация данных из lk.rudn.ru'}
-                        </p>
-                      </div>
-                      <ChevronRight className={`w-4 h-4 ${lkConnected ? 'text-green-400' : 'text-indigo-400'}`} />
-                    </button>
-
                     {/* Удаление аккаунта */}
                     <button
                       onClick={() => {
