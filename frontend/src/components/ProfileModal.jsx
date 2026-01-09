@@ -55,6 +55,8 @@ export const ProfileModal = ({
 
   // Загрузка настроек темы при открытии
   useEffect(() => {
+    let isCancelled = false;
+    
     const loadThemeSettings = async () => {
       if (!isOpen || !user?.id) return;
 
@@ -62,9 +64,22 @@ export const ProfileModal = ({
         const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
         const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
         
+        if (isCancelled) return;
+        
         if (response.ok) {
-          const data = await response.json();
-          setNewYearThemeMode(data.new_year_theme_mode || 'auto');
+          // Читаем тело ответа безопасно через text() + JSON.parse()
+          const responseText = await response.text();
+          let data = {};
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            data = {};
+          }
+          
+          if (!isCancelled) {
+            setNewYearThemeMode(data.new_year_theme_mode || 'auto');
+          }
         }
       } catch (error) {
         console.error('Ошибка загрузки настроек темы:', error);
@@ -72,6 +87,10 @@ export const ProfileModal = ({
     };
 
     loadThemeSettings();
+    
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, user]);
 
   // Проверка статуса ЛК РУДН при открытии
