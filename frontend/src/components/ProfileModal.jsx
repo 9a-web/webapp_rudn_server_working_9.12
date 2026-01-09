@@ -33,7 +33,7 @@ export const ProfileModal = ({
   profilePhoto,
   hapticFeedback,
   onThemeChange
-}}) => {
+}) => {
   const modalRef = useRef(null);
   const lkDataUpdatedRef = useRef(false); // Флаг: данные ЛК обновлены через callback
   const [referralData, setReferralData] = useState(null);
