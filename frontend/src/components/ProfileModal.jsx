@@ -1023,6 +1023,7 @@ export const ProfileModal = ({
             telegramId={user?.id}
             hapticFeedback={hapticFeedback}
             onConnectionChange={(connected, data) => {
+              lkDataUpdatedRef.current = true; // Помечаем что данные обновлены через callback
               setLkConnected(connected);
               setLkData(data);
             }}
