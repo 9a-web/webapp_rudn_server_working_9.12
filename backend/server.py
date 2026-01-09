@@ -283,6 +283,16 @@ async def create_indexes():
 
 @app.on_event("startup")
 async def startup_event():
+    # Setup Playwright browser symlinks for LK RUDN parser
+    import subprocess
+    try:
+        setup_script = "/app/scripts/setup_playwright.sh"
+        if os.path.exists(setup_script):
+            subprocess.run(["bash", setup_script], check=True, capture_output=True)
+            logger.info("✅ Playwright browser symlinks configured")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to setup Playwright symlinks: {e}")
+    
     # Start background tasks
     asyncio.create_task(create_indexes())
 
