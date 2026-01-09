@@ -10,6 +10,26 @@ const getBackendURL = () => {
   return window.location.origin;
 };
 
+// Функция для получения корректного ФИО
+// Если full_name содержит "Персональные данные" (ошибка парсинга), 
+// используем отдельные поля last_name, first_name, patronymic
+const getDisplayName = (lkData) => {
+  if (!lkData) return null;
+  
+  // Если full_name корректное (не содержит "Персональные данные")
+  if (lkData.full_name && !lkData.full_name.includes('Персональные данные')) {
+    return lkData.full_name;
+  }
+  
+  // Собираем ФИО из отдельных полей
+  const nameParts = [];
+  if (lkData.last_name) nameParts.push(lkData.last_name);
+  if (lkData.first_name) nameParts.push(lkData.first_name);
+  if (lkData.patronymic) nameParts.push(lkData.patronymic);
+  
+  return nameParts.length > 0 ? nameParts.join(' ') : null;
+};
+
 const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConnectionChange }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +43,9 @@ const LKConnectionModal = ({ isOpen, onClose, telegramId, hapticFeedback, onConn
   const [refreshing, setRefreshing] = useState(false);
 
   const backendUrl = useMemo(() => getBackendURL(), []);
+  
+  // Получаем корректное отображаемое ФИО
+  const displayName = useMemo(() => getDisplayName(lkData), [lkData]);
 
   // Проверка статуса подключения при открытии
   useEffect(() => {
