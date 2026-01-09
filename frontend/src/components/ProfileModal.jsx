@@ -497,7 +497,7 @@ export const ProfileModal = ({
                     </p>
                     <p className="text-xs text-gray-500">
                       {lkConnected 
-                        ? (lkData?.full_name || 'lk.rudn.ru') 
+                        ? (getDisplayName(lkData) || 'lk.rudn.ru') 
                         : 'Синхронизация данных'}
                     </p>
                   </div>
