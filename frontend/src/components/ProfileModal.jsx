@@ -5,6 +5,14 @@ import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { ReferralTree } from './ReferralTree';
 import LKConnectionModal from './LKConnectionModal';
 
+// Определяем URL backend в зависимости от окружения
+const getBackendURL = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:8001';
+  }
+  return window.location.origin;
+};
+
 // Функция для получения корректного ФИО
 // Если full_name содержит "Персональные данные" (ошибка парсинга), 
 // используем отдельные поля last_name, first_name, patronymic
