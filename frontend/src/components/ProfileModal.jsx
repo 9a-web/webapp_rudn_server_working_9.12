@@ -114,13 +114,13 @@ export const ProfileModal = ({
     };
   }, [isOpen, user]);
 
-  // Проверка статуса ЛК РУДН при открытии (только если ЛК модалка закрыта)
+  // Проверка статуса ЛК РУДН при открытии (только если данные не были обновлены через callback)
   useEffect(() => {
     let isCancelled = false;
     
     const checkLKStatus = async () => {
-      // Не запрашиваем статус если модалка ЛК открыта - данные придут через onConnectionChange
-      if (!isOpen || !user?.id || showLKModal) return;
+      // Не запрашиваем если данные уже были обновлены через onConnectionChange
+      if (!isOpen || !user?.id || lkDataUpdatedRef.current) return;
 
       try {
         const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
@@ -164,6 +164,13 @@ export const ProfileModal = ({
       isCancelled = true;
     };
   }, [isOpen, user]);
+  
+  // Сброс флага при закрытии ProfileModal
+  useEffect(() => {
+    if (!isOpen) {
+      lkDataUpdatedRef.current = false;
+    }
+  }, [isOpen]);
 
   // Изменение режима новогодней темы
   const changeNewYearThemeMode = async (mode) => {
