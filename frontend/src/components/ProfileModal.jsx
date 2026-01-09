@@ -493,7 +493,7 @@ export const ProfileModal = ({
                   </div>
                   <div className="text-left flex-1">
                     <p className={`text-sm font-semibold ${lkConnected ? 'text-green-400' : 'text-indigo-300'}`}>
-                      {lkConnected ? 'ЛК РУДН подключён' : 'Подключить ЛК РУДН'}
+                      {lkConnected ? 'Подключено' : 'Подключить ЛК РУДН'}
                     </p>
                     <p className="text-xs text-gray-500">
                       {lkConnected 
