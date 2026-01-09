@@ -76,6 +76,8 @@ export const ProfileModal = ({
 
   // Проверка статуса ЛК РУДН при открытии
   useEffect(() => {
+    let isCancelled = false;
+    
     const checkLKStatus = async () => {
       if (!isOpen || !user?.id) return;
 
@@ -83,21 +85,43 @@ export const ProfileModal = ({
         const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
         const response = await fetch(`${backendUrl}/api/lk/data/${user.id}`);
         
+        if (isCancelled) return;
+        
         if (response.ok) {
-          const data = await response.json();
-          setLkConnected(true);
-          setLkData(data.personal_data);
+          // Читаем тело ответа безопасно через text() + JSON.parse()
+          const responseText = await response.text();
+          let data = {};
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            data = {};
+          }
+          
+          if (!isCancelled) {
+            setLkConnected(data.lk_connected || false);
+            setLkData(data.personal_data || null);
+          }
         } else {
+          if (!isCancelled) {
+            setLkConnected(false);
+            setLkData(null);
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка проверки статуса ЛК:', error);
+        if (!isCancelled) {
           setLkConnected(false);
           setLkData(null);
         }
-      } catch (error) {
-        setLkConnected(false);
-        setLkData(null);
       }
     };
 
     checkLKStatus();
+    
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, user]);
 
   // Изменение режима новогодней темы
