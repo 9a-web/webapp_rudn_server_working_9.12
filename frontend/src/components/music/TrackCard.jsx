@@ -64,15 +64,17 @@ export const TrackCard = ({
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileTap={{ scale: 0.98 }}
+      animate={{ opacity: isBlocked ? 0.5 : 1, y: 0 }}
+      whileTap={{ scale: isBlocked ? 1 : 0.98 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       onClick={handlePlay}
-      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-        isCurrentTrack 
-          ? 'bg-purple-500/20 border border-purple-500/30' 
-          : 'bg-white/5 hover:bg-white/10'
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+        isBlocked
+          ? 'bg-white/5 cursor-not-allowed'
+          : isCurrentTrack 
+            ? 'bg-purple-500/20 border border-purple-500/30 cursor-pointer' 
+            : 'bg-white/5 hover:bg-white/10 cursor-pointer'
       }`}
     >
       {/* Cover */}
@@ -82,32 +84,43 @@ export const TrackCard = ({
           artist={track.artist} 
           title={track.title}
           size="md"
-          className="rounded-lg"
+          className={`rounded-lg ${isBlocked ? 'grayscale' : ''}`}
         />
         
-        {/* Play/Pause overlay */}
-        <motion.div 
-          className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isHovered || isCurrentTrack ? 1 : 0 }}
-        >
-          {isCurrentlyPlaying ? (
-            <Pause className="w-5 h-5 text-white" />
-          ) : (
-            <Play className="w-5 h-5 text-white ml-0.5" />
-          )}
-        </motion.div>
+        {/* Blocked overlay */}
+        {isBlocked ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
+            <Ban className="w-5 h-5 text-red-400/80" />
+          </div>
+        ) : (
+          /* Play/Pause overlay */
+          <motion.div 
+            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: isHovered || isCurrentTrack ? 1 : 0 }}
+          >
+            {isCurrentlyPlaying ? (
+              <Pause className="w-5 h-5 text-white" />
+            ) : (
+              <Play className="w-5 h-5 text-white ml-0.5" />
+            )}
+          </motion.div>
+        )}
       </div>
 
       {/* Track info */}
       <div className="flex-1 min-w-0">
         <p className={`font-medium truncate text-sm ${
-          isCurrentTrack ? 'text-purple-400' : 'text-white'
+          isBlocked 
+            ? 'text-white/50' 
+            : isCurrentTrack 
+              ? 'text-purple-400' 
+              : 'text-white'
         }`}>
           {track.title}
         </p>
-        <p className="text-white/60 text-xs truncate">
-          {track.artist}
+        <p className={`text-xs truncate ${isBlocked ? 'text-red-400/60' : 'text-white/60'}`}>
+          {isBlocked ? 'Заблокировано правообладателем' : track.artist}
         </p>
       </div>
 
