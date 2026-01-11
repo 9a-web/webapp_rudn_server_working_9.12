@@ -25,6 +25,13 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
     if (onClose) onClose();
   };
 
+  const handleExpand = () => {
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+    if (onExpand) onExpand();
+  };
+
   return (
     <AnimatePresence>
       <motion.div
