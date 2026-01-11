@@ -1089,8 +1089,18 @@ const Home = () => {
       </div>
 
       {/* Mini Player - показывается над BottomNavigation */}
+      {!showGroupSelector && userSettings && !isFullscreenPlayerOpen && (
+        <MiniPlayer 
+          onExpand={() => setIsFullscreenPlayerOpen(true)}
+        />
+      )}
+
+      {/* Fullscreen Player */}
       {!showGroupSelector && userSettings && (
-        <MiniPlayer />
+        <FullscreenPlayer 
+          isOpen={isFullscreenPlayerOpen}
+          onClose={() => setIsFullscreenPlayerOpen(false)}
+        />
       )}
 
       {/* Bottom Navigation */}
