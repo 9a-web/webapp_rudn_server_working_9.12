@@ -30,6 +30,14 @@ export const TrackCard = ({
   const handlePlay = (e) => {
     e.stopPropagation();
     
+    // Не воспроизводить заблокированные треки
+    if (isBlocked) {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+      }
+      return;
+    }
+    
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
