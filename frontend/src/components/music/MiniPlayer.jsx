@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, X } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, X, Maximize2 } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
 export const MiniPlayer = ({ onExpand, onClose }) => {
-  const { currentTrack, isPlaying, progress, duration, toggle, next, prev, pause, error, clearError } = usePlayer();
+  const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, pause, error, clearError } = usePlayer();
 
   if (!currentTrack) return null;
 
