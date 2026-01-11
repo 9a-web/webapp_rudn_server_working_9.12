@@ -27,7 +27,7 @@ import { getWeekNumberForDate, isWinterSeason } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
 import { NewYearTheme } from './components/NewYearTheme';
-import { PlayerProvider, usePlayer, MiniPlayer, MusicSection } from './components/music';
+import { PlayerProvider, usePlayer, MiniPlayer, FullscreenPlayer, MusicSection } from './components/music';
 
 // Lazy load модальных окон для уменьшения начального bundle
 const CalendarModal = lazy(() => import('./components/CalendarModal').then(module => ({ default: module.CalendarModal })));
