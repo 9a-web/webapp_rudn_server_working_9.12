@@ -421,6 +421,91 @@ export const PlayerProvider = ({ children }) => {
     };
   }, [next, queue, queueIndex]);
 
+  // Media Session обработчики (кнопки на Lock Screen)
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    // Обработчик Play
+    navigator.mediaSession.setActionHandler('play', () => {
+      console.log('🎵 Media Session: play');
+      if (audioRef.current && currentTrack) {
+        audioRef.current.play()
+          .then(() => setIsPlaying(true))
+          .catch(err => console.error('Media Session play error:', err));
+      }
+    });
+
+    // Обработчик Pause
+    navigator.mediaSession.setActionHandler('pause', () => {
+      console.log('🎵 Media Session: pause');
+      pause();
+    });
+
+    // Обработчик Previous Track (кнопка ⏮)
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      console.log('🎵 Media Session: previoustrack');
+      if (queue.length > 0 && queueIndex > 0) {
+        prev();
+      }
+    });
+
+    // Обработчик Next Track (кнопка ⏭)
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      console.log('🎵 Media Session: nexttrack');
+      if (queue.length > 0 && queueIndex < queue.length - 1) {
+        next();
+      }
+    });
+
+    // Обработчик Seek To (перемотка)
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      console.log('🎵 Media Session: seekto', details.seekTime);
+      if (audioRef.current && details.seekTime !== undefined) {
+        seek(details.seekTime);
+      }
+    });
+
+    // Обработчик Stop
+    navigator.mediaSession.setActionHandler('stop', () => {
+      console.log('🎵 Media Session: stop');
+      pause();
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
+      setProgress(0);
+    });
+
+    return () => {
+      // Очистка обработчиков при размонтировании
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('seekto', null);
+        navigator.mediaSession.setActionHandler('stop', null);
+      }
+    };
+  }, [currentTrack, pause, prev, next, seek, queue, queueIndex]);
+
+  // Обновление состояния воспроизведения в Media Session
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
+
+  // Периодическое обновление позиции в Media Session
+  useEffect(() => {
+    if (!isPlaying || !duration) return;
+    
+    const interval = setInterval(() => {
+      updateMediaSessionPositionState();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, duration, updateMediaSessionPositionState]);
+
   const value = {
     currentTrack,
     isPlaying,
