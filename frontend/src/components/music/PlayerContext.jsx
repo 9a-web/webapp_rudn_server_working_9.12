@@ -3,6 +3,72 @@ import { musicAPI } from '../../services/musicAPI';
 
 const PlayerContext = createContext();
 
+/**
+ * Генерация обложки из градиента на основе названия трека
+ * Возвращает data URL для использования в Media Session
+ */
+const generateGradientCover = (artist, title) => {
+  const str = `${artist || ''}${title || ''}`;
+  
+  // Простой хеш для генерации цветов
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  
+  // Палитра градиентов (hex цвета)
+  const gradients = [
+    ['#a855f7', '#ec4899'], // purple to pink
+    ['#3b82f6', '#a855f7'], // blue to purple
+    ['#22c55e', '#14b8a6'], // green to teal
+    ['#f97316', '#ef4444'], // orange to red
+    ['#ec4899', '#f43f5e'], // pink to rose
+    ['#06b6d4', '#3b82f6'], // cyan to blue
+    ['#8b5cf6', '#a855f7'], // violet to purple
+    ['#f59e0b', '#f97316'], // amber to orange
+    ['#10b981', '#22c55e'], // emerald to green
+    ['#d946ef', '#ec4899'], // fuchsia to pink
+    ['#6366f1', '#8b5cf6'], // indigo to violet
+    ['#f43f5e', '#ef4444'], // rose to red
+  ];
+  
+  const index = Math.abs(hash) % gradients.length;
+  const [color1, color2] = gradients[index];
+  
+  // Создаем canvas с градиентом
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  
+  // Градиент
+  const gradient = ctx.createLinearGradient(0, 0, 512, 512);
+  gradient.addColorStop(0, color1);
+  gradient.addColorStop(1, color2);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 512, 512);
+  
+  // Добавляем музыкальную ноту в центре
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.font = 'bold 200px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('♪', 256, 256);
+  
+  // Декоративные круги
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.beginPath();
+  ctx.arc(100, 100, 60, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(420, 400, 40, 0, Math.PI * 2);
+  ctx.fill();
+  
+  return canvas.toDataURL('image/png');
+};
+
 export const PlayerProvider = ({ children }) => {
   // Создаем Audio объект сразу (не в useEffect) для избежания race condition
   const audioRef = useRef(typeof Audio !== 'undefined' ? new Audio() : null);
@@ -15,6 +81,9 @@ export const PlayerProvider = ({ children }) => {
   const [queueIndex, setQueueIndex] = useState(0);
   const [volume, setVolume] = useState(1);
   const [error, setError] = useState(null);
+  
+  // Кэш для сгенерированных обложек
+  const coverCacheRef = useRef({});
 
   // Инициализация Audio элемента и установка громкости
   useEffect(() => {
