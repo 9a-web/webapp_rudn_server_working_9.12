@@ -240,6 +240,8 @@ const Home = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   // Состояние для модального окна ShareScheduleModal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  // Состояние для полноэкранного музыкального плеера
+  const [isFullscreenPlayerOpen, setIsFullscreenPlayerOpen] = useState(false);
 
   // Сохраняем activeTab в localStorage при изменении
   useEffect(() => {
