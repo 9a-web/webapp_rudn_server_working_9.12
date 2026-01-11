@@ -212,6 +212,13 @@ class VKMusicService:
                 if thumb:
                     cover = thumb.get('photo_300') or thumb.get('photo_600')
         
+        # Проверяем, заблокирован ли трек
+        track_url = track.url if hasattr(track, 'url') else None
+        is_blocked = (
+            not track_url or 
+            'audio_api_unavailable' in str(track_url)
+        )
+        
         return {
             "id": full_id,
             "owner_id": owner_id,
@@ -219,9 +226,10 @@ class VKMusicService:
             "artist": track.artist,
             "title": track.title,
             "duration": track.duration,
-            "url": track.url if track.url else None,
+            "url": track_url if track_url and 'audio_api_unavailable' not in str(track_url) else None,
             "cover": cover,
-            "stream_url": f"/api/music/stream/{full_id}"
+            "stream_url": f"/api/music/stream/{full_id}",
+            "is_blocked": is_blocked
         }
     
     def _playlist_to_dict(self, playlist) -> dict:
