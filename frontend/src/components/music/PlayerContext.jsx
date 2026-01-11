@@ -103,6 +103,65 @@ export const PlayerProvider = ({ children }) => {
   }, []);
 
   /**
+   * Обновление Media Session метаданных (Lock Screen плеер)
+   * Показывает обложку, название, исполнителя и кнопки управления
+   */
+  const updateMediaSession = useCallback((track) => {
+    if (!('mediaSession' in navigator)) {
+      console.log('⚠️ Media Session API not supported');
+      return;
+    }
+
+    // Получаем или генерируем обложку
+    let artworkUrl = track.cover;
+    
+    if (!artworkUrl) {
+      // Генерируем обложку из градиента (с кэшированием)
+      const cacheKey = `${track.artist || ''}_${track.title || ''}`;
+      if (!coverCacheRef.current[cacheKey]) {
+        coverCacheRef.current[cacheKey] = generateGradientCover(track.artist, track.title);
+      }
+      artworkUrl = coverCacheRef.current[cacheKey];
+    }
+
+    // Устанавливаем метаданные
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || 'Неизвестный трек',
+      artist: track.artist || 'Неизвестный исполнитель',
+      album: track.album || '',
+      artwork: [
+        { src: artworkUrl, sizes: '96x96', type: 'image/png' },
+        { src: artworkUrl, sizes: '128x128', type: 'image/png' },
+        { src: artworkUrl, sizes: '192x192', type: 'image/png' },
+        { src: artworkUrl, sizes: '256x256', type: 'image/png' },
+        { src: artworkUrl, sizes: '384x384', type: 'image/png' },
+        { src: artworkUrl, sizes: '512x512', type: 'image/png' },
+      ]
+    });
+
+    console.log('🎵 Media Session updated:', track.title, '-', track.artist);
+  }, []);
+
+  /**
+   * Обновление позиции воспроизведения в Media Session
+   */
+  const updateMediaSessionPositionState = useCallback(() => {
+    if (!('mediaSession' in navigator) || !audioRef.current) return;
+    
+    try {
+      if ('setPositionState' in navigator.mediaSession && duration > 0) {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: audioRef.current.playbackRate || 1,
+          position: progress
+        });
+      }
+    } catch (e) {
+      // Игнорируем ошибки позиции
+    }
+  }, [duration, progress]);
+
+  /**
    * Получение прямой ссылки на трек
    * Если url уже есть (например, из избранного) - используем его
    * Иначе запрашиваем через API
