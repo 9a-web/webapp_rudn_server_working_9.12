@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart } from 'lucide-react';
+import { Play, Pause, Heart, Ban } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
@@ -16,6 +16,9 @@ export const TrackCard = ({
 
   const isCurrentTrack = currentTrack?.id === track.id;
   const isCurrentlyPlaying = isCurrentTrack && isPlaying;
+  
+  // Проверка на заблокированный трек (content_restricted или нет URL)
+  const isBlocked = track.content_restricted === true || track.is_licensed === false;
 
   const formatDuration = (sec) => {
     if (!sec) return '0:00';
