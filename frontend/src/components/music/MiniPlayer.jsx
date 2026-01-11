@@ -42,13 +42,13 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
         className="fixed bottom-20 left-0 right-0 z-40 flex justify-center px-3"
       >
         <div
-          className="w-full max-w-[420px] rounded-2xl border border-white/10 p-3 relative overflow-hidden"
+          className="w-full max-w-[420px] rounded-2xl border border-white/10 p-3 relative overflow-hidden cursor-pointer"
           style={{
             backgroundColor: 'rgba(28, 28, 30, 0.95)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)'
           }}
-          onClick={onExpand}
+          onClick={handleExpand}
         >
           {/* Progress bar */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-white/5">
