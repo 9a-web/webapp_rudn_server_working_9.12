@@ -98,6 +98,14 @@ class VKMusicService:
             # Проверяем, есть ли URL (некоторые треки доступны сразу)
             direct_url = item.get('url', '')
             
+            # Определяем, заблокирован ли трек правообладателем
+            # VK возвращает специальный URL для заблокированных треков
+            is_blocked = (
+                not direct_url or 
+                'audio_api_unavailable' in direct_url or
+                item.get('content_restricted') == 1
+            )
+            
             tracks.append({
                 "id": track_id,
                 "owner_id": item['owner_id'],
@@ -105,9 +113,10 @@ class VKMusicService:
                 "artist": item.get('artist', 'Unknown'),
                 "title": item.get('title', 'Unknown'),
                 "duration": item.get('duration', 0),
-                "url": direct_url if direct_url else None,  # Может быть пустым!
+                "url": direct_url if direct_url and 'audio_api_unavailable' not in direct_url else None,
                 "cover": cover_url,
-                "stream_url": f"/api/music/stream/{track_id}"  # Endpoint для получения прямой ссылки
+                "stream_url": f"/api/music/stream/{track_id}",
+                "is_blocked": is_blocked  # Трек заблокирован правообладателем
             })
         
         logger.info(f"Found {len(tracks)} tracks for query: {query}")
