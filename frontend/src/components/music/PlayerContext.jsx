@@ -217,6 +217,9 @@ export const PlayerProvider = ({ children }) => {
     
     setCurrentTrack(track);
     
+    // Обновляем Media Session (Lock Screen плеер)
+    updateMediaSession(track);
+    
     try {
       // Получаем URL (из кэша трека или через API)
       const url = await getTrackUrl(track);
