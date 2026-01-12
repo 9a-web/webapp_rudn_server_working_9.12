@@ -37,6 +37,12 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [editingTask, setEditingTask] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  
+  // Состояния для inline добавления подзадач
+  const [addingSubtaskForTaskId, setAddingSubtaskForTaskId] = useState(null);
+  const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [savingSubtask, setSavingSubtask] = useState(false);
+  
   const [scheduleSubjects, setScheduleSubjects] = useState([]);
   const [scheduleEvents, setScheduleEvents] = useState([]); // Все события расписания для поиска ближайших пар
   const [scheduleData, setScheduleData] = useState({ 1: [], 2: [] }); // Расписание по неделям (1 и 2)
