@@ -9,7 +9,8 @@ export const TrackCard = ({
   trackList = [], 
   onFavorite, 
   isFavorite = false,
-  showFavorite = true 
+  showFavorite = true,
+  onArtistClick
 }) => {
   const { currentTrack, isPlaying, play, toggle } = usePlayer();
   const [isHovered, setIsHovered] = useState(false);
