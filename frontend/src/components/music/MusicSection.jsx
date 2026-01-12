@@ -312,8 +312,8 @@ export const MusicSection = ({ telegramId }) => {
               }
             />
             
-            {/* Кнопка "Загрузить ещё" для раздела "Мои" */}
-            {activeTab === 'my' && !loading && tracks.length > 0 && hasMore && (
+            {/* Кнопка "Загрузить ещё" для разделов с пагинацией */}
+            {(activeTab === 'my' || activeTab === 'popular') && !loading && tracks.length > 0 && hasMore && (
               <div className="px-4 pb-4">
                 <button
                   onClick={handleLoadMore}
