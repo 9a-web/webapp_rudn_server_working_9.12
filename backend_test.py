@@ -128,50 +128,66 @@ class MusicPaginationTester:
                 f"Request failed: {str(e)}"
             )
 
-    def test_get_lk_data(self):
-        """Test GET /api/lk/data/{telegram_id} - Get LK data for user without connection"""
-        print("🔍 Testing GET /api/lk/data/{telegram_id}...")
+    def test_pagination_load(self):
+        """Test pagination: GET /api/music/my?count=30&offset=28"""
+        print("📄 Testing pagination load (count=30, offset=28)...")
         
         try:
-            response = self.session.get(f"{BACKEND_URL}/lk/data/{TEST_TELEGRAM_ID}")
+            response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset=28")
             
             if response.status_code == 200:
                 data = response.json()
                 
-                # Check response structure according to review request
-                required_fields = ["personal_data", "last_sync", "cached", "lk_connected"]
+                # Check response structure
+                required_fields = ["tracks", "has_more", "count"]
                 missing_fields = [field for field in required_fields if field not in data]
                 
                 if not missing_fields:
-                    # Expected response for user without connection
-                    expected_response = {
-                        "personal_data": None,
-                        "last_sync": None,
-                        "cached": False,
-                        "lk_connected": False
-                    }
+                    tracks = data.get("tracks", [])
+                    has_more = data.get("has_more")
+                    count = data.get("count")
+                    offset = data.get("offset", 28)
                     
-                    # Check each field
-                    all_correct = True
+                    # Validate response structure
+                    success = True
                     details = []
                     
-                    for field, expected_value in expected_response.items():
-                        actual_value = data.get(field)
-                        if actual_value == expected_value:
-                            details.append(f"✅ {field}: {actual_value}")
-                        else:
-                            details.append(f"❌ {field}: expected {expected_value}, got {actual_value}")
-                            all_correct = False
+                    # Check tracks array
+                    if isinstance(tracks, list):
+                        details.append(f"✅ tracks: array with {len(tracks)} items")
+                    else:
+                        details.append(f"❌ tracks: expected array, got {type(tracks)}")
+                        success = False
+                    
+                    # Check has_more boolean
+                    if isinstance(has_more, bool):
+                        details.append(f"✅ has_more: {has_more}")
+                    else:
+                        details.append(f"❌ has_more: expected boolean, got {type(has_more)}")
+                        success = False
+                    
+                    # Check count field
+                    if isinstance(count, int):
+                        details.append(f"✅ count: {count}")
+                    else:
+                        details.append(f"❌ count: expected integer, got {type(count)}")
+                        success = False
+                    
+                    # Check offset
+                    if offset == 28:
+                        details.append(f"✅ offset: {offset}")
+                    else:
+                        details.append(f"ℹ️  offset: {offset} (expected 28)")
                     
                     self.log_result(
-                        "GET /api/lk/data/{telegram_id} - User without connection",
-                        all_correct,
+                        "Pagination load - Response structure",
+                        success,
                         "; ".join(details),
-                        data
+                        {"tracks_count": len(tracks), "has_more": has_more, "count": count, "offset": offset}
                     )
                 else:
                     self.log_result(
-                        "GET /api/lk/data/{telegram_id} - Response structure",
+                        "Pagination load - Response structure",
                         False,
                         f"Missing required fields: {missing_fields}",
                         data
@@ -182,7 +198,7 @@ class MusicPaginationTester:
                 except:
                     data = response.text
                 self.log_result(
-                    "GET /api/lk/data/{telegram_id} - Response",
+                    "Pagination load - HTTP Response",
                     False,
                     f"Unexpected status code: {response.status_code}",
                     data
@@ -190,7 +206,91 @@ class MusicPaginationTester:
                 
         except Exception as e:
             self.log_result(
-                "GET /api/lk/data/{telegram_id} - Request",
+                "Pagination load - Request",
+                False,
+                f"Request failed: {str(e)}"
+            )
+    
+    def test_end_of_list(self):
+        """Test end of list: GET /api/music/my?count=30&offset=500"""
+        print("🔚 Testing end of list (count=30, offset=500)...")
+        
+        try:
+            response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset=500")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check response structure
+                required_fields = ["tracks", "has_more", "count"]
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if not missing_fields:
+                    tracks = data.get("tracks", [])
+                    has_more = data.get("has_more")
+                    count = data.get("count")
+                    
+                    # Validate end of list behavior
+                    success = True
+                    details = []
+                    
+                    # Check tracks array - should be empty or very small
+                    if isinstance(tracks, list):
+                        if len(tracks) == 0:
+                            details.append("✅ tracks: empty array (expected for high offset)")
+                        else:
+                            details.append(f"ℹ️  tracks: {len(tracks)} items (may have some tracks at high offset)")
+                    else:
+                        details.append(f"❌ tracks: expected array, got {type(tracks)}")
+                        success = False
+                    
+                    # Check has_more - should be false for high offset
+                    if isinstance(has_more, bool):
+                        if not has_more:
+                            details.append("✅ has_more: false (expected for high offset)")
+                        else:
+                            details.append("ℹ️  has_more: true (may still have more tracks)")
+                    else:
+                        details.append(f"❌ has_more: expected boolean, got {type(has_more)}")
+                        success = False
+                    
+                    # Check count field
+                    if isinstance(count, int):
+                        details.append(f"✅ count: {count}")
+                        if count == len(tracks):
+                            details.append("✅ count matches tracks array length")
+                    else:
+                        details.append(f"❌ count: expected integer, got {type(count)}")
+                        success = False
+                    
+                    self.log_result(
+                        "End of list - Response structure",
+                        success,
+                        "; ".join(details),
+                        {"tracks_count": len(tracks), "has_more": has_more, "count": count}
+                    )
+                else:
+                    self.log_result(
+                        "End of list - Response structure",
+                        False,
+                        f"Missing required fields: {missing_fields}",
+                        data
+                    )
+            else:
+                try:
+                    data = response.json()
+                except:
+                    data = response.text
+                self.log_result(
+                    "End of list - HTTP Response",
+                    False,
+                    f"Unexpected status code: {response.status_code}",
+                    data
+                )
+                
+        except Exception as e:
+            self.log_result(
+                "End of list - Request",
                 False,
                 f"Request failed: {str(e)}"
             )
