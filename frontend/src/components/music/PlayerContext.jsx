@@ -318,7 +318,7 @@ export const PlayerProvider = ({ children }) => {
         setError('Не удалось загрузить трек');
       }
     }
-  }, [volume, getTrackUrl, updateMediaSession]);
+  }, [volume, getTrackUrl, updateMediaSession, resetMediaSessionPositionState]);
 
   // Пауза
   const pause = useCallback(() => {
