@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Droplets, Wind, Snowflake } from 'lucide-react';
+import { Sun, Moon, Droplets, Wind } from 'lucide-react';
 import { weatherAPI } from '../services/api';
 
 // Standalone версия компонента для показа в очереди
 export const GreetingNotificationContent = ({ greeting, onClose }) => {
   const weather = greeting.weather;
   const isMorning = greeting.type === 'morning';
-  const isWinter = greeting.isWinter;
   
   return (
     <motion.div
@@ -25,19 +24,15 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
       <div 
         onClick={onClose}
         className={`cursor-pointer active:scale-95 transition-transform pointer-events-auto w-full max-w-sm px-4 py-3 rounded-2xl shadow-2xl border backdrop-blur-xl backdrop-saturate-150
-        ${isWinter 
-            ? 'bg-gradient-to-br from-blue-900 via-sky-800 to-indigo-900 border-sky-300/30 text-white shadow-sky-500/25'
-            : isMorning 
-              ? 'bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 border-orange-300/30 text-white shadow-orange-500/25' 
-              : 'bg-gradient-to-br from-indigo-800 via-blue-900 to-slate-900 border-indigo-400/30 text-white shadow-indigo-500/25'
+        ${isMorning 
+          ? 'bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 border-orange-300/30 text-white shadow-orange-500/25' 
+          : 'bg-gradient-to-br from-indigo-800 via-blue-900 to-slate-900 border-indigo-400/30 text-white shadow-indigo-500/25'
         }`}
       >
         {/* Header row */}
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-full flex-shrink-0 ${isMorning ? 'bg-white/25' : 'bg-white/15'}`}>
-            {isWinter ? (
-               <Snowflake className="w-6 h-6 text-sky-100 animate-pulse" />
-            ) : isMorning ? (
+            {isMorning ? (
               <Sun className="w-6 h-6 text-yellow-100" />
             ) : (
               <Moon className="w-6 h-6 text-blue-200" />
@@ -84,7 +79,7 @@ export const GreetingNotificationContent = ({ greeting, onClose }) => {
             
             {/* Weather description */}
             <div className="mt-2 text-xs text-white/80 text-center">
-              Москва • {isWinter ? "С наступающим! 🎄" : "Хорошего дня!"}
+              Москва • Хорошего дня!
             </div>
           </div>
         )}
