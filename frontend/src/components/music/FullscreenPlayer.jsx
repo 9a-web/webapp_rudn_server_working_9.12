@@ -9,7 +9,7 @@ import {
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
-export const FullscreenPlayer = ({ isOpen, onClose }) => {
+export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
   const { 
     currentTrack, 
     isPlaying, 
