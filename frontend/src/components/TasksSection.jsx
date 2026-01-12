@@ -703,6 +703,22 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     }
   };
 
+  // Переключить состояние подзадачи (completed)
+  const handleToggleSubtask = async (taskId, subtaskId, currentCompleted) => {
+    try {
+      hapticFeedback && hapticFeedback('impact', 'light');
+      
+      const updatedTask = await tasksAPI.updateSubtask(taskId, subtaskId, {
+        completed: !currentCompleted
+      });
+      setTasks(tasks.map(t => t.id === taskId ? updatedTask : t));
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error toggling subtask:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+    }
+  };
 
   // Шаблоны быстрых задач
   const quickActionTemplates = [
