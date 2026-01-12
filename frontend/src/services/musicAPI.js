@@ -90,6 +90,17 @@ export const musicAPI = {
   removeFavorite: async (telegramId, trackId) => {
     const response = await api.delete(`/music/favorites/${telegramId}/${trackId}`);
     return response.data;
+  },
+
+  /**
+   * Получить треки артиста
+   * @param {string} artistName - Имя артиста
+   * @param {number} count - Количество треков
+   * @returns {Promise<{artist: string, tracks: Array, count: number}>}
+   */
+  getArtistTracks: async (artistName, count = 50) => {
+    const response = await api.get(`/music/artist/${encodeURIComponent(artistName)}?count=${count}`);
+    return response.data;
   }
 };
 
