@@ -19,11 +19,15 @@ export const FullscreenPlayer = ({ isOpen, onClose }) => {
     volume,
     queue,
     queueIndex,
+    repeatMode,
+    shuffle,
     toggle, 
     next, 
     prev, 
     seek, 
     changeVolume,
+    toggleRepeat,
+    toggleShuffle,
     error 
   } = usePlayer();
 
