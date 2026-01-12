@@ -4,10 +4,14 @@ import { Play, Pause, SkipBack, SkipForward, X, Maximize2 } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
-export const MiniPlayer = ({ onExpand }) => {
+export const MiniPlayer = ({ onExpand, isHidden = false }) => {
   const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, stop, error } = usePlayer();
 
+  // Не рендерим если нет трека
   if (!currentTrack) return null;
+
+  // Скрываем плеер при открытии модальных окон
+  const shouldShow = !isHidden;
 
   const formatTime = (sec) => {
     if (!sec || isNaN(sec)) return '0:00';
