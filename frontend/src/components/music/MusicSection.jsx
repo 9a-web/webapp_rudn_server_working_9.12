@@ -120,6 +120,7 @@ export const MusicSection = ({ telegramId }) => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      loadingMoreRef.current = false;
     }
   };
 
