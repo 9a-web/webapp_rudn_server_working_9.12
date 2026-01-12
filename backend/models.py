@@ -475,6 +475,12 @@ class TaskResponse(BaseModel):
     order: int = 0
     created_at: datetime
     updated_at: datetime
+    # Подзадачи
+    subtasks: List[TaskSubtask] = []
+    # Прогресс по подзадачам
+    subtasks_progress: int = 0  # Процент выполнения подзадач (0-100)
+    subtasks_completed: int = 0  # Количество выполненных подзадач
+    subtasks_total: int = 0  # Общее количество подзадач
     # Дополнительные поля для событий расписания
     teacher: Optional[str] = None
     auditory: Optional[str] = None
