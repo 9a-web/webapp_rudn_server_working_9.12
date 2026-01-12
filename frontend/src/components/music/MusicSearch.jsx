@@ -109,6 +109,7 @@ export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick }) => {
           tracks={tracks}
           favorites={favorites}
           onFavorite={onFavorite}
+          onArtistClick={onArtistClick}
           emptyMessage="Ничего не найдено"
         />
       )}
