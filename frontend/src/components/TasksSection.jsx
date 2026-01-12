@@ -1241,6 +1241,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     onToggle={toggleTask}
                     onStartEdit={handleStartEdit}      // Inline редактирование по двойному клику
                     onEdit={handleOpenEditModal}        // Модальное окно для метаданных
+                    onAddSubtask={handleOpenEditModal}  // Открываем EditTaskModal для добавления подзадач
                     onSaveEdit={handleSaveEdit}
                     onCancelEdit={handleCancelEdit}
                     onDelete={handleDeleteTask}
