@@ -637,21 +637,25 @@ export const PlayerProvider = ({ children }) => {
   const value = {
     currentTrack,
     isPlaying,
-    isLoading, // Новое состояние
+    isLoading,
     progress,
     duration,
     queue,
     queueIndex,
     volume,
     error,
+    repeatMode,
+    shuffle,
     play,
     pause,
-    stop, // Полная остановка и закрытие плеера
+    stop,
     toggle,
     next,
     prev,
     seek,
     changeVolume,
+    toggleRepeat,
+    toggleShuffle,
     setQueue,
     clearError: () => setError(null),
   };
