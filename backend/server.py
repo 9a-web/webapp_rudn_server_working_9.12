@@ -1282,7 +1282,10 @@ async def update_task(task_id: str, task_update: TaskUpdate):
                 }
             )
         
-        return TaskResponse(**updated_task)
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
     except HTTPException:
         raise
     except Exception as e:
