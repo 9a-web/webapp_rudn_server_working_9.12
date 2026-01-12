@@ -467,7 +467,31 @@ export const PlayerProvider = ({ children }) => {
     };
     
     const onEnded = () => {
-      // Автоматически играть следующий трек
+      console.log('🎵 Track ended, repeatMode:', repeatMode);
+      
+      // Режим повтора одного трека
+      if (repeatMode === 'track') {
+        console.log('🔁 Repeating track');
+        audio.currentTime = 0;
+        audio.play().catch(err => console.error('Repeat play error:', err));
+        return;
+      }
+      
+      // Режим повтора очереди/альбома
+      if (repeatMode === 'queue' && queue.length > 0) {
+        if (queueIndex >= queue.length - 1) {
+          // Последний трек - переходим к первому
+          console.log('🔁 Repeating queue from start');
+          setQueueIndex(0);
+          play(queue[0], queue);
+        } else {
+          // Следующий трек
+          next();
+        }
+        return;
+      }
+      
+      // Стандартное поведение (repeat = off)
       if (queue.length > 0 && queueIndex < queue.length - 1) {
         next();
       } else {
