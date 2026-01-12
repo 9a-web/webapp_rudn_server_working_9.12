@@ -18,7 +18,7 @@ class MusicPaginationTester:
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': 'LK-RUDN-API-Tester/1.0'
+            'User-Agent': 'Music-Pagination-Tester/1.0'
         })
         self.results = []
         
@@ -41,39 +41,72 @@ class MusicPaginationTester:
             print(f"    Response: {response_data}")
         print()
     
-    def test_get_lk_status(self):
-        """Test GET /api/lk/status/{telegram_id} - Check LK connection status"""
-        print("📊 Testing GET /api/lk/status/{telegram_id}...")
+    def test_initial_load(self):
+        """Test initial load: GET /api/music/my?count=30&offset=0"""
+        print("🎵 Testing initial load (count=30, offset=0)...")
         
         try:
-            response = self.session.get(f"{BACKEND_URL}/lk/status/{TEST_TELEGRAM_ID}")
+            response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset=0")
             
             if response.status_code == 200:
                 data = response.json()
                 
-                # Check response structure - should have lk_connected field
-                if "lk_connected" in data:
-                    # For new user (telegram_id=999777888), should return lk_connected=false
-                    expected_connected = False
-                    if data["lk_connected"] == expected_connected:
-                        self.log_result(
-                            "GET /api/lk/status/{telegram_id} - New user status",
-                            True,
-                            f"✅ Correct: lk_connected={data['lk_connected']} for new user",
-                            data
-                        )
+                # Check response structure
+                required_fields = ["tracks", "has_more", "count"]
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if not missing_fields:
+                    tracks = data.get("tracks", [])
+                    has_more = data.get("has_more")
+                    count = data.get("count")
+                    
+                    # Validate response structure
+                    success = True
+                    details = []
+                    
+                    # Check tracks array
+                    if isinstance(tracks, list):
+                        details.append(f"✅ tracks: array with {len(tracks)} items")
                     else:
-                        self.log_result(
-                            "GET /api/lk/status/{telegram_id} - New user status",
-                            False,
-                            f"❌ Expected lk_connected={expected_connected}, got {data['lk_connected']}",
-                            data
-                        )
+                        details.append(f"❌ tracks: expected array, got {type(tracks)}")
+                        success = False
+                    
+                    # Check has_more boolean
+                    if isinstance(has_more, bool):
+                        details.append(f"✅ has_more: {has_more}")
+                        # If we have tracks and there are more than 30 total, has_more should be true
+                        if len(tracks) == 30 and has_more:
+                            details.append("✅ has_more=true indicates more tracks available")
+                        elif len(tracks) < 30 and not has_more:
+                            details.append("✅ has_more=false indicates no more tracks")
+                        elif len(tracks) > 0:
+                            details.append(f"ℹ️  has_more={has_more} with {len(tracks)} tracks returned")
+                    else:
+                        details.append(f"❌ has_more: expected boolean, got {type(has_more)}")
+                        success = False
+                    
+                    # Check count field
+                    if isinstance(count, int):
+                        details.append(f"✅ count: {count}")
+                        if count == len(tracks):
+                            details.append("✅ count matches tracks array length")
+                        else:
+                            details.append(f"⚠️  count ({count}) != tracks length ({len(tracks)})")
+                    else:
+                        details.append(f"❌ count: expected integer, got {type(count)}")
+                        success = False
+                    
+                    self.log_result(
+                        "Initial load - Response structure",
+                        success,
+                        "; ".join(details),
+                        {"tracks_count": len(tracks), "has_more": has_more, "count": count}
+                    )
                 else:
                     self.log_result(
-                        "GET /api/lk/status/{telegram_id} - Response structure",
+                        "Initial load - Response structure",
                         False,
-                        "Missing required field: lk_connected",
+                        f"Missing required fields: {missing_fields}",
                         data
                     )
             else:
@@ -82,7 +115,7 @@ class MusicPaginationTester:
                 except:
                     data = response.text
                 self.log_result(
-                    "GET /api/lk/status/{telegram_id} - Response",
+                    "Initial load - HTTP Response",
                     False,
                     f"Unexpected status code: {response.status_code}",
                     data
@@ -90,7 +123,7 @@ class MusicPaginationTester:
                 
         except Exception as e:
             self.log_result(
-                "GET /api/lk/status/{telegram_id} - Request",
+                "Initial load - Request",
                 False,
                 f"Request failed: {str(e)}"
             )
