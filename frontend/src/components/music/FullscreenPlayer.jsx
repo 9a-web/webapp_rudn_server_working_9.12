@@ -114,6 +114,29 @@ export const FullscreenPlayer = ({ isOpen, onClose }) => {
     onClose();
   }, [onClose]);
 
+  // Обработка завершения свайпа вниз
+  const handleDragEnd = useCallback((event, info) => {
+    setIsDragging(false);
+    
+    // Порог для закрытия: смещение > 100px или скорость > 500
+    const shouldClose = info.offset.y > 100 || info.velocity.y > 500;
+    
+    if (shouldClose) {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+      }
+      onClose();
+    }
+  }, [onClose]);
+
+  // Начало свайпа
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.selectionChanged();
+    }
+  }, []);
+
   if (!currentTrack) return null;
 
   return (
