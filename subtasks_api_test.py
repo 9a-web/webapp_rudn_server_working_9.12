@@ -13,7 +13,7 @@ import sys
 from datetime import datetime
 
 # Backend URL configuration
-BACKEND_URL = "https://rudn-schedule.ru"
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test data
