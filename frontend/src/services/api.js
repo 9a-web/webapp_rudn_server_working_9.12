@@ -478,6 +478,44 @@ export const plannerAPI = {
   },
 
   /**
+   * Получить предварительный просмотр пар для синхронизации
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} date - Дата в формате YYYY-MM-DD
+   * @param {number} weekNumber - Номер недели (1 или 2)
+   */
+  getPreview: async (telegramId, date, weekNumber = 1) => {
+    try {
+      const response = await api.post('/planner/preview', {
+        telegram_id: telegramId,
+        date: date,
+        week_number: weekNumber,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Синхронизировать выбранные пары в планировщик
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} date - Дата в формате YYYY-MM-DD
+   * @param {Array} events - Массив выбранных событий для синхронизации
+   */
+  syncSelected: async (telegramId, date, events) => {
+    try {
+      const response = await api.post('/planner/sync-selected', {
+        telegram_id: telegramId,
+        date: date,
+        events: events,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
    * Получить все события (пары + задачи) на конкретную дату
    * @param {number} telegramId - Telegram ID пользователя
    * @param {string} date - Дата в формате YYYY-MM-DD
