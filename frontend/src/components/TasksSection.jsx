@@ -1777,6 +1777,21 @@ const TodayTaskItem = ({
               
               {/* Кнопки действий */}
               <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Кнопка добавления подзадачи */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'light');
+                    // Открываем EditTaskModal для добавления подзадач
+                    if (onAddSubtask) {
+                      onAddSubtask(task);
+                    }
+                  }}
+                  className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
+                  title="Добавить подзадачу"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                
                 {/* Кнопка редактирования - открывает модальное окно для изменения метаданных */}
                 <button
                   onClick={() => {
@@ -1791,21 +1806,6 @@ const TodayTaskItem = ({
                   title="Редактировать метаданные (категория, приоритет, дедлайн)"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
-                </button>
-                
-                {/* Кнопка добавления подзадачи */}
-                <button
-                  onClick={() => {
-                    hapticFeedback && hapticFeedback('impact', 'light');
-                    // Открываем EditTaskModal для добавления подзадач
-                    if (onAddSubtask) {
-                      onAddSubtask(task);
-                    }
-                  }}
-                  className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
-                  title="Добавить подзадачу"
-                >
-                  <Plus className="w-3.5 h-3.5" />
                 </button>
                 
                 {/* Кнопка удаления */}
