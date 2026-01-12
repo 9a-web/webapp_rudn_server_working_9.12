@@ -434,6 +434,7 @@ class TaskCreate(BaseModel):
     time_end: Optional[str] = None
     is_fixed: bool = False
     origin: str = "user"
+    subtasks: List[str] = []  # Названия подзадач при создании
 
 
 class TaskUpdate(BaseModel):
