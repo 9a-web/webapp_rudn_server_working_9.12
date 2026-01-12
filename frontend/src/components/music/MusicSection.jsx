@@ -75,7 +75,7 @@ export const MusicSection = ({ telegramId }) => {
     
     try {
       switch (activeTab) {
-        case 'my':
+        case 'my': {
           const currentOffset = loadMore ? offsetRef.current : 0;
           const my = await musicAPI.getMyAudio(TRACKS_PER_PAGE, currentOffset);
           const newTracks = my.tracks || [];
@@ -94,21 +94,39 @@ export const MusicSection = ({ telegramId }) => {
           setHasMore(my.has_more || newTracks.length === TRACKS_PER_PAGE);
           offsetRef.current = currentOffset + newTracks.length;
           break;
-        case 'popular':
-          const popular = await musicAPI.getPopular();
-          setTracks(popular.tracks || []);
-          setHasMore(false);
+        }
+        case 'popular': {
+          const currentOffset = loadMore ? offsetRef.current : 0;
+          const popular = await musicAPI.getPopular(TRACKS_PER_PAGE, currentOffset);
+          const newTracks = popular.tracks || [];
+          
+          if (loadMore) {
+            // Дедупликация по id трека
+            setTracks(prev => {
+              const existingIds = new Set(prev.map(t => t.id));
+              const uniqueNewTracks = newTracks.filter(t => !existingIds.has(t.id));
+              return [...prev, ...uniqueNewTracks];
+            });
+          } else {
+            setTracks(newTracks);
+          }
+          
+          setHasMore(popular.has_more || newTracks.length === TRACKS_PER_PAGE);
+          offsetRef.current = currentOffset + newTracks.length;
           break;
-        case 'playlists':
+        }
+        case 'playlists': {
           const pl = await musicAPI.getPlaylists();
           setPlaylists(pl.playlists || []);
           setHasMore(false);
           break;
-        case 'favorites':
+        }
+        case 'favorites': {
           await loadFavorites();
           setTracks(favorites);
           setHasMore(false);
           break;
+        }
         default:
           break;
       }
