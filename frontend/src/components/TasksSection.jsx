@@ -1679,7 +1679,7 @@ const TodayTaskItem = ({
                     className={`
                       w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center transition-all duration-200 mt-0.5 cursor-pointer
                       ${task.completed 
-                        ? 'bg-gradient-to-br from-yellow-400 to-orange-400' 
+                        ? 'bg-gradient-to-br from-yellow-400 to-orange-400 border-0' 
                         : shouldPulse
                           ? 'bg-gradient-to-br from-green-400 to-emerald-500 border-0'
                           : 'bg-white border-2 border-[#E5E5E5] group-hover:border-yellow-400'
