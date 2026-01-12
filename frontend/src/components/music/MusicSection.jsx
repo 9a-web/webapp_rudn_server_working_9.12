@@ -168,6 +168,18 @@ export const MusicSection = ({ telegramId }) => {
     setActiveTab(tabId);
   };
 
+  // Открыть карточку артиста
+  const handleArtistClick = useCallback((artistName) => {
+    setSelectedArtist(artistName);
+    setArtistCardOpen(true);
+  }, []);
+
+  // Закрыть карточку артиста
+  const handleArtistCardClose = useCallback(() => {
+    setArtistCardOpen(false);
+    setSelectedArtist(null);
+  }, []);
+
   return (
     <div className="pb-36">
       {/* Tabs */}
