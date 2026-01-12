@@ -132,7 +132,7 @@ export const WeekDateSelector = ({
   };
   
   return (
-    <div className="mb-4" style={{ overflow: 'visible' }}>
+    <div className="mb-2">
       {/* Контейнер с кнопками и датами - только горизонтальная прокрутка */}
       <div className="flex items-center gap-2" style={{ touchAction: 'pan-x' }}>
         {/* Кнопка предыдущей недели */}
