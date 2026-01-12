@@ -218,6 +218,13 @@ export const PlayerProvider = ({ children }) => {
     setError(null);
     setIsLoading(true);
     
+    // Сбрасываем прогресс и длительность для нового трека
+    setProgress(0);
+    setDuration(0);
+    
+    // Сбрасываем позицию в Media Session (системный плеер)
+    resetMediaSessionPositionState(0);
+    
     // Создаем audio если его нет
     if (!audioRef.current && typeof Audio !== 'undefined') {
       audioRef.current = new Audio();
