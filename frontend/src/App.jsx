@@ -1088,10 +1088,11 @@ const Home = () => {
         )}
       </div>
 
-      {/* Mini Player - показывается над BottomNavigation */}
+      {/* Mini Player - показывается над BottomNavigation, скрывается при открытии модальных окон */}
       {!showGroupSelector && userSettings && !isFullscreenPlayerOpen && (
         <MiniPlayer 
           onExpand={() => setIsFullscreenPlayerOpen(true)}
+          isHidden={isAnyModalOpen}
         />
       )}
 
