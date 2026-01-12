@@ -19,7 +19,7 @@ class MusicArtistTester:
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': 'Music-Pagination-Tester/1.0'
+            'User-Agent': 'Music-Artist-Tester/1.0'
         })
         self.results = []
         
