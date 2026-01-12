@@ -122,6 +122,18 @@ backend:
         agent: "testing"
         comment: "✅ COMPREHENSIVE RE-TEST COMPLETED - All 8 Tasks Subtasks API scenarios verified with telegram_id=123456789: 1) POST /api/tasks - Task 'Тестовая задача для подзадач' created ✅ 2) POST /api/tasks/{task_id}/subtasks - 'Подзадача 1' added (0% progress, 1 total) ✅ 3) POST /api/tasks/{task_id}/subtasks - 'Подзадача 2' added (0% progress, 2 total) ✅ 4) PUT /api/tasks/{task_id}/subtasks/{subtask1_id} - First subtask completed (50% progress, 1/2 completed) ✅ 5) PUT /api/tasks/{task_id}/subtasks/{subtask2_id} - Second subtask completed (100% progress, 2/2 completed) ✅ 6) DELETE /api/tasks/{task_id}/subtasks/{subtask1_id} - First subtask deleted (1 total, 100% progress) ✅ 7) GET /api/tasks/123456789 - Task list retrieved with preserved progress ✅ 8) DELETE /api/tasks/{task_id} - Test task cleanup successful ✅ All progress calculations, completion timestamps, and data persistence working perfectly."
 
+  - task: "Basic Tasks API - User Requested Test"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ USER REQUESTED FOCUSED TEST COMPLETED - All 5 basic Tasks API scenarios tested successfully with telegram_id=12345: 1) GET /api/tasks/12345 - Initial empty list retrieved ✅ 2) POST /api/tasks - Task 'Test task' created with ID 3f45ca38-e54b-4116-abb2-799bd382efdc ✅ 3) GET /api/tasks/12345 - Created task found in list ✅ 4) DELETE /api/tasks/{task_id} - Task deleted successfully ✅ 5) GET /api/tasks/12345 - Confirmed task removed from list ✅ All basic CRUD operations for tasks working perfectly. Response structure correct with proper UUID generation, timestamps, and data validation."
+
 frontend:
   - task: "Music Load More Button Display"
     implemented: true
