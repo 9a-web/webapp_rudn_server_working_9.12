@@ -1433,6 +1433,12 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           setEditingTask(null);
         }}
         onEditTask={handleEditTask}
+        onTaskUpdated={(updatedTask) => {
+          // Обновляем задачу в списке после операций с подзадачами
+          setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+          // Также обновляем editingTask для синхронизации состояния в модалке
+          setEditingTask(updatedTask);
+        }}
         task={editingTask}
         hapticFeedback={hapticFeedback}
         scheduleSubjects={scheduleSubjects}
