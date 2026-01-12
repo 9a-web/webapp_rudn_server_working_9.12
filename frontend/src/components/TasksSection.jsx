@@ -1019,7 +1019,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         </div>
         
         {/* Кнопки управления - зависят от activeView */}
-        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-[5px] sm:gap-[9px] flex-shrink-0">
           {activeView === 'todo' ? (
             <>
               {/* Кнопки для Списка дел */}
