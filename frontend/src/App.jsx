@@ -1117,6 +1117,7 @@ const Home = () => {
         <FullscreenPlayer 
           isOpen={isFullscreenPlayerOpen}
           onClose={() => setIsFullscreenPlayerOpen(false)}
+          onArtistClick={handleArtistClick}
         />
       )}
 
