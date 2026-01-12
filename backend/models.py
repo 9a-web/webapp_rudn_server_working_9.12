@@ -510,6 +510,17 @@ class TaskReorderRequest(BaseModel):
     tasks: List[TaskReorderItem]
 
 
+class TaskSubtaskCreate(BaseModel):
+    """Запрос создания подзадачи для личной задачи"""
+    title: str
+
+
+class TaskSubtaskUpdate(BaseModel):
+    """Запрос обновления подзадачи для личной задачи"""
+    title: Optional[str] = None
+    completed: Optional[bool] = None
+
+
 # ============ Модели для планировщика ============
 
 class PlannerSyncRequest(BaseModel):
