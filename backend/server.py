@@ -7053,11 +7053,11 @@ async def music_redirect(track_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/music/my")
-async def music_my_audio(count: int = 50):
+async def music_my_audio(count: int = 50, offset: int = 0):
     """Мои аудиозаписи VK"""
     try:
-        tracks = music_service.get_my_audio(count)
-        return {"tracks": tracks, "count": len(tracks)}
+        tracks = music_service.get_my_audio(count, offset)
+        return {"tracks": tracks, "count": len(tracks), "offset": offset, "has_more": len(tracks) == count}
     except Exception as e:
         logger.error(f"Music my audio error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
