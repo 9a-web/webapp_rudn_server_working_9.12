@@ -7,7 +7,8 @@ import { tasksAPI } from '../services/api';
 export const EditTaskModal = ({ 
   isOpen, 
   onClose, 
-  onEditTask, 
+  onEditTask,
+  onTaskUpdated, // Callback для обновления задачи в родителе
   task, // Существующая задача для редактирования
   hapticFeedback,
   scheduleSubjects = []
@@ -20,6 +21,11 @@ export const EditTaskModal = ({
   const [saving, setSaving] = useState(false);
   const [dragY, setDragY] = useState(0);
   
+  // Подзадачи
+  const [subtasks, setSubtasks] = useState([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  
   const modalRef = useRef(null);
   
   // Заполняем поля при открытии модального окна
@@ -29,6 +35,7 @@ export const EditTaskModal = ({
       setCategory(task.category || null);
       setPriority(task.priority || 'medium');
       setSubject(task.subject || '');
+      setSubtasks(task.subtasks || []);
       
       // Форматируем дедлайн для datetime-local input
       if (task.deadline) {
@@ -40,6 +47,85 @@ export const EditTaskModal = ({
       }
     }
   }, [isOpen, task]);
+  
+  // Обработчики подзадач
+  const handleAddSubtask = async () => {
+    const trimmedTitle = newSubtaskTitle.trim();
+    if (!trimmedTitle || !task) return;
+    
+    try {
+      setAddingSubtask(true);
+      hapticFeedback && hapticFeedback('impact', 'light');
+      
+      const updatedTask = await tasksAPI.addSubtask(task.id, trimmedTitle);
+      setSubtasks(updatedTask.subtasks || []);
+      setNewSubtaskTitle('');
+      
+      // Обновляем задачу в родителе
+      if (onTaskUpdated) {
+        onTaskUpdated(updatedTask);
+      }
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error adding subtask:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+    } finally {
+      setAddingSubtask(false);
+    }
+  };
+  
+  const handleToggleSubtask = async (subtask) => {
+    if (!task) return;
+    
+    try {
+      hapticFeedback && hapticFeedback('selection');
+      
+      const updatedTask = await tasksAPI.updateSubtask(task.id, subtask.subtask_id, {
+        completed: !subtask.completed
+      });
+      setSubtasks(updatedTask.subtasks || []);
+      
+      // Обновляем задачу в родителе
+      if (onTaskUpdated) {
+        onTaskUpdated(updatedTask);
+      }
+    } catch (error) {
+      console.error('Error toggling subtask:', error);
+    }
+  };
+  
+  const handleDeleteSubtask = async (subtaskId) => {
+    if (!task) return;
+    
+    try {
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      
+      const updatedTask = await tasksAPI.deleteSubtask(task.id, subtaskId);
+      setSubtasks(updatedTask.subtasks || []);
+      
+      // Обновляем задачу в родителе
+      if (onTaskUpdated) {
+        onTaskUpdated(updatedTask);
+      }
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error deleting subtask:', error);
+    }
+  };
+  
+  const handleSubtaskKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddSubtask();
+    }
+  };
+  
+  // Вычисление прогресса подзадач
+  const subtasksProgress = subtasks.length > 0 
+    ? Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100)
+    : 0;
   
   // Блокируем скролл страницы при открытии модального окна
   useEffect(() => {
