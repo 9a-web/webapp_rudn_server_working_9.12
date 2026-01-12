@@ -293,6 +293,29 @@ export const PlayerProvider = ({ children }) => {
     setIsPlaying(false);
   }, []);
 
+  // Полная остановка и закрытие плеера
+  const stop = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.src = '';
+    }
+    setCurrentTrack(null);
+    setIsPlaying(false);
+    setIsLoading(false);
+    setProgress(0);
+    setDuration(0);
+    setQueue([]);
+    setQueueIndex(0);
+    setError(null);
+    
+    // Очищаем Media Session
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = 'none';
+    }
+  }, []);
+
   // Переключение play/pause
   const toggle = useCallback(() => {
     if (!audioRef.current) return;
