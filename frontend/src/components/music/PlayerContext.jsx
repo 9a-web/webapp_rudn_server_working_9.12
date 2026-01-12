@@ -418,7 +418,27 @@ export const PlayerProvider = ({ children }) => {
     if (!audio) return;
 
     const onTimeUpdate = () => setProgress(audio.currentTime);
-    const onLoadedMetadata = () => setDuration(audio.duration);
+    
+    // При загрузке метаданных обновляем duration и сбрасываем позицию в Media Session
+    const onLoadedMetadata = () => {
+      const newDuration = audio.duration;
+      setDuration(newDuration);
+      
+      // Обновляем Media Session с новой длительностью и позицией 0
+      if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: newDuration,
+            playbackRate: audio.playbackRate || 1,
+            position: 0
+          });
+          console.log('🎵 Media Session position updated on loadedmetadata, duration:', newDuration);
+        } catch (e) {
+          console.log('⚠️ Failed to update Media Session position:', e.message);
+        }
+      }
+    };
+    
     const onEnded = () => {
       // Автоматически играть следующий трек
       if (queue.length > 0 && queueIndex < queue.length - 1) {
