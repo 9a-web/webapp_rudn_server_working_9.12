@@ -155,9 +155,17 @@ export const WeekDateSelector = ({
           </svg>
         </motion.button>
         
-        {/* Контейнер с горизонтальной прокруткой */}
-        <div className="flex-1 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2 min-w-max">
+        {/* Контейнер с горизонтальной прокруткой (только по горизонтали) */}
+        <div 
+          className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide"
+          style={{ 
+            overscrollBehaviorX: 'contain',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
+          <div className="flex gap-2 min-w-max" style={{ touchAction: 'pan-x' }}>
             {weekDates.map((date, index) => {
             const past = isPastDay(date);
             const today = isToday(date);
