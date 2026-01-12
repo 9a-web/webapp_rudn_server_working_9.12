@@ -1101,6 +1101,22 @@ async def get_user_tasks(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def calculate_subtasks_progress(subtasks: list) -> dict:
+    """Вычислить прогресс по подзадачам"""
+    if not subtasks:
+        return {"subtasks_progress": 0, "subtasks_completed": 0, "subtasks_total": 0}
+    
+    total = len(subtasks)
+    completed = sum(1 for s in subtasks if s.get("completed", False))
+    progress = round((completed / total) * 100) if total > 0 else 0
+    
+    return {
+        "subtasks_progress": progress,
+        "subtasks_completed": completed,
+        "subtasks_total": total
+    }
+
+
 @api_router.post("/tasks", response_model=TaskResponse)
 async def create_task(task_data: TaskCreate):
     """Создать новую задачу"""
@@ -1114,8 +1130,20 @@ async def create_task(task_data: TaskCreate):
         # Присваиваем order = max + 1 (или 0, если задач нет)
         next_order = (max_order_task.get("order", -1) + 1) if max_order_task else 0
         
-        task = Task(**task_data.dict(), order=next_order)
-        task_dict = task.dict()
+        # Создаём подзадачи из переданных названий
+        subtasks = []
+        for i, subtask_title in enumerate(task_data.subtasks):
+            subtasks.append(TaskSubtask(
+                title=subtask_title,
+                order=i
+            ).model_dump())
+        
+        # Создаём задачу без поля subtasks из task_data (оно содержит только названия)
+        task_dict_data = task_data.model_dump()
+        task_dict_data.pop('subtasks', None)  # Удаляем строковые названия
+        
+        task = Task(**task_dict_data, order=next_order, subtasks=subtasks)
+        task_dict = task.model_dump()
         
         await db.tasks.insert_one(task_dict)
         
@@ -1127,7 +1155,10 @@ async def create_task(task_data: TaskCreate):
             metadata={}
         )
         
-        return TaskResponse(**task_dict)
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(task_dict.get("subtasks", []))
+        
+        return TaskResponse(**task_dict, **progress_info)
     except Exception as e:
         logger.error(f"Ошибка при создании задачи: {e}")
         raise HTTPException(status_code=500, detail=str(e))
