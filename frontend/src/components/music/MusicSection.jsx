@@ -231,6 +231,7 @@ export const MusicSection = ({ telegramId }) => {
             <MusicSearch 
               favorites={favorites}
               onFavorite={handleFavorite}
+              onArtistClick={handleArtistClick}
             />
           </motion.div>
         ) : activeTab === 'playlists' && !selectedPlaylist ? (
