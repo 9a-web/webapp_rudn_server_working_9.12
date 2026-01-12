@@ -1346,7 +1346,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     savingSubtask={savingSubtask}
                     onSaveEdit={handleSaveEdit}
                     onCancelEdit={handleCancelEdit}
-                    onDelete={handleDeleteTask}
+                    onDelete={() => handleOpenDeleteConfirm(task)}
                     getCategoryEmoji={getCategoryEmoji}
                     getPriorityColor={getPriorityColor}
                     getDeadlineStatus={getDeadlineStatus}
