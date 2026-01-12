@@ -242,6 +242,21 @@ const Home = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   // Состояние для полноэкранного музыкального плеера
   const [isFullscreenPlayerOpen, setIsFullscreenPlayerOpen] = useState(false);
+  // Состояние для карточки артиста
+  const [isArtistCardOpen, setIsArtistCardOpen] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState(null);
+
+  // Открыть карточку артиста
+  const handleArtistClick = useCallback((artistName) => {
+    setSelectedArtist(artistName);
+    setIsArtistCardOpen(true);
+  }, []);
+
+  // Закрыть карточку артиста
+  const handleArtistCardClose = useCallback(() => {
+    setIsArtistCardOpen(false);
+    setSelectedArtist(null);
+  }, []);
 
   // Сохраняем activeTab в localStorage при изменении
   useEffect(() => {
