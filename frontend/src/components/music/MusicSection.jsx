@@ -306,6 +306,13 @@ export const MusicSection = ({ telegramId }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Artist Card Modal */}
+      <ArtistCard
+        isOpen={artistCardOpen}
+        onClose={handleArtistCardClose}
+        artistName={selectedArtist}
+      />
     </div>
   );
 };
