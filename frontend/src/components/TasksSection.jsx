@@ -1518,6 +1518,7 @@ const TodayTaskItem = ({
   editingText, 
   setEditingText,
   onToggle,
+  onToggleSubtask, // Для переключения состояния подзадачи
   onStartEdit,  // Для inline редактирования по двойному клику
   onEdit,       // Для открытия модального окна EditTaskModal
   onAddSubtask, // Для открытия inline поля добавления подзадачи
