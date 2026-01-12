@@ -407,6 +407,9 @@ test_plan:
       - working: true
         agent: "testing"
         comment: "✅ Successfully tested Music Search API. All test scenarios passed: 1) Valid search query (q=test, count=5) returns tracks with correct structure including all required fields (id, owner_id, song_id, artist, title, duration, url), 2) Russian query (q=музыка) works correctly, 3) Edge cases tested (count=0 returns empty list, count=100 respects limit), 4) All URLs are valid HTTPS links, 5) Duration values are positive numbers. VK Music integration working correctly with ENV=test."
+      - working: true
+        agent: "testing"
+        comment: "✅ COMPREHENSIVE RETEST COMPLETED: Music Search API GET /api/music/search fully tested according to review requirements. All 5 test scenarios passed: 1) Endpoint GET /api/music/search?q=test&count=3 returns correct structure with is_blocked field (boolean type), 2) All required fields present: id, owner_id, song_id, artist, title, duration, url, is_blocked, stream_url, 3) Tracks with is_blocked=true have url=null (logic verified in code), 4) Search with different queries works: q=Metallica (found 4 Metallica tracks), q=русская музыка (found Russian tracks with Cyrillic characters), 5) Edge cases tested (count=0, empty query). VK Music API integration working correctly on localhost:8001 with ENV=test. is_blocked field logic: blocked when no URL, URL contains 'audio_api_unavailable', or content_restricted=1. In test environment, most tracks are unblocked (is_blocked=false) with valid URLs, indicating healthy VK API integration."
 
   - task: "Music My Audio API - GET /api/music/my"
     implemented: true
