@@ -118,6 +118,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ Full integration test PASSED - All 8 test scenarios completed successfully: create task, add 2 subtasks, complete both subtasks, delete 1 subtask, verify persistence, cleanup. Progress bar calculation works correctly throughout all operations."
+      - working: true
+        agent: "testing"
+        comment: "✅ COMPREHENSIVE RE-TEST COMPLETED - All 8 Tasks Subtasks API scenarios verified with telegram_id=123456789: 1) POST /api/tasks - Task 'Тестовая задача для подзадач' created ✅ 2) POST /api/tasks/{task_id}/subtasks - 'Подзадача 1' added (0% progress, 1 total) ✅ 3) POST /api/tasks/{task_id}/subtasks - 'Подзадача 2' added (0% progress, 2 total) ✅ 4) PUT /api/tasks/{task_id}/subtasks/{subtask1_id} - First subtask completed (50% progress, 1/2 completed) ✅ 5) PUT /api/tasks/{task_id}/subtasks/{subtask2_id} - Second subtask completed (100% progress, 2/2 completed) ✅ 6) DELETE /api/tasks/{task_id}/subtasks/{subtask1_id} - First subtask deleted (1 total, 100% progress) ✅ 7) GET /api/tasks/123456789 - Task list retrieved with preserved progress ✅ 8) DELETE /api/tasks/{task_id} - Test task cleanup successful ✅ All progress calculations, completion timestamps, and data persistence working perfectly."
 
 frontend:
   - task: "Music Load More Button Display"
