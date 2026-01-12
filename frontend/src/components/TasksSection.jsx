@@ -600,8 +600,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           return false;
         });
         
-        // Если задач больше 2 и все выполнены - запускаем конфетти
-        if (tasksForDate.length > 2) {
+        // Если есть задачи и все выполнены - запускаем конфетти (даже если одна задача)
+        if (tasksForDate.length > 0) {
           const allCompleted = tasksForDate.every(t => t.completed);
           if (allCompleted) {
             // Сильная вибрация для успеха
