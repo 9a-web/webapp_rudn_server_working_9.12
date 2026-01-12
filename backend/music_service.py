@@ -243,6 +243,42 @@ class VKMusicService:
             "access_key": getattr(playlist, 'access_key', "")
         }
 
+    async def get_artist_tracks(self, artist_name: str, count: int = 50) -> Dict[str, Any]:
+        """
+        Получить треки артиста через поиск.
+        Возвращает треки, отфильтрованные по имени артиста.
+        """
+        if not artist_name:
+            return {"artist": "", "tracks": [], "count": 0}
+        
+        # Поиск треков по имени артиста
+        all_tracks = await self.search(artist_name, count=count)
+        
+        # Фильтруем треки, где имя артиста совпадает (нечёткое сравнение)
+        artist_lower = artist_name.lower().strip()
+        filtered_tracks = []
+        
+        for track in all_tracks:
+            track_artist = track.get('artist', '').lower().strip()
+            # Проверяем точное совпадение или содержание
+            if artist_lower == track_artist or artist_lower in track_artist or track_artist in artist_lower:
+                filtered_tracks.append(track)
+        
+        # Если отфильтрованных треков мало, добавляем все из поиска
+        if len(filtered_tracks) < 5:
+            seen_ids = {t['id'] for t in filtered_tracks}
+            for track in all_tracks:
+                if track['id'] not in seen_ids:
+                    filtered_tracks.append(track)
+                if len(filtered_tracks) >= count:
+                    break
+        
+        return {
+            "artist": artist_name,
+            "tracks": filtered_tracks[:count],
+            "count": len(filtered_tracks[:count])
+        }
+
 
 # Singleton instance
 music_service = VKMusicService()
