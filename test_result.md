@@ -152,7 +152,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Music Pagination API - All Tests Complete"
+    - "Tasks Subtasks API - All Tests Complete"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -160,3 +160,5 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "🎵 MUSIC PAGINATION API TESTING COMPLETE ✅ All 4 test scenarios passed successfully: 1) Initial load (count=30, offset=0) - Returns 28 tracks with has_more=true ✅ 2) Pagination load (count=30, offset=28) - Returns 27 tracks with has_more=true ✅ 3) End of list (count=30, offset=500) - Returns empty array with has_more=false ✅ 4) has_more logic validation - Sequential requests show correct behavior ✅ The Load More functionality should work correctly in the frontend. The backend properly implements the VK API integration with correct has_more field calculation by checking next page existence."
+  - agent: "testing"
+    message: "📋 TASKS SUBTASKS API TESTING COMPLETE ✅ All 8 test scenarios passed successfully with telegram_id 123456789: 1) Create task 'Тестовая задача с подзадачами' ✅ 2) Add subtask 'Подзадача 1' (progress: 0%, total: 1) ✅ 3) Add subtask 'Подзадача 2' (progress: 0%, total: 2) ✅ 4) Complete subtask 1 (progress: 50%, completed: 1/2) ✅ 5) Complete subtask 2 (progress: 100%, completed: 2/2) ✅ 6) Delete subtask 1 (total: 1, progress: 100%) ✅ 7) Get all tasks - progress preserved ✅ 8) Cleanup - task deleted ✅ The Tasks Subtasks API is fully functional with correct progress bar calculations and data persistence."
