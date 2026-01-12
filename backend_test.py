@@ -42,70 +42,113 @@ class MusicArtistTester:
             print(f"    Response: {response_data}")
         print()
     
-    def test_initial_load(self):
-        """Test initial load: GET /api/music/my?count=30&offset=0"""
-        print("🎵 Testing initial load (count=30, offset=0)...")
+    def test_basic_artist_request(self):
+        """Test basic request: GET /api/music/artist/Metallica?count=5"""
+        print("🎸 Testing basic artist request (Metallica, count=5)...")
+        
+        artist_name = "Metallica"
+        count = 5
         
         try:
-            response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset=0")
+            # URL encode the artist name
+            encoded_artist = urllib.parse.quote(artist_name)
+            response = self.session.get(f"{BACKEND_URL}/music/artist/{encoded_artist}?count={count}")
             
             if response.status_code == 200:
                 data = response.json()
                 
                 # Check response structure
-                required_fields = ["tracks", "has_more", "count"]
+                required_fields = ["artist", "tracks", "count"]
                 missing_fields = [field for field in required_fields if field not in data]
                 
                 if not missing_fields:
+                    artist = data.get("artist")
                     tracks = data.get("tracks", [])
-                    has_more = data.get("has_more")
-                    count = data.get("count")
+                    response_count = data.get("count")
                     
                     # Validate response structure
                     success = True
                     details = []
                     
+                    # Check artist field
+                    if isinstance(artist, str) and artist:
+                        details.append(f"✅ artist: '{artist}'")
+                    else:
+                        details.append(f"❌ artist: expected non-empty string, got {type(artist)} '{artist}'")
+                        success = False
+                    
                     # Check tracks array
                     if isinstance(tracks, list):
                         details.append(f"✅ tracks: array with {len(tracks)} items")
+                        
+                        # Validate each track structure
+                        if tracks:
+                            track = tracks[0]  # Check first track
+                            required_track_fields = ["id", "artist", "title", "duration", "stream_url"]
+                            track_missing = [field for field in required_track_fields if field not in track]
+                            
+                            if not track_missing:
+                                details.append("✅ track structure: all required fields present")
+                                
+                                # Validate track field types
+                                if isinstance(track.get("id"), str) and track.get("id"):
+                                    details.append(f"✅ track.id: '{track['id']}'")
+                                else:
+                                    details.append(f"❌ track.id: expected non-empty string")
+                                    success = False
+                                
+                                if isinstance(track.get("artist"), str) and track.get("artist"):
+                                    details.append(f"✅ track.artist: '{track['artist']}'")
+                                else:
+                                    details.append(f"❌ track.artist: expected non-empty string")
+                                    success = False
+                                
+                                if isinstance(track.get("title"), str) and track.get("title"):
+                                    details.append(f"✅ track.title: '{track['title']}'")
+                                else:
+                                    details.append(f"❌ track.title: expected non-empty string")
+                                    success = False
+                                
+                                if isinstance(track.get("duration"), int) and track.get("duration") >= 0:
+                                    details.append(f"✅ track.duration: {track['duration']} seconds")
+                                else:
+                                    details.append(f"❌ track.duration: expected non-negative integer")
+                                    success = False
+                                
+                                if isinstance(track.get("stream_url"), str) and track.get("stream_url"):
+                                    details.append(f"✅ track.stream_url: '{track['stream_url']}'")
+                                else:
+                                    details.append(f"❌ track.stream_url: expected non-empty string")
+                                    success = False
+                            else:
+                                details.append(f"❌ track structure: missing fields {track_missing}")
+                                success = False
+                        else:
+                            details.append("ℹ️  tracks: empty array (no tracks found)")
                     else:
                         details.append(f"❌ tracks: expected array, got {type(tracks)}")
                         success = False
                     
-                    # Check has_more boolean
-                    if isinstance(has_more, bool):
-                        details.append(f"✅ has_more: {has_more}")
-                        # If we have tracks and there are more than 30 total, has_more should be true
-                        if len(tracks) == 30 and has_more:
-                            details.append("✅ has_more=true indicates more tracks available")
-                        elif len(tracks) < 30 and not has_more:
-                            details.append("✅ has_more=false indicates no more tracks")
-                        elif len(tracks) > 0:
-                            details.append(f"ℹ️  has_more={has_more} with {len(tracks)} tracks returned")
-                    else:
-                        details.append(f"❌ has_more: expected boolean, got {type(has_more)}")
-                        success = False
-                    
                     # Check count field
-                    if isinstance(count, int):
-                        details.append(f"✅ count: {count}")
-                        if count == len(tracks):
+                    if isinstance(response_count, int) and response_count >= 0:
+                        details.append(f"✅ count: {response_count}")
+                        if response_count == len(tracks):
                             details.append("✅ count matches tracks array length")
                         else:
-                            details.append(f"⚠️  count ({count}) != tracks length ({len(tracks)})")
+                            details.append(f"⚠️  count ({response_count}) != tracks length ({len(tracks)})")
                     else:
-                        details.append(f"❌ count: expected integer, got {type(count)}")
+                        details.append(f"❌ count: expected non-negative integer, got {type(response_count)}")
                         success = False
                     
                     self.log_result(
-                        "Initial load - Response structure",
+                        "Basic artist request - Metallica",
                         success,
                         "; ".join(details),
-                        {"tracks_count": len(tracks), "has_more": has_more, "count": count}
+                        {"artist": artist, "tracks_count": len(tracks), "count": response_count}
                     )
                 else:
                     self.log_result(
-                        "Initial load - Response structure",
+                        "Basic artist request - Metallica",
                         False,
                         f"Missing required fields: {missing_fields}",
                         data
@@ -116,7 +159,7 @@ class MusicArtistTester:
                 except:
                     data = response.text
                 self.log_result(
-                    "Initial load - HTTP Response",
+                    "Basic artist request - Metallica",
                     False,
                     f"Unexpected status code: {response.status_code}",
                     data
@@ -124,71 +167,86 @@ class MusicArtistTester:
                 
         except Exception as e:
             self.log_result(
-                "Initial load - Request",
+                "Basic artist request - Metallica",
                 False,
                 f"Request failed: {str(e)}"
             )
 
-    def test_pagination_load(self):
-        """Test pagination: GET /api/music/my?count=30&offset=28"""
-        print("📄 Testing pagination load (count=30, offset=28)...")
+    def test_cyrillic_artist_request(self):
+        """Test cyrillic request: GET /api/music/artist/Моргенштерн?count=3"""
+        print("🎤 Testing cyrillic artist request (Моргенштерн, count=3)...")
+        
+        artist_name = "Моргенштерн"
+        count = 3
         
         try:
-            response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset=28")
+            # URL encode the cyrillic artist name
+            encoded_artist = urllib.parse.quote(artist_name)
+            response = self.session.get(f"{BACKEND_URL}/music/artist/{encoded_artist}?count={count}")
             
             if response.status_code == 200:
                 data = response.json()
                 
                 # Check response structure
-                required_fields = ["tracks", "has_more", "count"]
+                required_fields = ["artist", "tracks", "count"]
                 missing_fields = [field for field in required_fields if field not in data]
                 
                 if not missing_fields:
+                    artist = data.get("artist")
                     tracks = data.get("tracks", [])
-                    has_more = data.get("has_more")
-                    count = data.get("count")
-                    offset = data.get("offset", 28)
+                    response_count = data.get("count")
                     
                     # Validate response structure
                     success = True
                     details = []
                     
+                    # Check artist field
+                    if isinstance(artist, str):
+                        details.append(f"✅ artist: '{artist}' (cyrillic handled)")
+                    else:
+                        details.append(f"❌ artist: expected string, got {type(artist)}")
+                        success = False
+                    
                     # Check tracks array
                     if isinstance(tracks, list):
                         details.append(f"✅ tracks: array with {len(tracks)} items")
+                        
+                        # Check if we got some tracks (cyrillic search should work)
+                        if tracks:
+                            details.append("✅ cyrillic search returned results")
+                            
+                            # Validate first track structure
+                            track = tracks[0]
+                            required_track_fields = ["id", "artist", "title", "duration", "stream_url"]
+                            track_missing = [field for field in required_track_fields if field not in track]
+                            
+                            if not track_missing:
+                                details.append("✅ track structure: all required fields present")
+                            else:
+                                details.append(f"❌ track structure: missing fields {track_missing}")
+                                success = False
+                        else:
+                            details.append("ℹ️  tracks: empty array (no tracks found for cyrillic artist)")
                     else:
                         details.append(f"❌ tracks: expected array, got {type(tracks)}")
                         success = False
                     
-                    # Check has_more boolean
-                    if isinstance(has_more, bool):
-                        details.append(f"✅ has_more: {has_more}")
-                    else:
-                        details.append(f"❌ has_more: expected boolean, got {type(has_more)}")
-                        success = False
-                    
                     # Check count field
-                    if isinstance(count, int):
-                        details.append(f"✅ count: {count}")
+                    if isinstance(response_count, int) and response_count >= 0:
+                        details.append(f"✅ count: {response_count}")
                     else:
-                        details.append(f"❌ count: expected integer, got {type(count)}")
+                        details.append(f"❌ count: expected non-negative integer, got {type(response_count)}")
                         success = False
-                    
-                    # Check offset
-                    if offset == 28:
-                        details.append(f"✅ offset: {offset}")
-                    else:
-                        details.append(f"ℹ️  offset: {offset} (expected 28)")
                     
                     self.log_result(
-                        "Pagination load - Response structure",
+                        "Cyrillic artist request - Моргенштерн",
                         success,
                         "; ".join(details),
-                        {"tracks_count": len(tracks), "has_more": has_more, "count": count, "offset": offset}
+                        {"artist": artist, "tracks_count": len(tracks), "count": response_count}
                     )
                 else:
                     self.log_result(
-                        "Pagination load - Response structure",
+                        "Cyrillic artist request - Моргенштерн",
                         False,
                         f"Missing required fields: {missing_fields}",
                         data
@@ -199,7 +257,7 @@ class MusicArtistTester:
                 except:
                     data = response.text
                 self.log_result(
-                    "Pagination load - HTTP Response",
+                    "Cyrillic artist request - Моргенштерн",
                     False,
                     f"Unexpected status code: {response.status_code}",
                     data
@@ -207,72 +265,76 @@ class MusicArtistTester:
                 
         except Exception as e:
             self.log_result(
-                "Pagination load - Request",
+                "Cyrillic artist request - Моргенштерн",
                 False,
                 f"Request failed: {str(e)}"
             )
-    
-    def test_end_of_list(self):
-        """Test end of list: GET /api/music/my?count=30&offset=500"""
-        print("🔚 Testing end of list (count=30, offset=500)...")
+
+    def test_nonexistent_artist_request(self):
+        """Test non-existent artist: GET /api/music/artist/xxxxxxxxxnonexistent?count=5"""
+        print("❓ Testing non-existent artist request (xxxxxxxxxnonexistent, count=5)...")
+        
+        artist_name = "xxxxxxxxxnonexistent"
+        count = 5
         
         try:
-            response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset=500")
+            # URL encode the artist name
+            encoded_artist = urllib.parse.quote(artist_name)
+            response = self.session.get(f"{BACKEND_URL}/music/artist/{encoded_artist}?count={count}")
             
             if response.status_code == 200:
                 data = response.json()
                 
                 # Check response structure
-                required_fields = ["tracks", "has_more", "count"]
+                required_fields = ["artist", "tracks", "count"]
                 missing_fields = [field for field in required_fields if field not in data]
                 
                 if not missing_fields:
+                    artist = data.get("artist")
                     tracks = data.get("tracks", [])
-                    has_more = data.get("has_more")
-                    count = data.get("count")
+                    response_count = data.get("count")
                     
-                    # Validate end of list behavior
+                    # Validate response structure for non-existent artist
                     success = True
                     details = []
                     
-                    # Check tracks array - should be empty or very small
+                    # Check artist field
+                    if isinstance(artist, str):
+                        details.append(f"✅ artist: '{artist}'")
+                    else:
+                        details.append(f"❌ artist: expected string, got {type(artist)}")
+                        success = False
+                    
+                    # Check tracks array - should be empty or very few results
                     if isinstance(tracks, list):
                         if len(tracks) == 0:
-                            details.append("✅ tracks: empty array (expected for high offset)")
+                            details.append("✅ tracks: empty array (expected for non-existent artist)")
                         else:
-                            details.append(f"ℹ️  tracks: {len(tracks)} items (may have some tracks at high offset)")
+                            details.append(f"ℹ️  tracks: {len(tracks)} items (some results found despite non-existent artist)")
                     else:
                         details.append(f"❌ tracks: expected array, got {type(tracks)}")
                         success = False
                     
-                    # Check has_more - should be false for high offset
-                    if isinstance(has_more, bool):
-                        if not has_more:
-                            details.append("✅ has_more: false (expected for high offset)")
-                        else:
-                            details.append("ℹ️  has_more: true (may still have more tracks)")
-                    else:
-                        details.append(f"❌ has_more: expected boolean, got {type(has_more)}")
-                        success = False
-                    
                     # Check count field
-                    if isinstance(count, int):
-                        details.append(f"✅ count: {count}")
-                        if count == len(tracks):
+                    if isinstance(response_count, int) and response_count >= 0:
+                        details.append(f"✅ count: {response_count}")
+                        if response_count == len(tracks):
                             details.append("✅ count matches tracks array length")
+                        else:
+                            details.append(f"⚠️  count ({response_count}) != tracks length ({len(tracks)})")
                     else:
-                        details.append(f"❌ count: expected integer, got {type(count)}")
+                        details.append(f"❌ count: expected non-negative integer, got {type(response_count)}")
                         success = False
                     
                     self.log_result(
-                        "End of list - Response structure",
+                        "Non-existent artist request - xxxxxxxxxnonexistent",
                         success,
                         "; ".join(details),
-                        {"tracks_count": len(tracks), "has_more": has_more, "count": count}
+                        {"artist": artist, "tracks_count": len(tracks), "count": response_count}
                     )
                 else:
                     self.log_result(
-                        "End of list - Response structure",
+                        "Non-existent artist request - xxxxxxxxxnonexistent",
                         False,
                         f"Missing required fields: {missing_fields}",
                         data
@@ -283,7 +345,7 @@ class MusicArtistTester:
                 except:
                     data = response.text
                 self.log_result(
-                    "End of list - HTTP Response",
+                    "Non-existent artist request - xxxxxxxxxnonexistent",
                     False,
                     f"Unexpected status code: {response.status_code}",
                     data
@@ -291,78 +353,7 @@ class MusicArtistTester:
                 
         except Exception as e:
             self.log_result(
-                "End of list - Request",
-                False,
-                f"Request failed: {str(e)}"
-            )
-    
-    def test_has_more_logic(self):
-        """Test has_more field logic by making sequential requests"""
-        print("🔄 Testing has_more field logic with sequential requests...")
-        
-        try:
-            # Test multiple offsets to understand has_more behavior
-            offsets_to_test = [0, 30, 60, 90, 120]
-            results = []
-            
-            for offset in offsets_to_test:
-                response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset={offset}")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    tracks = data.get("tracks", [])
-                    has_more = data.get("has_more")
-                    count = data.get("count")
-                    
-                    results.append({
-                        "offset": offset,
-                        "tracks_count": len(tracks),
-                        "has_more": has_more,
-                        "count": count
-                    })
-                else:
-                    results.append({
-                        "offset": offset,
-                        "error": f"HTTP {response.status_code}"
-                    })
-            
-            # Analyze results
-            success = True
-            details = []
-            
-            for i, result in enumerate(results):
-                if "error" in result:
-                    details.append(f"❌ Offset {result['offset']}: {result['error']}")
-                    success = False
-                else:
-                    offset = result["offset"]
-                    tracks_count = result["tracks_count"]
-                    has_more = result["has_more"]
-                    count = result["count"]
-                    
-                    # Check logic: if we got fewer tracks than requested and has_more is false, that's correct
-                    # If we got the full amount requested and has_more is true, that's also correct
-                    if tracks_count < 30 and not has_more:
-                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=false (correct - end reached)")
-                    elif tracks_count == 30 and has_more:
-                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=true (correct - more available)")
-                    elif tracks_count == 30 and not has_more:
-                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=false (correct - exactly at end)")
-                    elif tracks_count == 0 and not has_more:
-                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=false (correct - beyond end)")
-                    else:
-                        details.append(f"ℹ️  Offset {offset}: {tracks_count} tracks, has_more={has_more}")
-            
-            self.log_result(
-                "has_more logic - Sequential requests",
-                success,
-                "; ".join(details),
-                results
-            )
-                
-        except Exception as e:
-            self.log_result(
-                "has_more logic - Sequential requests",
+                "Non-existent artist request - xxxxxxxxxnonexistent",
                 False,
                 f"Request failed: {str(e)}"
             )
