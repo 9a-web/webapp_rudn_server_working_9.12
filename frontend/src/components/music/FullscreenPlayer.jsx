@@ -33,7 +33,16 @@ export const FullscreenPlayer = ({ isOpen, onClose }) => {
 
   const [showVolume, setShowVolume] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const progressBarRef = useRef(null);
+  const constraintsRef = useRef(null);
+  
+  // Motion value для отслеживания позиции свайпа
+  const dragY = useMotionValue(0);
+  
+  // Трансформации для анимации при свайпе
+  const backgroundOpacity = useTransform(dragY, [0, 300], [1, 0.3]);
+  const scale = useTransform(dragY, [0, 300], [1, 0.92]);
 
   // Форматирование времени
   const formatTime = (sec) => {
