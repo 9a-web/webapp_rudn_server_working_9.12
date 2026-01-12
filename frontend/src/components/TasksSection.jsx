@@ -643,6 +643,37 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     setEditingText('');
   };
 
+  // Открыть модальное окно подтверждения удаления
+  const handleOpenDeleteConfirm = (task) => {
+    hapticFeedback && hapticFeedback('impact', 'medium');
+    setTaskToDelete(task);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // Закрыть модальное окно подтверждения удаления
+  const handleCloseDeleteConfirm = () => {
+    setIsDeleteConfirmOpen(false);
+    setTaskToDelete(null);
+    setIsDeleting(false);
+  };
+
+  // Подтвердить удаление задачи
+  const handleConfirmDelete = async () => {
+    if (!taskToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      hapticFeedback && hapticFeedback('impact', 'heavy');
+      await tasksAPI.deleteTask(taskToDelete.id);
+      setTasks(tasks.filter(t => t.id !== taskToDelete.id));
+      handleCloseDeleteConfirm();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      setIsDeleting(false);
+    }
+  };
+
+  // Старая функция удаления (оставлена для совместимости с планировщиком)
   const handleDeleteTask = async (taskId) => {
     try {
       hapticFeedback && hapticFeedback('impact', 'heavy');
