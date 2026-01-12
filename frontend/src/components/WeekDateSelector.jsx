@@ -132,9 +132,9 @@ export const WeekDateSelector = ({
   };
   
   return (
-    <div className="mb-2">
+    <div className="mb-2 -mx-2">
       {/* Контейнер с кнопками и датами - только горизонтальная прокрутка */}
-      <div className="flex items-center gap-2" style={{ touchAction: 'pan-x' }}>
+      <div className="flex items-center gap-2 px-2" style={{ touchAction: 'pan-x' }}>
         {/* Кнопка предыдущей недели */}
         <motion.button
           onClick={handlePreviousWeek}
@@ -157,15 +157,16 @@ export const WeekDateSelector = ({
         
         {/* Контейнер с горизонтальной прокруткой (только по горизонтали) */}
         <div 
-          className="flex-1 overflow-x-auto overflow-y-visible scrollbar-hide"
+          className="flex-1 overflow-x-auto scrollbar-hide"
           style={{ 
             overscrollBehaviorX: 'contain',
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
-            msOverflowStyle: 'none'
+            msOverflowStyle: 'none',
+            clipPath: 'inset(-10px -10px -10px -10px)'
           }}
         >
-          <div className="flex gap-2 min-w-max py-2" style={{ touchAction: 'pan-x' }}>
+          <div className="flex gap-2 min-w-max py-3 px-1" style={{ touchAction: 'pan-x' }}>
             {weekDates.map((date, index) => {
             const past = isPastDay(date);
             const today = isToday(date);
