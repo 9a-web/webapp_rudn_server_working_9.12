@@ -1113,7 +1113,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       />
 
       {/* Переключатель вида (Список дел / Распорядок дня) */}
-      <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 mt-[12px]">
+      <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 mt-[7px]">
         <button
           onClick={() => {
             setActiveView('todo');
