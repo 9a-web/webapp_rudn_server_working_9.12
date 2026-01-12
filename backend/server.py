@@ -7072,11 +7072,13 @@ async def music_my_audio(count: int = 50, offset: int = 0):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/music/popular")
-async def music_popular(count: int = 30):
-    """Популярные треки"""
+async def music_popular(count: int = 30, offset: int = 0):
+    """Популярные треки с пагинацией"""
     try:
-        tracks = music_service.get_popular(count)
-        return {"tracks": tracks, "count": len(tracks)}
+        tracks = music_service.get_popular(count, offset)
+        # has_more = true если получили полный набор треков
+        has_more = len(tracks) == count
+        return {"tracks": tracks, "count": len(tracks), "has_more": has_more, "offset": offset}
     except Exception as e:
         logger.error(f"Music popular error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
