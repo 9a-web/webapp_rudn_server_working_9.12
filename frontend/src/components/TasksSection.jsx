@@ -226,13 +226,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
-   * Синхронизировать расписание в планировщик
+   * Открыть модальное окно для предварительного просмотра пар перед синхронизацией
    */
   const handleSyncSchedule = async () => {
     if (!user?.id) return;
     
     try {
-      setSyncingSchedule(true);
+      setSyncPreviewLoading(true);
+      setIsSyncPreviewOpen(true);
       hapticFeedback && hapticFeedback('impact', 'medium');
       
       // Определяем номер недели для выбранной даты
@@ -241,20 +242,57 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       
       const dateString = formatDateToYYYYMMDD(tasksSelectedDate);
       
-      const response = await plannerAPI.syncSchedule(user.id, dateString, parity);
+      // Получаем preview вместо синхронизации
+      const response = await plannerAPI.getPreview(user.id, dateString, parity);
       
       if (response.success) {
+        setSyncPreviewData(response);
+      }
+    } catch (error) {
+      console.error('Error loading sync preview:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+      
+      const errorMessage = error?.message || 'Не удалось загрузить расписание';
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert(errorMessage);
+      } else {
+        alert(errorMessage);
+      }
+      setIsSyncPreviewOpen(false);
+    } finally {
+      setSyncPreviewLoading(false);
+    }
+  };
+
+  /**
+   * Синхронизировать выбранные пары из модального окна
+   */
+  const handleSyncSelectedEvents = async (selectedEvents) => {
+    if (!user?.id || selectedEvents.length === 0) return;
+    
+    try {
+      setSyncingSchedule(true);
+      hapticFeedback && hapticFeedback('impact', 'heavy');
+      
+      const dateString = formatDateToYYYYMMDD(tasksSelectedDate);
+      
+      const response = await plannerAPI.syncSelected(user.id, dateString, selectedEvents);
+      
+      if (response.success) {
+        // Закрываем модальное окно
+        setIsSyncPreviewOpen(false);
+        setSyncPreviewData(null);
+        
         // Перезагружаем события после синхронизации
         await loadPlannerEvents(tasksSelectedDate);
-        await loadTasks(); // Обновляем также общий список задач
+        await loadTasks();
         
         const message = response.synced_count > 0 
-          ? `Синхронизировано ${response.synced_count} пар`
-          : 'На этот день нет пар в расписании';
+          ? `Добавлено ${response.synced_count} ${response.synced_count === 1 ? 'пара' : response.synced_count < 5 ? 'пары' : 'пар'}`
+          : 'Все выбранные пары уже были добавлены';
         
         hapticFeedback && hapticFeedback('notification', 'success');
         
-        // Показываем уведомление
         if (window.Telegram?.WebApp) {
           window.Telegram.WebApp.showAlert(message);
         } else {
@@ -262,10 +300,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         }
       }
     } catch (error) {
-      console.error('Error syncing schedule:', error);
+      console.error('Error syncing selected events:', error);
       hapticFeedback && hapticFeedback('notification', 'error');
       
-      const errorMessage = error?.message || 'Не удалось синхронизировать расписание';
+      const errorMessage = error?.message || 'Не удалось синхронизировать пары';
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert(errorMessage);
       } else {
