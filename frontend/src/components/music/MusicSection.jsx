@@ -50,37 +50,67 @@ export const MusicSection = ({ telegramId }) => {
     }
   };
 
-  const loadContent = async () => {
+  const loadContent = async (loadMore = false) => {
     if (activeTab === 'search') return;
 
-    setLoading(true);
+    if (loadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setOffset(0);
+      setHasMore(false);
+    }
+    
     try {
       switch (activeTab) {
         case 'my':
-          const my = await musicAPI.getMyAudio();
-          setTracks(my.tracks || []);
+          const currentOffset = loadMore ? offset : 0;
+          const my = await musicAPI.getMyAudio(TRACKS_PER_PAGE, currentOffset);
+          const newTracks = my.tracks || [];
+          
+          if (loadMore) {
+            setTracks(prev => [...prev, ...newTracks]);
+          } else {
+            setTracks(newTracks);
+          }
+          
+          setHasMore(my.has_more || newTracks.length === TRACKS_PER_PAGE);
+          setOffset(currentOffset + newTracks.length);
           break;
         case 'popular':
           const popular = await musicAPI.getPopular();
           setTracks(popular.tracks || []);
+          setHasMore(false);
           break;
         case 'playlists':
           const pl = await musicAPI.getPlaylists();
           setPlaylists(pl.playlists || []);
+          setHasMore(false);
           break;
         case 'favorites':
           await loadFavorites();
           setTracks(favorites);
+          setHasMore(false);
           break;
         default:
           break;
       }
     } catch (error) {
       console.error('Load content error:', error);
-      setTracks([]);
+      if (!loadMore) {
+        setTracks([]);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+    loadContent(true);
   };
 
   const handleFavorite = async (track) => {
