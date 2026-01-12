@@ -157,7 +157,7 @@ export const WeekDateSelector = ({
         
         {/* Контейнер с горизонтальной прокруткой (только по горизонтали) */}
         <div 
-          className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide"
+          className="flex-1 overflow-x-auto overflow-y-visible scrollbar-hide"
           style={{ 
             overscrollBehaviorX: 'contain',
             WebkitOverflowScrolling: 'touch',
@@ -165,7 +165,7 @@ export const WeekDateSelector = ({
             msOverflowStyle: 'none'
           }}
         >
-          <div className="flex gap-2 min-w-max" style={{ touchAction: 'pan-x' }}>
+          <div className="flex gap-2 min-w-max py-2" style={{ touchAction: 'pan-x' }}>
             {weekDates.map((date, index) => {
             const past = isPastDay(date);
             const today = isToday(date);
