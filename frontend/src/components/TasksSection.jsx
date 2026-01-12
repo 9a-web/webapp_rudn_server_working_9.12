@@ -81,6 +81,11 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [plannerLoading, setPlannerLoading] = useState(false);
   const [syncingSchedule, setSyncingSchedule] = useState(false);
   
+  // Модальное окно предварительного просмотра синхронизации
+  const [isSyncPreviewOpen, setIsSyncPreviewOpen] = useState(false);
+  const [syncPreviewData, setSyncPreviewData] = useState(null);
+  const [syncPreviewLoading, setSyncPreviewLoading] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
