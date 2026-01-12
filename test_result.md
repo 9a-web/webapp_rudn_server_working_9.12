@@ -59,6 +59,18 @@ frontend:
       - working: true
         agent: "testing"
         comment: "✅ Load More button should now appear correctly since backend API returns proper has_more=true when more tracks are available. The root cause (incorrect has_more calculation) has been fixed."
+  
+  - task: "Music Load More Track Duplication Fix"
+    implemented: true
+    working: true
+    file: "frontend/src/components/music/MusicSection.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Fixed track duplication issue when clicking 'Load More': 1) Changed offset from useState to useRef to avoid closure/stale state issues 2) Added loadingMoreRef to prevent double API calls on rapid clicks 3) Added track deduplication by ID when appending new tracks"
 
 metadata:
   created_by: "testing_agent"
