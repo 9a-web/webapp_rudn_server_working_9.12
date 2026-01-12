@@ -276,26 +276,27 @@ export const FullscreenPlayer = ({ isOpen, onClose }) => {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="flex items-center justify-center gap-6"
+              className="flex items-center justify-center gap-4"
             >
-              {/* Rewind 10s */}
+              {/* Shuffle */}
               <button
-                onClick={seekBackward}
-                className="p-2 text-white/60 hover:text-white active:scale-90 transition-all"
+                onClick={toggleShuffle}
+                className={`p-2 transition-all active:scale-90 ${
+                  shuffle 
+                    ? 'text-purple-400' 
+                    : 'text-white/40 hover:text-white/60'
+                }`}
               >
-                <div className="relative">
-                  <RotateCcw className="w-6 h-6" />
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">10</span>
-                </div>
+                <Shuffle className="w-5 h-5" />
               </button>
 
               {/* Previous */}
               <button
                 onClick={prev}
-                disabled={queueIndex <= 0}
+                disabled={queueIndex <= 0 && repeatMode !== 'queue'}
                 className="p-3 text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <SkipBack className="w-8 h-8 fill-current" />
+                <SkipBack className="w-7 h-7 fill-current" />
               </button>
 
               {/* Play/Pause */}
@@ -316,23 +317,40 @@ export const FullscreenPlayer = ({ isOpen, onClose }) => {
               {/* Next */}
               <button
                 onClick={next}
-                disabled={queue.length === 0 || queueIndex >= queue.length - 1}
+                disabled={(queue.length === 0 || queueIndex >= queue.length - 1) && repeatMode !== 'queue'}
                 className="p-3 text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <SkipForward className="w-8 h-8 fill-current" />
+                <SkipForward className="w-7 h-7 fill-current" />
               </button>
 
-              {/* Forward 10s */}
+              {/* Repeat */}
               <button
-                onClick={seekForward}
-                className="p-2 text-white/60 hover:text-white active:scale-90 transition-all"
+                onClick={toggleRepeat}
+                className={`p-2 transition-all active:scale-90 relative ${
+                  repeatMode !== 'off' 
+                    ? 'text-purple-400' 
+                    : 'text-white/40 hover:text-white/60'
+                }`}
               >
-                <div className="relative">
-                  <RotateCw className="w-6 h-6" />
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold">10</span>
-                </div>
+                <Repeat className="w-5 h-5" />
+                {repeatMode === 'track' && (
+                  <span className="absolute -top-0.5 -right-0.5 text-[9px] font-bold text-purple-400">1</span>
+                )}
               </button>
             </motion.div>
+
+            {/* Repeat mode indicator */}
+            {repeatMode !== 'off' && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 text-center"
+              >
+                <span className="text-xs text-purple-400/80 bg-purple-400/10 px-3 py-1 rounded-full">
+                  {repeatMode === 'track' ? '🔂 Повтор трека' : '🔁 Повтор очереди'}
+                </span>
+              </motion.div>
+            )}
           </div>
 
           {/* Queue indicator */}
