@@ -376,6 +376,149 @@ export const EditTaskModal = ({
                 </div>
               )}
 
+              {/* Подзадачи (чек-лист) */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-[#1C1C1E] flex items-center gap-1.5 sm:gap-2">
+                    <ListChecks className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    Подзадачи
+                  </label>
+                  {subtasks.length > 0 && (
+                    <span className="text-xs text-gray-500">
+                      {subtasks.filter(s => s.completed).length} / {subtasks.length}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Прогресс-бар */}
+                {subtasks.length > 0 && (
+                  <div className="mb-3">
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${subtasksProgress}%` }}
+                        transition={{ duration: 0.3, ease: 'easeOut' }}
+                        className={`h-full rounded-full ${
+                          subtasksProgress === 100
+                            ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                            : 'bg-gradient-to-r from-blue-400 to-blue-500'
+                        }`}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 text-right">{subtasksProgress}% выполнено</p>
+                  </div>
+                )}
+                
+                {/* Список подзадач */}
+                {subtasks.length > 0 && (
+                  <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                    <AnimatePresence>
+                      {subtasks.map((subtask) => (
+                        <motion.div
+                          key={subtask.subtask_id}
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl group"
+                        >
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => handleToggleSubtask(subtask)}
+                            disabled={saving}
+                            className={`
+                              flex-shrink-0 w-5 h-5 rounded-md border-2 
+                              flex items-center justify-center transition-all
+                              touch-manipulation active:scale-95
+                              ${subtask.completed
+                                ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500'
+                                : 'bg-white border-gray-300 hover:border-blue-400'
+                              }
+                              disabled:opacity-50
+                            `}
+                          >
+                            {subtask.completed && (
+                              <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                            )}
+                          </button>
+                          
+                          {/* Название */}
+                          <span className={`
+                            flex-1 text-sm
+                            ${subtask.completed 
+                              ? 'line-through text-gray-400' 
+                              : 'text-[#1C1C1E]'
+                            }
+                          `}>
+                            {subtask.title}
+                          </span>
+                          
+                          {/* Кнопка удаления */}
+                          <button
+                            onClick={() => handleDeleteSubtask(subtask.subtask_id)}
+                            disabled={saving}
+                            className="flex-shrink-0 p-1 rounded-md
+                                     text-gray-400 hover:text-red-500 hover:bg-red-50
+                                     transition-colors touch-manipulation active:scale-95
+                                     opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
+                
+                {/* Поле добавления новой подзадачи */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-2 px-3 py-2
+                               bg-gray-50 border border-gray-200 rounded-xl
+                               focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100
+                               transition-all">
+                    <Plus className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={newSubtaskTitle}
+                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                      onKeyDown={handleSubtaskKeyDown}
+                      placeholder="Добавить подзадачу..."
+                      maxLength={100}
+                      disabled={addingSubtask || saving}
+                      className="flex-1 bg-transparent text-[#1C1C1E] text-sm
+                               placeholder-gray-400 focus:outline-none
+                               disabled:opacity-50"
+                    />
+                  </div>
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleAddSubtask}
+                    disabled={!newSubtaskTitle.trim() || addingSubtask || saving}
+                    className="p-2.5 rounded-xl
+                             bg-gradient-to-r from-blue-400 to-blue-500
+                             text-white disabled:opacity-30 disabled:cursor-not-allowed
+                             hover:from-blue-500 hover:to-blue-600
+                             active:scale-95 transition-all touch-manipulation"
+                  >
+                    {addingSubtask ? (
+                      <motion.div 
+                        className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      />
+                    ) : (
+                      <Plus className="w-5 h-5" />
+                    )}
+                  </motion.button>
+                </div>
+                
+                {subtasks.length === 0 && (
+                  <p className="text-xs text-gray-400 mt-2 text-center">
+                    Добавьте подзадачи для отслеживания прогресса
+                  </p>
+                )}
+              </div>
+
             </form>
           </div>
 
