@@ -667,6 +667,42 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     }
   };
 
+  // Открыть inline поле для добавления подзадачи
+  const handleOpenInlineSubtask = (task) => {
+    setAddingSubtaskForTaskId(task.id);
+    setNewSubtaskText('');
+    hapticFeedback && hapticFeedback('impact', 'light');
+  };
+
+  // Закрыть inline поле для добавления подзадачи
+  const handleCloseInlineSubtask = () => {
+    setAddingSubtaskForTaskId(null);
+    setNewSubtaskText('');
+  };
+
+  // Добавить подзадачу через inline поле
+  const handleAddSubtaskInline = async (taskId) => {
+    const trimmedText = newSubtaskText.trim();
+    if (!trimmedText || savingSubtask) return;
+
+    try {
+      setSavingSubtask(true);
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      
+      const updatedTask = await tasksAPI.addSubtask(taskId, trimmedText);
+      setTasks(tasks.map(t => t.id === taskId ? updatedTask : t));
+      setNewSubtaskText('');
+      // Оставляем поле открытым для возможности добавить ещё подзадачи
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error adding subtask:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+    } finally {
+      setSavingSubtask(false);
+    }
+  };
+
 
   // Шаблоны быстрых задач
   const quickActionTemplates = [
