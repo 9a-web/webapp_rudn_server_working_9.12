@@ -378,6 +378,15 @@ class BotInfo(BaseModel):
 
 # ============ Модели для списка дел ============
 
+class TaskSubtask(BaseModel):
+    """Подзадача для личной задачи"""
+    subtask_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    completed: bool = False
+    completed_at: Optional[datetime] = None
+    order: int = 0
+
+
 class Task(BaseModel):
     """Модель задачи"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -394,6 +403,9 @@ class Task(BaseModel):
     subject: Optional[str] = None  # Привязка к предмету из расписания
     discipline_id: Optional[str] = None  # ID дисциплины (для интеграции с расписанием)
     notes: Optional[str] = None  # Заметки/описание
+    
+    # Подзадачи (чек-листы)
+    subtasks: List[TaskSubtask] = []
     
     # Planner fields
     time_start: Optional[str] = None  # HH:MM
