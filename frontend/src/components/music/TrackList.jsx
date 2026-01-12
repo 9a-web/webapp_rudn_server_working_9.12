@@ -8,6 +8,7 @@ export const TrackList = ({
   loading = false, 
   favorites = [],
   onFavorite,
+  onArtistClick,
   emptyMessage = 'Треки не найдены'
 }) => {
   const favoriteIds = new Set(favorites.map(f => f.id));
