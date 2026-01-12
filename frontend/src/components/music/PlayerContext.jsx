@@ -81,6 +81,8 @@ export const PlayerProvider = ({ children }) => {
   const [queueIndex, setQueueIndex] = useState(0);
   const [volume, setVolume] = useState(1);
   const [error, setError] = useState(null);
+  const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'track' | 'queue'
+  const [shuffle, setShuffle] = useState(false);
   
   // Кэш для сгенерированных обложек
   const coverCacheRef = useRef({});
