@@ -27,9 +27,10 @@ export const musicAPI = {
   /**
    * Получить мои аудиозаписи
    * @param {number} count - Количество треков
+   * @param {number} offset - Смещение для пагинации
    */
-  getMyAudio: async (count = 50) => {
-    const response = await api.get(`/music/my?count=${count}`);
+  getMyAudio: async (count = 50, offset = 0) => {
+    const response = await api.get(`/music/my?count=${count}&offset=${offset}`);
     return response.data;
   },
 
