@@ -541,6 +541,7 @@ export const PlayerProvider = ({ children }) => {
     error,
     play,
     pause,
+    stop, // Полная остановка и закрытие плеера
     toggle,
     next,
     prev,
