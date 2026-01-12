@@ -164,11 +164,22 @@ class VKMusicService:
             logger.error(f"Get my audio error: {e}")
             return []
     
-    def get_popular(self, count: int = 30) -> List[dict]:
-        """Получение популярных треков"""
+    def get_popular(self, count: int = 30, offset: int = 0) -> List[dict]:
+        """Получение популярных треков с пагинацией"""
         try:
-            # Ищем популярное через текстовый запрос
-            tracks = self.service.search_songs_by_text("популярное 2025", count=count)
+            # Используем разные запросы для разных страниц чтобы получить разнообразные треки
+            queries = [
+                "популярное 2025",
+                "хиты 2025",
+                "топ чарт россия",
+                "новинки музыки",
+                "тренды музыка"
+            ]
+            # Выбираем запрос на основе offset
+            query_index = (offset // count) % len(queries)
+            query = queries[query_index]
+            
+            tracks = self.service.search_songs_by_text(query, count=count)
             return [self._track_to_dict(t) for t in tracks]
         except Exception as e:
             logger.error(f"Get popular error: {e}")
