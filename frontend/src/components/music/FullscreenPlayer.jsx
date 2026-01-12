@@ -143,19 +143,36 @@ export const FullscreenPlayer = ({ isOpen, onClose }) => {
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          ref={constraintsRef}
           initial={{ y: '100%' }}
-          animate={{ y: 0 }}
+          animate={{ y: 0, scale: 1 }}
           exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed inset-0 z-50 flex flex-col"
-          style={{
+          drag="y"
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0, bottom: 0.5 }}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          style={{ 
+            y: dragY,
+            scale: isDragging ? scale : 1,
             backgroundColor: '#0a0a0b',
           }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="fixed inset-0 z-50 flex flex-col touch-none"
         >
+          {/* Drag handle indicator - подсказка о свайпе */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20">
+            <motion.div 
+              className="w-10 h-1 bg-white/30 rounded-full"
+              animate={{ opacity: isDragging ? 1 : 0.5 }}
+            />
+          </div>
+
           {/* Background gradient */}
-          <div 
-            className="absolute inset-0 opacity-60"
+          <motion.div 
+            className="absolute inset-0"
             style={{
+              opacity: isDragging ? backgroundOpacity : 0.6,
               background: 'radial-gradient(ellipse at 50% 0%, rgba(139, 92, 246, 0.3) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.2) 0%, transparent 40%)'
             }}
           />
