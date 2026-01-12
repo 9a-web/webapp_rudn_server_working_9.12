@@ -162,6 +162,33 @@ export const PlayerProvider = ({ children }) => {
   }, [duration, progress]);
 
   /**
+   * Сброс позиции Media Session при смене трека
+   * Вызывается в начале воспроизведения нового трека
+   */
+  const resetMediaSessionPositionState = useCallback((newDuration = 0) => {
+    if (!('mediaSession' in navigator)) return;
+    
+    try {
+      if ('setPositionState' in navigator.mediaSession) {
+        if (newDuration > 0) {
+          navigator.mediaSession.setPositionState({
+            duration: newDuration,
+            playbackRate: 1,
+            position: 0
+          });
+        } else {
+          // Сбрасываем состояние позиции (iOS/Android покажут индикатор загрузки)
+          navigator.mediaSession.setPositionState(null);
+        }
+        console.log('🎵 Media Session position reset, duration:', newDuration);
+      }
+    } catch (e) {
+      // Игнорируем ошибки - некоторые браузеры не поддерживают setPositionState(null)
+      console.log('⚠️ Media Session position reset failed:', e.message);
+    }
+  }, []);
+
+  /**
    * Получение прямой ссылки на трек
    * Если url уже есть (например, из избранного) - используем его
    * Иначе запрашиваем через API
