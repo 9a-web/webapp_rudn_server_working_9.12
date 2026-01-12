@@ -120,9 +120,26 @@ export const TrackCard = ({
         }`}>
           {track.title}
         </p>
-        <p className={`text-xs truncate ${isBlocked ? 'text-red-400/60' : 'text-white/60'}`}>
-          {isBlocked ? 'Заблокировано правообладателем' : track.artist}
-        </p>
+        {isBlocked ? (
+          <p className="text-xs truncate text-red-400/60">
+            Заблокировано правообладателем
+          </p>
+        ) : (
+          <p 
+            className="text-xs truncate text-white/60 hover:text-purple-400 cursor-pointer transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onArtistClick && track.artist) {
+                if (window.Telegram?.WebApp?.HapticFeedback) {
+                  window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                }
+                onArtistClick(track.artist);
+              }
+            }}
+          >
+            {track.artist}
+          </p>
+        )}
       </div>
 
       {/* Duration */}
