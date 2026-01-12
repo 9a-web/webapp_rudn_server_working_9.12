@@ -127,14 +127,14 @@ const TimelineEventCard = ({
         </div>
       </motion.div>
 
-      {/* Модальное окно с подробной информацией */}
-      <AnimatePresence>
-        {isExpanded && (
+      {/* Модальное окно с подробной информацией - рендерится через Portal */}
+      {isExpanded && createPortal(
+        <AnimatePresence>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
             onClick={() => setIsExpanded(false)}
           >
             <motion.div
@@ -286,8 +286,9 @@ const TimelineEventCard = ({
               )}
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 };
