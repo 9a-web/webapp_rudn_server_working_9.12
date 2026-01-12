@@ -1607,21 +1607,48 @@ const TodayTaskItem = ({
                 <GripVertical className="w-4 h-4 text-gray-400 hover:text-yellow-500 transition-colors pointer-events-none" />
               </div>
               
-              {/* Checkbox */}
-              <div 
-                onClick={() => onToggle(task.id)}
-                className={`
-                  w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center transition-all duration-200 mt-0.5 cursor-pointer
-                  ${task.completed 
-                    ? 'bg-gradient-to-br from-yellow-400 to-orange-400' 
-                    : 'bg-white border-2 border-[#E5E5E5] group-hover:border-yellow-400'
-                  }
-                `}
-              >
-                {task.completed && (
-                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                )}
-              </div>
+              {/* Checkbox с анимацией когда все подзадачи выполнены */}
+              {(() => {
+                const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+                const allSubtasksCompleted = hasSubtasks && task.subtasks.every(s => s.completed);
+                const shouldPulse = !task.completed && allSubtasksCompleted;
+                
+                return (
+                  <motion.div 
+                    onClick={() => onToggle(task.id)}
+                    animate={shouldPulse ? {
+                      scale: [1, 1.2, 1],
+                      boxShadow: [
+                        '0 0 0 0 rgba(251, 191, 36, 0)',
+                        '0 0 0 6px rgba(251, 191, 36, 0.3)',
+                        '0 0 0 0 rgba(251, 191, 36, 0)'
+                      ]
+                    } : {}}
+                    transition={shouldPulse ? {
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: 'easeInOut'
+                    } : {}}
+                    className={`
+                      w-4 h-4 rounded-md flex-shrink-0 flex items-center justify-center transition-all duration-200 mt-0.5 cursor-pointer
+                      ${task.completed 
+                        ? 'bg-gradient-to-br from-yellow-400 to-orange-400' 
+                        : shouldPulse
+                          ? 'bg-gradient-to-br from-green-400 to-emerald-500 border-0'
+                          : 'bg-white border-2 border-[#E5E5E5] group-hover:border-yellow-400'
+                      }
+                    `}
+                    title={shouldPulse ? 'Все подзадачи выполнены! Нажмите, чтобы завершить задачу' : ''}
+                  >
+                    {task.completed && (
+                      <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                    )}
+                    {shouldPulse && !task.completed && (
+                      <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                    )}
+                  </motion.div>
+                );
+              })()}
 
               {/* Текст задачи */}
               <div className="flex-1 min-w-0">
