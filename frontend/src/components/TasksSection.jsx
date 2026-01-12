@@ -1547,8 +1547,12 @@ const TodayTaskItem = ({
       dragControls={dragControls}
       className="mb-2"
       style={{ listStyle: 'none' }}
-      layout
-      layoutId={task.id}
+      whileDrag={{ 
+        scale: 1.02, 
+        boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+        zIndex: 50 
+      }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Контент задачи */}
       <div className="relative bg-white rounded-lg p-2 group shadow-sm"
