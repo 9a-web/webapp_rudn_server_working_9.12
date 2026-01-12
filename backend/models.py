@@ -521,6 +521,58 @@ class PlannerDayResponse(BaseModel):
     total_count: int
 
 
+# ============ Модели для предварительного просмотра синхронизации ============
+
+class ScheduleEventPreview(BaseModel):
+    """Пара из расписания для предварительного просмотра"""
+    id: str  # Уникальный идентификатор события (generated)
+    discipline: str  # Название предмета
+    time: str  # Время (полное, например "10:00-11:30")
+    time_start: str  # Время начала
+    time_end: str  # Время окончания
+    teacher: Optional[str] = None
+    auditory: Optional[str] = None
+    lessonType: Optional[str] = None
+    selected: bool = True  # Выбрано ли для синхронизации
+    already_synced: bool = False  # Уже синхронизировано
+
+
+class PlannerPreviewRequest(BaseModel):
+    """Запрос предварительного просмотра пар для синхронизации"""
+    telegram_id: int
+    date: str  # YYYY-MM-DD
+    week_number: int = 1
+
+
+class PlannerPreviewResponse(BaseModel):
+    """Ответ с предварительным списком пар для синхронизации"""
+    success: bool
+    date: str
+    day_name: str  # День недели на русском
+    events: List[ScheduleEventPreview]
+    total_count: int
+    already_synced_count: int
+    message: str
+
+
+class ScheduleEventToSync(BaseModel):
+    """Событие для синхронизации (может быть отредактировано)"""
+    id: str  # Идентификатор из preview
+    discipline: str
+    time_start: str
+    time_end: str
+    teacher: Optional[str] = None
+    auditory: Optional[str] = None
+    lessonType: Optional[str] = None
+
+
+class PlannerSyncSelectedRequest(BaseModel):
+    """Запрос синхронизации выбранных пар"""
+    telegram_id: int
+    date: str  # YYYY-MM-DD
+    events: List[ScheduleEventToSync]
+
+
 # ============ Модели для групповых задач ============
 
 class GroupTaskParticipant(BaseModel):
