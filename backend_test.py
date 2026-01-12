@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Music Artist API Testing
-Testing the music artist API `/api/music/artist/{artist_name}` endpoint
+Planner Sync API Testing
+Testing the planner sync API `/api/planner/sync` endpoint
 Based on review request requirements
 """
 
