@@ -269,6 +269,7 @@ export const MusicSection = ({ telegramId }) => {
               loading={loading}
               favorites={favorites}
               onFavorite={handleFavorite}
+              onArtistClick={handleArtistClick}
               emptyMessage={
                 activeTab === 'favorites' 
                   ? 'Нет избранных треков' 
