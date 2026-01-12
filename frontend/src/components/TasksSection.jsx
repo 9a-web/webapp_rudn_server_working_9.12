@@ -1398,6 +1398,20 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         selectedDate={tasksSelectedDate}
       />
 
+      {/* Модальное окно предварительного просмотра синхронизации пар */}
+      <SyncPreviewModal
+        isOpen={isSyncPreviewOpen}
+        onClose={() => {
+          setIsSyncPreviewOpen(false);
+          setSyncPreviewData(null);
+        }}
+        previewData={syncPreviewData}
+        onSync={handleSyncSelectedEvents}
+        isLoading={syncPreviewLoading}
+        isSyncing={syncingSchedule}
+        hapticFeedback={hapticFeedback}
+      />
+
       {/* Модальные окна комнат (СКРЫТО: измените SHOW_ROOMS_FEATURE на true, чтобы показать) */}
       {SHOW_ROOMS_FEATURE && (
         <>
