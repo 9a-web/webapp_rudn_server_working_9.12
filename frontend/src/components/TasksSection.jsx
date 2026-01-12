@@ -1716,6 +1716,78 @@ const TodayTaskItem = ({
                 </button>
               </div>
             </div>
+            
+            {/* Список существующих подзадач */}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <div className="space-y-1">
+                  {task.subtasks.map((subtask) => (
+                    <div 
+                      key={subtask.subtask_id}
+                      className="flex items-center gap-2 pl-6"
+                    >
+                      <div className={`
+                        w-3 h-3 rounded flex-shrink-0 flex items-center justify-center
+                        ${subtask.completed 
+                          ? 'bg-green-400' 
+                          : 'bg-white border border-gray-300'
+                        }
+                      `}>
+                        {subtask.completed && (
+                          <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                        )}
+                      </div>
+                      <span className={`text-xs ${subtask.completed ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
+                        {subtask.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Inline поле для добавления подзадачи */}
+            {isAddingSubtask && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-2 pl-6">
+                  <div className="w-3 h-3 rounded border border-gray-300 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={newSubtaskText}
+                    onChange={(e) => setNewSubtaskText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSubtaskText.trim()) {
+                        onSaveSubtask(task.id);
+                      } else if (e.key === 'Escape') {
+                        onCancelSubtask();
+                      }
+                    }}
+                    placeholder="Название подзадачи..."
+                    className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-yellow-400 focus:bg-white"
+                    autoFocus
+                    disabled={savingSubtask}
+                  />
+                  <button
+                    onClick={() => onSaveSubtask(task.id)}
+                    disabled={!newSubtaskText.trim() || savingSubtask}
+                    className="p-1 text-green-600 hover:bg-green-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingSubtask ? (
+                      <div className="w-3 h-3 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check className="w-3 h-3" />
+                    )}
+                  </button>
+                  <button
+                    onClick={onCancelSubtask}
+                    className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                    disabled={savingSubtask}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
