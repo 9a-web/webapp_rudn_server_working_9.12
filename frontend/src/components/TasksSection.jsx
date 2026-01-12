@@ -1498,7 +1498,13 @@ const TodayTaskItem = ({
   onToggle,
   onStartEdit,  // Для inline редактирования по двойному клику
   onEdit,       // Для открытия модального окна EditTaskModal
-  onAddSubtask, // Для быстрого добавления подзадачи
+  onAddSubtask, // Для открытия inline поля добавления подзадачи
+  isAddingSubtask, // Флаг: показывать ли поле ввода подзадачи
+  newSubtaskText,  // Текст новой подзадачи
+  setNewSubtaskText, // Сеттер текста подзадачи
+  onSaveSubtask, // Сохранить подзадачу
+  onCancelSubtask, // Закрыть поле ввода
+  savingSubtask, // Флаг: идёт сохранение
   onSaveEdit,
   onCancelEdit,
   onDelete,
