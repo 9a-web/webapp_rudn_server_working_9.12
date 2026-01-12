@@ -404,7 +404,7 @@ class MusicPaginationTester:
 
 def main():
     """Main test runner"""
-    tester = LKRUDNTester()
+    tester = MusicPaginationTester()
     success = tester.run_all_tests()
     return 0 if success else 1
 
