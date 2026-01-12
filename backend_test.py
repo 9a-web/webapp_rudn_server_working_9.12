@@ -14,7 +14,7 @@ from datetime import datetime
 # Configuration - Using production backend URL
 BACKEND_URL = "https://rudn-schedule.ru/api"
 
-class MusicPaginationTester:
+class MusicArtistTester:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
