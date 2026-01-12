@@ -47,6 +47,78 @@ backend:
         agent: "testing"
         comment: "✅ has_more logic test PASSED - Sequential requests with different offsets (0,30,60,90,120) show correct has_more behavior. The VK API integration properly checks for next page existence to determine has_more field."
 
+  - task: "Tasks Subtasks API - Create Task"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Task creation test PASSED - POST /api/tasks successfully creates task with telegram_id 123456789 and text 'Тестовая задача с подзадачами'. Returns proper task structure with subtasks_progress=0, subtasks_total=0."
+
+  - task: "Tasks Subtasks API - Add Subtasks"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Add subtasks test PASSED - POST /api/tasks/{task_id}/subtasks successfully adds subtasks 'Подзадача 1' and 'Подзадача 2'. Progress calculation works correctly: 0% with 1 subtask, then 0% with 2 subtasks total."
+
+  - task: "Tasks Subtasks API - Complete Subtasks"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Complete subtasks test PASSED - PUT /api/tasks/{task_id}/subtasks/{subtask_id} with completed=true works correctly. Progress updates: 50% (1/2 completed), then 100% (2/2 completed). Completion timestamps are properly recorded."
+
+  - task: "Tasks Subtasks API - Delete Subtask"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Delete subtask test PASSED - DELETE /api/tasks/{task_id}/subtasks/{subtask_id} successfully removes subtask. Progress recalculates correctly: subtasks_total=1 after deletion, progress remains 100% (1/1 completed)."
+
+  - task: "Tasks Subtasks API - Get All Tasks"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Get all tasks test PASSED - GET /api/tasks/{telegram_id} returns task list with preserved subtasks progress. Task found with correct subtasks array and progress statistics (100%, 1 subtask remaining)."
+
+  - task: "Tasks Subtasks API - Full Integration"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Full integration test PASSED - All 8 test scenarios completed successfully: create task, add 2 subtasks, complete both subtasks, delete 1 subtask, verify persistence, cleanup. Progress bar calculation works correctly throughout all operations."
+
 frontend:
   - task: "Music Load More Button Display"
     implemented: true
