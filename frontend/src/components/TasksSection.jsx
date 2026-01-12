@@ -1802,7 +1802,7 @@ const TodayTaskItem = ({
                 <button
                   onClick={() => {
                     hapticFeedback && hapticFeedback('impact', 'medium');
-                    onDelete(task.id);
+                    onDelete();
                   }}
                   className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Удалить задачу"
