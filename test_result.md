@@ -153,11 +153,23 @@ frontend:
     file: "frontend/src/components/TasksSection.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "🔧 Fixed subtasks state sync issue in EditTaskModal: Added missing onTaskUpdated callback prop to EditTaskModal in TasksSection.jsx. This callback updates the tasks list and editingTask state when subtasks are added, toggled or deleted, ensuring the UI reflects changes immediately."
+
+  - task: "Tasks Subtasks Checkbox Click in TasksSection"
+    implemented: true
+    working: true
+    file: "frontend/src/components/TasksSection.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "🔧 Fixed subtask checkbox not clickable in TasksSection: 1) Added handleToggleSubtask function that calls tasksAPI.updateSubtask to toggle completed status 2) Changed subtask checkbox from non-interactive div to clickable button 3) Added onToggleSubtask prop to TodayTaskItem component 4) Added hover and active states for better UX"
 
 metadata:
   created_by: "testing_agent"
