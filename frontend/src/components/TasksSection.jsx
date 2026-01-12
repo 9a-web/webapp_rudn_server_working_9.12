@@ -1004,11 +1004,11 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       {/* Header секции */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-400 flex items-center justify-center flex-shrink-0">
-            <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 text-white" strokeWidth={2.5} />
+          <div className="w-[42px] h-[42px] sm:w-[50px] sm:h-[50px] rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-400 flex items-center justify-center flex-shrink-0">
+            <ClipboardList className="w-[21px] h-[21px] sm:w-[25px] sm:h-[25px] text-white" strokeWidth={2.5} />
           </div>
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#1C1C1E] truncate">{activeView === 'schedule' ? 'Планировщик' : 'Список дел'}</h2>
+            <h2 className="text-[21px] sm:text-[25px] font-bold text-[#1C1C1E] truncate">{activeView === 'schedule' ? 'Планировщик' : 'Список дел'}</h2>
             <p className="text-xs sm:text-sm text-[#999999] truncate">
               {activeView === 'schedule' 
                 ? `${plannerEvents.length} событий · ${plannerEvents.filter(e => e.completed).length} завершено`
