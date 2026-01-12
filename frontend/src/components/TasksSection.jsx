@@ -1008,7 +1008,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 text-white" strokeWidth={2.5} />
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-2xl font-bold text-[#1C1C1E] truncate">{activeView === 'schedule' ? 'Планировщик' : 'Список дел'}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-[#1C1C1E] truncate">{activeView === 'schedule' ? 'Планировщик' : 'Список дел'}</h2>
             <p className="text-xs sm:text-sm text-[#999999] truncate">
               {activeView === 'schedule' 
                 ? `${plannerEvents.length} событий · ${plannerEvents.filter(e => e.completed).length} завершено`
