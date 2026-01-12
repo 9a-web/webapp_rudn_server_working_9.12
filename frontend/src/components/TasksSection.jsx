@@ -1632,6 +1632,21 @@ const TodayTaskItem = ({
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
                 
+                {/* Кнопка добавления подзадачи */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'light');
+                    // Открываем EditTaskModal для добавления подзадач
+                    if (onAddSubtask) {
+                      onAddSubtask(task);
+                    }
+                  }}
+                  className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
+                  title="Добавить подзадачу"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                
                 {/* Кнопка удаления */}
                 <button
                   onClick={() => {
