@@ -10,12 +10,12 @@ import sys
 from datetime import datetime
 
 # Backend URL configuration
-BACKEND_URL = "http://localhost:8001"
+BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test data
 TELEGRAM_ID = 123456789
-TASK_TEXT = "Тестовая задача с подзадачами"
+TASK_TEXT = "Тестовая задача"
 
 class TasksSubtasksAPITester:
     def __init__(self):
