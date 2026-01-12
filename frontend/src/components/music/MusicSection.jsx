@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
@@ -16,11 +16,14 @@ export const MusicSection = ({ telegramId }) => {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [artistCardOpen, setArtistCardOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState(null);
   const { play } = usePlayer();
+
+  // Используем useRef для offset чтобы избежать race conditions
+  const offsetRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   const TRACKS_PER_PAGE = 30;
 
