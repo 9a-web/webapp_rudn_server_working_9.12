@@ -4,7 +4,7 @@ import { Play, Pause, SkipBack, SkipForward, X, Repeat } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
-export const MiniPlayer = ({ onExpand, isHidden = false }) => {
+export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
   const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, stop, error, repeatMode, toggleRepeat } = usePlayer();
 
   // Не рендерим если нет трека
