@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive Backend Testing for LK RUDN API
-Testing LK RUDN (Личный Кабинет РУДН) API endpoints with ENV=test
+Music Pagination API Testing
+Testing the music pagination API `/api/music/my` to verify "Load More" functionality
 Based on review request requirements
 """
 
@@ -10,11 +10,10 @@ import json
 import sys
 from datetime import datetime
 
-# Configuration - Using production URL as specified in review request
-BACKEND_URL = "https://rudn-schedule.ru/api"
-TEST_TELEGRAM_ID = 999777888  # Specific telegram_id from review request
+# Configuration - Using localhost as backend runs on 0.0.0.0:8001 internally
+BACKEND_URL = "http://localhost:8001/api"
 
-class LKRUDNTester:
+class MusicPaginationTester:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
