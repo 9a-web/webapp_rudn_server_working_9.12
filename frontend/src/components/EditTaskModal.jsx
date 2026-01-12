@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Calendar, Flag, Tag, BookOpen } from 'lucide-react';
+import { X, Edit2, Calendar, Flag, Tag, BookOpen, ListChecks, Plus, Check, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
+import { tasksAPI } from '../services/api';
 
 export const EditTaskModal = ({ 
   isOpen, 
