@@ -86,7 +86,18 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
                   {error}
                 </p>
               ) : (
-                <p className="text-white/60 text-xs truncate">
+                <p 
+                  className="text-white/60 text-xs truncate hover:text-purple-400 cursor-pointer transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onArtistClick && currentTrack.artist) {
+                      if (window.Telegram?.WebApp?.HapticFeedback) {
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                      }
+                      onArtistClick(currentTrack.artist);
+                    }
+                  }}
+                >
                   {currentTrack.artist}
                 </p>
               )}
