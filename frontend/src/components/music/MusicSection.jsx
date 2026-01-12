@@ -5,6 +5,7 @@ import { musicAPI } from '../../services/musicAPI';
 import { TrackList } from './TrackList';
 import { MusicSearch } from './MusicSearch';
 import { PlaylistCard } from './PlaylistCard';
+import { ArtistCard } from './ArtistCard';
 import { usePlayer } from './PlayerContext';
 
 export const MusicSection = ({ telegramId }) => {
@@ -17,6 +18,8 @@ export const MusicSection = ({ telegramId }) => {
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+  const [artistCardOpen, setArtistCardOpen] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState(null);
   const { play } = usePlayer();
 
   const TRACKS_PER_PAGE = 30;
