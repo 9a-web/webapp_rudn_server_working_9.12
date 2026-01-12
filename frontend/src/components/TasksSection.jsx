@@ -1545,6 +1545,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           />
         </>
       )}
+
+      {/* Модальное окно подтверждения удаления задачи */}
+      <DeleteConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={handleCloseDeleteConfirm}
+        onConfirm={handleConfirmDelete}
+        taskText={taskToDelete?.text}
+        hapticFeedback={hapticFeedback}
+        isDeleting={isDeleting}
+      />
     </motion.div>
   );
 };
