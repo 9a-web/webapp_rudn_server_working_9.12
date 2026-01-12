@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Music Pagination API Testing
-Testing the music pagination API `/api/music/my` to verify "Load More" functionality
+Music Artist API Testing
+Testing the music artist API `/api/music/artist/{artist_name}` endpoint
 Based on review request requirements
 """
 
 import requests
 import json
 import sys
+import urllib.parse
 from datetime import datetime
 
-# Configuration - Using localhost as backend runs on 0.0.0.0:8001 internally
-BACKEND_URL = "http://localhost:8001/api"
+# Configuration - Using production backend URL
+BACKEND_URL = "https://rudn-schedule.ru/api"
 
 class MusicPaginationTester:
     def __init__(self):
