@@ -133,6 +133,7 @@ export const MiniPlayer = ({ onExpand, isHidden = false }) => {
           </div>
         </div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 };
