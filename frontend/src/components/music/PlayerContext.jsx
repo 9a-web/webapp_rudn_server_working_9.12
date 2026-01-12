@@ -414,6 +414,31 @@ export const PlayerProvider = ({ children }) => {
     setVolume(vol);
   }, []);
 
+  // Переключение режима повтора: off -> track -> queue -> off
+  const toggleRepeat = useCallback(() => {
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.selectionChanged();
+    }
+    
+    setRepeatMode(prev => {
+      switch (prev) {
+        case 'off': return 'track';
+        case 'track': return 'queue';
+        case 'queue': return 'off';
+        default: return 'off';
+      }
+    });
+  }, []);
+
+  // Переключение shuffle
+  const toggleShuffle = useCallback(() => {
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.selectionChanged();
+    }
+    
+    setShuffle(prev => !prev);
+  }, []);
+
   // Audio события
   useEffect(() => {
     const audio = audioRef.current;
