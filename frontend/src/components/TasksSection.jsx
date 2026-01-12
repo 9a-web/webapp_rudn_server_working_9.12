@@ -1029,14 +1029,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                   hapticFeedback && hapticFeedback('impact', 'light');
                   setShowFilters(!showFilters);
                 }}
-                className={`p-1.5 rounded-xl transition-colors ${
+                className={`p-[7px] rounded-xl transition-colors ${
                   showFilters || selectedCategory || selectedPriority
                     ? 'bg-yellow-100 text-yellow-600'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
                 title="Фильтры"
               >
-                <Filter className="w-4 h-4" />
+                <Filter className="w-[18px] h-[18px]" />
               </motion.button>
               
               <motion.button
@@ -1045,14 +1045,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                   hapticFeedback && hapticFeedback('impact', 'light');
                   setShowQuickActions(!showQuickActions);
                 }}
-                className={`p-1.5 rounded-xl transition-colors ${
+                className={`p-[7px] rounded-xl transition-colors ${
                   showQuickActions
                     ? 'bg-orange-100 text-orange-600'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
                 title="Быстрые действия"
               >
-                <Zap className="w-4 h-4" />
+                <Zap className="w-[18px] h-[18px]" />
               </motion.button>
               
               <motion.button
@@ -1061,14 +1061,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                   hapticFeedback && hapticFeedback('impact', 'light');
                   setShowStats(!showStats);
                 }}
-                className={`p-1.5 rounded-xl transition-colors ${
+                className={`p-[7px] rounded-xl transition-colors ${
                   showStats
                     ? 'bg-purple-100 text-purple-600'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
                 title="Статистика продуктивности"
               >
-                <TrendingUp className="w-4 h-4" />
+                <TrendingUp className="w-[18px] h-[18px]" />
               </motion.button>
             </>
           ) : (
