@@ -51,13 +51,15 @@
 
 | Файл | Действие | Статус |
 |------|----------|--------|
-| `/app/backend/server.py` | Добавить endpoint | ⏳ |
-| `/app/backend/music_service.py` | Добавить метод поиска по артисту | ⏳ |
-| `/app/frontend/src/components/music/ArtistCard.jsx` | Создать | ⏳ |
-| `/app/frontend/src/components/music/index.js` | Экспорт | ⏳ |
-| `/app/frontend/src/components/music/TrackCard.jsx` | Добавить клик на артиста | ⏳ |
-| `/app/frontend/src/components/music/FullscreenPlayer.jsx` | Добавить клик на артиста | ⏳ |
-| `/app/frontend/src/services/musicAPI.js` | Добавить метод API | ⏳ |
+| `/app/backend/server.py` | Endpoint существует | ✅ |
+| `/app/backend/music_service.py` | Метод существует | ✅ |
+| `/app/frontend/src/components/music/ArtistCard.jsx` | Создан | ✅ |
+| `/app/frontend/src/components/music/index.js` | Экспорт добавлен | ✅ |
+| `/app/frontend/src/components/music/TrackCard.jsx` | onArtistClick добавлен | ✅ |
+| `/app/frontend/src/components/music/FullscreenPlayer.jsx` | onArtistClick добавлен | ✅ |
+| `/app/frontend/src/components/music/MiniPlayer.jsx` | onArtistClick добавлен | ✅ |
+| `/app/frontend/src/services/musicAPI.js` | getArtistTracks добавлен | ✅ |
+| `/app/frontend/src/App.jsx` | Интеграция ArtistCard | ✅ |
 
 ---
 
