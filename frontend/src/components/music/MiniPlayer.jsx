@@ -93,7 +93,21 @@ export const MiniPlayer = ({ onExpand, isHidden = false }) => {
             </div>
 
             {/* Controls */}
-            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              {/* Repeat button - compact */}
+              <button 
+                onClick={toggleRepeat}
+                className={`p-1.5 transition-all active:scale-95 relative ${
+                  repeatMode !== 'off' 
+                    ? 'text-purple-400' 
+                    : 'text-white/40 hover:text-white/60'
+                }`}
+              >
+                <Repeat className="w-4 h-4" />
+                {repeatMode === 'track' && (
+                  <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-purple-400">1</span>
+                )}
+              </button>
               <button 
                 onClick={prev} 
                 className="p-2 text-white/60 hover:text-white active:scale-95 transition-all"
