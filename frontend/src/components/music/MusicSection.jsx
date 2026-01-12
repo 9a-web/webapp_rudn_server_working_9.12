@@ -59,29 +59,40 @@ export const MusicSection = ({ telegramId }) => {
   const loadContent = async (loadMore = false) => {
     if (activeTab === 'search') return;
 
+    // Защита от двойного вызова при loadMore
+    if (loadMore && loadingMoreRef.current) {
+      return;
+    }
+
     if (loadMore) {
+      loadingMoreRef.current = true;
       setLoadingMore(true);
     } else {
       setLoading(true);
-      setOffset(0);
+      offsetRef.current = 0;
       setHasMore(false);
     }
     
     try {
       switch (activeTab) {
         case 'my':
-          const currentOffset = loadMore ? offset : 0;
+          const currentOffset = loadMore ? offsetRef.current : 0;
           const my = await musicAPI.getMyAudio(TRACKS_PER_PAGE, currentOffset);
           const newTracks = my.tracks || [];
           
           if (loadMore) {
-            setTracks(prev => [...prev, ...newTracks]);
+            // Дедупликация по id трека
+            setTracks(prev => {
+              const existingIds = new Set(prev.map(t => t.id));
+              const uniqueNewTracks = newTracks.filter(t => !existingIds.has(t.id));
+              return [...prev, ...uniqueNewTracks];
+            });
           } else {
             setTracks(newTracks);
           }
           
           setHasMore(my.has_more || newTracks.length === TRACKS_PER_PAGE);
-          setOffset(currentOffset + newTracks.length);
+          offsetRef.current = currentOffset + newTracks.length;
           break;
         case 'popular':
           const popular = await musicAPI.getPopular();
