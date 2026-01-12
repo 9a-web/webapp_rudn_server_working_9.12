@@ -1108,6 +1108,7 @@ const Home = () => {
         <MiniPlayer 
           onExpand={() => setIsFullscreenPlayerOpen(true)}
           isHidden={isAnyModalOpen}
+          onArtistClick={handleArtistClick}
         />
       )}
 
