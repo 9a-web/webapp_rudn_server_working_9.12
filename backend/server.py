@@ -7101,6 +7101,16 @@ async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str
         logger.error(f"Music playlist tracks error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/music/artist/{artist_name:path}")
+async def music_artist_tracks(artist_name: str, count: int = 50):
+    """Получить треки артиста по имени"""
+    try:
+        result = await music_service.get_artist_tracks(artist_name, count)
+        return result
+    except Exception as e:
+        logger.error(f"Music artist tracks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Избранные треки (хранятся в MongoDB)
 @api_router.get("/music/favorites/{telegram_id}")
 async def get_music_favorites(telegram_id: int):
