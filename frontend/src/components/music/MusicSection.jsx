@@ -261,6 +261,31 @@ export const MusicSection = ({ telegramId }) => {
                   : 'Треки не найдены'
               }
             />
+            
+            {/* Кнопка "Загрузить ещё" для раздела "Мои" */}
+            {activeTab === 'my' && !loading && tracks.length > 0 && hasMore && (
+              <div className="px-4 pb-4">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 
+                           border border-white/10 transition-all
+                           flex items-center justify-center gap-2 text-white/70 hover:text-white"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Загрузка...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-5 h-5" />
+                      <span>Загрузить ещё</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
