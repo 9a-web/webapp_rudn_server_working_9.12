@@ -155,10 +155,10 @@ class VKMusicService:
             logger.error(f"Error getting track URL for {track_id}: {e}")
             return None
     
-    def get_my_audio(self, count: int = 50) -> List[dict]:
+    def get_my_audio(self, count: int = 50, offset: int = 0) -> List[dict]:
         """Получение аудиозаписей пользователя (синхронно для совместимости)"""
         try:
-            tracks = self.service.get_songs_by_userid(self.user_id, count=count)
+            tracks = self.service.get_songs_by_userid(self.user_id, count=count, offset=offset)
             return [self._track_to_dict(t) for t in tracks]
         except Exception as e:
             logger.error(f"Get my audio error: {e}")
