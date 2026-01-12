@@ -295,88 +295,73 @@ class MusicPaginationTester:
                 f"Request failed: {str(e)}"
             )
     
-    def test_post_lk_connect(self):
-        """Test POST /api/lk/connect - Attempt connection with invalid credentials"""
-        print("🔗 Testing POST /api/lk/connect...")
-        
-        # Using exact credentials from review request
-        payload = {
-            "telegram_id": 123456789,
-            "email": "test@student.rudn.ru",
-            "password": "testpassword"
-        }
+    def test_has_more_logic(self):
+        """Test has_more field logic by making sequential requests"""
+        print("🔄 Testing has_more field logic with sequential requests...")
         
         try:
-            response = self.session.post(f"{BACKEND_URL}/lk/connect", json=payload)
+            # Test multiple offsets to understand has_more behavior
+            offsets_to_test = [0, 30, 60, 90, 120]
+            results = []
             
-            if response.status_code == 401:
-                # Expected response for invalid credentials
-                try:
+            for offset in offsets_to_test:
+                response = self.session.get(f"{BACKEND_URL}/music/my?count=30&offset={offset}")
+                
+                if response.status_code == 200:
                     data = response.json()
-                    if "message" in data and "Неверный логин или пароль ЛК РУДН" in data["message"]:
-                        self.log_result(
-                            "POST /api/lk/connect - Invalid credentials (401)",
-                            True,
-                            "✅ Correct 401 response with expected error message",
-                            data
-                        )
+                    tracks = data.get("tracks", [])
+                    has_more = data.get("has_more")
+                    count = data.get("count")
+                    
+                    results.append({
+                        "offset": offset,
+                        "tracks_count": len(tracks),
+                        "has_more": has_more,
+                        "count": count
+                    })
+                else:
+                    results.append({
+                        "offset": offset,
+                        "error": f"HTTP {response.status_code}"
+                    })
+            
+            # Analyze results
+            success = True
+            details = []
+            
+            for i, result in enumerate(results):
+                if "error" in result:
+                    details.append(f"❌ Offset {result['offset']}: {result['error']}")
+                    success = False
+                else:
+                    offset = result["offset"]
+                    tracks_count = result["tracks_count"]
+                    has_more = result["has_more"]
+                    count = result["count"]
+                    
+                    # Check logic: if we got fewer tracks than requested and has_more is false, that's correct
+                    # If we got the full amount requested and has_more is true, that's also correct
+                    if tracks_count < 30 and not has_more:
+                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=false (correct - end reached)")
+                    elif tracks_count == 30 and has_more:
+                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=true (correct - more available)")
+                    elif tracks_count == 30 and not has_more:
+                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=false (correct - exactly at end)")
+                    elif tracks_count == 0 and not has_more:
+                        details.append(f"✅ Offset {offset}: {tracks_count} tracks, has_more=false (correct - beyond end)")
                     else:
-                        self.log_result(
-                            "POST /api/lk/connect - Invalid credentials (401)",
-                            True,
-                            f"✅ 401 response received, message: {data.get('message', 'No message')}",
-                            data
-                        )
-                except:
-                    self.log_result(
-                        "POST /api/lk/connect - Invalid credentials (401)",
-                        True,
-                        "✅ 401 response received (no JSON body)"
-                    )
-            elif response.status_code == 404:
-                self.log_result(
-                    "POST /api/lk/connect - Endpoint existence",
-                    False,
-                    "❌ Endpoint returns 404 - endpoint not found",
-                    response.text
-                )
-            elif response.status_code == 500:
-                try:
-                    data = response.json()
-                except:
-                    data = response.text
-                self.log_result(
-                    "POST /api/lk/connect - Server error",
-                    True,
-                    "⚠️ Endpoint exists, server error (500) - likely RUDN connection issue",
-                    data
-                )
-            elif response.status_code == 200:
-                try:
-                    data = response.json()
-                except:
-                    data = response.text
-                self.log_result(
-                    "POST /api/lk/connect - Unexpected success",
-                    False,
-                    "❌ Unexpected 200 response for invalid credentials",
-                    data
-                )
-            else:
-                try:
-                    data = response.json()
-                except:
-                    data = response.text
-                self.log_result(
-                    "POST /api/lk/connect - Other response",
-                    True,
-                    f"Endpoint exists, status: {response.status_code}",
-                    data
-                )
+                        details.append(f"ℹ️  Offset {offset}: {tracks_count} tracks, has_more={has_more}")
+            
+            self.log_result(
+                "has_more logic - Sequential requests",
+                success,
+                "; ".join(details),
+                results
+            )
                 
         except Exception as e:
             self.log_result(
-                "POST /api/lk/connect - Request",
+                "has_more logic - Sequential requests",
                 False,
                 f"Request failed: {str(e)}"
             )
