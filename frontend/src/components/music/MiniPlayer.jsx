@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, X, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, X, Repeat } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
 export const MiniPlayer = ({ onExpand, isHidden = false }) => {
-  const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, stop, error } = usePlayer();
+  const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, stop, error, repeatMode, toggleRepeat } = usePlayer();
 
   // Не рендерим если нет трека
   if (!currentTrack) return null;
