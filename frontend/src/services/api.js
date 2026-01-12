@@ -452,6 +452,49 @@ export const tasksAPI = {
       handleError(error);
     }
   },
+
+  /**
+   * Добавить подзадачу к задаче
+   * @param {string} taskId - ID задачи
+   * @param {string} title - Название подзадачи
+   */
+  addSubtask: async (taskId, title) => {
+    try {
+      const response = await api.post(`/tasks/${taskId}/subtasks`, { title });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Обновить подзадачу
+   * @param {string} taskId - ID задачи
+   * @param {string} subtaskId - ID подзадачи
+   * @param {Object} updates - Обновления (title, completed)
+   */
+  updateSubtask: async (taskId, subtaskId, updates) => {
+    try {
+      const response = await api.put(`/tasks/${taskId}/subtasks/${subtaskId}`, updates);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Удалить подзадачу
+   * @param {string} taskId - ID задачи
+   * @param {string} subtaskId - ID подзадачи
+   */
+  deleteSubtask: async (taskId, subtaskId) => {
+    try {
+      const response = await api.delete(`/tasks/${taskId}/subtasks/${subtaskId}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
 };
 
 /**
