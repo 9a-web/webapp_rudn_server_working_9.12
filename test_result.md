@@ -144,6 +144,18 @@ frontend:
         agent: "main"
         comment: "🔧 Fixed track duplication issue when clicking 'Load More': 1) Changed offset from useState to useRef to avoid closure/stale state issues 2) Added loadingMoreRef to prevent double API calls on rapid clicks 3) Added track deduplication by ID when appending new tracks"
 
+  - task: "Tasks Subtasks Frontend - State Sync Fix"
+    implemented: true
+    working: true
+    file: "frontend/src/components/TasksSection.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "🔧 Fixed subtasks state sync issue in EditTaskModal: Added missing onTaskUpdated callback prop to EditTaskModal in TasksSection.jsx. This callback updates the tasks list and editingTask state when subtasks are added, toggled or deleted, ensuring the UI reflects changes immediately."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
