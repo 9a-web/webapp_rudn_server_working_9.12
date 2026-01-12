@@ -1585,6 +1585,33 @@ const TodayTaskItem = ({
                     </div>
                   );
                 })()}
+                
+                {/* Прогресс-бар подзадач */}
+                {task.subtasks && task.subtasks.length > 0 && (
+                  <div className="mt-1.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <ListChecks className="w-3 h-3 text-gray-400" />
+                      <span className="text-[9px] text-gray-500">
+                        {task.subtasks_completed || task.subtasks.filter(s => s.completed).length} / {task.subtasks_total || task.subtasks.length}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ 
+                          width: `${task.subtasks_progress || 
+                            Math.round((task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100)}%` 
+                        }}
+                        transition={{ duration: 0.3, ease: 'easeOut' }}
+                        className={`h-full rounded-full ${
+                          (task.subtasks_progress || Math.round((task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100)) === 100
+                            ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                            : 'bg-gradient-to-r from-yellow-400 to-orange-400'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Кнопки действий */}
