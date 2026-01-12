@@ -7056,13 +7056,17 @@ async def music_redirect(track_id: str):
 async def music_my_audio(count: int = 50, offset: int = 0):
     """Мои аудиозаписи VK"""
     try:
-        # Запрашиваем на 1 больше, чтобы понять, есть ли ещё треки
-        tracks = music_service.get_my_audio(count + 1, offset)
-        has_more = len(tracks) > count
-        # Возвращаем только запрошенное количество
-        if has_more:
-            tracks = tracks[:count]
-        return {"tracks": tracks, "count": len(tracks), "offset": offset, "has_more": has_more}
+        tracks = music_service.get_my_audio(count, offset)
+        current_count = len(tracks)
+        
+        # Проверяем, есть ли ещё треки, запрашивая следующую порцию
+        # VK API может возвращать меньше треков, чем запрошено из-за фильтрации
+        has_more = False
+        if current_count > 0:
+            next_tracks = music_service.get_my_audio(1, offset + current_count)
+            has_more = len(next_tracks) > 0
+        
+        return {"tracks": tracks, "count": current_count, "offset": offset, "has_more": has_more}
     except Exception as e:
         logger.error(f"Music my audio error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
