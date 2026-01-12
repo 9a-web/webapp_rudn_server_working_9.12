@@ -1310,6 +1310,132 @@ async def delete_task(task_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Подзадачи для личных задач ============
+
+@api_router.post("/tasks/{task_id}/subtasks", response_model=TaskResponse)
+async def add_task_subtask(task_id: str, subtask: TaskSubtaskCreate):
+    """Добавить подзадачу к личной задаче"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.tasks.find_one({"id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Создаём новую подзадачу
+        new_subtask = TaskSubtask(
+            title=subtask.title,
+            order=len(task_doc.get("subtasks", []))
+        )
+        
+        # Добавляем подзадачу в массив
+        await db.tasks.update_one(
+            {"id": task_id},
+            {
+                "$push": {"subtasks": new_subtask.model_dump()},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/tasks/{task_id}/subtasks/{subtask_id}", response_model=TaskResponse)
+async def update_task_subtask(task_id: str, subtask_id: str, update_data: TaskSubtaskUpdate):
+    """Обновить подзадачу личной задачи"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.tasks.find_one({"id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Ищем подзадачу
+        subtasks = task_doc.get("subtasks", [])
+        subtask_index = next((i for i, s in enumerate(subtasks) if s.get("subtask_id") == subtask_id), None)
+        
+        if subtask_index is None:
+            raise HTTPException(status_code=404, detail="Подзадача не найдена")
+        
+        # Обновляем поля подзадачи
+        if update_data.title is not None:
+            subtasks[subtask_index]["title"] = update_data.title
+        if update_data.completed is not None:
+            subtasks[subtask_index]["completed"] = update_data.completed
+            if update_data.completed:
+                subtasks[subtask_index]["completed_at"] = datetime.utcnow()
+            else:
+                subtasks[subtask_index]["completed_at"] = None
+        
+        # Сохраняем изменения
+        await db.tasks.update_one(
+            {"id": task_id},
+            {
+                "$set": {
+                    "subtasks": subtasks,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/tasks/{task_id}/subtasks/{subtask_id}", response_model=TaskResponse)
+async def delete_task_subtask(task_id: str, subtask_id: str):
+    """Удалить подзадачу из личной задачи"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.tasks.find_one({"id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Удаляем подзадачу из массива
+        await db.tasks.update_one(
+            {"id": task_id},
+            {
+                "$pull": {"subtasks": {"subtask_id": subtask_id}},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/tasks/{telegram_id}/productivity-stats", response_model=TaskProductivityStats)
 async def get_productivity_stats(telegram_id: int):
     """Получить статистику продуктивности по задачам пользователя"""
