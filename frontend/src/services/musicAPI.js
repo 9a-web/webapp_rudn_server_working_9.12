@@ -37,9 +37,10 @@ export const musicAPI = {
   /**
    * Получить популярные треки
    * @param {number} count - Количество треков
+   * @param {number} offset - Смещение для пагинации
    */
-  getPopular: async (count = 30) => {
-    const response = await api.get(`/music/popular?count=${count}`);
+  getPopular: async (count = 30, offset = 0) => {
+    const response = await api.get(`/music/popular?count=${count}&offset=${offset}`);
     return response.data;
   },
 
