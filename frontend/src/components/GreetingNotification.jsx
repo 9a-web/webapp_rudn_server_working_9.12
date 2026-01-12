@@ -98,13 +98,6 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
     const checkTime = async () => {
       const now = new Date();
       const hour = testHour !== null ? testHour : now.getHours();
-      const month = now.getMonth(); // 0-11
-      // Winter: December (11), January (0), February (1)
-      // Festive logic specifically for Dec/Jan
-      const isWinter = month === 11 || month === 0 || month === 1;
-      // Is it near New Year? (Dec 20 - Jan 10)
-      const day = now.getDate();
-      const isNewYearTime = (month === 11 && day >= 20) || (month === 0 && day <= 10);
       
       let type = null;
       let title = "";
@@ -114,24 +107,14 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
       // Morning: 04:00 - 11:59
       if (hour >= 4 && hour < 12) {
         type = 'morning';
-        if (isNewYearTime) {
-             title = userFirstName ? `🎄 Волшебного утра, ${userFirstName}!` : '🎄 Волшебного утра!';
-             message = 'Пусть этот день будет полон чудес и продуктивности! 🎁';
-        } else {
-             title = userFirstName ? `Доброе утро, ${userFirstName}!` : 'Доброе утро!';
-             message = 'Желаем продуктивного дня и отличного настроения ✨';
-        }
+        title = userFirstName ? `Доброе утро, ${userFirstName}!` : 'Доброе утро!';
+        message = 'Желаем продуктивного дня и отличного настроения ✨';
       } 
       // Night: 22:00 - 04:59
       else if (hour >= 22 || hour < 4) {
         type = 'night';
-        if (isNewYearTime) {
-            title = userFirstName ? `🎅 Уютной ночи, ${userFirstName}!` : '🎅 Уютной ночи!';
-            message = 'Время загадывать желания и отдыхать. Сладких снов! ❄️';
-        } else {
-            title = userFirstName ? `Доброй ночи, ${userFirstName}!` : 'Доброй ночи!';
-            message = 'Пора отдыхать и набираться сил перед завтрашним днем 🌙';
-        }
+        title = userFirstName ? `Доброй ночи, ${userFirstName}!` : 'Доброй ночи!';
+        message = 'Пора отдыхать и набираться сил перед завтрашним днем 🌙';
       }
 
       // Fetch weather for both morning and night greetings
@@ -142,7 +125,7 @@ export const GreetingNotification = ({ userFirstName, testHour = null, onRequest
           console.warn('Failed to fetch weather:', error);
         }
 
-        const greetingData = { type, title, message, weather, isWinter: isNewYearTime || isWinter };
+        const greetingData = { type, title, message, weather };
         
         if (!testHour) {
           sessionStorage.setItem('greetingShown', 'true');
