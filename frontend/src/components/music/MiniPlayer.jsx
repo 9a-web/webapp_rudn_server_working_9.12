@@ -4,8 +4,8 @@ import { Play, Pause, SkipBack, SkipForward, X, Maximize2 } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
-export const MiniPlayer = ({ onExpand, onClose }) => {
-  const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, pause, error, clearError } = usePlayer();
+export const MiniPlayer = ({ onExpand }) => {
+  const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, stop, error } = usePlayer();
 
   if (!currentTrack) return null;
 
@@ -20,9 +20,10 @@ export const MiniPlayer = ({ onExpand, onClose }) => {
 
   const handleClose = (e) => {
     e.stopPropagation();
-    pause();
-    clearError();
-    if (onClose) onClose();
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    }
+    stop();
   };
 
   const handleExpand = () => {
