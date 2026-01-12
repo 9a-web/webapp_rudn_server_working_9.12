@@ -366,90 +366,18 @@ class MusicPaginationTester:
                 f"Request failed: {str(e)}"
             )
     
-    def test_delete_lk_disconnect(self):
-        """Test DELETE /api/lk/disconnect/{telegram_id} - Disconnect LK account"""
-        print("🔌 Testing DELETE /api/lk/disconnect/{telegram_id}...")
-        
-        try:
-            response = self.session.delete(f"{BACKEND_URL}/lk/disconnect/{TEST_TELEGRAM_ID}")
-            
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    if "success" in data and "message" in data:
-                        self.log_result(
-                            "DELETE /api/lk/disconnect/{telegram_id} - Success response",
-                            True,
-                            "Endpoint working, proper success response structure",
-                            data
-                        )
-                    else:
-                        self.log_result(
-                            "DELETE /api/lk/disconnect/{telegram_id} - Success response",
-                            True,
-                            "Endpoint working, response structure may vary",
-                            data
-                        )
-                except:
-                    self.log_result(
-                        "DELETE /api/lk/disconnect/{telegram_id} - Success response",
-                        True,
-                        "Endpoint working (200), no JSON response"
-                    )
-            elif response.status_code == 404:
-                try:
-                    data = response.json()
-                    # Check if it's user not found (acceptable) vs endpoint not found
-                    if "detail" in data and "не найден" in data["detail"].lower():
-                        self.log_result(
-                            "DELETE /api/lk/disconnect/{telegram_id} - User not found",
-                            True,
-                            "Endpoint exists, user not found (404) - acceptable",
-                            data
-                        )
-                    else:
-                        self.log_result(
-                            "DELETE /api/lk/disconnect/{telegram_id} - User not found",
-                            False,
-                            "Endpoint may not exist (404)",
-                            data
-                        )
-                except:
-                    self.log_result(
-                        "DELETE /api/lk/disconnect/{telegram_id} - User not found",
-                        False,
-                        "404 response, unclear if endpoint exists"
-                    )
-            else:
-                try:
-                    data = response.json()
-                except:
-                    data = response.text
-                self.log_result(
-                    "DELETE /api/lk/disconnect/{telegram_id} - Response",
-                    True,
-                    f"Endpoint exists, status: {response.status_code}",
-                    data
-                )
-                
-        except Exception as e:
-            self.log_result(
-                "DELETE /api/lk/disconnect/{telegram_id} - Response",
-                False,
-                f"Request failed: {str(e)}"
-            )
-    
     def run_all_tests(self):
-        """Run all LK RUDN API tests"""
-        print("🧪 LK RUDN API Testing Suite")
+        """Run all music pagination API tests"""
+        print("🎵 Music Pagination API Testing Suite")
         print(f"Backend URL: {BACKEND_URL}")
-        print(f"Test Telegram ID: {TEST_TELEGRAM_ID}")
+        print("Testing /api/music/my endpoint for Load More functionality")
         print("=" * 60)
         
-        # Test all endpoints
-        self.test_get_lk_data()
-        self.test_post_lk_connect()
-        self.test_delete_lk_disconnect()
+        # Test all scenarios as specified in review request
+        self.test_initial_load()
+        self.test_pagination_load()
+        self.test_end_of_list()
+        self.test_has_more_logic()
         
         # Summary
         total_tests = len(self.results)
@@ -459,7 +387,8 @@ class MusicPaginationTester:
         print(f"📊 Test Summary: {passed_tests}/{total_tests} tests passed")
         
         if passed_tests == total_tests:
-            print("🎉 All LK RUDN API endpoints are working correctly!")
+            print("🎉 All music pagination API tests passed!")
+            print("✅ The 'Load More' functionality should work correctly!")
             return True
         else:
             print("⚠️  Some tests failed. Check the details above.")
