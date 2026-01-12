@@ -1562,6 +1562,253 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/planner/preview")
+async def get_schedule_preview_for_sync(request: PlannerSyncRequest):
+    """
+    Получить предварительный просмотр пар для синхронизации.
+    НЕ создает записи, только возвращает список пар на дату.
+    """
+    from models import ScheduleEventPreview, PlannerPreviewResponse
+    
+    try:
+        telegram_id = request.telegram_id
+        target_date_str = request.date
+        week_number = request.week_number
+        
+        # Проверяем существование пользователя и получаем его группу
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        group_id = user.get("group_id")
+        if not group_id:
+            raise HTTPException(status_code=400, detail="У пользователя не выбрана группа")
+        
+        # Получаем расписание из кэша или парсим
+        cached = await db.schedule_cache.find_one({
+            "group_id": group_id,
+            "week_number": week_number,
+            "expires_at": {"$gt": datetime.utcnow()}
+        })
+        
+        if not cached:
+            try:
+                events = await get_schedule(
+                    facultet_id=user.get("facultet_id"),
+                    level_id=user.get("level_id"),
+                    kurs=user.get("kurs"),
+                    form_code=user.get("form_code"),
+                    group_id=group_id,
+                    week_number=week_number
+                )
+                # Кэшируем
+                cache_data = {
+                    "id": str(uuid.uuid4()),
+                    "group_id": group_id,
+                    "week_number": week_number,
+                    "events": [event for event in events],
+                    "cached_at": datetime.utcnow(),
+                    "expires_at": datetime.utcnow() + timedelta(hours=1)
+                }
+                await db.schedule_cache.update_one(
+                    {"group_id": group_id, "week_number": week_number},
+                    {"$set": cache_data},
+                    upsert=True
+                )
+                schedule_events = events
+            except Exception as e:
+                logger.error(f"Не удалось получить расписание: {e}")
+                raise HTTPException(status_code=500, detail="Не удалось получить расписание")
+        else:
+            schedule_events = cached.get("events", [])
+        
+        # Парсим дату для фильтрации по дню недели
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        # Определяем день недели на русском
+        day_names_ru = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        target_day_name = day_names_ru[target_date.weekday()]
+        
+        # Фильтруем события по дню недели и неделе
+        filtered_events = [
+            event for event in schedule_events
+            if event.get("day") == target_day_name and event.get("week") == week_number
+        ]
+        
+        # Формируем preview список
+        preview_events = []
+        already_synced_count = 0
+        
+        for idx, event in enumerate(filtered_events):
+            # Парсим время
+            time_parts = event.get("time", "").split("-")
+            time_start = time_parts[0].strip() if len(time_parts) > 0 else ""
+            time_end = time_parts[1].strip() if len(time_parts) > 1 else ""
+            
+            # Проверяем, синхронизировано ли уже
+            existing_task = await db.tasks.find_one({
+                "telegram_id": telegram_id,
+                "origin": "schedule",
+                "target_date": target_date,
+                "time_start": time_start,
+                "text": event.get("discipline")
+            })
+            
+            is_synced = existing_task is not None
+            if is_synced:
+                already_synced_count += 1
+            
+            preview_event = ScheduleEventPreview(
+                id=f"{target_date_str}_{idx}_{time_start}",
+                discipline=event.get("discipline", ""),
+                time=event.get("time", ""),
+                time_start=time_start,
+                time_end=time_end,
+                teacher=event.get("teacher"),
+                auditory=event.get("auditory"),
+                lessonType=event.get("lessonType"),
+                selected=not is_synced,  # Не выбираем уже синхронизированные
+                already_synced=is_synced
+            )
+            preview_events.append(preview_event)
+        
+        return PlannerPreviewResponse(
+            success=True,
+            date=target_date_str,
+            day_name=target_day_name,
+            events=preview_events,
+            total_count=len(preview_events),
+            already_synced_count=already_synced_count,
+            message=f"Найдено {len(preview_events)} пар на {target_day_name}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении preview пар: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/planner/sync-selected", response_model=PlannerSyncResponse)
+async def sync_selected_schedule_events(request: dict):
+    """
+    Синхронизировать выбранные (и возможно отредактированные) пары в планировщик.
+    """
+    from models import PlannerSyncSelectedRequest, ScheduleEventToSync
+    
+    try:
+        telegram_id = request.get("telegram_id")
+        target_date_str = request.get("date")
+        events_data = request.get("events", [])
+        
+        if not telegram_id or not target_date_str:
+            raise HTTPException(status_code=400, detail="Не указан telegram_id или date")
+        
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Парсим дату
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        synced_tasks = []
+        synced_count = 0
+        
+        for event_data in events_data:
+            discipline = event_data.get("discipline", "")
+            time_start = event_data.get("time_start", "")
+            time_end = event_data.get("time_end", "")
+            teacher = event_data.get("teacher", "")
+            auditory = event_data.get("auditory", "")
+            lessonType = event_data.get("lessonType", "")
+            
+            # Проверяем, существует ли уже такое событие
+            existing_task = await db.tasks.find_one({
+                "telegram_id": telegram_id,
+                "origin": "schedule",
+                "target_date": target_date,
+                "time_start": time_start,
+                "text": discipline
+            })
+            
+            if existing_task:
+                # Событие уже существует, пропускаем
+                continue
+            
+            # Создаем новую задачу-событие
+            new_task = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": telegram_id,
+                "text": discipline,
+                "completed": False,
+                "completed_at": None,
+                "category": "study",
+                "priority": "medium",
+                "deadline": None,
+                "target_date": target_date,
+                "subject": discipline,
+                "discipline_id": None,
+                "time_start": time_start,
+                "time_end": time_end,
+                "is_fixed": True,
+                "origin": "schedule",
+                "order": 0,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "teacher": teacher,
+                "auditory": auditory,
+                "lessonType": lessonType
+            }
+            
+            await db.tasks.insert_one(new_task)
+            synced_count += 1
+            
+            task_response = TaskResponse(
+                id=new_task["id"],
+                telegram_id=new_task["telegram_id"],
+                text=new_task["text"],
+                completed=new_task["completed"],
+                completed_at=new_task.get("completed_at"),
+                category=new_task.get("category"),
+                priority=new_task.get("priority"),
+                deadline=new_task.get("deadline"),
+                target_date=new_task.get("target_date"),
+                subject=new_task.get("subject"),
+                discipline_id=new_task.get("discipline_id"),
+                time_start=new_task.get("time_start"),
+                time_end=new_task.get("time_end"),
+                is_fixed=new_task.get("is_fixed", False),
+                origin=new_task.get("origin", "user"),
+                order=new_task.get("order", 0),
+                created_at=new_task["created_at"],
+                updated_at=new_task["updated_at"],
+                teacher=new_task.get("teacher"),
+                auditory=new_task.get("auditory"),
+                lessonType=new_task.get("lessonType")
+            )
+            synced_tasks.append(task_response)
+        
+        return PlannerSyncResponse(
+            success=True,
+            synced_count=synced_count,
+            events=synced_tasks,
+            message=f"Синхронизировано {synced_count} событий на {target_date_str}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при синхронизации выбранных пар: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/planner/events", response_model=TaskResponse)
 async def create_planner_event(task_data: TaskCreate):
     """
