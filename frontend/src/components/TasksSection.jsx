@@ -93,6 +93,11 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [syncPreviewData, setSyncPreviewData] = useState(null);
   const [syncPreviewLoading, setSyncPreviewLoading] = useState(false);
   
+  // Модальное окно подтверждения удаления задачи
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
