@@ -57,6 +57,7 @@ export const TrackList = ({
           trackList={tracks}
           isFavorite={favoriteIds.has(track.id)}
           onFavorite={onFavorite}
+          onArtistClick={onArtistClick}
         />
       ))}
     </div>
