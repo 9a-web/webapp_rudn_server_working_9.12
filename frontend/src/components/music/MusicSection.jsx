@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Music, TrendingUp, ListMusic, Heart, Loader2 } from 'lucide-react';
+import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
 import { TrackList } from './TrackList';
@@ -13,8 +13,13 @@ export const MusicSection = ({ telegramId }) => {
   const [playlists, setPlaylists] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const { play } = usePlayer();
+
+  const TRACKS_PER_PAGE = 30;
 
   const tabs = [
     { id: 'search', icon: Search, label: 'Поиск' },
