@@ -1121,6 +1121,13 @@ const Home = () => {
         />
       )}
 
+      {/* Artist Card Modal */}
+      <ArtistCard
+        isOpen={isArtistCardOpen}
+        onClose={handleArtistCardClose}
+        artistName={selectedArtist}
+      />
+
       {/* Bottom Navigation */}
       {!showGroupSelector && userSettings && (
         <BottomNavigation 
