@@ -606,6 +606,7 @@ export const JournalDetailModal = ({
                     gradient={gradient}
                     isOwner={isOwner}
                     statsViewers={journal?.stats_viewers || []}
+                    hapticFeedback={hapticFeedback}
                     onUpdateStatsViewers={async (newViewers) => {
                       try {
                         const { updateJournal } = await import('../../services/journalAPI');
