@@ -318,10 +318,11 @@ export const JournalStatsTab = ({
           transition={{ delay: 0.22 }}
           className="bg-white/5 rounded-xl p-4"
         >
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-2">
             <BookOpen className="w-5 h-5 text-purple-400" />
             <h3 className="text-sm font-medium text-white">Посещаемость по предметам</h3>
           </div>
+          <p className="text-xs text-gray-500 mb-4">Нажмите на предмет для просмотра детальной статистики</p>
           
           <div className="space-y-3">
             {stats.subjects_stats.map((subject, index) => {
@@ -352,7 +353,9 @@ export const JournalStatsTab = ({
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.22 + index * 0.05 }}
-                  className="bg-white/5 rounded-xl p-4"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSubjectClick(subject.subject_id)}
+                  className="bg-white/5 rounded-xl p-4 cursor-pointer hover:bg-white/10 transition-colors active:bg-white/15"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -364,10 +367,13 @@ export const JournalStatsTab = ({
                         <p className="text-xs text-gray-500">{subject.total_sessions} занятий</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`text-xl font-bold ${getAttendanceColor(subject.attendance_percent)}`}>
-                        {subject.attendance_percent}%
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <p className={`text-xl font-bold ${getAttendanceColor(subject.attendance_percent)}`}>
+                          {subject.attendance_percent}%
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-500" />
                     </div>
                   </div>
                   
