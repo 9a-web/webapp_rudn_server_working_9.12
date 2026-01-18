@@ -905,7 +905,7 @@ const Home = () => {
   return (
     <div className="h-full min-h-screen bg-background telegram-webapp relative">
       <TopGlow />
-      <UpcomingClassNotification schedule={schedule} />
+      {activeTab === 'home' && <UpcomingClassNotification schedule={schedule} />}
       
       {/* Новогодняя тема с тремя режимами */}
       {renderNewYearTheme()}
