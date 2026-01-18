@@ -6540,6 +6540,173 @@ async def update_subject(subject_id: str, data: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/journals/subjects/{subject_id}/attendance-stats")
+async def get_subject_attendance_stats(subject_id: str, telegram_id: int = 0):
+    """Получить детальную статистику посещаемости по предмету со списком студентов"""
+    try:
+        # Получаем предмет
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        journal_id = subject["journal_id"]
+        
+        # Получаем журнал для проверки доступа
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получаем все занятия этого предмета
+        sessions = await db.journal_sessions.find(
+            {"subject_id": subject_id}
+        ).sort("date", -1).to_list(1000)
+        
+        # Получаем всех студентов журнала
+        students = await db.journal_students.find(
+            {"journal_id": journal_id}
+        ).to_list(1000)
+        
+        # Получаем все записи посещаемости для занятий этого предмета
+        session_ids = [s["session_id"] for s in sessions]
+        attendance_records = await db.attendance_records.find(
+            {"session_id": {"$in": session_ids}}
+        ).to_list(10000)
+        
+        # Создаём маппинг записей: {session_id: {student_id: record}}
+        records_map = {}
+        for record in attendance_records:
+            session_id = record["session_id"]
+            student_id = record["student_id"]
+            if session_id not in records_map:
+                records_map[session_id] = {}
+            records_map[session_id][student_id] = record
+        
+        total_students = len(students)
+        total_sessions = len(sessions)
+        
+        # Статистика по студентам
+        students_stats = []
+        total_present = 0
+        total_absent = 0
+        total_late = 0
+        total_excused = 0
+        
+        for student in students:
+            student_id = student["id"]
+            present = 0
+            absent = 0
+            late = 0
+            excused = 0
+            
+            for session in sessions:
+                session_id = session["session_id"]
+                record = records_map.get(session_id, {}).get(student_id)
+                if record:
+                    status = record.get("status", "absent")
+                    if status == "present":
+                        present += 1
+                    elif status == "absent":
+                        absent += 1
+                    elif status == "late":
+                        late += 1
+                        present += 1  # late считается как присутствие
+                    elif status == "excused":
+                        excused += 1
+            
+            # Считаем процент (присутствие = present + late)
+            marked_sessions = present + absent + excused
+            attendance_percent = 0.0
+            if marked_sessions > 0:
+                # present уже включает late
+                attendance_percent = round((present / marked_sessions) * 100, 1)
+            
+            students_stats.append({
+                "student_id": student_id,
+                "full_name": student.get("full_name", ""),
+                "is_linked": bool(student.get("linked_telegram_id")),
+                "telegram_id": student.get("linked_telegram_id"),
+                "present_count": present,
+                "absent_count": absent,
+                "late_count": late,
+                "excused_count": excused,
+                "total_sessions": total_sessions,
+                "attendance_percent": attendance_percent
+            })
+            
+            total_present += present
+            total_absent += absent
+            total_late += late
+            total_excused += excused
+        
+        # Сортируем по посещаемости (от худшей к лучшей для выявления проблемных студентов)
+        students_stats.sort(key=lambda x: (-x["attendance_percent"], x["full_name"]))
+        
+        # Статистика по занятиям
+        sessions_stats = []
+        for session in sessions:
+            session_id = session["session_id"]
+            session_records = records_map.get(session_id, {})
+            
+            s_present = 0
+            s_absent = 0
+            s_late = 0
+            s_excused = 0
+            
+            for student_id, record in session_records.items():
+                status = record.get("status", "absent")
+                if status == "present":
+                    s_present += 1
+                elif status == "absent":
+                    s_absent += 1
+                elif status == "late":
+                    s_late += 1
+                    s_present += 1
+                elif status == "excused":
+                    s_excused += 1
+            
+            marked = s_present + s_absent + s_excused
+            s_percent = round((s_present / marked * 100), 1) if marked > 0 else 0.0
+            
+            sessions_stats.append({
+                "session_id": session_id,
+                "date": session["date"],
+                "title": session.get("title", ""),
+                "type": session.get("type", "lecture"),
+                "present_count": s_present,
+                "absent_count": s_absent,
+                "late_count": s_late,
+                "excused_count": s_excused,
+                "total_students": total_students,
+                "attendance_percent": s_percent
+            })
+        
+        # Общий процент посещаемости
+        total_marked = total_present + total_absent + total_excused
+        overall_percent = round((total_present / total_marked * 100), 1) if total_marked > 0 else 0.0
+        
+        return {
+            "subject_id": subject_id,
+            "subject_name": subject.get("name", ""),
+            "subject_color": subject.get("color", "blue"),
+            "description": subject.get("description"),
+            "journal_id": journal_id,
+            "total_sessions": total_sessions,
+            "total_students": total_students,
+            "overall_attendance_percent": overall_percent,
+            "present_count": total_present,
+            "absent_count": total_absent,
+            "late_count": total_late,
+            "excused_count": total_excused,
+            "students_stats": students_stats,
+            "sessions_stats": sessions_stats
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting subject attendance stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.delete("/journals/subjects/{subject_id}")
 async def delete_subject(subject_id: str):
     """Удалить предмет и все его занятия"""
