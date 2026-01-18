@@ -855,6 +855,15 @@ export const JournalStatsTab = ({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Модал детальной статистики по предмету */}
+      <SubjectAttendanceModal
+        isOpen={!!selectedSubjectId}
+        onClose={() => setSelectedSubjectId(null)}
+        subjectId={selectedSubjectId}
+        telegramId={telegramId}
+        hapticFeedback={hapticFeedback}
+      />
     </div>
   );
 };
