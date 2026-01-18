@@ -1364,6 +1364,52 @@ class JournalStatsViewersUpdate(BaseModel):
     stats_viewers: List[int]  # Список telegram_id
 
 
+class SubjectStudentStats(BaseModel):
+    """Статистика студента по конкретному предмету"""
+    student_id: str
+    full_name: str
+    is_linked: bool = False
+    telegram_id: Optional[int] = None
+    present_count: int = 0
+    absent_count: int = 0
+    late_count: int = 0
+    excused_count: int = 0
+    total_sessions: int = 0
+    attendance_percent: float = 0.0
+
+
+class SubjectSessionStats(BaseModel):
+    """Статистика занятия предмета"""
+    session_id: str
+    date: str
+    title: str
+    type: str
+    present_count: int = 0
+    absent_count: int = 0
+    late_count: int = 0
+    excused_count: int = 0
+    total_students: int = 0
+    attendance_percent: float = 0.0
+
+
+class SubjectDetailedStatsResponse(BaseModel):
+    """Детальная статистика по предмету"""
+    subject_id: str
+    subject_name: str
+    subject_color: str
+    description: Optional[str] = None
+    journal_id: str
+    total_sessions: int = 0
+    total_students: int = 0
+    overall_attendance_percent: float = 0.0
+    present_count: int = 0
+    absent_count: int = 0
+    late_count: int = 0
+    excused_count: int = 0
+    students_stats: List[SubjectStudentStats] = []
+    sessions_stats: List[SubjectSessionStats] = []
+
+
 class JournalInviteLinkResponse(BaseModel):
     """Ответ со ссылкой приглашения"""
     invite_link: str
