@@ -7143,8 +7143,10 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
         late_count = sum(1 for r in records if r["status"] == "late")
         total_sessions = len(sessions)
         
-        attendance_percent = 0
-        if total_sessions > 0:
+        # Показываем процент только если студент был отмечен хотя бы раз
+        attendance_percent = None
+        total_records = len(records)
+        if total_sessions > 0 and total_records > 0:
             attendance_percent = round((present_count / total_sessions) * 100, 1)
         
         # Расчет стрика (серии посещений)
