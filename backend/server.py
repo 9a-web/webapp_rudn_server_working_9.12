@@ -7375,12 +7375,12 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
             # Числитель: Присутствовал + Опоздал
             numerator = present + late
             
-            # Процент
+            # Процент - показываем только если студент был отмечен хотя бы раз
             att_percent = None
-            if effective_sessions > 0:
+            if effective_sessions > 0 and total_marked > 0:
                 att_percent = round((numerator / effective_sessions) * 100, 1)
                 
-                # Добавляем в общую копилку (только если есть занятия)
+                # Добавляем в общую копилку (только если есть занятия И студент отмечен)
                 global_numerator += numerator
                 global_denominator += effective_sessions
             
@@ -7388,10 +7388,13 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
             # Чтобы в UI (present / present+absent) совпадало с процентом,
             # считаем "неотмеченные" (unmarked) как прогулы для отображения
             # absent_count = (Total Valid - Excused) - (Present + Late)
-            implicit_absent = effective_sessions - (present + late)
-            # Если вдруг отрицательное (из-за рассинхрона дат), ставим 0
-            if implicit_absent < 0:
-                implicit_absent = 0
+            # Но только если студент был отмечен
+            implicit_absent = 0
+            if total_marked > 0:
+                implicit_absent = effective_sessions - (present + late)
+                # Если вдруг отрицательное (из-за рассинхрона дат), ставим 0
+                if implicit_absent < 0:
+                    implicit_absent = 0
             
             students_stats.append(JournalStudentResponse(
                 id=s["id"],
