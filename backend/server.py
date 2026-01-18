@@ -6184,7 +6184,11 @@ async def get_journal_students(journal_id: str):
             })
             
             attendance_percent = None
-            if total_sessions > 0:
+            # Общее количество записей для этого студента (был ли он вообще отмечен)
+            total_records = present_count + absent_count + excused_count + late_count
+            
+            # Показываем процент только если есть занятия И студент был отмечен хотя бы раз
+            if total_sessions > 0 and total_records > 0:
                 attended = present_count + late_count
                 attendance_percent = round((attended / total_sessions) * 100, 1)
             
