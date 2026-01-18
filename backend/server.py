@@ -7332,12 +7332,13 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
         
         for s in students:
             s_id = s["id"]
-            stats = att_map.get(s_id, {"present": 0, "late": 0, "absent": 0, "excused": 0})
+            stats = att_map.get(s_id, {"present": 0, "late": 0, "absent": 0, "excused": 0, "total_marked": 0})
             
             present = stats["present"]
             late = stats["late"]
             absent = stats["absent"]
             excused = stats["excused"]
+            total_marked = stats.get("total_marked", 0)
             
             # --- ЛОГИКА "НОВИЧКА" (New Student Logic) ---
             # Студент отвечает за занятия, которые произошли после его добавления
