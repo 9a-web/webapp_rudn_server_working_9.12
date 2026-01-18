@@ -5507,6 +5507,16 @@ async def calculate_student_attendance(student_id: str, journal_id: str) -> Opti
         if total_sessions == 0:
             return None
         
+        # Проверяем, был ли студент отмечен хотя бы раз
+        total_records = await db.attendance_records.count_documents({
+            "student_id": student_id,
+            "journal_id": journal_id
+        })
+        
+        # Если студент ни разу не был отмечен - не показываем процент
+        if total_records == 0:
+            return None
+        
         present_count = await db.attendance_records.count_documents({
             "student_id": student_id,
             "journal_id": journal_id,
