@@ -68,13 +68,23 @@ export const JournalStatsTab = ({
   gradient = 'from-purple-400 to-pink-400',
   isOwner = false,
   statsViewers = [],
-  onUpdateStatsViewers
+  onUpdateStatsViewers,
+  hapticFeedback
 }) => {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [sortBy, setSortBy] = useState('attendance'); // 'attendance' | 'name' | 'present'
   const [showAccessModal, setShowAccessModal] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+
+  // Обработчик клика по предмету для просмотра детальной статистики
+  const handleSubjectClick = (subjectId) => {
+    if (hapticFeedback?.impactOccurred) {
+      hapticFeedback.impactOccurred('light');
+    }
+    setSelectedSubjectId(subjectId);
+  };
 
   useEffect(() => {
     const loadStats = async () => {
