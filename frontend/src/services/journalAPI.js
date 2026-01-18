@@ -237,6 +237,17 @@ export const getSubjectDetail = async (subjectId) => {
   }
 };
 
+// Получить детальную статистику посещаемости по предмету
+export const getSubjectAttendanceStats = async (subjectId, telegramId = 0) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/journals/subjects/${subjectId}/attendance-stats?telegram_id=${telegramId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching subject attendance stats:', error);
+    throw error;
+  }
+};
+
 // Обновить предмет
 export const updateSubject = async (subjectId, data) => {
   try {
