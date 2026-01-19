@@ -7543,12 +7543,16 @@ from cover_service import init_cover_service, get_cover_service
 @api_router.get("/music/search")
 async def music_search(q: str, count: int = 20):
     """
-    Асинхронный поиск музыки по запросу.
+    Асинхронный поиск музыки по запросу с обложками из Deezer.
     Возвращает треки с метаданными. Прямая ссылка может быть пустой -
     используйте /api/music/stream/{track_id} для получения URL при воспроизведении.
     """
     try:
         tracks = await music_service.search(q, count)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
         return {"tracks": tracks, "count": len(tracks)}
     except Exception as e:
         logger.error(f"Music search error: {e}")
