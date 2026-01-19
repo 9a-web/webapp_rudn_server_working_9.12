@@ -443,6 +443,13 @@ export const MusicSection = ({ telegramId }) => {
         onClose={handleArtistCardClose}
         artistName={selectedArtist}
       />
+
+      {/* VK Auth Modal */}
+      <VKAuthModal
+        isOpen={vkAuthModalOpen}
+        onClose={handleVkAuthModalClose}
+        telegramId={telegramId}
+      />
     </div>
   );
 };
