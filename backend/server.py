@@ -7740,6 +7740,8 @@ async def remove_music_favorite(telegram_id: int, track_id: str):
 # ============ VK AUTH API ============
 
 from vk_auth_service import vk_auth_service, VKAuthError
+from fastapi.responses import RedirectResponse, HTMLResponse
+from urllib.parse import urlencode, quote
 
 class VKAuthRequest(BaseModel):
     """Запрос авторизации VK через OAuth токен"""
@@ -7759,49 +7761,274 @@ class VKOAuthConfigResponse(BaseModel):
     auth_url: str
     app_id: int
     redirect_uri: str
-    scope: int
 
-# VK OAuth Configuration - Kate Mobile app
+# VK ID OAuth Configuration - RUDN Schedule App
 VK_OAUTH_CONFIG = {
-    "app_id": 2685278,  # Kate Mobile
-    "redirect_uri": "https://api.vk.com/blank.html",
-    "scope": 140491999,  # Все права включая audio
-    "response_type": "token"
+    "app_id": int(os.environ.get("VK_APP_ID", "54426792")),
+    "client_secret": os.environ.get("VK_CLIENT_SECRET", "yIej7gAG0WLQiULrFAVB"),
+    "redirect_uri": os.environ.get("VK_REDIRECT_URI", "https://rudn-schedule.ru/api/music/vk-callback"),
+    "scope": "audio,offline",  # Права на аудио и offline токен
+    "response_type": "code"    # Authorization Code Flow
 }
 
+# Временное хранилище state для CSRF защиты (telegram_id -> state)
+vk_oauth_states = {}
+
 @api_router.get("/music/auth/config")
-async def get_vk_oauth_config():
+async def get_vk_oauth_config(telegram_id: int = None):
     """
-    Получить конфигурацию OAuth для авторизации VK.
+    Получить конфигурацию OAuth для авторизации VK ID.
     
     Возвращает URL для авторизации через VK ID с правами на аудио.
+    telegram_id передаётся в state для связи callback с пользователем.
     """
-    import hashlib
     import secrets
     
-    # Генерируем хэши для URL
-    state = secrets.token_hex(16)
-    return_auth_hash = hashlib.md5(f"vk_auth_{state}".encode()).hexdigest()[:18]
-    redirect_uri_hash = hashlib.md5(f"redirect_{state}".encode()).hexdigest()[:18]
+    # Генерируем state с telegram_id
+    state_token = secrets.token_hex(16)
+    state = f"{telegram_id or 0}_{state_token}"
     
-    auth_url = (
-        f"https://id.vk.com/auth?"
-        f"return_auth_hash={return_auth_hash}&"
-        f"redirect_uri={VK_OAUTH_CONFIG['redirect_uri']}&"
-        f"redirect_uri_hash={redirect_uri_hash}&"
-        f"force_hash=1&"
-        f"app_id={VK_OAUTH_CONFIG['app_id']}&"
-        f"response_type={VK_OAUTH_CONFIG['response_type']}&"
-        f"scope={VK_OAUTH_CONFIG['scope']}&"
-        f"state={state}"
-    )
+    # Сохраняем state для проверки в callback
+    if telegram_id:
+        vk_oauth_states[state] = {
+            "telegram_id": telegram_id,
+            "created_at": datetime.utcnow()
+        }
+        # Очищаем старые states (старше 10 минут)
+        cutoff = datetime.utcnow() - timedelta(minutes=10)
+        vk_oauth_states_to_delete = [
+            s for s, data in vk_oauth_states.items() 
+            if data.get("created_at", datetime.utcnow()) < cutoff
+        ]
+        for s in vk_oauth_states_to_delete:
+            del vk_oauth_states[s]
+    
+    # Формируем OAuth URL для VK ID
+    params = {
+        "client_id": VK_OAUTH_CONFIG["app_id"],
+        "redirect_uri": VK_OAUTH_CONFIG["redirect_uri"],
+        "response_type": VK_OAUTH_CONFIG["response_type"],
+        "scope": VK_OAUTH_CONFIG["scope"],
+        "state": state,
+        "display": "mobile"  # Мобильная версия для Telegram WebApp
+    }
+    
+    auth_url = f"https://oauth.vk.com/authorize?{urlencode(params)}"
     
     return VKOAuthConfigResponse(
         auth_url=auth_url,
-        app_id=VK_OAUTH_CONFIG['app_id'],
-        redirect_uri=VK_OAUTH_CONFIG['redirect_uri'],
-        scope=VK_OAUTH_CONFIG['scope']
+        app_id=VK_OAUTH_CONFIG["app_id"],
+        redirect_uri=VK_OAUTH_CONFIG["redirect_uri"]
     )
+
+
+@api_router.get("/music/vk-callback")
+async def vk_oauth_callback(code: str = None, state: str = None, error: str = None, error_description: str = None):
+    """
+    Callback для VK OAuth.
+    
+    VK перенаправляет сюда после авторизации пользователя с параметром code.
+    Мы обмениваем code на access_token и сохраняем токен.
+    """
+    
+    # HTML шаблон для ответа
+    def make_html_response(success: bool, message: str, vk_user_name: str = None):
+        color = "#4CAF50" if success else "#f44336"
+        icon = "✅" if success else "❌"
+        return HTMLResponse(content=f"""
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK Авторизация - RUDN Schedule</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }}
+        .container {{
+            background: rgba(255,255,255,0.05);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }}
+        .icon {{
+            font-size: 64px;
+            margin-bottom: 20px;
+        }}
+        .title {{
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: {color};
+        }}
+        .message {{
+            font-size: 16px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }}
+        .user-name {{
+            font-size: 18px;
+            color: white;
+            margin-bottom: 24px;
+        }}
+        .hint {{
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 20px;
+        }}
+        .close-btn {{
+            background: {color};
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">{icon}</div>
+        <div class="title">{"Успешно!" if success else "Ошибка"}</div>
+        {f'<div class="user-name">{vk_user_name}</div>' if vk_user_name else ''}
+        <div class="message">{message}</div>
+        <button class="close-btn" onclick="window.close()">Закрыть</button>
+        <div class="hint">Вернитесь в приложение</div>
+    </div>
+    <script>
+        // Попробуем закрыть окно автоматически через 3 секунды
+        setTimeout(() => {{
+            try {{ window.close(); }} catch(e) {{}}
+        }}, 3000);
+    </script>
+</body>
+</html>
+        """)
+    
+    # Проверяем ошибку от VK
+    if error:
+        logger.error(f"VK OAuth error: {error} - {error_description}")
+        return make_html_response(False, f"VK вернул ошибку: {error_description or error}")
+    
+    # Проверяем наличие code
+    if not code:
+        return make_html_response(False, "Код авторизации не получен")
+    
+    # Проверяем state и извлекаем telegram_id
+    telegram_id = None
+    if state:
+        state_data = vk_oauth_states.get(state)
+        if state_data:
+            telegram_id = state_data.get("telegram_id")
+            # Удаляем использованный state
+            del vk_oauth_states[state]
+        else:
+            # Пробуем извлечь telegram_id из state напрямую
+            try:
+                telegram_id = int(state.split("_")[0])
+            except:
+                pass
+    
+    if not telegram_id:
+        return make_html_response(False, "Не удалось определить пользователя. Попробуйте авторизоваться заново.")
+    
+    try:
+        # Обмениваем code на access_token
+        token_url = "https://oauth.vk.com/access_token"
+        token_params = {
+            "client_id": VK_OAUTH_CONFIG["app_id"],
+            "client_secret": VK_OAUTH_CONFIG["client_secret"],
+            "redirect_uri": VK_OAUTH_CONFIG["redirect_uri"],
+            "code": code
+        }
+        
+        response = requests.get(token_url, params=token_params, timeout=10)
+        token_data = response.json()
+        
+        if "error" in token_data:
+            error_msg = token_data.get("error_description", token_data.get("error", "Unknown error"))
+            logger.error(f"VK token exchange error: {error_msg}")
+            return make_html_response(False, f"Ошибка получения токена: {error_msg}")
+        
+        access_token = token_data.get("access_token")
+        vk_user_id = token_data.get("user_id")
+        expires_in = token_data.get("expires_in", 0)
+        
+        if not access_token:
+            return make_html_response(False, "Токен не получен от VK")
+        
+        # Валидируем токен
+        verify_result = await vk_auth_service.verify_token(access_token)
+        
+        if not verify_result.get("valid"):
+            return make_html_response(False, f"Недействительный токен: {verify_result.get('error', 'Unknown')}")
+        
+        # Получаем user_id из токена если не было
+        if not vk_user_id:
+            vk_user_id = verify_result.get("user_id")
+        
+        # Проверяем доступ к аудио
+        audio_check = await vk_auth_service.test_audio_access(access_token)
+        audio_count = audio_check.get("audio_count", 0)
+        has_audio = audio_check.get("has_access", False)
+        
+        # Формируем имя пользователя
+        user_name = f"{verify_result.get('first_name', '')} {verify_result.get('last_name', '')}".strip()
+        
+        # Сохраняем токен в MongoDB
+        token_doc = {
+            "telegram_id": telegram_id,
+            "vk_user_id": vk_user_id,
+            "vk_token": access_token,
+            "user_agent": "VKAndroidApp/8.0-15000 (Android 10; SDK 29; arm64-v8a; ru)",
+            "audio_count": audio_count,
+            "has_audio_access": has_audio,
+            "expires_in": expires_in,
+            "auth_method": "vk_id_oauth",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        await db.user_vk_tokens.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": token_doc},
+            upsert=True
+        )
+        
+        logger.info(f"VK ID OAuth success: telegram_id={telegram_id}, vk_user_id={vk_user_id}, user={user_name}, audio_count={audio_count}")
+        
+        if has_audio:
+            return make_html_response(
+                True, 
+                f"VK аккаунт успешно подключен! У вас {audio_count} аудиозаписей.",
+                user_name
+            )
+        else:
+            return make_html_response(
+                True,
+                f"Аккаунт подключен, но доступ к аудио ограничен VK. Попробуйте использовать Kate Mobile.",
+                user_name
+            )
+        
+    except Exception as e:
+        logger.error(f"VK OAuth callback error: {e}")
+        return make_html_response(False, f"Ошибка обработки: {str(e)}")
 
 def parse_vk_token_from_url(url: str) -> dict:
     """
