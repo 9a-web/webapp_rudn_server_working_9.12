@@ -300,6 +300,12 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ Failed to setup Playwright symlinks: {e}")
     
+    # Initialize cover service for Deezer album art
+    try:
+        init_cover_service(db)
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to init cover service: {e}")
+    
     # Start background tasks
     asyncio.create_task(create_indexes())
 
