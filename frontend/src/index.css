@@ -280,6 +280,15 @@ code {
   }
 }
 
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 @layer base {
   [data-debug-wrapper="true"] {
     display: contents !important;
