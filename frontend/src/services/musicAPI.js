@@ -108,10 +108,11 @@ export const musicAPI = {
 
   /**
    * Получить конфигурацию OAuth для авторизации VK
-   * @returns {Promise<{auth_url: string, app_id: number, redirect_uri: string, scope: number}>}
+   * @param {number} telegramId - ID пользователя Telegram (для state)
+   * @returns {Promise<{auth_url: string, app_id: number, redirect_uri: string}>}
    */
-  getVKOAuthConfig: async () => {
-    const response = await api.get('/music/auth/config');
+  getVKOAuthConfig: async (telegramId) => {
+    const response = await api.get(`/music/auth/config${telegramId ? `?telegram_id=${telegramId}` : ''}`);
     return response.data;
   },
 
