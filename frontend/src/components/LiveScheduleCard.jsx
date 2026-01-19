@@ -40,6 +40,19 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   // SVG circle параметры
   const circleRadius = 42;
   const circleCircumference = 2 * Math.PI * circleRadius;
+  
+  // Адаптивная толщина круга: тоньше на десктопе
+  const [isDesktop, setIsDesktop] = useState(false);
+  
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
+  
+  const bgStrokeWidth = isDesktop ? 8 : 14;
+  const progressStrokeWidth = isDesktop ? 9 : 15;
 
   // Theme Styles Configuration
   const themeStyles = {
