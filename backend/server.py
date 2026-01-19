@@ -7528,6 +7528,7 @@ async def get_journal_stats(journal_id: str, telegram_id: int = 0):
 # ============ MUSIC API ENDPOINTS ============
 
 from music_service import music_service
+from cover_service import init_cover_service, get_cover_service
 
 @api_router.get("/music/search")
 async def music_search(q: str, count: int = 20):
