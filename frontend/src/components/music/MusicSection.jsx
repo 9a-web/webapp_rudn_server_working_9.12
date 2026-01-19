@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown } from 'lucide-react';
+import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
 import { TrackList } from './TrackList';
@@ -7,6 +7,7 @@ import { MusicSearch } from './MusicSearch';
 import { PlaylistCard } from './PlaylistCard';
 import { ArtistCard } from './ArtistCard';
 import { usePlayer } from './PlayerContext';
+import { VKAuthModal } from './VKAuthModal';
 
 export const MusicSection = ({ telegramId }) => {
   const [activeTab, setActiveTab] = useState('search');
