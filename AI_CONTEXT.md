@@ -220,6 +220,14 @@ GET /api/admin/faculty-stats    - статистика по факультета
 GET /api/admin/course-stats     - статистика по курсам
 ```
 
+### VK Music Авторизация (NEW!)
+```
+POST   /api/music/auth/{telegram_id}        - авторизация VK (login/password)
+GET    /api/music/auth/status/{telegram_id} - статус подключения VK
+DELETE /api/music/auth/{telegram_id}        - отключение VK аккаунта
+GET    /api/music/my-vk/{telegram_id}       - аудиозаписи с персональным токеном
+```
+
 ### Бэкапы и экспорт
 ```
 GET /api/export/database        - экспорт всей БД
