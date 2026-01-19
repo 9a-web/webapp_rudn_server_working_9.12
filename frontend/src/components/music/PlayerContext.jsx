@@ -140,6 +140,11 @@ export const PlayerProvider = ({ children }) => {
         { src: artworkUrl, sizes: '512x512', type: 'image/png' },
       ]
     });
+    
+    // ВАЖНО: Устанавливаем playbackState сразу после metadata
+    // Это "активирует" Media Session на iOS/Android для первого трека
+    // На некоторых устройствах без этого системный плеер не появляется
+    navigator.mediaSession.playbackState = 'playing';
 
     console.log('🎵 Media Session updated:', track.title, '-', track.artist);
   }, []);
