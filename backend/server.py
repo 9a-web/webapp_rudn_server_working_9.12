@@ -280,6 +280,10 @@ async def create_indexes():
         # Notification History
         await db.notification_history.create_index([("telegram_id", 1), ("sent_at", -1)])
         
+        # Cover Cache (Deezer обложки)
+        await db.cover_cache.create_index("cache_key", unique=True)
+        await db.cover_cache.create_index("expires_at", expireAfterSeconds=0)  # TTL индекс
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
