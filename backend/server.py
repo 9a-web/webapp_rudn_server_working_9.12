@@ -7604,10 +7604,13 @@ async def music_redirect(track_id: str):
 
 @api_router.get("/music/my")
 async def music_my_audio(count: int = 50, offset: int = 0):
-    """Мои аудиозаписи VK"""
+    """Мои аудиозаписи VK с обложками из Deezer"""
     try:
         tracks = music_service.get_my_audio(count, offset)
         current_count = len(tracks)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
         
         # Проверяем, есть ли ещё треки, запрашивая следующую порцию
         # VK API может возвращать меньше треков, чем запрошено из-за фильтрации
