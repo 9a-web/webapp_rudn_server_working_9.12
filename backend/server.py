@@ -7626,9 +7626,13 @@ async def music_my_audio(count: int = 50, offset: int = 0):
 
 @api_router.get("/music/popular")
 async def music_popular(count: int = 30, offset: int = 0):
-    """Популярные треки с пагинацией"""
+    """Популярные треки с пагинацией и обложками из Deezer"""
     try:
         tracks = music_service.get_popular(count, offset)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
         # has_more = true если получили полный набор треков
         has_more = len(tracks) == count
         return {"tracks": tracks, "count": len(tracks), "has_more": has_more, "offset": offset}
