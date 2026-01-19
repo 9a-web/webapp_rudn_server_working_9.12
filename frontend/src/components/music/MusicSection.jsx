@@ -244,6 +244,25 @@ export const MusicSection = ({ telegramId }) => {
     setSelectedArtist(null);
   }, []);
 
+  // Обработка закрытия модального окна VK Auth
+  const handleVkAuthModalClose = useCallback(() => {
+    setVkAuthModalOpen(false);
+    // Обновляем статус авторизации
+    checkVkAuthStatus();
+    // Если переключены на вкладку "Мои", перезагружаем контент
+    if (activeTab === 'my') {
+      loadContent();
+    }
+  }, [activeTab]);
+
+  // Открыть модальное окно VK Auth
+  const handleOpenVkAuth = () => {
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+    setVkAuthModalOpen(true);
+  };
+
   return (
     <div className="pb-36">
       {/* Tabs */}
