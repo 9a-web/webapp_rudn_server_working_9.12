@@ -332,7 +332,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   cy="60"
                   r={circleRadius}
                   stroke={themeStyles.circle.bgStroke.includes('url') ? themeStyles.circle.bgStroke : themeStyles.circle.bgStroke}
-                  strokeWidth="14"
+                  strokeWidth={bgStrokeWidth}
                   fill="none"
                   strokeLinecap="round"
                   initial={{ opacity: 0.3 }}
@@ -355,7 +355,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   cy="60"
                   r={circleRadius}
                   stroke={`url(#${themeStyles.circle.strokeId})`}
-                  strokeWidth="15"
+                  strokeWidth={progressStrokeWidth}
                   fill="none"
                   strokeLinecap="round"
                   initial={{ 
