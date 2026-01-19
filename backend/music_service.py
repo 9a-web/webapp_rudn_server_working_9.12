@@ -291,5 +291,43 @@ class VKMusicService:
         }
 
 
+    async def enrich_tracks_with_covers(self, tracks: list) -> list:
+        """
+        Добавляет обложки к трекам из Deezer API (для треков без обложек).
+        
+        Args:
+            tracks: Список треков
+        
+        Returns:
+            Список треков с обогащёнными обложками
+        """
+        if not tracks:
+            return tracks
+        
+        try:
+            from cover_service import get_cover_service
+            cover_svc = get_cover_service()
+            
+            if not cover_svc:
+                logger.warning("Cover service not initialized")
+                return tracks
+            
+            # Получаем обложки пакетно для треков без обложек
+            covers = await cover_svc.get_covers_batch(tracks, size='big')
+            
+            # Обогащаем треки
+            for track in tracks:
+                track_id = track.get('id')
+                # Если у трека нет обложки, берём из Deezer
+                if not track.get('cover') and track_id in covers:
+                    track['cover'] = covers[track_id]
+            
+            return tracks
+            
+        except Exception as e:
+            logger.error(f"Error enriching tracks with covers: {e}")
+            return tracks
+
+
 # Singleton instance
 music_service = VKMusicService()
