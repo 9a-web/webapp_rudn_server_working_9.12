@@ -7670,9 +7670,14 @@ async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str
 
 @api_router.get("/music/artist/{artist_name:path}")
 async def music_artist_tracks(artist_name: str, count: int = 50):
-    """Получить треки артиста по имени"""
+    """Получить треки артиста по имени с обложками из Deezer"""
     try:
         result = await music_service.get_artist_tracks(artist_name, count)
+        
+        # Обогащаем треки обложками из Deezer API
+        if result.get('tracks'):
+            result['tracks'] = await music_service.enrich_tracks_with_covers(result['tracks'])
+        
         return result
     except Exception as e:
         logger.error(f"Music artist tracks error: {e}")
