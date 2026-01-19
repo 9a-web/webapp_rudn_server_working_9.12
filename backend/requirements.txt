@@ -48,3 +48,4 @@ aiofiles
 playwright
 pyee
 greenlet
+vkaudiotoken
