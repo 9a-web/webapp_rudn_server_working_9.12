@@ -288,6 +288,13 @@ export const PlayerProvider = ({ children }) => {
             setIsLoading(false);
             setError(null);
             
+            // ВАЖНО: Сразу устанавливаем playbackState для системного плеера
+            // Это решает проблему когда первый трек не появляется в системном плеере
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+              console.log('🎵 Media Session playbackState set to playing');
+            }
+            
             // Обновляем URL в треке для будущего использования
             track.url = url;
           })
