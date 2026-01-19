@@ -383,6 +383,15 @@ telegram_id: int, referrer_id: int?, target_id: str, target_name: str
 invite_token: str, is_new_member: bool, created_at: datetime
 ```
 
+### VK Music Авторизация
+
+**user_vk_tokens**
+```python
+telegram_id: int (unique), vk_user_id: int, vk_token: str
+user_agent: str, audio_count: int
+created_at: datetime, updated_at: datetime
+```
+
 ### Кэш и прочее
 
 **schedule_cache**, **status_checks**
