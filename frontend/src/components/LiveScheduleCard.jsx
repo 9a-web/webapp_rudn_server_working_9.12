@@ -41,18 +41,18 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   const circleRadius = 42;
   const circleCircumference = 2 * Math.PI * circleRadius;
   
-  // Адаптивная толщина круга: тоньше на десктопе
-  const [isDesktop, setIsDesktop] = useState(false);
+  // Адаптивная толщина круга: тоньше на планшете и десктопе
+  const [isTabletOrDesktop, setIsTabletOrDesktop] = useState(false);
   
   useEffect(() => {
-    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
+    const checkSize = () => setIsTabletOrDesktop(window.innerWidth >= 768);
+    checkSize();
+    window.addEventListener('resize', checkSize);
+    return () => window.removeEventListener('resize', checkSize);
   }, []);
   
-  const bgStrokeWidth = isDesktop ? 12 : 14;
-  const progressStrokeWidth = isDesktop ? 13 : 15;
+  const bgStrokeWidth = isTabletOrDesktop ? 12 : 14;
+  const progressStrokeWidth = isTabletOrDesktop ? 13 : 15;
 
   // Theme Styles Configuration
   const themeStyles = {
