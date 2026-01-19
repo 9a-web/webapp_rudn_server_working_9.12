@@ -45,8 +45,27 @@ export const MusicSection = ({ telegramId }) => {
   useEffect(() => {
     if (telegramId) {
       loadFavorites();
+      checkVkAuthStatus();
     }
   }, [telegramId]);
+
+  // Проверка статуса VK авторизации
+  const checkVkAuthStatus = async () => {
+    if (!telegramId) return;
+    setCheckingVkAuth(true);
+    try {
+      const status = await musicAPI.getVKAuthStatus(telegramId);
+      setVkAuthStatus(status);
+    } catch (error) {
+      console.error('Check VK auth status error:', error);
+      setVkAuthStatus(null);
+    } finally {
+      setCheckingVkAuth(false);
+    }
+  };
+
+  // Проверка подключен ли VK
+  const isVkConnected = vkAuthStatus?.is_connected && vkAuthStatus?.token_valid && vkAuthStatus?.audio_access;
 
   // Загрузка контента при смене вкладки
   useEffect(() => {
