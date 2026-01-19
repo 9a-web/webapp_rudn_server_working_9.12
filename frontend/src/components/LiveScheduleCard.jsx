@@ -327,7 +327,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                 </defs>
                 
                 {/* Background circle */}
-                <motion.circle
+                <circle
                   cx="60"
                   cy="60"
                   r={circleRadius}
@@ -335,17 +335,9 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   strokeWidth={bgStrokeWidth}
                   fill="none"
                   strokeLinecap="round"
-                  initial={{ opacity: 0.3 }}
-                  animate={currentClass ? {
-                    opacity: [0.3, 0.5, 0.3]
-                  } : {
-                    opacity: 0.3
-                  }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: "linear",
-                    times: [0, 0.5, 1]
+                  style={{
+                    opacity: currentClass ? undefined : 0.3,
+                    animation: currentClass ? 'breathe 4s ease-in-out infinite' : 'none'
                   }}
                 />
                 
