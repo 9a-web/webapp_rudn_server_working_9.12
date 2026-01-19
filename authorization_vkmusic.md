@@ -130,7 +130,7 @@
 
 ### ⏳ Этап 7: Документация
 - [x] Создать `authorization_vkmusic.md`
-- [ ] Обновить `AI_CONTEXT.md`
+- [x] Обновить `AI_CONTEXT.md` (добавить VK Auth API endpoints)
 
 ---
 
