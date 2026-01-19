@@ -261,36 +261,23 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               style={{ overflow: 'visible' }}
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ 
-                scale: [1, 1.02, 1],
+                scale: 1,
                 opacity: 1
               }}
               transition={{ 
-                scale: {
-                  duration: 2.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                },
-                opacity: {
-                  duration: 0.4,
-                  delay: 0.3
-                }
+                duration: 0.4,
+                delay: 0.3,
+                ease: "easeOut"
               }}
             >
               {/* Glowing background effect */}
-              <motion.div
+              <div
                 className="absolute w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full"
                 style={{
                   background: themeStyles.circle.bgGradient,
-                  filter: isWinter ? 'blur(20px)' : 'blur(25px)'
-                }}
-                animate={{ 
-                  scale: [1, 1.1, 1],
-                  opacity: [0.5, 0.8, 0.5]
-                }}
-                transition={{ 
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut"
+                  filter: isWinter ? 'blur(20px)' : 'blur(25px)',
+                  opacity: 0.6,
+                  animation: currentClass ? 'glowPulse 4s ease-in-out infinite' : 'none'
                 }}
               />
               
