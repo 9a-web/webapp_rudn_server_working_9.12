@@ -107,18 +107,24 @@ export const musicAPI = {
   // ============ VK Auth API ============
 
   /**
-   * Авторизация VK для получения токена с доступом к аудио
-   * @param {number} telegramId - ID пользователя Telegram
-   * @param {object} credentials - Данные авторизации
-   * @param {string} credentials.login - Телефон, email или логин VK
-   * @param {string} credentials.password - Пароль от VK
-   * @param {string} [credentials.two_fa_code] - Код 2FA если требуется
-   * @param {string} [credentials.captcha_key] - Ответ на капчу
-   * @param {string} [credentials.captcha_sid] - ID капчи
-   * @returns {Promise<{success: boolean, message: string, vk_user_id?: number, needs_2fa: boolean}>}
+   * Получить конфигурацию OAuth для авторизации VK
+   * @returns {Promise<{auth_url: string, app_id: number, redirect_uri: string, scope: number}>}
    */
-  vkAuth: async (telegramId, credentials) => {
-    const response = await api.post(`/music/auth/${telegramId}`, credentials);
+  getVKOAuthConfig: async () => {
+    const response = await api.get('/music/auth/config');
+    return response.data;
+  },
+
+  /**
+   * Авторизация VK через OAuth токен
+   * @param {number} telegramId - ID пользователя Telegram
+   * @param {object} data - Данные авторизации
+   * @param {string} [data.token_url] - URL с токеном из redirect
+   * @param {string} [data.access_token] - Или напрямую access_token
+   * @returns {Promise<{success: boolean, message: string, vk_user_id?: number}>}
+   */
+  vkAuth: async (telegramId, data) => {
+    const response = await api.post(`/music/auth/${telegramId}`, data);
     return response.data;
   },
 
