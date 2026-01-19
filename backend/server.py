@@ -7742,12 +7742,9 @@ async def remove_music_favorite(telegram_id: int, track_id: str):
 from vk_auth_service import vk_auth_service, VKAuthError
 
 class VKAuthRequest(BaseModel):
-    """Запрос авторизации VK"""
-    login: str = Field(..., description="Телефон, email или логин VK")
-    password: str = Field(..., description="Пароль от VK")
-    two_fa_code: Optional[str] = Field(None, description="Код 2FA если требуется")
-    captcha_key: Optional[str] = Field(None, description="Ответ на капчу")
-    captcha_sid: Optional[str] = Field(None, description="ID капчи")
+    """Запрос авторизации VK через OAuth токен"""
+    token_url: Optional[str] = Field(None, description="URL с токеном из redirect (содержит access_token в fragment)")
+    access_token: Optional[str] = Field(None, description="Или напрямую access_token")
 
 class VKAuthResponse(BaseModel):
     """Ответ авторизации VK"""
@@ -7757,44 +7754,164 @@ class VKAuthResponse(BaseModel):
     needs_2fa: bool = False
     captcha_data: Optional[dict] = None
 
+class VKOAuthConfigResponse(BaseModel):
+    """Конфигурация OAuth для VK"""
+    auth_url: str
+    app_id: int
+    redirect_uri: str
+    scope: int
+
+# VK OAuth Configuration - Kate Mobile app
+VK_OAUTH_CONFIG = {
+    "app_id": 2685278,  # Kate Mobile
+    "redirect_uri": "https://api.vk.com/blank.html",
+    "scope": 140491999,  # Все права включая audio
+    "response_type": "token"
+}
+
+@api_router.get("/music/auth/config")
+async def get_vk_oauth_config():
+    """
+    Получить конфигурацию OAuth для авторизации VK.
+    
+    Возвращает URL для авторизации через VK ID с правами на аудио.
+    """
+    import hashlib
+    import secrets
+    
+    # Генерируем хэши для URL
+    state = secrets.token_hex(16)
+    return_auth_hash = hashlib.md5(f"vk_auth_{state}".encode()).hexdigest()[:18]
+    redirect_uri_hash = hashlib.md5(f"redirect_{state}".encode()).hexdigest()[:18]
+    
+    auth_url = (
+        f"https://id.vk.com/auth?"
+        f"return_auth_hash={return_auth_hash}&"
+        f"redirect_uri={VK_OAUTH_CONFIG['redirect_uri']}&"
+        f"redirect_uri_hash={redirect_uri_hash}&"
+        f"force_hash=1&"
+        f"app_id={VK_OAUTH_CONFIG['app_id']}&"
+        f"response_type={VK_OAUTH_CONFIG['response_type']}&"
+        f"scope={VK_OAUTH_CONFIG['scope']}&"
+        f"state={state}"
+    )
+    
+    return VKOAuthConfigResponse(
+        auth_url=auth_url,
+        app_id=VK_OAUTH_CONFIG['app_id'],
+        redirect_uri=VK_OAUTH_CONFIG['redirect_uri'],
+        scope=VK_OAUTH_CONFIG['scope']
+    )
+
+def parse_vk_token_from_url(url: str) -> dict:
+    """
+    Парсит токен VK из URL после OAuth редиректа.
+    
+    URL формат: https://api.vk.com/blank.html#access_token=...&expires_in=...&user_id=...
+    """
+    import re
+    from urllib.parse import urlparse, parse_qs
+    
+    result = {
+        "access_token": None,
+        "user_id": None,
+        "expires_in": None
+    }
+    
+    # Если это полный URL
+    if url.startswith("http"):
+        parsed = urlparse(url)
+        # Токен в fragment (#)
+        fragment = parsed.fragment
+        if fragment:
+            params = parse_qs(fragment)
+            result["access_token"] = params.get("access_token", [None])[0]
+            result["user_id"] = params.get("user_id", [None])[0]
+            result["expires_in"] = params.get("expires_in", [None])[0]
+    
+    # Если это просто токен
+    elif url.startswith("vk1.") or len(url) > 50:
+        result["access_token"] = url.strip()
+    
+    # Попробуем извлечь токен из произвольной строки
+    if not result["access_token"]:
+        # Ищем access_token= в строке
+        token_match = re.search(r'access_token=([^&\s]+)', url)
+        if token_match:
+            result["access_token"] = token_match.group(1)
+        
+        # Ищем user_id
+        user_match = re.search(r'user_id=(\d+)', url)
+        if user_match:
+            result["user_id"] = user_match.group(1)
+    
+    return result
+
 @api_router.post("/music/auth/{telegram_id}", response_model=VKAuthResponse)
 async def vk_auth(telegram_id: int, request: VKAuthRequest):
     """
-    Авторизация VK для получения токена с доступом к аудио.
+    Авторизация VK через OAuth токен.
     
     Процесс:
-    1. Пользователь вводит логин/пароль VK
-    2. Сервер получает Kate Mobile токен
-    3. Токен сохраняется в MongoDB
-    4. При необходимости запрашивается 2FA код
+    1. Пользователь авторизуется в VK через OAuth ссылку
+    2. Получает URL с токеном (redirect на blank.html)
+    3. Вставляет URL или токен в приложение
+    4. Сервер парсит и валидирует токен
+    5. Токен сохраняется в MongoDB
     """
     try:
-        # Авторизация через VK
-        auth_result = await vk_auth_service.authenticate(
-            login=request.login,
-            password=request.password,
-            two_fa_code=request.two_fa_code,
-            captcha_key=request.captcha_key,
-            captcha_sid=request.captcha_sid
-        )
+        # Парсим токен из URL или берём напрямую
+        token = None
+        vk_user_id = None
+        
+        if request.token_url:
+            parsed = parse_vk_token_from_url(request.token_url)
+            token = parsed.get("access_token")
+            vk_user_id = parsed.get("user_id")
+            if vk_user_id:
+                vk_user_id = int(vk_user_id)
+        elif request.access_token:
+            token = request.access_token.strip()
+        
+        if not token:
+            return VKAuthResponse(
+                success=False,
+                message="Не удалось извлечь токен. Убедитесь, что вы скопировали полный URL из адресной строки.",
+                needs_2fa=False
+            )
+        
+        # Валидируем токен через VK API
+        verify_result = await vk_auth_service.verify_token(token)
+        
+        if not verify_result.get("valid"):
+            return VKAuthResponse(
+                success=False,
+                message=f"Недействительный токен: {verify_result.get('error', 'Unknown error')}",
+                needs_2fa=False
+            )
+        
+        # Получаем user_id из токена если не было в URL
+        if not vk_user_id:
+            vk_user_id = verify_result.get("user_id")
         
         # Проверяем доступ к аудио
-        audio_check = await vk_auth_service.test_audio_access(auth_result["token"])
+        audio_check = await vk_auth_service.test_audio_access(token)
         
         if not audio_check.get("has_access"):
             return VKAuthResponse(
                 success=False,
-                message=f"Токен получен, но нет доступа к аудио: {audio_check.get('error', 'Unknown')}",
+                message=f"Токен действителен, но нет доступа к аудио. Попробуйте получить токен через приложение Kate Mobile.",
                 needs_2fa=False
             )
         
         # Сохраняем токен в MongoDB
         token_doc = {
             "telegram_id": telegram_id,
-            "vk_user_id": auth_result["user_id"],
-            "vk_token": auth_result["token"],
-            "user_agent": auth_result["user_agent"],
+            "vk_user_id": vk_user_id,
+            "vk_token": token,
+            "user_agent": "KateMobileAndroid/93 lite-530 (Android 10; SDK 29; arm64-v8a; Xiaomi Redmi Note 8 Pro; ru)",
             "audio_count": audio_check.get("audio_count", 0),
+            "auth_method": "oauth",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -7806,25 +7923,18 @@ async def vk_auth(telegram_id: int, request: VKAuthRequest):
             upsert=True
         )
         
-        logger.info(f"VK token saved for telegram_id: {telegram_id}, vk_user_id: {auth_result['user_id']}")
+        user_name = f"{verify_result.get('first_name', '')} {verify_result.get('last_name', '')}".strip()
+        logger.info(f"VK OAuth token saved for telegram_id: {telegram_id}, vk_user_id: {vk_user_id}, user: {user_name}")
         
         return VKAuthResponse(
             success=True,
-            message="VK аккаунт успешно подключен!",
-            vk_user_id=auth_result["user_id"],
+            message=f"VK аккаунт подключен! Добро пожаловать, {user_name}",
+            vk_user_id=vk_user_id,
             needs_2fa=False
         )
         
-    except VKAuthError as e:
-        logger.warning(f"VK auth error for {telegram_id}: {e.message}")
-        return VKAuthResponse(
-            success=False,
-            message=e.message,
-            needs_2fa=e.needs_2fa,
-            captcha_data=e.captcha_data
-        )
     except Exception as e:
-        logger.error(f"VK auth unexpected error: {e}")
+        logger.error(f"VK OAuth auth error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
