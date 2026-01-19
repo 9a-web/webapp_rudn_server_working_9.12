@@ -102,7 +102,13 @@ export const MusicSection = ({ telegramId }) => {
       switch (activeTab) {
         case 'my': {
           const currentOffset = loadMore ? offsetRef.current : 0;
-          const my = await musicAPI.getMyAudio(TRACKS_PER_PAGE, currentOffset);
+          // Используем персональный токен если VK подключен
+          let my;
+          if (isVkConnected && telegramId) {
+            my = await musicAPI.getMyVKAudio(telegramId, TRACKS_PER_PAGE, currentOffset);
+          } else {
+            my = await musicAPI.getMyAudio(TRACKS_PER_PAGE, currentOffset);
+          }
           const newTracks = my.tracks || [];
           
           if (loadMore) {
