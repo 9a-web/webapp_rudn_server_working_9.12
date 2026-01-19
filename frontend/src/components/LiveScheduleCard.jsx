@@ -51,8 +51,8 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
   
-  const bgStrokeWidth = isDesktop ? 8 : 14;
-  const progressStrokeWidth = isDesktop ? 9 : 15;
+  const bgStrokeWidth = isDesktop ? 12 : 14;
+  const progressStrokeWidth = isDesktop ? 13 : 15;
 
   // Theme Styles Configuration
   const themeStyles = {
