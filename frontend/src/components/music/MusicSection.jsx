@@ -404,7 +404,7 @@ export const MusicSection = ({ telegramId }) => {
                 activeTab === 'favorites' 
                   ? 'Нет избранных треков' 
                   : activeTab === 'my'
-                  ? 'Нет аудиозаписей'
+                  ? (isVkConnected ? 'Нет аудиозаписей' : 'Подключите VK аккаунт для загрузки ваших треков')
                   : 'Треки не найдены'
               }
             />
