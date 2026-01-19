@@ -1,4 +1,16 @@
 backend:
+  - task: "Music Cover API - Deezer Integration"
+    implemented: true
+    working: pending
+    file: "/app/backend/cover_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Implemented Deezer API integration for track covers. Created cover_service.py with CoverService class, MongoDB caching (30 day TTL), and integrated into music endpoints. Manual tests show covers working for popular tracks (Imagine Dragons - Believer)."
+
   - task: "Music Pagination API - Initial Load"
     implemented: true
     working: true
