@@ -182,7 +182,10 @@ export const LiveScheduleSection = ({
     const deltaY = Math.abs(touchEndY.current - touchStartY.current);
     
     // Обновляем motion value для визуальной обратной связи
-    if (Math.abs(deltaX) > deltaY) {
+    // Только когда горизонтальное движение БОЛЬШЕ вертикального
+    if (Math.abs(deltaX) > deltaY && Math.abs(deltaX) > 10) {
+      // Блокируем вертикальный скролл только при явном горизонтальном свайпе
+      e.preventDefault();
       x.set(deltaX);
       
       // Показываем индикатор направления
@@ -194,6 +197,7 @@ export const LiveScheduleSection = ({
         setSwipeDirection(0);
       }
     }
+    // При вертикальном движении НЕ вызываем preventDefault - позволяем скроллу работать
   }, [x]);
   
   const handleTouchEnd = useCallback(() => {
