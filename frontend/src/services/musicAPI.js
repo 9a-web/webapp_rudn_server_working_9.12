@@ -102,6 +102,56 @@ export const musicAPI = {
   getArtistTracks: async (artistName, count = 50) => {
     const response = await api.get(`/music/artist/${encodeURIComponent(artistName)}?count=${count}`);
     return response.data;
+  },
+
+  // ============ VK Auth API ============
+
+  /**
+   * Авторизация VK для получения токена с доступом к аудио
+   * @param {number} telegramId - ID пользователя Telegram
+   * @param {object} credentials - Данные авторизации
+   * @param {string} credentials.login - Телефон, email или логин VK
+   * @param {string} credentials.password - Пароль от VK
+   * @param {string} [credentials.two_fa_code] - Код 2FA если требуется
+   * @param {string} [credentials.captcha_key] - Ответ на капчу
+   * @param {string} [credentials.captcha_sid] - ID капчи
+   * @returns {Promise<{success: boolean, message: string, vk_user_id?: number, needs_2fa: boolean}>}
+   */
+  vkAuth: async (telegramId, credentials) => {
+    const response = await api.post(`/music/auth/${telegramId}`, credentials);
+    return response.data;
+  },
+
+  /**
+   * Получить статус авторизации VK пользователя
+   * @param {number} telegramId - ID пользователя Telegram
+   * @returns {Promise<{is_connected: boolean, vk_user_id?: number, vk_user_info?: object, token_valid?: boolean, audio_access?: boolean}>}
+   */
+  getVKAuthStatus: async (telegramId) => {
+    const response = await api.get(`/music/auth/status/${telegramId}`);
+    return response.data;
+  },
+
+  /**
+   * Отключить VK аккаунт (удалить токен)
+   * @param {number} telegramId - ID пользователя Telegram
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  vkAuthDisconnect: async (telegramId) => {
+    const response = await api.delete(`/music/auth/${telegramId}`);
+    return response.data;
+  },
+
+  /**
+   * Получить аудиозаписи пользователя с его персональным токеном
+   * @param {number} telegramId - ID пользователя Telegram
+   * @param {number} count - Количество треков
+   * @param {number} offset - Смещение для пагинации
+   * @returns {Promise<{tracks: Array, count: number, total: number, has_more: boolean}>}
+   */
+  getMyVKAudio: async (telegramId, count = 50, offset = 0) => {
+    const response = await api.get(`/music/my-vk/${telegramId}?count=${count}&offset=${offset}`);
+    return response.data;
   }
 };
 
