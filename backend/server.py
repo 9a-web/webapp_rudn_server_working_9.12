@@ -7737,6 +7737,273 @@ async def remove_music_favorite(telegram_id: int, track_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ VK AUTH API ============
+
+from vk_auth_service import vk_auth_service, VKAuthError
+
+class VKAuthRequest(BaseModel):
+    """Запрос авторизации VK"""
+    login: str = Field(..., description="Телефон, email или логин VK")
+    password: str = Field(..., description="Пароль от VK")
+    two_fa_code: Optional[str] = Field(None, description="Код 2FA если требуется")
+    captcha_key: Optional[str] = Field(None, description="Ответ на капчу")
+    captcha_sid: Optional[str] = Field(None, description="ID капчи")
+
+class VKAuthResponse(BaseModel):
+    """Ответ авторизации VK"""
+    success: bool
+    message: str
+    vk_user_id: Optional[int] = None
+    needs_2fa: bool = False
+    captcha_data: Optional[dict] = None
+
+@api_router.post("/music/auth/{telegram_id}", response_model=VKAuthResponse)
+async def vk_auth(telegram_id: int, request: VKAuthRequest):
+    """
+    Авторизация VK для получения токена с доступом к аудио.
+    
+    Процесс:
+    1. Пользователь вводит логин/пароль VK
+    2. Сервер получает Kate Mobile токен
+    3. Токен сохраняется в MongoDB
+    4. При необходимости запрашивается 2FA код
+    """
+    try:
+        # Авторизация через VK
+        auth_result = await vk_auth_service.authenticate(
+            login=request.login,
+            password=request.password,
+            two_fa_code=request.two_fa_code,
+            captcha_key=request.captcha_key,
+            captcha_sid=request.captcha_sid
+        )
+        
+        # Проверяем доступ к аудио
+        audio_check = await vk_auth_service.test_audio_access(auth_result["token"])
+        
+        if not audio_check.get("has_access"):
+            return VKAuthResponse(
+                success=False,
+                message=f"Токен получен, но нет доступа к аудио: {audio_check.get('error', 'Unknown')}",
+                needs_2fa=False
+            )
+        
+        # Сохраняем токен в MongoDB
+        token_doc = {
+            "telegram_id": telegram_id,
+            "vk_user_id": auth_result["user_id"],
+            "vk_token": auth_result["token"],
+            "user_agent": auth_result["user_agent"],
+            "audio_count": audio_check.get("audio_count", 0),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Upsert - обновляем если существует, создаем если нет
+        await db.user_vk_tokens.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": token_doc},
+            upsert=True
+        )
+        
+        logger.info(f"VK token saved for telegram_id: {telegram_id}, vk_user_id: {auth_result['user_id']}")
+        
+        return VKAuthResponse(
+            success=True,
+            message="VK аккаунт успешно подключен!",
+            vk_user_id=auth_result["user_id"],
+            needs_2fa=False
+        )
+        
+    except VKAuthError as e:
+        logger.warning(f"VK auth error for {telegram_id}: {e.message}")
+        return VKAuthResponse(
+            success=False,
+            message=e.message,
+            needs_2fa=e.needs_2fa,
+            captcha_data=e.captcha_data
+        )
+    except Exception as e:
+        logger.error(f"VK auth unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/auth/status/{telegram_id}")
+async def vk_auth_status(telegram_id: int):
+    """
+    Проверка статуса авторизации VK пользователя.
+    
+    Returns:
+        - is_connected: bool - подключен ли VK аккаунт
+        - vk_user_id: int - ID пользователя VK
+        - vk_user_info: dict - информация о пользователе VK
+        - token_valid: bool - валиден ли токен
+        - audio_access: bool - есть ли доступ к аудио
+    """
+    try:
+        # Ищем сохраненный токен
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            return {
+                "is_connected": False,
+                "message": "VK аккаунт не подключен"
+            }
+        
+        # Проверяем валидность токена
+        token = token_doc.get("vk_token")
+        verify_result = await vk_auth_service.verify_token(token)
+        
+        if not verify_result.get("valid"):
+            return {
+                "is_connected": True,
+                "vk_user_id": token_doc.get("vk_user_id"),
+                "token_valid": False,
+                "message": "Токен истёк, требуется повторная авторизация",
+                "error": verify_result.get("error")
+            }
+        
+        # Проверяем доступ к аудио
+        audio_check = await vk_auth_service.test_audio_access(token)
+        
+        return {
+            "is_connected": True,
+            "vk_user_id": token_doc.get("vk_user_id"),
+            "vk_user_info": {
+                "first_name": verify_result.get("first_name"),
+                "last_name": verify_result.get("last_name"),
+                "photo": verify_result.get("photo")
+            },
+            "token_valid": True,
+            "audio_access": audio_check.get("has_access", False),
+            "audio_count": audio_check.get("audio_count", 0),
+            "connected_at": token_doc.get("created_at").isoformat() if token_doc.get("created_at") else None
+        }
+        
+    except Exception as e:
+        logger.error(f"VK auth status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/music/auth/{telegram_id}")
+async def vk_auth_disconnect(telegram_id: int):
+    """
+    Отключение VK аккаунта (удаление токена).
+    """
+    try:
+        result = await db.user_vk_tokens.delete_one({"telegram_id": telegram_id})
+        
+        if result.deleted_count > 0:
+            logger.info(f"VK token deleted for telegram_id: {telegram_id}")
+            return {"success": True, "message": "VK аккаунт отключен"}
+        else:
+            return {"success": False, "message": "VK аккаунт не был подключен"}
+            
+    except Exception as e:
+        logger.error(f"VK auth disconnect error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/my-vk/{telegram_id}")
+async def get_my_vk_audio(telegram_id: int, count: int = 50, offset: int = 0):
+    """
+    Получение аудиозаписей пользователя с использованием его персонального токена.
+    
+    Использует персональный токен пользователя для доступа к его аудио.
+    """
+    try:
+        # Получаем токен пользователя
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            raise HTTPException(
+                status_code=401, 
+                detail="VK аккаунт не подключен. Авторизуйтесь в разделе Музыка."
+            )
+        
+        token = token_doc.get("vk_token")
+        vk_user_id = token_doc.get("vk_user_id")
+        user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
+        
+        # Запрос к VK API
+        import requests
+        response = requests.get(
+            "https://api.vk.com/method/audio.get",
+            params={
+                "access_token": token,
+                "owner_id": vk_user_id,
+                "count": count,
+                "offset": offset,
+                "v": "5.131"
+            },
+            headers={"User-Agent": user_agent},
+            timeout=15
+        )
+        data = response.json()
+        
+        if "error" in data:
+            error = data["error"]
+            error_code = error.get("error_code", 0)
+            
+            # Токен истёк
+            if error_code in [5, 27]:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Токен истёк. Требуется повторная авторизация."
+                )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error.get("error_msg", "VK API Error")
+            )
+        
+        items = data.get("response", {}).get("items", [])
+        total_count = data.get("response", {}).get("count", 0)
+        
+        # Форматируем треки
+        tracks = []
+        for item in items:
+            cover_url = None
+            album = item.get("album", {})
+            if album:
+                thumb = album.get("thumb", {})
+                if thumb:
+                    cover_url = thumb.get("photo_600") or thumb.get("photo_300")
+            
+            track_id = f"{item['owner_id']}_{item['id']}"
+            direct_url = item.get("url", "")
+            is_blocked = not direct_url or "audio_api_unavailable" in direct_url
+            
+            tracks.append({
+                "id": track_id,
+                "owner_id": item["owner_id"],
+                "song_id": item["id"],
+                "artist": item.get("artist", "Unknown"),
+                "title": item.get("title", "Unknown"),
+                "duration": item.get("duration", 0),
+                "url": direct_url if not is_blocked else None,
+                "cover": cover_url,
+                "stream_url": f"/api/music/stream/{track_id}",
+                "is_blocked": is_blocked
+            })
+        
+        # Обогащаем обложками
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        return {
+            "tracks": tracks,
+            "count": len(tracks),
+            "total": total_count,
+            "has_more": offset + len(tracks) < total_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get my VK audio error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
