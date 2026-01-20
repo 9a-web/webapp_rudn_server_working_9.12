@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@twa-dev/sdk": "^8.0.2",
+    "@vkontakte/icons": "^3.33.0",
     "axios": "^1.12.2",
     "canvas-confetti": "^1.9.4",
     "framer-motion": "^12.23.24",
