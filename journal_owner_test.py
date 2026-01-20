@@ -27,11 +27,10 @@ def create_test_journal():
     try:
         journal_data = {
             "name": f"Test Journal {datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "group_name": "ИКБО-01-21",
             "description": "Test journal for owner linking",
             "telegram_id": TEST_OWNER_ID,
-            "username": TEST_USERNAME,
-            "first_name": TEST_FIRST_NAME,
-            "last_name": TEST_LAST_NAME
+            "color": "blue"
         }
         
         url = f"{API_BASE}/journals"
