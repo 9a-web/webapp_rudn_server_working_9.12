@@ -219,7 +219,9 @@ export const MusicSection = ({ telegramId }) => {
     setLoading(true);
     
     try {
-      const result = await musicAPI.getPlaylistTracks(
+      // Используем персональный токен пользователя
+      const result = await musicAPI.getPlaylistTracksVK(
+        telegramId,
         playlist.owner_id, 
         playlist.id,
         playlist.access_key || ''
