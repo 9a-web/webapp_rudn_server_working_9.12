@@ -39,6 +39,7 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [needs2FA, setNeeds2FA] = useState(false);
+  const [twofaData, setTwofaData] = useState(null); // phone_mask, validation_type
   
   // Статус подключения
   const [authStatus, setAuthStatus] = useState(null);
@@ -59,6 +60,7 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
       setError('');
       setSuccess('');
       setNeeds2FA(false);
+      setTwofaData(null);
       setShowPassword(false);
     }
   }, [isOpen]);
