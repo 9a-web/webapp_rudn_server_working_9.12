@@ -357,11 +357,25 @@ export const MusicSection = ({ telegramId }) => {
             <span className="text-sm font-medium">{tab.label}</span>
             {/* Индикатор VK для вкладок "Мои" и "Плейлисты" */}
             {(tab.id === 'my' || tab.id === 'playlists') && isVkConnected && (
-              <motion.span 
-                animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                className="w-2 h-2 rounded-full bg-green-400" 
-              />
+              <span className="relative flex items-center justify-center w-2 h-2">
+                {/* Расходящиеся круги */}
+                <motion.span
+                  animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+                  className="absolute w-2 h-2 rounded-full bg-green-400"
+                />
+                <motion.span
+                  animate={{ scale: [1, 2.5], opacity: [0.6, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut", delay: 0.5 }}
+                  className="absolute w-2 h-2 rounded-full bg-green-400"
+                />
+                {/* Центральная точка */}
+                <motion.span 
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative w-2 h-2 rounded-full bg-green-400" 
+                />
+              </span>
             )}
           </button>
         ))}
