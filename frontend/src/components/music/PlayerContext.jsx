@@ -604,21 +604,45 @@ export const PlayerProvider = ({ children }) => {
       pause();
     });
 
+    // ВАЖНО: Динамическое управление кнопками переключения треков
+    // iOS/Android показывают кнопки seek ±10 сек если обработчик зарегистрирован, но недоступен
+    // Решение: устанавливаем обработчик только когда действие действительно возможно
+    
+    // Проверяем, есть ли предыдущий незаблокированный трек
+    const hasPrevTrack = queue.length > 0 && queueIndex > 0 && queue.slice(0, queueIndex).some(
+      t => t.is_blocked !== true && t.content_restricted !== true && t.is_licensed !== false
+    );
+    
+    // Проверяем, есть ли следующий незаблокированный трек
+    const hasNextTrack = queue.length > 0 && queueIndex < queue.length - 1 && queue.slice(queueIndex + 1).some(
+      t => t.is_blocked !== true && t.content_restricted !== true && t.is_licensed !== false
+    );
+
     // Обработчик Previous Track (кнопка ⏮)
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-      console.log('🎵 Media Session: previoustrack');
-      if (queue.length > 0 && queueIndex > 0) {
+    // Устанавливаем только если есть предыдущий трек, иначе null чтобы скрыть кнопку
+    if (hasPrevTrack) {
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        console.log('🎵 Media Session: previoustrack');
         prev();
-      }
-    });
+      });
+      console.log('🎵 Media Session: previoustrack handler SET (has prev track)');
+    } else {
+      navigator.mediaSession.setActionHandler('previoustrack', null);
+      console.log('🎵 Media Session: previoustrack handler REMOVED (no prev track)');
+    }
 
     // Обработчик Next Track (кнопка ⏭)
-    navigator.mediaSession.setActionHandler('nexttrack', () => {
-      console.log('🎵 Media Session: nexttrack');
-      if (queue.length > 0 && queueIndex < queue.length - 1) {
+    // Устанавливаем только если есть следующий трек, иначе null чтобы скрыть кнопку
+    if (hasNextTrack) {
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        console.log('🎵 Media Session: nexttrack');
         next();
-      }
-    });
+      });
+      console.log('🎵 Media Session: nexttrack handler SET (has next track)');
+    } else {
+      navigator.mediaSession.setActionHandler('nexttrack', null);
+      console.log('🎵 Media Session: nexttrack handler REMOVED (no next track)');
+    }
 
     // Обработчик Seek To (перемотка)
     navigator.mediaSession.setActionHandler('seekto', (details) => {
