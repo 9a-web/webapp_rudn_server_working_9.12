@@ -7762,6 +7762,7 @@ class VKAuthResponse(BaseModel):
     vk_user_id: Optional[int] = None
     needs_2fa: bool = False
     captcha_data: Optional[dict] = None
+    twofa_data: Optional[dict] = None  # phone_mask, validation_sid, validation_type
 
 class VKOAuthConfigResponse(BaseModel):
     """Конфигурация OAuth для VK"""
