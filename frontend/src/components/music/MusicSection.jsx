@@ -276,151 +276,58 @@ export const MusicSection = ({ telegramId }) => {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
     setVkAuthModalOpen(true);
-    setShowWelcomeBanner(false); // Скрываем баннер после нажатия
   };
-
-  // Скрыть приветственный баннер при подключении VK
-  useEffect(() => {
-    if (isVkConnected) {
-      setShowWelcomeBanner(false);
-    }
-  }, [isVkConnected]);
 
   return (
     <div className="pb-36">
-      {/* Приветственный баннер при входе в раздел Музыка (если VK не подключен) */}
-      {showWelcomeBanner && !checkingVkAuth && !isVkConnected && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mt-4 mb-4"
-        >
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20 
-                          border border-blue-500/30 backdrop-blur-sm">
-            <div className="flex flex-col items-center text-center space-y-4">
-              {/* Иконка */}
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 
-                              flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <Music2 className="w-8 h-8 text-white" />
-              </div>
-              
-              {/* Заголовок */}
-              <div>
-                <h2 className="text-xl font-bold text-white mb-1">
-                  Добро пожаловать в Музыку
-                </h2>
-                <p className="text-sm text-white/60">
-                  Для доступа к вашим аудиозаписям VK необходимо получить токен
-                </p>
-              </div>
-              
-              {/* Кнопка с пульсацией */}
-              <motion.button
-                onClick={handleOpenVkAuth}
-                animate={pulseAnimation}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                className="w-full py-4 px-6 rounded-xl font-semibold text-white
-                          bg-gradient-to-r from-blue-500 to-blue-600 
-                          hover:from-blue-600 hover:to-blue-700
-                          transition-all duration-300 flex items-center justify-center gap-3
-                          shadow-lg shadow-blue-500/30"
-              >
-                <Key className="w-5 h-5" />
-                <span>Получить токен для доступа к музыке</span>
-              </motion.button>
-              
-              {/* Подсказка */}
-              <p className="text-xs text-white/40">
-                Нажмите, чтобы авторизоваться через VK
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-      
-      {/* VK Auth Status Bar - показывается на ВСЕХ вкладках */}
-      {!showWelcomeBanner && (
+      {/* Компактная кнопка "Получить токен" - показывается на ВСЕХ вкладках КРОМЕ "Мои" (если VK не подключен) */}
+      {!checkingVkAuth && !isVkConnected && activeTab !== 'my' && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mx-4 mt-2 mb-2"
         >
-          {checkingVkAuth ? (
-            <div className="p-3 rounded-xl bg-white/5 flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 text-white/50 animate-spin" />
-              <span className="text-sm text-white/50">Проверка VK...</span>
-            </div>
-          ) : isVkConnected ? (
-            <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-green-400">
-                  VK подключен • {vkAuthStatus?.audio_count || 0} треков
-                </span>
-              </div>
-              <button
-                onClick={handleOpenVkAuth}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                <Settings className="w-4 h-4 text-white/50" />
-              </button>
-            </div>
-          ) : activeTab === 'my' ? (
-            /* Крупная кнопка для вкладки "Мои" */
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600/15 via-purple-600/15 to-pink-600/15 
-                            border border-blue-500/20">
-              <div className="flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 
-                                flex items-center justify-center">
-                  <Music className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-white font-medium mb-1">Ваши аудиозаписи VK</p>
-                  <p className="text-xs text-white/50">Подключите VK для доступа к вашей музыке</p>
-                </div>
-                <motion.button
-                  onClick={handleOpenVkAuth}
-                  animate={pulseAnimation}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  className="w-full py-3.5 px-4 rounded-xl font-medium text-white
-                            bg-gradient-to-r from-blue-500 to-blue-600 
-                            hover:from-blue-600 hover:to-blue-700
-                            transition-all flex items-center justify-center gap-2
-                            shadow-lg shadow-blue-500/25"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>Получить токен для доступа к музыке</span>
-                </motion.button>
-              </div>
-            </div>
-          ) : (
-            /* Компактная кнопка для остальных вкладок */
-            <motion.button
-              onClick={handleOpenVkAuth}
-              animate={pulseAnimation}
-              transition={{
-                duration: 2.5,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="w-full p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 
-                       border border-blue-500/30 hover:from-blue-500/30 hover:to-blue-600/30
-                       transition-all flex items-center justify-center gap-2"
-            >
-              <Key className="w-4 h-4 text-blue-400" />
-              <span className="text-sm font-medium text-blue-400">
-                Получить токен для доступа к музыке
+          <motion.button
+            onClick={handleOpenVkAuth}
+            animate={pulseAnimation}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="w-full p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 
+                     border border-blue-500/30 hover:from-blue-500/30 hover:to-blue-600/30
+                     transition-all flex items-center justify-center gap-2"
+          >
+            <Key className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-medium text-blue-400">
+              Получить токен для доступа к музыке
+            </span>
+          </motion.button>
+        </motion.div>
+      )}
+      
+      {/* Статус VK подключен - показывается на всех вкладках */}
+      {!checkingVkAuth && isVkConnected && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-4 mt-2 mb-2"
+        >
+          <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              <span className="text-sm text-green-400">
+                VK подключен • {vkAuthStatus?.audio_count || 0} треков
               </span>
-            </motion.button>
-          )}
+            </div>
+            <button
+              onClick={handleOpenVkAuth}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <Settings className="w-4 h-4 text-white/50" />
+            </button>
+          </div>
         </motion.div>
       )}
 
