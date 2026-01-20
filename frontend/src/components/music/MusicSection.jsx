@@ -20,7 +20,8 @@ const pulseAnimation = {
 };
 
 export const MusicSection = ({ telegramId }) => {
-  const [activeTab, setActiveTab] = useState('search');
+  // По умолчанию открываем вкладку "Мои"
+  const [activeTab, setActiveTab] = useState('my');
   const [tracks, setTracks] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [favorites, setFavorites] = useState([]);
@@ -36,9 +37,6 @@ export const MusicSection = ({ telegramId }) => {
   const [vkAuthModalOpen, setVkAuthModalOpen] = useState(false);
   const [vkAuthStatus, setVkAuthStatus] = useState(null);
   const [checkingVkAuth, setCheckingVkAuth] = useState(true);
-  
-  // Состояние: показывать ли приветственный баннер (при первом входе)
-  const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   // Используем useRef для offset чтобы избежать race conditions
   const offsetRef = useRef(0);
