@@ -396,21 +396,21 @@ export const MusicSection = ({ telegramId }) => {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center justify-center px-4 py-8 min-h-[50vh]"
           >
-            <div className="w-full max-w-sm p-6 rounded-2xl bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20 
+            <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20 
                             border border-blue-500/30 backdrop-blur-sm">
-              <div className="flex flex-col items-center text-center space-y-5">
+              <div className="flex flex-col items-center text-center space-y-5 sm:space-y-6">
                 {/* Иконка */}
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 
                                 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                  <Music2 className="w-10 h-10 text-white" />
+                  <Music2 className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
                 </div>
                 
                 {/* Заголовок */}
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                     Добро пожаловать в Музыку
                   </h2>
-                  <p className="text-sm text-white/60 leading-relaxed">
+                  <p className="text-sm sm:text-base text-white/60 leading-relaxed max-w-md mx-auto">
                     Для доступа к вашим аудиозаписям VK необходимо получить токен авторизации
                   </p>
                 </div>
@@ -424,18 +424,18 @@ export const MusicSection = ({ telegramId }) => {
                     repeat: Infinity,
                     ease: "easeInOut"
                   }}
-                  className="w-full py-4 px-6 rounded-xl font-semibold text-white
+                  className="w-full sm:w-auto sm:min-w-[320px] py-4 px-6 sm:px-8 rounded-xl font-semibold text-white text-base sm:text-lg
                             bg-gradient-to-r from-blue-500 to-blue-600 
                             hover:from-blue-600 hover:to-blue-700
                             transition-all duration-300 flex items-center justify-center gap-3
                             shadow-lg shadow-blue-500/30"
                 >
-                  <Key className="w-5 h-5" />
+                  <Key className="w-5 h-5 sm:w-6 sm:h-6" />
                   <span>Получить токен для доступа к музыке</span>
                 </motion.button>
                 
                 {/* Подсказка */}
-                <p className="text-xs text-white/40">
+                <p className="text-xs sm:text-sm text-white/40">
                   Нажмите, чтобы авторизоваться через VK
                 </p>
               </div>
