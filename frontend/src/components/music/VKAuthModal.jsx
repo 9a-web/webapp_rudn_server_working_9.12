@@ -9,37 +9,37 @@ import {
   Music,
   Shield,
   RefreshCw,
-  Eye,
-  EyeOff,
-  User,
-  Lock,
-  KeyRound
+  ExternalLink,
+  Copy,
+  ClipboardPaste,
+  ArrowRight,
+  Link2
 } from 'lucide-react';
 import { musicAPI } from '../../services/musicAPI';
 
 /**
- * VKAuthModal - Модальное окно авторизации VK через логин/пароль (Kate Mobile)
+ * VKAuthModal - Модальное окно авторизации VK через OAuth (Kate Mobile)
  * 
- * Flow авторизации:
- * 1. Пользователь вводит логин (телефон/email) и пароль от VK
- * 2. Backend получает Kate Mobile токен через vkaudiotoken
- * 3. Токен даёт доступ к VK Audio API
- * 4. Пользователь получает доступ к своим аудиозаписям
+ * Flow авторизации (как на vkserv.ru):
+ * 1. Пользователь нажимает "Получить токен" → открывается VK OAuth
+ * 2. Авторизуется в VK и даёт разрешения
+ * 3. VK редиректит на blank.html#access_token=XXX&user_id=YYY
+ * 4. Пользователь копирует URL из адресной строки
+ * 5. Вставляет URL в приложение
+ * 6. Backend парсит токен и сохраняет
  */
 export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
-  // Форма авторизации
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
-  const [twoFaCode, setTwoFaCode] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  // OAuth flow state
+  const [step, setStep] = useState(1); // 1 = инструкция, 2 = ввод URL
+  const [tokenUrl, setTokenUrl] = useState('');
+  const [authUrl, setAuthUrl] = useState('');
   
   // Состояние процесса
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [loadingConfig, setLoadingConfig] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [needs2FA, setNeeds2FA] = useState(false);
-  const [twofaData, setTwofaData] = useState(null); // phone_mask, validation_type
   
   // Статус подключения
   const [authStatus, setAuthStatus] = useState(null);
@@ -48,22 +48,31 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
   useEffect(() => {
     if (isOpen && telegramId) {
       checkAuthStatus();
+      loadAuthConfig();
     }
   }, [isOpen, telegramId]);
   
   // Сброс формы при закрытии
   useEffect(() => {
     if (!isOpen) {
-      setLogin('');
-      setPassword('');
-      setTwoFaCode('');
+      setStep(1);
+      setTokenUrl('');
       setError('');
       setSuccess('');
-      setNeeds2FA(false);
-      setTwofaData(null);
-      setShowPassword(false);
     }
   }, [isOpen]);
+  
+  const loadAuthConfig = async () => {
+    setLoadingConfig(true);
+    try {
+      const config = await musicAPI.getVKAuthConfig();
+      setAuthUrl(config.auth_url);
+    } catch (err) {
+      console.error('Load auth config error:', err);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
   
   const checkAuthStatus = async () => {
     setCheckingStatus(true);
@@ -78,11 +87,46 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
     }
   };
   
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleOpenAuthUrl = () => {
+    if (!authUrl) return;
     
-    if (!login || !password) {
-      setError('Введите логин и пароль');
+    // Haptic feedback
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    }
+    
+    // Открываем VK OAuth в новом окне/вкладке
+    window.open(authUrl, '_blank');
+    
+    // Переходим к шагу ввода URL
+    setStep(2);
+  };
+  
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setTokenUrl(text);
+        
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        }
+      }
+    } catch (err) {
+      console.error('Clipboard read error:', err);
+      setError('Не удалось прочитать буфер обмена. Вставьте ссылку вручную.');
+    }
+  };
+  
+  const handleSubmitToken = async () => {
+    if (!tokenUrl.trim()) {
+      setError('Вставьте ссылку с токеном');
+      return;
+    }
+    
+    // Проверяем что это правильная ссылка
+    if (!tokenUrl.includes('access_token=') && !tokenUrl.includes('blank.html')) {
+      setError('Неверная ссылка. Скопируйте полный URL из адресной строки после авторизации.');
       return;
     }
     
@@ -97,15 +141,12 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
     
     try {
       const result = await musicAPI.vkAuth(telegramId, {
-        login: login.trim(),
-        password: password,
-        two_fa_code: twoFaCode || undefined
+        token_url: tokenUrl.trim()
       });
       
       if (result.success) {
         // Успешная авторизация
         setSuccess(result.message || 'VK аккаунт подключен!');
-        setNeeds2FA(false);
         
         // Haptic feedback
         if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -116,21 +157,8 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
         await checkAuthStatus();
         
         // Сбрасываем форму
-        setLogin('');
-        setPassword('');
-        setTwoFaCode('');
-        setTwofaData(null);
-        
-      } else if (result.needs_2fa) {
-        // Требуется 2FA
-        setNeeds2FA(true);
-        setTwofaData(result.twofa_data || null);
-        setError('');
-        setTwoFaCode(''); // Очищаем поле кода для нового ввода
-        
-        if (window.Telegram?.WebApp?.HapticFeedback) {
-          window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
-        }
+        setStep(1);
+        setTokenUrl('');
         
       } else {
         // Ошибка
@@ -179,6 +207,18 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
     setSuccess('');
     setLoading(false);
     onClose();
+  };
+  
+  const copyAuthUrl = async () => {
+    if (!authUrl) return;
+    try {
+      await navigator.clipboard.writeText(authUrl);
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      }
+    } catch (err) {
+      console.error('Copy error:', err);
+    }
   };
   
   if (!isOpen) return null;
@@ -301,172 +341,230 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                 </div>
               </div>
             ) : (
-              /* Not connected - Login form */
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* What you get */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-white/80">После подключения вы получите:</p>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-sm text-white/60">
-                      <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
-                      <span>Доступ к вашим аудиозаписям VK</span>
+              /* Not connected - OAuth Flow */
+              <div className="space-y-4">
+                {/* Step indicators */}
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    step === 1 ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/50'
+                  }`}>
+                    1
+                  </div>
+                  <div className="w-8 h-0.5 bg-white/10" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                    step === 2 ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/50'
+                  }`}>
+                    2
+                  </div>
+                </div>
+                
+                {step === 1 ? (
+                  /* Step 1: Instructions and get token */
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                      <h3 className="text-sm font-medium text-blue-400 mb-3">
+                        Как получить токен:
+                      </h3>
+                      <ol className="space-y-2 text-sm text-white/70">
+                        <li className="flex gap-2">
+                          <span className="text-blue-400 font-medium">1.</span>
+                          <span>Нажмите кнопку «Получить токен»</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <span className="text-blue-400 font-medium">2.</span>
+                          <span>Авторизуйтесь в VK (если нужно)</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <span className="text-blue-400 font-medium">3.</span>
+                          <span>Разрешите доступ приложению</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <span className="text-blue-400 font-medium">4.</span>
+                          <span>Скопируйте <strong>всю ссылку</strong> из адресной строки</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <span className="text-blue-400 font-medium">5.</span>
+                          <span>Вернитесь сюда и вставьте её</span>
+                        </li>
+                      </ol>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-white/60">
-                      <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
-                      <span>Прослушивание музыки в приложении</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Login Field */}
-                <div className="space-y-2">
-                  <label className="text-sm text-white/60">Телефон или email</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                    <input
-                      type="text"
-                      value={login}
-                      onChange={(e) => setLogin(e.target.value)}
-                      placeholder="+7 900 123 45 67"
-                      disabled={loading}
-                      className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10
-                               text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
-                               disabled:opacity-50"
-                      autoComplete="username"
-                    />
-                  </div>
-                </div>
-                
-                {/* Password Field */}
-                <div className="space-y-2">
-                  <label className="text-sm text-white/60">Пароль от VK</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      disabled={loading}
-                      className="w-full pl-11 pr-12 py-3 rounded-xl bg-white/5 border border-white/10
-                               text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
-                               disabled:opacity-50"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white/60"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-                
-                {/* 2FA Field */}
-                {needs2FA && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-2"
-                  >
-                    <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <div className="flex items-start gap-2">
-                        <Shield className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-yellow-400">
-                            Требуется код подтверждения
-                          </p>
-                          {twofaData?.phone_mask ? (
-                            <p className="text-xs text-yellow-400/70 mt-1">
-                              Код отправлен на номер {twofaData.phone_mask}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-yellow-400/70 mt-1">
-                              Введите код из SMS или приложения-аутентификатора
-                            </p>
-                          )}
+                    
+                    {/* What you get */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-white/80">После подключения:</p>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm text-white/60">
+                          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                          <span>Доступ к вашим аудиозаписям VK</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-white/60">
+                          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                          <span>Прослушивание музыки в приложении</span>
                         </div>
                       </div>
                     </div>
-                    <label className="text-sm text-white/60">Код подтверждения (2FA)</label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                      <input
-                        type="text"
-                        value={twoFaCode}
-                        onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="123456"
-                        disabled={loading}
-                        className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10
-                                 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
-                                 disabled:opacity-50 text-center text-xl tracking-widest"
-                        maxLength={6}
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        autoFocus
-                      />
+                    
+                    {/* Get Token Button */}
+                    <button
+                      onClick={handleOpenAuthUrl}
+                      disabled={loadingConfig || !authUrl}
+                      className="w-full py-3.5 rounded-xl font-medium transition-all
+                               bg-gradient-to-r from-blue-500 to-blue-600 text-white
+                               hover:from-blue-600 hover:to-blue-700
+                               disabled:opacity-50 disabled:cursor-not-allowed
+                               flex items-center justify-center gap-2"
+                    >
+                      {loadingConfig ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Загрузка...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="w-5 h-5" />
+                          <span>Получить токен</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Copy URL button */}
+                    {authUrl && (
+                      <button
+                        onClick={copyAuthUrl}
+                        className="w-full py-2.5 rounded-xl text-sm text-white/50 hover:text-white/70
+                                 bg-white/5 hover:bg-white/10 transition-colors
+                                 flex items-center justify-center gap-2"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>Скопировать ссылку</span>
+                      </button>
+                    )}
+                    
+                    {/* Skip to step 2 */}
+                    <button
+                      onClick={() => setStep(2)}
+                      className="w-full py-2.5 text-sm text-white/40 hover:text-white/60 transition-colors
+                               flex items-center justify-center gap-1"
+                    >
+                      <span>У меня уже есть ссылка с токеном</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  /* Step 2: Paste token URL */
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <div className="flex items-start gap-3">
+                        <Link2 className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-400">
+                            Вставьте ссылку с токеном
+                          </p>
+                          <p className="text-xs text-yellow-400/70 mt-1">
+                            Скопируйте всю адресную строку после авторизации в VK
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </motion.div>
+                    
+                    {/* URL Input */}
+                    <div className="space-y-2">
+                      <label className="text-sm text-white/60">Ссылка с токеном</label>
+                      <div className="relative">
+                        <textarea
+                          value={tokenUrl}
+                          onChange={(e) => setTokenUrl(e.target.value)}
+                          placeholder="https://api.vk.com/blank.html#access_token=..."
+                          disabled={loading}
+                          className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10
+                                   text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
+                                   disabled:opacity-50 resize-none text-sm"
+                          rows={3}
+                        />
+                      </div>
+                      
+                      {/* Paste button */}
+                      <button
+                        onClick={handlePasteFromClipboard}
+                        disabled={loading}
+                        className="w-full py-2.5 rounded-xl text-sm text-white/70 
+                                 bg-white/5 hover:bg-white/10 transition-colors
+                                 flex items-center justify-center gap-2"
+                      >
+                        <ClipboardPaste className="w-4 h-4" />
+                        <span>Вставить из буфера обмена</span>
+                      </button>
+                    </div>
+                    
+                    {/* Error Message */}
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2"
+                      >
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                        <p className="text-sm text-red-400">{error}</p>
+                      </motion.div>
+                    )}
+                    
+                    {/* Success Message */}
+                    {success && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-2"
+                      >
+                        <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                        <p className="text-sm text-green-400">{success}</p>
+                      </motion.div>
+                    )}
+                    
+                    {/* Submit Button */}
+                    <button
+                      onClick={handleSubmitToken}
+                      disabled={loading || !tokenUrl.trim()}
+                      className="w-full py-3.5 rounded-xl font-medium transition-all
+                               bg-gradient-to-r from-blue-500 to-blue-600 text-white
+                               hover:from-blue-600 hover:to-blue-700
+                               disabled:opacity-50 disabled:cursor-not-allowed
+                               flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Подключение...</span>
+                        </>
+                      ) : (
+                        <span>Подключить VK</span>
+                      )}
+                    </button>
+                    
+                    {/* Back to step 1 */}
+                    <button
+                      onClick={() => {
+                        setStep(1);
+                        setError('');
+                      }}
+                      disabled={loading}
+                      className="w-full py-2.5 text-sm text-white/40 hover:text-white/60 transition-colors"
+                    >
+                      ← Вернуться к инструкции
+                    </button>
+                  </div>
                 )}
-                
-                {/* Error Message */}
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2"
-                  >
-                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                    <p className="text-sm text-red-400">{error}</p>
-                  </motion.div>
-                )}
-                
-                {/* Success Message */}
-                {success && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-2"
-                  >
-                    <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    <p className="text-sm text-green-400">{success}</p>
-                  </motion.div>
-                )}
-                
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={loading || !login || !password}
-                  className="w-full py-3.5 rounded-xl font-medium transition-all
-                           bg-gradient-to-r from-blue-500 to-blue-600 text-white
-                           hover:from-blue-600 hover:to-blue-700
-                           disabled:opacity-50 disabled:cursor-not-allowed
-                           flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Подключение...</span>
-                    </>
-                  ) : needs2FA ? (
-                    <span>Подтвердить код</span>
-                  ) : (
-                    <span>Подключить VK</span>
-                  )}
-                </button>
                 
                 {/* Security Note */}
                 <div className="p-3 rounded-xl bg-white/5">
                   <div className="flex gap-2">
                     <Shield className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
                     <div className="text-xs text-white/50">
-                      <p>Ваш пароль не сохраняется на сервере.</p>
-                      <p className="mt-1">Он используется только для получения токена доступа к музыке.</p>
+                      <p>Мы не сохраняем ваш пароль.</p>
+                      <p className="mt-1">Авторизация происходит напрямую через VK.</p>
                     </div>
                   </div>
                 </div>
-              </form>
+              </div>
             )}
           </div>
         </motion.div>
