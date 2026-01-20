@@ -20,6 +20,12 @@ const pulseAnimation = {
   ]
 };
 
+// Анимация пульсации для иконки связи
+const linkPulseAnimation = {
+  scale: [1, 1.15, 1],
+  opacity: [0.8, 1, 0.8]
+};
+
 export const MusicSection = ({ telegramId }) => {
   // По умолчанию открываем вкладку "Мои"
   const [activeTab, setActiveTab] = useState('my');
