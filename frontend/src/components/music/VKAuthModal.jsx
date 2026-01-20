@@ -119,11 +119,14 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
         setLogin('');
         setPassword('');
         setTwoFaCode('');
+        setTwofaData(null);
         
       } else if (result.needs_2fa) {
         // Требуется 2FA
         setNeeds2FA(true);
+        setTwofaData(result.twofa_data || null);
         setError('');
+        setTwoFaCode(''); // Очищаем поле кода для нового ввода
         
         if (window.Telegram?.WebApp?.HapticFeedback) {
           window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
