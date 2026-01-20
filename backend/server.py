@@ -8084,33 +8084,69 @@ def parse_vk_token_from_url(url: str) -> dict:
 @api_router.post("/music/auth/{telegram_id}", response_model=VKAuthResponse)
 async def vk_auth(telegram_id: int, request: VKAuthRequest):
     """
-    Авторизация VK через OAuth токен.
+    Авторизация VK через логин/пароль (Kate Mobile) или OAuth токен.
     
-    Процесс:
-    1. Пользователь авторизуется в VK через OAuth ссылку
-    2. Получает URL с токеном (redirect на blank.html)
-    3. Вставляет URL или токен в приложение
-    4. Сервер парсит и валидирует токен
-    5. Токен сохраняется в MongoDB
+    Основной метод - логин/пароль:
+    1. Пользователь вводит логин и пароль от VK
+    2. Сервер получает токен Kate Mobile через vkaudiotoken
+    3. Токен даёт доступ к VK Audio API
+    4. Токен сохраняется в MongoDB
+    
+    Fallback - OAuth токен (если передан):
+    1. Парсим токен из URL
+    2. Валидируем и сохраняем
     """
     try:
-        # Парсим токен из URL или берём напрямую
         token = None
         vk_user_id = None
+        user_agent = "KateMobileAndroid/93 lite-530 (Android 10; SDK 29; arm64-v8a; Xiaomi Redmi Note 8 Pro; ru)"
+        auth_method = "kate_mobile"
+        user_name = ""
         
-        if request.token_url:
-            parsed = parse_vk_token_from_url(request.token_url)
-            token = parsed.get("access_token")
-            vk_user_id = parsed.get("user_id")
-            if vk_user_id:
-                vk_user_id = int(vk_user_id)
-        elif request.access_token:
-            token = request.access_token.strip()
+        # === Метод 1: Авторизация через логин/пароль (Kate Mobile) ===
+        if request.login and request.password:
+            logger.info(f"VK Kate auth attempt for telegram_id: {telegram_id}")
+            
+            try:
+                auth_result = await vk_auth_service.authenticate(
+                    login=request.login,
+                    password=request.password,
+                    two_fa_code=request.two_fa_code,
+                    captcha_key=request.captcha_key,
+                    captcha_sid=request.captcha_sid
+                )
+                
+                token = auth_result.get("token")
+                vk_user_id = auth_result.get("user_id")
+                user_agent = auth_result.get("user_agent", user_agent)
+                
+            except VKAuthError as e:
+                logger.warning(f"VK Kate auth error: {e.error_code} - {e.message}")
+                return VKAuthResponse(
+                    success=False,
+                    message=e.message,
+                    needs_2fa=e.needs_2fa,
+                    captcha_data=e.captcha_data
+                )
         
+        # === Метод 2: OAuth токен (fallback) ===
+        elif request.token_url or request.access_token:
+            auth_method = "oauth"
+            
+            if request.token_url:
+                parsed = parse_vk_token_from_url(request.token_url)
+                token = parsed.get("access_token")
+                vk_user_id = parsed.get("user_id")
+                if vk_user_id:
+                    vk_user_id = int(vk_user_id)
+            elif request.access_token:
+                token = request.access_token.strip()
+        
+        # === Проверка токена ===
         if not token:
             return VKAuthResponse(
                 success=False,
-                message="Не удалось извлечь токен. Убедитесь, что вы скопировали полный URL из адресной строки.",
+                message="Введите логин и пароль от VK для авторизации",
                 needs_2fa=False
             )
         
@@ -8120,13 +8156,15 @@ async def vk_auth(telegram_id: int, request: VKAuthRequest):
         if not verify_result.get("valid"):
             return VKAuthResponse(
                 success=False,
-                message=f"Недействительный токен: {verify_result.get('error', 'Unknown error')}",
+                message=f"Ошибка токена: {verify_result.get('error', 'Unknown error')}",
                 needs_2fa=False
             )
         
-        # Получаем user_id из токена если не было в URL
+        # Получаем user_id из токена если не было
         if not vk_user_id:
             vk_user_id = verify_result.get("user_id")
+        
+        user_name = f"{verify_result.get('first_name', '')} {verify_result.get('last_name', '')}".strip()
         
         # Проверяем доступ к аудио
         audio_check = await vk_auth_service.test_audio_access(token)
@@ -8134,18 +8172,18 @@ async def vk_auth(telegram_id: int, request: VKAuthRequest):
         if not audio_check.get("has_access"):
             return VKAuthResponse(
                 success=False,
-                message=f"Токен действителен, но нет доступа к аудио. Попробуйте получить токен через приложение Kate Mobile.",
+                message="Токен получен, но нет доступа к аудио. Возможно, VK ограничил доступ. Попробуйте позже.",
                 needs_2fa=False
             )
         
-        # Сохраняем токен в MongoDB
+        # === Сохраняем токен в MongoDB ===
         token_doc = {
             "telegram_id": telegram_id,
             "vk_user_id": vk_user_id,
             "vk_token": token,
-            "user_agent": "KateMobileAndroid/93 lite-530 (Android 10; SDK 29; arm64-v8a; Xiaomi Redmi Note 8 Pro; ru)",
+            "user_agent": user_agent,
             "audio_count": audio_check.get("audio_count", 0),
-            "auth_method": "oauth",
+            "auth_method": auth_method,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -8157,8 +8195,7 @@ async def vk_auth(telegram_id: int, request: VKAuthRequest):
             upsert=True
         )
         
-        user_name = f"{verify_result.get('first_name', '')} {verify_result.get('last_name', '')}".strip()
-        logger.info(f"VK OAuth token saved for telegram_id: {telegram_id}, vk_user_id: {vk_user_id}, user: {user_name}")
+        logger.info(f"VK {auth_method} token saved for telegram_id: {telegram_id}, vk_user_id: {vk_user_id}, user: {user_name}")
         
         return VKAuthResponse(
             success=True,
@@ -8168,7 +8205,7 @@ async def vk_auth(telegram_id: int, request: VKAuthRequest):
         )
         
     except Exception as e:
-        logger.error(f"VK OAuth auth error: {e}")
+        logger.error(f"VK auth error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
