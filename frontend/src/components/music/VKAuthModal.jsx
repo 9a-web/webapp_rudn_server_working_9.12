@@ -410,28 +410,39 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                       </div>
                     </div>
                     
-                    {/* Get Token Button */}
-                    <button
-                      onClick={handleOpenAuthUrl}
-                      disabled={loadingConfig || !authUrl}
-                      className="w-full py-3.5 rounded-xl font-medium transition-all
-                               bg-gradient-to-r from-blue-500 to-blue-600 text-white
-                               hover:from-blue-600 hover:to-blue-700
-                               disabled:opacity-50 disabled:cursor-not-allowed
-                               flex items-center justify-center gap-2"
-                    >
-                      {loadingConfig ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span>Загрузка...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ExternalLink className="w-5 h-5" />
-                          <span>Получить токен</span>
-                        </>
-                      )}
-                    </button>
+                    {/* Get Token Button - используем <a> для открытия внутри Telegram */}
+                    {loadingConfig ? (
+                      <div className="w-full py-3.5 rounded-xl font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white opacity-50 flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Загрузка...</span>
+                      </div>
+                    ) : authUrl ? (
+                      <a
+                        href={authUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          // Haptic feedback
+                          if (window.Telegram?.WebApp?.HapticFeedback) {
+                            window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                          }
+                          // Переходим к шагу ввода URL через небольшую задержку
+                          setTimeout(() => setStep(2), 300);
+                        }}
+                        className="w-full py-3.5 rounded-xl font-medium transition-all
+                                 bg-gradient-to-r from-blue-500 to-blue-600 text-white
+                                 hover:from-blue-600 hover:to-blue-700
+                                 flex items-center justify-center gap-2 no-underline"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                        <span>Получить токен</span>
+                      </a>
+                    ) : (
+                      <div className="w-full py-3.5 rounded-xl font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white opacity-50 flex items-center justify-center gap-2">
+                        <ExternalLink className="w-5 h-5" />
+                        <span>Получить токен</span>
+                      </div>
+                    )}
                     
                     {/* Copy URL button */}
                     {authUrl && (
