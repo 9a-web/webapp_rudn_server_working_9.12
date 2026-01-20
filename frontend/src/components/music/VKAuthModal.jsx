@@ -252,10 +252,10 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-white">
-                  Подключение VK
+                  Получение токена VK
                 </h2>
                 <p className="text-sm text-white/50">
-                  Для доступа к аудиозаписям
+                  Для доступа к вашим аудиозаписям
                 </p>
               </div>
             </div>
