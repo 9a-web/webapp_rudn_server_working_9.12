@@ -303,7 +303,7 @@ export const MusicSection = ({ telegramId }) => {
             >
               <UserPlus className="w-4 h-4 text-blue-400" />
               <span className="text-sm font-medium text-blue-400">
-                Подключить VK для доступа к вашим аудиозаписям
+                Получить токен для доступа к вашим аудиозаписям
               </span>
             </button>
           )}
