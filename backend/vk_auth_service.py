@@ -227,8 +227,7 @@ class VKAuthService:
             return 0
     
     def _parse_captcha_error(self, error: str) -> Optional[dict]:
-        """Парсинг данных капчи из ошибки"""
-        # Попытка извлечь captcha_sid и captcha_img из сообщения об ошибке
+        """Парсинг данных капчи из строки ошибки"""
         captcha_data = {}
         
         import re
@@ -239,6 +238,20 @@ class VKAuthService:
             captcha_data['sid'] = sid_match.group(1)
         if img_match:
             captcha_data['img'] = img_match.group(1)
+        
+        return captcha_data if captcha_data else None
+    
+    def _parse_captcha_from_extra(self, extra: dict) -> Optional[dict]:
+        """Парсинг данных капчи из extra TokenException"""
+        if not extra:
+            return None
+        
+        captcha_data = {}
+        
+        if 'captcha_sid' in extra:
+            captcha_data['sid'] = extra['captcha_sid']
+        if 'captcha_img' in extra:
+            captcha_data['img'] = extra['captcha_img']
         
         return captcha_data if captcha_data else None
     
