@@ -3,11 +3,23 @@ VK Auth Service - Сервис авторизации VK для получени
 
 Позволяет пользователям авторизоваться через логин/пароль VK
 и получить токен с доступом к аудио API.
+
+Flow авторизации с 2FA:
+1. Пользователь вводит логин и пароль
+2. Вызываем get_kate_token(login, password) с auth_code='GET_CODE' (по умолчанию)
+   - Это добавляет force_sms=1 в запрос, VK пытается отправить SMS
+3. Если требуется 2FA - получаем TokenException с кодом TWOFA_REQ
+   - В extra содержится validation_sid, phone_mask и т.д.
+4. Возвращаем пользователю needs_2fa=True с phone_mask
+5. Пользователь вводит код из SMS
+6. Вызываем get_kate_token(login, password, auth_code=code)
+   - auth_code - это третий позиционный аргумент!
+7. Получаем токен
 """
 import logging
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime
-from vkaudiotoken import get_kate_token, get_vk_official_token, TwoFAHelper
+from vkaudiotoken import get_kate_token, get_vk_official_token, TwoFAHelper, TokenException
 import requests
 
 logger = logging.getLogger(__name__)
@@ -18,11 +30,13 @@ KATE_USER_AGENT = "KateMobileAndroid/93 lite-530 (Android 10; SDK 29; arm64-v8a;
 
 class VKAuthError(Exception):
     """Ошибка авторизации VK"""
-    def __init__(self, message: str, error_code: str = "auth_error", needs_2fa: bool = False, captcha_data: dict = None):
+    def __init__(self, message: str, error_code: str = "auth_error", needs_2fa: bool = False, 
+                 captcha_data: dict = None, twofa_data: dict = None):
         self.message = message
         self.error_code = error_code
         self.needs_2fa = needs_2fa
         self.captcha_data = captcha_data
+        self.twofa_data = twofa_data  # Данные о 2FA: phone_mask, validation_sid и т.д.
         super().__init__(message)
 
 
