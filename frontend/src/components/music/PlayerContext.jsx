@@ -381,35 +381,52 @@ export const PlayerProvider = ({ children }) => {
     }
   }, [isPlaying, pause]);
 
-  // Следующий трек
+  // Проверка заблокирован ли трек
+  const isTrackBlocked = useCallback((track) => {
+    return track.is_blocked === true || track.content_restricted === true || track.is_licensed === false;
+  }, []);
+
+  // Следующий трек (пропускает заблокированные)
   const next = useCallback(async () => {
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
     
-    if (queue.length > 0 && queueIndex < queue.length - 1) {
-      const nextTrack = queue[queueIndex + 1];
-      setQueueIndex(queueIndex + 1);
-      
-      // Используем play для загрузки URL
+    if (queue.length === 0) return;
+    
+    // Ищем следующий незаблокированный трек
+    let nextIndex = queueIndex + 1;
+    while (nextIndex < queue.length && isTrackBlocked(queue[nextIndex])) {
+      nextIndex++;
+    }
+    
+    if (nextIndex < queue.length) {
+      const nextTrack = queue[nextIndex];
+      setQueueIndex(nextIndex);
       await play(nextTrack, queue);
     }
-  }, [queue, queueIndex, play]);
+  }, [queue, queueIndex, play, isTrackBlocked]);
 
-  // Предыдущий трек
+  // Предыдущий трек (пропускает заблокированные)
   const prev = useCallback(async () => {
     if (window.Telegram?.WebApp?.HapticFeedback) {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
     
-    if (queue.length > 0 && queueIndex > 0) {
-      const prevTrack = queue[queueIndex - 1];
-      setQueueIndex(queueIndex - 1);
-      
-      // Используем play для загрузки URL
+    if (queue.length === 0) return;
+    
+    // Ищем предыдущий незаблокированный трек
+    let prevIndex = queueIndex - 1;
+    while (prevIndex >= 0 && isTrackBlocked(queue[prevIndex])) {
+      prevIndex--;
+    }
+    
+    if (prevIndex >= 0) {
+      const prevTrack = queue[prevIndex];
+      setQueueIndex(prevIndex);
       await play(prevTrack, queue);
     }
-  }, [queue, queueIndex, play]);
+  }, [queue, queueIndex, play, isTrackBlocked]);
 
   // Перемотка
   const seek = useCallback((time) => {
