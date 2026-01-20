@@ -509,10 +509,16 @@ export const PlayerProvider = ({ children }) => {
       // Режим повтора очереди/альбома
       if (repeatMode === 'queue' && queue.length > 0) {
         if (queueIndex >= queue.length - 1) {
-          // Последний трек - переходим к первому
+          // Последний трек - ищем первый незаблокированный
           console.log('🔁 Repeating queue from start');
-          setQueueIndex(0);
-          play(queue[0], queue);
+          let firstIndex = 0;
+          while (firstIndex < queue.length && (queue[firstIndex].is_blocked === true || queue[firstIndex].content_restricted === true || queue[firstIndex].is_licensed === false)) {
+            firstIndex++;
+          }
+          if (firstIndex < queue.length) {
+            setQueueIndex(firstIndex);
+            play(queue[firstIndex], queue);
+          }
         } else {
           // Следующий трек
           next();
