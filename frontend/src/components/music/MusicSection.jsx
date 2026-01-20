@@ -403,10 +403,10 @@ export const MusicSection = ({ telegramId }) => {
             <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20 
                             border border-blue-500/30 backdrop-blur-sm">
               <div className="flex flex-col items-center text-center space-y-5 sm:space-y-6">
-                {/* Иконка */}
+                {/* Иконка VK */}
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 
                                 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                  <Music2 className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
+                  <Icon28LogoVkColor width={48} height={48} className="sm:w-14 sm:h-14" />
                 </div>
                 
                 {/* Заголовок */}
