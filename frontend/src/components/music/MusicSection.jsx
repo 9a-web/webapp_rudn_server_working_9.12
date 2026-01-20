@@ -391,10 +391,10 @@ export const MusicSection = ({ telegramId }) => {
               onArtistClick={handleArtistClick}
             />
           </motion.div>
-        ) : activeTab === 'my' && !isVkConnected && !checkingVkAuth ? (
-          /* Вкладка "Мои" - крупная карточка по центру когда VK не подключен */
+        ) : (activeTab === 'my' || activeTab === 'playlists') && !isVkConnected && !checkingVkAuth && !selectedPlaylist ? (
+          /* Вкладка "Мои" или "Плейлисты" - крупная карточка по центру когда VK не подключен */
           <motion.div
-            key="my-not-connected"
+            key="vk-not-connected"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
