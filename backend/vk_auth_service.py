@@ -73,20 +73,17 @@ class VKAuthService:
         try:
             logger.info(f"Attempting VK auth for login: {login[:3]}***")
             
-            # Формируем kwargs для vkaudiotoken
-            kwargs = {}
+            # Определяем auth_code для vkaudiotoken:
+            # - 'GET_CODE' (по умолчанию) - запросить отправку SMS
+            # - <код> - передать введённый пользователем код
+            auth_code = two_fa_code if two_fa_code else 'GET_CODE'
             
             if two_fa_code:
-                kwargs['code'] = two_fa_code
-                logger.info("Using 2FA code")
-            
-            if captcha_key and captcha_sid:
-                kwargs['captcha_key'] = captcha_key
-                kwargs['captcha_sid'] = captcha_sid
-                logger.info("Using captcha solution")
+                logger.info(f"Using 2FA code: {two_fa_code[:2]}****")
             
             # Получаем токен Kate Mobile
-            result = get_kate_token(login, password, **kwargs)
+            # ВАЖНО: auth_code - это третий позиционный аргумент!
+            result = get_kate_token(login, password, auth_code)
             
             if not result or 'token' not in result:
                 raise VKAuthError("Не удалось получить токен", "token_error")
@@ -106,12 +103,73 @@ class VKAuthService:
                 "authenticated_at": datetime.utcnow().isoformat()
             }
             
+        except TokenException as e:
+            logger.error(f"VK TokenException: code={e.code}, extra={e.extra}")
+            
+            # TWOFA_REQ = 4 - требуется 2FA
+            if e.code == TokenException.TWOFA_REQ:
+                extra = e.extra or {}
+                phone_mask = extra.get('phone_mask', '')
+                validation_sid = extra.get('validation_sid', '')
+                validation_type = extra.get('validation_type', 'sms')
+                
+                # Формируем понятное сообщение с маской телефона
+                if phone_mask:
+                    message = f"Код подтверждения отправлен на {phone_mask}"
+                else:
+                    message = "Требуется код подтверждения (2FA)"
+                
+                logger.info(f"2FA required: phone_mask={phone_mask}, validation_type={validation_type}")
+                
+                raise VKAuthError(
+                    message=message,
+                    error_code="need_2fa",
+                    needs_2fa=True,
+                    twofa_data={
+                        "phone_mask": phone_mask,
+                        "validation_sid": validation_sid,
+                        "validation_type": validation_type
+                    }
+                )
+            
+            # TWOFA_ERR = 5 - ошибка 2FA (неверный код)
+            if e.code == TokenException.TWOFA_ERR:
+                raise VKAuthError(
+                    message="Неверный код подтверждения. Проверьте код и попробуйте снова.",
+                    error_code="invalid_2fa_code",
+                    needs_2fa=True  # Остаёмся в режиме ввода кода
+                )
+            
+            # REGISTRATION_ERROR = 0
+            if e.code == TokenException.REGISTRATION_ERROR:
+                raise VKAuthError(
+                    message="Ошибка регистрации устройства. Попробуйте позже.",
+                    error_code="registration_error"
+                )
+            
+            # TOKEN_NOT_RECEIVED = 2 - не удалось получить токен
+            if e.code == TokenException.TOKEN_NOT_RECEIVED:
+                extra = e.extra or {}
+                error_desc = extra.get('error_description', extra.get('error', 'Unknown'))
+                
+                # Проверяем конкретные ошибки
+                if 'invalid_client' in str(error_desc).lower():
+                    raise VKAuthError("Неверный логин или пароль", "invalid_credentials")
+                if 'captcha' in str(error_desc).lower():
+                    captcha_data = self._parse_captcha_from_extra(extra)
+                    raise VKAuthError("Требуется ввод капчи", "need_captcha", captcha_data=captcha_data)
+                
+                raise VKAuthError(f"Ошибка авторизации: {error_desc}", "token_error")
+            
+            # Остальные ошибки
+            raise VKAuthError(f"Ошибка авторизации VK: {str(e)}", "unknown_error")
+            
         except Exception as e:
             error_msg = str(e).lower()
             logger.error(f"VK auth error: {e}")
             
-            # Проверяем тип ошибки
-            if "need_validation" in error_msg or "2fa" in error_msg or "code" in error_msg:
+            # Проверяем тип ошибки по тексту (fallback)
+            if "need_validation" in error_msg or "two factor" in error_msg:
                 raise VKAuthError(
                     "Требуется код подтверждения (2FA)",
                     "need_2fa",
@@ -119,7 +177,6 @@ class VKAuthService:
                 )
             
             if "captcha" in error_msg:
-                # Парсим данные капчи из ошибки
                 captcha_data = self._parse_captcha_error(str(e))
                 raise VKAuthError(
                     "Требуется ввод капчи",
