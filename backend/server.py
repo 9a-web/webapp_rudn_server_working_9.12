@@ -7646,7 +7646,7 @@ async def music_popular(count: int = 30, offset: int = 0):
 
 @api_router.get("/music/playlists")
 async def music_playlists():
-    """Плейлисты пользователя VK"""
+    """Плейлисты пользователя VK (DEPRECATED - используйте /music/playlists-vk/{telegram_id})"""
     try:
         playlists = music_service.get_playlists()
         return {"playlists": playlists}
@@ -7654,9 +7654,95 @@ async def music_playlists():
         logger.error(f"Music playlists error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@api_router.get("/music/playlists-vk/{telegram_id}")
+async def music_playlists_vk(telegram_id: int):
+    """
+    Получение плейлистов пользователя с использованием его персонального токена VK.
+    """
+    try:
+        # Получаем токен пользователя
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            raise HTTPException(
+                status_code=401, 
+                detail="VK аккаунт не подключен. Авторизуйтесь в разделе Музыка."
+            )
+        
+        token = token_doc.get("vk_token")
+        vk_user_id = token_doc.get("vk_user_id")
+        user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
+        
+        # Запрос плейлистов к VK API
+        import requests
+        response = requests.get(
+            "https://api.vk.com/method/audio.getPlaylists",
+            params={
+                "access_token": token,
+                "owner_id": vk_user_id,
+                "count": 50,
+                "v": "5.131"
+            },
+            headers={"User-Agent": user_agent},
+            timeout=15
+        )
+        data = response.json()
+        
+        if "error" in data:
+            error = data["error"]
+            error_code = error.get("error_code", 0)
+            
+            # Токен истёк
+            if error_code in [5, 27]:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Токен истёк. Требуется повторная авторизация."
+                )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error.get("error_msg", "VK API Error")
+            )
+        
+        items = data.get("response", {}).get("items", [])
+        
+        # Форматируем плейлисты
+        playlists = []
+        for item in items:
+            # Получаем обложку плейлиста
+            cover_url = None
+            thumbs = item.get("thumbs", [])
+            if thumbs and len(thumbs) > 0:
+                cover_url = thumbs[0].get("photo_600") or thumbs[0].get("photo_300")
+            if not cover_url:
+                photo = item.get("photo", {})
+                if photo:
+                    cover_url = photo.get("photo_600") or photo.get("photo_300")
+            
+            playlists.append({
+                "id": item.get("id", 0),
+                "owner_id": item.get("owner_id", vk_user_id),
+                "title": item.get("title", "Без названия"),
+                "count": item.get("count", 0),
+                "cover": cover_url,
+                "access_key": item.get("access_key", "")
+            })
+        
+        logger.info(f"VK playlists for telegram_id={telegram_id}: found {len(playlists)} playlists")
+        
+        return {"playlists": playlists}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music playlists VK error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/music/playlist/{owner_id}/{playlist_id}")
 async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str = "", count: int = 100):
-    """Треки конкретного плейлиста с обложками из Deezer"""
+    """Треки конкретного плейлиста с обложками из Deezer (DEPRECATED - используйте /music/playlist-vk/{telegram_id}/{owner_id}/{playlist_id})"""
     try:
         tracks = music_service.get_playlist_tracks(owner_id, playlist_id, access_key, count)
         
@@ -7666,6 +7752,101 @@ async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str
         return {"tracks": tracks, "count": len(tracks)}
     except Exception as e:
         logger.error(f"Music playlist tracks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/playlist-vk/{telegram_id}/{owner_id}/{playlist_id}")
+async def music_playlist_tracks_vk(telegram_id: int, owner_id: int, playlist_id: int, access_key: str = "", count: int = 100):
+    """
+    Получение треков плейлиста с использованием персонального токена VK.
+    """
+    try:
+        # Получаем токен пользователя
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            raise HTTPException(
+                status_code=401, 
+                detail="VK аккаунт не подключен. Авторизуйтесь в разделе Музыка."
+            )
+        
+        token = token_doc.get("vk_token")
+        user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
+        
+        # Запрос треков плейлиста к VK API
+        import requests
+        params = {
+            "access_token": token,
+            "owner_id": owner_id,
+            "playlist_id": playlist_id,
+            "count": min(count, 100),
+            "v": "5.131"
+        }
+        if access_key:
+            params["access_key"] = access_key
+            
+        response = requests.get(
+            "https://api.vk.com/method/audio.get",
+            params=params,
+            headers={"User-Agent": user_agent},
+            timeout=15
+        )
+        data = response.json()
+        
+        if "error" in data:
+            error = data["error"]
+            error_code = error.get("error_code", 0)
+            
+            if error_code in [5, 27]:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Токен истёк. Требуется повторная авторизация."
+                )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error.get("error_msg", "VK API Error")
+            )
+        
+        items = data.get("response", {}).get("items", [])
+        
+        # Форматируем треки
+        tracks = []
+        for item in items:
+            cover_url = None
+            album = item.get("album", {})
+            if album:
+                thumb = album.get("thumb", {})
+                if thumb:
+                    cover_url = thumb.get("photo_600") or thumb.get("photo_300")
+            
+            track_id = f"{item['owner_id']}_{item['id']}"
+            direct_url = item.get("url", "")
+            is_blocked = not direct_url or "audio_api_unavailable" in direct_url
+            
+            tracks.append({
+                "id": track_id,
+                "owner_id": item["owner_id"],
+                "song_id": item["id"],
+                "artist": item.get("artist", "Unknown"),
+                "title": item.get("title", "Unknown"),
+                "duration": item.get("duration", 0),
+                "cover": cover_url,
+                "stream_url": f"/api/music/stream/{track_id}",
+                "is_blocked": is_blocked
+            })
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        logger.info(f"VK playlist tracks for telegram_id={telegram_id}: found {len(tracks)} tracks")
+        
+        return {"tracks": tracks, "count": len(tracks)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music playlist tracks VK error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/music/artist/{artist_name:path}")
