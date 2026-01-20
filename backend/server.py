@@ -7744,8 +7744,15 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from urllib.parse import urlencode, quote
 
 class VKAuthRequest(BaseModel):
-    """Запрос авторизации VK через OAuth токен"""
-    token_url: Optional[str] = Field(None, description="URL с токеном из redirect (содержит access_token в fragment)")
+    """Запрос авторизации VK через логин/пароль (Kate Mobile)"""
+    # Авторизация через логин/пароль (основной метод)
+    login: Optional[str] = Field(None, description="Телефон, email или логин VK")
+    password: Optional[str] = Field(None, description="Пароль от аккаунта VK")
+    two_fa_code: Optional[str] = Field(None, description="Код двухфакторной аутентификации")
+    captcha_key: Optional[str] = Field(None, description="Ответ на капчу")
+    captcha_sid: Optional[str] = Field(None, description="ID капчи")
+    # Fallback - OAuth токен (если есть)
+    token_url: Optional[str] = Field(None, description="URL с токеном из redirect")
     access_token: Optional[str] = Field(None, description="Или напрямую access_token")
 
 class VKAuthResponse(BaseModel):
