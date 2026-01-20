@@ -8127,7 +8127,8 @@ async def vk_auth(telegram_id: int, request: VKAuthRequest):
                     success=False,
                     message=e.message,
                     needs_2fa=e.needs_2fa,
-                    captcha_data=e.captcha_data
+                    captcha_data=e.captcha_data,
+                    twofa_data=e.twofa_data  # Передаём данные о 2FA (phone_mask и т.д.)
                 )
         
         # === Метод 2: OAuth токен (fallback) ===
