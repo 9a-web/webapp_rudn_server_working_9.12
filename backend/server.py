@@ -5800,14 +5800,9 @@ async def join_journal_by_student_link(invite_code: str, data: JoinStudentReques
         if not journal:
             raise HTTPException(status_code=404, detail="Journal not found")
         
-        # Проверить, не владелец ли это
-        if journal["owner_id"] == data.telegram_id:
-            return {
-                "status": "owner", 
-                "message": "Вы являетесь старостой этого журнала", 
-                "journal_id": journal_id,
-                "student_name": student["full_name"]
-            }
+        # Владелец (староста) тоже может привязать себя к студенту
+        # Это нужно для случаев когда староста также является студентом группы
+        is_owner = journal["owner_id"] == data.telegram_id
         
         # Проверить, не привязан ли уже этот студент к другому Telegram
         if student.get("is_linked") and student.get("telegram_id") != data.telegram_id:
