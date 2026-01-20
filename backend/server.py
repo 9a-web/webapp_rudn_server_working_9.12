@@ -7775,7 +7775,7 @@ class VKOAuthConfigResponse(BaseModel):
 VK_OAUTH_CONFIG = {
     "app_id": 2685278,  # Kate Mobile - даёт доступ к audio API
     "redirect_uri": "https://api.vk.com/blank.html",  # Стандартный redirect для Implicit Grant
-    "scope": "notify,friends,photos,audio,video,stories,pages,+256,status,notes,messages,wall,ads,offline,docs,groups,notifications,stats,email,market",
+    "scope": "audio,offline",  # Минимальные права: только музыка и бессрочный токен
     "response_type": "token",  # Implicit Grant Flow - токен сразу в URL
     "display": "page"  # Полноразмерная страница авторизации
 }
