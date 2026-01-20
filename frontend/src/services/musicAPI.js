@@ -123,11 +123,13 @@ export const musicAPI = {
   },
 
   /**
-   * Авторизация VK через логин/пароль (Kate Mobile)
+   * Авторизация VK через OAuth токен (Kate Mobile)
    * @param {number} telegramId - ID пользователя Telegram
    * @param {object} data - Данные авторизации
-   * @param {string} data.login - Телефон, email или логин VK
-   * @param {string} data.password - Пароль от аккаунта VK
+   * @param {string} [data.token_url] - URL с токеном после OAuth (из blank.html)
+   * @param {string} [data.access_token] - Токен напрямую
+   * @param {string} [data.login] - (legacy) Телефон, email или логин VK
+   * @param {string} [data.password] - (legacy) Пароль от аккаунта VK
    * @param {string} [data.two_fa_code] - Код двухфакторной аутентификации
    * @returns {Promise<{success: boolean, message: string, vk_user_id?: number, needs_2fa: boolean}>}
    */
