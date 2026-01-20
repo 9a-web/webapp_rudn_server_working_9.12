@@ -162,7 +162,8 @@ export const MusicSection = ({ telegramId }) => {
           break;
         }
         case 'playlists': {
-          const pl = await musicAPI.getPlaylists();
+          // Используем персональный токен пользователя
+          const pl = await musicAPI.getPlaylistsVK(telegramId);
           setPlaylists(pl.playlists || []);
           setHasMore(false);
           break;
