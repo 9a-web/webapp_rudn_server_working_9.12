@@ -311,7 +311,7 @@ export const MusicSection = ({ telegramId }) => {
           >
             <Key className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-medium text-blue-400">
-              Получить токен для доступа к музыке
+              Получить токен
             </span>
           </motion.button>
         </motion.div>
@@ -455,7 +455,7 @@ export const MusicSection = ({ telegramId }) => {
                             shadow-lg shadow-blue-500/30"
                 >
                   <Key className="w-5 h-5 sm:w-6 sm:h-6" />
-                  <span>Получить токен для доступа к музыке</span>
+                  <span>Получить токен</span>
                 </motion.button>
                 
                 {/* Подсказка */}
