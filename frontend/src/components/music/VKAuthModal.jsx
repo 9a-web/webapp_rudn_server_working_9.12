@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
-  ExternalLink,
   LogOut, 
   CheckCircle2, 
   AlertCircle,
@@ -10,74 +9,65 @@ import {
   Music,
   Shield,
   RefreshCw,
-  Info
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import { musicAPI } from '../../services/musicAPI';
 
 /**
- * VKAuthModal - Модальное окно авторизации VK через OAuth
+ * VKAuthModal - Модальное окно авторизации VK через логин/пароль (Kate Mobile)
  * 
- * Новый flow через VK ID:
- * 1. Пользователь нажимает "Войти через VK"
- * 2. Открывается страница авторизации VK
- * 3. После авторизации VK перенаправляет на callback URL
- * 4. Backend обрабатывает callback и сохраняет токен
- * 5. Пользователь возвращается в приложение
+ * Flow авторизации:
+ * 1. Пользователь вводит логин (телефон/email) и пароль от VK
+ * 2. Backend получает Kate Mobile токен через vkaudiotoken
+ * 3. Токен даёт доступ к VK Audio API
+ * 4. Пользователь получает доступ к своим аудиозаписям
  */
 export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
+  // Форма авторизации
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
   // Состояние процесса
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [oauthUrl, setOauthUrl] = useState('');
+  const [needs2FA, setNeeds2FA] = useState(false);
   
   // Статус подключения
   const [authStatus, setAuthStatus] = useState(null);
   
-  // Загрузка OAuth конфигурации и проверка статуса при открытии
+  // Проверка статуса при открытии
   useEffect(() => {
     if (isOpen && telegramId) {
       checkAuthStatus();
-      loadOAuthConfig();
     }
   }, [isOpen, telegramId]);
   
-  // Периодическая проверка статуса после открытия OAuth
+  // Сброс формы при закрытии
   useEffect(() => {
-    let interval;
-    if (isOpen && loading) {
-      // Проверяем статус каждые 3 секунды пока ожидаем авторизации
-      interval = setInterval(() => {
-        checkAuthStatusSilent();
-      }, 3000);
+    if (!isOpen) {
+      setLogin('');
+      setPassword('');
+      setTwoFaCode('');
+      setError('');
+      setSuccess('');
+      setNeeds2FA(false);
+      setShowPassword(false);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isOpen, loading, telegramId]);
-  
-  const loadOAuthConfig = async () => {
-    try {
-      const config = await musicAPI.getVKOAuthConfig(telegramId);
-      setOauthUrl(config.auth_url);
-    } catch (err) {
-      console.error('Load OAuth config error:', err);
-      setError('Не удалось загрузить конфигурацию VK');
-    }
-  };
+  }, [isOpen]);
   
   const checkAuthStatus = async () => {
     setCheckingStatus(true);
     try {
       const status = await musicAPI.getVKAuthStatus(telegramId);
       setAuthStatus(status);
-      
-      // Если статус изменился на подключен - останавливаем loading
-      if (status?.is_connected && status?.token_valid) {
-        setLoading(false);
-        setSuccess('VK аккаунт подключен!');
-      }
     } catch (err) {
       console.error('Check auth status error:', err);
       setAuthStatus(null);
@@ -86,27 +76,11 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
     }
   };
   
-  const checkAuthStatusSilent = async () => {
-    try {
-      const status = await musicAPI.getVKAuthStatus(telegramId);
-      if (status?.is_connected && status?.token_valid) {
-        setAuthStatus(status);
-        setLoading(false);
-        setSuccess('VK аккаунт успешно подключен!');
-        
-        // Haptic feedback
-        if (window.Telegram?.WebApp?.HapticFeedback) {
-          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-        }
-      }
-    } catch (err) {
-      // Игнорируем ошибки silent проверки
-    }
-  };
-  
-  const handleOpenVkAuth = () => {
-    if (!oauthUrl) {
-      setError('URL авторизации не загружен');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!login || !password) {
+      setError('Введите логин и пароль');
       return;
     }
     
@@ -117,12 +91,60 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
     
     setLoading(true);
     setError('');
+    setSuccess('');
     
-    // Открываем OAuth ссылку
-    if (window.Telegram?.WebApp?.openLink) {
-      window.Telegram.WebApp.openLink(oauthUrl);
-    } else {
-      window.open(oauthUrl, '_blank');
+    try {
+      const result = await musicAPI.vkAuth(telegramId, {
+        login: login.trim(),
+        password: password,
+        two_fa_code: twoFaCode || undefined
+      });
+      
+      if (result.success) {
+        // Успешная авторизация
+        setSuccess(result.message || 'VK аккаунт подключен!');
+        setNeeds2FA(false);
+        
+        // Haptic feedback
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+        
+        // Обновляем статус
+        await checkAuthStatus();
+        
+        // Сбрасываем форму
+        setLogin('');
+        setPassword('');
+        setTwoFaCode('');
+        
+      } else if (result.needs_2fa) {
+        // Требуется 2FA
+        setNeeds2FA(true);
+        setError('');
+        
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+        }
+        
+      } else {
+        // Ошибка
+        setError(result.message || 'Ошибка авторизации');
+        
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+        }
+      }
+      
+    } catch (err) {
+      console.error('VK auth error:', err);
+      setError(err.response?.data?.detail || 'Ошибка подключения к серверу');
+      
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+      }
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -188,7 +210,7 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                   Подключение VK
                 </h2>
                 <p className="text-sm text-white/50">
-                  Авторизация через VK ID
+                  Для доступа к аудиозаписям
                 </p>
               </div>
             </div>
@@ -273,69 +295,100 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                   </button>
                 </div>
               </div>
-            ) : loading ? (
-              /* Waiting for authorization */
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-                    <div>
-                      <p className="text-blue-400 font-medium">Ожидание авторизации...</p>
-                      <p className="text-sm text-white/50">
-                        Завершите авторизацию в открывшемся окне VK
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 rounded-xl bg-white/5">
-                  <p className="text-sm text-white/70">
-                    После успешной авторизации эта страница обновится автоматически
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => setLoading(false)}
-                  className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors
-                           text-white/60 text-sm"
-                >
-                  Отмена
-                </button>
-              </div>
             ) : (
-              /* Not connected - Authorization form */
-              <div className="space-y-4">
-                {/* Info Block */}
-                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                  <div className="flex gap-2">
-                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-white/70">
-                      <p>Авторизация через официальный VK ID</p>
-                      <p className="mt-1 text-white/50">
-                        Вы будете перенаправлены на страницу VK для входа в аккаунт
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
+              /* Not connected - Login form */
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* What you get */}
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-white/80">После подключения вы получите:</p>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-sm text-white/60">
-                      <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      <span>Доступ к вашим аудиозаписям</span>
+                      <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                      <span>Доступ к вашим аудиозаписям VK</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-white/60">
-                      <CheckCircle2 className="w-4 h-4 text-green-400" />
+                      <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
                       <span>Прослушивание музыки в приложении</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-white/60">
-                      <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      <span>Сохранение плейлистов</span>
                     </div>
                   </div>
                 </div>
+                
+                {/* Login Field */}
+                <div className="space-y-2">
+                  <label className="text-sm text-white/60">Телефон или email</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                    <input
+                      type="text"
+                      value={login}
+                      onChange={(e) => setLogin(e.target.value)}
+                      placeholder="+7 900 123 45 67"
+                      disabled={loading}
+                      className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10
+                               text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
+                               disabled:opacity-50"
+                      autoComplete="username"
+                    />
+                  </div>
+                </div>
+                
+                {/* Password Field */}
+                <div className="space-y-2">
+                  <label className="text-sm text-white/60">Пароль от VK</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      disabled={loading}
+                      className="w-full pl-11 pr-12 py-3 rounded-xl bg-white/5 border border-white/10
+                               text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
+                               disabled:opacity-50"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white/60"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* 2FA Field */}
+                {needs2FA && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-2"
+                  >
+                    <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-sm text-yellow-400">
+                        Требуется код подтверждения из SMS или приложения-аутентификатора
+                      </p>
+                    </div>
+                    <label className="text-sm text-white/60">Код подтверждения (2FA)</label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                      <input
+                        type="text"
+                        value={twoFaCode}
+                        onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="123456"
+                        disabled={loading}
+                        className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10
+                                 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50
+                                 disabled:opacity-50 text-center text-xl tracking-widest"
+                        maxLength={6}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                      />
+                    </div>
+                  </motion.div>
+                )}
                 
                 {/* Error Message */}
                 {error && (
@@ -361,26 +414,39 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                   </motion.div>
                 )}
                 
-                {/* Authorization Button */}
+                {/* Submit Button */}
                 <button
-                  onClick={handleOpenVkAuth}
-                  disabled={!oauthUrl}
+                  type="submit"
+                  disabled={loading || !login || !password}
                   className="w-full py-3.5 rounded-xl font-medium transition-all
                            bg-gradient-to-r from-blue-500 to-blue-600 text-white
                            hover:from-blue-600 hover:to-blue-700
                            disabled:opacity-50 disabled:cursor-not-allowed
                            flex items-center justify-center gap-2"
                 >
-                  <ExternalLink className="w-5 h-5" />
-                  <span>Войти через VK</span>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Подключение...</span>
+                    </>
+                  ) : needs2FA ? (
+                    <span>Подтвердить код</span>
+                  ) : (
+                    <span>Подключить VK</span>
+                  )}
                 </button>
                 
                 {/* Security Note */}
-                <p className="text-xs text-center text-white/40">
-                  <Shield className="w-3 h-3 inline mr-1" />
-                  Безопасная авторизация через VK ID
-                </p>
-              </div>
+                <div className="p-3 rounded-xl bg-white/5">
+                  <div className="flex gap-2">
+                    <Shield className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-white/50">
+                      <p>Ваш пароль не сохраняется на сервере.</p>
+                      <p className="mt-1">Он используется только для получения токена доступа к музыке.</p>
+                    </div>
+                  </div>
+                </div>
+              </form>
             )}
           </div>
         </motion.div>
