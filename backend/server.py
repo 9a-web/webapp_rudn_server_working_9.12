@@ -7786,40 +7786,26 @@ vk_oauth_states = {}
 @api_router.get("/music/auth/config")
 async def get_vk_oauth_config(telegram_id: int = None):
     """
-    Получить конфигурацию OAuth для авторизации VK ID.
+    Получить конфигурацию OAuth для авторизации VK (Kate Mobile).
     
-    Возвращает URL для авторизации через VK ID с правами на аудио.
-    telegram_id передаётся в state для связи callback с пользователем.
+    Используем Implicit Grant Flow как на vkserv.ru:
+    - client_id=2685278 (Kate Mobile)
+    - redirect_uri=https://api.vk.com/blank.html
+    - response_type=token (токен сразу в URL)
+    
+    Flow:
+    1. Пользователь открывает auth_url
+    2. Авторизуется в VK
+    3. VK редиректит на blank.html#access_token=XXX&user_id=YYY
+    4. Пользователь копирует URL и вставляет в приложение
     """
-    import secrets
-    
-    # Генерируем state с telegram_id
-    state_token = secrets.token_hex(16)
-    state = f"{telegram_id or 0}_{state_token}"
-    
-    # Сохраняем state для проверки в callback
-    if telegram_id:
-        vk_oauth_states[state] = {
-            "telegram_id": telegram_id,
-            "created_at": datetime.utcnow()
-        }
-        # Очищаем старые states (старше 10 минут)
-        cutoff = datetime.utcnow() - timedelta(minutes=10)
-        vk_oauth_states_to_delete = [
-            s for s, data in vk_oauth_states.items() 
-            if data.get("created_at", datetime.utcnow()) < cutoff
-        ]
-        for s in vk_oauth_states_to_delete:
-            del vk_oauth_states[s]
-    
-    # Формируем OAuth URL для VK ID
+    # Формируем OAuth URL (Implicit Grant - токен сразу в URL)
     params = {
         "client_id": VK_OAUTH_CONFIG["app_id"],
         "redirect_uri": VK_OAUTH_CONFIG["redirect_uri"],
         "response_type": VK_OAUTH_CONFIG["response_type"],
         "scope": VK_OAUTH_CONFIG["scope"],
-        "state": state,
-        "display": "mobile"  # Мобильная версия для Telegram WebApp
+        "display": VK_OAUTH_CONFIG["display"]
     }
     
     auth_url = f"https://oauth.vk.com/authorize?{urlencode(params)}"
