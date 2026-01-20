@@ -355,8 +355,8 @@ export const MusicSection = ({ telegramId }) => {
           >
             <tab.icon className="w-4 h-4" />
             <span className="text-sm font-medium">{tab.label}</span>
-            {/* Индикатор VK для вкладки "Мои" */}
-            {tab.id === 'my' && isVkConnected && (
+            {/* Индикатор VK для вкладок "Мои" и "Плейлисты" */}
+            {(tab.id === 'my' || tab.id === 'playlists') && isVkConnected && (
               <span className="w-2 h-2 rounded-full bg-green-400" />
             )}
           </button>
