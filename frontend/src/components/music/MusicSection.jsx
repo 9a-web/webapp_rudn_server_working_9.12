@@ -67,10 +67,12 @@ export const MusicSection = ({ telegramId }) => {
   // Проверка подключен ли VK
   const isVkConnected = vkAuthStatus?.is_connected && vkAuthStatus?.token_valid && vkAuthStatus?.audio_access;
 
-  // Загрузка контента при смене вкладки
+  // Загрузка контента при смене вкладки или изменении статуса VK
   useEffect(() => {
+    // Не загружаем пока идёт проверка статуса VK для вкладки "Мои"
+    if (activeTab === 'my' && checkingVkAuth) return;
     loadContent();
-  }, [activeTab]);
+  }, [activeTab, isVkConnected, checkingVkAuth]);
 
   const loadFavorites = async () => {
     try {
