@@ -290,8 +290,8 @@ export const MusicSection = ({ telegramId }) => {
 
   return (
     <div className="pb-36">
-      {/* Компактная кнопка "Получить токен" - показывается на ВСЕХ вкладках КРОМЕ "Мои" (если VK не подключен) */}
-      {!checkingVkAuth && !isVkConnected && activeTab !== 'my' && (
+      {/* Компактная кнопка "Получить токен" - показывается на ВСЕХ вкладках КРОМЕ "Мои" и "Плейлисты" (если VK не подключен) */}
+      {!checkingVkAuth && !isVkConnected && activeTab !== 'my' && activeTab !== 'playlists' && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
