@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings, Key, Music2 } from 'lucide-react';
+import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings, Key } from 'lucide-react';
+import { Icon28LogoVkColor } from '@vkontakte/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
 import { TrackList } from './TrackList';
