@@ -371,9 +371,23 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                     className="space-y-2"
                   >
                     <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-sm text-yellow-400">
-                        Требуется код подтверждения из SMS или приложения-аутентификатора
-                      </p>
+                      <div className="flex items-start gap-2">
+                        <Shield className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-400">
+                            Требуется код подтверждения
+                          </p>
+                          {twofaData?.phone_mask ? (
+                            <p className="text-xs text-yellow-400/70 mt-1">
+                              Код отправлен на номер {twofaData.phone_mask}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-yellow-400/70 mt-1">
+                              Введите код из SMS или приложения-аутентификатора
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <label className="text-sm text-white/60">Код подтверждения (2FA)</label>
                     <div className="relative">
@@ -390,6 +404,7 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
                         maxLength={6}
                         inputMode="numeric"
                         autoComplete="one-time-code"
+                        autoFocus
                       />
                     </div>
                   </motion.div>
