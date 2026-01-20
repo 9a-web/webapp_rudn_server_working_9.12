@@ -45,7 +45,7 @@ export const musicAPI = {
   },
 
   /**
-   * Получить плейлисты
+   * Получить плейлисты (DEPRECATED - используйте getPlaylistsVK)
    */
   getPlaylists: async () => {
     const response = await api.get('/music/playlists');
@@ -53,7 +53,16 @@ export const musicAPI = {
   },
 
   /**
-   * Получить треки плейлиста
+   * Получить плейлисты пользователя с его персональным токеном VK
+   * @param {number} telegramId - ID пользователя Telegram
+   */
+  getPlaylistsVK: async (telegramId) => {
+    const response = await api.get(`/music/playlists-vk/${telegramId}`);
+    return response.data;
+  },
+
+  /**
+   * Получить треки плейлиста (DEPRECATED - используйте getPlaylistTracksVK)
    * @param {number} ownerId - ID владельца плейлиста
    * @param {number} playlistId - ID плейлиста
    * @param {string} accessKey - Ключ доступа плейлиста
@@ -61,6 +70,19 @@ export const musicAPI = {
    */
   getPlaylistTracks: async (ownerId, playlistId, accessKey = '', count = 100) => {
     const response = await api.get(`/music/playlist/${ownerId}/${playlistId}?access_key=${accessKey}&count=${count}`);
+    return response.data;
+  },
+
+  /**
+   * Получить треки плейлиста с персональным токеном VK
+   * @param {number} telegramId - ID пользователя Telegram
+   * @param {number} ownerId - ID владельца плейлиста
+   * @param {number} playlistId - ID плейлиста
+   * @param {string} accessKey - Ключ доступа плейлиста
+   * @param {number} count - Количество треков
+   */
+  getPlaylistTracksVK: async (telegramId, ownerId, playlistId, accessKey = '', count = 100) => {
+    const response = await api.get(`/music/playlist-vk/${telegramId}/${ownerId}/${playlistId}?access_key=${accessKey}&count=${count}`);
     return response.data;
   },
 
