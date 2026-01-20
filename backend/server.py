@@ -7770,13 +7770,14 @@ class VKOAuthConfigResponse(BaseModel):
     app_id: int
     redirect_uri: str
 
-# VK ID OAuth Configuration - RUDN Schedule App
+# VK OAuth Configuration - Kate Mobile (как vkserv.ru)
+# Используем Implicit Grant Flow для получения токена с доступом к аудио
 VK_OAUTH_CONFIG = {
-    "app_id": int(os.environ.get("VK_APP_ID", "54426792")),
-    "client_secret": os.environ.get("VK_CLIENT_SECRET", "yIej7gAG0WLQiULrFAVB"),
-    "redirect_uri": os.environ.get("VK_REDIRECT_URI", "https://rudn-schedule.ru/api/music/vk-callback"),
-    "scope": "audio,offline",  # Права на аудио и offline токен
-    "response_type": "code"    # Authorization Code Flow
+    "app_id": 2685278,  # Kate Mobile - даёт доступ к audio API
+    "redirect_uri": "https://api.vk.com/blank.html",  # Стандартный redirect для Implicit Grant
+    "scope": "notify,friends,photos,audio,video,stories,pages,+256,status,notes,messages,wall,ads,offline,docs,groups,notifications,stats,email,market",
+    "response_type": "token",  # Implicit Grant Flow - токен сразу в URL
+    "display": "page"  # Полноразмерная страница авторизации
 }
 
 # Временное хранилище state для CSRF защиты (telegram_id -> state)
