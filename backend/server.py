@@ -5993,16 +5993,9 @@ async def process_journal_webapp_invite(data: ProcessJournalInviteRequest):
             journal_name = journal.get("name", "Журнал")
             student_name = student["full_name"]
             
-            # Проверить, не владелец ли это
-            if journal["owner_id"] == data.telegram_id:
-                return {
-                    "success": False,
-                    "status": "owner",
-                    "message": f"Вы являетесь старостой журнала «{journal_name}»",
-                    "journal_id": journal_id,
-                    "journal_name": journal_name,
-                    "student_name": student_name
-                }
+            # Владелец (староста) тоже может привязать себя к студенту
+            # Это нужно для случаев когда староста также является студентом группы
+            is_owner = journal["owner_id"] == data.telegram_id
             
             # Проверить, не занято ли место
             if student.get("is_linked") and student.get("telegram_id") != data.telegram_id:
