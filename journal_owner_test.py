@@ -10,8 +10,8 @@ import sys
 import uuid
 from datetime import datetime
 
-# Backend URL from frontend .env.production
-BACKEND_URL = "https://rudn-schedule.ru"
+# Backend URL - using local backend for testing
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test data
