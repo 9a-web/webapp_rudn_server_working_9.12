@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings } from 'lucide-react';
+import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings, Key, Music2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
 import { TrackList } from './TrackList';
@@ -8,6 +8,16 @@ import { PlaylistCard } from './PlaylistCard';
 import { ArtistCard } from './ArtistCard';
 import { usePlayer } from './PlayerContext';
 import { VKAuthModal } from './VKAuthModal';
+
+// Стили анимации пульсации
+const pulseAnimation = {
+  scale: [1, 1.02, 1],
+  boxShadow: [
+    '0 0 0 0 rgba(59, 130, 246, 0.4)',
+    '0 0 0 12px rgba(59, 130, 246, 0)',
+    '0 0 0 0 rgba(59, 130, 246, 0)'
+  ]
+};
 
 export const MusicSection = ({ telegramId }) => {
   const [activeTab, setActiveTab] = useState('search');
@@ -26,6 +36,9 @@ export const MusicSection = ({ telegramId }) => {
   const [vkAuthModalOpen, setVkAuthModalOpen] = useState(false);
   const [vkAuthStatus, setVkAuthStatus] = useState(null);
   const [checkingVkAuth, setCheckingVkAuth] = useState(true);
+  
+  // Состояние: показывать ли приветственный баннер (при первом входе)
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   // Используем useRef для offset чтобы избежать race conditions
   const offsetRef = useRef(0);
