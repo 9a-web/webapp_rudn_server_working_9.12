@@ -101,14 +101,16 @@ export const MusicSection = ({ telegramId }) => {
     try {
       switch (activeTab) {
         case 'my': {
-          const currentOffset = loadMore ? offsetRef.current : 0;
-          // Используем персональный токен если VK подключен
-          let my;
-          if (isVkConnected && telegramId) {
-            my = await musicAPI.getMyVKAudio(telegramId, TRACKS_PER_PAGE, currentOffset);
-          } else {
-            my = await musicAPI.getMyAudio(TRACKS_PER_PAGE, currentOffset);
+          // Загружаем треки ТОЛЬКО если VK подключен (персональный токен)
+          // НЕ используем токен из .env
+          if (!isVkConnected || !telegramId) {
+            setTracks([]);
+            setHasMore(false);
+            break;
           }
+          
+          const currentOffset = loadMore ? offsetRef.current : 0;
+          const my = await musicAPI.getMyVKAudio(telegramId, TRACKS_PER_PAGE, currentOffset);
           const newTracks = my.tracks || [];
           
           if (loadMore) {
