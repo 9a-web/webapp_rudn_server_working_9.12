@@ -95,8 +95,14 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     }
     
-    // Открываем VK OAuth в новом окне/вкладке
-    window.open(authUrl, '_blank');
+    // Открываем VK OAuth внутри Telegram (in-app browser)
+    if (window.Telegram?.WebApp?.openLink) {
+      // try_instant_view: false - открывает как обычную веб-страницу, не Instant View
+      window.Telegram.WebApp.openLink(authUrl, { try_instant_view: false });
+    } else {
+      // Fallback для обычного браузера
+      window.open(authUrl, '_blank');
+    }
     
     // Переходим к шагу ввода URL
     setStep(2);
