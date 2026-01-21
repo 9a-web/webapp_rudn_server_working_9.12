@@ -2028,17 +2028,30 @@ const TaskGroupItem = ({
 
             {/* Текст и метаданные */}
             <div className="flex-1 min-w-0">
-              <span 
-                className={`
-                  block text-sm leading-tight transition-all duration-200
-                  ${task.completed 
-                    ? 'text-gray-400 line-through' 
-                    : 'text-gray-800'
-                  }
-                `}
-              >
-                {task.text}
-              </span>
+              {/* Текст задачи (без YouTube ссылки если есть превью) */}
+              {(() => {
+                const { displayText, hasTextContent } = parseTaskText(task.text, {
+                  youtube_url: task.youtube_url,
+                  youtube_title: task.youtube_title
+                });
+                
+                if (hasTextContent) {
+                  return (
+                    <span 
+                      className={`
+                        block text-sm leading-tight transition-all duration-200
+                        ${task.completed 
+                          ? 'text-gray-400 line-through' 
+                          : 'text-gray-800'
+                        }
+                      `}
+                    >
+                      {displayText}
+                    </span>
+                  );
+                }
+                return null;
+              })()}
               
               {/* Метки */}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
