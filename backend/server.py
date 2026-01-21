@@ -8976,6 +8976,11 @@ async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(.
         )
         await db.friend_requests.insert_one(request.dict())
         
+        # Отправляем уведомление получателю
+        sender_user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if sender_user:
+            await notify_friend_request(target_telegram_id, sender_user, request.id)
+        
         logger.info(f"👥 Friend request sent: {telegram_id} -> {target_telegram_id}")
         return FriendActionResponse(
             success=True,
