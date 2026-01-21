@@ -1,27 +1,33 @@
 backend:
   - task: "YouTube Info in Tasks"
     implemented: true
-    working: pending
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "🔧 Добавлено обогащение задач YouTube информацией при создании и обновлении. При добавлении ссылки на YouTube видео в текст задачи - автоматически извлекается название, длительность и превью."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: YouTube Info in Tasks API fully functional. Created task with YouTube URL 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' and received complete metadata: youtube_title='Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)', youtube_duration='3:33', youtube_thumbnail='https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/maxresdefault.webp', youtube_url. YouTube integration working perfectly."
 
   - task: "Friends System API"
     implemented: true
-    working: pending
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "🔧 Реализована полная система друзей: поиск, добавление, принятие/отклонение запросов, удаление, блокировка, настройки приватности, профили, расписание друзей, QR-код для добавления."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: All Friends System APIs working correctly. Tested: 1) GET /api/friends/search - returns proper structure with results array, 2) POST /api/friends/request/{id} - handles business logic (already friends), 3) GET /api/friends/{id}/requests - returns incoming/outgoing with counts, 4) GET /api/friends/{id} - returns friends list with total, 5) GET /api/profile/{id} - returns profile with friendship_status, 6) GET/PUT /api/profile/{id}/privacy - privacy settings work, 7) GET /api/profile/{id}/qr - handles user not found appropriately. All endpoints respond correctly with expected data structures."
 
   - task: "VK OAuth Config API"
     implemented: true
