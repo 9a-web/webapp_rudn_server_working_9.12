@@ -1053,6 +1053,13 @@ const Home = () => {
             />
           </div>
         )}
+
+        {/* Раздел "Друзья" */}
+        {activeTab === 'friends' && (
+          <FriendsSection 
+            userSettings={userSettings}
+          />
+        )}
         
         <Suspense fallback={null}>
           <CalendarModal
