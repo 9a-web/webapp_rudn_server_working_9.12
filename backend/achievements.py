@@ -226,6 +226,88 @@ ACHIEVEMENTS = [
         "points": 40,
         "type": "completion_master",
         "requirement": 100
+    },
+    # ============ Достижения за друзей ============
+    {
+        "id": "first_friend",
+        "name": "Первый друг",
+        "description": "Добавил первого друга",
+        "emoji": "🤝",
+        "points": 10,
+        "type": "first_friend",
+        "requirement": 1
+    },
+    {
+        "id": "friendly_5",
+        "name": "Общительный",
+        "description": "5 друзей в приложении",
+        "emoji": "👋",
+        "points": 15,
+        "type": "friendly",
+        "requirement": 5
+    },
+    {
+        "id": "friendly_15",
+        "name": "Дружелюбный",
+        "description": "15 друзей в приложении",
+        "emoji": "🎉",
+        "points": 20,
+        "type": "friendly",
+        "requirement": 15
+    },
+    {
+        "id": "friendly_25",
+        "name": "Популярный",
+        "description": "25 друзей в приложении",
+        "emoji": "⭐",
+        "points": 25,
+        "type": "friendly",
+        "requirement": 25
+    },
+    {
+        "id": "soul_of_company",
+        "name": "Душа компании",
+        "description": "50 друзей в приложении",
+        "emoji": "👑",
+        "points": 40,
+        "type": "friendly",
+        "requirement": 50
+    },
+    {
+        "id": "interfaculty",
+        "name": "Межфакультетский",
+        "description": "Друзья с 3+ разных факультетов",
+        "emoji": "🌐",
+        "points": 25,
+        "type": "interfaculty",
+        "requirement": 3
+    },
+    {
+        "id": "networker",
+        "name": "Нетворкер",
+        "description": "Друзья с 5+ разных факультетов",
+        "emoji": "🔗",
+        "points": 35,
+        "type": "networker",
+        "requirement": 5
+    },
+    {
+        "id": "recruiter",
+        "name": "Рекрутер",
+        "description": "Пригласил 3 новых пользователей",
+        "emoji": "📢",
+        "points": 20,
+        "type": "recruiter",
+        "requirement": 3
+    },
+    {
+        "id": "influencer",
+        "name": "Инфлюенсер",
+        "description": "Пригласил 10 новых пользователей",
+        "emoji": "🚀",
+        "points": 40,
+        "type": "influencer",
+        "requirement": 10
     }
 ]
 
