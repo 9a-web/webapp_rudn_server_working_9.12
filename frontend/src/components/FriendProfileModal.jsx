@@ -12,6 +12,14 @@ import {
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 
+// Получение URL для фото профиля
+const getBackendURL = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:8001';
+  }
+  return window.location.origin;
+};
+
 const FriendProfileModal = ({ 
   isOpen, 
   onClose, 
@@ -28,6 +36,8 @@ const FriendProfileModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   // Синхронизация is_favorite при открытии
   useEffect(() => {
@@ -35,6 +45,14 @@ const FriendProfileModal = ({
       setIsFavorite(friend.is_favorite || false);
     }
   }, [friend]);
+
+  // Загрузка аватарки
+  useEffect(() => {
+    if (isOpen && friend?.telegram_id) {
+      setAvatarError(false);
+      setAvatarUrl(`${getBackendURL()}/api/user-profile-photo-proxy/${friend.telegram_id}`);
+    }
+  }, [isOpen, friend?.telegram_id]);
 
   // Загрузка данных профиля
   useEffect(() => {
