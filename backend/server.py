@@ -149,7 +149,27 @@ from models import (
     LKPersonalData,
     LKConnectionResponse,
     LKDataResponse,
-    LKStatusResponse
+    LKStatusResponse,
+    # Модели для системы друзей
+    FriendshipStatus,
+    PrivacySettings,
+    FriendRequest,
+    FriendRequestCreate,
+    Friend,
+    UserBlock,
+    UserProfilePublic,
+    FriendCard,
+    FriendRequestCard,
+    FriendsListResponse,
+    FriendRequestsResponse,
+    FriendSearchResult,
+    FriendSearchResponse,
+    ProcessFriendInviteRequest,
+    ProcessFriendInviteResponse,
+    MutualFriendsResponse,
+    FriendScheduleResponse,
+    PrivacySettingsUpdate,
+    FriendActionResponse
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
