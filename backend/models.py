@@ -485,6 +485,22 @@ class TaskResponse(BaseModel):
     teacher: Optional[str] = None
     auditory: Optional[str] = None
     lessonType: Optional[str] = None
+    # YouTube метаданные
+    youtube_title: Optional[str] = None
+    youtube_duration: Optional[str] = None
+    youtube_thumbnail: Optional[str] = None
+    youtube_url: Optional[str] = None
+
+
+class YouTubeInfoResponse(BaseModel):
+    """Ответ с информацией о YouTube видео"""
+    url: str
+    video_id: str
+    title: str
+    duration: str  # Формат: "MM:SS" или "HH:MM:SS"
+    duration_seconds: int
+    thumbnail: str
+    channel: Optional[str] = None
 
 
 class TaskProductivityStats(BaseModel):
