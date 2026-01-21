@@ -25,6 +25,7 @@ import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { YouTubePreview } from './YouTubePreview';
 
 import { getWeekNumberForDate } from '../utils/dateUtils';
+import { parseTaskText } from '../utils/textUtils';
 // 🔧 FEATURE FLAG: Показать/скрыть функцию комнат
 // Измените на false, чтобы скрыть комнаты
 const SHOW_ROOMS_FEATURE = true;
