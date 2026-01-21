@@ -61,7 +61,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       transition={{ duration: 0.3, ease: 'easeInOut' }}
       className="fixed bottom-4 z-50"
       style={{ 
-        width: '280px', 
+        width: '340px', 
         height: '50px',
         left: '50%',
         overflow: 'visible'
