@@ -105,6 +105,8 @@ const FriendProfileModal = ({
       setMutualFriends([]);
       setActiveTab('info');
       setShowRemoveConfirm(false);
+      setAvatarUrl(null);
+      setAvatarError(false);
     }
   }, [isOpen]);
 
