@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { tasksAPI } from '../services/api';
 import { YouTubePreview } from './YouTubePreview';
+import { parseTaskText } from '../utils/textUtils';
 
 export const EditTaskModal = ({ 
   isOpen, 
