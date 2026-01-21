@@ -212,13 +212,15 @@ export const TelegramProvider = ({ children }) => {
         setUser(userData);
         console.log('👤 Пользователь Telegram:', userData.first_name);
       } else {
-        console.warn('⚠️ Telegram user не найден. Mock данные.');
-        // Mock user для разработки вне Telegram
+        console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
+        // Генерируем уникальный ID для этого браузера
+        const { deviceId, numericId } = getOrCreateDeviceId();
         setUser({
-          id: 999888777,
-          first_name: 'Test',
-          last_name: 'User',
-          username: 'testuser',
+          id: numericId,
+          first_name: 'Пользователь',
+          last_name: '',
+          username: `user_${deviceId.substring(0, 8)}`,
+          device_id: deviceId, // Сохраняем полный UUID для отладки
         });
       }
       
