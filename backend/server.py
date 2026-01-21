@@ -9751,6 +9751,500 @@ async def get_blocked_users(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ API для системы уведомлений (In-App Notifications) ============
+
+def get_time_ago(dt: datetime) -> str:
+    """Получить относительное время (5м, 2ч, вчера)"""
+    now = datetime.utcnow()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    minutes = seconds / 60
+    hours = minutes / 60
+    days = hours / 24
+    
+    if seconds < 60:
+        return "сейчас"
+    elif minutes < 60:
+        return f"{int(minutes)}м"
+    elif hours < 24:
+        return f"{int(hours)}ч"
+    elif days < 2:
+        return "вчера"
+    elif days < 7:
+        return f"{int(days)}д"
+    else:
+        return dt.strftime("%d.%m")
+
+
+async def get_notification_settings(telegram_id: int) -> ExtendedNotificationSettings:
+    """Получить расширенные настройки уведомлений"""
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if user and "extended_notification_settings" in user:
+        return ExtendedNotificationSettings(**user["extended_notification_settings"])
+    return ExtendedNotificationSettings()
+
+
+async def should_send_notification(telegram_id: int, category: NotificationCategory, notification_type: NotificationType) -> tuple[bool, bool]:
+    """Проверить, нужно ли отправлять уведомление. Возвращает (in_app, push)"""
+    settings = await get_notification_settings(telegram_id)
+    
+    if not settings.notifications_enabled:
+        return False, False
+    
+    in_app = True
+    push = False
+    
+    if category == NotificationCategory.STUDY:
+        in_app = settings.study_enabled
+        push = settings.study_push
+    elif category == NotificationCategory.SOCIAL:
+        in_app = settings.social_enabled
+        push = settings.social_push
+        if notification_type == NotificationType.FRIEND_REQUEST:
+            in_app = in_app and settings.social_friend_requests
+        elif notification_type == NotificationType.FRIEND_ACCEPTED:
+            in_app = in_app and settings.social_friend_accepted
+    elif category == NotificationCategory.ROOMS:
+        in_app = settings.rooms_enabled
+        push = settings.rooms_push
+        if notification_type == NotificationType.ROOM_TASK_NEW:
+            in_app = in_app and settings.rooms_new_tasks
+        elif notification_type == NotificationType.ROOM_TASK_ASSIGNED:
+            in_app = in_app and settings.rooms_assignments
+        elif notification_type == NotificationType.ROOM_TASK_COMPLETED:
+            in_app = in_app and settings.rooms_completions
+    elif category == NotificationCategory.JOURNAL:
+        in_app = settings.journal_enabled
+        push = settings.journal_push
+    elif category == NotificationCategory.ACHIEVEMENTS:
+        in_app = settings.achievements_enabled
+        push = settings.achievements_push
+    elif category == NotificationCategory.SYSTEM:
+        in_app = settings.system_enabled
+        push = settings.system_push
+    
+    return in_app, push
+
+
+async def create_notification(
+    telegram_id: int,
+    notification_type: NotificationType,
+    category: NotificationCategory,
+    title: str,
+    message: str,
+    emoji: str = "🔔",
+    priority: NotificationPriority = NotificationPriority.NORMAL,
+    data: dict = None,
+    actions: list = None,
+    send_push: bool = None
+) -> Optional[str]:
+    """Создать уведомление"""
+    try:
+        # Проверяем настройки
+        should_in_app, should_push = await should_send_notification(telegram_id, category, notification_type)
+        
+        if not should_in_app:
+            return None
+        
+        notification = InAppNotification(
+            telegram_id=telegram_id,
+            type=notification_type,
+            category=category,
+            priority=priority,
+            title=title,
+            message=message,
+            emoji=emoji,
+            data=data or {},
+            actions=actions or []
+        )
+        
+        await db.in_app_notifications.insert_one(notification.dict())
+        
+        # Отправляем push если нужно
+        if (send_push is True) or (send_push is None and should_push and priority == NotificationPriority.HIGH):
+            try:
+                from notifications import get_notification_service
+                notification_service = get_notification_service()
+                await notification_service.send_message(
+                    telegram_id,
+                    f"{emoji} {title}\n\n{message}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send push notification: {e}")
+        
+        logger.info(f"📬 Notification created: {notification_type} for {telegram_id}")
+        return notification.id
+        
+    except Exception as e:
+        logger.error(f"Create notification error: {e}")
+        return None
+
+
+# Хелперы для создания уведомлений разных типов
+
+async def notify_friend_request(to_telegram_id: int, from_user: dict, request_id: str):
+    """Уведомление о новой заявке в друзья"""
+    from_name = f"{from_user.get('first_name', '')} {from_user.get('last_name', '')}".strip() or from_user.get('username', 'Пользователь')
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.FRIEND_REQUEST,
+        category=NotificationCategory.SOCIAL,
+        priority=NotificationPriority.HIGH,
+        title="Новая заявка в друзья",
+        message=f"{from_name} хочет добавить вас в друзья",
+        emoji="👥",
+        data={
+            "request_id": request_id,
+            "from_telegram_id": from_user.get("telegram_id"),
+            "from_name": from_name
+        },
+        actions=[
+            {"id": "accept", "label": "Принять", "type": "primary"},
+            {"id": "reject", "label": "Отклонить", "type": "secondary"}
+        ]
+    )
+
+
+async def notify_friend_accepted(to_telegram_id: int, friend_user: dict):
+    """Уведомление о принятии заявки"""
+    friend_name = f"{friend_user.get('first_name', '')} {friend_user.get('last_name', '')}".strip() or friend_user.get('username', 'Пользователь')
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.FRIEND_ACCEPTED,
+        category=NotificationCategory.SOCIAL,
+        priority=NotificationPriority.NORMAL,
+        title="Заявка принята",
+        message=f"{friend_name} принял вашу заявку в друзья",
+        emoji="✅",
+        data={
+            "friend_telegram_id": friend_user.get("telegram_id"),
+            "friend_name": friend_name
+        }
+    )
+
+
+async def notify_room_invite(to_telegram_id: int, room: dict, inviter: dict):
+    """Уведомление о приглашении в комнату"""
+    inviter_name = f"{inviter.get('first_name', '')} {inviter.get('last_name', '')}".strip() or inviter.get('username', 'Пользователь')
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.ROOM_INVITE,
+        category=NotificationCategory.ROOMS,
+        priority=NotificationPriority.HIGH,
+        title="Приглашение в комнату",
+        message=f"{inviter_name} приглашает вас в комнату «{room.get('name', 'Комната')}»",
+        emoji="🏠",
+        data={
+            "room_id": room.get("id"),
+            "room_name": room.get("name"),
+            "inviter_telegram_id": inviter.get("telegram_id")
+        },
+        actions=[
+            {"id": "join", "label": "Присоединиться", "type": "primary"},
+            {"id": "decline", "label": "Отклонить", "type": "secondary"}
+        ]
+    )
+
+
+async def notify_room_task(to_telegram_id: int, room: dict, task: dict, creator: dict):
+    """Уведомление о новой задаче в комнате"""
+    creator_name = f"{creator.get('first_name', '')} {creator.get('last_name', '')}".strip() or "Участник"
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.ROOM_TASK_NEW,
+        category=NotificationCategory.ROOMS,
+        priority=NotificationPriority.NORMAL,
+        title="Новая задача",
+        message=f"{creator_name} добавил задачу «{task.get('text', '')[:50]}» в комнату «{room.get('name', '')}»",
+        emoji="📝",
+        data={
+            "room_id": room.get("id"),
+            "task_id": task.get("id"),
+            "room_name": room.get("name")
+        }
+    )
+
+
+async def notify_task_assigned(to_telegram_id: int, room: dict, task: dict, assigner: dict):
+    """Уведомление о назначении задачи"""
+    assigner_name = f"{assigner.get('first_name', '')} {assigner.get('last_name', '')}".strip() or "Участник"
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.ROOM_TASK_ASSIGNED,
+        category=NotificationCategory.ROOMS,
+        priority=NotificationPriority.HIGH,
+        title="Вам назначена задача",
+        message=f"{assigner_name} назначил вам задачу «{task.get('text', '')[:50]}»",
+        emoji="📌",
+        data={
+            "room_id": room.get("id"),
+            "task_id": task.get("id"),
+            "room_name": room.get("name")
+        }
+    )
+
+
+async def notify_task_completed(to_telegram_id: int, room: dict, task: dict, completer: dict):
+    """Уведомление о выполнении задачи"""
+    completer_name = f"{completer.get('first_name', '')} {completer.get('last_name', '')}".strip() or "Участник"
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.ROOM_TASK_COMPLETED,
+        category=NotificationCategory.ROOMS,
+        priority=NotificationPriority.LOW,
+        title="Задача выполнена",
+        message=f"{completer_name} выполнил задачу «{task.get('text', '')[:50]}»",
+        emoji="✅",
+        data={
+            "room_id": room.get("id"),
+            "task_id": task.get("id")
+        }
+    )
+
+
+async def notify_achievement(to_telegram_id: int, achievement: dict):
+    """Уведомление о получении достижения"""
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.ACHIEVEMENT_EARNED,
+        category=NotificationCategory.ACHIEVEMENTS,
+        priority=NotificationPriority.NORMAL,
+        title="Новое достижение!",
+        message=f"Получено достижение «{achievement.get('name', '')}» +{achievement.get('points', 0)} очков",
+        emoji=achievement.get('emoji', '🏆'),
+        data={
+            "achievement_id": achievement.get("id"),
+            "achievement_name": achievement.get("name"),
+            "points": achievement.get("points")
+        }
+    )
+
+
+async def notify_journal_attendance(to_telegram_id: int, journal: dict, status: str, date: str):
+    """Уведомление об отметке посещаемости"""
+    status_text = "присутствие" if status == "present" else "отсутствие" if status == "absent" else "опоздание"
+    status_emoji = "✅" if status == "present" else "❌" if status == "absent" else "⏰"
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.JOURNAL_ATTENDANCE,
+        category=NotificationCategory.JOURNAL,
+        priority=NotificationPriority.LOW,
+        title="Отметка в журнале",
+        message=f"Вам отмечено {status_text} за {date} в журнале «{journal.get('name', '')}»",
+        emoji=status_emoji,
+        data={
+            "journal_id": journal.get("id"),
+            "status": status,
+            "date": date
+        }
+    )
+
+
+# API Endpoints для уведомлений
+
+@api_router.get("/notifications/{telegram_id}", response_model=NotificationsListResponse)
+async def get_notifications(telegram_id: int, limit: int = 50, offset: int = 0, unread_only: bool = False):
+    """Получить список уведомлений"""
+    try:
+        query = {"telegram_id": telegram_id, "dismissed": False}
+        if unread_only:
+            query["read"] = False
+        
+        total = await db.in_app_notifications.count_documents(query)
+        unread_count = await db.in_app_notifications.count_documents({
+            "telegram_id": telegram_id, 
+            "read": False,
+            "dismissed": False
+        })
+        
+        notifications_cursor = db.in_app_notifications.find(query) \
+            .sort("created_at", -1) \
+            .skip(offset) \
+            .limit(limit)
+        
+        notifications = []
+        async for notif in notifications_cursor:
+            created_at = notif.get("created_at")
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            
+            notifications.append(NotificationCard(
+                id=notif["id"],
+                type=notif["type"],
+                category=notif["category"],
+                priority=notif.get("priority", "normal"),
+                title=notif["title"],
+                message=notif["message"],
+                emoji=notif.get("emoji", "🔔"),
+                data=notif.get("data", {}),
+                actions=notif.get("actions", []),
+                action_taken=notif.get("action_taken"),
+                read=notif.get("read", False),
+                created_at=created_at,
+                time_ago=get_time_ago(created_at) if created_at else ""
+            ))
+        
+        return NotificationsListResponse(
+            notifications=notifications,
+            total=total,
+            unread_count=unread_count,
+            has_more=offset + limit < total
+        )
+        
+    except Exception as e:
+        logger.error(f"Get notifications error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/notifications/{telegram_id}/unread-count", response_model=UnreadCountResponse)
+async def get_unread_count(telegram_id: int):
+    """Получить количество непрочитанных уведомлений"""
+    try:
+        total = await db.in_app_notifications.count_documents({
+            "telegram_id": telegram_id,
+            "read": False,
+            "dismissed": False
+        })
+        
+        # Считаем по категориям
+        pipeline = [
+            {"$match": {"telegram_id": telegram_id, "read": False, "dismissed": False}},
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}}
+        ]
+        
+        by_category = {}
+        async for doc in db.in_app_notifications.aggregate(pipeline):
+            by_category[doc["_id"]] = doc["count"]
+        
+        return UnreadCountResponse(unread_count=total, by_category=by_category)
+        
+    except Exception as e:
+        logger.error(f"Get unread count error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отметить уведомление как прочитанное"""
+    try:
+        result = await db.in_app_notifications.update_one(
+            {"id": notification_id, "telegram_id": telegram_id},
+            {"$set": {"read": True, "read_at": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        
+        return {"success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark notification read error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{telegram_id}/read-all")
+async def mark_all_notifications_read(telegram_id: int):
+    """Отметить все уведомления как прочитанные"""
+    try:
+        result = await db.in_app_notifications.update_many(
+            {"telegram_id": telegram_id, "read": False},
+            {"$set": {"read": True, "read_at": datetime.utcnow()}}
+        )
+        
+        return {"success": True, "updated": result.modified_count}
+        
+    except Exception as e:
+        logger.error(f"Mark all notifications read error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/notifications/{notification_id}")
+async def dismiss_notification(notification_id: str, telegram_id: int = Body(..., embed=True)):
+    """Скрыть уведомление"""
+    try:
+        result = await db.in_app_notifications.update_one(
+            {"id": notification_id, "telegram_id": telegram_id},
+            {"$set": {"dismissed": True}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        
+        return {"success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dismiss notification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{notification_id}/action")
+async def notification_action(notification_id: str, telegram_id: int = Body(...), action_id: str = Body(...)):
+    """Выполнить действие уведомления"""
+    try:
+        result = await db.in_app_notifications.update_one(
+            {"id": notification_id, "telegram_id": telegram_id},
+            {"$set": {"action_taken": action_id, "read": True, "read_at": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        
+        return {"success": True, "action_id": action_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Notification action error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/notifications/{telegram_id}/settings", response_model=ExtendedNotificationSettings)
+async def get_extended_notification_settings(telegram_id: int):
+    """Получить расширенные настройки уведомлений"""
+    try:
+        return await get_notification_settings(telegram_id)
+    except Exception as e:
+        logger.error(f"Get extended notification settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{telegram_id}/settings", response_model=ExtendedNotificationSettings)
+async def update_extended_notification_settings(telegram_id: int, settings: ExtendedNotificationSettingsUpdate):
+    """Обновить расширенные настройки уведомлений"""
+    try:
+        current = await get_notification_settings(telegram_id)
+        
+        # Обновляем только переданные поля
+        update_data = settings.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(current, key, value)
+        
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"extended_notification_settings": current.dict()}},
+            upsert=True
+        )
+        
+        logger.info(f"📬 Extended notification settings updated for {telegram_id}")
+        return current
+        
+    except Exception as e:
+        logger.error(f"Update extended notification settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
