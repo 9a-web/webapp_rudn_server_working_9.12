@@ -247,6 +247,8 @@ const Home = () => {
   // Состояние для карточки артиста
   const [isArtistCardOpen, setIsArtistCardOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState(null);
+  // Состояние для модального окна профиля друга
+  const [isFriendProfileOpen, setIsFriendProfileOpen] = useState(false);
 
   // Открыть карточку артиста
   const handleArtistClick = useCallback((artistName) => {
