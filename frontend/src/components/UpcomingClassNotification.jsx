@@ -89,7 +89,10 @@ export const UpcomingClassNotification = ({ schedule }) => {
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className="fixed top-4 left-0 right-0 mx-auto z-[100] w-[95%] md:w-auto md:max-w-md flex justify-center pointer-events-none"
       >
-        <div className="pointer-events-auto w-full max-w-sm bg-black/80 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/10">
+        <div 
+          onClick={handleDismiss}
+          className="pointer-events-auto w-full max-w-sm bg-black/80 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-lg flex items-center gap-3 border border-white/10 cursor-pointer active:scale-[0.98] transition-transform"
+        >
           <div className="bg-blue-500/20 p-2 rounded-full flex-shrink-0">
             <Clock className="w-5 h-5 text-blue-400" />
           </div>
