@@ -177,6 +177,13 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const handleOpenProfile = (friend) => {
     hapticFeedback('impact', 'light');
     setSelectedProfile(friend);
+    onFriendProfileOpen?.(true);
+  };
+
+  // Закрыть профиль
+  const handleCloseProfile = () => {
+    setSelectedProfile(null);
+    onFriendProfileOpen?.(false);
   };
 
   // Рендер карточки запроса
