@@ -7,6 +7,36 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const TelegramContext = createContext(null);
 
+// Генерация и сохранение уникального ID устройства в localStorage
+const getOrCreateDeviceId = () => {
+  const DEVICE_ID_KEY = 'rudn_device_id';
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+  
+  if (!deviceId) {
+    // Генерируем уникальный ID с использованием crypto.randomUUID или fallback
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      deviceId = crypto.randomUUID();
+    } else {
+      // Fallback для старых браузеров
+      deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    console.log('🆕 Создан новый Device ID:', deviceId);
+  } else {
+    console.log('📱 Используется существующий Device ID:', deviceId);
+  }
+  
+  // Преобразуем UUID в числовой ID для совместимости с API
+  // Берем первые 8 символов hex и конвертируем в число
+  const numericId = parseInt(deviceId.replace(/-/g, '').substring(0, 12), 16);
+  
+  return { deviceId, numericId };
+};
+
 export const useTelegram = () => {
   const context = useContext(TelegramContext);
   if (!context) {
