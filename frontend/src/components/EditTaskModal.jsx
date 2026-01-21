@@ -3,6 +3,7 @@ import { X, Edit2, Calendar, Flag, Tag, BookOpen, ListChecks, Plus, Check, Trash
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { tasksAPI } from '../services/api';
+import { YouTubePreview } from './YouTubePreview';
 
 export const EditTaskModal = ({ 
   isOpen, 
