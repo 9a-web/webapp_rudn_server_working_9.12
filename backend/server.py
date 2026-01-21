@@ -8743,6 +8743,998 @@ async def get_my_vk_audio(telegram_id: int, count: int = 50, offset: int = 0):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ API для системы друзей (Friends) ============
+
+# Вспомогательные функции для друзей
+
+async def get_user_friends_count(telegram_id: int) -> int:
+    """Получить количество друзей пользователя"""
+    return await db.friends.count_documents({"user_telegram_id": telegram_id})
+
+
+async def get_mutual_friends_count(user1_id: int, user2_id: int) -> int:
+    """Получить количество общих друзей двух пользователей"""
+    # Получаем друзей первого пользователя
+    friends1 = await db.friends.find({"user_telegram_id": user1_id}).to_list(1000)
+    friends1_ids = set(f["friend_telegram_id"] for f in friends1)
+    
+    # Получаем друзей второго пользователя
+    friends2 = await db.friends.find({"user_telegram_id": user2_id}).to_list(1000)
+    friends2_ids = set(f["friend_telegram_id"] for f in friends2)
+    
+    # Находим пересечение
+    return len(friends1_ids & friends2_ids)
+
+
+async def is_blocked(blocker_id: int, blocked_id: int) -> bool:
+    """Проверить, заблокирован ли пользователь"""
+    block = await db.user_blocks.find_one({
+        "blocker_telegram_id": blocker_id,
+        "blocked_telegram_id": blocked_id
+    })
+    return block is not None
+
+
+async def are_friends(user1_id: int, user2_id: int) -> bool:
+    """Проверить, являются ли пользователи друзьями"""
+    friend = await db.friends.find_one({
+        "user_telegram_id": user1_id,
+        "friend_telegram_id": user2_id
+    })
+    return friend is not None
+
+
+async def get_friendship_status(user_id: int, target_id: int) -> Optional[str]:
+    """Получить статус дружбы между пользователями"""
+    # Проверка блокировки
+    if await is_blocked(user_id, target_id):
+        return "blocked"
+    if await is_blocked(target_id, user_id):
+        return "blocked_by"
+    
+    # Проверка дружбы
+    if await are_friends(user_id, target_id):
+        return "friend"
+    
+    # Проверка входящих запросов
+    incoming = await db.friend_requests.find_one({
+        "from_telegram_id": target_id,
+        "to_telegram_id": user_id,
+        "status": "pending"
+    })
+    if incoming:
+        return "pending_incoming"
+    
+    # Проверка исходящих запросов
+    outgoing = await db.friend_requests.find_one({
+        "from_telegram_id": user_id,
+        "to_telegram_id": target_id,
+        "status": "pending"
+    })
+    if outgoing:
+        return "pending_outgoing"
+    
+    return None
+
+
+async def get_user_privacy_settings(telegram_id: int) -> PrivacySettings:
+    """Получить настройки приватности пользователя"""
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if user and "privacy_settings" in user:
+        return PrivacySettings(**user["privacy_settings"])
+    return PrivacySettings()  # Возвращаем настройки по умолчанию
+
+
+async def build_friend_card(user_data: dict, current_user_id: int, friendship_date: datetime = None, is_favorite: bool = False) -> FriendCard:
+    """Построить карточку друга"""
+    friend_id = user_data.get("telegram_id")
+    privacy = await get_user_privacy_settings(friend_id)
+    
+    # Проверяем онлайн-статус (активность за последние 5 минут)
+    is_online = False
+    last_activity = user_data.get("last_activity")
+    if last_activity and privacy.show_online_status:
+        if isinstance(last_activity, str):
+            last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+        is_online = (datetime.utcnow() - last_activity).total_seconds() < 300
+    
+    return FriendCard(
+        telegram_id=friend_id,
+        username=user_data.get("username"),
+        first_name=user_data.get("first_name"),
+        last_name=user_data.get("last_name"),
+        group_name=user_data.get("group_name"),
+        facultet_name=user_data.get("facultet_name"),
+        is_online=is_online if privacy.show_online_status else False,
+        last_activity=last_activity if privacy.show_online_status else None,
+        is_favorite=is_favorite,
+        mutual_friends_count=await get_mutual_friends_count(current_user_id, friend_id),
+        friendship_date=friendship_date
+    )
+
+
+async def update_friends_stats(telegram_id: int):
+    """Обновить статистику друзей пользователя"""
+    # Подсчитываем друзей
+    friends_count = await get_user_friends_count(telegram_id)
+    
+    # Подсчитываем уникальные факультеты друзей
+    friends = await db.friends.find({"user_telegram_id": telegram_id}).to_list(1000)
+    friend_ids = [f["friend_telegram_id"] for f in friends]
+    
+    faculties = set()
+    if friend_ids:
+        friend_users = await db.user_settings.find({"telegram_id": {"$in": friend_ids}}).to_list(1000)
+        for u in friend_users:
+            if u.get("facultet_id"):
+                faculties.add(u["facultet_id"])
+    
+    # Обновляем статистику
+    await db.user_stats.update_one(
+        {"telegram_id": telegram_id},
+        {
+            "$set": {
+                "friends_count": friends_count,
+                "friends_faculties_count": len(faculties),
+                "updated_at": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+
+
+# API Endpoints для друзей
+
+@api_router.post("/friends/request/{target_telegram_id}", response_model=FriendActionResponse)
+async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Отправить запрос на дружбу"""
+    try:
+        # Проверяем, что не отправляем запрос самому себе
+        if telegram_id == target_telegram_id:
+            raise HTTPException(status_code=400, detail="Нельзя добавить себя в друзья")
+        
+        # Проверяем существование целевого пользователя
+        target_user = await db.user_settings.find_one({"telegram_id": target_telegram_id})
+        if not target_user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Проверяем блокировку
+        if await is_blocked(target_telegram_id, telegram_id):
+            raise HTTPException(status_code=403, detail="Вы заблокированы этим пользователем")
+        if await is_blocked(telegram_id, target_telegram_id):
+            raise HTTPException(status_code=403, detail="Вы заблокировали этого пользователя")
+        
+        # Проверяем, не друзья ли уже
+        if await are_friends(telegram_id, target_telegram_id):
+            raise HTTPException(status_code=400, detail="Вы уже друзья")
+        
+        # Проверяем существующий запрос от нас
+        existing_outgoing = await db.friend_requests.find_one({
+            "from_telegram_id": telegram_id,
+            "to_telegram_id": target_telegram_id,
+            "status": "pending"
+        })
+        if existing_outgoing:
+            raise HTTPException(status_code=400, detail="Запрос уже отправлен")
+        
+        # Проверяем входящий запрос от этого пользователя
+        existing_incoming = await db.friend_requests.find_one({
+            "from_telegram_id": target_telegram_id,
+            "to_telegram_id": telegram_id,
+            "status": "pending"
+        })
+        
+        if existing_incoming:
+            # Автоматически принимаем - взаимный запрос
+            await db.friend_requests.update_one(
+                {"id": existing_incoming["id"]},
+                {"$set": {"status": "accepted", "updated_at": datetime.utcnow()}}
+            )
+            
+            # Создаем связи дружбы
+            friend1 = Friend(
+                user_telegram_id=telegram_id,
+                friend_telegram_id=target_telegram_id
+            )
+            friend2 = Friend(
+                user_telegram_id=target_telegram_id,
+                friend_telegram_id=telegram_id
+            )
+            await db.friends.insert_many([friend1.dict(), friend2.dict()])
+            
+            # Обновляем статистику
+            await update_friends_stats(telegram_id)
+            await update_friends_stats(target_telegram_id)
+            
+            # Проверяем достижения
+            from achievements import check_and_award_achievements, get_or_create_user_stats
+            stats = await get_or_create_user_stats(db, telegram_id)
+            await check_and_award_achievements(db, telegram_id, stats)
+            
+            friend_card = await build_friend_card(target_user, telegram_id, datetime.utcnow())
+            return FriendActionResponse(
+                success=True,
+                message="Запрос принят, вы теперь друзья!",
+                friend=friend_card
+            )
+        
+        # Создаем новый запрос
+        request = FriendRequest(
+            from_telegram_id=telegram_id,
+            to_telegram_id=target_telegram_id
+        )
+        await db.friend_requests.insert_one(request.dict())
+        
+        logger.info(f"👥 Friend request sent: {telegram_id} -> {target_telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Запрос на дружбу отправлен"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/accept/{request_id}", response_model=FriendActionResponse)
+async def accept_friend_request(request_id: str, telegram_id: int = Body(..., embed=True)):
+    """Принять запрос на дружбу"""
+    try:
+        # Находим запрос
+        request = await db.friend_requests.find_one({"id": request_id, "status": "pending"})
+        if not request:
+            raise HTTPException(status_code=404, detail="Запрос не найден")
+        
+        # Проверяем, что запрос адресован нам
+        if request["to_telegram_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Это не ваш запрос")
+        
+        # Обновляем статус запроса
+        await db.friend_requests.update_one(
+            {"id": request_id},
+            {"$set": {"status": "accepted", "updated_at": datetime.utcnow()}}
+        )
+        
+        from_id = request["from_telegram_id"]
+        
+        # Создаем связи дружбы (двусторонние)
+        friend1 = Friend(
+            user_telegram_id=telegram_id,
+            friend_telegram_id=from_id
+        )
+        friend2 = Friend(
+            user_telegram_id=from_id,
+            friend_telegram_id=telegram_id
+        )
+        await db.friends.insert_many([friend1.dict(), friend2.dict()])
+        
+        # Обновляем статистику обоих
+        await update_friends_stats(telegram_id)
+        await update_friends_stats(from_id)
+        
+        # Проверяем достижения для обоих
+        from achievements import check_and_award_achievements, get_or_create_user_stats
+        for user_id in [telegram_id, from_id]:
+            stats = await get_or_create_user_stats(db, user_id)
+            await check_and_award_achievements(db, user_id, stats)
+        
+        # Получаем данные нового друга
+        friend_user = await db.user_settings.find_one({"telegram_id": from_id})
+        friend_card = await build_friend_card(friend_user, telegram_id, datetime.utcnow()) if friend_user else None
+        
+        logger.info(f"👥 Friend request accepted: {from_id} <-> {telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Запрос принят, вы теперь друзья!",
+            friend=friend_card
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Accept friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/reject/{request_id}", response_model=FriendActionResponse)
+async def reject_friend_request(request_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отклонить запрос на дружбу"""
+    try:
+        # Находим запрос
+        request = await db.friend_requests.find_one({"id": request_id, "status": "pending"})
+        if not request:
+            raise HTTPException(status_code=404, detail="Запрос не найден")
+        
+        # Проверяем, что запрос адресован нам
+        if request["to_telegram_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Это не ваш запрос")
+        
+        # Обновляем статус запроса
+        await db.friend_requests.update_one(
+            {"id": request_id},
+            {"$set": {"status": "rejected", "updated_at": datetime.utcnow()}}
+        )
+        
+        logger.info(f"👥 Friend request rejected: {request['from_telegram_id']} -> {telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Запрос отклонен"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reject friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/cancel/{request_id}", response_model=FriendActionResponse)
+async def cancel_friend_request(request_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отменить отправленный запрос на дружбу"""
+    try:
+        # Находим запрос
+        request = await db.friend_requests.find_one({"id": request_id, "status": "pending"})
+        if not request:
+            raise HTTPException(status_code=404, detail="Запрос не найден")
+        
+        # Проверяем, что запрос от нас
+        if request["from_telegram_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Это не ваш запрос")
+        
+        # Удаляем запрос
+        await db.friend_requests.delete_one({"id": request_id})
+        
+        logger.info(f"👥 Friend request cancelled: {telegram_id} -> {request['to_telegram_id']}")
+        return FriendActionResponse(
+            success=True,
+            message="Запрос отменен"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Cancel friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/friends/{friend_telegram_id}", response_model=FriendActionResponse)
+async def remove_friend(friend_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Удалить из друзей"""
+    try:
+        # Проверяем, что действительно друзья
+        if not await are_friends(telegram_id, friend_telegram_id):
+            raise HTTPException(status_code=400, detail="Вы не друзья")
+        
+        # Удаляем связи дружбы (обе стороны)
+        await db.friends.delete_many({
+            "$or": [
+                {"user_telegram_id": telegram_id, "friend_telegram_id": friend_telegram_id},
+                {"user_telegram_id": friend_telegram_id, "friend_telegram_id": telegram_id}
+            ]
+        })
+        
+        # Обновляем статистику
+        await update_friends_stats(telegram_id)
+        await update_friends_stats(friend_telegram_id)
+        
+        logger.info(f"👥 Friend removed: {telegram_id} X {friend_telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Удален из друзей"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Remove friend error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/block/{target_telegram_id}", response_model=FriendActionResponse)
+async def block_user(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Заблокировать пользователя"""
+    try:
+        if telegram_id == target_telegram_id:
+            raise HTTPException(status_code=400, detail="Нельзя заблокировать себя")
+        
+        # Проверяем, не заблокирован ли уже
+        if await is_blocked(telegram_id, target_telegram_id):
+            raise HTTPException(status_code=400, detail="Пользователь уже заблокирован")
+        
+        # Удаляем из друзей, если были друзьями
+        await db.friends.delete_many({
+            "$or": [
+                {"user_telegram_id": telegram_id, "friend_telegram_id": target_telegram_id},
+                {"user_telegram_id": target_telegram_id, "friend_telegram_id": telegram_id}
+            ]
+        })
+        
+        # Удаляем все запросы между пользователями
+        await db.friend_requests.delete_many({
+            "$or": [
+                {"from_telegram_id": telegram_id, "to_telegram_id": target_telegram_id},
+                {"from_telegram_id": target_telegram_id, "to_telegram_id": telegram_id}
+            ]
+        })
+        
+        # Создаем блокировку
+        block = UserBlock(
+            blocker_telegram_id=telegram_id,
+            blocked_telegram_id=target_telegram_id
+        )
+        await db.user_blocks.insert_one(block.dict())
+        
+        # Обновляем статистику
+        await update_friends_stats(telegram_id)
+        await update_friends_stats(target_telegram_id)
+        
+        logger.info(f"🚫 User blocked: {telegram_id} blocked {target_telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Пользователь заблокирован"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Block user error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/friends/block/{target_telegram_id}", response_model=FriendActionResponse)
+async def unblock_user(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Разблокировать пользователя"""
+    try:
+        result = await db.user_blocks.delete_one({
+            "blocker_telegram_id": telegram_id,
+            "blocked_telegram_id": target_telegram_id
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не был заблокирован")
+        
+        logger.info(f"✅ User unblocked: {telegram_id} unblocked {target_telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Пользователь разблокирован"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unblock user error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/{friend_telegram_id}/favorite", response_model=FriendActionResponse)
+async def toggle_favorite_friend(friend_telegram_id: int, telegram_id: int = Body(..., embed=True), is_favorite: bool = Body(...)):
+    """Добавить/убрать из избранных друзей"""
+    try:
+        result = await db.friends.update_one(
+            {"user_telegram_id": telegram_id, "friend_telegram_id": friend_telegram_id},
+            {"$set": {"is_favorite": is_favorite}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Друг не найден")
+        
+        message = "Добавлен в избранное" if is_favorite else "Убран из избранного"
+        return FriendActionResponse(success=True, message=message)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle favorite friend error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}", response_model=FriendsListResponse)
+async def get_friends_list(telegram_id: int, favorites_only: bool = False, search: str = None):
+    """Получить список друзей"""
+    try:
+        query = {"user_telegram_id": telegram_id}
+        if favorites_only:
+            query["is_favorite"] = True
+        
+        friends_data = await db.friends.find(query).to_list(1000)
+        
+        friends = []
+        for f in friends_data:
+            friend_user = await db.user_settings.find_one({"telegram_id": f["friend_telegram_id"]})
+            if friend_user:
+                # Фильтрация по поиску
+                if search:
+                    search_lower = search.lower()
+                    name = f"{friend_user.get('first_name', '')} {friend_user.get('last_name', '')}".lower()
+                    username = (friend_user.get("username") or "").lower()
+                    if search_lower not in name and search_lower not in username:
+                        continue
+                
+                friend_card = await build_friend_card(
+                    friend_user, 
+                    telegram_id, 
+                    f.get("created_at"),
+                    f.get("is_favorite", False)
+                )
+                friends.append(friend_card)
+        
+        # Сортируем: избранные первые, потом по алфавиту
+        friends.sort(key=lambda x: (not x.is_favorite, x.first_name or "", x.last_name or ""))
+        
+        return FriendsListResponse(friends=friends, total=len(friends))
+        
+    except Exception as e:
+        logger.error(f"Get friends list error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}/requests", response_model=FriendRequestsResponse)
+async def get_friend_requests(telegram_id: int):
+    """Получить входящие и исходящие запросы на дружбу"""
+    try:
+        # Входящие запросы
+        incoming_data = await db.friend_requests.find({
+            "to_telegram_id": telegram_id,
+            "status": "pending"
+        }).to_list(100)
+        
+        incoming = []
+        for req in incoming_data:
+            user = await db.user_settings.find_one({"telegram_id": req["from_telegram_id"]})
+            if user:
+                incoming.append(FriendRequestCard(
+                    request_id=req["id"],
+                    telegram_id=req["from_telegram_id"],
+                    username=user.get("username"),
+                    first_name=user.get("first_name"),
+                    last_name=user.get("last_name"),
+                    group_name=user.get("group_name"),
+                    facultet_name=user.get("facultet_name"),
+                    message=req.get("message"),
+                    mutual_friends_count=await get_mutual_friends_count(telegram_id, req["from_telegram_id"]),
+                    created_at=req.get("created_at", datetime.utcnow())
+                ))
+        
+        # Исходящие запросы
+        outgoing_data = await db.friend_requests.find({
+            "from_telegram_id": telegram_id,
+            "status": "pending"
+        }).to_list(100)
+        
+        outgoing = []
+        for req in outgoing_data:
+            user = await db.user_settings.find_one({"telegram_id": req["to_telegram_id"]})
+            if user:
+                outgoing.append(FriendRequestCard(
+                    request_id=req["id"],
+                    telegram_id=req["to_telegram_id"],
+                    username=user.get("username"),
+                    first_name=user.get("first_name"),
+                    last_name=user.get("last_name"),
+                    group_name=user.get("group_name"),
+                    facultet_name=user.get("facultet_name"),
+                    message=req.get("message"),
+                    mutual_friends_count=await get_mutual_friends_count(telegram_id, req["to_telegram_id"]),
+                    created_at=req.get("created_at", datetime.utcnow())
+                ))
+        
+        return FriendRequestsResponse(
+            incoming=incoming,
+            outgoing=outgoing,
+            incoming_count=len(incoming),
+            outgoing_count=len(outgoing)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get friend requests error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/mutual/{telegram_id}/{other_telegram_id}", response_model=MutualFriendsResponse)
+async def get_mutual_friends(telegram_id: int, other_telegram_id: int):
+    """Получить список общих друзей"""
+    try:
+        # Получаем друзей первого пользователя
+        friends1 = await db.friends.find({"user_telegram_id": telegram_id}).to_list(1000)
+        friends1_ids = set(f["friend_telegram_id"] for f in friends1)
+        
+        # Получаем друзей второго пользователя
+        friends2 = await db.friends.find({"user_telegram_id": other_telegram_id}).to_list(1000)
+        friends2_ids = set(f["friend_telegram_id"] for f in friends2)
+        
+        # Находим пересечение
+        mutual_ids = friends1_ids & friends2_ids
+        
+        mutual_friends = []
+        for friend_id in mutual_ids:
+            user = await db.user_settings.find_one({"telegram_id": friend_id})
+            if user:
+                friend_card = await build_friend_card(user, telegram_id)
+                mutual_friends.append(friend_card)
+        
+        return MutualFriendsResponse(
+            mutual_friends=mutual_friends,
+            count=len(mutual_friends)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get mutual friends error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/search", response_model=FriendSearchResponse)
+async def search_users(
+    telegram_id: int,
+    query: str = None,
+    group_id: str = None,
+    facultet_id: str = None,
+    limit: int = 50
+):
+    """Поиск пользователей для добавления в друзья"""
+    try:
+        # Базовый фильтр - не показываем себя
+        filter_query = {"telegram_id": {"$ne": telegram_id}}
+        
+        # Получаем заблокированных пользователей
+        blocked_by_me = await db.user_blocks.find({"blocker_telegram_id": telegram_id}).to_list(100)
+        blocked_me = await db.user_blocks.find({"blocked_telegram_id": telegram_id}).to_list(100)
+        blocked_ids = [b["blocked_telegram_id"] for b in blocked_by_me] + [b["blocker_telegram_id"] for b in blocked_me]
+        
+        if blocked_ids:
+            filter_query["telegram_id"]["$nin"] = blocked_ids
+        
+        # Поиск по группе
+        if group_id:
+            filter_query["group_id"] = group_id
+        
+        # Поиск по факультету
+        if facultet_id:
+            filter_query["facultet_id"] = facultet_id
+        
+        # Текстовый поиск
+        if query:
+            query_lower = query.lower()
+            # Используем регулярное выражение для поиска
+            filter_query["$or"] = [
+                {"username": {"$regex": query, "$options": "i"}},
+                {"first_name": {"$regex": query, "$options": "i"}},
+                {"last_name": {"$regex": query, "$options": "i"}}
+            ]
+        
+        users = await db.user_settings.find(filter_query).limit(limit).to_list(limit)
+        
+        # Фильтруем пользователей, которые скрыли себя из поиска
+        results = []
+        for user in users:
+            privacy = await get_user_privacy_settings(user["telegram_id"])
+            if not privacy.show_in_search and not query:  # Если ищем конкретно по имени - показываем
+                continue
+            
+            friendship_status = await get_friendship_status(telegram_id, user["telegram_id"])
+            
+            results.append(FriendSearchResult(
+                telegram_id=user["telegram_id"],
+                username=user.get("username"),
+                first_name=user.get("first_name"),
+                last_name=user.get("last_name"),
+                group_name=user.get("group_name"),
+                facultet_name=user.get("facultet_name"),
+                kurs=user.get("kurs"),
+                mutual_friends_count=await get_mutual_friends_count(telegram_id, user["telegram_id"]),
+                friendship_status=friendship_status
+            ))
+        
+        return FriendSearchResponse(
+            results=results,
+            total=len(results),
+            query=query
+        )
+        
+    except Exception as e:
+        logger.error(f"Search users error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API для профиля
+
+@api_router.get("/profile/{telegram_id}", response_model=UserProfilePublic)
+async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
+    """Получить публичный профиль пользователя"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        privacy = await get_user_privacy_settings(telegram_id)
+        
+        # Получаем статистику
+        stats = await db.user_stats.find_one({"telegram_id": telegram_id})
+        achievements_count = await db.user_achievements.count_documents({"telegram_id": telegram_id})
+        friends_count = await get_user_friends_count(telegram_id)
+        
+        # Проверяем онлайн-статус
+        is_online = False
+        last_activity = user.get("last_activity")
+        if last_activity and privacy.show_online_status:
+            if isinstance(last_activity, str):
+                last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+            is_online = (datetime.utcnow() - last_activity).total_seconds() < 300
+        
+        # Вычисляем общих друзей
+        mutual_count = 0
+        if viewer_telegram_id and viewer_telegram_id != telegram_id:
+            mutual_count = await get_mutual_friends_count(viewer_telegram_id, telegram_id)
+        
+        # Определяем статус дружбы
+        friendship_status = None
+        if viewer_telegram_id and viewer_telegram_id != telegram_id:
+            friendship_status = await get_friendship_status(viewer_telegram_id, telegram_id)
+        
+        return UserProfilePublic(
+            telegram_id=telegram_id,
+            username=user.get("username"),
+            first_name=user.get("first_name"),
+            last_name=user.get("last_name"),
+            group_id=user.get("group_id"),
+            group_name=user.get("group_name"),
+            facultet_id=user.get("facultet_id"),
+            facultet_name=user.get("facultet_name"),
+            kurs=user.get("kurs"),
+            friends_count=friends_count if privacy.show_friends_list else 0,
+            mutual_friends_count=mutual_count,
+            achievements_count=achievements_count if privacy.show_achievements else 0,
+            total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
+            is_online=is_online if privacy.show_online_status else False,
+            last_activity=last_activity if privacy.show_online_status else None,
+            privacy=privacy,
+            created_at=user.get("created_at"),
+            friendship_status=friendship_status
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get user profile error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/profile/{telegram_id}/schedule", response_model=FriendScheduleResponse)
+async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: str = None):
+    """Получить расписание друга"""
+    try:
+        # Проверяем, что пользователи друзья
+        if not await are_friends(viewer_telegram_id, telegram_id):
+            raise HTTPException(status_code=403, detail="Вы не друзья с этим пользователем")
+        
+        # Проверяем настройки приватности
+        privacy = await get_user_privacy_settings(telegram_id)
+        if not privacy.show_schedule:
+            raise HTTPException(status_code=403, detail="Пользователь скрыл своё расписание")
+        
+        # Получаем данные пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user or not user.get("group_id"):
+            raise HTTPException(status_code=404, detail="У пользователя не настроена группа")
+        
+        # Получаем расписание
+        from rudn_parser import get_schedule
+        
+        if not date:
+            date = datetime.now().strftime("%Y-%m-%d")
+        
+        schedule_data = get_schedule(
+            user["group_id"],
+            user.get("level_id", ""),
+            user.get("kurs", ""),
+            user.get("form_code", "")
+        )
+        
+        # Фильтруем по дате если нужно
+        schedule_events = schedule_data.get("events", [])
+        if date:
+            schedule_events = [e for e in schedule_events if e.get("date") == date]
+        
+        # Получаем расписание просматривающего для сравнения
+        viewer = await db.user_settings.find_one({"telegram_id": viewer_telegram_id})
+        common_classes = []
+        common_breaks = []
+        
+        if viewer and viewer.get("group_id") == user.get("group_id"):
+            # Если в одной группе - все пары общие
+            common_classes = schedule_events
+        
+        friend_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Друг"
+        
+        return FriendScheduleResponse(
+            friend_telegram_id=telegram_id,
+            friend_name=friend_name,
+            group_name=user.get("group_name"),
+            schedule=schedule_events,
+            common_classes=common_classes,
+            common_breaks=common_breaks
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get friend schedule error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
+async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpdate):
+    """Обновить настройки приватности"""
+    try:
+        # Получаем текущие настройки
+        current = await get_user_privacy_settings(telegram_id)
+        
+        # Обновляем только переданные поля
+        update_data = settings.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(current, key, value)
+        
+        # Сохраняем
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"privacy_settings": current.dict()}}
+        )
+        
+        logger.info(f"🔒 Privacy settings updated for {telegram_id}")
+        return current
+        
+    except Exception as e:
+        logger.error(f"Update privacy settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
+async def get_privacy_settings(telegram_id: int):
+    """Получить настройки приватности"""
+    try:
+        return await get_user_privacy_settings(telegram_id)
+    except Exception as e:
+        logger.error(f"Get privacy settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/profile/{telegram_id}/qr")
+async def get_profile_qr_data(telegram_id: int):
+    """Получить данные для QR-кода профиля"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Генерируем ссылку для добавления в друзья
+        bot_username = os.getenv("BOT_USERNAME", "rudn_mosbot")
+        # Формат: friend_{telegram_id}
+        friend_link = f"https://t.me/{bot_username}?start=friend_{telegram_id}"
+        
+        return {
+            "qr_data": friend_link,
+            "telegram_id": telegram_id,
+            "display_name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or user.get("username", "Пользователь")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get profile QR data error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Обработка приглашения от друга (онбординг)
+
+@api_router.post("/friends/process-invite", response_model=ProcessFriendInviteResponse)
+async def process_friend_invite(request: ProcessFriendInviteRequest):
+    """Обработать приглашение от друга при онбординге"""
+    try:
+        inviter = await db.user_settings.find_one({"telegram_id": request.inviter_telegram_id})
+        if not inviter:
+            return ProcessFriendInviteResponse(
+                success=False,
+                friend_added=False,
+                group_set=False,
+                message="Пригласивший пользователь не найден"
+            )
+        
+        # Проверяем, новый ли это пользователь
+        existing_user = await db.user_settings.find_one({"telegram_id": request.telegram_id})
+        is_new_user = existing_user is None
+        
+        # Автоматически добавляем в друзья
+        if not await are_friends(request.telegram_id, request.inviter_telegram_id):
+            friend1 = Friend(
+                user_telegram_id=request.telegram_id,
+                friend_telegram_id=request.inviter_telegram_id
+            )
+            friend2 = Friend(
+                user_telegram_id=request.inviter_telegram_id,
+                friend_telegram_id=request.telegram_id
+            )
+            await db.friends.insert_many([friend1.dict(), friend2.dict()])
+            
+            # Обновляем статистику
+            await update_friends_stats(request.telegram_id)
+            await update_friends_stats(request.inviter_telegram_id)
+            
+            # Если новый пользователь - увеличиваем счетчик приглашений
+            if is_new_user:
+                await db.user_stats.update_one(
+                    {"telegram_id": request.inviter_telegram_id},
+                    {"$inc": {"users_invited": 1}},
+                    upsert=True
+                )
+        
+        # Устанавливаем группу пригласившего если запрошено
+        group_set = False
+        if request.use_inviter_group and inviter.get("group_id"):
+            await db.user_settings.update_one(
+                {"telegram_id": request.telegram_id},
+                {
+                    "$set": {
+                        "group_id": inviter["group_id"],
+                        "group_name": inviter.get("group_name"),
+                        "facultet_id": inviter.get("facultet_id"),
+                        "facultet_name": inviter.get("facultet_name"),
+                        "level_id": inviter.get("level_id"),
+                        "kurs": inviter.get("kurs"),
+                        "form_code": inviter.get("form_code")
+                    }
+                },
+                upsert=True
+            )
+            group_set = True
+        
+        # Проверяем достижения
+        from achievements import check_and_award_achievements, get_or_create_user_stats
+        for user_id in [request.telegram_id, request.inviter_telegram_id]:
+            stats = await get_or_create_user_stats(db, user_id)
+            await check_and_award_achievements(db, user_id, stats)
+        
+        inviter_card = await build_friend_card(inviter, request.telegram_id, datetime.utcnow())
+        
+        logger.info(f"👥 Friend invite processed: {request.inviter_telegram_id} -> {request.telegram_id}")
+        return ProcessFriendInviteResponse(
+            success=True,
+            friend_added=True,
+            group_set=group_set,
+            inviter_info=inviter_card,
+            message="Вы добавлены в друзья!"
+        )
+        
+    except Exception as e:
+        logger.error(f"Process friend invite error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}/blocked")
+async def get_blocked_users(telegram_id: int):
+    """Получить список заблокированных пользователей"""
+    try:
+        blocks = await db.user_blocks.find({"blocker_telegram_id": telegram_id}).to_list(100)
+        
+        blocked_users = []
+        for block in blocks:
+            user = await db.user_settings.find_one({"telegram_id": block["blocked_telegram_id"]})
+            if user:
+                blocked_users.append({
+                    "telegram_id": block["blocked_telegram_id"],
+                    "username": user.get("username"),
+                    "first_name": user.get("first_name"),
+                    "last_name": user.get("last_name"),
+                    "blocked_at": block.get("created_at")
+                })
+        
+        return {"blocked_users": blocked_users, "count": len(blocked_users)}
+        
+    except Exception as e:
+        logger.error(f"Get blocked users error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
