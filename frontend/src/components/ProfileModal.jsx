@@ -59,21 +59,25 @@ export const ProfileModal = ({
   const [showLKModal, setShowLKModal] = useState(false);
   const [lkConnected, setLkConnected] = useState(false);
   const [lkData, setLkData] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrData, setQrData] = useState(null);
 
-  // Загрузка реферальных данных при открытии
+  // Загрузка реферальных данных и QR при открытии
   useEffect(() => {
     const loadReferralData = async () => {
       if (!isOpen || !user?.id) return;
       
       setLoading(true);
       try {
-        const [codeData, statsData] = await Promise.all([
+        const [codeData, statsData, qrDataResult] = await Promise.all([
           getReferralCode(user.id),
-          getReferralStats(user.id)
+          getReferralStats(user.id),
+          friendsAPI.getProfileQR(user.id).catch(() => null)
         ]);
         
         setReferralData(codeData);
         setReferralStats(statsData);
+        setQrData(qrDataResult);
       } catch (error) {
         console.error('Ошибка загрузки реферальных данных:', error);
       } finally {
