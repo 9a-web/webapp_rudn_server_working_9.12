@@ -1168,6 +1168,17 @@ const Home = () => {
 
         {user && (
           <Suspense fallback={null}>
+            <NotificationsPanel
+              isOpen={isNotificationsPanelOpen}
+              onClose={handleNotificationsPanelClose}
+              telegramId={user.id}
+              hapticFeedback={hapticFeedback}
+            />
+          </Suspense>
+        )}
+
+        {user && (
+          <Suspense fallback={null}>
             <NotificationSettings
               telegramId={user.id}
               onClose={() => setIsNotificationSettingsOpen(false)}
