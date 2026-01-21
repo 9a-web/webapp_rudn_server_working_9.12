@@ -2050,6 +2050,17 @@ const TaskGroupItem = ({
                   );
                 })()}
               </div>
+              
+              {/* YouTube Preview */}
+              {task.youtube_url && task.youtube_title && (
+                <YouTubePreview
+                  title={task.youtube_title}
+                  duration={task.youtube_duration}
+                  thumbnail={task.youtube_thumbnail}
+                  url={task.youtube_url}
+                  compact={true}
+                />
+              )}
             </div>
             
             {/* Кнопка удаления (всегда видна) */}
