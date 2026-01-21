@@ -146,14 +146,12 @@ export const ArtistCard = ({
             style={{ 
               y: dragY,
               scale: isDragging ? scale : 1,
-            }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] rounded-t-3xl overflow-hidden touch-none"
-            style={{
               backgroundColor: 'rgba(20, 20, 22, 0.98)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)'
             }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] rounded-t-3xl overflow-hidden touch-none"
           >
             {/* Drag handle */}
             <div className="sticky top-0 z-10 pt-3 pb-2 bg-inherit">
