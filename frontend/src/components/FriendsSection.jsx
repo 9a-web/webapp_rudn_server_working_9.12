@@ -22,7 +22,7 @@ const TABS = [
   { id: 'search', name: 'Поиск', icon: Search }
 ];
 
-const FriendsSection = ({ userSettings }) => {
+const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const { user, webApp } = useTelegram();
   const [activeTab, setActiveTab] = useState('friends');
   const [friends, setFriends] = useState([]);
