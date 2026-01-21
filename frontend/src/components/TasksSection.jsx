@@ -1701,24 +1701,38 @@ const TodayTaskItem = ({
 
               {/* Текст задачи */}
               <div className="flex-1 min-w-0">
-                <span 
-                  onDoubleClick={() => {
-                    if (!task.completed && onStartEdit) {
-                      onStartEdit(task); // Переключаемся в inline режим редактирования
-                      hapticFeedback && hapticFeedback('selection');
-                    }
-                  }}
-                  className={`
-                    block text-xs leading-tight transition-all duration-200 cursor-pointer
-                    ${task.completed 
-                      ? 'text-[#999999] line-through' 
-                      : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
-                    }
-                  `}
-                  title={!task.completed ? "Двойной клик для быстрого редактирования текста" : ""}
-                >
-                  {task.text}
-                </span>
+                {/* Текст задачи (без YouTube ссылки если есть превью) */}
+                {(() => {
+                  const { displayText, hasYouTube, hasTextContent } = parseTaskText(task.text, {
+                    youtube_url: task.youtube_url,
+                    youtube_title: task.youtube_title
+                  });
+                  
+                  // Показываем текст только если есть что показывать
+                  if (hasTextContent) {
+                    return (
+                      <span 
+                        onDoubleClick={() => {
+                          if (!task.completed && onStartEdit) {
+                            onStartEdit(task);
+                            hapticFeedback && hapticFeedback('selection');
+                          }
+                        }}
+                        className={`
+                          block text-xs leading-tight transition-all duration-200 cursor-pointer
+                          ${task.completed 
+                            ? 'text-[#999999] line-through' 
+                            : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
+                          }
+                        `}
+                        title={!task.completed ? "Двойной клик для быстрого редактирования текста" : ""}
+                      >
+                        {displayText}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
                 
                 {/* Метки: категория, приоритет, предмет */}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
