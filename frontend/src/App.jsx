@@ -1112,6 +1112,7 @@ const Home = () => {
         {activeTab === 'friends' && (
           <FriendsSection 
             userSettings={userSettings}
+            onFriendProfileOpen={setIsFriendProfileOpen}
           />
         )}
         
