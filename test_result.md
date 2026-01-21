@@ -95,6 +95,8 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Реализовано отображение YouTube информации в задачах. При добавлении ссылки на YouTube в текст задачи автоматически показывается название видео, длительность и превью. Поддерживаются форматы: youtube.com/watch?v=, youtu.be/, youtube.com/shorts/"
+  - agent: "testing"
+    message: "✅ BACKEND TESTING COMPLETE: All high-priority backend APIs tested and working correctly. Friends System API (9/9 endpoints) and YouTube Info in Tasks both PASSED. All endpoints return proper data structures and handle edge cases appropriately. Backend is ready for production use."
 
 # Testing Protocol
 # - Test POST /api/tasks with YouTube URL - должен вернуть youtube_title, youtube_duration, youtube_thumbnail
