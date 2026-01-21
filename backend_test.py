@@ -51,14 +51,22 @@ def test_friends_search():
             return False
         
         # Validate response structure
-        if not isinstance(data, list):
-            print(f"❌ FAILED: Expected list response, got {type(data)}")
+        if not isinstance(data, dict):
+            print(f"❌ FAILED: Expected dict response, got {type(data)}")
+            return False
+        
+        if 'results' not in data:
+            print(f"❌ FAILED: Missing 'results' field in response")
+            return False
+        
+        if not isinstance(data['results'], list):
+            print(f"❌ FAILED: Expected 'results' to be a list, got {type(data['results'])}")
             return False
         
         # Check if users have required fields
-        if data:  # If there are results
+        if data['results']:  # If there are results
             required_fields = ['telegram_id', 'username', 'first_name', 'last_name', 'group_name', 'friendship_status']
-            for user in data[:1]:  # Check first user
+            for user in data['results'][:1]:  # Check first user
                 for field in required_fields:
                     if field not in user:
                         print(f"❌ FAILED: Missing required field '{field}' in user object")
