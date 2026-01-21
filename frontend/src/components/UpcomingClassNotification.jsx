@@ -67,9 +67,18 @@ export const UpcomingClassNotification = ({ schedule }) => {
     checkUpcomingClass();
     const interval = setInterval(checkUpcomingClass, 10000); // Check every 10 sec
     return () => clearInterval(interval);
-  }, [schedule]);
+  }, [schedule, dismissedClassId]);
 
-  if (!nextClass) return null;
+  // Функция скрытия уведомления
+  const handleDismiss = () => {
+    if (nextClass) {
+      const classId = `${nextClass.discipline}-${nextClass.time}`;
+      setDismissedClassId(classId);
+      setIsDismissed(true);
+    }
+  };
+
+  if (!nextClass || isDismissed) return null;
 
   return (
     <AnimatePresence>
