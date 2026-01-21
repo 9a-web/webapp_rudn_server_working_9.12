@@ -27,6 +27,14 @@ const FriendProfileModal = ({
   const [activeTab, setActiveTab] = useState('info');
   const [isLoading, setIsLoading] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Синхронизация is_favorite при открытии
+  useEffect(() => {
+    if (friend) {
+      setIsFavorite(friend.is_favorite || false);
+    }
+  }, [friend]);
 
   // Загрузка данных профиля
   useEffect(() => {
@@ -82,6 +90,19 @@ const FriendProfileModal = ({
     }
   }, [isOpen]);
 
+  // Обработка переключения избранного
+  const handleToggleFavorite = async () => {
+    const newValue = !isFavorite;
+    setIsFavorite(newValue); // Оптимистичное обновление UI
+    
+    try {
+      await onToggleFavorite?.(friend.telegram_id, newValue);
+    } catch (error) {
+      setIsFavorite(!newValue); // Откат при ошибке
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
   if (!friend) return null;
 
   const displayName = [friend.first_name, friend.last_name].filter(Boolean).join(' ') || friend.username || 'Пользователь';
@@ -122,8 +143,8 @@ const FriendProfileModal = ({
             <div className="px-4 pb-4">
               <div className="flex items-start gap-4">
                 {/* Аватар */}
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-2xl">
+                <div className="relative flex-shrink-0">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-2xl overflow-hidden">
                     {initials}
                   </div>
                   {profile?.is_online && (
@@ -135,7 +156,7 @@ const FriendProfileModal = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-white truncate">{displayName}</h2>
-                    {friend.is_favorite && (
+                    {isFavorite && (
                       <Star className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="currentColor" />
                     )}
                   </div>
@@ -143,11 +164,11 @@ const FriendProfileModal = ({
                     <p className="text-gray-400">@{friend.username}</p>
                   )}
                   <p className="text-sm text-purple-400 mt-1">
-                    {friend.group_name || 'Группа не указана'}
+                    {friend.group_name || profile?.group_name || 'Группа не указана'}
                   </p>
-                  {friend.facultet_name && (
+                  {(friend.facultet_name || profile?.facultet_name) && (
                     <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {friend.facultet_name}
+                      {friend.facultet_name || profile?.facultet_name}
                     </p>
                   )}
                 </div>
@@ -155,7 +176,7 @@ const FriendProfileModal = ({
                 {/* Кнопка закрытия */}
                 <button
                   onClick={onClose}
-                  className="p-2 bg-white/10 rounded-xl text-gray-400 hover:bg-white/20"
+                  className="p-2 bg-white/10 rounded-xl text-gray-400 hover:bg-white/20 flex-shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -165,16 +186,16 @@ const FriendProfileModal = ({
               {profile && (
                 <div className="flex gap-4 mt-4">
                   <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-white">{profile.friends_count}</p>
+                    <p className="text-2xl font-bold text-white">{profile.friends_count || 0}</p>
                     <p className="text-xs text-gray-400">Друзей</p>
                   </div>
                   <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
                     <p className="text-2xl font-bold text-white">{mutualFriends.length}</p>
                     <p className="text-xs text-gray-400">Общих</p>
                   </div>
-                  {profile.privacy?.show_achievements && (
+                  {profile.privacy?.show_achievements !== false && (
                     <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold text-white">{profile.achievements_count}</p>
+                      <p className="text-2xl font-bold text-white">{profile.achievements_count || 0}</p>
                       <p className="text-xs text-gray-400">Достижений</p>
                     </div>
                   )}
@@ -238,18 +259,18 @@ const FriendProfileModal = ({
                   {/* Действия */}
                   <div className="space-y-2">
                     <button
-                      onClick={() => onToggleFavorite?.(friend.telegram_id, !friend.is_favorite)}
+                      onClick={handleToggleFavorite}
                       className="w-full flex items-center gap-3 p-4 bg-white/5 rounded-2xl text-left hover:bg-white/10 transition-colors"
                     >
-                      <div className={`p-2 rounded-xl ${friend.is_favorite ? 'bg-yellow-500/20' : 'bg-white/10'}`}>
-                        <Star className={`w-5 h-5 ${friend.is_favorite ? 'text-yellow-400' : 'text-gray-400'}`} fill={friend.is_favorite ? 'currentColor' : 'none'} />
+                      <div className={`p-2 rounded-xl ${isFavorite ? 'bg-yellow-500/20' : 'bg-white/10'}`}>
+                        <Star className={`w-5 h-5 ${isFavorite ? 'text-yellow-400' : 'text-gray-400'}`} fill={isFavorite ? 'currentColor' : 'none'} />
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-white">
-                          {friend.is_favorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                          {isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
                         </p>
                         <p className="text-sm text-gray-400">
-                          {friend.is_favorite ? 'Уберет из начала списка' : 'Будет в начале списка'}
+                          {isFavorite ? 'Уберет из начала списка' : 'Будет в начале списка'}
                         </p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-500" />
@@ -282,8 +303,10 @@ const FriendProfileModal = ({
                   ) : schedule.error ? (
                     <div className="text-center py-8">
                       <EyeOff className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                      <p className="text-gray-400">Расписание скрыто</p>
-                      <p className="text-sm text-gray-500 mt-1">{schedule.message}</p>
+                      <p className="text-gray-400">Расписание недоступно</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {schedule.message || 'Пользователь скрыл расписание или группа не настроена'}
+                      </p>
                     </div>
                   ) : schedule.schedule?.length > 0 ? (
                     <>
@@ -296,25 +319,25 @@ const FriendProfileModal = ({
                           className="bg-white/5 rounded-2xl p-4 border border-white/10"
                         >
                           <div className="flex items-start gap-3">
-                            <div className="bg-purple-500/20 rounded-xl px-3 py-2 text-center">
+                            <div className="bg-purple-500/20 rounded-xl px-3 py-2 text-center min-w-[60px]">
                               <p className="text-lg font-bold text-purple-400">
-                                {event.time_start?.split(':').slice(0, 2).join(':')}
+                                {event.time_start?.split(':').slice(0, 2).join(':') || event.startTime?.slice(0, 5)}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {event.time_end?.split(':').slice(0, 2).join(':')}
+                                {event.time_end?.split(':').slice(0, 2).join(':') || event.endTime?.slice(0, 5)}
                               </p>
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-white truncate">
-                                {event.discipline || event.title}
+                                {event.discipline || event.title || event.subject}
                               </h4>
-                              {event.teacher && (
-                                <p className="text-sm text-gray-400 truncate">{event.teacher}</p>
+                              {(event.teacher || event.professor) && (
+                                <p className="text-sm text-gray-400 truncate">{event.teacher || event.professor}</p>
                               )}
-                              {event.auditory && (
+                              {(event.auditory || event.room || event.location) && (
                                 <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                                   <MapPin className="w-3 h-3" />
-                                  {event.auditory}
+                                  {event.auditory || event.room || event.location}
                                 </p>
                               )}
                             </div>
