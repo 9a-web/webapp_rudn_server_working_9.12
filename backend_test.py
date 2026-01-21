@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for VK OAuth
-Tests the VK OAuth configuration endpoint as specified in the review request.
+Backend API Testing Script for Friends System
+Tests the Friends System API endpoints as specified in the review request.
 """
 
 import requests
@@ -12,6 +12,10 @@ from urllib.parse import urlparse, parse_qs
 # Backend URL from frontend .env.production
 BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
+
+# Test users as specified in the review request
+TEST_USER_1 = 123456789  # тестовый
+TEST_USER_2 = 765963392  # существующий в БД
 
 def test_vk_oauth_config():
     """
