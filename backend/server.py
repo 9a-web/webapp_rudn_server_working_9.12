@@ -10308,6 +10308,16 @@ async def startup_event():
             name="unique_block"
         )
         
+        # Индексы для in-app уведомлений
+        await db.in_app_notifications.create_index(
+            [("telegram_id", 1), ("created_at", -1)],
+            name="user_notifications_index"
+        )
+        await db.in_app_notifications.create_index(
+            [("telegram_id", 1), ("read", 1), ("dismissed", 1)],
+            name="unread_notifications_index"
+        )
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
