@@ -48,11 +48,19 @@ export const UpcomingClassNotification = ({ schedule }) => {
       }
 
       if (upcoming) {
+        // Если это новая пара (отличается от скрытой), показываем уведомление
+        const classId = `${upcoming.discipline}-${upcoming.time}`;
+        if (classId !== dismissedClassId) {
+          setIsDismissed(false);
+        }
         setNextClass(upcoming);
         setTimeLeft(minDiff);
       } else {
         setNextClass(null);
         setTimeLeft(null);
+        // Сбрасываем скрытие когда нет предстоящих пар
+        setIsDismissed(false);
+        setDismissedClassId(null);
       }
     };
 
