@@ -845,7 +845,7 @@ const Home = () => {
 
   const handleNotificationsClick = async () => {
     hapticFeedback('impact', 'light');
-    setIsNotificationSettingsOpen(true);
+    setIsNotificationsPanelOpen(true);
     
     // Отслеживаем посещение пункта меню уведомлений
     if (user) {
@@ -855,6 +855,12 @@ const Home = () => {
         console.error('Error tracking notifications view:', err);
       }
     }
+  };
+
+  const handleNotificationsPanelClose = () => {
+    setIsNotificationsPanelOpen(false);
+    // Обновляем счётчик после закрытия панели
+    loadUnreadCount();
   };
 
   const handleDateSelect = (date) => {
