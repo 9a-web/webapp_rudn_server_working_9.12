@@ -9040,6 +9040,11 @@ async def accept_friend_request(request_id: str, telegram_id: int = Body(..., em
         friend_user = await db.user_settings.find_one({"telegram_id": from_id})
         friend_card = await build_friend_card(friend_user, telegram_id, datetime.utcnow()) if friend_user else None
         
+        # Отправляем уведомление отправителю заявки
+        accepter_user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if accepter_user:
+            await notify_friend_accepted(from_id, accepter_user)
+        
         logger.info(f"👥 Friend request accepted: {from_id} <-> {telegram_id}")
         return FriendActionResponse(
             success=True,
