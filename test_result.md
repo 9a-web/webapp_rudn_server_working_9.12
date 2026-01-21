@@ -36,13 +36,25 @@ backend:
         comment: "🔧 Updated POST /api/music/auth/{telegram_id} to accept token_url or access_token instead of login/password. Parses token from OAuth redirect URL, validates via VK API, checks audio access, and saves to MongoDB."
 
 frontend:
+  - task: "YouTube Preview in Tasks"
+    implemented: true
+    working: pending
+    file: "/app/frontend/src/components/TasksSection.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 YouTubePreview компонент уже был реализован и интегрирован в TasksSection и EditTaskModal. Показывает название, длительность и превью YouTube видео."
+
   - task: "VK OAuth UI - Auth Modal"
     implemented: true
     working: pending
     file: "/app/frontend/src/components/music/VKAuthModal.jsx"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: true
+    priority: "low"
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
