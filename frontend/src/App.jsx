@@ -278,7 +278,8 @@ const Home = () => {
     isShareModalOpen ||
     isAddTaskModalOpen || // from TasksSection's AddTaskModal
     isJournalModalOpen || // from JournalSection
-    isFullscreenPlayerOpen; // fullscreen music player
+    isFullscreenPlayerOpen || // fullscreen music player
+    isFriendProfileOpen; // friend profile modal
 
   // Загрузка данных пользователя при монтировании
   useEffect(() => {
