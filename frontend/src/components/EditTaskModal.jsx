@@ -272,6 +272,16 @@ export const EditTaskModal = ({
                 <p className="text-[10px] sm:text-xs text-gray-400 mt-1 text-right">
                   {taskText.length} / 500
                 </p>
+                
+                {/* YouTube Preview если есть ссылка в задаче */}
+                {task.youtube_url && task.youtube_title && (
+                  <YouTubePreview
+                    title={task.youtube_title}
+                    duration={task.youtube_duration}
+                    thumbnail={task.youtube_thumbnail}
+                    url={task.youtube_url}
+                  />
+                )}
               </div>
 
               {/* Категория */}
