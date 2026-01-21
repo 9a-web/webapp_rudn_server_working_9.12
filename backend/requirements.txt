@@ -49,3 +49,4 @@ playwright
 pyee
 greenlet
 vkaudiotoken
+yt-dlp
