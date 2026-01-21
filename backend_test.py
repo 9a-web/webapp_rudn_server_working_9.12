@@ -486,86 +486,47 @@ def test_youtube_info_in_tasks():
         print(f"❌ FAILED: Unexpected error - {e}")
         return False
 
-def test_with_curl():
-    """Test using curl command as requested in the review"""
-    print("\n🔧 Testing with curl command...")
-    
-    import subprocess
-    
-    try:
-        curl_cmd = [
-            'curl', '-s', '-w', '\\nHTTP_CODE:%{http_code}\\n',
-            f'{API_BASE}/music/auth/config'
-        ]
-        
-        print(f"🔧 Running: {' '.join(curl_cmd)}")
-        
-        result = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=10)
-        
-        print(f"📤 curl stdout:")
-        print(result.stdout)
-        
-        if result.stderr:
-            print(f"📤 curl stderr:")
-            print(result.stderr)
-        
-        print(f"📤 curl return code: {result.returncode}")
-        
-        # Parse the output to extract HTTP code
-        lines = result.stdout.strip().split('\n')
-        http_code_line = [line for line in lines if line.startswith('HTTP_CODE:')]
-        
-        if http_code_line:
-            http_code = http_code_line[0].replace('HTTP_CODE:', '')
-            print(f"📊 HTTP Status Code: {http_code}")
-            
-            if http_code == '200':
-                print("✅ curl test PASSED - HTTP 200 received")
-                return True
-            else:
-                print(f"❌ curl test FAILED - Expected HTTP 200, got {http_code}")
-                return False
-        else:
-            print("⚠️  Could not extract HTTP status code from curl output")
-            return False
-            
-    except subprocess.TimeoutExpired:
-        print("❌ curl test FAILED - Request timed out")
-        return False
-    except Exception as e:
-        print(f"❌ curl test FAILED - Error: {e}")
-        return False
-
 def main():
-    """Run all VK OAuth API tests"""
-    print("🚀 Starting VK OAuth API Tests")
+    """Run all Friends System API tests"""
+    print("🚀 Starting Friends System API Tests")
     print("=" * 50)
     
-    # Test VK OAuth Config
-    config_test_passed = test_vk_oauth_config()
+    # Test results tracking
+    test_results = {}
     
-    # Test with curl as requested
-    curl_test_passed = test_with_curl()
+    # Test Friends System APIs
+    test_results['friends_search'] = test_friends_search()
+    test_results['send_friend_request'] = test_send_friend_request()
+    test_results['get_friend_requests'] = test_get_friend_requests()
+    test_results['get_friends_list'] = test_get_friends_list()
+    test_results['public_profile'] = test_public_profile()
+    test_results['privacy_settings_get'] = test_privacy_settings_get()
+    test_results['privacy_settings_update'] = test_privacy_settings_update()
+    test_results['qr_code'] = test_qr_code()
+    
+    # Test YouTube Info in Tasks
+    test_results['youtube_info_tasks'] = test_youtube_info_in_tasks()
     
     print("\n" + "=" * 50)
     print("📊 TEST SUMMARY")
     print("=" * 50)
     
-    if config_test_passed:
-        print("✅ VK OAuth Config API: PASSED")
-    else:
-        print("❌ VK OAuth Config API: FAILED")
+    passed_count = 0
+    total_count = len(test_results)
     
-    if curl_test_passed:
-        print("✅ curl test: PASSED")
-    else:
-        print("❌ curl test: FAILED")
+    for test_name, result in test_results.items():
+        status = "✅ PASSED" if result else "❌ FAILED"
+        print(f"{status}: {test_name}")
+        if result:
+            passed_count += 1
     
-    if config_test_passed and curl_test_passed:
+    print(f"\n📈 Results: {passed_count}/{total_count} tests passed")
+    
+    if passed_count == total_count:
         print("\n🎉 All tests PASSED!")
         return 0
     else:
-        print("\n💥 Some tests FAILED!")
+        print(f"\n💥 {total_count - passed_count} test(s) FAILED!")
         return 1
 
 if __name__ == "__main__":
