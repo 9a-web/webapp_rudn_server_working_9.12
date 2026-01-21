@@ -14,6 +14,7 @@ import { SwipeHint } from './components/SwipeHint';
 import { BottomNavigation } from './components/BottomNavigation';
 import { TasksSection } from './components/TasksSection';
 import { JournalSection } from './components/JournalSection';
+import FriendsSection from './components/FriendsSection';
 import GroupSelector from './components/GroupSelector';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusTester from './StatusTester';
@@ -23,6 +24,7 @@ import { scheduleAPI, userAPI, achievementsAPI, tasksAPI } from './services/api'
 import { processReferralWebApp } from './services/referralAPI';
 import { processJournalWebAppInvite } from './services/journalAPI';
 import { joinRoomByToken } from './services/roomsAPI';
+import { friendsAPI } from './services/friendsAPI';
 import { getWeekNumberForDate, isWinterSeason } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
