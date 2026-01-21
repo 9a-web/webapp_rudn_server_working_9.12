@@ -8,6 +8,8 @@ export const UpcomingClassNotification = ({ schedule }) => {
   const { t, i18n } = useTranslation();
   const [nextClass, setNextClass] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [dismissedClassId, setDismissedClassId] = useState(null);
 
   useEffect(() => {
     const checkUpcomingClass = () => {
