@@ -460,6 +460,57 @@ const Home = () => {
     }
   }, [isReady, user, startParam, roomInviteProcessed]);
 
+  // Обработка приглашения от друга
+  const [friendInviteProcessed, setFriendInviteProcessed] = useState(false);
+  useEffect(() => {
+    const processFriendInvite = async () => {
+      if (!startParam || friendInviteProcessed || !user) {
+        return;
+      }
+      
+      // Формат: friend_{telegram_id}
+      if (!startParam.startsWith('friend_')) {
+        return;
+      }
+      
+      const inviterIdStr = startParam.replace('friend_', '');
+      const inviterId = parseInt(inviterIdStr, 10);
+      
+      if (isNaN(inviterId) || inviterId === user.id) {
+        return;
+      }
+      
+      console.log('👥 Обработка приглашения от друга:', inviterId);
+      
+      try {
+        const result = await friendsAPI.processFriendInvite(user.id, inviterId, false);
+        
+        setFriendInviteProcessed(true);
+        
+        if (result && result.success) {
+          console.log('✅ Добавлен в друзья:', result.inviter_info?.first_name);
+          hapticFeedback('success');
+          
+          const inviterName = result.inviter_info 
+            ? `${result.inviter_info.first_name || ''} ${result.inviter_info.last_name || ''}`.trim()
+            : 'Пользователь';
+          
+          showAlert(`Вы теперь друзья с ${inviterName}!`);
+          
+          // Переключаемся на вкладку "Друзья"
+          setActiveTab('friends');
+        }
+      } catch (error) {
+        console.error('❌ Ошибка обработки приглашения от друга:', error);
+        setFriendInviteProcessed(true);
+      }
+    };
+    
+    if (isReady && user && startParam) {
+      processFriendInvite();
+    }
+  }, [isReady, user, startParam, friendInviteProcessed]);
+
   // Загрузка расписания при изменении настроек или недели
   useEffect(() => {
     // Проверяем, что у пользователя есть полные настройки группы
