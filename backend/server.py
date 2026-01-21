@@ -1469,6 +1469,9 @@ async def update_task(task_id: str, task_update: TaskUpdate):
                 }
             )
         
+        # Обогащаем задачу YouTube информацией если есть ссылка
+        updated_task = await enrich_task_with_youtube(updated_task)
+        
         # Добавляем статистику подзадач
         progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
         
