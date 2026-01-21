@@ -9524,11 +9524,13 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
         if not date:
             date = datetime.now().strftime("%Y-%m-%d")
         
-        schedule_data = get_schedule(
-            user["group_id"],
+        # Правильный порядок параметров: facultet_id, level_id, kurs, form_code, group_id
+        schedule_data = await get_schedule(
+            user.get("facultet_id", ""),
             user.get("level_id", ""),
             user.get("kurs", ""),
-            user.get("form_code", "")
+            user.get("form_code", ""),
+            user["group_id"]
         )
         
         # Фильтруем по дате если нужно
