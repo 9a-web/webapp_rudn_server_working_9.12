@@ -1035,6 +1035,7 @@ const Home = () => {
           onMenuStateChange={setIsMenuOpen}
           onProfileStateChange={setIsProfileOpen}
           onThemeChange={handleThemeChange}
+          unreadNotificationsCount={unreadNotificationsCount}
         />
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
