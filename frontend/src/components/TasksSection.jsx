@@ -22,6 +22,7 @@ import * as roomsAPI from '../services/roomsAPI';
 import { ProductivityStats } from './ProductivityStats';
 import SyncPreviewModal from './SyncPreviewModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { YouTubePreview } from './YouTubePreview';
 
 import { getWeekNumberForDate } from '../utils/dateUtils';
 // 🔧 FEATURE FLAG: Показать/скрыть функцию комнат
