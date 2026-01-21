@@ -1278,9 +1278,11 @@ async def get_user_tasks(telegram_id: int):
         # Сортируем по order (порядок drag & drop), затем по created_at
         tasks = await db.tasks.find(query).sort([("order", 1), ("created_at", -1)]).to_list(1000)
         
-        # Добавляем статистику подзадач для каждой задачи
+        # Добавляем статистику подзадач и YouTube информацию для каждой задачи
         result = []
         for task in tasks:
+            # Обогащаем задачу YouTube информацией
+            task = await enrich_task_with_youtube(task)
             progress_info = calculate_subtasks_progress(task.get("subtasks", []))
             result.append(TaskResponse(**task, **progress_info))
         
