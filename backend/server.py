@@ -169,7 +169,18 @@ from models import (
     MutualFriendsResponse,
     FriendScheduleResponse,
     PrivacySettingsUpdate,
-    FriendActionResponse
+    FriendActionResponse,
+    # Модели для системы уведомлений
+    NotificationType,
+    NotificationCategory,
+    NotificationPriority,
+    InAppNotification,
+    InAppNotificationCreate,
+    NotificationCard,
+    NotificationsListResponse,
+    ExtendedNotificationSettings,
+    ExtendedNotificationSettingsUpdate,
+    UnreadCountResponse
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
