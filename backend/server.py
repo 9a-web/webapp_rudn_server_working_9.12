@@ -9525,7 +9525,7 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
             date = datetime.now().strftime("%Y-%m-%d")
         
         # Правильный порядок параметров: facultet_id, level_id, kurs, form_code, group_id
-        schedule_data = await get_schedule(
+        schedule_events = await get_schedule(
             user.get("facultet_id", ""),
             user.get("level_id", ""),
             user.get("kurs", ""),
@@ -9533,9 +9533,12 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
             user["group_id"]
         )
         
+        # schedule_events - это уже список событий
+        if not isinstance(schedule_events, list):
+            schedule_events = []
+        
         # Фильтруем по дате если нужно
-        schedule_events = schedule_data.get("events", [])
-        if date:
+        if date and schedule_events:
             schedule_events = [e for e in schedule_events if e.get("date") == date]
         
         # Получаем расписание просматривающего для сравнения
