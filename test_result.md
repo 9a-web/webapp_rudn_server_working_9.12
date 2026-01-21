@@ -1,11 +1,23 @@
 backend:
-  - task: "VK OAuth Config API"
+  - task: "YouTube Info in Tasks"
     implemented: true
     working: pending
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Добавлено обогащение задач YouTube информацией при создании и обновлении. При добавлении ссылки на YouTube видео в текст задачи - автоматически извлекается название, длительность и превью."
+
+  - task: "VK OAuth Config API"
+    implemented: true
+    working: pending
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
@@ -16,8 +28,8 @@ backend:
     working: pending
     file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: true
+    priority: "low"
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
