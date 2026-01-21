@@ -136,7 +136,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
       await friendsAPI.removeFriend(user.id, friendId);
       hapticFeedback('notification', 'success');
       await loadFriends();
-      setSelectedProfile(null);
+      handleCloseProfile();
     } catch (error) {
       hapticFeedback('notification', 'error');
       console.error('Error removing friend:', error);
