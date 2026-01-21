@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Home, ClipboardList, FileCheck, Music } from 'lucide-react';
+import { Home, ClipboardList, FileCheck, Music, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
@@ -20,16 +20,22 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       gradient: 'from-yellow-400 to-orange-400'
     },
     {
+      id: 'friends',
+      icon: Users,
+      label: t('bottomNav.friends', 'Друзья'),
+      gradient: 'from-purple-400 to-pink-400'
+    },
+    {
       id: 'journal',
       icon: FileCheck,
       label: t('bottomNav.journal', 'Журнал'),
-      gradient: 'from-purple-400 to-pink-400'
+      gradient: 'from-indigo-400 to-blue-400'
     },
     {
       id: 'music',
       icon: Music,
       label: t('bottomNav.music', 'Музыка'),
-      gradient: 'from-blue-400 to-indigo-400'
+      gradient: 'from-pink-400 to-red-400'
     }
   ];
 
