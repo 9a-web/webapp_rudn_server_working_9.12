@@ -277,6 +277,7 @@ const Home = () => {
     isAnalyticsOpen || 
     isAchievementsOpen || 
     isNotificationSettingsOpen ||
+    isNotificationsPanelOpen ||
     isMenuOpen ||
     isProfileOpen ||
     isShareModalOpen ||
@@ -284,6 +285,26 @@ const Home = () => {
     isJournalModalOpen || // from JournalSection
     isFullscreenPlayerOpen || // fullscreen music player
     isFriendProfileOpen; // friend profile modal
+
+  // Загрузка счётчика непрочитанных уведомлений
+  const loadUnreadCount = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await notificationsAPI.getUnreadCount(user.id);
+      setUnreadNotificationsCount(data.unread_count || 0);
+    } catch (error) {
+      console.error('Error loading unread count:', error);
+    }
+  }, [user?.id]);
+
+  // Периодическая загрузка счётчика
+  useEffect(() => {
+    if (isReady && user?.id) {
+      loadUnreadCount();
+      const interval = setInterval(loadUnreadCount, 30000); // Каждые 30 секунд
+      return () => clearInterval(interval);
+    }
+  }, [isReady, user?.id, loadUnreadCount]);
 
   // Загрузка данных пользователя при монтировании
   useEffect(() => {
