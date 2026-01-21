@@ -68,18 +68,18 @@ metadata:
 
 test_plan:
   current_focus:
-    - "VK OAuth Config API"
-    - "VK OAuth Token Auth API"
+    - "YouTube Info in Tasks"
+    - "YouTube Preview in Tasks"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Changed VK Music authorization from login/password (vkaudiotoken) to OAuth flow (VK ID). Users now open VK auth URL, authorize, and paste the redirect URL containing the token. Backend parses and validates the token."
+    message: "Реализовано отображение YouTube информации в задачах. При добавлении ссылки на YouTube в текст задачи автоматически показывается название видео, длительность и превью. Поддерживаются форматы: youtube.com/watch?v=, youtu.be/, youtube.com/shorts/"
 
 # Testing Protocol
-# - Test GET /api/music/auth/config returns valid auth_url
-# - Test POST /api/music/auth/{telegram_id} with token_url parameter
-# - Test token parsing from different URL formats
-# - Test error handling for invalid tokens
+# - Test POST /api/tasks with YouTube URL - должен вернуть youtube_title, youtube_duration, youtube_thumbnail
+# - Test PUT /api/tasks/{task_id} with YouTube URL
+# - Test GET /api/tasks/{telegram_id} - задачи с YouTube должны содержать метаданные
+# - Test different YouTube URL formats: youtube.com/watch?v=, youtu.be/, youtube.com/shorts/
