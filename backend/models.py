@@ -1583,3 +1583,204 @@ class LKStatusResponse(BaseModel):
     lk_connected: bool
     lk_email: Optional[str] = None
     lk_last_sync: Optional[str] = None
+
+
+# ============ Модели для системы друзей ============
+
+class FriendshipStatus(str, Enum):
+    """Статус дружбы"""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    BLOCKED = "blocked"
+
+
+class PrivacySettings(BaseModel):
+    """Настройки приватности профиля"""
+    show_online_status: bool = True
+    show_in_search: bool = True
+    show_friends_list: bool = True
+    show_achievements: bool = True
+    show_schedule: bool = True  # Показывать расписание друзьям
+
+
+class FriendRequest(BaseModel):
+    """Запрос на дружбу"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    from_telegram_id: int
+    to_telegram_id: int
+    status: FriendshipStatus = FriendshipStatus.PENDING
+    message: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class FriendRequestCreate(BaseModel):
+    """Создание запроса на дружбу"""
+    from_telegram_id: int
+    to_telegram_id: int
+    message: Optional[str] = None
+
+
+class Friend(BaseModel):
+    """Связь дружбы между пользователями"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_telegram_id: int
+    friend_telegram_id: int
+    is_favorite: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserBlock(BaseModel):
+    """Блокировка пользователя"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    blocker_telegram_id: int
+    blocked_telegram_id: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserProfilePublic(BaseModel):
+    """Публичный профиль пользователя"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    
+    # Учебная информация
+    group_id: Optional[str] = None
+    group_name: Optional[str] = None
+    facultet_id: Optional[str] = None
+    facultet_name: Optional[str] = None
+    kurs: Optional[str] = None
+    
+    # Статистика
+    friends_count: int = 0
+    mutual_friends_count: int = 0
+    achievements_count: int = 0
+    total_points: int = 0
+    
+    # Статус
+    is_online: bool = False
+    last_activity: Optional[datetime] = None
+    
+    # Приватность (что показывать)
+    privacy: Optional[PrivacySettings] = None
+    
+    # Метаданные
+    created_at: Optional[datetime] = None
+    
+    # Статус дружбы с текущим пользователем
+    friendship_status: Optional[str] = None  # "friend", "pending_incoming", "pending_outgoing", "blocked", None
+
+
+class FriendCard(BaseModel):
+    """Карточка друга для списка"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    group_name: Optional[str] = None
+    facultet_name: Optional[str] = None
+    is_online: bool = False
+    last_activity: Optional[datetime] = None
+    is_favorite: bool = False
+    mutual_friends_count: int = 0
+    friendship_date: Optional[datetime] = None
+
+
+class FriendRequestCard(BaseModel):
+    """Карточка запроса на дружбу"""
+    request_id: str
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    group_name: Optional[str] = None
+    facultet_name: Optional[str] = None
+    message: Optional[str] = None
+    mutual_friends_count: int = 0
+    created_at: datetime
+
+
+class FriendsListResponse(BaseModel):
+    """Ответ со списком друзей"""
+    friends: List[FriendCard]
+    total: int
+
+
+class FriendRequestsResponse(BaseModel):
+    """Ответ со списком запросов на дружбу"""
+    incoming: List[FriendRequestCard]
+    outgoing: List[FriendRequestCard]
+    incoming_count: int
+    outgoing_count: int
+
+
+class FriendSearchResult(BaseModel):
+    """Результат поиска пользователей"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    group_name: Optional[str] = None
+    facultet_name: Optional[str] = None
+    kurs: Optional[str] = None
+    mutual_friends_count: int = 0
+    friendship_status: Optional[str] = None  # "friend", "pending_incoming", "pending_outgoing", "blocked", None
+
+
+class FriendSearchResponse(BaseModel):
+    """Ответ на поиск пользователей"""
+    results: List[FriendSearchResult]
+    total: int
+    query: Optional[str] = None
+
+
+class ProcessFriendInviteRequest(BaseModel):
+    """Запрос на обработку приглашения от друга"""
+    telegram_id: int
+    inviter_telegram_id: int
+    use_inviter_group: bool = False
+
+
+class ProcessFriendInviteResponse(BaseModel):
+    """Ответ на обработку приглашения от друга"""
+    success: bool
+    friend_added: bool
+    group_set: bool
+    inviter_info: Optional[FriendCard] = None
+    message: str
+
+
+class MutualFriendsResponse(BaseModel):
+    """Ответ с общими друзьями"""
+    mutual_friends: List[FriendCard]
+    count: int
+
+
+class FriendScheduleResponse(BaseModel):
+    """Расписание друга"""
+    friend_telegram_id: int
+    friend_name: str
+    group_name: Optional[str] = None
+    schedule: List[dict]  # ScheduleEvent objects
+    common_classes: List[dict] = []  # Общие пары
+    common_breaks: List[str] = []  # Общие окна
+
+
+class PrivacySettingsUpdate(BaseModel):
+    """Обновление настроек приватности"""
+    show_online_status: Optional[bool] = None
+    show_in_search: Optional[bool] = None
+    show_friends_list: Optional[bool] = None
+    show_achievements: Optional[bool] = None
+    show_schedule: Optional[bool] = None
+
+
+class FriendActionResponse(BaseModel):
+    """Ответ на действие с другом"""
+    success: bool
+    message: str
+    friend: Optional[FriendCard] = None
+    new_achievements: List[dict] = []
+
