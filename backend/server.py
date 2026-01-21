@@ -1086,6 +1086,177 @@ async def get_user_profile_photo_proxy(telegram_id: int):
         raise HTTPException(status_code=500, detail="Failed to load profile photo")
 
 
+# ============ YouTube API ============
+
+import re
+import yt_dlp
+
+# Кэш для YouTube информации (в памяти, чтобы не запрашивать повторно)
+youtube_cache = {}
+
+def extract_youtube_video_id(url: str) -> Optional[str]:
+    """Извлекает video_id из YouTube URL"""
+    patterns = [
+        r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})',
+        r'youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def format_duration(seconds: int) -> str:
+    """Форматирует длительность в человекочитаемый формат"""
+    if seconds < 0:
+        return "0:00"
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+def find_youtube_url_in_text(text: str) -> Optional[str]:
+    """Находит первую YouTube ссылку в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://youtu\.be/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/embed/[a-zA-Z0-9_-]{11}[^\s]*',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(0)
+    return None
+
+
+@api_router.get("/youtube/info", response_model=YouTubeInfoResponse)
+async def get_youtube_info(url: str):
+    """
+    Получить информацию о YouTube видео (название, длительность, превью)
+    """
+    try:
+        # Проверяем кэш
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            raise HTTPException(status_code=400, detail="Некорректная YouTube ссылка")
+        
+        if video_id in youtube_cache:
+            logger.info(f"🎬 YouTube info from cache: {video_id}")
+            return youtube_cache[video_id]
+        
+        logger.info(f"🎬 Fetching YouTube info for: {url}")
+        
+        # Используем yt-dlp для получения информации
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if not info:
+            raise HTTPException(status_code=404, detail="Видео не найдено")
+        
+        duration_seconds = info.get('duration', 0) or 0
+        
+        result = YouTubeInfoResponse(
+            url=url,
+            video_id=video_id,
+            title=info.get('title', 'Без названия'),
+            duration=format_duration(duration_seconds),
+            duration_seconds=duration_seconds,
+            thumbnail=info.get('thumbnail', f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"),
+            channel=info.get('channel', info.get('uploader', None))
+        )
+        
+        # Сохраняем в кэш
+        youtube_cache[video_id] = result
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о YouTube видео: {e}")
+        raise HTTPException(status_code=500, detail=f"Не удалось получить информацию о видео: {str(e)}")
+
+
+async def enrich_task_with_youtube(task_dict: dict) -> dict:
+    """Обогащает задачу информацией о YouTube видео, если в тексте есть ссылка"""
+    text = task_dict.get('text', '')
+    youtube_url = find_youtube_url_in_text(text)
+    
+    if not youtube_url:
+        return task_dict
+    
+    video_id = extract_youtube_video_id(youtube_url)
+    if not video_id:
+        return task_dict
+    
+    try:
+        # Проверяем кэш
+        if video_id in youtube_cache:
+            info = youtube_cache[video_id]
+            task_dict['youtube_title'] = info.title
+            task_dict['youtube_duration'] = info.duration
+            task_dict['youtube_thumbnail'] = info.thumbnail
+            task_dict['youtube_url'] = youtube_url
+            return task_dict
+        
+        # Если нет в кэше - запрашиваем
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(youtube_url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if info:
+            duration_seconds = info.get('duration', 0) or 0
+            
+            result = YouTubeInfoResponse(
+                url=youtube_url,
+                video_id=video_id,
+                title=info.get('title', 'Без названия'),
+                duration=format_duration(duration_seconds),
+                duration_seconds=duration_seconds,
+                thumbnail=info.get('thumbnail', f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"),
+                channel=info.get('channel', info.get('uploader', None))
+            )
+            
+            # Сохраняем в кэш
+            youtube_cache[video_id] = result
+            
+            task_dict['youtube_title'] = result.title
+            task_dict['youtube_duration'] = result.duration
+            task_dict['youtube_thumbnail'] = result.thumbnail
+            task_dict['youtube_url'] = youtube_url
+            
+    except Exception as e:
+        logger.warning(f"Не удалось получить YouTube info для задачи: {e}")
+    
+    return task_dict
+
+
 # ============ Эндпоинты для списка дел ============
 
 @api_router.get("/tasks/{telegram_id}", response_model=List[TaskResponse])
