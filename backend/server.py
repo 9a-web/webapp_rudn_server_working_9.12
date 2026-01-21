@@ -9607,10 +9607,10 @@ async def get_profile_qr_data(telegram_id: int):
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
-        # Генерируем ссылку для добавления в друзья
+        # Генерируем ссылку для добавления в друзья (открывает Web App напрямую)
         bot_username = os.getenv("BOT_USERNAME", "rudn_mosbot")
-        # Формат: friend_{telegram_id}
-        friend_link = f"https://t.me/{bot_username}?start=friend_{telegram_id}"
+        # Формат для прямого открытия Web App: https://t.me/{bot}/app?startapp=friend_{id}
+        friend_link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
         
         return {
             "qr_data": friend_link,
