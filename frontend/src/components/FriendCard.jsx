@@ -2,9 +2,17 @@
  * FriendCard - Карточка друга в списке
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Star, ChevronRight, Circle } from 'lucide-react';
+import { Star, ChevronRight } from 'lucide-react';
+
+// Получение URL для фото профиля
+const getBackendURL = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:8001';
+  }
+  return window.location.origin;
+};
 
 const FriendCard = ({ friend, onPress, onToggleFavorite }) => {
   const {
@@ -19,8 +27,16 @@ const FriendCard = ({ friend, onPress, onToggleFavorite }) => {
     mutual_friends_count
   } = friend;
 
+  const [avatarError, setAvatarError] = useState(false);
+  const avatarUrl = `${getBackendURL()}/api/user-profile-photo-proxy/${telegram_id}`;
+
   const displayName = [first_name, last_name].filter(Boolean).join(' ') || username || 'Пользователь';
   const initials = (first_name?.[0] || username?.[0] || '?').toUpperCase();
+
+  // Сброс ошибки при смене друга
+  useEffect(() => {
+    setAvatarError(false);
+  }, [telegram_id]);
 
   return (
     <motion.div
@@ -32,8 +48,17 @@ const FriendCard = ({ friend, onPress, onToggleFavorite }) => {
       <div className="flex items-center gap-3">
         {/* Аватар с индикатором онлайн */}
         <div className="relative">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-lg">
-            {initials}
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-lg overflow-hidden">
+            {!avatarError ? (
+              <img 
+                src={avatarUrl} 
+                alt={displayName}
+                className="w-full h-full object-cover"
+                onError={() => setAvatarError(true)}
+              />
+            ) : (
+              initials
+            )}
           </div>
           {is_online && (
             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900" />
