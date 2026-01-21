@@ -1789,3 +1789,168 @@ class FriendActionResponse(BaseModel):
     friend: Optional[FriendCard] = None
     new_achievements: List[dict] = []
 
+
+
+# ============ Модели для системы уведомлений (In-App Notifications) ============
+
+class NotificationType(str, Enum):
+    """Типы уведомлений"""
+    # Учебные
+    CLASS_STARTING = "class_starting"
+    SCHEDULE_CHANGED = "schedule_changed"
+    TASK_DEADLINE = "task_deadline"
+    
+    # Социальные
+    FRIEND_REQUEST = "friend_request"
+    FRIEND_ACCEPTED = "friend_accepted"
+    FRIEND_JOINED = "friend_joined"
+    
+    # Комнаты
+    ROOM_INVITE = "room_invite"
+    ROOM_TASK_NEW = "room_task_new"
+    ROOM_TASK_ASSIGNED = "room_task_assigned"
+    ROOM_TASK_COMPLETED = "room_task_completed"
+    ROOM_MEMBER_JOINED = "room_member_joined"
+    
+    # Журнал
+    JOURNAL_ATTENDANCE = "journal_attendance"
+    JOURNAL_INVITE = "journal_invite"
+    
+    # Достижения
+    ACHIEVEMENT_EARNED = "achievement_earned"
+    LEVEL_UP = "level_up"
+    
+    # Системные
+    APP_UPDATE = "app_update"
+    ANNOUNCEMENT = "announcement"
+
+
+class NotificationCategory(str, Enum):
+    """Категории уведомлений"""
+    STUDY = "study"
+    SOCIAL = "social"
+    ROOMS = "rooms"
+    JOURNAL = "journal"
+    ACHIEVEMENTS = "achievements"
+    SYSTEM = "system"
+
+
+class NotificationPriority(str, Enum):
+    """Приоритет уведомления"""
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+
+
+class InAppNotification(BaseModel):
+    """Уведомление в приложении"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    telegram_id: int
+    type: NotificationType
+    category: NotificationCategory
+    priority: NotificationPriority = NotificationPriority.NORMAL
+    title: str
+    message: str
+    emoji: str = "🔔"
+    data: dict = {}
+    action_url: Optional[str] = None
+    actions: List[dict] = []
+    action_taken: Optional[str] = None
+    read: bool = False
+    dismissed: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    read_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+
+class InAppNotificationCreate(BaseModel):
+    """Создание уведомления"""
+    telegram_id: int
+    type: NotificationType
+    category: NotificationCategory
+    priority: NotificationPriority = NotificationPriority.NORMAL
+    title: str
+    message: str
+    emoji: str = "🔔"
+    data: dict = {}
+    action_url: Optional[str] = None
+    actions: List[dict] = []
+    expires_at: Optional[datetime] = None
+
+
+class NotificationCard(BaseModel):
+    """Карточка уведомления для отображения"""
+    id: str
+    type: str
+    category: str
+    priority: str
+    title: str
+    message: str
+    emoji: str
+    data: dict = {}
+    actions: List[dict] = []
+    action_taken: Optional[str] = None
+    read: bool
+    created_at: datetime
+    time_ago: str = ""
+
+
+class NotificationsListResponse(BaseModel):
+    """Ответ со списком уведомлений"""
+    notifications: List[NotificationCard]
+    total: int
+    unread_count: int
+    has_more: bool
+
+
+class ExtendedNotificationSettings(BaseModel):
+    """Расширенные настройки уведомлений"""
+    notifications_enabled: bool = True
+    study_enabled: bool = True
+    study_push: bool = True
+    study_minutes_before: int = 10
+    social_enabled: bool = True
+    social_push: bool = True
+    social_friend_requests: bool = True
+    social_friend_accepted: bool = True
+    rooms_enabled: bool = True
+    rooms_push: bool = True
+    rooms_new_tasks: bool = True
+    rooms_assignments: bool = True
+    rooms_completions: bool = True
+    journal_enabled: bool = True
+    journal_push: bool = False
+    achievements_enabled: bool = True
+    achievements_push: bool = False
+    system_enabled: bool = True
+    system_push: bool = True
+
+
+class ExtendedNotificationSettingsUpdate(BaseModel):
+    """Обновление расширенных настроек"""
+    notifications_enabled: Optional[bool] = None
+    study_enabled: Optional[bool] = None
+    study_push: Optional[bool] = None
+    study_minutes_before: Optional[int] = None
+    social_enabled: Optional[bool] = None
+    social_push: Optional[bool] = None
+    social_friend_requests: Optional[bool] = None
+    social_friend_accepted: Optional[bool] = None
+    rooms_enabled: Optional[bool] = None
+    rooms_push: Optional[bool] = None
+    rooms_new_tasks: Optional[bool] = None
+    rooms_assignments: Optional[bool] = None
+    rooms_completions: Optional[bool] = None
+    journal_enabled: Optional[bool] = None
+    journal_push: Optional[bool] = None
+    achievements_enabled: Optional[bool] = None
+    achievements_push: Optional[bool] = None
+    system_enabled: Optional[bool] = None
+    system_push: Optional[bool] = None
+
+
+class UnreadCountResponse(BaseModel):
+    """Счётчик непрочитанных"""
+    unread_count: int
+    by_category: dict = {}
+
