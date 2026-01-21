@@ -538,7 +538,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
       {/* Модалки */}
       <FriendProfileModal
         isOpen={!!selectedProfile}
-        onClose={() => setSelectedProfile(null)}
+        onClose={handleCloseProfile}
         friend={selectedProfile}
         currentUserId={user?.id}
         userSettings={userSettings}
