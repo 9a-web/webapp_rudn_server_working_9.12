@@ -303,6 +303,11 @@ class UserStats(BaseModel):
     last_daily_reset: Optional[str] = None  # Дата последнего сброса счетчика дня
     first_task_created: bool = False  # Создана ли первая задача
     
+    # Счетчики для достижений за друзей
+    friends_count: int = 0  # Количество друзей
+    friends_faculties_count: int = 0  # Количество разных факультетов друзей
+    users_invited: int = 0  # Количество приглашенных новых пользователей
+    
     # Общая статистика
     total_points: int = 0  # Всего очков
     achievements_count: int = 0  # Количество достижений
