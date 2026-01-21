@@ -9774,6 +9774,30 @@ async def startup_event():
             name="scheduled_time_index"
         )
         
+        # Индексы для системы друзей
+        await db.friends.create_index(
+            [("user_telegram_id", 1), ("friend_telegram_id", 1)],
+            unique=True,
+            name="unique_friendship"
+        )
+        await db.friends.create_index(
+            [("user_telegram_id", 1)],
+            name="user_friends_index"
+        )
+        await db.friend_requests.create_index(
+            [("from_telegram_id", 1), ("to_telegram_id", 1), ("status", 1)],
+            name="friend_request_index"
+        )
+        await db.friend_requests.create_index(
+            [("to_telegram_id", 1), ("status", 1)],
+            name="incoming_requests_index"
+        )
+        await db.user_blocks.create_index(
+            [("blocker_telegram_id", 1), ("blocked_telegram_id", 1)],
+            unique=True,
+            name="unique_block"
+        )
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
