@@ -165,7 +165,16 @@ const FriendProfileModal = ({
                 {/* Аватар */}
                 <div className="relative flex-shrink-0">
                   <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-2xl overflow-hidden">
-                    {initials}
+                    {avatarUrl && !avatarError ? (
+                      <img 
+                        src={avatarUrl} 
+                        alt={displayName}
+                        className="w-full h-full object-cover"
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      initials
+                    )}
                   </div>
                   {profile?.is_online && (
                     <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-3 border-gray-900" />
