@@ -416,9 +416,28 @@ async def check_and_award_achievements(db, telegram_id: int, stats: UserStats) -
             earned = True
         elif achievement_id == "completion_master" and stats.tasks_completed_total >= 100:
             earned = True
+        # ============ Достижения за друзей ============
+        elif achievement_id == "first_friend" and getattr(stats, 'friends_count', 0) >= 1:
+            earned = True
+        elif achievement_id == "friendly_5" and getattr(stats, 'friends_count', 0) >= 5:
+            earned = True
+        elif achievement_id == "friendly_15" and getattr(stats, 'friends_count', 0) >= 15:
+            earned = True
+        elif achievement_id == "friendly_25" and getattr(stats, 'friends_count', 0) >= 25:
+            earned = True
+        elif achievement_id == "soul_of_company" and getattr(stats, 'friends_count', 0) >= 50:
+            earned = True
+        elif achievement_id == "interfaculty" and getattr(stats, 'friends_faculties_count', 0) >= 3:
+            earned = True
+        elif achievement_id == "networker" and getattr(stats, 'friends_faculties_count', 0) >= 5:
+            earned = True
+        elif achievement_id == "recruiter" and getattr(stats, 'users_invited', 0) >= 3:
+            earned = True
+        elif achievement_id == "influencer" and getattr(stats, 'users_invited', 0) >= 10:
+            earned = True
         elif achievement_id == "perfectionist":
-            # Проверяем, что получены все остальные достижения
-            if len(existing_ids) >= 23:  # Все кроме самого перфекциониста
+            # Проверяем, что получены все остальные достижения (обновлено количество)
+            if len(existing_ids) >= 32:  # Все кроме самого перфекциониста
                 earned = True
         
         # Если заработано, добавляем
