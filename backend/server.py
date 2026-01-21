@@ -54,6 +54,7 @@ from models import (
     TaskCreate,
     TaskUpdate,
     TaskResponse,
+    YouTubeInfoResponse,
     TaskProductivityStats,
     TaskReorderItem,
     TaskReorderRequest,
