@@ -1451,17 +1451,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           ) : (
             <PlannerTimeline
               events={plannerEvents}
-              currentDate={tasksSelectedDate}
+              currentDate={formatDateToYYYYMMDD(tasksSelectedDate)}
               onToggleComplete={async (eventId) => {
                 await toggleTask(eventId);
                 await loadPlannerEvents(tasksSelectedDate);
               }}
               onDelete={async (eventId) => {
-                if (window.confirm('Удалить это событие?')) {
-                  await handleDeleteTask(eventId);
-                  await loadPlannerEvents(tasksSelectedDate);
-                }
+                await handleDeleteEvent(eventId);
               }}
+              onEdit={handleEditEvent}
+              onQuickCreate={handleQuickCreate}
               hapticFeedback={hapticFeedback}
             />
           )}
