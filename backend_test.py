@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Friends System
-Tests the Friends System API endpoints as specified in the review request.
+Backend API Testing Script for Task Update with Skipped Field
+Tests the task update API with skipped field as specified in the review request.
 """
 
 import requests
@@ -9,13 +9,12 @@ import json
 import sys
 from urllib.parse import urlparse, parse_qs
 
-# Backend URL - use local for testing since external URL is not accessible in this environment
-BACKEND_URL = "http://localhost:8001"
+# Backend URL - use production URL for testing
+BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
 
-# Test users as specified in the review request
-TEST_USER_1 = 123456789  # тестовый
-TEST_USER_2 = 765963392  # существующий в БД
+# Test user as specified in the review request
+TEST_USER_ID = 765963392  # существующий в БД
 
 def test_friends_search():
     """
