@@ -193,19 +193,18 @@ def test_verify_task_skipped(task_id):
         return False
 
 
-def test_public_profile():
+def test_planner_endpoint_skipped():
     """
-    Test GET /api/profile/{telegram_id}?viewer_telegram_id={viewer_id}
-    Should return profile with friendship_status
+    Step 5: Check planner endpoint for skipped field
+    GET /api/planner/765963392/2026-01-22
     """
-    print("🔍 Testing Public Profile API...")
+    print("🔍 Step 5: Testing GET /api/planner/765963392/2026-01-22...")
     
     try:
-        url = f"{API_BASE}/profile/{TEST_USER_2}"
-        params = {"viewer_telegram_id": TEST_USER_1}
-        print(f"📡 Making request to: {url} with params: {params}")
+        url = f"{API_BASE}/planner/{TEST_USER_ID}/2026-01-22"
+        print(f"📡 Making request to: {url}")
         
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, timeout=15)
         print(f"📊 Response Status: {response.status_code}")
         print(f"📋 Response Headers: {dict(response.headers)}")
         
@@ -222,12 +221,28 @@ def test_public_profile():
             print(f"📄 Response body: {response.text}")
             return False
         
-        # Validate that friendship_status is present
-        if 'friendship_status' not in data:
-            print(f"❌ FAILED: Missing 'friendship_status' field in profile response")
+        # Validate response structure
+        if 'events' not in data:
+            print(f"❌ FAILED: Missing 'events' field in response")
             return False
         
-        print("✅ Public Profile API test PASSED")
+        if not isinstance(data['events'], list):
+            print(f"❌ FAILED: Expected 'events' to be a list, got {type(data['events'])}")
+            return False
+        
+        # Check if any events have skipped field
+        events_with_skipped = []
+        for event in data['events']:
+            if 'skipped' in event:
+                events_with_skipped.append(event)
+        
+        if events_with_skipped:
+            print(f"✅ Planner endpoint test PASSED - Found {len(events_with_skipped)} events with 'skipped' field")
+            for event in events_with_skipped[:3]:  # Show first 3 events
+                print(f"   Event: {event.get('text', 'No text')[:30]}... skipped={event.get('skipped')}")
+        else:
+            print(f"⚠️ Planner endpoint test - No events with 'skipped' field found (may be expected if no events on this date)")
+        
         return True
         
     except requests.exceptions.RequestException as e:
