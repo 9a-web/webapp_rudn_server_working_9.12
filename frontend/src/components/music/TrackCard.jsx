@@ -115,7 +115,7 @@ export const TrackCard = ({
           isBlocked 
             ? 'text-white/50' 
             : isCurrentTrack 
-              ? 'text-purple-400' 
+              ? 'text-pink-400' 
               : 'text-white'
         }`}>
           {track.title}
