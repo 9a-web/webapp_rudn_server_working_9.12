@@ -9,6 +9,8 @@ export const CreateEventModal = ({
   onCreateEvent, 
   hapticFeedback,
   selectedDate, // Выбранная дата
+  defaultTimeStart, // Предустановленное время начала (для быстрого создания)
+  defaultTimeEnd, // Предустановленное время окончания
 }) => {
   const [eventText, setEventText] = useState('');
   const [timeStart, setTimeStart] = useState('');
@@ -33,17 +35,17 @@ export const CreateEventModal = ({
     };
   }, [isOpen]);
   
-  // Сбрасываем поля при открытии
+  // Сбрасываем поля при открытии и применяем предустановленное время
   useEffect(() => {
     if (isOpen) {
       setEventText('');
-      setTimeStart('');
-      setTimeEnd('');
+      setTimeStart(defaultTimeStart || '');
+      setTimeEnd(defaultTimeEnd || '');
       setCategory('personal');
       setNotes('');
       setTimeError('');
     }
-  }, [isOpen]);
+  }, [isOpen, defaultTimeStart, defaultTimeEnd]);
   
   // Категории событий
   const categories = [
