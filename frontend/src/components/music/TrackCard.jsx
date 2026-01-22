@@ -74,7 +74,7 @@ export const TrackCard = ({
         isBlocked
           ? 'bg-white/5 cursor-not-allowed'
           : isCurrentTrack 
-            ? 'bg-purple-500/20 border border-purple-500/30 cursor-pointer' 
+            ? 'bg-pink-500/20 border border-pink-500/30 cursor-pointer' 
             : 'bg-white/5 hover:bg-white/10 cursor-pointer'
       }`}
     >
