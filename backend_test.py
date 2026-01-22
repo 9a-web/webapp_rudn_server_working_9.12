@@ -86,25 +86,27 @@ def find_user_origin_task(tasks):
     return selected_task
 
 
-def test_get_friend_requests():
+def test_update_task_with_skipped(task_id):
     """
-    Test GET /api/friends/{telegram_id}/requests
-    Should return: {"incoming": [...], "outgoing": [...], "incoming_count": N, "outgoing_count": N}
+    Step 3: Update task with skipped=true
+    PUT /api/tasks/{task_id}
+    Body: {"skipped": true}
     """
-    print("🔍 Testing Get Friend Requests API...")
+    print(f"🔍 Step 3: Testing PUT /api/tasks/{task_id} with skipped=true...")
     
     try:
-        url = f"{API_BASE}/friends/{TEST_USER_1}/requests"
-        print(f"📡 Making request to: {url}")
+        url = f"{API_BASE}/tasks/{task_id}"
+        payload = {"skipped": True}
+        print(f"📡 Making request to: {url} with payload: {payload}")
         
-        response = requests.get(url, timeout=10)
+        response = requests.put(url, json=payload, timeout=15)
         print(f"📊 Response Status: {response.status_code}")
         print(f"📋 Response Headers: {dict(response.headers)}")
         
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
+        if response.status_code not in [200, 201]:
+            print(f"❌ FAILED: Expected status 200/201, got {response.status_code}")
             print(f"📄 Response body: {response.text}")
-            return False
+            return False, None
         
         try:
             data = response.json()
@@ -112,33 +114,26 @@ def test_get_friend_requests():
         except json.JSONDecodeError:
             print(f"❌ FAILED: Response is not valid JSON")
             print(f"📄 Response body: {response.text}")
-            return False
+            return False, None
         
-        # Validate response structure
-        required_fields = ['incoming', 'outgoing', 'incoming_count', 'outgoing_count']
-        for field in required_fields:
-            if field not in data:
-                print(f"❌ FAILED: Missing required field '{field}' in response")
-                return False
+        # Check if skipped field is present and set to true
+        if 'skipped' not in data:
+            print(f"❌ FAILED: Missing 'skipped' field in response")
+            return False, None
         
-        # Validate that incoming and outgoing are lists
-        if not isinstance(data['incoming'], list):
-            print(f"❌ FAILED: Expected 'incoming' to be a list, got {type(data['incoming'])}")
-            return False
+        if data.get('skipped') != True:
+            print(f"❌ FAILED: Expected skipped=true, got skipped={data.get('skipped')}")
+            return False, None
         
-        if not isinstance(data['outgoing'], list):
-            print(f"❌ FAILED: Expected 'outgoing' to be a list, got {type(data['outgoing'])}")
-            return False
-        
-        print("✅ Get Friend Requests API test PASSED")
-        return True
+        print("✅ Update task with skipped=true PASSED")
+        return True, data
         
     except requests.exceptions.RequestException as e:
         print(f"❌ FAILED: Network error - {e}")
-        return False
+        return False, None
     except Exception as e:
         print(f"❌ FAILED: Unexpected error - {e}")
-        return False
+        return False, None
 
 
 def test_get_friends_list():
