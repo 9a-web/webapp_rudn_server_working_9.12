@@ -306,7 +306,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
               >
                 {/* Progress fill */}
                 <motion.div
-                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-400 to-red-400"
                   style={{ width: `${progressPercent}%` }}
                 />
                 
