@@ -60,7 +60,7 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
           {/* Progress bar */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-white/5">
             <motion.div
-              className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+              className="h-full bg-gradient-to-r from-pink-400 to-red-400"
               style={{ width: `${progressPercent}%` }}
               transition={{ duration: 0.1 }}
             />
