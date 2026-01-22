@@ -87,7 +87,7 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
                 </p>
               ) : (
                 <p 
-                  className="text-white/60 text-xs truncate hover:text-purple-400 cursor-pointer transition-colors"
+                  className="text-white/60 text-xs truncate hover:text-pink-400 cursor-pointer transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (onArtistClick && currentTrack.artist) {
