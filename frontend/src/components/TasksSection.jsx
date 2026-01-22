@@ -1485,10 +1485,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             <PlannerTimeline
               events={plannerEvents}
               currentDate={formatDateToYYYYMMDD(tasksSelectedDate)}
-              onToggleComplete={async (eventId) => {
-                await toggleTask(eventId);
-                await loadPlannerEvents(tasksSelectedDate);
-              }}
+              onToggleComplete={handleTogglePlannerEvent}
               onDelete={async (eventId) => {
                 await handleDeleteEvent(eventId);
               }}
