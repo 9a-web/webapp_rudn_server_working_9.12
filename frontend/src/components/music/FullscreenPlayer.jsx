@@ -244,7 +244,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
               <div 
                 className="absolute inset-0 blur-3xl opacity-50 scale-110"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.5) 0%, rgba(236, 72, 153, 0.5) 100%)'
+                  background: 'linear-gradient(135deg, rgba(244, 114, 182, 0.5) 0%, rgba(239, 68, 68, 0.5) 100%)'
                 }}
               />
               
