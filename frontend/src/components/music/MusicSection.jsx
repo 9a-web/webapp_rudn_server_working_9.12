@@ -342,30 +342,32 @@ export const MusicSection = ({ telegramId }) => {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all flex-shrink-0 ${
-              activeTab === tab.id
-                ? 'bg-gradient-to-r from-pink-400 to-red-400 text-white shadow-lg shadow-pink-500/25'
-                : 'bg-white/5 text-white/60 hover:bg-white/10'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            <span className="text-sm font-medium">{tab.label}</span>
-            {/* Индикатор VK для вкладок "Мои" и "Плейлисты" */}
-            {(tab.id === 'my' || tab.id === 'playlists') && isVkConnected && (
-              <span className="relative flex items-center justify-center w-2 h-2">
-                {/* Один расходящийся круг */}
-                <span className="absolute w-2 h-2 rounded-full bg-green-400 animate-ping opacity-75" />
-                {/* Центральная точка */}
-                <span className="relative w-2 h-2 rounded-full bg-green-400" />
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 px-4 py-4 w-max">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all flex-shrink-0 ${
+                activeTab === tab.id
+                  ? 'bg-gradient-to-r from-pink-400 to-red-400 text-white shadow-lg shadow-pink-500/25'
+                  : 'bg-white/5 text-white/60 hover:bg-white/10'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span className="text-sm font-medium">{tab.label}</span>
+              {/* Индикатор VK для вкладок "Мои" и "Плейлисты" */}
+              {(tab.id === 'my' || tab.id === 'playlists') && isVkConnected && (
+                <span className="relative flex items-center justify-center w-2 h-2">
+                  {/* Один расходящийся круг */}
+                  <span className="absolute w-2 h-2 rounded-full bg-green-400 animate-ping opacity-75" />
+                  {/* Центральная точка */}
+                  <span className="relative w-2 h-2 rounded-full bg-green-400" />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Selected playlist header */}
