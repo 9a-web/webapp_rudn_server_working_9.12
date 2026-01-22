@@ -286,11 +286,12 @@ def test_update_task_with_skipped(task_id):
 def test_verify_task_skipped(task_id):
     """
     Step 4: Verify that skipped field is saved by getting the task again
-    GET /api/tasks/765963392 and check the specific task
+    Check both regular tasks and planner events
     """
     print(f"🔍 Step 4: Verifying skipped field is saved for task {task_id}...")
     
     try:
+        # First check regular tasks
         url = f"{API_BASE}/tasks/{TEST_USER_ID}"
         print(f"📡 Making request to: {url}")
         
@@ -309,15 +310,25 @@ def test_verify_task_skipped(task_id):
             print(f"📄 Response body: {response.text}")
             return False
         
-        # Find the specific task
+        # Find the specific task in regular tasks
         target_task = None
         for task in data:
             if task.get('id') == task_id:
                 target_task = task
                 break
         
+        # If not found in regular tasks, check planner events
         if not target_task:
-            print(f"❌ FAILED: Task {task_id} not found in response")
+            print("📝 Task not found in regular tasks, checking planner events...")
+            planner_success, planner_events = get_planner_tasks()
+            if planner_success:
+                for task in planner_events:
+                    if task.get('id') == task_id:
+                        target_task = task
+                        break
+        
+        if not target_task:
+            print(f"❌ FAILED: Task {task_id} not found in either regular tasks or planner events")
             return False
         
         # Check skipped field
