@@ -110,7 +110,7 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
                 onClick={toggleRepeat}
                 className={`p-1.5 transition-all active:scale-95 relative ${
                   repeatMode !== 'off' 
-                    ? 'text-purple-400' 
+                    ? 'text-pink-400' 
                     : 'text-white/40 hover:text-white/60'
                 }`}
               >
