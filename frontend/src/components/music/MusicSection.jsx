@@ -349,7 +349,7 @@ export const MusicSection = ({ telegramId }) => {
             onClick={() => handleTabChange(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all flex-shrink-0 ${
               activeTab === tab.id
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25'
+                ? 'bg-gradient-to-r from-pink-400 to-red-400 text-white shadow-lg shadow-pink-500/25'
                 : 'bg-white/5 text-white/60 hover:bg-white/10'
             }`}
           >
