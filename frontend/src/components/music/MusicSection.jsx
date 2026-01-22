@@ -479,7 +479,7 @@ export const MusicSection = ({ telegramId }) => {
           >
             {loading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+                <Loader2 className="w-8 h-8 text-pink-500 animate-spin" />
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 p-4">
