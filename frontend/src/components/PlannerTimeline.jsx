@@ -489,8 +489,8 @@ export const PlannerTimeline = ({
             </div>
           ))}
           
-          {/* Индикатор текущего времени (только для сегодня) */}
-          {isToday && (
+          {/* Индикатор текущего времени (только для сегодня и если есть события) */}
+          {isToday && events.length > 0 && (
             <div
               className="absolute left-14 right-0 z-20 flex items-center"
               style={{ top: `${currentTimePosition}px` }}
