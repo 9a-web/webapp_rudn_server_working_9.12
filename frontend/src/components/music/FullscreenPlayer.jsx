@@ -222,7 +222,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
                     onChange={handleVolumeChange}
                     className="flex-1 h-1.5 rounded-full appearance-none bg-white/20 cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, rgb(168, 85, 247) 0%, rgb(236, 72, 153) ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%, rgba(255,255,255,0.2) 100%)`
+                      background: `linear-gradient(to right, rgb(244, 114, 182) 0%, rgb(239, 68, 68) ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%, rgba(255,255,255,0.2) 100%)`
                     }}
                   />
                   <Volume2 className="w-4 h-4 text-white/40" />
