@@ -1450,6 +1450,8 @@ async def update_task(task_id: str, task_update: TaskUpdate):
             # Если задача снимается с выполнения - очищаем время
             elif is_uncompleting:
                 update_data["completed_at"] = None
+        if task_update.skipped is not None:
+            update_data["skipped"] = task_update.skipped
         if task_update.category is not None:
             update_data["category"] = task_update.category
         if task_update.priority is not None:
