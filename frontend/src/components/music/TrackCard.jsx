@@ -126,7 +126,7 @@ export const TrackCard = ({
           </p>
         ) : (
           <p 
-            className="text-xs truncate text-white/60 hover:text-purple-400 cursor-pointer transition-colors"
+            className="text-xs truncate text-white/60 hover:text-pink-400 cursor-pointer transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               if (onArtistClick && track.artist) {
