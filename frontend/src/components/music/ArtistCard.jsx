@@ -261,9 +261,9 @@ export const ArtistCard = ({
                           {isCurrentlyPlaying && !isBlocked && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
                               <div className="flex gap-0.5">
-                                <span className="w-1 h-4 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                                <span className="w-1 h-4 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                                <span className="w-1 h-4 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                                <span className="w-1 h-4 bg-pink-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                                <span className="w-1 h-4 bg-pink-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                                <span className="w-1 h-4 bg-pink-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                               </div>
                             </div>
                           )}
