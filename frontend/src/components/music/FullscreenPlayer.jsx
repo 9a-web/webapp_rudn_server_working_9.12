@@ -173,7 +173,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
             className="absolute inset-0"
             style={{
               opacity: isDragging ? backgroundOpacity : 0.6,
-              background: 'radial-gradient(ellipse at 50% 0%, rgba(139, 92, 246, 0.3) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.2) 0%, transparent 40%)'
+              background: 'radial-gradient(ellipse at 50% 0%, rgba(244, 114, 182, 0.3) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(239, 68, 68, 0.2) 0%, transparent 40%)'
             }}
           />
 
