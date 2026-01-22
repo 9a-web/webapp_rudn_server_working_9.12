@@ -114,7 +114,7 @@ const TimelineEventCard = ({
           absolute rounded-lg cursor-pointer overflow-hidden
           border-l-4 ${colors.border} ${colors.bg}
           shadow-md hover:shadow-lg transition-shadow
-          ${isCompleted ? 'opacity-50' : ''}
+          ${(isCompleted || isSkipped) ? 'opacity-50' : ''}
           ${isOverlapping ? '' : 'left-0 right-2'}
         `}
       >
@@ -124,7 +124,10 @@ const TimelineEventCard = ({
             {isCompleted && (
               <Check className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
             )}
-            <span>{event.text}</span>
+            {isSkipped && (
+              <X className="w-3 h-3 text-red-500 flex-shrink-0 mt-0.5" />
+            )}
+            <span className={isSkipped ? 'line-through' : ''}>{event.text}</span>
           </h4>
           
           {/* Время (если высота позволяет) */}
