@@ -294,7 +294,7 @@ const TimelineEventCard = ({
                 </button>
 
                 {/* Кнопка завершения (только для пользовательских) */}
-                {isUserEvent && (
+                {isUserEvent && !isSkipped && (
                   <button
                     onClick={() => {
                       hapticFeedback && hapticFeedback('impact', 'light');
@@ -311,6 +311,27 @@ const TimelineEventCard = ({
                     `}
                   >
                     <Check className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Кнопка пропуска (только для пользовательских и не выполненных) */}
+                {isUserEvent && !isCompleted && (
+                  <button
+                    onClick={() => {
+                      hapticFeedback && hapticFeedback('impact', 'medium');
+                      onMarkSkipped && onMarkSkipped(event.id);
+                      setIsExpanded(false);
+                    }}
+                    className={`
+                      py-3 px-4 rounded-xl font-medium text-sm
+                      transition-all active:scale-95 flex items-center justify-center gap-2
+                      ${isSkipped 
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }
+                    `}
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 )}
 
