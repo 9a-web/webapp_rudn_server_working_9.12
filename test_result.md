@@ -29,6 +29,21 @@ backend:
         agent: "testing"
         comment: "✅ PASSED: All Friends System APIs working correctly. Tested: 1) GET /api/friends/search - returns proper structure with results array, 2) POST /api/friends/request/{id} - handles business logic (already friends), 3) GET /api/friends/{id}/requests - returns incoming/outgoing with counts, 4) GET /api/friends/{id} - returns friends list with total, 5) GET /api/profile/{id} - returns profile with friendship_status, 6) GET/PUT /api/profile/{id}/privacy - privacy settings work, 7) GET /api/profile/{id}/qr - handles user not found appropriately. All endpoints respond correctly with expected data structures."
 
+  - task: "Task Update API with Skipped Field"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL BUG FOUND: PUT /api/tasks/{task_id} endpoint was missing handling for 'skipped' field. The TaskUpdate model included skipped field but update_task function ignored it. Also planner endpoint was missing explicit skipped field in TaskResponse creation."
+      - working: true
+        agent: "testing"
+        comment: "✅ FIXED & PASSED: Added missing skipped field handling to update_task function (line 1453 in server.py) and explicit skipped field to planner endpoint TaskResponse (line 2286). All tests passed: 1) GET /api/tasks/765963392 - returns tasks correctly, 2) Found task with origin='user', 3) PUT /api/tasks/{task_id} with {'skipped': true} - now correctly updates skipped field, 4) Verified skipped field persists in database, 5) GET /api/planner/765963392/2026-01-22 - returns events with skipped field. Task update API with skipped field now fully functional."
+
   - task: "VK OAuth Config API"
     implemented: true
     working: pending
