@@ -432,8 +432,8 @@ export const PlannerTimeline = ({
     return events.filter(event => {
       // Только пользовательские события (не из расписания)
       if (event.origin === 'schedule') return false;
-      // Только невыполненные
-      if (event.completed) return false;
+      // Только невыполненные и не пропущенные
+      if (event.completed || event.skipped) return false;
       // Время окончания прошло
       const endMinutes = parseTime(event.time_end);
       return endMinutes < currentMinutes;
