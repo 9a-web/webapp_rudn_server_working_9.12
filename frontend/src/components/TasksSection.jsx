@@ -445,6 +445,26 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
+   * Отметить событие как пропущенное
+   */
+  const handleMarkSkipped = async (eventId) => {
+    if (!user?.id) return;
+    
+    try {
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      
+      // Обновить статус
+      await plannerAPI.updateEvent(eventId, { skipped: true });
+      
+      // Перезагрузить события
+      await loadPlannerEvents(tasksSelectedDate);
+      await loadTasks();
+    } catch (error) {
+      console.error('Error marking event as skipped:', error);
+    }
+  };
+
+  /**
    * Быстрое создание события по клику на время в Timeline
    */
   const handleQuickCreate = (timeStart, timeEnd) => {
