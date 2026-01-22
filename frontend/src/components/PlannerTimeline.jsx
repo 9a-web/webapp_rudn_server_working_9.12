@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clock, ChevronDown, ChevronUp, Check, Trash2, MapPin, User, 
-  BookOpen, Info, X, GripVertical 
+  BookOpen, Info, X, GripVertical, Edit2, Plus, Copy
 } from 'lucide-react';
 
 /**
  * Timeline-вид планировщика с часами слева
  * События отображаются как блоки на временной шкале
+ * Поддерживает: просмотр, редактирование, удаление, быстрое создание
  */
 
 const HOUR_HEIGHT = 60; // Высота одного часа в пикселях
@@ -26,12 +27,20 @@ const formatHour = (hour) => {
   return `${hour.toString().padStart(2, '0')}:00`;
 };
 
+// Форматирование минут в HH:MM
+const formatMinutesToTime = (minutes) => {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
+
 // Компонент карточки события на timeline
 const TimelineEventCard = ({ 
   event, 
   style, 
   onToggleComplete, 
-  onDelete, 
+  onDelete,
+  onEdit,
   hapticFeedback,
   isOverlapping,
   overlapIndex,
@@ -95,7 +104,8 @@ const TimelineEventCard = ({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         style={{ ...style, ...overlapStyle }}
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           hapticFeedback && hapticFeedback('selection');
           setIsExpanded(true);
         }}
