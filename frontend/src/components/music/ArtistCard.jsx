@@ -203,7 +203,7 @@ export const ArtistCard = ({
               {/* Loading state */}
               {loading && (
                 <div className="flex flex-col items-center justify-center py-16">
-                  <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
+                  <Loader2 className="w-10 h-10 text-pink-500 animate-spin mb-4" />
                   <p className="text-white/60">Загрузка треков...</p>
                 </div>
               )}
