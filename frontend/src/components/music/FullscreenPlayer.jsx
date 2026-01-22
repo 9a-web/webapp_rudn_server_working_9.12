@@ -398,14 +398,13 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
               </button>
             </motion.div>
 
-            {/* Repeat mode indicator */}
             {repeatMode !== 'off' && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mt-4 text-center"
               >
-                <span className="text-xs text-purple-400/80 bg-purple-400/10 px-3 py-1 rounded-full">
+                <span className="text-xs text-pink-400/80 bg-pink-400/10 px-3 py-1 rounded-full">
                   {repeatMode === 'track' ? '🔂 Повтор трека' : '🔁 Повтор очереди'}
                 </span>
               </motion.div>
