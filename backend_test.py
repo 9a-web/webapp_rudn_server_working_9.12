@@ -16,6 +16,60 @@ API_BASE = f"{BACKEND_URL}/api"
 # Test user as specified in the review request
 TEST_USER_ID = 765963392  # существующий в БД
 
+def test_get_user_tasks():
+    """
+    Step 1: Get tasks for user 765963392
+    GET /api/tasks/765963392 (for regular tasks)
+    GET /api/planner/765963392/2026-01-22 (for planner events)
+    """
+    print("🔍 Step 1: Testing GET /api/tasks/765963392...")
+    
+    try:
+        url = f"{API_BASE}/tasks/{TEST_USER_ID}"
+        print(f"📡 Making request to: {url}")
+        
+        response = requests.get(url, timeout=15)
+        print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
+        
+        if response.status_code != 200:
+            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
+            print(f"📄 Response body: {response.text}")
+            return False, None
+        
+        try:
+            data = response.json()
+            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        except json.JSONDecodeError:
+            print(f"❌ FAILED: Response is not valid JSON")
+            print(f"📄 Response body: {response.text}")
+            return False, None
+        
+        # Validate response structure
+        if not isinstance(data, list):
+            print(f"❌ FAILED: Expected list response, got {type(data)}")
+            return False, None
+        
+        print(f"✅ GET tasks API test PASSED - Found {len(data)} regular tasks")
+        
+        # Also get planner events
+        planner_success, planner_events = get_planner_tasks()
+        if planner_success:
+            # Combine regular tasks and planner events
+            all_tasks = data + planner_events
+            print(f"✅ Combined: {len(data)} regular tasks + {len(planner_events)} planner events = {len(all_tasks)} total")
+            return True, all_tasks
+        else:
+            return True, data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ FAILED: Network error - {e}")
+        return False, None
+    except Exception as e:
+        print(f"❌ FAILED: Unexpected error - {e}")
+        return False, None
+
+
 def get_planner_tasks():
     """
     Get tasks from planner endpoint since tasks with time_start and time_end are planner events
