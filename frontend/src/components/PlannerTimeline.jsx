@@ -332,7 +332,8 @@ export const PlannerTimeline = ({
   onToggleComplete, 
   onDelete,
   onEdit,
-  onQuickCreate, 
+  onQuickCreate,
+  onMarkSkipped,
   hapticFeedback,
   currentDate 
 }) => {
