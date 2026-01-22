@@ -8,6 +8,7 @@ import { AddTaskModal } from './AddTaskModal';
 import { EditTaskModal } from './EditTaskModal';
 import { PrepareForLectureModal } from './PrepareForLectureModal';
 import { CreateEventModal } from './CreateEventModal';
+import { EditEventModal } from './EditEventModal';
 import { PlannerEventCard } from './PlannerEventCard';
 import { PlannerTimeline } from './PlannerTimeline';
 import { WeekDateSelector } from './WeekDateSelector';
