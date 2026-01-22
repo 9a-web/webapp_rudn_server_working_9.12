@@ -305,9 +305,23 @@ def main():
     
     # Step 1: Get user tasks
     success, tasks = test_get_user_tasks()
-    if not success or not tasks:
-        print("\n💥 Cannot proceed - failed to get user tasks or no tasks found")
+    if not success:
+        print("\n💥 Cannot proceed - failed to get user tasks")
         return 1
+    
+    # If no tasks, create a test task
+    if not tasks:
+        print("\n📝 No tasks found, creating a test task...")
+        success, created_task = create_test_task_if_needed()
+        if not success:
+            print("\n💥 Cannot proceed - failed to create test task")
+            return 1
+        
+        # Get tasks again after creating
+        success, tasks = test_get_user_tasks()
+        if not success or not tasks:
+            print("\n💥 Cannot proceed - failed to get tasks after creation")
+            return 1
     
     # Step 2: Find task with origin="user"
     user_task = find_user_origin_task(tasks)
