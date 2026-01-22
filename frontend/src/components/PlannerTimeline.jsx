@@ -413,8 +413,99 @@ export const PlannerTimeline = ({
     }));
   }, [events]);
 
+  // Найти просроченные невыполненные события (только пользовательские)
+  const overdueEvents = useMemo(() => {
+    if (!isToday) return [];
+    
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    return events.filter(event => {
+      // Только пользовательские события (не из расписания)
+      if (event.origin === 'schedule') return false;
+      // Только невыполненные
+      if (event.completed) return false;
+      // Время окончания прошло
+      const endMinutes = parseTime(event.time_end);
+      return endMinutes < currentMinutes;
+    });
+  }, [events, isToday, currentTime]);
+
+  // Текущее просроченное событие для показа (первое в списке)
+  const [currentOverdueIndex, setCurrentOverdueIndex] = useState(0);
+  const currentOverdueEvent = overdueEvents[currentOverdueIndex] || null;
+
+  // Сброс индекса при изменении списка просроченных
+  useEffect(() => {
+    setCurrentOverdueIndex(0);
+  }, [overdueEvents.length]);
+
+  // Обработчик ответа на просроченное событие
+  const handleOverdueResponse = async (completed) => {
+    if (!currentOverdueEvent) return;
+    
+    hapticFeedback && hapticFeedback('impact', 'light');
+    
+    if (completed) {
+      // Отмечаем как выполненное
+      onToggleComplete && onToggleComplete(currentOverdueEvent.id);
+    } else {
+      // Переходим к следующему или скрываем плашку
+      if (currentOverdueIndex < overdueEvents.length - 1) {
+        setCurrentOverdueIndex(prev => prev + 1);
+      }
+    }
+  };
+
   return (
     <div className="relative bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+      {/* Плашка с просроченным событием */}
+      <AnimatePresence>
+        {currentOverdueEvent && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200"
+          >
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-amber-600 font-medium mb-0.5">
+                    ⏰ Время прошло — выполнено?
+                  </p>
+                  <p className="text-sm text-gray-800 font-medium truncate">
+                    {currentOverdueEvent.text}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {currentOverdueEvent.time_start} – {currentOverdueEvent.time_end}
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleOverdueResponse(true)}
+                    className="px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 active:scale-95 transition-all shadow-sm"
+                  >
+                    Да
+                  </button>
+                  <button
+                    onClick={() => handleOverdueResponse(false)}
+                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 active:scale-95 transition-all"
+                  >
+                    Нет
+                  </button>
+                </div>
+              </div>
+              {overdueEvents.length > 1 && (
+                <p className="text-xs text-amber-500 mt-1">
+                  +{overdueEvents.length - 1} ещё
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Заголовок с датой */}
       <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-100 to-gray-50 border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
