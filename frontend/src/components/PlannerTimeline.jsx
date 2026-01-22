@@ -119,8 +119,11 @@ const TimelineEventCard = ({
       >
         <div className="p-2 h-full flex flex-col">
           {/* Название события */}
-          <h4 className={`text-xs font-semibold ${colors.text} leading-tight line-clamp-2`}>
-            {event.text}
+          <h4 className={`text-xs font-semibold ${colors.text} leading-tight line-clamp-2 flex items-start gap-1`}>
+            {isCompleted && (
+              <Check className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
+            )}
+            <span>{event.text}</span>
           </h4>
           
           {/* Время (если высота позволяет) */}
