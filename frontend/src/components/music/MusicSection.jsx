@@ -342,8 +342,8 @@ export const MusicSection = ({ telegramId }) => {
       )}
 
       {/* Tabs */}
-      <div className="overflow-x-auto scrollbar-hide">
-        <div className="flex gap-2 px-4 py-4 w-max">
+      <div className="overflow-x-auto overflow-y-visible scrollbar-hide -my-2 py-2">
+        <div className="flex gap-2 px-4 py-2 w-max">
           {tabs.map(tab => (
             <button
               key={tab.id}
