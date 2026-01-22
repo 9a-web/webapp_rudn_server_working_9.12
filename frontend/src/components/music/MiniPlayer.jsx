@@ -116,7 +116,7 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
               >
                 <Repeat className="w-4 h-4" />
                 {repeatMode === 'track' && (
-                  <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-purple-400">1</span>
+                  <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-pink-400">1</span>
                 )}
               </button>
               <button 
