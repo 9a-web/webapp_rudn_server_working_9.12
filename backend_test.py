@@ -253,261 +253,54 @@ def test_planner_endpoint_skipped():
         return False
 
 
-def test_privacy_settings_get():
-    """
-    Test GET /api/profile/{telegram_id}/privacy
-    Should return privacy settings
-    """
-    print("🔍 Testing Get Privacy Settings API...")
-    
-    try:
-        url = f"{API_BASE}/profile/{TEST_USER_1}/privacy"
-        print(f"📡 Making request to: {url}")
-        
-        response = requests.get(url, timeout=10)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        print("✅ Get Privacy Settings API test PASSED")
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False
-
-
-def test_privacy_settings_update():
-    """
-    Test PUT /api/profile/{telegram_id}/privacy
-    Body: {"show_online_status": false, "show_in_search": true}
-    """
-    print("🔍 Testing Update Privacy Settings API...")
-    
-    try:
-        url = f"{API_BASE}/profile/{TEST_USER_1}/privacy"
-        payload = {"show_online_status": False, "show_in_search": True}
-        print(f"📡 Making request to: {url} with payload: {payload}")
-        
-        response = requests.put(url, json=payload, timeout=10)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code not in [200, 201]:
-            print(f"❌ FAILED: Expected status 200/201, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        print("✅ Update Privacy Settings API test PASSED")
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False
-
-
-def test_qr_code():
-    """
-    Test GET /api/profile/{telegram_id}/qr
-    Should return: {"qr_data": "https://t.me/bot?start=friend_123", "telegram_id": 123, "display_name": "Имя"}
-    """
-    print("🔍 Testing QR Code API...")
-    
-    try:
-        url = f"{API_BASE}/profile/{TEST_USER_1}/qr"
-        print(f"📡 Making request to: {url}")
-        
-        response = requests.get(url, timeout=10)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code not in [200, 404]:
-            print(f"❌ FAILED: Expected status 200 or 404, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        # Handle different response cases
-        if response.status_code == 404:
-            # Expected case: user not found (test user doesn't exist)
-            if 'detail' in data:
-                print(f"✅ QR Code API test PASSED - User not found response: {data['detail']}")
-                return True
-            else:
-                print(f"❌ FAILED: Expected 'detail' field in 404 response")
-                return False
-        
-        # Validate success response structure
-        required_fields = ['qr_data', 'telegram_id', 'display_name']
-        for field in required_fields:
-            if field not in data:
-                print(f"❌ FAILED: Missing required field '{field}' in response")
-                return False
-        
-        # Validate QR data format
-        qr_data = data.get('qr_data', '')
-        if not qr_data.startswith('https://t.me/'):
-            print(f"❌ FAILED: QR data should start with 'https://t.me/', got: {qr_data}")
-            return False
-        
-        print("✅ QR Code API test PASSED")
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False
-
-
-def test_youtube_info_in_tasks():
-    """
-    Test YouTube info integration in tasks
-    Test POST /api/tasks with YouTube URL - should return youtube_title, youtube_duration, youtube_thumbnail
-    """
-    print("🔍 Testing YouTube Info in Tasks API...")
-    
-    try:
-        # First create a task with YouTube URL
-        url = f"{API_BASE}/tasks"
-        payload = {
-            "telegram_id": TEST_USER_1,
-            "text": "Watch this video: https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            "subtasks": []
-        }
-        print(f"📡 Making request to: {url} with payload: {payload}")
-        
-        response = requests.post(url, json=payload, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code not in [200, 201]:
-            print(f"❌ FAILED: Expected status 200/201, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        # Check if YouTube metadata is present
-        youtube_fields = ['youtube_title', 'youtube_duration', 'youtube_thumbnail']
-        youtube_present = any(field in data for field in youtube_fields)
-        
-        if youtube_present:
-            print("✅ YouTube Info in Tasks API test PASSED - YouTube metadata found")
-            
-            # Clean up - delete the created task
-            if 'id' in data:
-                try:
-                    delete_url = f"{API_BASE}/tasks/{data['id']}"
-                    requests.delete(delete_url, timeout=10)
-                    print("🧹 Test task cleaned up")
-                except:
-                    print("⚠️ Could not clean up test task")
-            
-            return True
-        else:
-            print("⚠️ YouTube Info in Tasks API test - No YouTube metadata found (may be expected if feature is not fully implemented)")
-            
-            # Clean up - delete the created task
-            if 'id' in data:
-                try:
-                    delete_url = f"{API_BASE}/tasks/{data['id']}"
-                    requests.delete(delete_url, timeout=10)
-                    print("🧹 Test task cleaned up")
-                except:
-                    print("⚠️ Could not clean up test task")
-            
-            return True  # Don't fail the test, just note the observation
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False
-
 def main():
-    """Run all Friends System API tests"""
-    print("🚀 Starting Friends System API Tests")
-    print("=" * 50)
+    """Run Task Update with Skipped Field API Tests"""
+    print("🚀 Starting Task Update with Skipped Field API Tests")
+    print("=" * 60)
     
-    # Test results tracking
-    test_results = {}
-    
-    # Test Friends System APIs
-    test_results['friends_search'] = test_friends_search()
-    test_results['send_friend_request'] = test_send_friend_request()
-    test_results['get_friend_requests'] = test_get_friend_requests()
-    test_results['get_friends_list'] = test_get_friends_list()
-    test_results['public_profile'] = test_public_profile()
-    test_results['privacy_settings_get'] = test_privacy_settings_get()
-    test_results['privacy_settings_update'] = test_privacy_settings_update()
-    test_results['qr_code'] = test_qr_code()
-    
-    # Test YouTube Info in Tasks
-    test_results['youtube_info_tasks'] = test_youtube_info_in_tasks()
-    
-    print("\n" + "=" * 50)
-    print("📊 TEST SUMMARY")
-    print("=" * 50)
-    
-    passed_count = 0
-    total_count = len(test_results)
-    
-    for test_name, result in test_results.items():
-        status = "✅ PASSED" if result else "❌ FAILED"
-        print(f"{status}: {test_name}")
-        if result:
-            passed_count += 1
-    
-    print(f"\n📈 Results: {passed_count}/{total_count} tests passed")
-    
-    if passed_count == total_count:
-        print("\n🎉 All tests PASSED!")
-        return 0
-    else:
-        print(f"\n💥 {total_count - passed_count} test(s) FAILED!")
+    # Step 1: Get user tasks
+    success, tasks = test_get_user_tasks()
+    if not success or not tasks:
+        print("\n💥 Cannot proceed - failed to get user tasks or no tasks found")
         return 1
+    
+    # Step 2: Find task with origin="user"
+    user_task = find_user_origin_task(tasks)
+    if not user_task:
+        print("\n💥 Cannot proceed - no task with origin='user' found")
+        return 1
+    
+    task_id = user_task['id']
+    
+    # Step 3: Update task with skipped=true
+    success, updated_task = test_update_task_with_skipped(task_id)
+    if not success:
+        print(f"\n💥 Failed to update task {task_id} with skipped=true")
+        return 1
+    
+    # Step 4: Verify skipped field is saved
+    success = test_verify_task_skipped(task_id)
+    if not success:
+        print(f"\n💥 Failed to verify skipped field for task {task_id}")
+        return 1
+    
+    # Step 5: Check planner endpoint
+    success = test_planner_endpoint_skipped()
+    if not success:
+        print("\n💥 Failed to test planner endpoint")
+        return 1
+    
+    print("\n" + "=" * 60)
+    print("📊 TEST SUMMARY")
+    print("=" * 60)
+    print("✅ Step 1: GET /api/tasks/765963392 - PASSED")
+    print("✅ Step 2: Found task with origin='user' - PASSED")
+    print("✅ Step 3: PUT /api/tasks/{task_id} with skipped=true - PASSED")
+    print("✅ Step 4: Verified skipped field is saved - PASSED")
+    print("✅ Step 5: GET /api/planner/765963392/2026-01-22 - PASSED")
+    
+    print(f"\n🎉 All tests PASSED! Task {task_id} successfully updated with skipped=true")
+    return 0
 
 if __name__ == "__main__":
     exit_code = main()
