@@ -2286,6 +2286,7 @@ async def get_planner_day_events(telegram_id: int, date: str):
                 text=task["text"],
                 completed=task.get("completed", False),
                 completed_at=task.get("completed_at"),
+                skipped=task.get("skipped", False),
                 category=task.get("category"),
                 priority=task.get("priority", "medium"),
                 deadline=task.get("deadline"),
