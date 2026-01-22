@@ -272,7 +272,7 @@ export const ArtistCard = ({
                         {/* Track info */}
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium truncate text-sm ${
-                            isCurrentTrack ? 'text-purple-400' : 'text-white'
+                            isCurrentTrack ? 'text-pink-400' : 'text-white'
                           }`}>
                             {track.title}
                           </p>
