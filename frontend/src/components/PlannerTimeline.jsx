@@ -163,8 +163,13 @@ const TimelineEventCard = ({
               <div className={`${colors.bg} p-4`}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className={`text-lg font-bold ${colors.text} leading-tight`}>
-                      {event.text}
+                    <h3 className={`text-lg font-bold ${colors.text} leading-tight flex items-center gap-2`}>
+                      {isCompleted && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 bg-green-500 rounded-full flex-shrink-0">
+                          <Check className="w-3 h-3 text-white" />
+                        </span>
+                      )}
+                      <span>{event.text}</span>
                     </h3>
                     <div className={`flex items-center gap-2 mt-2 ${colors.text} opacity-90`}>
                       <Clock className="w-4 h-4" />
