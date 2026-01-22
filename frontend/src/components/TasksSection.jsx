@@ -87,6 +87,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   
   // Планировщик (Planner)
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [quickCreateTime, setQuickCreateTime] = useState(null); // {start, end} для быстрого создания
   const [plannerEvents, setPlannerEvents] = useState([]); // События планировщика (пары + пользовательские)
   const [plannerLoading, setPlannerLoading] = useState(false);
   const [syncingSchedule, setSyncingSchedule] = useState(false);
