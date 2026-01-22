@@ -429,16 +429,15 @@ export const PlannerTimeline = ({
       const endMinutes = parseTime(event.time_end);
       return endMinutes < currentMinutes;
     });
-  }, [events, isToday, currentTime]);
+  }, [events, isToday]);
 
   // Текущее просроченное событие для показа (первое в списке)
   const [currentOverdueIndex, setCurrentOverdueIndex] = useState(0);
-  const currentOverdueEvent = overdueEvents[currentOverdueIndex] || null;
-
-  // Сброс индекса при изменении списка просроченных
-  useEffect(() => {
-    setCurrentOverdueIndex(0);
-  }, [overdueEvents.length]);
+  
+  // Сбрасываем индекс при изменении списка просроченных (безопасный способ)
+  const overdueEventsLength = overdueEvents.length;
+  const safeOverdueIndex = currentOverdueIndex >= overdueEventsLength ? 0 : currentOverdueIndex;
+  const currentOverdueEvent = overdueEvents[safeOverdueIndex] || null;
 
   // Обработчик ответа на просроченное событие
   const handleOverdueResponse = async (completed) => {
@@ -451,7 +450,7 @@ export const PlannerTimeline = ({
       onToggleComplete && onToggleComplete(currentOverdueEvent.id);
     } else {
       // Переходим к следующему или скрываем плашку
-      if (currentOverdueIndex < overdueEvents.length - 1) {
+      if (safeOverdueIndex < overdueEvents.length - 1) {
         setCurrentOverdueIndex(prev => prev + 1);
       }
     }
