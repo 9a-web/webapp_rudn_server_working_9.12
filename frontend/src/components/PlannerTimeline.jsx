@@ -41,6 +41,7 @@ const TimelineEventCard = ({
   onToggleComplete, 
   onDelete,
   onEdit,
+  onMarkSkipped,
   hapticFeedback,
   isOverlapping,
   overlapIndex,
