@@ -342,7 +342,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
                 onClick={toggleShuffle}
                 className={`p-2 transition-all active:scale-90 ${
                   shuffle 
-                    ? 'text-purple-400' 
+                    ? 'text-pink-400' 
                     : 'text-white/40 hover:text-white/60'
                 }`}
               >
