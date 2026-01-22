@@ -377,7 +377,7 @@ export const MusicSection = ({ telegramId }) => {
         >
           <button
             onClick={handleBackFromPlaylist}
-            className="text-purple-400 text-sm"
+            className="text-pink-400 text-sm"
           >
             ← Назад
           </button>
