@@ -186,6 +186,16 @@ const TimelineEventCard = ({
                       <span className="text-sm font-medium">
                         {event.time_start} — {event.time_end}
                       </span>
+                      {isCompleted && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-400/30 text-white font-medium ml-1">
+                          ✓ Выполнено
+                        </span>
+                      )}
+                      {isSkipped && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-400/30 text-white font-medium ml-1">
+                          ✗ Пропущено
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button
@@ -211,11 +221,6 @@ const TimelineEventCard = ({
                   {event.lessonType && (
                     <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
                       {event.lessonType}
-                    </span>
-                  )}
-                  {isCompleted && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-400/30 text-white font-medium">
-                      ✓ Выполнено
                     </span>
                   )}
                 </div>
