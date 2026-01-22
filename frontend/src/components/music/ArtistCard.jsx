@@ -186,7 +186,7 @@ export const ArtistCard = ({
                 <div className="px-5 pb-4">
                   <button
                     onClick={handlePlayAll}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl font-medium text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-purple-500/30"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-pink-400 to-red-400 rounded-xl font-medium text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-transform shadow-lg shadow-pink-500/30"
                   >
                     <Play className="w-5 h-5 fill-current" />
                     Воспроизвести все
