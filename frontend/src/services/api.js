@@ -597,6 +597,52 @@ export const plannerAPI = {
       handleError(error);
     }
   },
+
+  /**
+   * Обновить событие планировщика
+   * @param {string} eventId - ID события
+   * @param {Object} updateData - Данные для обновления
+   */
+  updateEvent: async (eventId, updateData) => {
+    try {
+      const response = await api.put(`/tasks/${eventId}`, updateData);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Удалить событие планировщика
+   * @param {string} eventId - ID события
+   */
+  deleteEvent: async (eventId) => {
+    try {
+      const response = await api.delete(`/tasks/${eventId}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Получить события для копирования на другую дату
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} sourceDate - Исходная дата в формате YYYY-MM-DD
+   * @param {string} targetDate - Целевая дата в формате YYYY-MM-DD
+   */
+  copyEventsToDate: async (telegramId, sourceDate, targetDate) => {
+    try {
+      const response = await api.post('/planner/copy', {
+        telegram_id: telegramId,
+        source_date: sourceDate,
+        target_date: targetDate,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
 };
 
 export default api;
