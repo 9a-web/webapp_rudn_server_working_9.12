@@ -1562,10 +1562,28 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       {/* Модальное окно создания события для планировщика */}
       <CreateEventModal
         isOpen={isCreateEventModalOpen}
-        onClose={() => setIsCreateEventModalOpen(false)}
+        onClose={() => {
+          setIsCreateEventModalOpen(false);
+          setQuickCreateTime(null);
+        }}
         onCreateEvent={handleCreateEvent}
         hapticFeedback={hapticFeedback}
         selectedDate={tasksSelectedDate}
+        defaultTimeStart={quickCreateTime?.start}
+        defaultTimeEnd={quickCreateTime?.end}
+      />
+
+      {/* Модальное окно редактирования события планировщика */}
+      <EditEventModal
+        isOpen={isEditEventModalOpen}
+        onClose={() => {
+          setIsEditEventModalOpen(false);
+          setEditingEvent(null);
+        }}
+        onUpdateEvent={handleUpdateEvent}
+        onDeleteEvent={handleDeleteEvent}
+        hapticFeedback={hapticFeedback}
+        event={editingEvent}
       />
 
       {/* Модальное окно предварительного просмотра синхронизации пар */}
