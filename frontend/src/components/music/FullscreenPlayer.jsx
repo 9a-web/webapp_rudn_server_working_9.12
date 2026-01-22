@@ -275,7 +275,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
                 {currentTrack.title}
               </h2>
               <p 
-                className="text-white/60 truncate hover:text-purple-400 cursor-pointer transition-colors"
+                className="text-white/60 truncate hover:text-pink-400 cursor-pointer transition-colors"
                 onClick={() => {
                   if (onArtistClick && currentTrack.artist) {
                     if (window.Telegram?.WebApp?.HapticFeedback) {
