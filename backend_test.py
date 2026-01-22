@@ -60,66 +60,30 @@ def test_get_user_tasks():
         return False, None
 
 
-def test_send_friend_request():
+def find_user_origin_task(tasks):
     """
-    Test POST /api/friends/request/{target_telegram_id}
-    Body: {"telegram_id": 123456789}
-    Should return: {"success": true, "message": "Запрос на дружбу отправлен"}
+    Step 2: Find a task with origin="user" (пользовательское событие планировщика)
     """
-    print("🔍 Testing Send Friend Request API...")
+    print("🔍 Step 2: Looking for task with origin='user'...")
     
-    try:
-        url = f"{API_BASE}/friends/request/{TEST_USER_2}"
-        payload = {"telegram_id": TEST_USER_1}
-        print(f"📡 Making request to: {url} with payload: {payload}")
-        
-        response = requests.post(url, json=payload, timeout=10)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code not in [200, 201, 400]:
-            print(f"❌ FAILED: Expected status 200/201/400, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        # Handle different response cases
-        if response.status_code == 400:
-            # Expected case: users are already friends or other business logic error
-            if 'detail' in data:
-                print(f"✅ Send Friend Request API test PASSED - Business logic response: {data['detail']}")
-                return True
-            else:
-                print(f"❌ FAILED: Expected 'detail' field in 400 response")
-                return False
-        
-        # Validate success response structure
-        required_fields = ['success', 'message']
-        for field in required_fields:
-            if field not in data:
-                print(f"❌ FAILED: Missing required field '{field}' in response")
-                return False
-        
-        if not data.get('success'):
-            print(f"❌ FAILED: Expected success=true, got success={data.get('success')}")
-            return False
-        
-        print("✅ Send Friend Request API test PASSED")
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False
+    user_tasks = [task for task in tasks if task.get("origin") == "user"]
+    
+    if not user_tasks:
+        print("❌ No tasks with origin='user' found")
+        return None
+    
+    # Prefer tasks that are not completed and not skipped
+    preferred_task = None
+    for task in user_tasks:
+        if not task.get("completed", False) and not task.get("skipped", False):
+            preferred_task = task
+            break
+    
+    # If no preferred task, take the first one
+    selected_task = preferred_task or user_tasks[0]
+    
+    print(f"✅ Found task with origin='user': ID={selected_task['id']}, text='{selected_task['text'][:50]}...', completed={selected_task.get('completed', False)}, skipped={selected_task.get('skipped', False)}")
+    return selected_task
 
 
 def test_get_friend_requests():
