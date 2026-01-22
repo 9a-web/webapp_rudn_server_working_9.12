@@ -261,9 +261,23 @@ const TimelineEventCard = ({
                 )}
               </div>
               
-              {/* Кнопки действий (только для пользовательских событий) */}
-              {isUserEvent && (
-                <div className="p-4 pt-0 flex gap-2">
+              {/* Кнопки действий */}
+              <div className="p-4 pt-0 flex gap-2">
+                {/* Кнопка редактирования */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'light');
+                    setIsExpanded(false);
+                    onEdit && onEdit(event);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl font-medium text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  {isUserEvent ? 'Редактировать' : 'Подробнее'}
+                </button>
+
+                {/* Кнопка завершения (только для пользовательских) */}
+                {isUserEvent && (
                   <button
                     onClick={() => {
                       hapticFeedback && hapticFeedback('impact', 'light');
@@ -271,7 +285,7 @@ const TimelineEventCard = ({
                       setIsExpanded(false);
                     }}
                     className={`
-                      flex-1 py-3 px-4 rounded-xl font-medium text-sm
+                      py-3 px-4 rounded-xl font-medium text-sm
                       transition-all active:scale-95 flex items-center justify-center gap-2
                       ${isCompleted 
                         ? 'bg-green-100 text-green-700 hover:bg-green-200' 
@@ -280,20 +294,21 @@ const TimelineEventCard = ({
                     `}
                   >
                     <Check className="w-4 h-4" />
-                    {isCompleted ? 'Выполнено' : 'Отметить'}
                   </button>
-                  <button
-                    onClick={() => {
-                      hapticFeedback && hapticFeedback('impact', 'medium');
-                      onDelete && onDelete(event.id);
-                      setIsExpanded(false);
-                    }}
-                    className="py-3 px-4 rounded-xl font-medium text-sm bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+                )}
+
+                {/* Кнопка удаления */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'medium');
+                    onDelete && onDelete(event.id);
+                    setIsExpanded(false);
+                  }}
+                  className="py-3 px-4 rounded-xl font-medium text-sm bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         </AnimatePresence>,
@@ -307,7 +322,9 @@ const TimelineEventCard = ({
 export const PlannerTimeline = ({ 
   events = [], 
   onToggleComplete, 
-  onDelete, 
+  onDelete,
+  onEdit,
+  onQuickCreate, 
   hapticFeedback,
   currentDate 
 }) => {
