@@ -1511,6 +1511,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               }}
               onEdit={handleEditEvent}
               onQuickCreate={handleQuickCreate}
+              onMarkSkipped={handleMarkSkipped}
               hapticFeedback={hapticFeedback}
             />
           )}
