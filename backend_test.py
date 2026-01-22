@@ -136,20 +136,19 @@ def test_update_task_with_skipped(task_id):
         return False, None
 
 
-def test_get_friends_list():
+def test_verify_task_skipped(task_id):
     """
-    Test GET /api/friends/{telegram_id}
-    Should return: {"friends": [...], "total": N}
+    Step 4: Verify that skipped field is saved by getting the task again
+    GET /api/tasks/765963392 and check the specific task
     """
-    print("🔍 Testing Get Friends List API...")
+    print(f"🔍 Step 4: Verifying skipped field is saved for task {task_id}...")
     
     try:
-        url = f"{API_BASE}/friends/{TEST_USER_1}"
+        url = f"{API_BASE}/tasks/{TEST_USER_ID}"
         print(f"📡 Making request to: {url}")
         
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15)
         print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
         
         if response.status_code != 200:
             print(f"❌ FAILED: Expected status 200, got {response.status_code}")
@@ -158,30 +157,32 @@ def test_get_friends_list():
         
         try:
             data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
         except json.JSONDecodeError:
             print(f"❌ FAILED: Response is not valid JSON")
             print(f"📄 Response body: {response.text}")
             return False
         
-        # Validate response structure
-        required_fields = ['friends', 'total']
-        for field in required_fields:
-            if field not in data:
-                print(f"❌ FAILED: Missing required field '{field}' in response")
-                return False
+        # Find the specific task
+        target_task = None
+        for task in data:
+            if task.get('id') == task_id:
+                target_task = task
+                break
         
-        # Validate that friends is a list
-        if not isinstance(data['friends'], list):
-            print(f"❌ FAILED: Expected 'friends' to be a list, got {type(data['friends'])}")
+        if not target_task:
+            print(f"❌ FAILED: Task {task_id} not found in response")
             return False
         
-        # Validate that total is a number
-        if not isinstance(data['total'], int):
-            print(f"❌ FAILED: Expected 'total' to be an integer, got {type(data['total'])}")
+        # Check skipped field
+        if 'skipped' not in target_task:
+            print(f"❌ FAILED: Missing 'skipped' field in task {task_id}")
             return False
         
-        print("✅ Get Friends List API test PASSED")
+        if target_task.get('skipped') != True:
+            print(f"❌ FAILED: Expected skipped=true, got skipped={target_task.get('skipped')}")
+            return False
+        
+        print(f"✅ Task {task_id} skipped field verification PASSED - skipped={target_task.get('skipped')}")
         return True
         
     except requests.exceptions.RequestException as e:
