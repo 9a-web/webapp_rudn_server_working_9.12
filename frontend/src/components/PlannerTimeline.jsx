@@ -50,6 +50,7 @@ const TimelineEventCard = ({
   
   const isScheduleEvent = event.origin === 'schedule';
   const isCompleted = event.completed;
+  const isSkipped = event.skipped;
   const isUserEvent = event.origin === 'user';
   
   // Цвета в зависимости от типа события
