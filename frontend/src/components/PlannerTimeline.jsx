@@ -497,7 +497,7 @@ export const PlannerTimeline = ({
                   </button>
                   <button
                     onClick={() => handleOverdueResponse(false)}
-                    className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 active:scale-95 transition-all"
+                    className="px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 active:scale-95 transition-all shadow-sm"
                   >
                     Нет
                   </button>
