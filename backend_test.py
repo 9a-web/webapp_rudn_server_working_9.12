@@ -16,7 +16,45 @@ API_BASE = f"{BACKEND_URL}/api"
 # Test user as specified in the review request
 TEST_USER_ID = 765963392  # существующий в БД
 
-def test_get_user_tasks():
+def get_planner_tasks():
+    """
+    Get tasks from planner endpoint since tasks with time_start and time_end are planner events
+    GET /api/planner/765963392/2026-01-22
+    """
+    print("🔍 Getting tasks from planner endpoint...")
+    
+    try:
+        url = f"{API_BASE}/planner/{TEST_USER_ID}/2026-01-22"
+        print(f"📡 Making request to: {url}")
+        
+        response = requests.get(url, timeout=15)
+        print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
+        
+        if response.status_code != 200:
+            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
+            print(f"📄 Response body: {response.text}")
+            return False, None
+        
+        try:
+            data = response.json()
+            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        except json.JSONDecodeError:
+            print(f"❌ FAILED: Response is not valid JSON")
+            print(f"📄 Response body: {response.text}")
+            return False, None
+        
+        # Extract events from planner response
+        events = data.get('events', [])
+        print(f"✅ GET planner tasks PASSED - Found {len(events)} events")
+        return True, events
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ FAILED: Network error - {e}")
+        return False, None
+    except Exception as e:
+        print(f"❌ FAILED: Unexpected error - {e}")
+        return False, None
     """
     Step 1: Get tasks for user 765963392
     GET /api/tasks/765963392
