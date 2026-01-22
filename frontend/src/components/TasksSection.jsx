@@ -412,6 +412,39 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
+   * Переключить статус выполнения события планировщика
+   */
+  const handleTogglePlannerEvent = async (eventId) => {
+    if (!user?.id) return;
+    
+    try {
+      hapticFeedback && hapticFeedback('impact', 'light');
+      
+      // Найти событие в plannerEvents
+      const event = plannerEvents.find(e => e.id === eventId);
+      if (!event) {
+        console.error('Event not found:', eventId);
+        return;
+      }
+      
+      // Обновить статус
+      const newStatus = !event.completed;
+      await plannerAPI.updateEvent(eventId, { completed: newStatus });
+      
+      // Перезагрузить события
+      await loadPlannerEvents(tasksSelectedDate);
+      await loadTasks();
+      
+      // Вибрация при успешном выполнении
+      if (newStatus) {
+        hapticFeedback && hapticFeedback('notification', 'success');
+      }
+    } catch (error) {
+      console.error('Error toggling planner event:', error);
+    }
+  };
+
+  /**
    * Быстрое создание события по клику на время в Timeline
    */
   const handleQuickCreate = (timeStart, timeEnd) => {
