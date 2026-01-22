@@ -364,6 +364,62 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
+   * Обновить событие планировщика
+   */
+  const handleUpdateEvent = async (eventId, updateData) => {
+    if (!user?.id) return;
+    
+    try {
+      await plannerAPI.updateEvent(eventId, updateData);
+      
+      // Перезагружаем события
+      await loadPlannerEvents(tasksSelectedDate);
+      await loadTasks();
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Удалить событие планировщика
+   */
+  const handleDeleteEvent = async (eventId) => {
+    if (!user?.id) return;
+    
+    try {
+      await plannerAPI.deleteEvent(eventId);
+      
+      // Перезагружаем события
+      await loadPlannerEvents(tasksSelectedDate);
+      await loadTasks();
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Открыть модальное окно редактирования события
+   */
+  const handleEditEvent = (event) => {
+    setEditingEvent(event);
+    setIsEditEventModalOpen(true);
+  };
+
+  /**
+   * Быстрое создание события по клику на время в Timeline
+   */
+  const handleQuickCreate = (timeStart, timeEnd) => {
+    setQuickCreateTime({ start: timeStart, end: timeEnd });
+    setIsCreateEventModalOpen(true);
+  };
+
+  /**
    * Форматировать дату в YYYY-MM-DD
    */
   const formatDateToYYYYMMDD = (date) => {
