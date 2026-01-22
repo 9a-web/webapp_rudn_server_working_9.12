@@ -117,8 +117,8 @@ export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick }) => {
       {/* Initial state */}
       {!loading && !searched && (
         <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
-            <Search className="w-10 h-10 text-purple-400" />
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-400/20 to-red-400/20 flex items-center justify-center mb-4">
+            <Search className="w-10 h-10 text-pink-400" />
           </div>
           <p className="text-white/50 text-center">Введите название песни или исполнителя</p>
         </div>
