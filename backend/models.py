@@ -469,6 +469,7 @@ class TaskResponse(BaseModel):
     text: str
     completed: bool
     completed_at: Optional[datetime] = None
+    skipped: bool = False
     category: Optional[str] = None
     priority: Optional[str] = 'medium'
     deadline: Optional[datetime] = None
