@@ -77,7 +77,7 @@ export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick }) => {
             value={query}
             onChange={handleInputChange}
             placeholder="Поиск музыки..."
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 transition-colors"
+            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white placeholder-white/40 focus:outline-none focus:border-pink-500/50 transition-colors"
           />
           <AnimatePresence>
             {query && (
