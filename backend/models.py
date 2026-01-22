@@ -447,6 +447,7 @@ class TaskUpdate(BaseModel):
     """Запрос обновления задачи"""
     text: Optional[str] = None
     completed: Optional[bool] = None
+    skipped: Optional[bool] = None
     category: Optional[str] = None
     priority: Optional[str] = None
     deadline: Optional[datetime] = None
