@@ -16,30 +16,25 @@ API_BASE = f"{BACKEND_URL}/api"
 # Test user as specified in the review request
 TEST_USER_ID = 765963392  # существующий в БД
 
-def test_friends_search():
+def test_get_user_tasks():
     """
-    Test GET /api/friends/search?telegram_id={id}&query={text}&limit=10
-    Should return list of users with fields: telegram_id, username, first_name, last_name, group_name, friendship_status
+    Step 1: Get tasks for user 765963392
+    GET /api/tasks/765963392
     """
-    print("🔍 Testing Friends Search API...")
+    print("🔍 Step 1: Testing GET /api/tasks/765963392...")
     
     try:
-        url = f"{API_BASE}/friends/search"
-        params = {
-            "telegram_id": TEST_USER_1,
-            "query": "test",
-            "limit": 10
-        }
-        print(f"📡 Making request to: {url} with params: {params}")
+        url = f"{API_BASE}/tasks/{TEST_USER_ID}"
+        print(f"📡 Making request to: {url}")
         
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, timeout=15)
         print(f"📊 Response Status: {response.status_code}")
         print(f"📋 Response Headers: {dict(response.headers)}")
         
         if response.status_code != 200:
             print(f"❌ FAILED: Expected status 200, got {response.status_code}")
             print(f"📄 Response body: {response.text}")
-            return False
+            return False, None
         
         try:
             data = response.json()
@@ -47,39 +42,22 @@ def test_friends_search():
         except json.JSONDecodeError:
             print(f"❌ FAILED: Response is not valid JSON")
             print(f"📄 Response body: {response.text}")
-            return False
+            return False, None
         
         # Validate response structure
-        if not isinstance(data, dict):
-            print(f"❌ FAILED: Expected dict response, got {type(data)}")
-            return False
+        if not isinstance(data, list):
+            print(f"❌ FAILED: Expected list response, got {type(data)}")
+            return False, None
         
-        if 'results' not in data:
-            print(f"❌ FAILED: Missing 'results' field in response")
-            return False
-        
-        if not isinstance(data['results'], list):
-            print(f"❌ FAILED: Expected 'results' to be a list, got {type(data['results'])}")
-            return False
-        
-        # Check if users have required fields
-        if data['results']:  # If there are results
-            required_fields = ['telegram_id', 'username', 'first_name', 'last_name', 'group_name', 'friendship_status']
-            for user in data['results'][:1]:  # Check first user
-                for field in required_fields:
-                    if field not in user:
-                        print(f"❌ FAILED: Missing required field '{field}' in user object")
-                        return False
-        
-        print("✅ Friends Search API test PASSED")
-        return True
+        print(f"✅ GET tasks API test PASSED - Found {len(data)} tasks")
+        return True, data
         
     except requests.exceptions.RequestException as e:
         print(f"❌ FAILED: Network error - {e}")
-        return False
+        return False, None
     except Exception as e:
         print(f"❌ FAILED: Unexpected error - {e}")
-        return False
+        return False, None
 
 
 def test_send_friend_request():
