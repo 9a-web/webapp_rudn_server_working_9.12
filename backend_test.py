@@ -9,8 +9,8 @@ import json
 import sys
 from urllib.parse import urlparse, parse_qs
 
-# Backend URL - use production URL for testing
-BACKEND_URL = "https://rudn-schedule.ru"
+# Backend URL - use localhost since external URL is not accessible in this environment
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test user as specified in the review request
