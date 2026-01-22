@@ -105,6 +105,7 @@ def create_test_task_if_needed():
     except Exception as e:
         print(f"❌ FAILED: Unexpected error - {e}")
         return False, None
+def find_user_origin_task(tasks):
     """
     Step 2: Find a task with origin="user" (пользовательское событие планировщика)
     """
