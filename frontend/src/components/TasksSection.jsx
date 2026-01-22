@@ -445,22 +445,30 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
-   * Отметить событие как пропущенное
+   * Переключить статус пропущенного события
    */
-  const handleMarkSkipped = async (eventId) => {
+  const handleToggleSkipped = async (eventId) => {
     if (!user?.id) return;
     
     try {
       hapticFeedback && hapticFeedback('impact', 'medium');
       
-      // Обновить статус
-      await plannerAPI.updateEvent(eventId, { skipped: true });
+      // Найти событие в plannerEvents
+      const event = plannerEvents.find(e => e.id === eventId);
+      if (!event) {
+        console.error('Event not found:', eventId);
+        return;
+      }
+      
+      // Переключить статус skipped
+      const newSkipped = !event.skipped;
+      await plannerAPI.updateEvent(eventId, { skipped: newSkipped });
       
       // Перезагрузить события
       await loadPlannerEvents(tasksSelectedDate);
       await loadTasks();
     } catch (error) {
-      console.error('Error marking event as skipped:', error);
+      console.error('Error toggling skipped status:', error);
     }
   };
 
