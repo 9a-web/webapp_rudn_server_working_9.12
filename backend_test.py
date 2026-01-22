@@ -60,7 +60,51 @@ def test_get_user_tasks():
         return False, None
 
 
-def find_user_origin_task(tasks):
+def create_test_task_if_needed():
+    """
+    Create a test task with origin='user' if no tasks exist for the user
+    """
+    print("🔍 Creating test task with origin='user'...")
+    
+    try:
+        url = f"{API_BASE}/tasks"
+        payload = {
+            "telegram_id": TEST_USER_ID,
+            "text": "Test task for skipped field testing",
+            "origin": "user",
+            "time_start": "10:00",
+            "time_end": "11:00",
+            "target_date": "2026-01-22T00:00:00Z",
+            "subtasks": []
+        }
+        print(f"📡 Making request to: {url} with payload: {payload}")
+        
+        response = requests.post(url, json=payload, timeout=15)
+        print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
+        
+        if response.status_code not in [200, 201]:
+            print(f"❌ FAILED: Expected status 200/201, got {response.status_code}")
+            print(f"📄 Response body: {response.text}")
+            return False, None
+        
+        try:
+            data = response.json()
+            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        except json.JSONDecodeError:
+            print(f"❌ FAILED: Response is not valid JSON")
+            print(f"📄 Response body: {response.text}")
+            return False, None
+        
+        print("✅ Test task created successfully")
+        return True, data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ FAILED: Network error - {e}")
+        return False, None
+    except Exception as e:
+        print(f"❌ FAILED: Unexpected error - {e}")
+        return False, None
     """
     Step 2: Find a task with origin="user" (пользовательское событие планировщика)
     """
