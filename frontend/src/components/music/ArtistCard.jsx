@@ -161,7 +161,7 @@ export const ArtistCard = ({
               <div className="px-5 pb-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {/* Artist avatar */}
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-red-400 flex items-center justify-center shadow-lg shadow-pink-500/30">
                     <Music2 className="w-7 h-7 text-white" />
                   </div>
                   
