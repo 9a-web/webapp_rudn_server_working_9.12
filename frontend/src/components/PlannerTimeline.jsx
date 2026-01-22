@@ -457,10 +457,8 @@ export const PlannerTimeline = ({
       // Отмечаем как выполненное
       onToggleComplete && onToggleComplete(currentOverdueEvent.id);
     } else {
-      // Переходим к следующему или скрываем плашку
-      if (safeOverdueIndex < overdueEvents.length - 1) {
-        setCurrentOverdueIndex(prev => prev + 1);
-      }
+      // Отмечаем как пропущенное
+      onMarkSkipped && onMarkSkipped(currentOverdueEvent.id);
     }
   };
 
