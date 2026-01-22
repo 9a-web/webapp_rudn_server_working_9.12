@@ -294,7 +294,7 @@ const TimelineEventCard = ({
                   {isUserEvent ? 'Редактировать' : 'Подробнее'}
                 </button>
 
-                {/* Кнопка завершения (только для пользовательских) */}
+                {/* Кнопка завершения (только для пользовательских и не пропущенных) */}
                 {isUserEvent && !isSkipped && (
                   <button
                     onClick={() => {
@@ -310,6 +310,7 @@ const TimelineEventCard = ({
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }
                     `}
+                    title={isCompleted ? 'Снять отметку выполнения' : 'Отметить выполненным'}
                   >
                     <Check className="w-4 h-4" />
                   </button>
