@@ -422,11 +422,28 @@ export const PlannerTimeline = ({
             <Clock className="w-5 h-5 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">Расписание дня</span>
           </div>
-          {events.length > 0 && (
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-              {events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {events.length > 0 && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                {events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}
+              </span>
+            )}
+            {onQuickCreate && (
+              <button
+                onClick={() => {
+                  hapticFeedback && hapticFeedback('impact', 'light');
+                  // По умолчанию создаем событие на текущий час
+                  const now = new Date();
+                  const startHour = now.getHours();
+                  onQuickCreate(formatMinutesToTime(startHour * 60), formatMinutesToTime((startHour + 1) * 60));
+                }}
+                className="p-1.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                title="Быстрое создание события"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
       
