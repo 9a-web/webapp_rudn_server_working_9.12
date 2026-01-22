@@ -315,7 +315,7 @@ const TimelineEventCard = ({
                   </button>
                 )}
 
-                {/* Кнопка пропуска (только для пользовательских и не выполненных) */}
+                {/* Кнопка пропуска/снятия пропуска (только для пользовательских и не выполненных) */}
                 {isUserEvent && !isCompleted && (
                   <button
                     onClick={() => {
@@ -331,6 +331,7 @@ const TimelineEventCard = ({
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }
                     `}
+                    title={isSkipped ? 'Снять статус пропущенного' : 'Отметить как пропущенное'}
                   >
                     <X className="w-4 h-4" />
                   </button>
