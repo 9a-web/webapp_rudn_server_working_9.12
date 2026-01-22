@@ -57,7 +57,8 @@ def get_planner_tasks():
         return False, None
     """
     Step 1: Get tasks for user 765963392
-    GET /api/tasks/765963392
+    GET /api/tasks/765963392 (for regular tasks)
+    GET /api/planner/765963392/2026-01-22 (for planner events)
     """
     print("🔍 Step 1: Testing GET /api/tasks/765963392...")
     
@@ -87,8 +88,17 @@ def get_planner_tasks():
             print(f"❌ FAILED: Expected list response, got {type(data)}")
             return False, None
         
-        print(f"✅ GET tasks API test PASSED - Found {len(data)} tasks")
-        return True, data
+        print(f"✅ GET tasks API test PASSED - Found {len(data)} regular tasks")
+        
+        # Also get planner events
+        planner_success, planner_events = get_planner_tasks()
+        if planner_success:
+            # Combine regular tasks and planner events
+            all_tasks = data + planner_events
+            print(f"✅ Combined: {len(data)} regular tasks + {len(planner_events)} planner events = {len(all_tasks)} total")
+            return True, all_tasks
+        else:
+            return True, data
         
     except requests.exceptions.RequestException as e:
         print(f"❌ FAILED: Network error - {e}")
