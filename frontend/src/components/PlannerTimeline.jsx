@@ -517,6 +517,7 @@ export const PlannerTimeline = ({
                     style={{ top: `${top}px`, height: `${height}px` }}
                     onToggleComplete={onToggleComplete}
                     onDelete={onDelete}
+                    onEdit={onEdit}
                     hapticFeedback={hapticFeedback}
                     isOverlapping={event.isOverlapping}
                     overlapIndex={event.overlapIndex}
