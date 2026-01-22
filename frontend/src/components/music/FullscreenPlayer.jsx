@@ -387,7 +387,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
                 onClick={toggleRepeat}
                 className={`p-2 transition-all active:scale-90 relative ${
                   repeatMode !== 'off' 
-                    ? 'text-purple-400' 
+                    ? 'text-pink-400' 
                     : 'text-white/40 hover:text-white/60'
                 }`}
               >
