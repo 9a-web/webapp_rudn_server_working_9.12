@@ -487,7 +487,7 @@ export const PlannerTimeline = ({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-amber-600 font-medium mb-0.5">
-                    ⏰ Время прошло — выполнено?
+                    ⏰ Событие прошло — выполнено?
                   </p>
                   <p className="text-sm text-gray-800 font-medium truncate">
                     {currentOverdueEvent.text}
