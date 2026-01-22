@@ -399,6 +399,7 @@ class Task(BaseModel):
     text: str
     completed: bool = False
     completed_at: Optional[datetime] = None  # Дата и время выполнения задачи
+    skipped: bool = False  # Пропущено ли событие
     
     # Новые поля
     category: Optional[str] = None  # Категория: 'study', 'personal', 'sport', 'project'
