@@ -388,13 +388,13 @@ export const AddTaskModal = ({
                 <label className="block text-xs sm:text-sm font-medium text-[#1C1C1E] mb-2">
                   Описание задачи
                 </label>
-                <TaskInputWithYouTube
+                <TaskInputWithVideo
                   value={taskText}
                   onChange={setTaskText}
-                  youtubeData={youtubeData}
-                  onYouTubeDetected={handleYouTubeDetected}
-                  onYouTubeRemove={handleYouTubeRemove}
-                  isLoadingYoutube={isLoadingYoutube}
+                  videoData={videoData}
+                  onVideoDetected={handleVideoDetected}
+                  onVideoRemove={handleVideoRemove}
+                  isLoadingVideo={isLoadingVideo}
                   disabled={saving}
                   placeholder="Например: Купить продукты, Подготовиться к экзамену..."
                 />
