@@ -2222,17 +2222,25 @@ const TaskGroupItem = ({
                     </div>
                   );
                 })()}
+                {/* YouTube ярлык - в строке меток если есть текст задачи */}
+                {task.youtube_url && task.youtube_title && parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
+                  <YouTubePreview
+                    title={task.youtube_title}
+                    duration={task.youtube_duration}
+                    url={task.youtube_url}
+                    badge={true}
+                  />
+                )}
               </div>
               
-              {/* YouTube Preview - ярлык если есть текст, иначе компактный режим */}
-              {task.youtube_url && task.youtube_title && (
+              {/* YouTube Preview - компактная карточка если НЕТ текста (только ссылка) */}
+              {task.youtube_url && task.youtube_title && !parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
                 <YouTubePreview
                   title={task.youtube_title}
                   duration={task.youtube_duration}
                   thumbnail={task.youtube_thumbnail}
                   url={task.youtube_url}
-                  badge={parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent}
-                  compact={!parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent}
+                  compact={true}
                 />
               )}
             </div>
