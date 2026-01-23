@@ -1926,14 +1926,15 @@ const TodayTaskItem = ({
                   </div>
                 )}
                 
-                {/* YouTube Preview */}
+                {/* YouTube Preview - ярлык если есть текст, иначе компактный режим */}
                 {task.youtube_url && task.youtube_title && (
                   <YouTubePreview
                     title={task.youtube_title}
                     duration={task.youtube_duration}
                     thumbnail={task.youtube_thumbnail}
                     url={task.youtube_url}
-                    compact={true}
+                    badge={parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent}
+                    compact={!parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent}
                   />
                 )}
               </div>
