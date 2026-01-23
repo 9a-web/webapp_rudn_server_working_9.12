@@ -2,11 +2,121 @@
  * Модальное окно редактирования задачи комнаты
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Calendar, Flag, Tag as TagIcon, Users, Check } from 'lucide-react';
+import { X, Save, Calendar, Flag, Tag as TagIcon, Users, Check, Play, Loader2 } from 'lucide-react';
 import { useTelegram } from '../contexts/TelegramContext';
 import TagsInput from './TagsInput';
+import { extractVideoUrl, splitTextByVideoUrl, parseTaskText } from '../utils/textUtils';
+import { scheduleAPI } from '../services/api';
+
+// Inline Video badge для тёмной темы
+const InlineVideoBadgeDark = ({ title, duration, url, type = 'youtube', onRemove }) => {
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+  
+  const truncateTitle = (text, maxLength = 25) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength).trim() + '...';
+  };
+  
+  const bgColor = type === 'vk' 
+    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+    : 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700';
+  const secondaryColor = type === 'vk' ? 'text-blue-200' : 'text-red-200';
+  const hoverBg = type === 'vk' ? 'hover:bg-blue-700' : 'hover:bg-red-700';
+  
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r ${bgColor} text-white rounded text-[11px] font-medium align-middle mx-0.5 group`}>
+      <Play className="w-2.5 h-2.5 flex-shrink-0 fill-white cursor-pointer" onClick={handleClick} />
+      <span className="truncate max-w-[150px] cursor-pointer" onClick={handleClick} title={title}>
+        {truncateTitle(title)}
+      </span>
+      {duration && (
+        <span className={`flex-shrink-0 ${secondaryColor} text-[9px]`}>{duration}</span>
+      )}
+      {onRemove && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className={`ml-0.5 w-3 h-3 flex items-center justify-center ${hoverBg} rounded-full transition-colors`}
+          title="Удалить видео"
+        >
+          <X className="w-2 h-2" />
+        </button>
+      )}
+    </span>
+  );
+};
+
+// Поле ввода с video badge для редактирования
+const EditInputWithVideo = ({
+  value, 
+  originalText,
+  onChange, 
+  videoData, 
+  disabled, 
+  placeholder,
+  rows = 3,
+  maxLength = 500
+}) => {
+  const textareaRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  if (isFocused || !videoData) {
+    return (
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none text-white placeholder-gray-500"
+        rows={rows}
+        disabled={disabled}
+        maxLength={maxLength}
+      />
+    );
+  }
+  
+  const { before, url, after } = splitTextByVideoUrl(originalText || '');
+  
+  return (
+    <div
+      onClick={() => !disabled && setIsFocused(true)}
+      className="w-full min-h-[80px] px-3 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl cursor-text text-white hover:border-gray-600 transition-colors leading-relaxed"
+    >
+      {url ? (
+        <>
+          {before}
+          <InlineVideoBadgeDark 
+            title={videoData.title} 
+            duration={videoData.duration} 
+            url={videoData.url}
+            type={videoData.type}
+          />
+          {after}
+        </>
+      ) : (
+        <>
+          {value}
+          {' '}
+          <InlineVideoBadgeDark 
+            title={videoData.title} 
+            duration={videoData.duration} 
+            url={videoData.url}
+            type={videoData.type}
+          />
+        </>
+      )}
+    </div>
+  );
+};
 
 const CATEGORIES = [
   { id: 'study', name: 'Учеба', emoji: '📚', color: 'blue' },
@@ -31,6 +141,10 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
   const [isSaving, setIsSaving] = useState(false);
   const [assignToAll, setAssignToAll] = useState(true);
   const [selectedParticipants, setSelectedParticipants] = useState([]);
+  
+  // Video данные
+  const [videoData, setVideoData] = useState(null);
+  
   const { webApp, user } = useTelegram();
 
   // Получаем участников кроме владельца задачи
@@ -42,7 +156,36 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
   useEffect(() => {
     if (isOpen && task) {
       setTitle(task.title || '');
-      setDescription(task.description || '');
+      
+      // Извлекаем чистое описание без видео ссылки
+      const { displayText } = parseTaskText(task.description || '', {
+        youtube_url: task.youtube_url,
+        youtube_title: task.youtube_title,
+        vk_video_url: task.vk_video_url,
+        vk_video_title: task.vk_video_title
+      });
+      setDescription(displayText);
+      
+      // Восстанавливаем video данные
+      if (task.youtube_url && task.youtube_title) {
+        setVideoData({
+          url: task.youtube_url,
+          title: task.youtube_title,
+          duration: task.youtube_duration,
+          thumbnail: task.youtube_thumbnail,
+          type: 'youtube'
+        });
+      } else if (task.vk_video_url && task.vk_video_title) {
+        setVideoData({
+          url: task.vk_video_url,
+          title: task.vk_video_title,
+          duration: task.vk_video_duration,
+          thumbnail: task.vk_video_thumbnail,
+          type: 'vk'
+        });
+      } else {
+        setVideoData(null);
+      }
       
       // Форматируем дедлайн для input datetime-local
       if (task.deadline) {
@@ -101,7 +244,17 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
         category: category || null,
         priority: priority,
         tags: tags,
-        assigned_to: assignToAll ? [] : selectedParticipants  // [] = все, массив = выбранные
+        assigned_to: assignToAll ? [] : selectedParticipants,  // [] = все, массив = выбранные
+        // YouTube данные
+        youtube_url: videoData?.type === 'youtube' ? videoData?.url : null,
+        youtube_title: videoData?.type === 'youtube' ? videoData?.title : null,
+        youtube_duration: videoData?.type === 'youtube' ? videoData?.duration : null,
+        youtube_thumbnail: videoData?.type === 'youtube' ? videoData?.thumbnail : null,
+        // VK Video данные
+        vk_video_url: videoData?.type === 'vk' ? videoData?.url : null,
+        vk_video_title: videoData?.type === 'vk' ? videoData?.title : null,
+        vk_video_duration: videoData?.type === 'vk' ? videoData?.duration : null,
+        vk_video_thumbnail: videoData?.type === 'vk' ? videoData?.thumbnail : null,
       };
 
       await onSave(task.task_id, updateData);
