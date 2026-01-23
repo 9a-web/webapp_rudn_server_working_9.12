@@ -47,9 +47,10 @@ const InlineVideoBadge = ({ title, duration, url, type = 'youtube' }) => {
 const TextWithVideoBadge = ({ 
   text, 
   originalText, // Оригинальный текст с ссылкой (task.text)
-  youtubeUrl, 
-  youtubeTitle, 
-  youtubeDuration,
+  videoUrl, 
+  videoTitle, 
+  videoDuration,
+  videoType = 'youtube', // 'youtube' или 'vk'
   onChange, 
   disabled,
   placeholder 
