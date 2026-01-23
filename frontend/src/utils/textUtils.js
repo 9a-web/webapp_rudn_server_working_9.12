@@ -30,6 +30,32 @@ export const removeYouTubeUrl = (text) => {
 };
 
 /**
+ * Разбивает текст на части: до ссылки, ссылка, после ссылки
+ * @param {string} text - Полный текст
+ * @returns {object} - { before: string, url: string|null, after: string }
+ */
+export const splitTextByYouTubeUrl = (text) => {
+  if (!text) return { before: '', url: null, after: '' };
+  
+  // Ищем YouTube ссылку
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:\S*)?/i;
+  const match = text.match(regex);
+  
+  if (!match) {
+    return { before: text, url: null, after: '' };
+  }
+  
+  const url = match[0];
+  const index = text.indexOf(url);
+  
+  return {
+    before: text.slice(0, index),
+    url: url,
+    after: text.slice(index + url.length)
+  };
+};
+
+/**
  * Разделяет текст задачи на текстовую часть и YouTube информацию
  * @param {string} text - Полный текст задачи
  * @param {object} youtubeData - Данные YouTube из задачи { youtube_url, youtube_title, etc }
@@ -58,5 +84,6 @@ export const parseTaskText = (text, youtubeData = {}) => {
 export default {
   extractYouTubeUrl,
   removeYouTubeUrl,
+  splitTextByYouTubeUrl,
   parseTaskText
 };
