@@ -367,30 +367,16 @@ export const EditTaskModal = ({
                 <label className="block text-xs sm:text-sm font-medium text-[#1C1C1E] mb-2">
                   Описание задачи
                 </label>
-                {/* Контейнер в стиле textarea с badge внутри */}
-                <div className="w-full bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl focus-within:ring-2 focus-within:ring-blue-400 focus-within:border-transparent transition-all">
-                  <textarea
-                    value={taskText}
-                    onChange={(e) => setTaskText(e.target.value)}
-                    placeholder="Например: Купить продукты, Подготовиться к экзамену..."
-                    className="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-transparent focus:outline-none resize-none placeholder-gray-400 text-[#1C1C1E] text-sm sm:text-base"
-                    rows={task.youtube_url && task.youtube_title ? "2" : "3"}
-                    autoFocus
-                    disabled={saving}
-                    maxLength={500}
-                  />
-                  {/* YouTube Badge внутри поля ввода */}
-                  {task.youtube_url && task.youtube_title && (
-                    <div className="px-3 pb-2.5 sm:px-4 sm:pb-3">
-                      <YouTubePreview
-                        title={task.youtube_title}
-                        duration={task.youtube_duration}
-                        url={task.youtube_url}
-                        badge={true}
-                      />
-                    </div>
-                  )}
-                </div>
+                {/* Поле с inline YouTube badge */}
+                <TextWithYouTubeBadge
+                  text={taskText}
+                  youtubeUrl={task.youtube_url}
+                  youtubeTitle={task.youtube_title}
+                  youtubeDuration={task.youtube_duration}
+                  onChange={setTaskText}
+                  disabled={saving}
+                  placeholder="Например: Купить продукты, Подготовиться к экзамену..."
+                />
                 <p className="text-[10px] sm:text-xs text-gray-400 mt-1 text-right">
                   {taskText.length} / 500
                 </p>
