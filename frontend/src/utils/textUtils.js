@@ -184,7 +184,8 @@ export const splitTextByYouTubeUrl = (text) => {
 export const splitTextByVKVideoUrl = (text) => {
   if (!text) return { before: '', url: null, after: '' };
   
-  const regex = /(?:https?:\/\/)?(?:www\.)?(?:vk\.com\/(?:video|clip|video\?z=video)|vkvideo\.ru\/video)(-?\d+_\d+)(?:\S*)?/i;
+  // Улучшенный regex для VK Video (покрывает все форматы: video-123_456, clip, ?z=video, wall, videos, club, etc.)
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:vk\.com\/(?:video-?\d+_\d+|clip-?\d+_\d+|[^\s]*[?&]z=video-?\d+_\d+)|vkvideo\.ru\/video-?\d+_\d+)(?:[^\s]*)?/i;
   const match = text.match(regex);
   
   if (!match) {
