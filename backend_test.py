@@ -1,479 +1,260 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Task Update with Skipped Field
-Tests the task update API with skipped field as specified in the review request.
+Backend API Testing Script for Multiple Video Links Support
+Tests the tasks API with support for multiple video links (YouTube and VK)
 """
 
 import requests
 import json
 import sys
-from urllib.parse import urlparse, parse_qs
+from datetime import datetime
 
-# Backend URL - use localhost since external URL is not accessible in this environment
+# Configuration
+TELEGRAM_ID = 765963392
 BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
-# Test user as specified in the review request
-TEST_USER_ID = 765963392  # существующий в БД
+def print_test_header(test_name):
+    print(f"\n{'='*60}")
+    print(f"🧪 {test_name}")
+    print(f"{'='*60}")
 
-def test_get_user_tasks():
-    """
-    Step 1: Get tasks for user 765963392
-    GET /api/tasks/765963392 (for regular tasks)
-    GET /api/planner/765963392/2026-01-22 (for planner events)
-    """
-    print("🔍 Step 1: Testing GET /api/tasks/765963392...")
+def print_success(message):
+    print(f"✅ {message}")
+
+def print_error(message):
+    print(f"❌ {message}")
+
+def print_info(message):
+    print(f"ℹ️  {message}")
+
+def test_get_tasks_with_videos():
+    """Test GET /api/tasks/{telegram_id} - check that tasks return with videos field"""
+    print_test_header("GET /api/tasks/{telegram_id} - Check videos field")
     
     try:
-        url = f"{API_BASE}/tasks/{TEST_USER_ID}"
-        print(f"📡 Making request to: {url}")
+        response = requests.get(f"{API_BASE}/tasks/{TELEGRAM_ID}")
+        print_info(f"Request: GET {API_BASE}/tasks/{TELEGRAM_ID}")
+        print_info(f"Status Code: {response.status_code}")
         
-        response = requests.get(url, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        # Validate response structure
-        if not isinstance(data, list):
-            print(f"❌ FAILED: Expected list response, got {type(data)}")
-            return False, None
-        
-        print(f"✅ GET tasks API test PASSED - Found {len(data)} regular tasks")
-        
-        # Also get planner events
-        planner_success, planner_events = get_planner_tasks()
-        if planner_success:
-            # Combine regular tasks and planner events
-            all_tasks = data + planner_events
-            print(f"✅ Combined: {len(data)} regular tasks + {len(planner_events)} planner events = {len(all_tasks)} total")
-            return True, all_tasks
+        if response.status_code == 200:
+            tasks = response.json()
+            print_success(f"Successfully retrieved {len(tasks)} tasks")
+            
+            # Check if any tasks have videos field
+            tasks_with_videos = [task for task in tasks if task.get('videos')]
+            print_info(f"Tasks with videos: {len(tasks_with_videos)}")
+            
+            # Show structure of first task
+            if tasks:
+                first_task = tasks[0]
+                print_info("First task structure:")
+                print_info(f"  - id: {first_task.get('id')}")
+                print_info(f"  - text: {first_task.get('text', '')[:50]}...")
+                print_info(f"  - videos: {first_task.get('videos', [])}")
+                
+                # Check if videos field exists and is array
+                if 'videos' in first_task:
+                    videos = first_task['videos']
+                    if isinstance(videos, list):
+                        print_success("✅ videos field exists and is an array")
+                        if videos:
+                            video = videos[0]
+                            expected_fields = ['url', 'title', 'duration', 'thumbnail', 'type']
+                            for field in expected_fields:
+                                if field in video:
+                                    print_success(f"  ✅ Video has {field}: {video[field]}")
+                                else:
+                                    print_error(f"  ❌ Video missing {field}")
+                        else:
+                            print_info("  No videos in first task")
+                    else:
+                        print_error("videos field is not an array")
+                else:
+                    print_error("videos field missing from task")
+            else:
+                print_info("No tasks found")
+                
+            return tasks
         else:
-            return True, data
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False, None
+            print_error(f"Failed to get tasks: {response.status_code}")
+            print_error(f"Response: {response.text}")
+            return []
+            
     except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False, None
+        print_error(f"Exception during GET tasks: {str(e)}")
+        return []
 
-
-def get_planner_tasks():
-    """
-    Get tasks from planner endpoint since tasks with time_start and time_end are planner events
-    GET /api/planner/765963392/2026-01-22
-    """
-    print("🔍 Getting tasks from planner endpoint...")
+def test_create_task_with_multiple_videos():
+    """Test POST /api/tasks - create task with multiple YouTube/VK links"""
+    print_test_header("POST /api/tasks - Create task with multiple video links")
+    
+    # Task text with multiple video links as specified in the request
+    task_text = "Посмотреть https://www.youtube.com/watch?v=dQw4w9WgXcQ и https://youtu.be/jNQXAC9IVRw"
+    
+    task_data = {
+        "telegram_id": TELEGRAM_ID,
+        "text": task_text,
+        "completed": False,
+        "category": "test",
+        "priority": "medium",
+        "subtasks": []
+    }
     
     try:
-        url = f"{API_BASE}/planner/{TEST_USER_ID}/2026-01-22"
-        print(f"📡 Making request to: {url}")
+        response = requests.post(f"{API_BASE}/tasks", json=task_data)
+        print_info(f"Request: POST {API_BASE}/tasks")
+        print_info(f"Task text: {task_text}")
+        print_info(f"Status Code: {response.status_code}")
         
-        response = requests.get(url, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        # Extract events from planner response
-        events = data.get('events', [])
-        print(f"✅ GET planner tasks PASSED - Found {len(events)} events")
-        return True, events
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False, None
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False, None
-    """
-    Step 1: Get tasks for user 765963392
-    GET /api/tasks/765963392 (for regular tasks)
-    GET /api/planner/765963392/2026-01-22 (for planner events)
-    """
-    print("🔍 Step 1: Testing GET /api/tasks/765963392...")
-    
-    try:
-        url = f"{API_BASE}/tasks/{TEST_USER_ID}"
-        print(f"📡 Making request to: {url}")
-        
-        response = requests.get(url, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        # Validate response structure
-        if not isinstance(data, list):
-            print(f"❌ FAILED: Expected list response, got {type(data)}")
-            return False, None
-        
-        print(f"✅ GET tasks API test PASSED - Found {len(data)} regular tasks")
-        
-        # Also get planner events
-        planner_success, planner_events = get_planner_tasks()
-        if planner_success:
-            # Combine regular tasks and planner events
-            all_tasks = data + planner_events
-            print(f"✅ Combined: {len(data)} regular tasks + {len(planner_events)} planner events = {len(all_tasks)} total")
-            return True, all_tasks
+        if response.status_code == 200:
+            task = response.json()
+            print_success("Task created successfully")
+            print_info(f"Task ID: {task.get('id')}")
+            print_info(f"Task text: {task.get('text')}")
+            
+            # Check videos array
+            videos = task.get('videos', [])
+            print_info(f"Videos count: {len(videos)}")
+            
+            if len(videos) == 2:
+                print_success("✅ Task has 2 videos as expected")
+                
+                for i, video in enumerate(videos):
+                    print_info(f"Video {i+1}:")
+                    print_info(f"  - url: {video.get('url')}")
+                    print_info(f"  - title: {video.get('title')}")
+                    print_info(f"  - duration: {video.get('duration')}")
+                    print_info(f"  - thumbnail: {video.get('thumbnail')}")
+                    print_info(f"  - type: {video.get('type')}")
+                    
+                    # Validate required fields
+                    required_fields = ['url', 'title', 'duration', 'thumbnail', 'type']
+                    for field in required_fields:
+                        if field in video and video[field]:
+                            print_success(f"    ✅ {field}: {video[field]}")
+                        else:
+                            print_error(f"    ❌ Missing or empty {field}")
+                            
+            elif len(videos) == 0:
+                print_error("❌ No videos found in response")
+            else:
+                print_error(f"❌ Expected 2 videos, got {len(videos)}")
+                
+            return task
         else:
-            return True, data
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False, None
+            print_error(f"Failed to create task: {response.status_code}")
+            print_error(f"Response: {response.text}")
+            return None
+            
     except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False, None
-
-
-def create_test_task_if_needed():
-    """
-    Create a test task with origin='user' if no tasks exist for the user
-    """
-    print("🔍 Creating test task with origin='user'...")
-    
-    try:
-        url = f"{API_BASE}/tasks"
-        payload = {
-            "telegram_id": TEST_USER_ID,
-            "text": "Test task for skipped field testing",
-            "origin": "user",
-            "time_start": "10:00",
-            "time_end": "11:00",
-            "target_date": "2026-01-22T00:00:00Z",
-            "subtasks": []
-        }
-        print(f"📡 Making request to: {url} with payload: {payload}")
-        
-        response = requests.post(url, json=payload, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code not in [200, 201]:
-            print(f"❌ FAILED: Expected status 200/201, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        print("✅ Test task created successfully")
-        return True, data
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False, None
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False, None
-def find_user_origin_task(tasks):
-    """
-    Step 2: Find a task with origin="user" (пользовательское событие планировщика)
-    """
-    print("🔍 Step 2: Looking for task with origin='user'...")
-    
-    user_tasks = [task for task in tasks if task.get("origin") == "user"]
-    
-    if not user_tasks:
-        print("❌ No tasks with origin='user' found")
+        print_error(f"Exception during POST task: {str(e)}")
         return None
-    
-    # Prefer tasks that are not completed and not skipped
-    preferred_task = None
-    for task in user_tasks:
-        if not task.get("completed", False) and not task.get("skipped", False):
-            preferred_task = task
-            break
-    
-    # If no preferred task, take the first one
-    selected_task = preferred_task or user_tasks[0]
-    
-    print(f"✅ Found task with origin='user': ID={selected_task['id']}, text='{selected_task['text'][:50]}...', completed={selected_task.get('completed', False)}, skipped={selected_task.get('skipped', False)}")
-    return selected_task
 
-
-def test_update_task_with_skipped(task_id):
-    """
-    Step 3: Update task with skipped=true
-    PUT /api/tasks/{task_id}
-    Body: {"skipped": true}
-    """
-    print(f"🔍 Step 3: Testing PUT /api/tasks/{task_id} with skipped=true...")
+def test_update_task_with_new_video():
+    """Test PUT /api/tasks/{task_id} - update task text with new video link"""
+    print_test_header("PUT /api/tasks/{task_id} - Update task with new video link")
     
-    try:
-        url = f"{API_BASE}/tasks/{task_id}"
-        payload = {"skipped": True}
-        print(f"📡 Making request to: {url} with payload: {payload}")
-        
-        response = requests.put(url, json=payload, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code not in [200, 201]:
-            print(f"❌ FAILED: Expected status 200/201, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False, None
-        
-        # Check if skipped field is present and set to true
-        if 'skipped' not in data:
-            print(f"❌ FAILED: Missing 'skipped' field in response")
-            return False, None
-        
-        if data.get('skipped') != True:
-            print(f"❌ FAILED: Expected skipped=true, got skipped={data.get('skipped')}")
-            return False, None
-        
-        print("✅ Update task with skipped=true PASSED")
-        return True, data
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False, None
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False, None
-
-
-def test_verify_task_skipped(task_id):
-    """
-    Step 4: Verify that skipped field is saved by getting the task again
-    Check both regular tasks and planner events
-    """
-    print(f"🔍 Step 4: Verifying skipped field is saved for task {task_id}...")
+    # First, create a task to update
+    print_info("Creating a task to update...")
+    task = test_create_task_with_multiple_videos()
     
-    try:
-        # First check regular tasks
-        url = f"{API_BASE}/tasks/{TEST_USER_ID}"
-        print(f"📡 Making request to: {url}")
-        
-        response = requests.get(url, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        # Find the specific task in regular tasks
-        target_task = None
-        for task in data:
-            if task.get('id') == task_id:
-                target_task = task
-                break
-        
-        # If not found in regular tasks, check planner events
-        if not target_task:
-            print("📝 Task not found in regular tasks, checking planner events...")
-            planner_success, planner_events = get_planner_tasks()
-            if planner_success:
-                for task in planner_events:
-                    if task.get('id') == task_id:
-                        target_task = task
-                        break
-        
-        if not target_task:
-            print(f"❌ FAILED: Task {task_id} not found in either regular tasks or planner events")
-            return False
-        
-        # Check skipped field
-        if 'skipped' not in target_task:
-            print(f"❌ FAILED: Missing 'skipped' field in task {task_id}")
-            return False
-        
-        if target_task.get('skipped') != True:
-            print(f"❌ FAILED: Expected skipped=true, got skipped={target_task.get('skipped')}")
-            return False
-        
-        print(f"✅ Task {task_id} skipped field verification PASSED - skipped={target_task.get('skipped')}")
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
+    if not task:
+        print_error("Failed to create task for update test")
         return False
-    except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
-        return False
-
-
-def test_planner_endpoint_skipped():
-    """
-    Step 5: Check planner endpoint for skipped field
-    GET /api/planner/765963392/2026-01-22
-    """
-    print("🔍 Step 5: Testing GET /api/planner/765963392/2026-01-22...")
+        
+    task_id = task.get('id')
+    print_info(f"Updating task ID: {task_id}")
+    
+    # Update task text with additional video link
+    updated_text = task.get('text') + " и также https://www.youtube.com/watch?v=3JZ_D3ELwOQ"
+    
+    update_data = {
+        "text": updated_text
+    }
     
     try:
-        url = f"{API_BASE}/planner/{TEST_USER_ID}/2026-01-22"
-        print(f"📡 Making request to: {url}")
+        response = requests.put(f"{API_BASE}/tasks/{task_id}", json=update_data)
+        print_info(f"Request: PUT {API_BASE}/tasks/{task_id}")
+        print_info(f"Updated text: {updated_text}")
+        print_info(f"Status Code: {response.status_code}")
         
-        response = requests.get(url, timeout=15)
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
-        if response.status_code != 200:
-            print(f"❌ FAILED: Expected status 200, got {response.status_code}")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        try:
-            data = response.json()
-            print(f"📄 Response JSON: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        except json.JSONDecodeError:
-            print(f"❌ FAILED: Response is not valid JSON")
-            print(f"📄 Response body: {response.text}")
-            return False
-        
-        # Validate response structure
-        if 'events' not in data:
-            print(f"❌ FAILED: Missing 'events' field in response")
-            return False
-        
-        if not isinstance(data['events'], list):
-            print(f"❌ FAILED: Expected 'events' to be a list, got {type(data['events'])}")
-            return False
-        
-        # Check if any events have skipped field
-        events_with_skipped = []
-        for event in data['events']:
-            if 'skipped' in event:
-                events_with_skipped.append(event)
-        
-        if events_with_skipped:
-            print(f"✅ Planner endpoint test PASSED - Found {len(events_with_skipped)} events with 'skipped' field")
-            for event in events_with_skipped[:3]:  # Show first 3 events
-                print(f"   Event: {event.get('text', 'No text')[:30]}... skipped={event.get('skipped')}")
+        if response.status_code == 200:
+            updated_task = response.json()
+            print_success("Task updated successfully")
+            
+            # Check videos array
+            videos = updated_task.get('videos', [])
+            print_info(f"Videos count after update: {len(videos)}")
+            
+            if len(videos) == 3:
+                print_success("✅ Task now has 3 videos as expected")
+                
+                for i, video in enumerate(videos):
+                    print_info(f"Video {i+1}: {video.get('title')} ({video.get('url')})")
+                    
+            elif len(videos) == 0:
+                print_error("❌ No videos found after update")
+            else:
+                print_error(f"❌ Expected 3 videos after update, got {len(videos)}")
+                
+            return True
         else:
-            print(f"⚠️ Planner endpoint test - No events with 'skipped' field found (may be expected if no events on this date)")
-        
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ FAILED: Network error - {e}")
-        return False
+            print_error(f"Failed to update task: {response.status_code}")
+            print_error(f"Response: {response.text}")
+            return False
+            
     except Exception as e:
-        print(f"❌ FAILED: Unexpected error - {e}")
+        print_error(f"Exception during PUT task: {str(e)}")
         return False
-
 
 def main():
-    """Run Task Update with Skipped Field API Tests"""
-    print("🚀 Starting Task Update with Skipped Field API Tests")
-    print("=" * 60)
+    """Run all tests"""
+    print("🚀 Starting Backend API Tests for Multiple Video Links Support")
+    print(f"Backend URL: {BACKEND_URL}")
+    print(f"Telegram ID: {TELEGRAM_ID}")
     
-    # Step 1: Get user tasks
-    success, tasks = test_get_user_tasks()
-    if not success:
-        print("\n💥 Cannot proceed - failed to get user tasks")
-        return 1
+    # Test 1: GET tasks with videos field
+    tasks = test_get_tasks_with_videos()
     
-    # If no tasks, create a test task
-    if not tasks:
-        print("\n📝 No tasks found, creating a test task...")
-        success, created_task = create_test_task_if_needed()
-        if not success:
-            print("\n💥 Cannot proceed - failed to create test task")
-            return 1
+    # Test 2: POST task with multiple video links
+    created_task = test_create_task_with_multiple_videos()
+    
+    # Test 3: PUT task with new video link
+    update_success = test_update_task_with_new_video()
+    
+    # Summary
+    print_test_header("TEST SUMMARY")
+    
+    tests_passed = 0
+    total_tests = 3
+    
+    if tasks is not None:
+        print_success("✅ GET /api/tasks/{telegram_id} - PASSED")
+        tests_passed += 1
+    else:
+        print_error("❌ GET /api/tasks/{telegram_id} - FAILED")
         
-        # Get tasks again after creating
-        success, tasks = test_get_user_tasks()
-        if not success or not tasks:
-            print("\n💥 Cannot proceed - failed to get tasks after creation")
-            return 1
+    if created_task is not None:
+        print_success("✅ POST /api/tasks with multiple videos - PASSED")
+        tests_passed += 1
+    else:
+        print_error("❌ POST /api/tasks with multiple videos - FAILED")
+        
+    if update_success:
+        print_success("✅ PUT /api/tasks/{task_id} with new video - PASSED")
+        tests_passed += 1
+    else:
+        print_error("❌ PUT /api/tasks/{task_id} with new video - FAILED")
     
-    # Step 2: Find task with origin="user"
-    user_task = find_user_origin_task(tasks)
-    if not user_task:
-        print("\n💥 Cannot proceed - no task with origin='user' found")
+    print(f"\n🎯 Tests passed: {tests_passed}/{total_tests}")
+    
+    if tests_passed == total_tests:
+        print_success("🎉 ALL TESTS PASSED!")
+        return 0
+    else:
+        print_error("💥 SOME TESTS FAILED!")
         return 1
-    
-    task_id = user_task['id']
-    
-    # Step 3: Update task with skipped=true
-    success, updated_task = test_update_task_with_skipped(task_id)
-    if not success:
-        print(f"\n💥 Failed to update task {task_id} with skipped=true")
-        return 1
-    
-    # Step 4: Verify skipped field is saved
-    success = test_verify_task_skipped(task_id)
-    if not success:
-        print(f"\n💥 Failed to verify skipped field for task {task_id}")
-        return 1
-    
-    # Step 5: Check planner endpoint
-    success = test_planner_endpoint_skipped()
-    if not success:
-        print("\n💥 Failed to test planner endpoint")
-        return 1
-    
-    print("\n" + "=" * 60)
-    print("📊 TEST SUMMARY")
-    print("=" * 60)
-    print("✅ Step 1: GET /api/tasks/765963392 - PASSED")
-    print("✅ Step 2: Found task with origin='user' - PASSED")
-    print("✅ Step 3: PUT /api/tasks/{task_id} with skipped=true - PASSED")
-    print("✅ Step 4: Verified skipped field is saved - PASSED")
-    print("✅ Step 5: GET /api/planner/765963392/2026-01-22 - PASSED")
-    
-    print(f"\n🎉 All tests PASSED! Task {task_id} successfully updated with skipped=true")
-    return 0
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(main())
