@@ -194,7 +194,7 @@ export const AddTaskModal = ({
       setTaskText('');
       setCategory(null);
       setPriority('medium');
-      setYoutubeData(null);
+      setVideoData(null);
     }
   }, [isOpen, quickTemplate]);
   
