@@ -248,7 +248,17 @@ export const AddRoomTaskModal = ({
         priority: priority,
         deadline: deadline ? new Date(deadline).toISOString() : null,
         tags: tags,
-        assigned_to: assignToAll ? null : selectedParticipants  // null = все, массив = выбранные
+        assigned_to: assignToAll ? null : selectedParticipants,  // null = все, массив = выбранные
+        // YouTube данные
+        youtube_url: videoData?.type === 'youtube' ? videoData?.url : null,
+        youtube_title: videoData?.type === 'youtube' ? videoData?.title : null,
+        youtube_duration: videoData?.type === 'youtube' ? videoData?.duration : null,
+        youtube_thumbnail: videoData?.type === 'youtube' ? videoData?.thumbnail : null,
+        // VK Video данные
+        vk_video_url: videoData?.type === 'vk' ? videoData?.url : null,
+        vk_video_title: videoData?.type === 'vk' ? videoData?.title : null,
+        vk_video_duration: videoData?.type === 'vk' ? videoData?.duration : null,
+        vk_video_thumbnail: videoData?.type === 'vk' ? videoData?.thumbnail : null,
       };
       
       await onAddTask(taskData);
