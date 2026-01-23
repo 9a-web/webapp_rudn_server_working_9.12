@@ -511,6 +511,17 @@ class YouTubeInfoResponse(BaseModel):
     channel: Optional[str] = None
 
 
+class VKVideoInfoResponse(BaseModel):
+    """Ответ с информацией о VK видео"""
+    url: str
+    video_id: str
+    title: str
+    duration: str  # Формат: "MM:SS" или "HH:MM:SS"
+    duration_seconds: int
+    thumbnail: str
+    channel: Optional[str] = None
+
+
 class TaskProductivityStats(BaseModel):
     """Статистика продуктивности по задачам"""
     total_completed: int = 0  # Всего выполнено задач
