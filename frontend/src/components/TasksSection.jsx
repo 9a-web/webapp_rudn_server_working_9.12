@@ -1993,17 +1993,6 @@ const TodayTaskItem = ({
                     </div>
                   </div>
                 )}
-                
-                {/* YouTube Preview - компактная карточка если НЕТ текста (только ссылка) */}
-                {task.youtube_url && task.youtube_title && !parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
-                  <YouTubePreview
-                    title={task.youtube_title}
-                    duration={task.youtube_duration}
-                    thumbnail={task.youtube_thumbnail}
-                    url={task.youtube_url}
-                    compact={true}
-                  />
-                )}
               </div>
               
               {/* Кнопки действий */}
