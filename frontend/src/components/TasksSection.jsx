@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, Reorder, useDragControls } from 'framer-motion';
-import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users, TrendingUp, Link2, ListChecks } from 'lucide-react';
+import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users, TrendingUp, Link2, ListChecks, Play } from 'lucide-react';
 import { tasksAPI, scheduleAPI, achievementsAPI, plannerAPI } from '../services/api';
 import { groupTasksAPI } from '../services/groupTasksAPI';
 import { useTelegram } from '../contexts/TelegramContext';
@@ -26,7 +26,95 @@ import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { YouTubePreview } from './YouTubePreview';
 
 import { getWeekNumberForDate } from '../utils/dateUtils';
-import { parseTaskText } from '../utils/textUtils';
+import { parseTaskText, splitTextByYouTubeUrl } from '../utils/textUtils';
+
+// Компонент для отображения текста задачи с inline YouTube badge
+const TaskTextWithBadge = ({ task, completed, onDoubleClick, hapticFeedback }) => {
+  const { youtube_url, youtube_title, youtube_duration, text } = task;
+  
+  // Функция для открытия YouTube
+  const handleBadgeClick = (e) => {
+    e.stopPropagation();
+    if (youtube_url) {
+      window.open(youtube_url, '_blank', 'noopener,noreferrer');
+    }
+  };
+  
+  // Обрезаем название
+  const truncateTitle = (title, maxLength = 20) => {
+    if (!title) return '';
+    if (title.length <= maxLength) return title;
+    return title.slice(0, maxLength).trim() + '...';
+  };
+  
+  // Inline badge компонент
+  const InlineBadge = () => (
+    <button
+      onClick={handleBadgeClick}
+      className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded text-[9px] font-medium transition-all align-middle mx-0.5"
+      title={youtube_title}
+    >
+      <Play className="w-2 h-2 flex-shrink-0 fill-white" />
+      <span className="truncate max-w-[100px]">{truncateTitle(youtube_title)}</span>
+      {youtube_duration && (
+        <span className="flex-shrink-0 text-red-200 text-[8px] ml-0.5">{youtube_duration}</span>
+      )}
+    </button>
+  );
+  
+  // Если нет YouTube данных - просто текст
+  if (!youtube_url || !youtube_title) {
+    return (
+      <span 
+        onDoubleClick={onDoubleClick}
+        className={`
+          block text-xs leading-tight transition-all duration-200 cursor-pointer
+          ${completed 
+            ? 'text-[#999999] line-through' 
+            : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
+          }
+        `}
+        title={!completed ? "Двойной клик для быстрого редактирования текста" : ""}
+      >
+        {text}
+      </span>
+    );
+  }
+  
+  // Разбиваем текст на части
+  const { before, url, after } = splitTextByYouTubeUrl(text || '');
+  
+  return (
+    <span 
+      onDoubleClick={onDoubleClick}
+      className={`
+        block text-xs leading-relaxed transition-all duration-200 cursor-pointer
+        ${completed 
+          ? 'text-[#999999] line-through' 
+          : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
+        }
+      `}
+      title={!completed ? "Двойной клик для быстрого редактирования текста" : ""}
+    >
+      {url ? (
+        // Есть ссылка в тексте - вставляем badge на её место
+        <>
+          {before}
+          <InlineBadge />
+          {after}
+        </>
+      ) : (
+        // Ссылки в тексте нет, но YouTube данные есть - показываем текст + badge
+        <>
+          {parseTaskText(text, { youtube_url, youtube_title }).displayText}
+          {' '}
+          <InlineBadge />
+        </>
+      )}
+    </span>
+  );
+};
+
 // 🔧 FEATURE FLAG: Показать/скрыть функцию комнат
 // Измените на false, чтобы скрыть комнаты
 const SHOW_ROOMS_FEATURE = true;
