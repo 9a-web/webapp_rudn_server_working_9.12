@@ -396,13 +396,14 @@ export const EditTaskModal = ({
                 <label className="block text-xs sm:text-sm font-medium text-[#1C1C1E] mb-2">
                   Описание задачи
                 </label>
-                {/* Поле с inline YouTube badge на месте ссылки */}
-                <TextWithYouTubeBadge
+                {/* Поле с inline video badge на месте ссылки */}
+                <TextWithVideoBadge
                   text={taskText}
                   originalText={task.text}
-                  youtubeUrl={task.youtube_url}
-                  youtubeTitle={task.youtube_title}
-                  youtubeDuration={task.youtube_duration}
+                  videoUrl={task.youtube_url || task.vk_url}
+                  videoTitle={task.youtube_title || task.vk_title}
+                  videoDuration={task.youtube_duration || task.vk_duration}
+                  videoType={task.vk_url ? 'vk' : 'youtube'}
                   onChange={setTaskText}
                   disabled={saving}
                   placeholder="Например: Купить продукты, Подготовиться к экзамену..."
