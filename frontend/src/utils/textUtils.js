@@ -216,6 +216,54 @@ export const splitTextByVideoUrl = (text) => {
 };
 
 /**
+ * Разбивает текст на сегменты с учетом ВСЕХ видео ссылок
+ * Возвращает массив сегментов: текстовые части и видео ссылки в порядке их появления
+ * @param {string} text - Полный текст
+ * @returns {Array<{type: 'text'|'youtube'|'vk', content: string}>} - Массив сегментов
+ */
+export const splitTextByAllVideoUrls = (text) => {
+  if (!text) return [];
+  
+  // Комбинированное regex для поиска всех видео ссылок
+  const combinedRegex = /(?:https?:\/\/)?(?:www\.)?(?:(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:\S*)?|(?:vk\.com\/(?:video|clip|video\?z=video)|vkvideo\.ru\/video)(-?\d+_\d+)(?:\S*)?)/gi;
+  
+  const segments = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = combinedRegex.exec(text)) !== null) {
+    // Добавляем текст перед ссылкой (если есть)
+    if (match.index > lastIndex) {
+      const textBefore = text.slice(lastIndex, match.index);
+      if (textBefore.trim()) {
+        segments.push({ type: 'text', content: textBefore });
+      }
+    }
+    
+    // Определяем тип ссылки
+    const url = match[0];
+    const isYouTube = /youtube|youtu\.be/i.test(url);
+    
+    segments.push({
+      type: isYouTube ? 'youtube' : 'vk',
+      content: url
+    });
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Добавляем оставшийся текст (если есть)
+  if (lastIndex < text.length) {
+    const remainingText = text.slice(lastIndex);
+    if (remainingText.trim()) {
+      segments.push({ type: 'text', content: remainingText });
+    }
+  }
+  
+  return segments;
+};
+
+/**
  * Разделяет текст задачи на текстовую часть и видео информацию
  * @param {string} text - Полный текст задачи
  * @param {object} videoData - Данные видео из задачи
