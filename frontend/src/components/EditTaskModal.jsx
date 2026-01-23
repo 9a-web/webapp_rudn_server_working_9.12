@@ -164,10 +164,12 @@ export const EditTaskModal = ({
   // Заполняем поля при открытии модального окна
   useEffect(() => {
     if (isOpen && task) {
-      // Если есть YouTube превью, убираем ссылку из текста для чистоты
+      // Если есть видео превью, убираем ссылку из текста для чистоты
       const { displayText } = parseTaskText(task.text || '', {
         youtube_url: task.youtube_url,
-        youtube_title: task.youtube_title
+        youtube_title: task.youtube_title,
+        vk_url: task.vk_url,
+        vk_title: task.vk_title
       });
       setTaskText(displayText);
       setCategory(task.category || null);
