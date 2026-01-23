@@ -78,22 +78,23 @@ const TextWithVideoBadge = ({
   
   // Рендерим текст с badge на месте ссылки
   const renderTextWithInlineBadge = () => {
-    // Если нет YouTube данных - просто показываем текст
-    if (!youtubeUrl || !youtubeTitle) {
+    // Если нет видео данных - просто показываем текст
+    if (!videoUrl || !videoTitle) {
       return text || <span className="text-gray-400">{placeholder}</span>;
     }
     
     // Разбиваем оригинальный текст на части (до ссылки, ссылка, после ссылки)
-    const { before, url, after } = splitTextByYouTubeUrl(originalText || '');
+    const { before, url, after } = splitTextByVideoUrl(originalText || '');
     
     // Если ссылка не найдена в оригинальном тексте, показываем текст + badge
     if (!url) {
       if (!text || text.trim() === '') {
         return (
-          <InlineYouTubeBadge 
-            title={youtubeTitle} 
-            duration={youtubeDuration} 
-            url={youtubeUrl} 
+          <InlineVideoBadge 
+            title={videoTitle} 
+            duration={videoDuration} 
+            url={videoUrl}
+            type={videoType}
           />
         );
       }
@@ -101,10 +102,11 @@ const TextWithVideoBadge = ({
         <>
           <span>{text}</span>
           {' '}
-          <InlineYouTubeBadge 
-            title={youtubeTitle} 
-            duration={youtubeDuration} 
-            url={youtubeUrl} 
+          <InlineVideoBadge 
+            title={videoTitle} 
+            duration={videoDuration} 
+            url={videoUrl}
+            type={videoType}
           />
         </>
       );
@@ -114,10 +116,11 @@ const TextWithVideoBadge = ({
     return (
       <>
         {before}
-        <InlineYouTubeBadge 
-          title={youtubeTitle} 
-          duration={youtubeDuration} 
-          url={youtubeUrl} 
+        <InlineVideoBadge 
+          title={videoTitle} 
+          duration={videoDuration} 
+          url={videoUrl}
+          type={videoType}
         />
         {after}
       </>
