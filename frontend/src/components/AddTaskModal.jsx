@@ -286,12 +286,16 @@ export const AddTaskModal = ({
         // target_date - дата, к которой привязана задача (всегда устанавливаем, если selectedDate передан)
         target_date: targetDateISO,
         subject: subject || null,
-        // Видео данные (YouTube или VK)
-        video_url: videoData?.url || null,
-        video_title: videoData?.title || null,
-        video_duration: videoData?.duration || null,
-        video_thumbnail: videoData?.thumbnail || null,
-        video_type: videoData?.type || null,
+        // YouTube данные
+        youtube_url: videoData?.type === 'youtube' ? videoData?.url : null,
+        youtube_title: videoData?.type === 'youtube' ? videoData?.title : null,
+        youtube_duration: videoData?.type === 'youtube' ? videoData?.duration : null,
+        youtube_thumbnail: videoData?.type === 'youtube' ? videoData?.thumbnail : null,
+        // VK Video данные
+        vk_video_url: videoData?.type === 'vk' ? videoData?.url : null,
+        vk_video_title: videoData?.type === 'vk' ? videoData?.title : null,
+        vk_video_duration: videoData?.type === 'vk' ? videoData?.duration : null,
+        vk_video_thumbnail: videoData?.type === 'vk' ? videoData?.thumbnail : null,
       };
       
       await onAddTask(taskData);
