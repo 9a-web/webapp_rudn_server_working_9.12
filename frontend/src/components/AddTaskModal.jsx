@@ -278,11 +278,12 @@ export const AddTaskModal = ({
         // target_date - дата, к которой привязана задача (всегда устанавливаем, если selectedDate передан)
         target_date: targetDateISO,
         subject: subject || null,
-        // YouTube данные
-        youtube_url: youtubeData?.url || null,
-        youtube_title: youtubeData?.title || null,
-        youtube_duration: youtubeData?.duration || null,
-        youtube_thumbnail: youtubeData?.thumbnail || null,
+        // Видео данные (YouTube или VK)
+        video_url: videoData?.url || null,
+        video_title: videoData?.title || null,
+        video_duration: videoData?.duration || null,
+        video_thumbnail: videoData?.thumbnail || null,
+        video_type: videoData?.type || null,
       };
       
       await onAddTask(taskData);
