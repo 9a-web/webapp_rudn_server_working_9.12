@@ -1323,6 +1323,10 @@ async def get_vk_video_info(url: str):
 
 async def enrich_task_with_youtube(task_dict: dict) -> dict:
     """Обогащает задачу информацией о YouTube видео, если в тексте есть ссылка"""
+    # Если данные уже переданы клиентом - не перезаписываем
+    if task_dict.get('youtube_title') and task_dict.get('youtube_url'):
+        return task_dict
+    
     text = task_dict.get('text', '')
     youtube_url = find_youtube_url_in_text(text)
     
