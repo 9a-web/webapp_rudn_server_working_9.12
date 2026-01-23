@@ -6,7 +6,16 @@
 const YOUTUBE_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:\S*)?/gi;
 
 // Регулярное выражение для поиска VK Video ссылок
-const VK_VIDEO_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:vk\.com\/(?:video|clip|video\?z=video)|vkvideo\.ru\/video)(-?\d+_\d+)(?:\S*)?/gi;
+// Покрывает форматы:
+// 1. vk.com/video-123_456 (прямая ссылка на видео)
+// 2. vk.com/clip-123_456 (клипы)
+// 3. vkvideo.ru/video-123_456 (новый домен VK Video)
+// 4. vk.com/video?z=video-123_456 (модальное окно видео)
+// 5. vk.com/videos-123?z=video-123_456 (из списка видео пользователя/группы)
+// 6. vk.com/wall-123_456?z=video-789_012 (видео со стены)
+// 7. vk.com/video/@username?z=video-123_456 (с @username)
+// 8. vk.com/*?z=video-123_456 (любой путь с z=video параметром - club, music, etc.)
+const VK_VIDEO_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:vk\.com\/(?:video-?\d+_\d+|clip-?\d+_\d+|[^\s]*[?&]z=video-?\d+_\d+)|vkvideo\.ru\/video-?\d+_\d+)(?:[^\s]*)?/gi;
 
 /**
  * Извлекает YouTube URL из текста (первый найденный)
