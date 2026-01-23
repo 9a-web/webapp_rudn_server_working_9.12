@@ -103,7 +103,7 @@ const TaskInputWithVideo = ({
   }
   
   // Режим отображения с badge
-  const { before, url, after } = splitTextByYouTubeUrl(value || '');
+  const { before, url, after } = splitTextByVideoUrl(value || '');
   
   return (
     <div
@@ -114,21 +114,23 @@ const TaskInputWithVideo = ({
         // Есть ссылка в тексте - вставляем badge на её место
         <>
           {before}
-          <InlineYouTubeBadge 
-            title={youtubeData.title} 
-            duration={youtubeData.duration} 
-            url={youtubeData.url}
-            onRemove={onYouTubeRemove}
+          <InlineVideoBadge 
+            title={videoData.title} 
+            duration={videoData.duration} 
+            url={videoData.url}
+            type={videoData.type}
+            onRemove={onVideoRemove}
           />
           {after}
         </>
       ) : (
         // Ссылки в тексте нет, показываем только badge
-        <InlineYouTubeBadge 
-          title={youtubeData.title} 
-          duration={youtubeData.duration} 
-          url={youtubeData.url}
-          onRemove={onYouTubeRemove}
+        <InlineVideoBadge 
+          title={videoData.title} 
+          duration={videoData.duration} 
+          url={videoData.url}
+          type={videoData.type}
+          onRemove={onVideoRemove}
         />
       )}
     </div>
