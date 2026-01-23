@@ -199,13 +199,21 @@ export const AddTaskModal = ({
   }, [isOpen, quickTemplate]);
   
   // Обработка обнаружения видео ссылки (YouTube или VK)
-  const handleVideoDetected = useCallback(async (url) => {
+  const handleVideoDetected = useCallback(async (videoInfo) => {
     if (isLoadingVideo || videoData) return;
+    
+    const { url, type } = videoInfo;
     
     setIsLoadingVideo(true);
     try {
-      // Получаем информацию о видео
-      const response = await scheduleAPI.getVideoInfo(url);
+      // Получаем информацию о видео в зависимости от типа
+      let response;
+      if (type === 'vk') {
+        response = await scheduleAPI.getVKVideoInfo(url);
+      } else {
+        response = await scheduleAPI.getYouTubeInfo(url);
+      }
+      
       if (response) {
         setVideoData({
           url: response.url || url,
@@ -213,7 +221,7 @@ export const AddTaskModal = ({
           duration: response.duration,
           thumbnail: response.thumbnail,
           video_id: response.video_id,
-          type: response.type || 'youtube' // 'youtube' или 'vk'
+          type: type // 'youtube' или 'vk'
         });
         hapticFeedback && hapticFeedback('success');
       }
