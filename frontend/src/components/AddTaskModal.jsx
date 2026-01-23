@@ -294,7 +294,7 @@ export const AddTaskModal = ({
       setPriority('medium');
       setDeadline('');
       setSubject('');
-      setYoutubeData(null);
+      setVideoData(null);
       onClose();
     } catch (error) {
       console.error('Error adding task:', error);
