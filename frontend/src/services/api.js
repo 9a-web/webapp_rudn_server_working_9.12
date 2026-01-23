@@ -127,6 +127,20 @@ export const scheduleAPI = {
       return null;
     }
   },
+  
+  /**
+   * Получить информацию о YouTube видео
+   * @param {string} url - URL YouTube видео
+   */
+  getYouTubeInfo: async (url) => {
+    try {
+      const response = await api.get('/youtube/info', { params: { url } });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching YouTube info:', error);
+      return null;
+    }
+  },
 };
 
 /**
