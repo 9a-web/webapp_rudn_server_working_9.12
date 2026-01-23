@@ -1925,40 +1925,20 @@ const TodayTaskItem = ({
 
               {/* Текст задачи */}
               <div className="flex-1 min-w-0">
-                {/* Текст задачи (без YouTube ссылки если есть превью) */}
-                {(() => {
-                  const { displayText, hasYouTube, hasTextContent } = parseTaskText(task.text, {
-                    youtube_url: task.youtube_url,
-                    youtube_title: task.youtube_title
-                  });
-                  
-                  // Показываем текст только если есть что показывать
-                  if (hasTextContent) {
-                    return (
-                      <span 
-                        onDoubleClick={() => {
-                          if (!task.completed && onStartEdit) {
-                            onStartEdit(task);
-                            hapticFeedback && hapticFeedback('selection');
-                          }
-                        }}
-                        className={`
-                          block text-xs leading-tight transition-all duration-200 cursor-pointer
-                          ${task.completed 
-                            ? 'text-[#999999] line-through' 
-                            : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
-                          }
-                        `}
-                        title={!task.completed ? "Двойной клик для быстрого редактирования текста" : ""}
-                      >
-                        {displayText}
-                      </span>
-                    );
-                  }
-                  return null;
-                })()}
+                {/* Текст задачи с inline YouTube badge */}
+                <TaskTextWithBadge 
+                  task={task}
+                  completed={task.completed}
+                  onDoubleClick={() => {
+                    if (!task.completed && onStartEdit) {
+                      onStartEdit(task);
+                      hapticFeedback && hapticFeedback('selection');
+                    }
+                  }}
+                  hapticFeedback={hapticFeedback}
+                />
                 
-                {/* Метки: категория, приоритет, предмет, YouTube ярлык */}
+                {/* Метки: категория, приоритет, предмет */}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {task.category && (
                     <span className="text-xs">
@@ -1972,15 +1952,6 @@ const TodayTaskItem = ({
                     <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                       {task.subject}
                     </span>
-                  )}
-                  {/* YouTube ярлык - в строке меток если есть текст задачи */}
-                  {task.youtube_url && task.youtube_title && parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
-                    <YouTubePreview
-                      title={task.youtube_title}
-                      duration={task.youtube_duration}
-                      url={task.youtube_url}
-                      badge={true}
-                    />
                   )}
                 </div>
                 
