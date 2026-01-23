@@ -67,34 +67,37 @@
 
 ### 2.1 Главные модули
 
-#### server.py (3500+ LOC)
+#### server.py (10,432 LOC)
 
-**Назначение:** Главный FastAPI сервер со всеми endpoints
+**Назначение:** Главный FastAPI сервер со всеми endpoints (173)
 
 **Основные разделы:**
 ```python
 # 1. Инициализация
 app = FastAPI()
-router = APIRouter(prefix="/api")
-db = client["rudn_schedule"]
+api_router = APIRouter(prefix="/api")
+db = client[DB_NAME]
 
 # 2. CORS настройки
 app.add_middleware(CORSMiddleware, ...)
 
-# 3. Health check
-@router.get("/health")
-
-# 4. Endpoints (50+):
-# - Расписание РУДН (5 endpoints)
-# - Пользователи (4 endpoints)
-# - Задачи (4 endpoints)
-# - Комнаты (7 endpoints)
-# - Групповые задачи (4 endpoints)
-# - Достижения (3 endpoints)
-# - Статистика (2 endpoints)
-# - Уведомления (2 endpoints)
-# - Погода (1 endpoint)
-# - Бот инфо (1 endpoint)
+# 3. Endpoints (173):
+# - Расписание РУДН (6 endpoints)
+# - Пользователи (15 endpoints)
+# - Планировщик (5 endpoints)
+# - Задачи (9 endpoints)
+# - Комнаты (12 endpoints)
+# - Групповые задачи (16 endpoints)
+# - Журнал посещений (23 endpoints)
+# - VK Music (20 endpoints)
+# - Друзья (15 endpoints)
+# - In-App уведомления (8 endpoints)
+# - Достижения (5 endpoints)
+# - Реферальная система (4 endpoints)
+# - ЛК РУДН (4 endpoints)
+# - Админ статистика (12 endpoints)
+# - Бэкапы (3 endpoints)
+# - Прочее (5 endpoints)
 ```
 
 **Ключевые зависимости:**
