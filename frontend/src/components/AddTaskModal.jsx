@@ -68,15 +68,15 @@ const TaskInputWithVideo = ({
     const newText = e.target.value;
     onChange(newText);
     
-    // Проверяем наличие YouTube ссылки
-    const youtubeUrl = extractYouTubeUrl(newText);
-    if (youtubeUrl && !youtubeData) {
-      onYouTubeDetected(youtubeUrl);
+    // Проверяем наличие видео ссылки (YouTube или VK)
+    const videoUrl = extractVideoUrl(newText);
+    if (videoUrl && !videoData) {
+      onVideoDetected(videoUrl);
     }
   };
   
-  // Если в фокусе или нет YouTube данных - показываем обычный textarea
-  if (isFocused || !youtubeData) {
+  // Если в фокусе или нет видео данных - показываем обычный textarea
+  if (isFocused || !videoData) {
     return (
       <div className="relative">
         <textarea
