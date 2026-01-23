@@ -304,11 +304,15 @@ export default {
   extractYouTubeUrl,
   extractVKVideoUrl,
   extractVideoUrl,
+  extractAllYouTubeUrls,
+  extractAllVKVideoUrls,
+  extractAllVideoUrls,
   removeYouTubeUrl,
   removeVKVideoUrl,
   removeVideoUrl,
   splitTextByYouTubeUrl,
   splitTextByVKVideoUrl,
   splitTextByVideoUrl,
+  splitTextByAllVideoUrls,
   parseTaskText
 };
