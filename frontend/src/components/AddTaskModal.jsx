@@ -154,9 +154,9 @@ export const AddTaskModal = ({
   const [saving, setSaving] = useState(false);
   const [dragY, setDragY] = useState(0);
   
-  // YouTube данные
-  const [youtubeData, setYoutubeData] = useState(null);
-  const [isLoadingYoutube, setIsLoadingYoutube] = useState(false);
+  // Видео данные (YouTube или VK)
+  const [videoData, setVideoData] = useState(null);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
   
   const modalRef = useRef(null);
   
