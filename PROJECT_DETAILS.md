@@ -163,9 +163,9 @@ class UserAchievement(BaseModel): ...
 class ActionTrack(BaseModel): ...
 ```
 
-#### achievements.py (630 LOC)
+#### achievements.py (733 LOC)
 
-**25 достижений в словаре ACHIEVEMENTS:**
+**24 достижения в словаре ACHIEVEMENTS:**
 
 ```python
 ACHIEVEMENTS = {
