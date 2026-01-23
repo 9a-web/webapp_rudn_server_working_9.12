@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Plus, Calendar, Flag, Tag, BookOpen, ChevronDown, Play, Loader2 } from 'lucide-react';
+import { X, Plus, Calendar, Flag, Tag, BookOpen, Play, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { modalVariants, backdropVariants } from '../utils/animations';
-import { extractVideoUrl, splitTextByVideoUrl } from '../utils/textUtils';
+import { backdropVariants } from '../utils/animations';
+import { extractAllVideoUrls, splitTextByAllVideoUrls } from '../utils/textUtils';
 import { scheduleAPI } from '../services/api';
 
 // Inline Video badge для поля ввода (YouTube или VK)
@@ -49,14 +49,15 @@ const InlineVideoBadge = ({ title, duration, url, type = 'youtube', onRemove }) 
   );
 };
 
-// Компонент поля ввода с inline video badge (YouTube или VK)
-const TaskInputWithVideo = ({ 
+// Компонент поля ввода с несколькими video badges (YouTube и VK)
+const TaskInputWithMultipleVideos = ({ 
   value, 
   onChange, 
-  videoData, 
+  videosData, // Массив видео данных
   onVideoDetected,
   onVideoRemove,
   isLoadingVideo,
+  loadingUrls, // Массив URL, которые сейчас загружаются
   disabled, 
   placeholder 
 }) => {
@@ -68,15 +69,24 @@ const TaskInputWithVideo = ({
     const newText = e.target.value;
     onChange(newText);
     
-    // Проверяем наличие видео ссылки (YouTube или VK)
-    const videoUrl = extractVideoUrl(newText);
-    if (videoUrl && !videoData) {
-      onVideoDetected(videoUrl);
-    }
+    // Находим все новые видео ссылки в тексте
+    const allVideoUrls = extractAllVideoUrls(newText);
+    const existingUrls = videosData.map(v => v.url);
+    
+    // Находим новые URL, которых ещё нет в videosData и не загружаются
+    const newUrls = allVideoUrls.filter(v => 
+      !existingUrls.includes(v.url) && 
+      !loadingUrls.includes(v.url)
+    );
+    
+    // Запускаем загрузку для каждой новой ссылки
+    newUrls.forEach(videoInfo => {
+      onVideoDetected(videoInfo);
+    });
   };
   
   // Если в фокусе или нет видео данных - показываем обычный textarea
-  if (isFocused || !videoData) {
+  if (isFocused || videosData.length === 0) {
     return (
       <div className="relative">
         <textarea
@@ -90,7 +100,7 @@ const TaskInputWithVideo = ({
           rows="3"
           autoFocus
           disabled={disabled}
-          maxLength={500}
+          maxLength={1000}
         />
         {isLoadingVideo && (
           <div className="absolute right-3 top-3 flex items-center gap-1 text-xs text-gray-400">
@@ -102,36 +112,61 @@ const TaskInputWithVideo = ({
     );
   }
   
-  // Режим отображения с badge
-  const { before, url, after } = splitTextByVideoUrl(value || '');
+  // Режим отображения с badges - разбиваем текст на сегменты
+  const segments = splitTextByAllVideoUrls(value || '');
+  
+  // Создаём маппинг url -> videoData для быстрого поиска
+  const videoDataMap = {};
+  videosData.forEach(v => {
+    videoDataMap[v.url] = v;
+  });
   
   return (
     <div
       onClick={() => !disabled && setIsFocused(true)}
       className="w-full min-h-[80px] px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl cursor-text text-[#1C1C1E] text-sm sm:text-base hover:border-gray-300 transition-colors leading-relaxed"
     >
-      {url ? (
-        // Есть ссылка в тексте - вставляем badge на её место
-        <>
-          {before}
-          <InlineVideoBadge 
-            title={videoData.title} 
-            duration={videoData.duration} 
-            url={videoData.url}
-            type={videoData.type}
-            onRemove={onVideoRemove}
-          />
-          {after}
-        </>
+      {segments.length > 0 ? (
+        segments.map((segment, index) => {
+          if (segment.type === 'text') {
+            return <span key={index}>{segment.content}</span>;
+          } else {
+            // Это видео ссылка - ищем данные
+            const videoInfo = videoDataMap[segment.content];
+            if (videoInfo) {
+              return (
+                <InlineVideoBadge 
+                  key={index}
+                  title={videoInfo.title} 
+                  duration={videoInfo.duration} 
+                  url={videoInfo.url}
+                  type={videoInfo.type}
+                  onRemove={() => onVideoRemove(videoInfo.url)}
+                />
+              );
+            } else {
+              // Данные ещё не загружены - показываем заглушку
+              return (
+                <span key={index} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-300 text-gray-600 rounded text-[11px] font-medium align-middle mx-0.5">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  <span>Загрузка...</span>
+                </span>
+              );
+            }
+          }
+        })
       ) : (
-        // Ссылки в тексте нет, показываем только badge
-        <InlineVideoBadge 
-          title={videoData.title} 
-          duration={videoData.duration} 
-          url={videoData.url}
-          type={videoData.type}
-          onRemove={onVideoRemove}
-        />
+        // Если сегментов нет, показываем все badges
+        videosData.map((video, index) => (
+          <InlineVideoBadge 
+            key={index}
+            title={video.title} 
+            duration={video.duration} 
+            url={video.url}
+            type={video.type}
+            onRemove={() => onVideoRemove(video.url)}
+          />
+        ))
       )}
     </div>
   );
@@ -149,14 +184,14 @@ export const AddTaskModal = ({
   const [taskText, setTaskText] = useState('');
   const [category, setCategory] = useState(null);
   const [priority, setPriority] = useState('medium');
-  const [deadline, setDeadline] = useState(''); // По умолчанию пустое значение (нет дедлайна)
+  const [deadline, setDeadline] = useState('');
   const [subject, setSubject] = useState('');
   const [saving, setSaving] = useState(false);
   const [dragY, setDragY] = useState(0);
   
-  // Видео данные (YouTube или VK)
-  const [videoData, setVideoData] = useState(null);
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  // Массив видео данных (поддержка нескольких ссылок)
+  const [videosData, setVideosData] = useState([]);
+  const [loadingUrls, setLoadingUrls] = useState([]); // URL, которые сейчас загружаются
   
   const modalRef = useRef(null);
   
@@ -172,39 +207,37 @@ export const AddTaskModal = ({
     };
   }, [isOpen]);
   
-  // При открытии модального окна дедлайн остается пустым (пользователь сам решает, нужен ли срок)
+  // При открытии модального окна сбрасываем состояние
   useEffect(() => {
     if (isOpen) {
-      // Сбрасываем дедлайн при открытии модального окна
       setDeadline('');
-      setVideoData(null);
+      setVideosData([]);
+      setLoadingUrls([]);
     }
   }, [isOpen]);
   
   // Предзаполнение данных из быстрого шаблона
   useEffect(() => {
     if (isOpen && quickTemplate) {
-      // Заполняем поля из шаблона
       setTaskText(quickTemplate.text || '');
       setCategory(quickTemplate.category || null);
       setPriority(quickTemplate.priority || 'medium');
-      // Дедлайн и предмет оставляем пустыми - пользователь может заполнить сам
     } else if (isOpen && !quickTemplate) {
-      // Если нет шаблона, сбрасываем в значения по умолчанию
       setTaskText('');
       setCategory(null);
       setPriority('medium');
-      setVideoData(null);
+      setVideosData([]);
+      setLoadingUrls([]);
     }
   }, [isOpen, quickTemplate]);
   
-  // Обработка обнаружения видео ссылки (YouTube или VK)
+  // Обработка обнаружения новой видео ссылки
   const handleVideoDetected = useCallback(async (videoInfo) => {
-    if (isLoadingVideo || videoData) return;
-    
     const { url, type } = videoInfo;
     
-    setIsLoadingVideo(true);
+    // Добавляем URL в список загружаемых
+    setLoadingUrls(prev => [...prev, url]);
+    
     try {
       // Получаем информацию о видео в зависимости от типа
       let response;
@@ -215,32 +248,41 @@ export const AddTaskModal = ({
       }
       
       if (response) {
-        setVideoData({
+        const newVideoData = {
           url: response.url || url,
           title: response.title,
           duration: response.duration,
           thumbnail: response.thumbnail,
-          video_id: response.video_id,
-          type: type // 'youtube' или 'vk'
+          type: type
+        };
+        
+        // Добавляем в массив видео
+        setVideosData(prev => {
+          // Проверяем, что такого URL ещё нет
+          if (prev.some(v => v.url === newVideoData.url)) {
+            return prev;
+          }
+          return [...prev, newVideoData];
         });
+        
         hapticFeedback && hapticFeedback('success');
       }
     } catch (error) {
       console.error('Error fetching video info:', error);
-      // Если не удалось получить инфо, оставляем как есть
     } finally {
-      setIsLoadingVideo(false);
+      // Убираем URL из списка загружаемых
+      setLoadingUrls(prev => prev.filter(u => u !== url));
     }
-  }, [isLoadingVideo, videoData, hapticFeedback]);
+  }, [hapticFeedback]);
   
-  // Удаление видео данных
-  const handleVideoRemove = useCallback(() => {
-    // Убираем видео ссылку из текста
-    const { before, after } = splitTextByVideoUrl(taskText);
-    setTaskText((before + after).trim());
-    setVideoData(null);
+  // Удаление видео из массива
+  const handleVideoRemove = useCallback((urlToRemove) => {
+    // Убираем URL из текста
+    setTaskText(prev => prev.replace(urlToRemove, '').replace(/\s+/g, ' ').trim());
+    // Убираем из массива данных
+    setVideosData(prev => prev.filter(v => v.url !== urlToRemove));
     hapticFeedback && hapticFeedback('impact', 'light');
-  }, [taskText, hapticFeedback]);
+  }, [hapticFeedback]);
   
   // Категории задач
   const categories = [
@@ -260,57 +302,53 @@ export const AddTaskModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!taskText.trim() && !videoData) return;
+    if (!taskText.trim() && videosData.length === 0) return;
     
     try {
       setSaving(true);
       hapticFeedback && hapticFeedback('impact', 'medium');
       
-      // Создаем объект задачи с дополнительными полями
-      // Для target_date форматируем дату без конвертации в UTC
+      // Форматируем target_date
       let targetDateISO = null;
       if (selectedDate) {
         const targetDate = new Date(selectedDate);
-        // Форматируем дату в формате YYYY-MM-DD без времени
         const year = targetDate.getFullYear();
         const month = String(targetDate.getMonth() + 1).padStart(2, '0');
         const day = String(targetDate.getDate()).padStart(2, '0');
         targetDateISO = `${year}-${month}-${day}T00:00:00`;
       }
       
+      // Создаем объект задачи с массивом видео
       const taskData = {
         text: taskText.trim(),
         category: category,
         priority: priority,
         deadline: deadline ? new Date(deadline).toISOString() : null,
-        // target_date - дата, к которой привязана задача (всегда устанавливаем, если selectedDate передан)
         target_date: targetDateISO,
         subject: subject || null,
-        // YouTube данные
-        youtube_url: videoData?.type === 'youtube' ? videoData?.url : null,
-        youtube_title: videoData?.type === 'youtube' ? videoData?.title : null,
-        youtube_duration: videoData?.type === 'youtube' ? videoData?.duration : null,
-        youtube_thumbnail: videoData?.type === 'youtube' ? videoData?.thumbnail : null,
-        // VK Video данные
-        vk_video_url: videoData?.type === 'vk' ? videoData?.url : null,
-        vk_video_title: videoData?.type === 'vk' ? videoData?.title : null,
-        vk_video_duration: videoData?.type === 'vk' ? videoData?.duration : null,
-        vk_video_thumbnail: videoData?.type === 'vk' ? videoData?.thumbnail : null,
+        // Новый формат - массив видео
+        videos: videosData.map(v => ({
+          url: v.url,
+          title: v.title,
+          duration: v.duration,
+          thumbnail: v.thumbnail,
+          type: v.type
+        }))
       };
       
       await onAddTask(taskData);
       
-      // Очищаем все поля и закрываем модальное окно
+      // Очищаем все поля
       setTaskText('');
       setCategory(null);
       setPriority('medium');
       setDeadline('');
       setSubject('');
-      setVideoData(null);
+      setVideosData([]);
+      setLoadingUrls([]);
       onClose();
     } catch (error) {
       console.error('Error adding task:', error);
-      // Показываем понятное сообщение об ошибке
       const errorMessage = error?.message || error?.toString() || 'Неизвестная ошибка при создании задачи';
       alert(`Ошибка при создании задачи: ${errorMessage}`);
     } finally {
@@ -319,14 +357,15 @@ export const AddTaskModal = ({
   };
 
   const handleClose = () => {
-    if (saving) return; // Не закрываем во время сохранения
+    if (saving) return;
     hapticFeedback && hapticFeedback('impact', 'light');
     setTaskText('');
     setCategory(null);
     setPriority('medium');
     setDeadline('');
     setSubject('');
-    setVideoData(null);
+    setVideosData([]);
+    setLoadingUrls([]);
     setDragY(0);
     onClose();
   };
@@ -373,7 +412,7 @@ export const AddTaskModal = ({
             <div className="w-10 h-1 bg-gray-300 rounded-full" />
           </div>
 
-          {/* Header - фиксированный */}
+          {/* Header */}
           <div className="flex-shrink-0 px-4 sm:px-6 pt-3 pb-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 sm:gap-3">
@@ -392,7 +431,7 @@ export const AddTaskModal = ({
             </div>
           </div>
 
-          {/* Form - прокручиваемый контент */}
+          {/* Form */}
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 px-4 sm:px-6 py-4 sm:py-5">
               {/* Описание задачи */}
@@ -400,18 +439,19 @@ export const AddTaskModal = ({
                 <label className="block text-xs sm:text-sm font-medium text-[#1C1C1E] mb-2">
                   Описание задачи
                 </label>
-                <TaskInputWithVideo
+                <TaskInputWithMultipleVideos
                   value={taskText}
                   onChange={setTaskText}
-                  videoData={videoData}
+                  videosData={videosData}
                   onVideoDetected={handleVideoDetected}
                   onVideoRemove={handleVideoRemove}
-                  isLoadingVideo={isLoadingVideo}
+                  isLoadingVideo={loadingUrls.length > 0}
+                  loadingUrls={loadingUrls}
                   disabled={saving}
-                  placeholder="Например: Купить продукты, Подготовиться к экзамену..."
+                  placeholder="Например: Посмотреть видео https://youtube.com/... и https://vk.com/video..."
                 />
                 <p className="text-[10px] sm:text-xs text-gray-400 mt-1 text-right">
-                  {taskText.length} / 500
+                  {taskText.length} / 1000 • Видео: {videosData.length}
                 </p>
               </div>
 
@@ -521,7 +561,7 @@ export const AddTaskModal = ({
             </form>
           </div>
 
-          {/* Footer с кнопками - фиксированный */}
+          {/* Footer с кнопками */}
           <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-100 bg-white">
             <div className="flex gap-2 sm:gap-3">
               <motion.button
