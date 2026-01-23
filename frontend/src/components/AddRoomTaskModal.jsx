@@ -151,6 +151,10 @@ export const AddRoomTaskModal = ({
   const [assignToAll, setAssignToAll] = useState(true);  // По умолчанию для всех
   const [selectedParticipants, setSelectedParticipants] = useState([]);  // Выбранные участники
   
+  // Video данные
+  const [videoData, setVideoData] = useState(null);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  
   const { webApp, user } = useTelegram();
   const modalRef = useRef(null);
   
@@ -165,6 +169,51 @@ export const AddRoomTaskModal = ({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
+  
+  // Обработка обнаружения видео ссылки
+  const handleVideoDetected = useCallback(async (videoInfo) => {
+    if (isLoadingVideo || videoData) return;
+    
+    const { url, type } = videoInfo;
+    
+    setIsLoadingVideo(true);
+    try {
+      let response;
+      if (type === 'vk') {
+        response = await scheduleAPI.getVKVideoInfo(url);
+      } else {
+        response = await scheduleAPI.getYouTubeInfo(url);
+      }
+      
+      if (response) {
+        setVideoData({
+          url: response.url || url,
+          title: response.title,
+          duration: response.duration,
+          thumbnail: response.thumbnail,
+          video_id: response.video_id,
+          type: type
+        });
+        if (webApp?.HapticFeedback) {
+          webApp.HapticFeedback.notificationOccurred('success');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching video info:', error);
+    } finally {
+      setIsLoadingVideo(false);
+    }
+  }, [isLoadingVideo, videoData, webApp]);
+  
+  // Удаление видео
+  const handleVideoRemove = useCallback(() => {
+    const { before, after } = splitTextByVideoUrl(description);
+    setDescription((before + after).trim());
+    setVideoData(null);
+    if (webApp?.HapticFeedback) {
+      webApp.HapticFeedback.impactOccurred('light');
+    }
+  }, [description, webApp]);
   
   // Категории задач
   const categories = [
