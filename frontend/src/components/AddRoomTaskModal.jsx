@@ -1,7 +1,136 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Calendar, Flag, Tag, AlignLeft, List, Users, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Plus, Calendar, Flag, Tag, AlignLeft, List, Users, Check, Play, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTelegram } from '../contexts/TelegramContext';
+import { extractVideoUrl, splitTextByVideoUrl } from '../utils/textUtils';
+import { scheduleAPI } from '../services/api';
+
+// Inline Video badge для поля ввода (YouTube или VK) - тёмная тема
+const InlineVideoBadgeDark = ({ title, duration, url, type = 'youtube', onRemove }) => {
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+  
+  const truncateTitle = (text, maxLength = 25) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength).trim() + '...';
+  };
+  
+  const bgColor = type === 'vk' 
+    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+    : 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700';
+  const secondaryColor = type === 'vk' ? 'text-blue-200' : 'text-red-200';
+  const hoverBg = type === 'vk' ? 'hover:bg-blue-700' : 'hover:bg-red-700';
+  
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r ${bgColor} text-white rounded text-[11px] font-medium align-middle mx-0.5 group`}>
+      <Play className="w-2.5 h-2.5 flex-shrink-0 fill-white cursor-pointer" onClick={handleClick} />
+      <span className="truncate max-w-[150px] cursor-pointer" onClick={handleClick} title={title}>
+        {truncateTitle(title)}
+      </span>
+      {duration && (
+        <span className={`flex-shrink-0 ${secondaryColor} text-[9px]`}>{duration}</span>
+      )}
+      {onRemove && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className={`ml-0.5 w-3 h-3 flex items-center justify-center ${hoverBg} rounded-full transition-colors`}
+          title="Удалить видео"
+        >
+          <X className="w-2 h-2" />
+        </button>
+      )}
+    </span>
+  );
+};
+
+// Компонент поля ввода с inline video badge - тёмная тема
+const TaskInputWithVideoDark = ({
+  value, 
+  onChange, 
+  videoData, 
+  onVideoDetected,
+  onVideoRemove,
+  isLoadingVideo,
+  disabled, 
+  placeholder,
+  rows = 3,
+  maxLength = 500
+}) => {
+  const textareaRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  const handleChange = (e) => {
+    const newText = e.target.value;
+    onChange(newText);
+    
+    const videoUrl = extractVideoUrl(newText);
+    if (videoUrl && !videoData) {
+      onVideoDetected(videoUrl);
+    }
+  };
+  
+  if (isFocused || !videoData) {
+    return (
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-800 border border-gray-700 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none placeholder-gray-500 text-white text-sm sm:text-base"
+          rows={rows}
+          autoFocus={rows === 1}
+          disabled={disabled}
+          maxLength={maxLength}
+        />
+        {isLoadingVideo && (
+          <div className="absolute right-3 top-3 flex items-center gap-1 text-xs text-gray-400">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>Загрузка...</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  const { before, url, after } = splitTextByVideoUrl(value || '');
+  
+  return (
+    <div
+      onClick={() => !disabled && setIsFocused(true)}
+      className="w-full min-h-[80px] px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-800 border border-gray-700 rounded-xl sm:rounded-2xl cursor-text text-white text-sm sm:text-base hover:border-gray-600 transition-colors leading-relaxed"
+    >
+      {url ? (
+        <>
+          {before}
+          <InlineVideoBadgeDark 
+            title={videoData.title} 
+            duration={videoData.duration} 
+            url={videoData.url}
+            type={videoData.type}
+            onRemove={onVideoRemove}
+          />
+          {after}
+        </>
+      ) : (
+        <InlineVideoBadgeDark 
+          title={videoData.title} 
+          duration={videoData.duration} 
+          url={videoData.url}
+          type={videoData.type}
+          onRemove={onVideoRemove}
+        />
+      )}
+    </div>
+  );
+};
 
 export const AddRoomTaskModal = ({ 
   isOpen, 
