@@ -1145,8 +1145,8 @@ def extract_vk_video_id(url: str) -> Optional[str]:
         r'vk\.com/video(-?\d+_\d+)',  # vk.com/video-123_456
         r'vk\.com/clip(-?\d+_\d+)',   # vk.com/clip-123_456
         r'vkvideo\.ru/video(-?\d+_\d+)',  # vkvideo.ru/video-123_456
-        r'vk\.com/video\?z=video(-?\d+_\d+)',  # vk.com/video?z=video-123_456
-        r'vk\.com/.*video(-?\d+_\d+)',  # любой URL с video-123_456
+        r'[?&]z=video(-?\d+_\d+)',  # ?z=video-123_456 или &z=video-123_456 (из любого пути: wall, videos, club, etc.)
+        r'vk\.com/.*video(-?\d+_\d+)',  # любой URL с video-123_456 (fallback)
     ]
     for pattern in patterns:
         match = re.search(pattern, url)
@@ -1157,10 +1157,10 @@ def extract_vk_video_id(url: str) -> Optional[str]:
 def find_vk_video_url_in_text(text: str) -> Optional[str]:
     """Находит первую VK Video ссылку в тексте"""
     patterns = [
-        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',
-        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',
-        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',
-        r'https?://(?:www\.)?vk\.com/video\?z=video-?\d+_\d+[^\s]*',
+        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',  # vk.com/video-123_456
+        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',   # vk.com/clip-123_456
+        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',  # vkvideo.ru/video-123_456
+        r'https?://(?:www\.)?vk\.com/[^\s]*[?&]z=video-?\d+_\d+[^\s]*',  # любой путь с ?z=video (wall, videos, club, etc.)
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
@@ -1171,10 +1171,10 @@ def find_vk_video_url_in_text(text: str) -> Optional[str]:
 def find_all_vk_video_urls_in_text(text: str) -> List[str]:
     """Находит ВСЕ VK Video ссылки в тексте"""
     patterns = [
-        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',
-        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',
-        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',
-        r'https?://(?:www\.)?vk\.com/video\?z=video-?\d+_\d+[^\s]*',
+        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',  # vk.com/video-123_456
+        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',   # vk.com/clip-123_456
+        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',  # vkvideo.ru/video-123_456
+        r'https?://(?:www\.)?vk\.com/[^\s]*[?&]z=video-?\d+_\d+[^\s]*',  # любой путь с ?z=video (wall, videos, club, etc.)
     ]
     urls = []
     for pattern in patterns:
