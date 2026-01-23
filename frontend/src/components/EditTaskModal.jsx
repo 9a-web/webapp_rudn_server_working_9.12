@@ -310,6 +310,16 @@ export const EditTaskModal = ({
         priority: priority,
         deadline: deadline ? new Date(deadline).toISOString() : null,
         subject: subject || null,
+        // Сохраняем YouTube данные
+        youtube_url: task.youtube_url || null,
+        youtube_title: task.youtube_title || null,
+        youtube_duration: task.youtube_duration || null,
+        youtube_thumbnail: task.youtube_thumbnail || null,
+        // Сохраняем VK Video данные
+        vk_video_url: task.vk_video_url || null,
+        vk_video_title: task.vk_video_title || null,
+        vk_video_duration: task.vk_video_duration || null,
+        vk_video_thumbnail: task.vk_video_thumbnail || null,
       };
       
       await onEditTask(task.id, updates);
