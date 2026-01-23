@@ -2221,30 +2221,12 @@ const TaskGroupItem = ({
 
             {/* Текст и метаданные */}
             <div className="flex-1 min-w-0">
-              {/* Текст задачи (без YouTube ссылки если есть превью) */}
-              {(() => {
-                const { displayText, hasTextContent } = parseTaskText(task.text, {
-                  youtube_url: task.youtube_url,
-                  youtube_title: task.youtube_title
-                });
-                
-                if (hasTextContent) {
-                  return (
-                    <span 
-                      className={`
-                        block text-sm leading-tight transition-all duration-200
-                        ${task.completed 
-                          ? 'text-gray-400 line-through' 
-                          : 'text-gray-800'
-                        }
-                      `}
-                    >
-                      {displayText}
-                    </span>
-                  );
-                }
-                return null;
-              })()}
+              {/* Текст задачи с inline YouTube badge */}
+              <TaskTextWithBadge 
+                task={task}
+                completed={task.completed}
+                hapticFeedback={hapticFeedback}
+              />
               
               {/* Метки */}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -2270,27 +2252,7 @@ const TaskGroupItem = ({
                     </div>
                   );
                 })()}
-                {/* YouTube ярлык - в строке меток если есть текст задачи */}
-                {task.youtube_url && task.youtube_title && parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
-                  <YouTubePreview
-                    title={task.youtube_title}
-                    duration={task.youtube_duration}
-                    url={task.youtube_url}
-                    badge={true}
-                  />
-                )}
               </div>
-              
-              {/* YouTube Preview - компактная карточка если НЕТ текста (только ссылка) */}
-              {task.youtube_url && task.youtube_title && !parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
-                <YouTubePreview
-                  title={task.youtube_title}
-                  duration={task.youtube_duration}
-                  thumbnail={task.youtube_thumbnail}
-                  url={task.youtube_url}
-                  compact={true}
-                />
-              )}
             </div>
             
             {/* Кнопка удаления (всегда видна) */}
