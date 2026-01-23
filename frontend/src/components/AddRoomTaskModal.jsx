@@ -423,19 +423,22 @@ export const AddRoomTaskModal = ({
                 </p>
               </div>
 
-              {/* Описание */}
+              {/* Описание с поддержкой видео */}
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2 flex items-center gap-1.5">
                   <AlignLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   Описание
                 </label>
-                <textarea
+                <TaskInputWithVideoDark
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Подробное описание задачи (опционально)..."
-                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-800 border border-gray-700 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none placeholder-gray-500 text-white text-sm sm:text-base"
-                  rows="3"
+                  onChange={setDescription}
+                  videoData={videoData}
+                  onVideoDetected={handleVideoDetected}
+                  onVideoRemove={handleVideoRemove}
+                  isLoadingVideo={isLoadingVideo}
                   disabled={saving}
+                  placeholder="Подробное описание задачи (опционально). Вставьте ссылку на YouTube или VK видео..."
+                  rows={3}
                   maxLength={500}
                 />
                 <p className="text-[10px] sm:text-xs text-gray-500 mt-1 text-right">
