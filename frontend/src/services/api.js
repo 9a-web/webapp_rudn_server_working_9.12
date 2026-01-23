@@ -141,6 +141,20 @@ export const scheduleAPI = {
       return null;
     }
   },
+  
+  /**
+   * Получить информацию о VK видео
+   * @param {string} url - URL VK видео
+   */
+  getVKVideoInfo: async (url) => {
+    try {
+      const response = await api.get('/vkvideo/info', { params: { url } });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching VK Video info:', error);
+      return null;
+    }
+  },
 };
 
 /**
