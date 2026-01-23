@@ -314,7 +314,7 @@ export const AddTaskModal = ({
     setPriority('medium');
     setDeadline('');
     setSubject('');
-    setYoutubeData(null);
+    setVideoData(null);
     setDragY(0);
     onClose();
   };
