@@ -1455,4 +1455,276 @@ cd /app/frontend && yarn install && sudo supervisorctl restart frontend
 
 ---
 
+## 8. VK Music интеграция
+
+### 8.1 Архитектура
+
+**Компоненты:**
+- `vk_auth_service.py` - авторизация VK (логин/пароль)
+- `music_service.py` - API для работы с музыкой
+- `cover_service.py` - получение обложек треков
+
+**Библиотеки:**
+- `vkpymusic` - VK Music API
+- `vkaudiotoken` - получение аудио токенов
+- `yt-dlp` - резервное скачивание
+
+### 8.2 Авторизация
+
+```python
+# POST /api/music/auth/{telegram_id}
+# Body: {"login": "...", "password": "..."}
+# Response: {"success": true, "audio_count": 150}
+
+# Токен сохраняется в коллекции user_vk_tokens
+{
+    "telegram_id": int,
+    "vk_user_id": int,
+    "vk_token": str,
+    "user_agent": str,
+    "audio_count": int,
+    "created_at": datetime,
+    "updated_at": datetime
+}
+```
+
+### 8.3 API Endpoints
+
+```
+GET    /api/music/search?q={query}        - поиск треков
+GET    /api/music/stream/{track_id}       - стрим трека
+GET    /api/music/my                      - мои аудио (Kate Mobile)
+GET    /api/music/my-vk/{telegram_id}     - мои аудио (персональный токен)
+GET    /api/music/popular                 - популярные треки
+GET    /api/music/playlists               - плейлисты
+GET    /api/music/playlist/{owner_id}/{id} - конкретный плейлист
+GET    /api/music/artist/{name}           - треки исполнителя
+GET    /api/music/favorites/{telegram_id} - избранное
+POST   /api/music/favorites/{telegram_id} - добавить в избранное
+DELETE /api/music/favorites/{telegram_id}/{track_id} - удалить из избранного
+```
+
+### 8.4 Frontend компоненты
+
+```
+components/music/
+├── MusicSection.jsx       # Главный компонент
+├── MusicSearch.jsx        # Поиск треков
+├── TrackCard.jsx          # Карточка трека
+├── TrackCover.jsx         # Обложка трека
+├── TrackList.jsx          # Список треков
+├── ArtistCard.jsx         # Карточка исполнителя
+├── PlaylistCard.jsx       # Карточка плейлиста
+├── MiniPlayer.jsx         # Мини-плеер (снизу)
+├── FullscreenPlayer.jsx   # Полноэкранный плеер
+├── VKAuthModal.jsx        # Модалка авторизации VK
+├── PlayerContext.jsx      # Контекст плеера (state)
+└── index.js               # Экспорты
+```
+
+---
+
+## 9. Система друзей
+
+### 9.1 Функциональность
+
+- Отправка запросов в друзья
+- Принятие/отклонение запросов
+- Удаление из друзей
+- Блокировка пользователей
+- Поиск друзей
+- Взаимные друзья
+- Избранные друзья
+- QR-коды для добавления
+- Просмотр расписания друзей (с учётом приватности)
+
+### 9.2 MongoDB коллекции
+
+**friends:**
+```python
+{
+    "user1_telegram_id": int,
+    "user2_telegram_id": int,
+    "is_favorite_by_user1": bool,
+    "is_favorite_by_user2": bool,
+    "created_at": datetime
+}
+```
+
+**friend_requests:**
+```python
+{
+    "id": UUID,
+    "from_telegram_id": int,
+    "to_telegram_id": int,
+    "status": str,  # "pending", "accepted", "rejected", "cancelled"
+    "created_at": datetime,
+    "responded_at": datetime?
+}
+```
+
+**user_blocks:**
+```python
+{
+    "blocker_telegram_id": int,
+    "blocked_telegram_id": int,
+    "created_at": datetime
+}
+```
+
+### 9.3 API Endpoints
+
+```
+POST   /api/friends/request/{target_id}   - отправить запрос
+POST   /api/friends/accept/{request_id}   - принять
+POST   /api/friends/reject/{request_id}   - отклонить
+POST   /api/friends/cancel/{request_id}   - отменить
+DELETE /api/friends/{friend_id}           - удалить
+POST   /api/friends/block/{target_id}     - заблокировать
+DELETE /api/friends/block/{target_id}     - разблокировать
+POST   /api/friends/{friend_id}/favorite  - избранное
+GET    /api/friends/search?q={query}      - поиск
+GET    /api/friends/{telegram_id}         - список друзей
+GET    /api/friends/{telegram_id}/requests - запросы
+GET    /api/friends/mutual/{id1}/{id2}    - взаимные
+GET    /api/friends/{telegram_id}/blocked - заблокированные
+POST   /api/friends/process-invite        - обработка ссылки
+```
+
+### 9.4 Frontend компоненты
+
+```
+components/
+├── FriendsSection.jsx      # Секция друзей
+├── FriendCard.jsx          # Карточка друга
+├── FriendProfileModal.jsx  # Профиль друга
+├── FriendSearchModal.jsx   # Поиск друзей
+├── SelectFriendsModal.jsx  # Выбор друзей (для приглашений)
+└── PrivacySettingsModal.jsx # Настройки приватности
+```
+
+---
+
+## 10. In-App уведомления
+
+### 10.1 Типы уведомлений
+
+- `friend_request` - запрос в друзья
+- `friend_accepted` - запрос принят
+- `room_invite` - приглашение в комнату
+- `task_assigned` - назначена задача
+- `task_completed` - задача выполнена
+- `achievement` - новое достижение
+- `system` - системные
+
+### 10.2 MongoDB коллекция
+
+**in_app_notifications:**
+```python
+{
+    "id": UUID,
+    "telegram_id": int,            # получатель
+    "type": str,                   # тип уведомления
+    "title": str,
+    "message": str,
+    "data": dict,                  # дополнительные данные
+    "action_type": str?,           # тип действия
+    "action_target_id": str?,      # ID цели действия
+    "is_read": bool,
+    "created_at": datetime,
+    "read_at": datetime?
+}
+```
+
+### 10.3 API Endpoints
+
+```
+GET    /api/notifications/{telegram_id}           - список
+GET    /api/notifications/{telegram_id}/unread-count - количество непрочитанных
+PUT    /api/notifications/{notification_id}/read  - пометить прочитанным
+PUT    /api/notifications/{telegram_id}/read-all  - прочитать все
+DELETE /api/notifications/{notification_id}       - удалить
+PUT    /api/notifications/{notification_id}/action - выполнить действие
+GET    /api/notifications/{telegram_id}/settings  - настройки
+PUT    /api/notifications/{telegram_id}/settings  - обновить настройки
+```
+
+### 10.4 Frontend компоненты
+
+```
+components/
+├── NotificationsPanel.jsx       # Панель уведомлений
+├── NotificationQueue.jsx        # Очередь всплывающих
+└── notificationsAPI.js          # API клиент (services/)
+```
+
+---
+
+## 11. MongoDB коллекции (полный список - 30)
+
+### Пользователи (5)
+| Коллекция | Описание |
+|-----------|----------|
+| `user_settings` | Настройки и группа пользователя |
+| `user_stats` | Статистика для достижений |
+| `user_achievements` | Полученные достижения |
+| `user_vk_tokens` | VK токены для музыки |
+| `user_blocks` | Заблокированные пользователи |
+
+### Задачи (4)
+| Коллекция | Описание |
+|-----------|----------|
+| `tasks` | Личные задачи |
+| `group_tasks` | Групповые задачи |
+| `group_task_comments` | Комментарии к групповым |
+| `group_task_invites` | Приглашения в задачи |
+
+### Комнаты (2)
+| Коллекция | Описание |
+|-----------|----------|
+| `rooms` | Комнаты (участники встроены) |
+| `room_activities` | История активности |
+
+### Журнал посещений (7)
+| Коллекция | Описание |
+|-----------|----------|
+| `attendance_journals` / `journals` | Журналы |
+| `journal_students` | Студенты |
+| `journal_subjects` | Предметы |
+| `journal_sessions` | Занятия |
+| `attendance_records` | Записи посещаемости |
+| `journal_pending_members` | Ожидающие участники |
+
+### Друзья (2)
+| Коллекция | Описание |
+|-----------|----------|
+| `friends` | Связи друзей |
+| `friend_requests` | Запросы в друзья |
+
+### Уведомления (4)
+| Коллекция | Описание |
+|-----------|----------|
+| `scheduled_notifications` | Запланированные (V2) |
+| `notification_history` | История отправок |
+| `sent_notifications` | Отправленные |
+| `in_app_notifications` | Внутренние уведомления |
+
+### Реферальная система (2)
+| Коллекция | Описание |
+|-----------|----------|
+| `referral_connections` | Связи рефералов |
+| `referral_events` | События переходов |
+
+### Кэш и прочее (4)
+| Коллекция | Описание |
+|-----------|----------|
+| `schedule_cache` | Кэш расписаний |
+| `cover_cache` | Кэш обложек треков |
+| `music_favorites` | Избранные треки |
+| `status_checks` | Проверки статуса |
+
+---
+
 **Конец подробной технической документации**
+
+**Последнее обновление:** 2025-07-16
