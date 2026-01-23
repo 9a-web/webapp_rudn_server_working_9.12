@@ -518,6 +518,11 @@ class TaskResponse(BaseModel):
     youtube_duration: Optional[str] = None
     youtube_thumbnail: Optional[str] = None
     youtube_url: Optional[str] = None
+    # VK Video метаданные
+    vk_video_title: Optional[str] = None
+    vk_video_duration: Optional[str] = None
+    vk_video_thumbnail: Optional[str] = None
+    vk_video_url: Optional[str] = None
 
 
 class YouTubeInfoResponse(BaseModel):
