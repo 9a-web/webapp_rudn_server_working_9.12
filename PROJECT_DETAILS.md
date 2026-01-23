@@ -30,24 +30,30 @@
 ### 1.2 Технологический стек
 
 #### Backend
-- **Framework:** FastAPI 0.104+
+- **Framework:** FastAPI 0.110.1
 - **Language:** Python 3.10+
-- **Database:** MongoDB (pymongo)
-- **Async:** asyncio, httpx
-- **Scheduler:** APScheduler
-- **Telegram:** python-telegram-bot
-- **Validation:** Pydantic v2
+- **Database:** MongoDB (pymongo 4.5.0)
+- **Async:** asyncio, httpx 0.24+, aiohttp 3.9+
+- **Scheduler:** APScheduler 3.10.4
+- **Telegram:** python-telegram-bot 20.7+
+- **Validation:** Pydantic v2.6+
 - **HTTP Client:** httpx (async)
+- **VK Music:** vkpymusic, vkaudiotoken
+- **Media:** yt-dlp, Pillow
 
 #### Frontend
-- **Framework:** React 18
-- **Bundler:** Vite
-- **Styling:** TailwindCSS 3
-- **Animation:** Framer Motion
-- **i18n:** react-i18next
-- **State:** React Hooks (useState, useEffect, useContext)
-- **HTTP Client:** axios
-- **Telegram:** @twa-dev/sdk
+- **Framework:** React 19.0.0
+- **Bundler:** Vite 7.2.2
+- **Styling:** TailwindCSS 3.4.17
+- **Animation:** Framer Motion 12.23.24
+- **i18n:** i18next 25.6.0, react-i18next 16.2.0
+- **State:** React Hooks + Context API
+- **HTTP Client:** axios 1.12.2
+- **Telegram:** @twa-dev/sdk 8.0.2
+- **Charts:** recharts 3.4.1
+- **QR Codes:** qrcode.react 4.2.0
+- **Confetti:** canvas-confetti 1.9.4
+- **VK Icons:** @vkontakte/icons 3.33.0
 
 #### Infrastructure
 - **Container:** Docker/Kubernetes
