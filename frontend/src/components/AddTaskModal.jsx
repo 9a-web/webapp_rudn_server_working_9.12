@@ -198,31 +198,32 @@ export const AddTaskModal = ({
     }
   }, [isOpen, quickTemplate]);
   
-  // Обработка обнаружения YouTube ссылки
-  const handleYouTubeDetected = useCallback(async (url) => {
-    if (isLoadingYoutube || youtubeData) return;
+  // Обработка обнаружения видео ссылки (YouTube или VK)
+  const handleVideoDetected = useCallback(async (url) => {
+    if (isLoadingVideo || videoData) return;
     
-    setIsLoadingYoutube(true);
+    setIsLoadingVideo(true);
     try {
       // Получаем информацию о видео
-      const response = await scheduleAPI.getYouTubeInfo(url);
+      const response = await scheduleAPI.getVideoInfo(url);
       if (response) {
-        setYoutubeData({
+        setVideoData({
           url: response.url || url,
           title: response.title,
           duration: response.duration,
           thumbnail: response.thumbnail,
-          video_id: response.video_id
+          video_id: response.video_id,
+          type: response.type || 'youtube' // 'youtube' или 'vk'
         });
         hapticFeedback && hapticFeedback('success');
       }
     } catch (error) {
-      console.error('Error fetching YouTube info:', error);
+      console.error('Error fetching video info:', error);
       // Если не удалось получить инфо, оставляем как есть
     } finally {
-      setIsLoadingYoutube(false);
+      setIsLoadingVideo(false);
     }
-  }, [isLoadingYoutube, youtubeData, hapticFeedback]);
+  }, [isLoadingVideo, videoData, hapticFeedback]);
   
   // Удаление YouTube данных
   const handleYouTubeRemove = useCallback(() => {
