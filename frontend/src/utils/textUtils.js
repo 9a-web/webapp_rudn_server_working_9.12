@@ -233,8 +233,9 @@ export const splitTextByVideoUrl = (text) => {
 export const splitTextByAllVideoUrls = (text) => {
   if (!text) return [];
   
-  // Комбинированное regex для поиска всех видео ссылок
-  const combinedRegex = /(?:https?:\/\/)?(?:www\.)?(?:(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:\S*)?|(?:vk\.com\/(?:video|clip|video\?z=video)|vkvideo\.ru\/video)(-?\d+_\d+)(?:\S*)?)/gi;
+  // Комбинированное regex для поиска всех видео ссылок (YouTube и VK)
+  // VK regex покрывает: video-123_456, clip-123_456, ?z=video-123_456 из любого пути (wall, videos, club, etc.)
+  const combinedRegex = /(?:https?:\/\/)?(?:www\.)?(?:(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:\S*)?|(?:vk\.com\/(?:video-?\d+_\d+|clip-?\d+_\d+|[^\s]*[?&]z=video-?\d+_\d+)|vkvideo\.ru\/video-?\d+_\d+)(?:[^\s]*)?)/gi;
   
   const segments = [];
   let lastIndex = 0;
