@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { tasksAPI } from '../services/api';
 import { YouTubePreview } from './YouTubePreview';
-import { parseTaskText, splitTextByYouTubeUrl } from '../utils/textUtils';
+import { parseTaskText, splitTextByVideoUrl } from '../utils/textUtils';
 
-// Компонент inline YouTube badge (маленький)
-const InlineYouTubeBadge = ({ title, duration, url }) => {
+// Компонент inline video badge (YouTube или VK)
+const InlineVideoBadge = ({ title, duration, url, type = 'youtube' }) => {
   const handleClick = (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -22,23 +22,29 @@ const InlineYouTubeBadge = ({ title, duration, url }) => {
     return text.slice(0, maxLength).trim() + '...';
   };
   
+  // Разные цвета для YouTube (красный) и VK (синий)
+  const bgColor = type === 'vk' 
+    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+    : 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700';
+  const secondaryColor = type === 'vk' ? 'text-blue-200' : 'text-red-200';
+  
   return (
     <button
       onClick={handleClick}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded text-[11px] font-medium transition-all shadow-sm hover:shadow align-middle mx-0.5"
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r ${bgColor} text-white rounded text-[11px] font-medium transition-all shadow-sm hover:shadow align-middle mx-0.5`}
       title={title}
     >
       <Play className="w-2.5 h-2.5 flex-shrink-0 fill-white" />
       <span className="truncate max-w-[150px]">{truncateTitle(title)}</span>
       {duration && (
-        <span className="flex-shrink-0 text-red-200 text-[9px]">{duration}</span>
+        <span className={`flex-shrink-0 ${secondaryColor} text-[9px]`}>{duration}</span>
       )}
     </button>
   );
 };
 
-// Компонент для inline отображения текста с YouTube badge на месте ссылки
-const TextWithYouTubeBadge = ({ 
+// Компонент для inline отображения текста с video badge на месте ссылки
+const TextWithVideoBadge = ({ 
   text, 
   originalText, // Оригинальный текст с ссылкой (task.text)
   youtubeUrl, 
