@@ -92,7 +92,7 @@ const TaskInputWithVideo = ({
           disabled={disabled}
           maxLength={500}
         />
-        {isLoadingYoutube && (
+        {isLoadingVideo && (
           <div className="absolute right-3 top-3 flex items-center gap-1 text-xs text-gray-400">
             <Loader2 className="w-3 h-3 animate-spin" />
             <span>Загрузка видео...</span>
