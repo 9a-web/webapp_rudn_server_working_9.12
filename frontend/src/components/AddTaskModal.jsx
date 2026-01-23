@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Plus, Calendar, Flag, Tag, BookOpen, ChevronDown, Play, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
-import { extractYouTubeUrl, splitTextByYouTubeUrl } from '../utils/textUtils';
+import { extractVideoUrl, splitTextByVideoUrl } from '../utils/textUtils';
 import { scheduleAPI } from '../services/api';
 
-// Inline YouTube badge для поля ввода
-const InlineYouTubeBadge = ({ title, duration, url, onRemove }) => {
+// Inline Video badge для поля ввода (YouTube или VK)
+const InlineVideoBadge = ({ title, duration, url, type = 'youtube', onRemove }) => {
   const handleClick = (e) => {
     e.stopPropagation();
     if (url) {
@@ -20,19 +20,26 @@ const InlineYouTubeBadge = ({ title, duration, url, onRemove }) => {
     return text.slice(0, maxLength).trim() + '...';
   };
   
+  // Разные цвета для YouTube (красный) и VK (синий)
+  const bgColor = type === 'vk' 
+    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+    : 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700';
+  const secondaryColor = type === 'vk' ? 'text-blue-200' : 'text-red-200';
+  const hoverBg = type === 'vk' ? 'hover:bg-blue-700' : 'hover:bg-red-700';
+  
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded text-[11px] font-medium align-middle mx-0.5 group">
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r ${bgColor} text-white rounded text-[11px] font-medium align-middle mx-0.5 group`}>
       <Play className="w-2.5 h-2.5 flex-shrink-0 fill-white cursor-pointer" onClick={handleClick} />
       <span className="truncate max-w-[150px] cursor-pointer" onClick={handleClick} title={title}>
         {truncateTitle(title)}
       </span>
       {duration && (
-        <span className="flex-shrink-0 text-red-200 text-[9px]">{duration}</span>
+        <span className={`flex-shrink-0 ${secondaryColor} text-[9px]`}>{duration}</span>
       )}
       {onRemove && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="ml-0.5 w-3 h-3 flex items-center justify-center hover:bg-red-700 rounded-full transition-colors"
+          className={`ml-0.5 w-3 h-3 flex items-center justify-center ${hoverBg} rounded-full transition-colors`}
           title="Удалить видео"
         >
           <X className="w-2 h-2" />
@@ -42,8 +49,8 @@ const InlineYouTubeBadge = ({ title, duration, url, onRemove }) => {
   );
 };
 
-// Компонент поля ввода с inline YouTube badge
-const TaskInputWithYouTube = ({ 
+// Компонент поля ввода с inline video badge (YouTube или VK)
+const TaskInputWithVideo = ({ 
   value, 
   onChange, 
   youtubeData, 
