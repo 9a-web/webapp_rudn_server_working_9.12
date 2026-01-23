@@ -53,10 +53,10 @@ const InlineVideoBadge = ({ title, duration, url, type = 'youtube', onRemove }) 
 const TaskInputWithVideo = ({ 
   value, 
   onChange, 
-  youtubeData, 
-  onYouTubeDetected,
-  onYouTubeRemove,
-  isLoadingYoutube,
+  videoData, 
+  onVideoDetected,
+  onVideoRemove,
+  isLoadingVideo,
   disabled, 
   placeholder 
 }) => {
