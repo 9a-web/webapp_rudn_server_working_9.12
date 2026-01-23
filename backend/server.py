@@ -1254,6 +1254,73 @@ async def get_youtube_info(url: str):
         raise HTTPException(status_code=500, detail=f"Не удалось получить информацию о видео: {str(e)}")
 
 
+@api_router.get("/vkvideo/info", response_model=VKVideoInfoResponse)
+async def get_vk_video_info(url: str):
+    """
+    Получить информацию о VK видео (название, длительность, превью)
+    """
+    try:
+        # Проверяем кэш
+        video_id = extract_vk_video_id(url)
+        if not video_id:
+            raise HTTPException(status_code=400, detail="Некорректная VK Video ссылка")
+        
+        if video_id in vk_video_cache:
+            logger.info(f"🎬 VK Video info from cache: {video_id}")
+            return vk_video_cache[video_id]
+        
+        logger.info(f"🎬 Fetching VK Video info for: {url}")
+        
+        # Используем yt-dlp для получения информации (поддерживает VK)
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if not info:
+            raise HTTPException(status_code=404, detail="Видео не найдено")
+        
+        duration_seconds = info.get('duration', 0) or 0
+        
+        # Пытаемся получить превью
+        thumbnail = info.get('thumbnail')
+        if not thumbnail:
+            thumbnails = info.get('thumbnails', [])
+            if thumbnails:
+                thumbnail = thumbnails[-1].get('url', '')
+        
+        result = VKVideoInfoResponse(
+            url=url,
+            video_id=video_id,
+            title=info.get('title', 'Без названия'),
+            duration=format_duration(duration_seconds),
+            duration_seconds=duration_seconds,
+            thumbnail=thumbnail or '',
+            channel=info.get('channel', info.get('uploader', None))
+        )
+        
+        # Сохраняем в кэш
+        vk_video_cache[video_id] = result
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о VK видео: {e}")
+        raise HTTPException(status_code=500, detail=f"Не удалось получить информацию о видео: {str(e)}")
+
+
 async def enrich_task_with_youtube(task_dict: dict) -> dict:
     """Обогащает задачу информацией о YouTube видео, если в тексте есть ссылка"""
     text = task_dict.get('text', '')
