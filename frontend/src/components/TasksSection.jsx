@@ -26,17 +26,28 @@ import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { YouTubePreview } from './YouTubePreview';
 
 import { getWeekNumberForDate } from '../utils/dateUtils';
-import { parseTaskText, splitTextByYouTubeUrl } from '../utils/textUtils';
+import { parseTaskText, splitTextByVideoUrl } from '../utils/textUtils';
 
-// Компонент для отображения текста задачи с inline YouTube badge
+// Компонент для отображения текста задачи с inline video badge (YouTube или VK)
 const TaskTextWithBadge = ({ task, completed, onDoubleClick, hapticFeedback }) => {
-  const { youtube_url, youtube_title, youtube_duration, text } = task;
+  const { youtube_url, youtube_title, youtube_duration, vk_video_url, vk_video_title, vk_video_duration, text } = task;
   
-  // Функция для открытия YouTube
+  // Определяем тип видео
+  const hasYouTube = youtube_url && youtube_title;
+  const hasVKVideo = vk_video_url && vk_video_title;
+  const hasVideo = hasYouTube || hasVKVideo;
+  
+  // Данные видео
+  const videoUrl = hasYouTube ? youtube_url : vk_video_url;
+  const videoTitle = hasYouTube ? youtube_title : vk_video_title;
+  const videoDuration = hasYouTube ? youtube_duration : vk_video_duration;
+  const videoType = hasYouTube ? 'youtube' : 'vk';
+  
+  // Функция для открытия видео
   const handleBadgeClick = (e) => {
     e.stopPropagation();
-    if (youtube_url) {
-      window.open(youtube_url, '_blank', 'noopener,noreferrer');
+    if (videoUrl) {
+      window.open(videoUrl, '_blank', 'noopener,noreferrer');
     }
   };
   
@@ -47,23 +58,30 @@ const TaskTextWithBadge = ({ task, completed, onDoubleClick, hapticFeedback }) =
     return title.slice(0, maxLength).trim() + '...';
   };
   
-  // Inline badge компонент
-  const InlineBadge = () => (
-    <button
-      onClick={handleBadgeClick}
-      className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded text-[9px] font-medium transition-all align-middle mx-0.5"
-      title={youtube_title}
-    >
-      <Play className="w-2 h-2 flex-shrink-0 fill-white" />
-      <span className="truncate max-w-[100px]">{truncateTitle(youtube_title)}</span>
-      {youtube_duration && (
-        <span className="flex-shrink-0 text-red-200 text-[8px] ml-0.5">{youtube_duration}</span>
-      )}
-    </button>
-  );
+  // Inline badge компонент (разные цвета для YouTube и VK)
+  const InlineBadge = () => {
+    const bgColor = videoType === 'vk' 
+      ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+      : 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700';
+    const secondaryColor = videoType === 'vk' ? 'text-blue-200' : 'text-red-200';
+    
+    return (
+      <button
+        onClick={handleBadgeClick}
+        className={`inline-flex items-center gap-0.5 px-1 py-0.5 bg-gradient-to-r ${bgColor} text-white rounded text-[9px] font-medium transition-all align-middle mx-0.5`}
+        title={videoTitle}
+      >
+        <Play className="w-2 h-2 flex-shrink-0 fill-white" />
+        <span className="truncate max-w-[100px]">{truncateTitle(videoTitle)}</span>
+        {videoDuration && (
+          <span className={`flex-shrink-0 ${secondaryColor} text-[8px] ml-0.5`}>{videoDuration}</span>
+        )}
+      </button>
+    );
+  };
   
-  // Если нет YouTube данных - просто текст
-  if (!youtube_url || !youtube_title) {
+  // Если нет видео данных - просто текст
+  if (!hasVideo) {
     return (
       <span 
         onDoubleClick={onDoubleClick}
@@ -82,7 +100,7 @@ const TaskTextWithBadge = ({ task, completed, onDoubleClick, hapticFeedback }) =
   }
   
   // Разбиваем текст на части
-  const { before, url, after } = splitTextByYouTubeUrl(text || '');
+  const { before, url, after } = splitTextByVideoUrl(text || '');
   
   return (
     <span 
@@ -104,9 +122,9 @@ const TaskTextWithBadge = ({ task, completed, onDoubleClick, hapticFeedback }) =
           {after}
         </>
       ) : (
-        // Ссылки в тексте нет, но YouTube данные есть - показываем текст + badge
+        // Ссылки в тексте нет, но видео данные есть - показываем текст + badge
         <>
-          {parseTaskText(text, { youtube_url, youtube_title }).displayText}
+          {parseTaskText(text, { youtube_url, youtube_title, vk_video_url, vk_video_title }).displayText}
           {' '}
           <InlineBadge />
         </>
