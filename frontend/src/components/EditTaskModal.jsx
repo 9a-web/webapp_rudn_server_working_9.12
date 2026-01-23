@@ -386,9 +386,10 @@ export const EditTaskModal = ({
                 <label className="block text-xs sm:text-sm font-medium text-[#1C1C1E] mb-2">
                   Описание задачи
                 </label>
-                {/* Поле с inline YouTube badge */}
+                {/* Поле с inline YouTube badge на месте ссылки */}
                 <TextWithYouTubeBadge
                   text={taskText}
+                  originalText={task.text}
                   youtubeUrl={task.youtube_url}
                   youtubeTitle={task.youtube_title}
                   youtubeDuration={task.youtube_duration}
