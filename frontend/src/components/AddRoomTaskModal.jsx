@@ -294,6 +294,7 @@ export const AddRoomTaskModal = ({
     setDragY(0);
     setAssignToAll(true);
     setSelectedParticipants([]);
+    setVideoData(null);
   };
 
   const handleClose = () => {
