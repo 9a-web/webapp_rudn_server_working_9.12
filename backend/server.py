@@ -1650,6 +1650,26 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         if task_update.order is not None:
             update_data["order"] = task_update.order
         
+        # YouTube данные
+        if task_update.youtube_url is not None:
+            update_data["youtube_url"] = task_update.youtube_url
+        if task_update.youtube_title is not None:
+            update_data["youtube_title"] = task_update.youtube_title
+        if task_update.youtube_duration is not None:
+            update_data["youtube_duration"] = task_update.youtube_duration
+        if task_update.youtube_thumbnail is not None:
+            update_data["youtube_thumbnail"] = task_update.youtube_thumbnail
+        
+        # VK Video данные
+        if task_update.vk_video_url is not None:
+            update_data["vk_video_url"] = task_update.vk_video_url
+        if task_update.vk_video_title is not None:
+            update_data["vk_video_title"] = task_update.vk_video_title
+        if task_update.vk_video_duration is not None:
+            update_data["vk_video_duration"] = task_update.vk_video_duration
+        if task_update.vk_video_thumbnail is not None:
+            update_data["vk_video_thumbnail"] = task_update.vk_video_thumbnail
+        
         update_data["updated_at"] = datetime.utcnow()
         
         await db.tasks.update_one(
