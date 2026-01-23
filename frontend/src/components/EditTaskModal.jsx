@@ -4,11 +4,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { tasksAPI } from '../services/api';
 import { YouTubePreview } from './YouTubePreview';
-import { parseTaskText, extractYouTubeUrl } from '../utils/textUtils';
+import { parseTaskText, splitTextByYouTubeUrl } from '../utils/textUtils';
 
-// Компонент для inline отображения текста с YouTube badge
+// Компонент inline YouTube badge (маленький)
+const InlineYouTubeBadge = ({ title, duration, url }) => {
+  const handleClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+  
+  const truncateTitle = (text, maxLength = 25) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength).trim() + '...';
+  };
+  
+  return (
+    <button
+      onClick={handleClick}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded text-[11px] font-medium transition-all shadow-sm hover:shadow align-middle mx-0.5"
+      title={title}
+    >
+      <Play className="w-2.5 h-2.5 flex-shrink-0 fill-white" />
+      <span className="truncate max-w-[150px]">{truncateTitle(title)}</span>
+      {duration && (
+        <span className="flex-shrink-0 text-red-200 text-[9px]">{duration}</span>
+      )}
+    </button>
+  );
+};
+
+// Компонент для inline отображения текста с YouTube badge на месте ссылки
 const TextWithYouTubeBadge = ({ 
   text, 
+  originalText, // Оригинальный текст с ссылкой (task.text)
   youtubeUrl, 
   youtubeTitle, 
   youtubeDuration,
@@ -19,22 +51,7 @@ const TextWithYouTubeBadge = ({
   const textareaRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   
-  // Функция для открытия YouTube видео
-  const handleBadgeClick = (e) => {
-    e.stopPropagation();
-    if (youtubeUrl) {
-      window.open(youtubeUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-  
-  // Обрезаем название для badge
-  const truncateTitle = (title, maxLength = 30) => {
-    if (!title) return '';
-    if (title.length <= maxLength) return title;
-    return title.slice(0, maxLength).trim() + '...';
-  };
-  
-  // Если в фокусе - показываем обычный textarea
+  // Если в фокусе - показываем обычный textarea с чистым текстом (без ссылки)
   if (isFocused) {
     return (
       <textarea
@@ -52,58 +69,60 @@ const TextWithYouTubeBadge = ({
     );
   }
   
-  // Рендерим текст с badge вместо ссылки
-  const renderTextWithBadge = () => {
+  // Рендерим текст с badge на месте ссылки
+  const renderTextWithInlineBadge = () => {
+    // Если нет YouTube данных - просто показываем текст
     if (!youtubeUrl || !youtubeTitle) {
       return text || <span className="text-gray-400">{placeholder}</span>;
     }
     
-    // Если текст пустой - показываем только badge
-    if (!text || text.trim() === '') {
+    // Разбиваем оригинальный текст на части (до ссылки, ссылка, после ссылки)
+    const { before, url, after } = splitTextByYouTubeUrl(originalText || '');
+    
+    // Если ссылка не найдена в оригинальном тексте, показываем текст + badge
+    if (!url) {
+      if (!text || text.trim() === '') {
+        return (
+          <InlineYouTubeBadge 
+            title={youtubeTitle} 
+            duration={youtubeDuration} 
+            url={youtubeUrl} 
+          />
+        );
+      }
       return (
-        <button
-          onClick={handleBadgeClick}
-          className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow"
-          title={youtubeTitle}
-        >
-          <Play className="w-3 h-3 flex-shrink-0 fill-white" />
-          <span className="truncate max-w-[200px]">{truncateTitle(youtubeTitle)}</span>
-          {youtubeDuration && (
-            <span className="flex-shrink-0 text-red-200 text-[10px]">{youtubeDuration}</span>
-          )}
-          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60" />
-        </button>
+        <>
+          <span>{text}</span>
+          {' '}
+          <InlineYouTubeBadge 
+            title={youtubeTitle} 
+            duration={youtubeDuration} 
+            url={youtubeUrl} 
+          />
+        </>
       );
     }
     
-    // Текст есть - показываем текст + badge на новой строке
+    // Собираем текст с badge на месте ссылки
     return (
-      <div className="space-y-2">
-        <span>{text}</span>
-        <div>
-          <button
-            onClick={handleBadgeClick}
-            className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow"
-            title={youtubeTitle}
-          >
-            <Play className="w-3 h-3 flex-shrink-0 fill-white" />
-            <span className="truncate max-w-[200px]">{truncateTitle(youtubeTitle)}</span>
-            {youtubeDuration && (
-              <span className="flex-shrink-0 text-red-200 text-[10px]">{youtubeDuration}</span>
-            )}
-            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60" />
-          </button>
-        </div>
-      </div>
+      <>
+        {before}
+        <InlineYouTubeBadge 
+          title={youtubeTitle} 
+          duration={youtubeDuration} 
+          url={youtubeUrl} 
+        />
+        {after}
+      </>
     );
   };
   
   return (
     <div
       onClick={() => !disabled && setIsFocused(true)}
-      className="w-full min-h-[80px] px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl cursor-text text-[#1C1C1E] text-sm sm:text-base hover:border-gray-300 transition-colors"
+      className="w-full min-h-[80px] px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl cursor-text text-[#1C1C1E] text-sm sm:text-base hover:border-gray-300 transition-colors leading-relaxed"
     >
-      {renderTextWithBadge()}
+      {renderTextWithInlineBadge()}
     </div>
   );
 };
