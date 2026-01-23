@@ -1,10 +1,112 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Calendar, Flag, Tag, BookOpen, ListChecks, Plus, Check, Trash2 } from 'lucide-react';
+import { X, Edit2, Calendar, Flag, Tag, BookOpen, ListChecks, Plus, Check, Trash2, Play, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { tasksAPI } from '../services/api';
 import { YouTubePreview } from './YouTubePreview';
-import { parseTaskText } from '../utils/textUtils';
+import { parseTaskText, extractYouTubeUrl } from '../utils/textUtils';
+
+// Компонент для inline отображения текста с YouTube badge
+const TextWithYouTubeBadge = ({ 
+  text, 
+  youtubeUrl, 
+  youtubeTitle, 
+  youtubeDuration,
+  onChange, 
+  disabled,
+  placeholder 
+}) => {
+  const textareaRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  // Функция для открытия YouTube видео
+  const handleBadgeClick = (e) => {
+    e.stopPropagation();
+    if (youtubeUrl) {
+      window.open(youtubeUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+  
+  // Обрезаем название для badge
+  const truncateTitle = (title, maxLength = 30) => {
+    if (!title) return '';
+    if (title.length <= maxLength) return title;
+    return title.slice(0, maxLength).trim() + '...';
+  };
+  
+  // Если в фокусе - показываем обычный textarea
+  if (isFocused) {
+    return (
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setIsFocused(false)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none placeholder-gray-400 text-[#1C1C1E] text-sm sm:text-base"
+        rows="3"
+        autoFocus
+        disabled={disabled}
+        maxLength={500}
+      />
+    );
+  }
+  
+  // Рендерим текст с badge вместо ссылки
+  const renderTextWithBadge = () => {
+    if (!youtubeUrl || !youtubeTitle) {
+      return text || <span className="text-gray-400">{placeholder}</span>;
+    }
+    
+    // Если текст пустой - показываем только badge
+    if (!text || text.trim() === '') {
+      return (
+        <button
+          onClick={handleBadgeClick}
+          className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow"
+          title={youtubeTitle}
+        >
+          <Play className="w-3 h-3 flex-shrink-0 fill-white" />
+          <span className="truncate max-w-[200px]">{truncateTitle(youtubeTitle)}</span>
+          {youtubeDuration && (
+            <span className="flex-shrink-0 text-red-200 text-[10px]">{youtubeDuration}</span>
+          )}
+          <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60" />
+        </button>
+      );
+    }
+    
+    // Текст есть - показываем текст + badge на новой строке
+    return (
+      <div className="space-y-2">
+        <span>{text}</span>
+        <div>
+          <button
+            onClick={handleBadgeClick}
+            className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow"
+            title={youtubeTitle}
+          >
+            <Play className="w-3 h-3 flex-shrink-0 fill-white" />
+            <span className="truncate max-w-[200px]">{truncateTitle(youtubeTitle)}</span>
+            {youtubeDuration && (
+              <span className="flex-shrink-0 text-red-200 text-[10px]">{youtubeDuration}</span>
+            )}
+            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+  
+  return (
+    <div
+      onClick={() => !disabled && setIsFocused(true)}
+      className="w-full min-h-[80px] px-3 py-2.5 sm:px-4 sm:py-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl cursor-text text-[#1C1C1E] text-sm sm:text-base hover:border-gray-300 transition-colors"
+    >
+      {renderTextWithBadge()}
+    </div>
+  );
+};
 
 export const EditTaskModal = ({ 
   isOpen, 
