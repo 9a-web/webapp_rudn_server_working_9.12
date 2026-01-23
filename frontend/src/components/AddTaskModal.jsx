@@ -252,7 +252,7 @@ export const AddTaskModal = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!taskText.trim() && !youtubeData) return;
+    if (!taskText.trim() && !videoData) return;
     
     try {
       setSaving(true);
