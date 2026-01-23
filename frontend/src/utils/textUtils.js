@@ -9,7 +9,7 @@ const YOUTUBE_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?
 const VK_VIDEO_URL_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:vk\.com\/(?:video|clip|video\?z=video)|vkvideo\.ru\/video)(-?\d+_\d+)(?:\S*)?/gi;
 
 /**
- * Извлекает YouTube URL из текста
+ * Извлекает YouTube URL из текста (первый найденный)
  * @param {string} text - Текст для поиска
  * @returns {string|null} - YouTube URL или null
  */
@@ -21,7 +21,19 @@ export const extractYouTubeUrl = (text) => {
 };
 
 /**
- * Извлекает VK Video URL из текста
+ * Извлекает ВСЕ YouTube URLs из текста
+ * @param {string} text - Текст для поиска
+ * @returns {string[]} - Массив YouTube URLs
+ */
+export const extractAllYouTubeUrls = (text) => {
+  if (!text) return [];
+  const regex = new RegExp(YOUTUBE_URL_REGEX.source, 'gi');
+  const matches = text.match(regex);
+  return matches ? [...new Set(matches)] : []; // Убираем дубликаты
+};
+
+/**
+ * Извлекает VK Video URL из текста (первый найденный)
  * @param {string} text - Текст для поиска
  * @returns {string|null} - VK Video URL или null
  */
@@ -33,7 +45,19 @@ export const extractVKVideoUrl = (text) => {
 };
 
 /**
- * Извлекает любую видео ссылку (YouTube или VK) из текста
+ * Извлекает ВСЕ VK Video URLs из текста
+ * @param {string} text - Текст для поиска
+ * @returns {string[]} - Массив VK Video URLs
+ */
+export const extractAllVKVideoUrls = (text) => {
+  if (!text) return [];
+  const regex = new RegExp(VK_VIDEO_URL_REGEX.source, 'gi');
+  const matches = text.match(regex);
+  return matches ? [...new Set(matches)] : []; // Убираем дубликаты
+};
+
+/**
+ * Извлекает любую видео ссылку (YouTube или VK) из текста (первую найденную)
  * @param {string} text - Текст для поиска
  * @returns {object|null} - { url: string, type: 'youtube'|'vk' } или null
  */
@@ -51,6 +75,31 @@ export const extractVideoUrl = (text) => {
   }
   
   return null;
+};
+
+/**
+ * Извлекает ВСЕ видео ссылки из текста (YouTube и VK)
+ * @param {string} text - Текст для поиска
+ * @returns {Array<{url: string, type: 'youtube'|'vk'}>} - Массив объектов с url и type
+ */
+export const extractAllVideoUrls = (text) => {
+  if (!text) return [];
+  
+  const results = [];
+  
+  // Извлекаем все YouTube ссылки
+  const youtubeUrls = extractAllYouTubeUrls(text);
+  youtubeUrls.forEach(url => {
+    results.push({ url, type: 'youtube' });
+  });
+  
+  // Извлекаем все VK ссылки
+  const vkUrls = extractAllVKVideoUrls(text);
+  vkUrls.forEach(url => {
+    results.push({ url, type: 'vk' });
+  });
+  
+  return results;
 };
 
 /**
