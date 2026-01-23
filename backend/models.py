@@ -9,6 +9,17 @@ from enum import Enum
 import uuid
 
 
+# ============ Модели для видео данных ============
+
+class VideoData(BaseModel):
+    """Данные видео (YouTube или VK)"""
+    url: str
+    title: Optional[str] = None
+    duration: Optional[str] = None
+    thumbnail: Optional[str] = None
+    type: str = "youtube"  # "youtube" или "vk"
+
+
 # ============ Модели для парсера расписания ============
 
 class Faculty(BaseModel):
