@@ -1495,8 +1495,8 @@ async def get_user_tasks(telegram_id: int):
         # Добавляем статистику подзадач и YouTube информацию для каждой задачи
         result = []
         for task in tasks:
-            # Обогащаем задачу YouTube информацией
-            task = await enrich_task_with_youtube(task)
+            # Обогащаем задачу видео информацией (YouTube и VK)
+            task = await enrich_task_with_video(task)
             progress_info = calculate_subtasks_progress(task.get("subtasks", []))
             result.append(TaskResponse(**task, **progress_info))
         
