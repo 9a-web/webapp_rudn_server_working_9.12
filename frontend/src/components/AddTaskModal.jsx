@@ -225,12 +225,12 @@ export const AddTaskModal = ({
     }
   }, [isLoadingVideo, videoData, hapticFeedback]);
   
-  // Удаление YouTube данных
-  const handleYouTubeRemove = useCallback(() => {
-    // Убираем YouTube ссылку из текста
-    const { before, after } = splitTextByYouTubeUrl(taskText);
+  // Удаление видео данных
+  const handleVideoRemove = useCallback(() => {
+    // Убираем видео ссылку из текста
+    const { before, after } = splitTextByVideoUrl(taskText);
     setTaskText((before + after).trim());
-    setYoutubeData(null);
+    setVideoData(null);
     hapticFeedback && hapticFeedback('impact', 'light');
   }, [taskText, hapticFeedback]);
   
