@@ -279,14 +279,16 @@ export const EditTaskModal = ({
                   {taskText.length} / 500
                 </p>
                 
-                {/* YouTube Preview если есть ссылка в задаче */}
+                {/* YouTube Badge если есть ссылка в задаче */}
                 {task.youtube_url && task.youtube_title && (
-                  <YouTubePreview
-                    title={task.youtube_title}
-                    duration={task.youtube_duration}
-                    thumbnail={task.youtube_thumbnail}
-                    url={task.youtube_url}
-                  />
+                  <div className="mt-2">
+                    <YouTubePreview
+                      title={task.youtube_title}
+                      duration={task.youtube_duration}
+                      url={task.youtube_url}
+                      badge={true}
+                    />
+                  </div>
                 )}
               </div>
 
