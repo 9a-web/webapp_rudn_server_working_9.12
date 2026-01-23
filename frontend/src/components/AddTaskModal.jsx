@@ -177,7 +177,7 @@ export const AddTaskModal = ({
     if (isOpen) {
       // Сбрасываем дедлайн при открытии модального окна
       setDeadline('');
-      setYoutubeData(null);
+      setVideoData(null);
     }
   }, [isOpen]);
   
