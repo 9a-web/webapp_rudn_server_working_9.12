@@ -208,7 +208,7 @@ ACHIEVEMENTS = {
 "daily_activity" -> first_week (7 дней), perfectionist (все ачивки)
 ```
 
-#### telegram_bot.py (850 LOC)
+#### telegram_bot.py (1,204 LOC)
 
 **Telegram Bot функции:**
 
