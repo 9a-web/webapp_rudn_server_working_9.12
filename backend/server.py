@@ -1390,6 +1390,87 @@ async def enrich_task_with_youtube(task_dict: dict) -> dict:
     return task_dict
 
 
+async def enrich_task_with_vk_video(task_dict: dict) -> dict:
+    """Обогащает задачу информацией о VK видео, если в тексте есть ссылка"""
+    # Если данные уже переданы клиентом - не перезаписываем
+    if task_dict.get('vk_video_title') and task_dict.get('vk_video_url'):
+        return task_dict
+    
+    text = task_dict.get('text', '')
+    vk_video_url = find_vk_video_url_in_text(text)
+    
+    if not vk_video_url:
+        return task_dict
+    
+    video_id = extract_vk_video_id(vk_video_url)
+    if not video_id:
+        return task_dict
+    
+    try:
+        # Проверяем кэш
+        if video_id in vk_video_cache:
+            info = vk_video_cache[video_id]
+            task_dict['vk_video_title'] = info.title
+            task_dict['vk_video_duration'] = info.duration
+            task_dict['vk_video_thumbnail'] = info.thumbnail
+            task_dict['vk_video_url'] = vk_video_url
+            return task_dict
+        
+        # Если нет в кэше - запрашиваем
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(vk_video_url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if info:
+            duration_seconds = info.get('duration', 0) or 0
+            thumbnail = info.get('thumbnail')
+            if not thumbnail:
+                thumbnails = info.get('thumbnails', [])
+                if thumbnails:
+                    thumbnail = thumbnails[-1].get('url', '')
+            
+            result = VKVideoInfoResponse(
+                url=vk_video_url,
+                video_id=video_id,
+                title=info.get('title', 'Без названия'),
+                duration=format_duration(duration_seconds),
+                duration_seconds=duration_seconds,
+                thumbnail=thumbnail or '',
+                channel=info.get('channel', info.get('uploader', None))
+            )
+            
+            # Сохраняем в кэш
+            vk_video_cache[video_id] = result
+            
+            task_dict['vk_video_title'] = result.title
+            task_dict['vk_video_duration'] = result.duration
+            task_dict['vk_video_thumbnail'] = result.thumbnail
+            task_dict['vk_video_url'] = vk_video_url
+            
+    except Exception as e:
+        logger.warning(f"Не удалось получить VK Video info для задачи: {e}")
+    
+    return task_dict
+
+
+async def enrich_task_with_video(task_dict: dict) -> dict:
+    """Обогащает задачу информацией о видео (YouTube или VK)"""
+    task_dict = await enrich_task_with_youtube(task_dict)
+    task_dict = await enrich_task_with_vk_video(task_dict)
+    return task_dict
+
+
 # ============ Эндпоинты для списка дел ============
 
 @api_router.get("/tasks/{telegram_id}", response_model=List[TaskResponse])
