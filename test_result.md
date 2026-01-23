@@ -132,3 +132,53 @@ agent_communication:
 # - Test PUT /api/tasks/{task_id} with YouTube URL
 # - Test GET /api/tasks/{telegram_id} - задачи с YouTube должны содержать метаданные
 # - Test different YouTube URL formats: youtube.com/watch?v=, youtu.be/, youtube.com/shorts/
+
+## Latest Fix: VK Video URL Recognition (2025-07-16)
+
+### Problem
+VK video links in various formats were not being recognized and converted to badges in room tasks (командные задачи). 
+
+### Root Cause
+The regex patterns in frontend (`textUtils.js`) and backend (`server.py`) only supported basic VK video URL formats like:
+- `vk.com/video-123_456`
+- `vk.com/clip-123_456`
+- `vk.com/video?z=video-123_456`
+
+But did NOT support common formats like:
+- `vk.com/videos-12345?z=video-123_456` (from user's video list)
+- `vk.com/wall-123_456?z=video-789_012` (from wall posts)
+- `vk.com/video/@username?z=video-123_456` (with @username)
+- `vk.com/club123?z=video-456_789` (from group pages)
+- `vk.com/music?z=video-111_222` (from any path with z=video param)
+
+### Fix Applied
+Updated regex patterns in:
+1. **Frontend** (`/app/frontend/src/utils/textUtils.js`):
+   - `VK_VIDEO_URL_REGEX` - now matches all VK video URL formats
+   - `splitTextByAllVideoUrls()` - combined regex for YouTube + VK
+   - `splitTextByVKVideoUrl()` - single VK URL extraction
+
+2. **Backend** (`/app/backend/server.py`):
+   - `extract_vk_video_id()` - extracts video ID from any VK URL format
+   - `find_vk_video_url_in_text()` - finds first VK URL in text
+   - `find_all_vk_video_urls_in_text()` - finds all VK URLs in text
+
+### Test Commands for Backend
+```bash
+# Test VK video URL extraction from text
+curl -s "http://localhost:8001/api/vkvideo/info?url=https://vk.com/wall-123_456%3Fz%3Dvideo-789_012"
+
+# Test standard VK format
+curl -s "http://localhost:8001/api/vkvideo/info?url=https://vk.com/video-12345_67890"
+```
+
+### Supported VK Video URL Formats (After Fix)
+- `vk.com/video-123_456` - direct link
+- `vk.com/clip-123_456` - clips
+- `vkvideo.ru/video-123_456` - new VK Video domain
+- `vk.com/video?z=video-123_456` - modal window
+- `vk.com/videos-123?z=video-123_456` - from video list (/videos)
+- `vk.com/wall-123_456?z=video-789_012` - from wall (/wall)
+- `vk.com/video/@username?z=video-123_456` - with @username
+- `vk.com/club123?z=video-456_789` - from group
+- `vk.com/music?z=video-111_222` - any path with z=video param
