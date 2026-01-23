@@ -1168,6 +1168,20 @@ def find_vk_video_url_in_text(text: str) -> Optional[str]:
             return match.group(0)
     return None
 
+def find_all_vk_video_urls_in_text(text: str) -> List[str]:
+    """Находит ВСЕ VK Video ссылки в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',
+        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',
+        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',
+        r'https?://(?:www\.)?vk\.com/video\?z=video-?\d+_\d+[^\s]*',
+    ]
+    urls = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        urls.extend(matches)
+    return list(set(urls))  # Убираем дубликаты
+
 def format_duration(seconds: int) -> str:
     """Форматирует длительность в человекочитаемый формат"""
     if seconds < 0:
@@ -1192,6 +1206,20 @@ def find_youtube_url_in_text(text: str) -> Optional[str]:
         if match:
             return match.group(0)
     return None
+
+def find_all_youtube_urls_in_text(text: str) -> List[str]:
+    """Находит ВСЕ YouTube ссылки в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://youtu\.be/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/embed/[a-zA-Z0-9_-]{11}[^\s]*',
+    ]
+    urls = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        urls.extend(matches)
+    return list(set(urls))  # Убираем дубликаты
 
 
 @api_router.get("/youtube/info", response_model=YouTubeInfoResponse)
