@@ -3,6 +3,10 @@ import { Play, Clock, ExternalLink } from 'lucide-react';
 
 /**
  * Компонент для отображения превью YouTube видео в задаче
+ * Режимы: 
+ * - badge (новый) - маленький ярлык с названием
+ * - compact - компактная карточка 
+ * - full - полная карточка с превью
  */
 export const YouTubePreview = ({ 
   title, 
@@ -10,6 +14,7 @@ export const YouTubePreview = ({
   thumbnail, 
   url,
   compact = false, // Компактный режим для карточки задачи
+  badge = false,   // Режим ярлыка (badge) - самый компактный
   onClick 
 }) => {
   if (!title || !url) return null;
@@ -23,6 +28,42 @@ export const YouTubePreview = ({
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
+  
+  // Обрезаем название для ярлыка
+  const truncateTitle = (text, maxLength = 35) => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength).trim() + '...';
+  };
+  
+  // Режим ярлыка (badge) - самый компактный
+  if (badge) {
+    return (
+      <button
+        onClick={handleClick}
+        className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg text-[10px] font-medium transition-all shadow-sm hover:shadow group max-w-full"
+        title={title}
+      >
+        {/* YouTube иконка */}
+        <Play className="w-3 h-3 flex-shrink-0 fill-white" />
+        
+        {/* Название видео */}
+        <span className="truncate">
+          {truncateTitle(title)}
+        </span>
+        
+        {/* Длительность если есть */}
+        {duration && (
+          <span className="flex-shrink-0 text-red-200 text-[9px]">
+            {duration}
+          </span>
+        )}
+        
+        {/* Иконка внешней ссылки */}
+        <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+      </button>
+    );
+  }
   
   // Компактный режим для списка задач
   if (compact) {
