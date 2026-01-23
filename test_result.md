@@ -44,6 +44,18 @@ backend:
         agent: "testing"
         comment: "✅ FIXED & PASSED: Added missing skipped field handling to update_task function (line 1453 in server.py) and explicit skipped field to planner endpoint TaskResponse (line 2286). All tests passed: 1) GET /api/tasks/765963392 - returns tasks correctly, 2) Found task with origin='user', 3) PUT /api/tasks/{task_id} with {'skipped': true} - now correctly updates skipped field, 4) Verified skipped field persists in database, 5) GET /api/planner/765963392/2026-01-22 - returns events with skipped field. Task update API with skipped field now fully functional."
 
+  - task: "Multiple Video Links Support API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: Multiple Video Links Support API fully functional. Tested all 3 endpoints: 1) GET /api/tasks/765963392 - returns tasks with videos array containing objects with url, title, duration, thumbnail, type fields, 2) POST /api/tasks - successfully created task with text 'Посмотреть https://www.youtube.com/watch?v=dQw4w9WgXcQ и https://youtu.be/jNQXAC9IVRw' and received videos array with 2 YouTube video objects with complete metadata, 3) PUT /api/tasks/{task_id} - successfully updated task text with additional video link and videos array updated to 3 videos. All video objects contain proper structure: url, title, duration, thumbnail, type='youtube'. YouTube metadata extraction working perfectly for multiple links."
+
   - task: "VK OAuth Config API"
     implemented: true
     working: pending
