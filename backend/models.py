@@ -441,6 +441,16 @@ class TaskCreate(BaseModel):
     is_fixed: bool = False
     origin: str = "user"
     subtasks: List[str] = []  # Названия подзадач при создании
+    # YouTube данные
+    youtube_url: Optional[str] = None
+    youtube_title: Optional[str] = None
+    youtube_duration: Optional[str] = None
+    youtube_thumbnail: Optional[str] = None
+    # VK Video данные
+    vk_video_url: Optional[str] = None
+    vk_video_title: Optional[str] = None
+    vk_video_duration: Optional[str] = None
+    vk_video_thumbnail: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
