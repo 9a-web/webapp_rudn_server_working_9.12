@@ -108,14 +108,19 @@ from weather import get_weather_data
 from rudn_parser import get_faculties, get_filter_data, get_schedule
 from notifications import send_class_notification
 from cache import get_cached, set_cached
+from music_service import MusicService  # VK Music
+from vk_auth_service import VKAuthService  # VK авторизация
+from lk_parser import LKParser  # ЛК РУДН
+from cover_service import CoverService  # Обложки треков
 ```
 
 **Основные функции:**
 - `get_user_settings(telegram_id)` - получить настройки юзера
 - `update_last_activity(telegram_id)` - обновить last_activity
 - `get_or_create_user_stats(telegram_id)` - получить/создать статистику
+- `create_in_app_notification(...)` - создать внутреннее уведомление
 
-#### models.py (750+ LOC)
+#### models.py (1,959 LOC)
 
 **Все Pydantic модели:**
 
