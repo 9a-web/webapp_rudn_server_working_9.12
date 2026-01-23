@@ -375,22 +375,20 @@ const EditRoomTaskModal = ({ isOpen, onClose, task, onSave, roomParticipants = [
                 />
               </div>
 
-              {/* Описание */}
+              {/* Описание с video badge */}
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
                   Описание
                 </label>
-                <textarea
+                <EditInputWithVideo
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  originalText={task?.description}
+                  onChange={setDescription}
+                  videoData={videoData}
+                  disabled={isSaving}
                   placeholder="Добавьте описание..."
                   maxLength={500}
                   rows={3}
-                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 
-                           bg-gray-800 border border-gray-700 rounded-xl sm:rounded-2xl
-                           text-white placeholder-gray-500
-                           focus:outline-none focus:ring-2 focus:ring-blue-500
-                           text-sm sm:text-base resize-none touch-manipulation"
                 />
               </div>
 
