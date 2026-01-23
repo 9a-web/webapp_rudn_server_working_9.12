@@ -1870,7 +1870,7 @@ const TodayTaskItem = ({
                   return null;
                 })()}
                 
-                {/* Метки: категория, приоритет, предмет */}
+                {/* Метки: категория, приоритет, предмет, YouTube ярлык */}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {task.category && (
                     <span className="text-xs">
@@ -1884,6 +1884,15 @@ const TodayTaskItem = ({
                     <span className="text-[9px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                       {task.subject}
                     </span>
+                  )}
+                  {/* YouTube ярлык - в строке меток если есть текст задачи */}
+                  {task.youtube_url && task.youtube_title && parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
+                    <YouTubePreview
+                      title={task.youtube_title}
+                      duration={task.youtube_duration}
+                      url={task.youtube_url}
+                      badge={true}
+                    />
                   )}
                 </div>
                 
@@ -1926,15 +1935,14 @@ const TodayTaskItem = ({
                   </div>
                 )}
                 
-                {/* YouTube Preview - ярлык если есть текст, иначе компактный режим */}
-                {task.youtube_url && task.youtube_title && (
+                {/* YouTube Preview - компактная карточка если НЕТ текста (только ссылка) */}
+                {task.youtube_url && task.youtube_title && !parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent && (
                   <YouTubePreview
                     title={task.youtube_title}
                     duration={task.youtube_duration}
                     thumbnail={task.youtube_thumbnail}
                     url={task.youtube_url}
-                    badge={parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent}
-                    compact={!parseTaskText(task.text, { youtube_url: task.youtube_url, youtube_title: task.youtube_title }).hasTextContent}
+                    compact={true}
                   />
                 )}
               </div>
