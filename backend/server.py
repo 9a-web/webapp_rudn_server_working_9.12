@@ -1560,8 +1560,8 @@ async def create_task(task_data: TaskCreate):
             metadata={}
         )
         
-        # Обогащаем задачу YouTube информацией если есть ссылка
-        task_dict = await enrich_task_with_youtube(task_dict)
+        # Обогащаем задачу видео информацией (YouTube и VK)
+        task_dict = await enrich_task_with_video(task_dict)
         
         # Добавляем статистику подзадач
         progress_info = calculate_subtasks_progress(task_dict.get("subtasks", []))
