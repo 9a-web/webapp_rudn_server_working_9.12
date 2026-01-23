@@ -508,16 +508,8 @@ class TaskResponse(BaseModel):
     teacher: Optional[str] = None
     auditory: Optional[str] = None
     lessonType: Optional[str] = None
-    # YouTube метаданные
-    youtube_title: Optional[str] = None
-    youtube_duration: Optional[str] = None
-    youtube_thumbnail: Optional[str] = None
-    youtube_url: Optional[str] = None
-    # VK Video метаданные
-    vk_video_title: Optional[str] = None
-    vk_video_duration: Optional[str] = None
-    vk_video_thumbnail: Optional[str] = None
-    vk_video_url: Optional[str] = None
+    # Массив видео (YouTube и VK)
+    videos: List[VideoData] = []
 
 
 class YouTubeInfoResponse(BaseModel):
