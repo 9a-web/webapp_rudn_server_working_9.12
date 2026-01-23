@@ -1350,30 +1350,32 @@ async def get_vk_video_info(url: str):
 
 
 async def enrich_task_with_youtube(task_dict: dict) -> dict:
-    """Обогащает задачу информацией о YouTube видео, если в тексте есть ссылка"""
-    # Если данные уже переданы клиентом - не перезаписываем
-    if task_dict.get('youtube_title') and task_dict.get('youtube_url'):
-        return task_dict
-    
-    text = task_dict.get('text', '')
-    youtube_url = find_youtube_url_in_text(text)
-    
-    if not youtube_url:
-        return task_dict
-    
+    """DEPRECATED: Используйте enrich_task_with_all_videos для поддержки нескольких ссылок"""
+    return task_dict
+
+
+async def enrich_task_with_vk_video(task_dict: dict) -> dict:
+    """DEPRECATED: Используйте enrich_task_with_all_videos для поддержки нескольких ссылок"""
+    return task_dict
+
+
+async def get_youtube_video_info(youtube_url: str) -> Optional[dict]:
+    """Получает информацию о YouTube видео по URL"""
     video_id = extract_youtube_video_id(youtube_url)
     if not video_id:
-        return task_dict
+        return None
     
     try:
         # Проверяем кэш
         if video_id in youtube_cache:
             info = youtube_cache[video_id]
-            task_dict['youtube_title'] = info.title
-            task_dict['youtube_duration'] = info.duration
-            task_dict['youtube_thumbnail'] = info.thumbnail
-            task_dict['youtube_url'] = youtube_url
-            return task_dict
+            return {
+                'url': youtube_url,
+                'title': info.title,
+                'duration': info.duration,
+                'thumbnail': info.thumbnail,
+                'type': 'youtube'
+            }
         
         # Если нет в кэше - запрашиваем
         ydl_opts = {
@@ -1407,42 +1409,36 @@ async def enrich_task_with_youtube(task_dict: dict) -> dict:
             # Сохраняем в кэш
             youtube_cache[video_id] = result
             
-            task_dict['youtube_title'] = result.title
-            task_dict['youtube_duration'] = result.duration
-            task_dict['youtube_thumbnail'] = result.thumbnail
-            task_dict['youtube_url'] = youtube_url
-            
+            return {
+                'url': youtube_url,
+                'title': result.title,
+                'duration': result.duration,
+                'thumbnail': result.thumbnail,
+                'type': 'youtube'
+            }
     except Exception as e:
-        logger.warning(f"Не удалось получить YouTube info для задачи: {e}")
+        logger.warning(f"Не удалось получить YouTube info: {e}")
     
-    return task_dict
+    return None
 
 
-async def enrich_task_with_vk_video(task_dict: dict) -> dict:
-    """Обогащает задачу информацией о VK видео, если в тексте есть ссылка"""
-    # Если данные уже переданы клиентом - не перезаписываем
-    if task_dict.get('vk_video_title') and task_dict.get('vk_video_url'):
-        return task_dict
-    
-    text = task_dict.get('text', '')
-    vk_video_url = find_vk_video_url_in_text(text)
-    
-    if not vk_video_url:
-        return task_dict
-    
+async def get_vk_video_info(vk_video_url: str) -> Optional[dict]:
+    """Получает информацию о VK видео по URL"""
     video_id = extract_vk_video_id(vk_video_url)
     if not video_id:
-        return task_dict
+        return None
     
     try:
         # Проверяем кэш
         if video_id in vk_video_cache:
             info = vk_video_cache[video_id]
-            task_dict['vk_video_title'] = info.title
-            task_dict['vk_video_duration'] = info.duration
-            task_dict['vk_video_thumbnail'] = info.thumbnail
-            task_dict['vk_video_url'] = vk_video_url
-            return task_dict
+            return {
+                'url': vk_video_url,
+                'title': info.title,
+                'duration': info.duration,
+                'thumbnail': info.thumbnail,
+                'type': 'vk'
+            }
         
         # Если нет в кэше - запрашиваем
         ydl_opts = {
@@ -1481,22 +1477,54 @@ async def enrich_task_with_vk_video(task_dict: dict) -> dict:
             # Сохраняем в кэш
             vk_video_cache[video_id] = result
             
-            task_dict['vk_video_title'] = result.title
-            task_dict['vk_video_duration'] = result.duration
-            task_dict['vk_video_thumbnail'] = result.thumbnail
-            task_dict['vk_video_url'] = vk_video_url
-            
+            return {
+                'url': vk_video_url,
+                'title': result.title,
+                'duration': result.duration,
+                'thumbnail': result.thumbnail,
+                'type': 'vk'
+            }
     except Exception as e:
-        logger.warning(f"Не удалось получить VK Video info для задачи: {e}")
+        logger.warning(f"Не удалось получить VK Video info: {e}")
     
+    return None
+
+
+async def enrich_task_with_all_videos(task_dict: dict) -> dict:
+    """Обогащает задачу информацией о ВСЕХ видео (YouTube и VK) в тексте"""
+    # Если videos уже заполнен клиентом - не перезаписываем
+    existing_videos = task_dict.get('videos', [])
+    if existing_videos and len(existing_videos) > 0:
+        return task_dict
+    
+    text = task_dict.get('text', '')
+    if not text:
+        task_dict['videos'] = []
+        return task_dict
+    
+    videos = []
+    
+    # Находим все YouTube ссылки
+    youtube_urls = find_all_youtube_urls_in_text(text)
+    for url in youtube_urls:
+        video_info = await get_youtube_video_info(url)
+        if video_info:
+            videos.append(video_info)
+    
+    # Находим все VK ссылки
+    vk_urls = find_all_vk_video_urls_in_text(text)
+    for url in vk_urls:
+        video_info = await get_vk_video_info(url)
+        if video_info:
+            videos.append(video_info)
+    
+    task_dict['videos'] = videos
     return task_dict
 
 
 async def enrich_task_with_video(task_dict: dict) -> dict:
-    """Обогащает задачу информацией о видео (YouTube или VK)"""
-    task_dict = await enrich_task_with_youtube(task_dict)
-    task_dict = await enrich_task_with_vk_video(task_dict)
-    return task_dict
+    """Обогащает задачу информацией о видео (YouTube и VK) - новая версия с поддержкой нескольких ссылок"""
+    return await enrich_task_with_all_videos(task_dict)
 
 
 # ============ Эндпоинты для списка дел ============
