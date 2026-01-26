@@ -163,6 +163,12 @@ const AdminPanel = ({ isOpen, onClose }) => {
                   icon={<BookOpen className="w-4 h-4" />}
                   label="Занятия" 
                 />
+                <TabButton 
+                  active={activeTab === 'notifications'} 
+                  onClick={() => setActiveTab('notifications')} 
+                  icon={<Bell className="w-4 h-4" />}
+                  label="Уведомления" 
+                />
               </div>
             </div>
           </div>
