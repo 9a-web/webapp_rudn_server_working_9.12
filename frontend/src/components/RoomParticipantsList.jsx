@@ -175,13 +175,16 @@ const RoomParticipantsList = ({
 
   return (
     <div className="space-y-3">
-      {/* Заголовок с кнопкой добавления */}
+      {/* Заголовок */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
           <Users className="w-4 h-4" />
           Участники ({participants.length})
         </h4>
-        
+      </div>
+
+      {/* Кнопки действий: добавить друзей и скопировать ссылку */}
+      <div className="flex gap-2">
         {canAddMembers && (
           <motion.button
             whileTap={{ scale: 0.95 }}
@@ -191,22 +194,52 @@ const RoomParticipantsList = ({
                 webApp.HapticFeedback.impactOccurred('light');
               }
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 
                      bg-gradient-to-r from-purple-500 to-pink-500 
-                     text-white text-xs font-medium rounded-lg
+                     text-white text-xs font-medium rounded-xl
                      hover:opacity-90 transition-all"
           >
-            <UserPlus className="w-3.5 h-3.5" />
+            <UserPlus className="w-4 h-4" />
             Добавить друзей
           </motion.button>
         )}
+        
+        {/* Кнопка копирования ссылки-приглашения */}
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={handleCopyInviteLink}
+          disabled={isGeneratingLink}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 
+                   text-xs font-medium rounded-xl transition-all
+                   ${linkCopied 
+                     ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                     : 'bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30'
+                   }`}
+        >
+          {isGeneratingLink ? (
+            <>
+              <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              Генерация...
+            </>
+          ) : linkCopied ? (
+            <>
+              <Check className="w-4 h-4" />
+              Скопировано!
+            </>
+          ) : (
+            <>
+              <Link2 className="w-4 h-4" />
+              Скопировать ссылку
+            </>
+          )}
+        </motion.button>
       </div>
 
       {/* Info banner */}
       {canAddMembers && (
         <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
           <p className="text-xs text-purple-300">
-            💡 Быстро добавьте друзей нажав на кнопку выше. Они автоматически присоединятся к комнате и всем задачам.
+            💡 Быстро добавьте друзей или скопируйте ссылку-приглашение для отправки другим.
           </p>
         </div>
       )}
