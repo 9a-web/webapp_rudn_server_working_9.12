@@ -15,6 +15,7 @@ import {
   generateJournalInviteLink,
   addStudent,
   addStudentsBulk,
+  addStudentsFromFriends,
   linkStudent,
   deleteStudent,
   createSubject,
