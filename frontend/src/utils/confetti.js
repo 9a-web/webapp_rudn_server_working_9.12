@@ -129,38 +129,77 @@ export const confettiFireworks = () => {
 };
 
 /**
- * Радужное конфетти (для пасхалки) - Теперь "Северное сияние"
+ * Радужное конфетти (для пасхалки) - Элегантное северное сияние
  */
 export const rainbowConfetti = () => {
-  const end = Date.now() + (3 * 1000);
-  // Aurora Borealis colors
-  const colors = ['#6EE7B7', '#3B82F6', '#9333EA', '#FFFFFF'];
+  const duration = 4000;
+  const animationEnd = Date.now() + duration;
+  
+  // Elegant aurora colors - мягкие переливающиеся цвета
+  const auroraColors = [
+    '#67E8F9', // cyan
+    '#A78BFA', // violet  
+    '#F472B6', // pink
+    '#34D399', // emerald
+    '#FBBF24', // amber
+    '#FFFFFF'  // white sparkle
+  ];
 
-  (function frame() {
+  // Начальный взрыв из центра
+  confetti({
+    particleCount: 80,
+    spread: 100,
+    origin: { x: 0.5, y: 0.4 },
+    colors: auroraColors,
+    zIndex: 9999,
+    shapes: ['circle', 'star'],
+    scalar: 1.1,
+    startVelocity: 40,
+    gravity: 0.8,
+    ticks: 200
+  });
+
+  // Плавные волны конфетти с обеих сторон
+  const interval = setInterval(() => {
+    const timeLeft = animationEnd - Date.now();
+    
+    if (timeLeft <= 0) {
+      return clearInterval(interval);
+    }
+
+    const progress = timeLeft / duration;
+    const particleCount = Math.floor(4 * progress);
+
+    // Левая сторона
     confetti({
-      particleCount: 3,
+      particleCount,
       angle: 60,
-      spread: 55,
-      origin: { x: 0 },
-      colors: colors,
+      spread: 45,
+      origin: { x: 0, y: 0.5 },
+      colors: auroraColors,
       zIndex: 9999,
-      shapes: ['star']
+      shapes: ['circle'],
+      scalar: 0.9,
+      gravity: 0.6,
+      drift: 1,
+      ticks: 150
     });
     
+    // Правая сторона
     confetti({
-      particleCount: 3,
+      particleCount,
       angle: 120,
-      spread: 55,
-      origin: { x: 1 },
-      colors: colors,
+      spread: 45,
+      origin: { x: 1, y: 0.5 },
+      colors: auroraColors,
       zIndex: 9999,
-      shapes: ['star']
+      shapes: ['circle'],
+      scalar: 0.9,
+      gravity: 0.6,
+      drift: -1,
+      ticks: 150
     });
-
-    if (Date.now() < end) {
-      requestAnimationFrame(frame);
-    }
-  }());
+  }, 100);
 };
 
 /**
