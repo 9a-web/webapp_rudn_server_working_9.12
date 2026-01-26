@@ -544,7 +544,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                     ease: "easeInOut"
                   }}
                 >
-                  ✨
+                  <Sparkles className="w-8 h-8" style={{ color: '#A78BFA' }} />
                 </motion.div>
                 
                 {/* Заголовок */}
