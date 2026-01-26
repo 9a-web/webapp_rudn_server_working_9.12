@@ -5422,10 +5422,8 @@ async def admin_send_notification(data: AdminSendNotificationRequest):
                 from notifications import get_notification_service
                 notification_service = get_notification_service()
                 
-                # Формируем сообщение без emoji
-                telegram_message = f"📢 {data.title}\n\n{data.message}"
-                
-                await notification_service.send_message(data.telegram_id, telegram_message)
+                # Отправляем только текст сообщения без дополнительных фраз
+                await notification_service.send_message(data.telegram_id, data.message)
                 results["telegram_sent"] = True
                 logger.info(f"📨 Admin message sent via Telegram to {data.telegram_id}")
             except Exception as e:
