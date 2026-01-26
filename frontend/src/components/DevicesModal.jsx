@@ -463,7 +463,7 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
                       {/* Кнопка отключения */}
                       <button
                         onClick={() => handleRevokeDevice(device.session_token)}
-                        disabled={revokingToken === device.session_token}
+                        disabled={revokingToken === device.session_token || revokingAll}
                         className={`p-2 rounded-lg transition-colors ${
                           device.is_current
                             ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400'
@@ -480,6 +480,30 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
                     </div>
                   </motion.div>
                 ))}
+
+                {/* Кнопка "Отвязать все устройства" */}
+                {devices.length > 0 && (
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    onClick={handleRevokeAll}
+                    disabled={revokingAll || revokingToken}
+                    className="w-full mt-4 p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {revokingAll ? (
+                      <>
+                        <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
+                        <span className="text-red-400 font-medium text-sm">Отключение...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-4 h-4 text-red-400" />
+                        <span className="text-red-400 font-medium text-sm">Отвязать все устройства</span>
+                      </>
+                    )}
+                  </motion.button>
+                )}
               </div>
             )}
           </div>
