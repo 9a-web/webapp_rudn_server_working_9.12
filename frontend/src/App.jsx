@@ -1070,6 +1070,7 @@ const Home = () => {
           onProfileStateChange={setIsProfileOpen}
           onThemeChange={handleThemeChange}
           unreadNotificationsCount={unreadNotificationsCount}
+          hasNewNotification={hasNewNotification}
         />
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
