@@ -11010,10 +11010,6 @@ async def update_extended_notification_settings(telegram_id: int, settings: Exte
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Include the router in the main app
-app.include_router(api_router)
-
-
 # ============ Web Sessions (связка Telegram профиля через QR) ============
 
 # Словарь для хранения активных WebSocket соединений по session_token
@@ -11208,6 +11204,12 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
         logger.error(f"Link web session error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# Include the router in the main app
+app.include_router(api_router)
+
+
+# ============ WebSocket для Web Sessions (связка Telegram профиля) ============
 
 @app.websocket("/ws/session/{session_token}")
 async def websocket_session(websocket: WebSocket, session_token: str):
