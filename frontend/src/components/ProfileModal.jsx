@@ -63,6 +63,25 @@ export const ProfileModal = ({
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrData, setQrData] = useState(null);
 
+  // Состояния для связки Telegram профиля
+  const [showTelegramLink, setShowTelegramLink] = useState(false);
+  const [telegramLinkSession, setTelegramLinkSession] = useState(null);
+  const [telegramLinkStatus, setTelegramLinkStatus] = useState('idle'); // idle, loading, pending, linked, expired, error
+  const [telegramLinkTimeLeft, setTelegramLinkTimeLeft] = useState(null);
+  const [telegramLinkError, setTelegramLinkError] = useState(null);
+  const telegramLinkWsRef = useRef(null);
+  const telegramLinkTimerRef = useRef(null);
+
+  // Проверяем, является ли пользователь гостем (без привязки к Telegram)
+  const isGuestUser = useMemo(() => {
+    return user?.is_guest || user?.device_id;
+  }, [user]);
+
+  // Проверяем, открыто ли в Telegram WebApp
+  const isTelegramWebApp = useMemo(() => {
+    return !!window.Telegram?.WebApp?.initDataUnsafe?.user;
+  }, []);
+
   // Загрузка реферальных данных и QR при открытии
   useEffect(() => {
     const loadReferralData = async () => {
