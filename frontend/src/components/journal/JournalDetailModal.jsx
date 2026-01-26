@@ -198,6 +198,16 @@ export const JournalDetailModal = ({
     }
   };
 
+  const handleAddStudentsFromFriends = async (friends) => {
+    try {
+      await addStudentsFromFriends(journalId, friends);
+      loadData();
+    } catch (error) {
+      console.error('Error adding students from friends:', error);
+      throw error;
+    }
+  };
+
   const handleUpdateStudent = async (studentId, data) => {
     try {
       const { updateStudent } = await import('../../services/journalAPI');
