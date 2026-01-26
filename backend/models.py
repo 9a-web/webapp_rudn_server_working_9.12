@@ -1040,6 +1040,16 @@ class TopUser(BaseModel):
     group_name: Optional[str] = None
 
 
+class AdminSendNotificationRequest(BaseModel):
+    """Запрос на отправку уведомления от админа"""
+    telegram_id: int  # Кому отправить
+    title: str  # Заголовок
+    message: str  # Текст сообщения
+    emoji: str = "📢"  # Эмодзи (по умолчанию мегафон)
+    send_in_app: bool = True  # Отправить в приложение
+    send_telegram: bool = False  # Отправить в Telegram
+
+
 class FacultyStats(BaseModel):
     """Статистика по факультету"""
     faculty_name: str
