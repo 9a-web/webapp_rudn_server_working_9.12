@@ -5369,17 +5369,42 @@ async def admin_send_notification(data: AdminSendNotificationRequest):
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
+        # Маппинг типов на NotificationType enum
+        type_mapping = {
+            "admin_message": NotificationType.ADMIN_MESSAGE,
+            "announcement": NotificationType.ANNOUNCEMENT,
+            "app_update": NotificationType.APP_UPDATE,
+            "schedule_changed": NotificationType.SCHEDULE_CHANGED,
+            "task_deadline": NotificationType.TASK_DEADLINE,
+            "achievement_earned": NotificationType.ACHIEVEMENT_EARNED,
+            "level_up": NotificationType.LEVEL_UP,
+            "room_invite": NotificationType.ROOM_INVITE,
+        }
+        
+        # Маппинг категорий
+        category_mapping = {
+            "system": NotificationCategory.SYSTEM,
+            "study": NotificationCategory.STUDY,
+            "achievements": NotificationCategory.ACHIEVEMENTS,
+            "rooms": NotificationCategory.ROOMS,
+            "social": NotificationCategory.SOCIAL,
+            "journal": NotificationCategory.JOURNAL,
+        }
+        
+        notification_type = type_mapping.get(data.notification_type, NotificationType.ADMIN_MESSAGE)
+        notification_category = category_mapping.get(data.category, NotificationCategory.SYSTEM)
+        
         # Отправляем In-App уведомление
         if data.send_in_app:
             try:
                 notification = InAppNotification(
                     telegram_id=data.telegram_id,
-                    type=NotificationType.ADMIN_MESSAGE,
-                    category=NotificationCategory.SYSTEM,
+                    type=notification_type,
+                    category=notification_category,
                     priority=NotificationPriority.HIGH,
                     title=data.title,
                     message=data.message,
-                    emoji=data.emoji,
+                    emoji="",  # Не используем emoji, иконка определяется по типу
                     data={"from_admin": True}
                 )
                 await db.in_app_notifications.insert_one(notification.model_dump())
@@ -5395,8 +5420,8 @@ async def admin_send_notification(data: AdminSendNotificationRequest):
                 from notifications import get_notification_service
                 notification_service = get_notification_service()
                 
-                # Формируем сообщение
-                telegram_message = f"{data.emoji} {data.title}\n\n{data.message}"
+                # Формируем сообщение без emoji
+                telegram_message = f"📢 {data.title}\n\n{data.message}"
                 
                 await notification_service.send_message(data.telegram_id, telegram_message)
                 results["telegram_sent"] = True
