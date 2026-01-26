@@ -197,7 +197,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             
             {/* Unread notifications badge */}
             {unreadNotificationsCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg border-2 border-[#1a1a1a]">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg">
                 {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
               </span>
             )}
