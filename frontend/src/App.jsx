@@ -1033,6 +1033,17 @@ const Home = () => {
     return showSnow ? <NewYearTheme enabled={true} /> : null;
   };
 
+  // Показываем экран связки с Telegram для гостевых пользователей
+  // (только если пользователь зашел из браузера без Telegram и без сохраненного профиля)
+  if (user?.is_guest && !window.Telegram?.WebApp?.initDataUnsafe?.user) {
+    return (
+      <>
+        {renderNewYearTheme()}
+        <TelegramLinkScreen onLinked={handleTelegramLinked} />
+      </>
+    );
+  }
+
   // Показываем Welcome Screen
   if (showWelcomeScreen) {
     return (
