@@ -136,9 +136,69 @@ export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpi
   return ws;
 };
 
+/**
+ * Получить список устройств пользователя
+ * @param {number} telegramId - ID пользователя в Telegram
+ * @param {string} currentToken - токен текущей сессии (опционально)
+ * @returns {Promise<{devices: Array, total: number}>}
+ */
+export const getUserDevices = async (telegramId, currentToken = null) => {
+  const backendUrl = getBackendURL();
+  let url = `${backendUrl}/api/web-sessions/user/${telegramId}/devices`;
+  if (currentToken) {
+    url += `?current_token=${currentToken}`;
+  }
+  
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    throw new Error('Failed to get devices');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Отключить устройство (отозвать сессию)
+ * @param {string} sessionToken - токен сессии
+ * @param {number} telegramId - ID пользователя в Telegram
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const revokeDevice = async (sessionToken, telegramId) => {
+  const backendUrl = getBackendURL();
+  const response = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}?telegram_id=${telegramId}`, {
+    method: 'DELETE'
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to revoke device');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Отправить heartbeat для сессии
+ * @param {string} sessionToken - токен сессии
+ */
+export const sendHeartbeat = async (sessionToken) => {
+  const backendUrl = getBackendURL();
+  try {
+    await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/heartbeat`, {
+      method: 'POST'
+    });
+  } catch (e) {
+    console.warn('Heartbeat failed:', e);
+  }
+};
+
 export default {
   createWebSession,
   getWebSessionStatus,
   linkWebSession,
-  createSessionWebSocket
+  createSessionWebSocket,
+  getUserDevices,
+  revokeDevice,
+  sendHeartbeat
 };
