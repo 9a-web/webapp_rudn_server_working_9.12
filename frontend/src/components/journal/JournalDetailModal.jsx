@@ -458,13 +458,30 @@ export const JournalDetailModal = ({
                     {/* Students List */}
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-white">Список студентов</h3>
-                      <button
-                        onClick={() => setShowAddStudents(true)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        Добавить
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {/* Кнопка заявок (только для владельца) */}
+                        {isOwner && (
+                          <button
+                            onClick={() => setShowApplications(true)}
+                            className="relative flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-sm hover:bg-orange-500/30 transition-colors"
+                          >
+                            <Inbox className="w-4 h-4" />
+                            Заявки
+                            {applicationsCount > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                                {applicationsCount}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setShowAddStudents(true)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          Добавить
+                        </button>
+                      </div>
                     </div>
 
                     {students.length === 0 ? (
