@@ -165,10 +165,56 @@ export const JournalDetailModal = ({
     }
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    if (hapticFeedback?.notificationOccurred) {
-      hapticFeedback.notificationOccurred('success');
+  const handleCopyLink = async () => {
+    if (!inviteLink) {
+      console.error('No invite link to copy');
+      return;
+    }
+    
+    try {
+      // Пробуем использовать Telegram WebApp API если доступен
+      if (window.Telegram?.WebApp?.openLink) {
+        // Используем clipboard API
+        await navigator.clipboard.writeText(inviteLink);
+      } else {
+        // Fallback для обычного браузера
+        await navigator.clipboard.writeText(inviteLink);
+      }
+      
+      if (hapticFeedback?.notificationOccurred) {
+        hapticFeedback.notificationOccurred('success');
+      }
+      
+      // Показываем что ссылка скопирована
+      setShowInviteLink(false);
+      
+      // Можно показать уведомление через WebApp
+      if (window.Telegram?.WebApp?.showPopup) {
+        window.Telegram.WebApp.showPopup({
+          message: 'Ссылка скопирована!',
+          buttons: [{ type: 'ok' }]
+        });
+      }
+    } catch (error) {
+      console.error('Error copying link:', error);
+      // Fallback: создаём временный input для копирования
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = inviteLink;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (hapticFeedback?.notificationOccurred) {
+          hapticFeedback.notificationOccurred('success');
+        }
+        setShowInviteLink(false);
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+      }
     }
   };
 
