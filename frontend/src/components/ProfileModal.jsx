@@ -1,11 +1,12 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle, QrCode } from 'lucide-react';
+import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle, QrCode, Smartphone, RefreshCw, Clock, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { ReferralTree } from './ReferralTree';
 import LKConnectionModal from './LKConnectionModal';
 import { friendsAPI } from '../services/friendsAPI';
+import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
 
 // Определяем URL backend в зависимости от окружения
 const getBackendURL = () => {
