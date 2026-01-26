@@ -92,6 +92,7 @@ export const JournalDetailModal = ({
   const [showApplications, setShowApplications] = useState(false); // Модал заявок
   const [applicationsCount, setApplicationsCount] = useState(0); // Количество заявок
   const [inviteLink, setInviteLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!journalId) return;
