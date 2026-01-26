@@ -510,15 +510,22 @@ export const JournalDetailModal = ({
                             )}
                           </button>
                         )}
-                        <button
-                          onClick={() => setShowAddStudents(true)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white ${
-                            students.length === 0 ? 'animate-pulse shadow-lg shadow-purple-500/30' : ''
-                          }`}
-                        >
-                          <UserPlus className="w-4 h-4" />
-                          Добавить
-                        </button>
+                        <div className="relative">
+                          {/* Волны пульсации когда нет студентов */}
+                          {students.length === 0 && (
+                            <>
+                              <span className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 animate-ping opacity-75" />
+                              <span className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 animate-ping opacity-50 animation-delay-150" style={{ animationDelay: '0.15s' }} />
+                            </>
+                          )}
+                          <button
+                            onClick={() => setShowAddStudents(true)}
+                            className={`relative flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            Добавить
+                          </button>
+                        </div>
                       </div>
                     </div>
 
