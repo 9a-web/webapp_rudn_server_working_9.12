@@ -60,15 +60,23 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
     hapticFeedback?.('impact', 'medium');
     setRevokingToken(sessionToken);
     
+    // Получаем текущий токен из localStorage (может измениться)
+    const currentToken = localStorage.getItem('session_token');
+    console.log('🗑️ Revoking device:', sessionToken);
+    console.log('📱 Current session token:', currentToken);
+    console.log('👤 User ID:', user.id);
+    
     try {
-      await revokeDevice(sessionToken, user.id);
+      const result = await revokeDevice(sessionToken, user.id);
+      console.log('✅ Revoke result:', result);
       hapticFeedback?.('notification', 'success');
       
       // Удаляем из списка
       setDevices(prev => prev.filter(d => d.session_token !== sessionToken));
       
       // Если отключили текущее устройство - полностью очищаем localStorage и перезагружаем
-      if (sessionToken === currentSessionToken) {
+      if (sessionToken === currentToken) {
+        console.log('🔄 Current device revoked, clearing localStorage and reloading...');
         localStorage.removeItem('telegram_user');
         localStorage.removeItem('session_token');
         localStorage.removeItem('user_settings');
@@ -77,7 +85,7 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
         window.location.reload();
       }
     } catch (err) {
-      console.error('Failed to revoke device:', err);
+      console.error('❌ Failed to revoke device:', err);
       hapticFeedback?.('notification', 'error');
       setError('Не удалось отключить устройство');
     } finally {
