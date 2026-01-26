@@ -195,7 +195,10 @@ from models import (
     WebSessionCreate,
     WebSessionResponse,
     WebSessionLinkRequest,
-    WebSessionLinkResponse
+    WebSessionLinkResponse,
+    WebSessionCreateRequest,
+    DeviceInfo,
+    DevicesListResponse
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
