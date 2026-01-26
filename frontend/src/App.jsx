@@ -1363,6 +1363,14 @@ const Home = () => {
           />
         </Suspense>
       )}
+
+      {/* Telegram Link Confirm Modal - показывается при открытии через QR-код */}
+      <TelegramLinkConfirmModal
+        isOpen={showTelegramLinkConfirm}
+        onClose={handleLinkConfirmClose}
+        sessionToken={linkSessionToken}
+        onSuccess={handleLinkConfirmSuccess}
+      />
     </div>
   );
 };
