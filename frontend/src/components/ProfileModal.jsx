@@ -235,9 +235,15 @@ export const ProfileModal = ({
       setTelegramLinkStatus('pending');
       
       // Вычисляем оставшееся время
-      const expiresAt = new Date(sessionData.expires_at);
+      // Сервер возвращает UTC время без "Z", добавляем для правильного парсинга
+      let expiresAtStr = sessionData.expires_at;
+      if (!expiresAtStr.endsWith('Z') && !expiresAtStr.includes('+')) {
+        expiresAtStr += 'Z';
+      }
+      const expiresAt = new Date(expiresAtStr);
       const now = new Date();
       const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      console.log('📱 Session expires in:', diff, 'seconds');
       setTelegramLinkTimeLeft(diff);
       
       // Запускаем таймер обратного отсчёта
