@@ -176,7 +176,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               if (hapticFeedback) hapticFeedback('impact', 'medium');
               onNotificationsClick();
             }}
-            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative overflow-hidden group"
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative group"
             style={{
               backgroundColor: 'rgba(52, 52, 52, 0.6)',
               backdropFilter: 'blur(20px) saturate(180%)',
@@ -189,13 +189,15 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             variants={headerItemVariants}
           >
             {/* Gradient glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-pink-400/20 via-rose-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute inset-0 rounded-xl overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-400/20 via-rose-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </div>
             
             <Bell className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
             
             {/* Unread notifications badge */}
             {unreadNotificationsCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-20">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg border-2 border-[#1a1a1a]">
                 {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
               </span>
             )}
