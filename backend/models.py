@@ -1982,10 +1982,18 @@ class WebSession(BaseModel):
     username: Optional[str] = None
     photo_url: Optional[str] = None
     
+    # Информация об устройстве
+    device_name: Optional[str] = None       # Название устройства (Chrome на Windows)
+    browser: Optional[str] = None           # Браузер
+    os: Optional[str] = None                # Операционная система
+    user_agent: Optional[str] = None        # Полный User-Agent
+    ip_address: Optional[str] = None        # IP адрес
+    
     # Метаданные
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(minutes=10))
     linked_at: Optional[datetime] = None
+    last_active: Optional[datetime] = None  # Последняя активность
     
     # Дополнительные данные (группа, настройки)
     user_settings: Optional[dict] = None
