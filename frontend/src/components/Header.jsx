@@ -470,16 +470,14 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
       <AnimatePresence>
         {showEasterEgg && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: -30 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ 
               opacity: 1, 
-              scale: 1, 
-              y: 0
+              scale: 1
             }}
             exit={{ 
               opacity: 0, 
-              scale: 0.95,
-              y: -20
+              scale: 0.95
             }}
             transition={{
               type: "spring",
@@ -487,7 +485,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               stiffness: 300,
               mass: 0.8
             }}
-            className="fixed top-24 left-1/2 -translate-x-1/2 z-[200]"
+            className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none"
           >
             {/* Внешнее свечение */}
             <div 
