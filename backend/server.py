@@ -96,6 +96,8 @@ from models import (
     RoomStatsResponse,
     ParticipantRoleUpdate,
     RoomUpdate,
+    RoomAddFriendsRequest,
+    RoomFriendToAdd,
     TaskReorderRequest as RoomTaskReorderRequest,
     ReferralUser,
     ReferralStats,
