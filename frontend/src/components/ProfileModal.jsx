@@ -1458,6 +1458,13 @@ export const ProfileModal = ({
               setLkData(data);
             }}
           />
+
+          {/* Модальное окно управления устройствами */}
+          <DevicesModal
+            isOpen={showDevicesModal}
+            onClose={() => setShowDevicesModal(false)}
+            user={user}
+          />
         </>
       )}
     </AnimatePresence>
