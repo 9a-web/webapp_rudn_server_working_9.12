@@ -1191,6 +1191,19 @@ class JournalStudentBulkCreate(BaseModel):
     names: List[str]                     # Список ФИО
 
 
+class JournalStudentFromFriend(BaseModel):
+    """Друг для добавления в журнал"""
+    telegram_id: int
+    full_name: str
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+
+
+class JournalStudentsFromFriendsCreate(BaseModel):
+    """Массовое добавление друзей в журнал как студентов"""
+    friends: List[JournalStudentFromFriend]  # Список друзей
+
+
 class JournalStudentLink(BaseModel):
     """Привязка Telegram к ФИО"""
     telegram_id: int
