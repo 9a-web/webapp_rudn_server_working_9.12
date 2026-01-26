@@ -1,4 +1,16 @@
 backend:
+  - task: "Telegram Profile Link via QR Code (Web Sessions)"
+    implemented: true
+    working: pending
+    file: "/app/backend/server.py, /app/backend/models.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Реализована система связки Telegram профиля через QR-код для веб-версии. Endpoints: POST /api/web-sessions (создание сессии), GET /api/web-sessions/{token}/status (статус), POST /api/web-sessions/{token}/link (связка), WebSocket /ws/session/{token} (real-time). Модели: WebSession, WebSessionResponse, WebSessionLinkRequest/Response."
+
   - task: "Real-time Notification Counter with Animation"
     implemented: true
     working: pending
