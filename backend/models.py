@@ -1875,6 +1875,9 @@ class NotificationType(str, Enum):
     # Системные
     APP_UPDATE = "app_update"
     ANNOUNCEMENT = "announcement"
+    
+    # Админские
+    ADMIN_MESSAGE = "admin_message"
 
 
 class NotificationCategory(str, Enum):
