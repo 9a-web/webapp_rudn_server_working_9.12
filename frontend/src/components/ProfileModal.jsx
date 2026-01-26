@@ -208,8 +208,111 @@ export const ProfileModal = ({
   useEffect(() => {
     if (!isOpen) {
       lkDataUpdatedRef.current = false;
+      // Очищаем сессию связки при закрытии
+      if (telegramLinkWsRef.current) {
+        telegramLinkWsRef.current.close();
+        telegramLinkWsRef.current = null;
+      }
+      if (telegramLinkTimerRef.current) {
+        clearInterval(telegramLinkTimerRef.current);
+        telegramLinkTimerRef.current = null;
+      }
+      setShowTelegramLink(false);
+      setTelegramLinkSession(null);
+      setTelegramLinkStatus('idle');
     }
   }, [isOpen]);
+
+  // Создание сессии для связки Telegram
+  const createTelegramLinkSession = useCallback(async () => {
+    setTelegramLinkStatus('loading');
+    setTelegramLinkError(null);
+    
+    try {
+      const sessionData = await createWebSession();
+      console.log('📱 Created Telegram link session:', sessionData);
+      setTelegramLinkSession(sessionData);
+      setTelegramLinkStatus('pending');
+      
+      // Вычисляем оставшееся время
+      const expiresAt = new Date(sessionData.expires_at);
+      const now = new Date();
+      const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      setTelegramLinkTimeLeft(diff);
+      
+      // Запускаем таймер обратного отсчёта
+      if (telegramLinkTimerRef.current) {
+        clearInterval(telegramLinkTimerRef.current);
+      }
+      telegramLinkTimerRef.current = setInterval(() => {
+        setTelegramLinkTimeLeft(prev => {
+          if (prev <= 1) {
+            setTelegramLinkStatus('expired');
+            clearInterval(telegramLinkTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      // Подключаемся к WebSocket
+      if (telegramLinkWsRef.current) {
+        telegramLinkWsRef.current.close();
+      }
+      
+      telegramLinkWsRef.current = createSessionWebSocket(sessionData.session_token, {
+        onConnected: () => {
+          console.log('✅ WebSocket connected for Telegram link');
+        },
+        onLinked: (userData) => {
+          console.log('🎉 Telegram profile linked!', userData);
+          setTelegramLinkStatus('linked');
+          
+          // Сохраняем данные пользователя в localStorage
+          localStorage.setItem('telegram_user', JSON.stringify({
+            id: userData.telegram_id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            username: userData.username,
+            photo_url: userData.photo_url
+          }));
+          
+          if (userData.user_settings) {
+            localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
+          }
+          
+          // Haptic feedback
+          if (hapticFeedback) hapticFeedback('notification', 'success');
+          
+          // Перезагружаем страницу через 2 секунды
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        },
+        onExpired: () => {
+          console.log('⏰ Telegram link session expired');
+          setTelegramLinkStatus('expired');
+        },
+        onError: (message) => {
+          console.error('❌ Telegram link error:', message);
+          setTelegramLinkError(message);
+          setTelegramLinkStatus('error');
+        }
+      });
+      
+    } catch (err) {
+      console.error('Failed to create Telegram link session:', err);
+      setTelegramLinkError('Не удалось создать сессию');
+      setTelegramLinkStatus('error');
+    }
+  }, [hapticFeedback]);
+
+  // Форматирование времени
+  const formatLinkTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Изменение режима новогодней темы
   const changeNewYearThemeMode = async (mode) => {
