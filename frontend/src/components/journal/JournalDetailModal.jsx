@@ -173,29 +173,17 @@ export const JournalDetailModal = ({
     }
     
     try {
-      // Пробуем использовать Telegram WebApp API если доступен
-      if (window.Telegram?.WebApp?.openLink) {
-        // Используем clipboard API
-        await navigator.clipboard.writeText(inviteLink);
-      } else {
-        // Fallback для обычного браузера
-        await navigator.clipboard.writeText(inviteLink);
-      }
+      // Пробуем скопировать
+      await navigator.clipboard.writeText(inviteLink);
       
       if (hapticFeedback?.notificationOccurred) {
         hapticFeedback.notificationOccurred('success');
       }
       
-      // Показываем что ссылка скопирована
-      setShowInviteLink(false);
+      // Показываем что скопировано
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
       
-      // Можно показать уведомление через WebApp
-      if (window.Telegram?.WebApp?.showPopup) {
-        window.Telegram.WebApp.showPopup({
-          message: 'Ссылка скопирована!',
-          buttons: [{ type: 'ok' }]
-        });
-      }
     } catch (error) {
       console.error('Error copying link:', error);
       // Fallback: создаём временный input для копирования
@@ -212,7 +200,8 @@ export const JournalDetailModal = ({
         if (hapticFeedback?.notificationOccurred) {
           hapticFeedback.notificationOccurred('success');
         }
-        setShowInviteLink(false);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
       } catch (fallbackError) {
         console.error('Fallback copy failed:', fallbackError);
       }
