@@ -131,6 +131,8 @@ from models import (
     AttendanceBulkCreate,
     JournalPendingMember,
     JournalJoinRequest,
+    JournalJoinApplication,
+    ProcessJournalApplicationRequest,
     JournalResponse,
     JournalStudentResponse,
     JournalSessionResponse,
