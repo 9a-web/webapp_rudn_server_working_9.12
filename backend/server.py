@@ -6924,6 +6924,182 @@ async def add_students_from_friends(journal_id: str, data: JournalStudentsFromFr
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ===== Заявки на вступление в журнал =====
+
+@api_router.get("/journals/{journal_id}/applications")
+async def get_journal_applications(journal_id: str, telegram_id: int):
+    """Получить список заявок на вступление в журнал (только для владельца)"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Проверяем что это владелец
+        if journal["owner_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Только староста может просматривать заявки")
+        
+        applications = await db.journal_applications.find({
+            "journal_id": journal_id,
+            "status": "pending"
+        }).sort("created_at", -1).to_list(100)
+        
+        result = []
+        for app in applications:
+            result.append({
+                "id": app["id"],
+                "telegram_id": app["telegram_id"],
+                "username": app.get("username"),
+                "first_name": app.get("first_name"),
+                "last_name": app.get("last_name"),
+                "full_name": f"{app.get('first_name', '')} {app.get('last_name', '')}".strip() or app.get("username") or f"User {app['telegram_id']}",
+                "telegram_link": f"tg://user?id={app['telegram_id']}",
+                "created_at": app["created_at"].isoformat() if app.get("created_at") else None,
+                "status": app["status"]
+            })
+        
+        return {
+            "applications": result,
+            "total": len(result)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting journal applications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/applications/{application_id}/process")
+async def process_journal_application(application_id: str, data: ProcessJournalApplicationRequest):
+    """Обработать заявку на вступление в журнал"""
+    try:
+        # Находим заявку
+        application = await db.journal_applications.find_one({"id": application_id})
+        if not application:
+            raise HTTPException(status_code=404, detail="Заявка не найдена")
+        
+        if application["status"] != "pending":
+            raise HTTPException(status_code=400, detail="Заявка уже обработана")
+        
+        journal_id = application["journal_id"]
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Журнал не найден")
+        
+        # Проверяем что это владелец
+        if journal["owner_id"] != data.owner_telegram_id:
+            raise HTTPException(status_code=403, detail="Только староста может обрабатывать заявки")
+        
+        applicant_telegram_id = application["telegram_id"]
+        applicant_name = f"{application.get('first_name', '')} {application.get('last_name', '')}".strip()
+        if not applicant_name:
+            applicant_name = application.get("username") or f"User {applicant_telegram_id}"
+        
+        if data.action == "approve":
+            if not data.student_id:
+                raise HTTPException(status_code=400, detail="Не выбран студент для привязки")
+            
+            # Проверяем что студент существует и не привязан
+            student = await db.journal_students.find_one({
+                "id": data.student_id,
+                "journal_id": journal_id
+            })
+            if not student:
+                raise HTTPException(status_code=404, detail="Студент не найден")
+            
+            if student.get("is_linked") and student.get("telegram_id") != applicant_telegram_id:
+                raise HTTPException(status_code=400, detail="Этот студент уже привязан к другому пользователю")
+            
+            # Привязываем студента
+            await db.journal_students.update_one(
+                {"id": data.student_id},
+                {
+                    "$set": {
+                        "telegram_id": applicant_telegram_id,
+                        "is_linked": True,
+                        "linked_at": datetime.utcnow(),
+                        "username": application.get("username"),
+                        "first_name": application.get("first_name")
+                    }
+                }
+            )
+            
+            # Обновляем статус заявки
+            await db.journal_applications.update_one(
+                {"id": application_id},
+                {
+                    "$set": {
+                        "status": "approved",
+                        "processed_at": datetime.utcnow(),
+                        "linked_student_id": data.student_id
+                    }
+                }
+            )
+            
+            # Уведомляем заявителя
+            await create_notification(
+                telegram_id=applicant_telegram_id,
+                notification_type=NotificationType.JOURNAL_ATTENDANCE,
+                category=NotificationCategory.JOURNAL,
+                priority=NotificationPriority.HIGH,
+                title="Заявка одобрена!",
+                message=f"Вы добавлены в журнал «{journal.get('name', 'Журнал')}» как «{student['full_name']}»",
+                emoji="",
+                data={
+                    "journal_id": journal_id,
+                    "student_id": data.student_id,
+                    "student_name": student['full_name']
+                }
+            )
+            
+            logger.info(f"✅ Application {application_id} approved: user {applicant_telegram_id} linked to student '{student['full_name']}'")
+            
+            return {
+                "status": "success",
+                "message": f"Заявка одобрена. {applicant_name} привязан к «{student['full_name']}»",
+                "student_name": student['full_name']
+            }
+        
+        elif data.action == "reject":
+            # Отклоняем заявку
+            await db.journal_applications.update_one(
+                {"id": application_id},
+                {
+                    "$set": {
+                        "status": "rejected",
+                        "processed_at": datetime.utcnow()
+                    }
+                }
+            )
+            
+            # Уведомляем заявителя
+            await create_notification(
+                telegram_id=applicant_telegram_id,
+                notification_type=NotificationType.JOURNAL_ATTENDANCE,
+                category=NotificationCategory.JOURNAL,
+                priority=NotificationPriority.NORMAL,
+                title="Заявка отклонена",
+                message=f"Ваша заявка на вступление в журнал «{journal.get('name', 'Журнал')}» была отклонена",
+                emoji="",
+                data={"journal_id": journal_id}
+            )
+            
+            logger.info(f"❌ Application {application_id} rejected for user {applicant_telegram_id}")
+            
+            return {
+                "status": "success",
+                "message": "Заявка отклонена"
+            }
+        
+        else:
+            raise HTTPException(status_code=400, detail="Неверное действие. Используйте 'approve' или 'reject'")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing journal application: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/journals/{journal_id}/students", response_model=List[JournalStudentResponse])
 async def get_journal_students(journal_id: str):
     """Получить список студентов журнала"""
