@@ -240,8 +240,33 @@ export const TelegramProvider = ({ children }) => {
         tg.offEvent('viewportChanged', handleViewportChanged);
       };
     } else {
-      console.warn('⚠️ Telegram WebApp API недоступен. Используем уникальный Device ID.');
-      // Генерируем уникальный ID для этого браузера
+      console.warn('⚠️ Telegram WebApp API недоступен.');
+      
+      // Проверяем, есть ли сохраненный Telegram пользователь в localStorage
+      const savedTelegramUser = localStorage.getItem('telegram_user');
+      
+      if (savedTelegramUser) {
+        try {
+          const parsedUser = JSON.parse(savedTelegramUser);
+          console.log('📱 Загружен сохраненный Telegram пользователь:', parsedUser.first_name);
+          setUser({
+            id: parsedUser.id,
+            first_name: parsedUser.first_name || 'Пользователь',
+            last_name: parsedUser.last_name || '',
+            username: parsedUser.username || '',
+            photo_url: parsedUser.photo_url,
+            is_linked: true // Флаг что это связанный пользователь
+          });
+          setIsReady(true);
+          return;
+        } catch (e) {
+          console.error('Ошибка парсинга сохраненного пользователя:', e);
+          localStorage.removeItem('telegram_user');
+        }
+      }
+      
+      // Если нет сохраненного пользователя - создаем гостевого с device_id
+      console.warn('⚠️ Используем уникальный Device ID.');
       const { deviceId, numericId } = getOrCreateDeviceId();
       setUser({
         id: numericId,
@@ -249,6 +274,7 @@ export const TelegramProvider = ({ children }) => {
         last_name: '',
         username: `user_${deviceId.substring(0, 8)}`,
         device_id: deviceId,
+        is_guest: true // Флаг что это гостевой пользователь
       });
       setIsReady(true);
     }
