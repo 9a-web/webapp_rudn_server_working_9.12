@@ -1,4 +1,16 @@
 backend:
+  - task: "Real-time Notification Counter with Animation"
+    implemented: true
+    working: pending
+    file: "/app/frontend/src/App.jsx, /app/frontend/src/components/Header.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Реализован real-time счётчик уведомлений с интервалом 5 секунд. При появлении нового уведомления запускается анимация на 5 секунд: пульсация (3 волны ripple), свечение кнопки и покачивание колокольчика. Добавлен тестовый endpoint POST /api/notifications/test-inapp."
+
   - task: "Quick Add Friends to Journal API"
     implemented: true
     working: pending
