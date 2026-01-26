@@ -416,9 +416,10 @@ export const ProfileModal = ({
 
   if (!user) return null;
 
-  // Проверяем, зашел ли пользователь через Telegram или через сайт напрямую
-  const isTelegramUser = typeof window !== 'undefined' && 
-                          window.Telegram?.WebApp?.initDataUnsafe?.user;
+  // Проверяем, зашел ли пользователь через Telegram или связан через QR-код
+  const isTelegramUser = (typeof window !== 'undefined' && 
+                          window.Telegram?.WebApp?.initDataUnsafe?.user) || 
+                          user?.is_linked;
   
   // Формируем полное имя
   const fullName = isTelegramUser 
