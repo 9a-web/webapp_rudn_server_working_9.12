@@ -111,6 +111,7 @@ const Home = () => {
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [hasNewNotification, setHasNewNotification] = useState(false); // Флаг нового уведомления для анимации
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentClass, setCurrentClass] = useState(null);
