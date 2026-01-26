@@ -98,6 +98,41 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
     }
   };
 
+  // Отключение всех устройств
+  const handleRevokeAll = async () => {
+    if (!user?.id) return;
+    
+    hapticFeedback?.('impact', 'heavy');
+    setRevokingAll(true);
+    setError(null);
+    
+    try {
+      const result = await revokeAllDevices(user.id);
+      console.log('✅ All devices revoked:', result);
+      hapticFeedback?.('notification', 'success');
+      
+      // Очищаем список
+      setDevices([]);
+      
+      // Если мы на веб-версии (связанный пользователь) - очищаем localStorage и перезагружаем
+      if (currentSessionToken) {
+        console.log('🔄 Current device was among revoked, clearing localStorage...');
+        localStorage.removeItem('telegram_user');
+        localStorage.removeItem('session_token');
+        localStorage.removeItem('user_settings');
+        localStorage.removeItem('rudn_device_id');
+        localStorage.removeItem('activeTab');
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('❌ Failed to revoke all devices:', err);
+      hapticFeedback?.('notification', 'error');
+      setError('Не удалось отключить устройства');
+    } finally {
+      setRevokingAll(false);
+    }
+  };
+
   // Сканирование QR через Telegram
   const handleScanQR = async () => {
     if (!webApp?.showScanQrPopup) {
