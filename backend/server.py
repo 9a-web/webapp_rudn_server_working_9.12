@@ -188,7 +188,14 @@ from models import (
     NotificationsListResponse,
     ExtendedNotificationSettings,
     ExtendedNotificationSettingsUpdate,
-    UnreadCountResponse
+    UnreadCountResponse,
+    # Модели для веб-сессий (связка Telegram профиля)
+    WebSessionStatus,
+    WebSession,
+    WebSessionCreate,
+    WebSessionResponse,
+    WebSessionLinkRequest,
+    WebSessionLinkResponse
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
