@@ -114,6 +114,8 @@ from models import (
     JournalStudent,
     JournalStudentCreate,
     JournalStudentBulkCreate,
+    JournalStudentsFromFriendsCreate,
+    JournalStudentFromFriend,
     JournalStudentLink,
     JournalSubject,
     JournalSubjectCreate,
