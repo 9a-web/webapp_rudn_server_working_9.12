@@ -671,8 +671,8 @@ export const ProfileModal = ({
               </motion.div>
             )}
 
-            {/* Связка с Telegram - показываем для гостевых пользователей или в браузере */}
-            {(isGuestUser || !isTelegramWebApp) && !loading && (
+            {/* Связка с Telegram - показываем ТОЛЬКО для гостевых пользователей (не связанных) */}
+            {isGuestUser && !loading && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
