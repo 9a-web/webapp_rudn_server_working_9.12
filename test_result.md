@@ -1,15 +1,18 @@
 backend:
   - task: "Telegram Profile Link via QR Code (Web Sessions)"
     implemented: true
-    working: pending
+    working: true
     file: "/app/backend/server.py, /app/backend/models.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: pending
         agent: "main"
         comment: "🔧 Реализована система связки Telegram профиля через QR-код для веб-версии. Endpoints: POST /api/web-sessions (создание сессии), GET /api/web-sessions/{token}/status (статус), POST /api/web-sessions/{token}/link (связка), WebSocket /ws/session/{token} (real-time). Модели: WebSession, WebSessionResponse, WebSessionLinkRequest/Response."
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: Web Sessions API fully functional. Tested all 3 main endpoints: 1) POST /api/web-sessions - creates session with session_token, status='pending', qr_url (format https://t.me/rudn_pro_bot/app?startapp=link_{token}), expires_at, 2) GET /api/web-sessions/{token}/status - returns correct pending/linked status with user data, 3) POST /api/web-sessions/{token}/link - successfully links session with Telegram profile (telegram_id=765963392), returns success=true and message='Профиль успешно подключен!'. User settings correctly loaded for existing users. Duplicate link attempts properly rejected. Invalid session tokens handled correctly. All scenarios from review request working perfectly."
 
   - task: "Real-time Notification Counter with Animation"
     implemented: true
