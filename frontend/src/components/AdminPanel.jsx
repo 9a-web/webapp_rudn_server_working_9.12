@@ -641,13 +641,24 @@ const NotificationsTab = () => {
   // Форма уведомления
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
-  const [notificationEmoji, setNotificationEmoji] = useState('📢');
+  const [notificationType, setNotificationType] = useState('admin_message');
+  const [notificationCategory, setNotificationCategory] = useState('system');
   const [sendInApp, setSendInApp] = useState(true);
   const [sendTelegram, setSendTelegram] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
 
-  const EMOJI_OPTIONS = ['📢', '🔔', '⚠️', '✅', '❌', '💡', '🎉', '📌', '🚀', '💬', '📝', '🎁'];
+  // Типы уведомлений с иконками
+  const NOTIFICATION_TYPES = [
+    { id: 'admin_message', label: 'Сообщение', icon: Megaphone, color: 'purple', category: 'system' },
+    { id: 'announcement', label: 'Объявление', icon: Bell, color: 'blue', category: 'system' },
+    { id: 'app_update', label: 'Обновление', icon: Sparkles, color: 'cyan', category: 'system' },
+    { id: 'schedule_changed', label: 'Расписание', icon: Calendar, color: 'orange', category: 'study' },
+    { id: 'task_deadline', label: 'Дедлайн', icon: Clock, color: 'red', category: 'study' },
+    { id: 'achievement_earned', label: 'Достижение', icon: Award, color: 'yellow', category: 'achievements' },
+    { id: 'level_up', label: 'Уровень', icon: Star, color: 'amber', category: 'achievements' },
+    { id: 'room_invite', label: 'Приглашение', icon: Home, color: 'green', category: 'rooms' },
+  ];
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
