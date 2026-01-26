@@ -246,18 +246,18 @@ def test_endpoint_validation():
 
 def main():
     """Run all tests"""
-    print("🚀 Starting Backend API Tests for Multiple Video Links Support")
+    print("🚀 Starting Backend API Tests for Friends Integration")
     print(f"Backend URL: {BACKEND_URL}")
     print(f"Telegram ID: {TELEGRAM_ID}")
     
-    # Test 1: GET tasks with videos field
-    tasks = test_get_tasks_with_videos()
+    # Test 1: Room add-friends endpoint
+    room_test_result = test_room_add_friends_api()
     
-    # Test 2: POST task with multiple video links
-    created_task = test_create_task_with_multiple_videos()
+    # Test 2: Journal add-friends endpoint  
+    journal_test_result = test_journal_add_friends_api()
     
-    # Test 3: PUT task with new video link
-    update_success = test_update_task_with_new_video()
+    # Test 3: Validation and error handling
+    validation_test_result = test_endpoint_validation()
     
     # Summary
     print_test_header("TEST SUMMARY")
@@ -265,23 +265,23 @@ def main():
     tests_passed = 0
     total_tests = 3
     
-    if tasks is not None:
-        print_success("✅ GET /api/tasks/{telegram_id} - PASSED")
+    if room_test_result:
+        print_success("✅ POST /api/rooms/{room_id}/add-friends - PASSED")
         tests_passed += 1
     else:
-        print_error("❌ GET /api/tasks/{telegram_id} - FAILED")
+        print_error("❌ POST /api/rooms/{room_id}/add-friends - FAILED")
         
-    if created_task is not None:
-        print_success("✅ POST /api/tasks with multiple videos - PASSED")
+    if journal_test_result:
+        print_success("✅ POST /api/journals/{journal_id}/students/from-friends - PASSED")
         tests_passed += 1
     else:
-        print_error("❌ POST /api/tasks with multiple videos - FAILED")
+        print_error("❌ POST /api/journals/{journal_id}/students/from-friends - FAILED")
         
-    if update_success:
-        print_success("✅ PUT /api/tasks/{task_id} with new video - PASSED")
+    if validation_test_result:
+        print_success("✅ API Validation and Error Handling - PASSED")
         tests_passed += 1
     else:
-        print_error("❌ PUT /api/tasks/{task_id} with new video - FAILED")
+        print_error("❌ API Validation and Error Handling - FAILED")
     
     print(f"\n🎯 Tests passed: {tests_passed}/{total_tests}")
     
