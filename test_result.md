@@ -1,4 +1,28 @@
 backend:
+  - task: "Quick Add Friends to Journal API"
+    implemented: true
+    working: pending
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Добавлен endpoint POST /api/journals/{journal_id}/students/from-friends для быстрого добавления друзей в журнал посещений как студентов с автоматической привязкой telegram_id. Друзья добавляются с is_linked=True."
+
+  - task: "Quick Add Friends to Room API"
+    implemented: true
+    working: pending
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Добавлен endpoint POST /api/rooms/{room_id}/add-friends для быстрого добавления друзей в комнату. Проверяет что пользователи действительно друзья, добавляет их в комнату как участников и автоматически во все существующие задачи комнаты."
+
   - task: "YouTube Info in Tasks"
     implemented: true
     working: true
