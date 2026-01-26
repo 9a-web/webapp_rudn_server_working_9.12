@@ -6606,55 +6606,64 @@ async def process_journal_webapp_invite(data: ProcessJournalInviteRequest):
                     "student_name": existing_link['full_name']
                 }
             
-            # Проверить, не в pending ли уже (для обратной совместимости - удаляем из pending)
-            existing_pending = await db.journal_pending_members.find_one({
+            # Проверить, не подана ли уже заявка
+            existing_application = await db.journal_applications.find_one({
                 "journal_id": journal_id,
-                "telegram_id": data.telegram_id
+                "telegram_id": data.telegram_id,
+                "status": "pending"
             })
-            if existing_pending:
-                # Удаляем из pending, так как сейчас будем создавать студента напрямую
-                await db.journal_pending_members.delete_one({"_id": existing_pending["_id"]})
+            if existing_application:
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "message": f"Ваша заявка на вступление в журнал «{journal_name}» ожидает рассмотрения старостой",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name
+                }
             
-            # Создаем нового студента и сразу привязываем его
-            # Приоритет имени: @username, затем Имя Фамилия из Telegram
-            if data.username:
-                student_name = f"@{data.username}"
-            elif data.first_name:
-                # Собираем полное имя из first_name и last_name
-                name_parts = [data.first_name]
-                if data.last_name:
-                    name_parts.append(data.last_name)
-                student_name = " ".join(name_parts)
-            else:
-                student_name = f"Студент {data.telegram_id}"
-            
-            # Получаем максимальный order для новых студентов
-            max_order_student = await db.journal_students.find_one(
-                {"journal_id": journal_id},
-                sort=[("order", -1)]
-            )
-            new_order = (max_order_student["order"] + 1) if max_order_student else 0
-            
-            new_student = JournalStudent(
+            # Создаём заявку на вступление
+            application = JournalJoinApplication(
                 journal_id=journal_id,
-                full_name=student_name,
                 telegram_id=data.telegram_id,
                 username=data.username,
                 first_name=data.first_name,
-                is_linked=True,
-                linked_at=datetime.utcnow(),
-                order=new_order
+                last_name=data.last_name
             )
-            await db.journal_students.insert_one(new_student.model_dump())
+            await db.journal_applications.insert_one(application.model_dump())
             
-            logger.info(f"✅ User {data.telegram_id} joined journal '{journal_name}' as '{student_name}' (auto-linked)")
+            # Отправляем уведомление старосте
+            owner_id = journal["owner_id"]
+            applicant_name = data.first_name or data.username or f"User {data.telegram_id}"
+            if data.last_name:
+                applicant_name = f"{data.first_name} {data.last_name}"
+            
+            await create_notification(
+                telegram_id=owner_id,
+                notification_type=NotificationType.JOURNAL_INVITE,
+                category=NotificationCategory.JOURNAL,
+                priority=NotificationPriority.HIGH,
+                title="Новая заявка в журнал",
+                message=f"{applicant_name} хочет присоединиться к журналу «{journal_name}»",
+                emoji="",
+                data={
+                    "application_id": application.id,
+                    "journal_id": journal_id,
+                    "applicant_telegram_id": data.telegram_id,
+                    "applicant_name": applicant_name,
+                    "applicant_username": data.username
+                },
+                actions=[
+                    {"id": "view_application", "label": "Просмотреть", "type": "primary"}
+                ]
+            )
+            
+            logger.info(f"📝 User {data.telegram_id} applied to journal '{journal_name}'")
             return {
                 "success": True,
-                "status": "joined",
-                "message": f"Вы присоединились к журналу «{journal_name}» как «{student_name}»!",
+                "status": "application_sent",
+                "message": f"Заявка на вступление в журнал «{journal_name}» отправлена! Ожидайте подтверждения от старосты.",
                 "journal_id": journal_id,
-                "journal_name": journal_name,
-                "student_name": student_name
+                "journal_name": journal_name
             }
         
         elif data.invite_type == "jstudent":
