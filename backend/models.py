@@ -2028,15 +2028,6 @@ class WebSessionLinkResponse(BaseModel):
     session_token: Optional[str] = None
 
 
-    title: str
-    message: str
-    emoji: str = "🔔"
-    data: dict = {}
-    action_url: Optional[str] = None
-    actions: List[dict] = []
-    expires_at: Optional[datetime] = None
-
-
 class NotificationCard(BaseModel):
     """Карточка уведомления для отображения"""
     id: str
