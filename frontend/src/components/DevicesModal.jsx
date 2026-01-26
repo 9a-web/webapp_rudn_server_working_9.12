@@ -3,6 +3,7 @@
  * Показывает список подключенных устройств и позволяет:
  * - Сканировать QR для подключения нового устройства
  * - Отключать существующие устройства
+ * - Отключать все устройства сразу
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -10,9 +11,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Smartphone, Monitor, Tablet, Globe, 
   Trash2, QrCode, Loader2, AlertCircle, 
-  CheckCircle, Clock, RefreshCw, Camera
+  CheckCircle, Clock, RefreshCw, Camera, LogOut
 } from 'lucide-react';
-import { getUserDevices, revokeDevice, linkWebSession } from '../services/webSessionAPI';
+import { getUserDevices, revokeDevice, revokeAllDevices, linkWebSession } from '../services/webSessionAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 
 const DevicesModal = ({ isOpen, onClose, user }) => {
@@ -21,12 +22,16 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [revokingToken, setRevokingToken] = useState(null);
+  const [revokingAll, setRevokingAll] = useState(false);
   const [scanningQR, setScanningQR] = useState(false);
   const [linkStatus, setLinkStatus] = useState(null); // null, 'linking', 'success', 'error'
   const [linkMessage, setLinkMessage] = useState('');
 
   // Получаем текущий session_token из localStorage
   const currentSessionToken = localStorage.getItem('session_token');
+  
+  // Проверяем, находимся ли мы в Telegram WebApp (тогда текущее устройство - это телефон, а не веб)
+  const isInTelegramWebApp = !!webApp?.initDataUnsafe?.user;
 
   // Загрузка списка устройств
   const loadDevices = useCallback(async () => {
