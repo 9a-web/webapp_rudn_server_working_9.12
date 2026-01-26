@@ -392,53 +392,108 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
         onThemeChange={onThemeChange}
       />
 
-      {/* Easter Egg Message */}
+      {/* Easter Egg Message - Элегантное уведомление */}
       <AnimatePresence>
         {showEasterEgg && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: -50 }}
+            initial={{ opacity: 0, scale: 0.9, y: -30 }}
             animate={{ 
               opacity: 1, 
               scale: 1, 
-              y: 0,
-              transition: {
-                type: "spring",
-                damping: 15,
-                stiffness: 300
-              }
+              y: 0
             }}
             exit={{ 
               opacity: 0, 
-              scale: 0.8,
-              y: -50,
-              transition: { duration: 0.3 }
+              scale: 0.95,
+              y: -20
             }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl"
-            style={{
-              background: 'linear-gradient(135deg, #A3F7BF, #FFE66D, #FFB4D1, #C4A3FF, #80E8FF)',
-              backgroundSize: '300% 300%',
-              animation: 'gradient 3s ease infinite'
+            transition={{
+              type: "spring",
+              damping: 20,
+              stiffness: 300,
+              mass: 0.8
             }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-[200]"
           >
-            <motion.div
-              animate={{
-                scale: [1, 1.05, 1],
-                rotate: [0, 5, -5, 0]
+            {/* Внешнее свечение */}
+            <div 
+              className="absolute -inset-4 rounded-3xl opacity-60 blur-2xl"
+              style={{
+                background: 'linear-gradient(135deg, #67E8F9, #A78BFA, #F472B6)',
               }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
+            />
+            
+            {/* Основной контейнер */}
+            <div 
+              className="relative px-8 py-5 rounded-2xl border border-white/20 shadow-2xl overflow-hidden"
+              style={{
+                background: 'rgba(20, 20, 25, 0.85)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
               }}
-              className="text-center"
             >
-              <p className="text-2xl font-bold text-white mb-1">
-                🎉 Секрет раскрыт! 🎉
-              </p>
-              <p className="text-sm text-white/90">
-                Ты нашёл пасхалку! {logoClickCount > 10 ? `(${logoClickCount} кликов!)` : ''}
-              </p>
-            </motion.div>
+              {/* Градиентная полоска сверху */}
+              <motion.div 
+                className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
+                style={{
+                  background: 'linear-gradient(90deg, #67E8F9, #A78BFA, #F472B6, #34D399)',
+                  backgroundSize: '200% 100%',
+                }}
+                animate={{
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: 'linear'
+                }}
+              />
+              
+              {/* Мягкое внутреннее свечение */}
+              <div 
+                className="absolute inset-0 rounded-2xl opacity-30"
+                style={{
+                  background: 'radial-gradient(ellipse at center top, rgba(167, 139, 250, 0.3), transparent 70%)',
+                }}
+              />
+
+              {/* Контент */}
+              <div className="relative text-center">
+                {/* Иконка */}
+                <motion.div 
+                  className="text-3xl mb-2"
+                  animate={{
+                    scale: [1, 1.15, 1],
+                    rotate: [0, -5, 5, 0]
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  ✨
+                </motion.div>
+                
+                {/* Заголовок */}
+                <h3 
+                  className="text-lg font-semibold mb-1"
+                  style={{
+                    background: 'linear-gradient(135deg, #67E8F9, #A78BFA, #F472B6)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  Секрет раскрыт!
+                </h3>
+                
+                {/* Подзаголовок */}
+                <p className="text-sm text-white/70">
+                  Ты нашёл пасхалку
+                </p>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
