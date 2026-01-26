@@ -694,6 +694,64 @@ const Home = () => {
     setNewYearThemeMode(mode);
   }, []);
 
+  // Периодическая проверка валидности сессии для связанных пользователей
+  useEffect(() => {
+    // Проверяем только если пользователь связан через веб (есть session_token)
+    const sessionToken = localStorage.getItem('session_token');
+    const telegramUser = localStorage.getItem('telegram_user');
+    
+    // Если нет session_token или нет сохранённого пользователя - не проверяем
+    if (!sessionToken || !telegramUser) {
+      return;
+    }
+    
+    // Если мы в Telegram WebApp - не проверяем (там своя авторизация)
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+      return;
+    }
+    
+    console.log('🔒 Starting session validity check for linked user');
+    
+    const checkSessionValidity = async () => {
+      try {
+        const status = await getWebSessionStatus(sessionToken);
+        
+        if (status.status !== 'linked') {
+          console.warn('⚠️ Session is no longer valid:', status.status);
+          handleSessionRevoked();
+        }
+      } catch (err) {
+        // Если сессия не найдена (404) - она была удалена
+        console.warn('⚠️ Session check failed, session may be revoked:', err.message);
+        handleSessionRevoked();
+      }
+    };
+    
+    const handleSessionRevoked = () => {
+      console.log('🔄 Session revoked, clearing data and reloading...');
+      
+      // Полная очистка localStorage
+      localStorage.removeItem('telegram_user');
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('user_settings');
+      localStorage.removeItem('rudn_device_id');
+      localStorage.removeItem('activeTab');
+      
+      // Перезагружаем страницу
+      window.location.reload();
+    };
+    
+    // Проверяем сразу при монтировании
+    checkSessionValidity();
+    
+    // Затем проверяем каждые 10 секунд
+    const intervalId = setInterval(checkSessionValidity, 10000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
   const loadSchedule = async () => {
     try {
       setLoading(true);
