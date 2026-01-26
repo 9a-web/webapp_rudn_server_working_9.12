@@ -286,9 +286,19 @@ export const TelegramProvider = ({ children }) => {
           console.log('📱 Проверка сохраненной сессии для:', parsedUser.first_name);
           
           // Проверяем валидность сессии на сервере
-          const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:8001'
-            : window.location.origin;
+          // Используем ту же логику что в api.js
+          let backendUrl;
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            backendUrl = 'http://localhost:8001';
+          } else if (import.meta.env.REACT_APP_BACKEND_URL) {
+            backendUrl = import.meta.env.REACT_APP_BACKEND_URL;
+          } else if (process.env.REACT_APP_BACKEND_URL) {
+            backendUrl = process.env.REACT_APP_BACKEND_URL;
+          } else {
+            backendUrl = window.location.origin;
+          }
+          
+          console.log('🔗 Checking session at:', `${backendUrl}/api/web-sessions/${savedSessionToken}/status`);
           
           fetch(`${backendUrl}/api/web-sessions/${savedSessionToken}/status`)
             .then(response => {
