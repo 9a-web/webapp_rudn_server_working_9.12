@@ -399,3 +399,25 @@ export const createSessionsFromSchedule = async (journalId, data) => {
     throw error;
   }
 };
+
+// ===== Добавление студентов из друзей =====
+
+// Добавить друзей как студентов с автоматической привязкой
+export const addStudentsFromFriends = async (journalId, friends) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/journals/${journalId}/students/from-friends`, {
+      friends: friends.map(f => ({
+        telegram_id: f.telegram_id,
+        full_name: f.first_name && f.last_name 
+          ? `${f.last_name} ${f.first_name}`.trim()
+          : f.first_name || f.username || `User ${f.telegram_id}`,
+        username: f.username,
+        first_name: f.first_name
+      }))
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error adding students from friends:', error);
+    throw error;
+  }
+};
