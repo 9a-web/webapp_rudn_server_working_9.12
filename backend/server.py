@@ -11353,6 +11353,50 @@ async def revoke_device_session(session_token: str, telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.delete("/web-sessions/user/{telegram_id}/all")
+async def revoke_all_devices(telegram_id: int):
+    """
+    Отключить все устройства пользователя (удалить все сессии).
+    """
+    try:
+        # Получаем все сессии пользователя для закрытия WebSocket соединений
+        sessions = await db.web_sessions.find({
+            "telegram_id": telegram_id,
+            "status": WebSessionStatus.LINKED.value
+        }).to_list(length=100)
+        
+        # Закрываем WebSocket соединения
+        for session in sessions:
+            session_token = session.get("session_token")
+            if session_token and session_token in web_session_connections:
+                try:
+                    ws = web_session_connections[session_token]
+                    await ws.send_json({"event": "revoked", "message": "Все сессии отключены"})
+                    await ws.close()
+                except:
+                    pass
+                finally:
+                    if session_token in web_session_connections:
+                        del web_session_connections[session_token]
+        
+        # Удаляем все сессии пользователя
+        result = await db.web_sessions.delete_many({
+            "telegram_id": telegram_id
+        })
+        
+        logger.info(f"🗑️ Revoked all {result.deleted_count} sessions for user {telegram_id}")
+        
+        return {
+            "success": True, 
+            "message": f"Отключено устройств: {result.deleted_count}",
+            "deleted_count": result.deleted_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Revoke all devices error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/web-sessions/{session_token}/heartbeat")
 async def session_heartbeat(session_token: str):
     """
