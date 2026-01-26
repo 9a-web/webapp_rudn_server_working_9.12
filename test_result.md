@@ -135,14 +135,14 @@ frontend:
   - task: "Telegram Profile Link via QR Code UI"
     implemented: true
     working: pending
-    file: "/app/frontend/src/components/TelegramLinkScreen.jsx, /app/frontend/src/components/TelegramLinkConfirmModal.jsx, /app/frontend/src/App.jsx"
+    file: "/app/frontend/src/components/ProfileModal.jsx, /app/frontend/src/components/TelegramLinkConfirmModal.jsx, /app/frontend/src/App.jsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: pending
         agent: "main"
-        comment: "🔧 Реализован UI для связки Telegram профиля: TelegramLinkScreen (экран с QR-кодом, таймером, WebSocket для real-time обновлений), TelegramLinkConfirmModal (модальное окно подтверждения в Telegram Web App). Добавлена обработка startapp=link_{token} в App.jsx. Обновлён TelegramContext для сохранения/загрузки связанного пользователя в localStorage."
+        comment: "🔧 QR-код для связки Telegram теперь показывается в ProfileModal (вкладка профиля). Добавлена секция 'Подключить Telegram' с QR-кодом, таймером обратного отсчёта, WebSocket для real-time обновлений. Доступно для гостевых пользователей и при открытии в браузере. После сканирования QR в Telegram показывается TelegramLinkConfirmModal для подтверждения."
 
   - task: "YouTube Preview in Tasks"
     implemented: true
