@@ -11211,7 +11211,7 @@ app.include_router(api_router)
 
 # ============ WebSocket для Web Sessions (связка Telegram профиля) ============
 
-@app.websocket("/ws/session/{session_token}")
+@app.websocket("/api/ws/session/{session_token}")
 async def websocket_session(websocket: WebSocket, session_token: str):
     """
     WebSocket для real-time уведомления о связке сессии.
