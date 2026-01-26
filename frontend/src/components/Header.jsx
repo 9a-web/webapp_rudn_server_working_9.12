@@ -207,7 +207,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                       opacity: [0.5, 0]
                     }}
                     transition={{ 
-                      duration: 3, 
+                      duration: 7, 
                       repeat: Infinity,
                       ease: [0.25, 0.1, 0.25, 1]
                     }}
@@ -222,9 +222,9 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                       opacity: [0.4, 0]
                     }}
                     transition={{ 
-                      duration: 3, 
+                      duration: 7, 
                       repeat: Infinity,
-                      delay: 1,
+                      delay: 2.33,
                       ease: [0.25, 0.1, 0.25, 1]
                     }}
                   />
@@ -238,9 +238,9 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                       opacity: [0.3, 0]
                     }}
                     transition={{ 
-                      duration: 3, 
+                      duration: 7, 
                       repeat: Infinity,
-                      delay: 2,
+                      delay: 4.66,
                       ease: [0.25, 0.1, 0.25, 1]
                     }}
                   />
@@ -253,7 +253,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                       opacity: [0.15, 0.4, 0.15]
                     }}
                     transition={{ 
-                      duration: 3, 
+                      duration: 7, 
                       repeat: Infinity,
                       ease: "easeInOut"
                     }}
