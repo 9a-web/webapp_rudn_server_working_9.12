@@ -2036,6 +2036,31 @@ class WebSessionLinkResponse(BaseModel):
     session_token: Optional[str] = None
 
 
+class WebSessionCreateRequest(BaseModel):
+    """Запрос на создание веб-сессии с информацией об устройстве"""
+    device_name: Optional[str] = None
+    browser: Optional[str] = None
+    os: Optional[str] = None
+    user_agent: Optional[str] = None
+
+
+class DeviceInfo(BaseModel):
+    """Информация об устройстве/сессии"""
+    session_token: str
+    device_name: str
+    browser: Optional[str] = None
+    os: Optional[str] = None
+    linked_at: Optional[datetime] = None
+    last_active: Optional[datetime] = None
+    is_current: bool = False  # Текущее устройство
+
+
+class DevicesListResponse(BaseModel):
+    """Список устройств пользователя"""
+    devices: List[DeviceInfo]
+    total: int
+
+
 class NotificationCard(BaseModel):
     """Карточка уведомления для отображения"""
     id: str
