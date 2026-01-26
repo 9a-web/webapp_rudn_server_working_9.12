@@ -11269,6 +11269,112 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/web-sessions/user/{telegram_id}/devices", response_model=DevicesListResponse)
+async def get_user_devices(telegram_id: int, current_token: str = None):
+    """
+    Получить список активных устройств пользователя.
+    current_token - токен текущей сессии для маркировки.
+    """
+    try:
+        # Получаем все активные (linked) сессии пользователя
+        cursor = db.web_sessions.find({
+            "telegram_id": telegram_id,
+            "status": WebSessionStatus.LINKED.value
+        }).sort("linked_at", -1)
+        
+        sessions = await cursor.to_list(length=100)
+        
+        devices = []
+        for session in sessions:
+            device = DeviceInfo(
+                session_token=session.get("session_token", ""),
+                device_name=session.get("device_name", "Неизвестное устройство"),
+                browser=session.get("browser"),
+                os=session.get("os"),
+                linked_at=session.get("linked_at"),
+                last_active=session.get("last_active"),
+                is_current=(current_token == session.get("session_token")) if current_token else False
+            )
+            devices.append(device)
+        
+        logger.info(f"📱 Found {len(devices)} devices for user {telegram_id}")
+        
+        return DevicesListResponse(
+            devices=devices,
+            total=len(devices)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get user devices error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/web-sessions/{session_token}")
+async def revoke_device_session(session_token: str, telegram_id: int):
+    """
+    Отключить устройство (отозвать сессию).
+    telegram_id используется для проверки владельца.
+    """
+    try:
+        # Проверяем, что сессия принадлежит пользователю
+        session = await db.web_sessions.find_one({
+            "session_token": session_token,
+            "telegram_id": telegram_id
+        })
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Сессия не найдена или не принадлежит вам")
+        
+        # Удаляем сессию
+        result = await db.web_sessions.delete_one({"session_token": session_token})
+        
+        if result.deleted_count > 0:
+            logger.info(f"🗑️ Revoked session {session_token[:8]}... for user {telegram_id}")
+            
+            # Если есть активное WebSocket соединение - закрываем его
+            if session_token in web_session_connections:
+                try:
+                    ws = web_session_connections[session_token]
+                    await ws.send_json({"event": "revoked", "message": "Сессия отключена"})
+                    await ws.close()
+                except:
+                    pass
+                finally:
+                    del web_session_connections[session_token]
+            
+            return {"success": True, "message": "Устройство отключено"}
+        else:
+            raise HTTPException(status_code=500, detail="Не удалось удалить сессию")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Revoke device session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/heartbeat")
+async def session_heartbeat(session_token: str):
+    """
+    Обновить время последней активности сессии.
+    Вызывается периодически с клиента.
+    """
+    try:
+        result = await db.web_sessions.update_one(
+            {"session_token": session_token, "status": WebSessionStatus.LINKED.value},
+            {"$set": {"last_active": datetime.utcnow()}}
+        )
+        
+        if result.modified_count > 0:
+            return {"success": True}
+        else:
+            return {"success": False, "message": "Сессия не найдена"}
+        
+    except Exception as e:
+        logger.error(f"Session heartbeat error: {e}")
+        return {"success": False, "message": str(e)}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
