@@ -197,63 +197,63 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             <AnimatePresence>
               {hasNewNotification && (
                 <>
-                  {/* Первая волна - плавная анимация */}
+                  {/* Первая волна - очень плавная анимация */}
                   <motion.div
                     key="ripple1"
-                    className="absolute inset-0 rounded-xl border-2 border-pink-500/50"
+                    className="absolute inset-0 rounded-xl border border-pink-500/40"
                     initial={{ scale: 1, opacity: 0 }}
                     animate={{ 
-                      scale: [1, 1.5],
-                      opacity: [0.6, 0]
+                      scale: [1, 1.6],
+                      opacity: [0.5, 0]
                     }}
                     transition={{ 
-                      duration: 1.8, 
+                      duration: 3, 
                       repeat: Infinity,
-                      ease: [0.4, 0, 0.2, 1]
+                      ease: [0.25, 0.1, 0.25, 1]
                     }}
                   />
                   {/* Вторая волна с задержкой */}
                   <motion.div
                     key="ripple2"
-                    className="absolute inset-0 rounded-xl border-2 border-red-500/40"
+                    className="absolute inset-0 rounded-xl border border-red-500/30"
                     initial={{ scale: 1, opacity: 0 }}
                     animate={{ 
-                      scale: [1, 1.7],
-                      opacity: [0.5, 0]
+                      scale: [1, 1.8],
+                      opacity: [0.4, 0]
                     }}
                     transition={{ 
-                      duration: 1.8, 
+                      duration: 3, 
                       repeat: Infinity,
-                      delay: 0.6,
-                      ease: [0.4, 0, 0.2, 1]
+                      delay: 1,
+                      ease: [0.25, 0.1, 0.25, 1]
                     }}
                   />
                   {/* Третья волна */}
                   <motion.div
                     key="ripple3"
-                    className="absolute inset-0 rounded-xl border-2 border-purple-500/30"
+                    className="absolute inset-0 rounded-xl border border-purple-500/25"
                     initial={{ scale: 1, opacity: 0 }}
                     animate={{ 
-                      scale: [1, 1.9],
-                      opacity: [0.4, 0]
+                      scale: [1, 2],
+                      opacity: [0.3, 0]
                     }}
                     transition={{ 
-                      duration: 1.8, 
+                      duration: 3, 
                       repeat: Infinity,
-                      delay: 1.2,
-                      ease: [0.4, 0, 0.2, 1]
+                      delay: 2,
+                      ease: [0.25, 0.1, 0.25, 1]
                     }}
                   />
                   {/* Свечение кнопки - мягкое пульсирование */}
                   <motion.div
                     key="glow"
-                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/25 via-red-500/25 to-purple-500/25"
-                    initial={{ opacity: 0.2 }}
+                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/20 via-red-500/20 to-purple-500/20"
+                    initial={{ opacity: 0.15 }}
                     animate={{ 
-                      opacity: [0.2, 0.5, 0.2]
+                      opacity: [0.15, 0.4, 0.15]
                     }}
                     transition={{ 
-                      duration: 1.8, 
+                      duration: 3, 
                       repeat: Infinity,
                       ease: "easeInOut"
                     }}
