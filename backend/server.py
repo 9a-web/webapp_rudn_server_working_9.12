@@ -3478,6 +3478,132 @@ async def join_room_by_token(invite_token: str, join_data: RoomJoinRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/rooms/{room_id}/add-friends", response_model=RoomResponse)
+async def add_friends_to_room(room_id: str, data: RoomAddFriendsRequest):
+    """Быстро добавить друзей в комнату"""
+    try:
+        # Проверяем существование комнаты
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, что пользователь является участником комнаты
+        is_participant = any(
+            p["telegram_id"] == data.telegram_id 
+            for p in room_doc.get("participants", [])
+        )
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        added_friends = []
+        existing_participant_ids = {p["telegram_id"] for p in room_doc.get("participants", [])}
+        
+        for friend in data.friends:
+            # Проверяем что друг еще не в комнате
+            if friend.telegram_id in existing_participant_ids:
+                continue
+            
+            # Проверяем что это действительно друг
+            is_friend = await db.friends.find_one({
+                "$or": [
+                    {"user1_id": data.telegram_id, "user2_id": friend.telegram_id},
+                    {"user1_id": friend.telegram_id, "user2_id": data.telegram_id}
+                ]
+            })
+            
+            if not is_friend:
+                continue  # Пропускаем если не друзья
+            
+            # Добавляем друга в комнату
+            new_participant = {
+                "telegram_id": friend.telegram_id,
+                "username": friend.username,
+                "first_name": friend.first_name,
+                "role": "member",
+                "joined_at": datetime.utcnow()
+            }
+            
+            added_friends.append(new_participant)
+            existing_participant_ids.add(friend.telegram_id)
+        
+        if not added_friends:
+            raise HTTPException(status_code=400, detail="Все выбранные друзья уже в комнате или не являются вашими друзьями")
+        
+        # Обновляем комнату
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$push": {"participants": {"$each": added_friends}}}
+        )
+        
+        # Записываем активность
+        for friend in added_friends:
+            activity = RoomActivity(
+                room_id=room_id,
+                user_id=data.telegram_id,
+                username=None,
+                first_name="",
+                event_type="member_added",
+                target_user_id=friend["telegram_id"],
+                target_user_name=friend["first_name"],
+                description=f"Добавлен участник {friend['first_name']}"
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
+        # Добавляем друзей ко всем существующим задачам комнаты
+        room_tasks = await db.group_tasks.find({"room_id": room_id}).to_list(200)
+        for task in room_tasks:
+            for friend in added_friends:
+                # Проверяем что друг еще не участник задачи
+                existing_task_participants = {p["telegram_id"] for p in task.get("participants", [])}
+                if friend["telegram_id"] in existing_task_participants:
+                    continue
+                
+                new_task_participant = GroupTaskParticipant(
+                    telegram_id=friend["telegram_id"],
+                    username=friend.get("username"),
+                    first_name=friend["first_name"],
+                    role='member'
+                )
+                
+                await db.group_tasks.update_one(
+                    {"task_id": task["task_id"]},
+                    {"$push": {"participants": new_task_participant.model_dump()}}
+                )
+        
+        # Отправляем уведомления
+        for friend in added_friends:
+            await send_room_join_notifications_api(
+                room_doc=room_doc,
+                new_user_name=friend["first_name"],
+                new_user_id=friend["telegram_id"]
+            )
+        
+        # Получаем обновленную комнату
+        updated_room = await db.rooms.find_one({"room_id": room_id})
+        
+        # Статистика задач
+        total_tasks = await db.group_tasks.count_documents({"room_id": room_id})
+        completed_tasks = 0
+        room_tasks = await db.group_tasks.find({"room_id": room_id}).to_list(200)
+        for task in room_tasks:
+            if task.get("status") == "completed":
+                completed_tasks += 1
+        completion_percentage = round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0)
+        
+        return RoomResponse(
+            **updated_room,
+            total_participants=len(updated_room.get("participants", [])),
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks,
+            completion_percentage=completion_percentage
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении друзей в комнату: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/rooms/{room_id}/tasks", response_model=GroupTaskResponse)
 async def create_task_in_room(room_id: str, task_data: RoomTaskCreate):
     """Создать групповую задачу в комнате"""
