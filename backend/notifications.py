@@ -144,6 +144,35 @@ class TelegramNotificationService:
             logger.error(f"Failed to send test notification to {telegram_id}: {e}")
             return False
 
+    async def send_message(self, telegram_id: int, text: str, parse_mode: str = 'HTML') -> bool:
+        """
+        Отправить произвольное сообщение пользователю
+        
+        Args:
+            telegram_id: ID пользователя в Telegram
+            text: Текст сообщения
+            parse_mode: Режим форматирования ('HTML' или 'Markdown')
+            
+        Returns:
+            True если сообщение отправлено успешно
+        """
+        try:
+            await self.bot.send_message(
+                chat_id=telegram_id,
+                text=text,
+                parse_mode=parse_mode
+            )
+            
+            logger.info(f"Message sent to {telegram_id}")
+            return True
+            
+        except TelegramError as e:
+            logger.error(f"Failed to send message to {telegram_id}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error sending message to {telegram_id}: {e}")
+            return False
+
 
 # Глобальный экземпляр сервиса
 notification_service: Optional[TelegramNotificationService] = None
