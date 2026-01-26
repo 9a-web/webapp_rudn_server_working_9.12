@@ -1452,7 +1452,6 @@ export const ProfileModal = ({
               </>
             )}
           </AnimatePresence>
-          )}
 
           {/* Модальное окно подключения ЛК РУДН */}
           <LKConnectionModal
