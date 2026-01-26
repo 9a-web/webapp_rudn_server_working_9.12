@@ -1957,6 +1957,77 @@ class InAppNotificationCreate(BaseModel):
     type: NotificationType
     category: NotificationCategory
     priority: NotificationPriority = NotificationPriority.NORMAL
+
+
+# ============ Модели для Web Session (связка Telegram профиля) ============
+
+class WebSessionStatus(str, Enum):
+    """Статус веб-сессии"""
+    PENDING = "pending"        # Ожидает подтверждения
+    LINKED = "linked"          # Связан с Telegram
+    EXPIRED = "expired"        # Истёк срок действия
+    CANCELLED = "cancelled"    # Отменён
+
+
+class WebSession(BaseModel):
+    """Веб-сессия для связки с Telegram профилем"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_token: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    status: WebSessionStatus = WebSessionStatus.PENDING
+    
+    # Данные пользователя после связки
+    telegram_id: Optional[int] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    
+    # Метаданные
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(minutes=10))
+    linked_at: Optional[datetime] = None
+    
+    # Дополнительные данные (группа, настройки)
+    user_settings: Optional[dict] = None
+
+
+class WebSessionCreate(BaseModel):
+    """Создание веб-сессии"""
+    pass  # Не требует параметров
+
+
+class WebSessionResponse(BaseModel):
+    """Ответ с данными веб-сессии"""
+    session_token: str
+    status: WebSessionStatus
+    qr_url: str
+    expires_at: datetime
+    
+    # Данные пользователя (если связан)
+    telegram_id: Optional[int] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    user_settings: Optional[dict] = None
+
+
+class WebSessionLinkRequest(BaseModel):
+    """Запрос на связывание сессии с Telegram"""
+    telegram_id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+
+
+class WebSessionLinkResponse(BaseModel):
+    """Ответ на связывание сессии"""
+    success: bool
+    message: str
+    session_token: Optional[str] = None
+
+
     title: str
     message: str
     emoji: str = "🔔"
