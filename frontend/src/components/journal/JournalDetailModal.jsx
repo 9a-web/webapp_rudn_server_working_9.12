@@ -514,8 +514,30 @@ export const JournalDetailModal = ({
                           {/* Волны пульсации когда нет студентов */}
                           {students.length === 0 && (
                             <>
-                              <span className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 animate-ping opacity-75" />
-                              <span className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400 animate-ping opacity-50 animation-delay-150" style={{ animationDelay: '0.15s' }} />
+                              <span 
+                                className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400"
+                                style={{
+                                  animation: 'pulse-wave 2s ease-out infinite',
+                                }}
+                              />
+                              <span 
+                                className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400"
+                                style={{
+                                  animation: 'pulse-wave 2s ease-out infinite 0.5s',
+                                }}
+                              />
+                              <style>{`
+                                @keyframes pulse-wave {
+                                  0% {
+                                    transform: scale(1);
+                                    opacity: 0.4;
+                                  }
+                                  100% {
+                                    transform: scale(1.15);
+                                    opacity: 0;
+                                  }
+                                }
+                              `}</style>
                             </>
                           )}
                           <button
