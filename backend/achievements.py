@@ -738,3 +738,33 @@ async def award_referral_points(db, telegram_id: int, points_earned: int):
     
     except Exception as e:
         logger.error(f"❌ Ошибка при начислении реферальных баллов: {e}", exc_info=True)
+
+
+async def create_achievement_notification(db, telegram_id: int, achievement: dict):
+    """
+    Создать in-app уведомление о получении достижения
+    
+    Args:
+        db: Соединение с базой данных
+        telegram_id: ID пользователя
+        achievement: Данные достижения
+    """
+    from models import InAppNotification, NotificationType, NotificationCategory, NotificationPriority
+    
+    notification = InAppNotification(
+        telegram_id=telegram_id,
+        type=NotificationType.ACHIEVEMENT_EARNED,
+        category=NotificationCategory.ACHIEVEMENTS,
+        priority=NotificationPriority.NORMAL,
+        title="Новое достижение!",
+        message=f"Получено достижение «{achievement.get('name', '')}» +{achievement.get('points', 0)} очков",
+        emoji=achievement.get('emoji', '🏆'),
+        data={
+            "achievement_id": achievement.get("id"),
+            "achievement_name": achievement.get("name"),
+            "points": achievement.get("points")
+        }
+    )
+    
+    await db.in_app_notifications.insert_one(notification.dict())
+    logger.info(f"🏆 Создано уведомление о достижении '{achievement.get('name')}' для {telegram_id}")
