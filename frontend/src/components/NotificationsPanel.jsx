@@ -7,19 +7,63 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Bell, Check, CheckCheck, Settings, Trash2,
   Users, Calendar, Home, Trophy, MessageSquare, AlertCircle,
-  ChevronRight, RefreshCw
+  ChevronRight, RefreshCw, UserPlus, UserCheck, Clock,
+  ListTodo, ClipboardCheck, Award, Star, Megaphone, Send,
+  BookOpen, GraduationCap, Sparkles, Gift, Zap, Info
 } from 'lucide-react';
 import { notificationsAPI } from '../services/notificationsAPI';
 import { friendsAPI } from '../services/friendsAPI';
 import NotificationSettingsPanel from './NotificationSettingsPanel';
 
+// Конфиг категорий
 const CATEGORY_CONFIG = {
   study: { icon: Calendar, color: 'blue', label: 'Учебные' },
   social: { icon: Users, color: 'purple', label: 'Социальные' },
   rooms: { icon: Home, color: 'green', label: 'Комнаты' },
-  journal: { icon: MessageSquare, color: 'indigo', label: 'Журнал' },
+  journal: { icon: BookOpen, color: 'indigo', label: 'Журнал' },
   achievements: { icon: Trophy, color: 'yellow', label: 'Достижения' },
   system: { icon: AlertCircle, color: 'gray', label: 'Системные' }
+};
+
+// Маппинг типов уведомлений на иконки
+const TYPE_ICONS = {
+  // Учебные
+  class_starting: Clock,
+  schedule_changed: Calendar,
+  task_deadline: ListTodo,
+  
+  // Социальные
+  friend_request: UserPlus,
+  friend_accepted: UserCheck,
+  friend_joined: Users,
+  
+  // Комнаты
+  room_invite: Home,
+  room_task_new: ListTodo,
+  room_task_assigned: ClipboardCheck,
+  room_task_completed: CheckCheck,
+  room_member_joined: Users,
+  
+  // Журнал
+  journal_attendance: BookOpen,
+  journal_invite: GraduationCap,
+  
+  // Достижения
+  achievement_earned: Award,
+  level_up: Star,
+  
+  // Системные
+  app_update: Sparkles,
+  announcement: Megaphone,
+  admin_message: Send,
+  
+  // Дефолт
+  default: Bell
+};
+
+// Получить иконку по типу уведомления
+const getNotificationIcon = (type) => {
+  return TYPE_ICONS[type] || TYPE_ICONS.default;
 };
 
 const NotificationsPanel = ({ 
