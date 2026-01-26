@@ -114,8 +114,16 @@
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
-        <!-- Vite Module Entry Point -->
-        <script type="module" src="/src/index.jsx"></script>
+        <!-- Vite Module Entry Point с динамическим обходом кэша -->
+        <script>
+            // 🔄 Динамическая загрузка модуля с timestamp для обхода кэша Telegram
+            (function() {
+                var script = document.createElement('script');
+                script.type = 'module';
+                script.src = '/src/index.jsx?t=' + Date.now();
+                document.body.appendChild(script);
+            })();
+        </script>
         
         <!-- PostHog Analytics -->
         <script>
