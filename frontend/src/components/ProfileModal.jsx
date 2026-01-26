@@ -1212,6 +1212,7 @@ export const ProfileModal = ({
               </motion.div>
             )}
           </motion.div>
+          )}
 
           {/* Модальное окно настроек */}
           <AnimatePresence>
