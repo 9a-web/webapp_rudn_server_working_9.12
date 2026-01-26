@@ -278,25 +278,80 @@ export const TelegramProvider = ({ children }) => {
       
       // Проверяем, есть ли сохраненный Telegram пользователь в localStorage
       const savedTelegramUser = localStorage.getItem('telegram_user');
+      const savedSessionToken = localStorage.getItem('session_token');
       
-      if (savedTelegramUser) {
+      if (savedTelegramUser && savedSessionToken) {
         try {
           const parsedUser = JSON.parse(savedTelegramUser);
-          console.log('📱 Загружен сохраненный Telegram пользователь:', parsedUser.first_name);
-          setUser({
-            id: parsedUser.id,
-            first_name: parsedUser.first_name || 'Пользователь',
-            last_name: parsedUser.last_name || '',
-            username: parsedUser.username || '',
-            photo_url: parsedUser.photo_url,
-            is_linked: true // Флаг что это связанный пользователь
-          });
-          setIsReady(true);
-          return;
+          console.log('📱 Проверка сохраненной сессии для:', parsedUser.first_name);
+          
+          // Проверяем валидность сессии на сервере
+          const backendUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8001'
+            : window.location.origin;
+          
+          fetch(`${backendUrl}/api/web-sessions/${savedSessionToken}/status`)
+            .then(response => {
+              if (response.ok) {
+                return response.json();
+              }
+              throw new Error('Session not found');
+            })
+            .then(sessionData => {
+              if (sessionData.status === 'linked' && sessionData.telegram_id === parsedUser.id) {
+                console.log('✅ Сессия валидна, загружаем пользователя');
+                setUser({
+                  id: parsedUser.id,
+                  first_name: parsedUser.first_name || 'Пользователь',
+                  last_name: parsedUser.last_name || '',
+                  username: parsedUser.username || '',
+                  photo_url: parsedUser.photo_url,
+                  is_linked: true
+                });
+              } else {
+                console.warn('⚠️ Сессия невалидна или принадлежит другому пользователю');
+                localStorage.removeItem('telegram_user');
+                localStorage.removeItem('session_token');
+                // Создаем гостевого пользователя
+                const { deviceId, numericId } = getOrCreateDeviceId();
+                setUser({
+                  id: numericId,
+                  first_name: 'Пользователь',
+                  last_name: '',
+                  username: `user_${deviceId.substring(0, 8)}`,
+                  device_id: deviceId,
+                  is_guest: true
+                });
+              }
+              setIsReady(true);
+            })
+            .catch(err => {
+              console.warn('⚠️ Сессия не найдена или удалена:', err.message);
+              localStorage.removeItem('telegram_user');
+              localStorage.removeItem('session_token');
+              // Создаем гостевого пользователя
+              const { deviceId, numericId } = getOrCreateDeviceId();
+              setUser({
+                id: numericId,
+                first_name: 'Пользователь',
+                last_name: '',
+                username: `user_${deviceId.substring(0, 8)}`,
+                device_id: deviceId,
+                is_guest: true
+              });
+              setIsReady(true);
+            });
+          
+          return; // Ждём ответ от сервера
         } catch (e) {
           console.error('Ошибка парсинга сохраненного пользователя:', e);
           localStorage.removeItem('telegram_user');
+          localStorage.removeItem('session_token');
         }
+      } else if (savedTelegramUser) {
+        // Есть пользователь но нет токена сессии - очищаем
+        console.warn('⚠️ Нет токена сессии, очищаем данные');
+        localStorage.removeItem('telegram_user');
       }
       
       // Если нет сохраненного пользователя - создаем гостевого с device_id
