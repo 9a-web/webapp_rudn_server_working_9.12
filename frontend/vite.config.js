@@ -26,6 +26,10 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
+          // 🔄 Хеширование файлов для обхода кэша Telegram
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
           manualChunks: {
             'react-vendor': ['react', 'react-dom'],
             'router': ['react-router-dom'],
