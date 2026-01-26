@@ -133,8 +133,10 @@ def test_journal_add_friends_api():
     # Create a test journal first
     journal_data = {
         "name": "Test Journal for Friends",
+        "group_name": "Test Group",
         "description": "Testing journal for adding friends as students",
-        "owner_id": TELEGRAM_ID
+        "telegram_id": TELEGRAM_ID,
+        "color": "purple"
     }
     
     try:
