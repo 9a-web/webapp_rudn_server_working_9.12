@@ -690,7 +690,9 @@ export const JournalDetailModal = ({
           onClose={() => setShowAddStudents(false)}
           onAddSingle={handleAddSingleStudent}
           onAddBulk={handleAddBulkStudents}
+          onAddFromFriends={handleAddStudentsFromFriends}
           hapticFeedback={hapticFeedback}
+          telegramId={telegramId}
         />
 
         <CreateSessionModal
