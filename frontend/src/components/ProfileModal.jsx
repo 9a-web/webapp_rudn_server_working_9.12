@@ -63,6 +63,7 @@ export const ProfileModal = ({
   const [lkData, setLkData] = useState(null);
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrData, setQrData] = useState(null);
+  const [showDevicesModal, setShowDevicesModal] = useState(false);
 
   // Состояния для связки Telegram профиля
   const [showTelegramLink, setShowTelegramLink] = useState(false);
