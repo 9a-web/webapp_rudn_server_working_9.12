@@ -197,64 +197,64 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             <AnimatePresence>
               {hasNewNotification && (
                 <>
-                  {/* Первая волна */}
+                  {/* Первая волна - плавная анимация */}
                   <motion.div
                     key="ripple1"
-                    className="absolute inset-0 rounded-xl border-2 border-pink-500/60"
-                    initial={{ scale: 1, opacity: 0.8 }}
+                    className="absolute inset-0 rounded-xl border-2 border-pink-500/50"
+                    initial={{ scale: 1, opacity: 0 }}
                     animate={{ 
-                      scale: [1, 1.6, 1.6],
-                      opacity: [0.8, 0.3, 0]
+                      scale: [1, 1.5],
+                      opacity: [0.6, 0]
                     }}
                     transition={{ 
-                      duration: 1.5, 
-                      repeat: 3,
-                      ease: "easeOut"
+                      duration: 1.8, 
+                      repeat: Infinity,
+                      ease: [0.4, 0, 0.2, 1]
                     }}
                   />
                   {/* Вторая волна с задержкой */}
                   <motion.div
                     key="ripple2"
-                    className="absolute inset-0 rounded-xl border-2 border-red-500/50"
-                    initial={{ scale: 1, opacity: 0.6 }}
+                    className="absolute inset-0 rounded-xl border-2 border-red-500/40"
+                    initial={{ scale: 1, opacity: 0 }}
                     animate={{ 
-                      scale: [1, 1.8, 1.8],
-                      opacity: [0.6, 0.2, 0]
+                      scale: [1, 1.7],
+                      opacity: [0.5, 0]
                     }}
                     transition={{ 
-                      duration: 1.5, 
-                      repeat: 3,
-                      delay: 0.3,
-                      ease: "easeOut"
+                      duration: 1.8, 
+                      repeat: Infinity,
+                      delay: 0.6,
+                      ease: [0.4, 0, 0.2, 1]
                     }}
                   />
                   {/* Третья волна */}
                   <motion.div
                     key="ripple3"
-                    className="absolute inset-0 rounded-xl border-2 border-purple-500/40"
-                    initial={{ scale: 1, opacity: 0.5 }}
+                    className="absolute inset-0 rounded-xl border-2 border-purple-500/30"
+                    initial={{ scale: 1, opacity: 0 }}
                     animate={{ 
-                      scale: [1, 2, 2],
-                      opacity: [0.5, 0.1, 0]
+                      scale: [1, 1.9],
+                      opacity: [0.4, 0]
                     }}
                     transition={{ 
-                      duration: 1.5, 
-                      repeat: 3,
-                      delay: 0.6,
-                      ease: "easeOut"
+                      duration: 1.8, 
+                      repeat: Infinity,
+                      delay: 1.2,
+                      ease: [0.4, 0, 0.2, 1]
                     }}
                   />
-                  {/* Свечение кнопки */}
+                  {/* Свечение кнопки - мягкое пульсирование */}
                   <motion.div
                     key="glow"
-                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/30 via-red-500/30 to-purple-500/30"
-                    initial={{ opacity: 0 }}
+                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/25 via-red-500/25 to-purple-500/25"
+                    initial={{ opacity: 0.2 }}
                     animate={{ 
-                      opacity: [0.3, 0.6, 0.3]
+                      opacity: [0.2, 0.5, 0.2]
                     }}
                     transition={{ 
-                      duration: 0.8, 
-                      repeat: 6,
+                      duration: 1.8, 
+                      repeat: Infinity,
                       ease: "easeInOut"
                     }}
                   />
@@ -262,17 +262,18 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               )}
             </AnimatePresence>
             
-            {/* Bell icon с анимацией покачивания */}
+            {/* Bell icon с анимацией покачивания - плавное и синхронизированное */}
             <motion.div
               className="relative z-10"
               animate={hasNewNotification ? {
-                rotate: [0, -20, 20, -15, 15, -10, 10, -5, 5, 0],
-                scale: [1, 1.1, 1.1, 1.05, 1.05, 1],
+                rotate: [0, -12, 12, -8, 8, -4, 4, 0],
+                scale: [1, 1.08, 1.08, 1.04, 1.04, 1, 1, 1],
               } : {}}
               transition={hasNewNotification ? {
-                duration: 0.8,
-                repeat: 5,
-                repeatDelay: 0.2
+                duration: 0.9,
+                repeat: Infinity,
+                repeatDelay: 0.9,
+                ease: "easeInOut"
               } : {}}
             >
               <Bell className="w-5 h-5 md:w-6 md:h-6" style={{ color: hasNewNotification ? '#ff6b9d' : '#E7E7E7' }} />
@@ -283,12 +284,12 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               <motion.span 
                 className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg"
                 animate={hasNewNotification ? {
-                  scale: [1, 1.3, 1],
+                  scale: [1, 1.15, 1],
                 } : {}}
                 transition={hasNewNotification ? {
-                  duration: 0.5,
-                  repeat: 9,
-                  repeatDelay: 0.3
+                  duration: 1.8,
+                  repeat: Infinity,
+                  ease: "easeInOut"
                 } : {}}
               >
                 {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
