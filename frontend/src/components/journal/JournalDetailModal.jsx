@@ -742,9 +742,23 @@ export const JournalDetailModal = ({
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={handleCopyLink}
-                  className={`w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r ${gradient}`}
+                  className={`w-full py-3 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all ${
+                    linkCopied 
+                      ? 'bg-green-500' 
+                      : `bg-gradient-to-r ${gradient}`
+                  }`}
                 >
-                  Скопировать ссылку
+                  {linkCopied ? (
+                    <>
+                      <Check className="w-5 h-5" />
+                      Скопировано!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-5 h-5" />
+                      Скопировать ссылку
+                    </>
+                  )}
                 </motion.button>
               </motion.div>
             </div>
