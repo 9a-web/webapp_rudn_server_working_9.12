@@ -657,6 +657,170 @@ export const ProfileModal = ({
               </motion.div>
             )}
 
+            {/* Связка с Telegram - показываем для гостевых пользователей или в браузере */}
+            {(isGuestUser || !isTelegramWebApp) && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    if (!showTelegramLink) {
+                      setShowTelegramLink(true);
+                      createTelegramLinkSession();
+                    } else {
+                      setShowTelegramLink(false);
+                    }
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}
+                  >
+                    <Smartphone className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      Подключить Telegram
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Синхронизация профиля через QR-код
+                    </p>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-blue-400 transition-transform ${showTelegramLink ? 'rotate-90' : ''}`} />
+                </button>
+
+                {/* QR-код для связки (раскрывающийся) */}
+                <AnimatePresence>
+                  {showTelegramLink && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-3 p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                        {/* Загрузка */}
+                        {telegramLinkStatus === 'loading' && (
+                          <div className="flex flex-col items-center py-8">
+                            <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-3" />
+                            <p className="text-gray-400 text-sm">Создание сессии...</p>
+                          </div>
+                        )}
+
+                        {/* QR-код */}
+                        {telegramLinkStatus === 'pending' && telegramLinkSession && (
+                          <div className="flex flex-col items-center">
+                            <div className="bg-white p-3 rounded-xl shadow-lg mb-3">
+                              <QRCodeSVG
+                                value={telegramLinkSession.qr_url}
+                                size={160}
+                                level="H"
+                                includeMargin={false}
+                                bgColor="#ffffff"
+                                fgColor="#1a1a1a"
+                              />
+                            </div>
+                            
+                            {/* Таймер */}
+                            <div className="flex items-center gap-2 text-gray-400 text-xs mb-3">
+                              <Clock className="w-3 h-3" />
+                              <span>Действителен: {formatLinkTime(telegramLinkTimeLeft || 0)}</span>
+                            </div>
+
+                            {/* Инструкция */}
+                            <div className="w-full bg-gray-700/30 rounded-lg p-3">
+                              <ol className="text-xs text-gray-300 space-y-1.5">
+                                <li className="flex gap-2">
+                                  <span className="text-blue-400 font-bold">1.</span>
+                                  <span>Откройте Telegram</span>
+                                </li>
+                                <li className="flex gap-2">
+                                  <span className="text-blue-400 font-bold">2.</span>
+                                  <span>Отсканируйте QR-код камерой</span>
+                                </li>
+                                <li className="flex gap-2">
+                                  <span className="text-blue-400 font-bold">3.</span>
+                                  <span>Подтвердите подключение</span>
+                                </li>
+                              </ol>
+                            </div>
+
+                            {/* Ссылка на бота */}
+                            <a
+                              href={telegramLinkSession.qr_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 text-blue-400 hover:text-blue-300 text-xs underline"
+                            >
+                              Или откройте в Telegram напрямую
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Успешно подключено */}
+                        {telegramLinkStatus === 'linked' && (
+                          <div className="flex flex-col items-center py-6">
+                            <div className="w-14 h-14 bg-green-500/20 rounded-full flex items-center justify-center mb-3">
+                              <CheckCircle className="w-7 h-7 text-green-500" />
+                            </div>
+                            <p className="text-white font-medium mb-1">Профиль подключен!</p>
+                            <p className="text-gray-400 text-xs">Страница перезагрузится...</p>
+                          </div>
+                        )}
+
+                        {/* Сессия истекла */}
+                        {telegramLinkStatus === 'expired' && (
+                          <div className="flex flex-col items-center py-6">
+                            <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center mb-3">
+                              <Clock className="w-6 h-6 text-yellow-500" />
+                            </div>
+                            <p className="text-white font-medium mb-1">Время истекло</p>
+                            <p className="text-gray-400 text-xs mb-3">QR-код больше не действителен</p>
+                            <button
+                              onClick={() => createTelegramLinkSession()}
+                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Создать новый
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Ошибка */}
+                        {telegramLinkStatus === 'error' && (
+                          <div className="flex flex-col items-center py-6">
+                            <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mb-3">
+                              <AlertTriangle className="w-6 h-6 text-red-500" />
+                            </div>
+                            <p className="text-white font-medium mb-1">Ошибка</p>
+                            <p className="text-gray-400 text-xs mb-3">{telegramLinkError || 'Попробуйте снова'}</p>
+                            <button
+                              onClick={() => createTelegramLinkSession()}
+                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Попробовать снова
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
             {/* QR-код для добавления в друзья */}
             {isTelegramUser && qrData && !loading && (
               <motion.div
