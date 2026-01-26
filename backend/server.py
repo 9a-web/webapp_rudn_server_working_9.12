@@ -85,6 +85,7 @@ from models import (
     HourlyActivityPoint,
     FeatureUsageStats,
     TopUser,
+    AdminSendNotificationRequest,
     FacultyStats,
     CourseStats,
     Subtask,
