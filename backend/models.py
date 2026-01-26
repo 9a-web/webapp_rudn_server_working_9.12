@@ -969,6 +969,19 @@ class RoomTaskReorderRequest(BaseModel):
     tasks: List[dict]  # [{"task_id": "...", "order": 0}, ...]
 
 
+class RoomFriendToAdd(BaseModel):
+    """Друг для добавления в комнату"""
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: str
+
+
+class RoomAddFriendsRequest(BaseModel):
+    """Запрос на добавление друзей в комнату"""
+    telegram_id: int  # Кто добавляет
+    friends: List[RoomFriendToAdd]  # Список друзей для добавления
+
+
 # ============ Модели для админ панели ============
 
 class AdminStatsResponse(BaseModel):
