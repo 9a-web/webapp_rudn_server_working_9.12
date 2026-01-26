@@ -291,3 +291,24 @@ export const reorderRoomTasks = async (roomId, tasks) => {
     throw error;
   }
 };
+
+// Добавить друзей в комнату
+export const addFriendsToRoom = async (roomId, telegramId, friends) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/rooms/${roomId}/add-friends`,
+      {
+        telegram_id: telegramId,
+        friends: friends.map(f => ({
+          telegram_id: f.telegram_id,
+          username: f.username,
+          first_name: f.first_name || f.username || 'User'
+        }))
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error adding friends to room:', error);
+    throw error;
+  }
+};
