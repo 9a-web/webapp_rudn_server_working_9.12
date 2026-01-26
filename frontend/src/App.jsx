@@ -580,6 +580,38 @@ const Home = () => {
     }
   }, [isReady, user, startParam, friendInviteProcessed]);
 
+  // Обработка связки Telegram профиля (startapp=link_{token})
+  const [linkInviteProcessed, setLinkInviteProcessed] = useState(false);
+  useEffect(() => {
+    const processLinkInvite = async () => {
+      if (!startParam || linkInviteProcessed || !user) {
+        return;
+      }
+      
+      // Формат: link_{session_token}
+      if (!startParam.startsWith('link_')) {
+        return;
+      }
+      
+      const sessionToken = startParam.replace('link_', '');
+      
+      if (!sessionToken) {
+        return;
+      }
+      
+      console.log('🔗 Обработка запроса на связку профиля:', sessionToken);
+      
+      // Показываем модальное окно подтверждения
+      setLinkSessionToken(sessionToken);
+      setShowTelegramLinkConfirm(true);
+      setLinkInviteProcessed(true);
+    };
+    
+    if (isReady && user && startParam) {
+      processLinkInvite();
+    }
+  }, [isReady, user, startParam, linkInviteProcessed]);
+
   // Загрузка расписания при изменении настроек или недели
   useEffect(() => {
     // Проверяем, что у пользователя есть полные настройки группы
