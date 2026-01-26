@@ -129,6 +129,18 @@ backend:
         comment: "🔧 Updated POST /api/music/auth/{telegram_id} to accept token_url or access_token instead of login/password. Parses token from OAuth redirect URL, validates via VK API, checks audio access, and saves to MongoDB."
 
 frontend:
+  - task: "Telegram Profile Link via QR Code UI"
+    implemented: true
+    working: pending
+    file: "/app/frontend/src/components/TelegramLinkScreen.jsx, /app/frontend/src/components/TelegramLinkConfirmModal.jsx, /app/frontend/src/App.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: pending
+        agent: "main"
+        comment: "🔧 Реализован UI для связки Telegram профиля: TelegramLinkScreen (экран с QR-кодом, таймером, WebSocket для real-time обновлений), TelegramLinkConfirmModal (модальное окно подтверждения в Telegram Web App). Добавлена обработка startapp=link_{token} в App.jsx. Обновлён TelegramContext для сохранения/загрузки связанного пользователя в localStorage."
+
   - task: "YouTube Preview in Tasks"
     implemented: true
     working: pending
