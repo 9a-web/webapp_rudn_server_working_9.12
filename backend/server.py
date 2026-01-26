@@ -11554,10 +11554,10 @@ async def startup_event():
             name="session_token_index"
         )
         await db.web_sessions.create_index(
-            [("expires_at", 1)],
-            expireAfterSeconds=0,  # TTL index - автоудаление по expires_at
-            name="session_expiry_index"
+            [("telegram_id", 1), ("status", 1)],
+            name="user_devices_index"
         )
+        # Не используем TTL индекс для linked сессий, только для pending
         
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
