@@ -270,9 +270,9 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                 scale: [1, 1.05, 1.05, 1.02, 1.02, 1, 1, 1],
               } : {}}
               transition={hasNewNotification ? {
-                duration: 1.2,
+                duration: 1.4,
                 repeat: Infinity,
-                repeatDelay: 1.8,
+                repeatDelay: 5.6,
                 ease: "easeInOut"
               } : {}}
             >
@@ -287,7 +287,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                   scale: [1, 1.1, 1],
                 } : {}}
                 transition={hasNewNotification ? {
-                  duration: 3,
+                  duration: 7,
                   repeat: Infinity,
                   ease: "easeInOut"
                 } : {}}
