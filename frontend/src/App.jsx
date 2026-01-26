@@ -655,24 +655,31 @@ const Home = () => {
         // Пользователь существует, но у него неполные настройки
         console.log('User has incomplete settings, showing welcome screen');
         setShowWelcomeScreen(true);
-        // Очищаем данные связки - пользователь должен заново настроить профиль
+        // Очищаем все данные связки - пользователь должен заново настроить профиль
         localStorage.removeItem('telegram_user');
         localStorage.removeItem('session_token');
+        localStorage.removeItem('user_settings');
       } else {
         // Пользователь не найден
         setShowWelcomeScreen(true);
-        // Очищаем данные связки при показе формы регистрации
+        // Полная очистка данных при показе формы регистрации
         localStorage.removeItem('telegram_user');
         localStorage.removeItem('session_token');
+        localStorage.removeItem('user_settings');
+        localStorage.removeItem('rudn_device_id');
+        localStorage.removeItem('activeTab');
       }
     } catch (err) {
       console.error('Error loading user data:', err);
       // Если пользователь не найден (404), показываем welcome screen
       if (err.message === 'Пользователь не найден') {
         setShowWelcomeScreen(true);
-        // Очищаем данные связки при показе формы регистрации
+        // Полная очистка данных при показе формы регистрации
         localStorage.removeItem('telegram_user');
         localStorage.removeItem('session_token');
+        localStorage.removeItem('user_settings');
+        localStorage.removeItem('rudn_device_id');
+        localStorage.removeItem('activeTab');
       } else {
         setError(err.message);
       }
