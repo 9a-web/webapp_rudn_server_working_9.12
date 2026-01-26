@@ -212,16 +212,50 @@ export const TelegramProvider = ({ children }) => {
         setUser(userData);
         console.log('👤 Пользователь Telegram:', userData.first_name);
       } else {
-        console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
-        // Генерируем уникальный ID для этого браузера
-        const { deviceId, numericId } = getOrCreateDeviceId();
-        setUser({
-          id: numericId,
-          first_name: 'Пользователь',
-          last_name: '',
-          username: `user_${deviceId.substring(0, 8)}`,
-          device_id: deviceId, // Сохраняем полный UUID для отладки
-        });
+        // Telegram WebApp загружен, но пользователя нет
+        // Проверяем localStorage на наличие связанного профиля
+        const savedTelegramUser = localStorage.getItem('telegram_user');
+        
+        if (savedTelegramUser) {
+          try {
+            const parsedUser = JSON.parse(savedTelegramUser);
+            console.log('📱 Загружен связанный Telegram пользователь:', parsedUser.first_name);
+            setUser({
+              id: parsedUser.id,
+              first_name: parsedUser.first_name || 'Пользователь',
+              last_name: parsedUser.last_name || '',
+              username: parsedUser.username || '',
+              photo_url: parsedUser.photo_url,
+              is_linked: true // Флаг что это связанный пользователь
+            });
+          } catch (e) {
+            console.error('Ошибка парсинга сохраненного пользователя:', e);
+            localStorage.removeItem('telegram_user');
+            // Fallback на Device ID
+            console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
+            const { deviceId, numericId } = getOrCreateDeviceId();
+            setUser({
+              id: numericId,
+              first_name: 'Пользователь',
+              last_name: '',
+              username: `user_${deviceId.substring(0, 8)}`,
+              device_id: deviceId,
+              is_guest: true
+            });
+          }
+        } else {
+          console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
+          // Генерируем уникальный ID для этого браузера
+          const { deviceId, numericId } = getOrCreateDeviceId();
+          setUser({
+            id: numericId,
+            first_name: 'Пользователь',
+            last_name: '',
+            username: `user_${deviceId.substring(0, 8)}`,
+            device_id: deviceId,
+            is_guest: true
+          });
+        }
       }
       
       setIsReady(true);
