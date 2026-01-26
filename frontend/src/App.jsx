@@ -710,46 +710,17 @@ const Home = () => {
       return;
     }
     
-    console.log('🔒 Starting session validity check for linked user');
+    console.log('🔒 Session check disabled - using persistent localStorage data');
     
-    const checkSessionValidity = async () => {
-      try {
-        const status = await getWebSessionStatus(sessionToken);
-        
-        if (status.status !== 'linked') {
-          console.warn('⚠️ Session is no longer valid:', status.status);
-          handleSessionRevoked();
-        }
-      } catch (err) {
-        // Если сессия не найдена (404) - она была удалена
-        console.warn('⚠️ Session check failed, session may be revoked:', err.message);
-        handleSessionRevoked();
-      }
-    };
+    // ОТКЛЮЧЕНО: Периодическая проверка сессии
+    // Причина: Сессии на сервере могут истекать, но пользователь должен 
+    // сохранять доступ к приложению пока явно не разлогинится
+    // 
+    // Раньше этот код каждые 10 секунд проверял сессию на сервере
+    // и при 404 ошибке очищал все данные и перезагружал страницу
+    // Это приводило к потере данных при каждой перезагрузке
     
-    const handleSessionRevoked = () => {
-      console.log('🔄 Session revoked, clearing data and reloading...');
-      
-      // Полная очистка localStorage
-      localStorage.removeItem('telegram_user');
-      localStorage.removeItem('session_token');
-      localStorage.removeItem('user_settings');
-      localStorage.removeItem('rudn_device_id');
-      localStorage.removeItem('activeTab');
-      
-      // Перезагружаем страницу
-      window.location.reload();
-    };
-    
-    // Проверяем сразу при монтировании
-    checkSessionValidity();
-    
-    // Затем проверяем каждые 10 секунд
-    const intervalId = setInterval(checkSessionValidity, 10000);
-    
-    return () => {
-      clearInterval(intervalId);
-    };
+    return () => {};
   }, []);
 
   const loadSchedule = async () => {
