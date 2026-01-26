@@ -443,21 +443,24 @@ export const ProfileModal = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay с затемнением */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[100]"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
-            onClick={onClose}
-          />
+          {/* Overlay с затемнением - скрываем когда открыто окно устройств */}
+          {!showDevicesModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-[100]"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+              onClick={onClose}
+            />
+          )}
 
-          {/* Модальное окно профиля */}
-          <motion.div
-            ref={modalRef}
-            initial={{ opacity: 0, scale: 0.85, y: -10 }}
+          {/* Модальное окно профиля - скрываем когда открыто окно устройств */}
+          {!showDevicesModal && (
+            <motion.div
+              ref={modalRef}
+              initial={{ opacity: 0, scale: 0.85, y: -10 }}
             animate={{ 
               opacity: 1, 
               scale: 1, 
