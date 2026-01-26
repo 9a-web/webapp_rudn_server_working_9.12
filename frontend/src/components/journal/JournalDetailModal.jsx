@@ -512,7 +512,9 @@ export const JournalDetailModal = ({
                         )}
                         <button
                           onClick={() => setShowAddStudents(true)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white ${
+                            students.length === 0 ? 'animate-pulse shadow-lg shadow-purple-500/30' : ''
+                          }`}
                         >
                           <UserPlus className="w-4 h-4" />
                           Добавить
