@@ -5352,6 +5352,77 @@ async def get_course_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/admin/send-notification")
+async def admin_send_notification(data: AdminSendNotificationRequest):
+    """Отправить уведомление пользователю от имени администратора"""
+    try:
+        results = {
+            "telegram_id": data.telegram_id,
+            "in_app_sent": False,
+            "telegram_sent": False,
+            "errors": []
+        }
+        
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": data.telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Отправляем In-App уведомление
+        if data.send_in_app:
+            try:
+                notification = InAppNotification(
+                    telegram_id=data.telegram_id,
+                    type=NotificationType.ADMIN_MESSAGE,
+                    category=NotificationCategory.SYSTEM,
+                    priority=NotificationPriority.HIGH,
+                    title=data.title,
+                    message=data.message,
+                    emoji=data.emoji,
+                    data={"from_admin": True}
+                )
+                await db.in_app_notifications.insert_one(notification.model_dump())
+                results["in_app_sent"] = True
+                logger.info(f"📬 Admin notification sent in-app to {data.telegram_id}")
+            except Exception as e:
+                logger.error(f"Failed to send in-app notification: {e}")
+                results["errors"].append(f"In-App: {str(e)}")
+        
+        # Отправляем Telegram сообщение
+        if data.send_telegram:
+            try:
+                from notifications import get_notification_service
+                notification_service = get_notification_service()
+                
+                # Формируем сообщение
+                telegram_message = f"{data.emoji} {data.title}\n\n{data.message}"
+                
+                await notification_service.send_message(data.telegram_id, telegram_message)
+                results["telegram_sent"] = True
+                logger.info(f"📨 Admin message sent via Telegram to {data.telegram_id}")
+            except Exception as e:
+                logger.error(f"Failed to send Telegram message: {e}")
+                results["errors"].append(f"Telegram: {str(e)}")
+        
+        if not results["in_app_sent"] and not results["telegram_sent"]:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Не удалось отправить уведомление: {', '.join(results['errors'])}"
+            )
+        
+        return {
+            "status": "success",
+            "message": "Уведомление отправлено",
+            **results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending admin notification: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/admin/stats", response_model=AdminStatsResponse)
 async def get_admin_stats(days: Optional[int] = None):
     """Get general statistics for admin panel"""
