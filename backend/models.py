@@ -1342,6 +1342,28 @@ class JournalJoinRequest(BaseModel):
     referrer_id: Optional[int] = None  # ID пользователя, который пригласил
 
 
+class JournalJoinApplication(BaseModel):
+    """Заявка на вступление в журнал (ожидает одобрения старосты)"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    journal_id: str
+    telegram_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    status: str = "pending"  # pending, approved, rejected
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    processed_at: Optional[datetime] = None
+    linked_student_id: Optional[str] = None  # К какому студенту привязали
+
+
+class ProcessJournalApplicationRequest(BaseModel):
+    """Запрос на обработку заявки в журнал"""
+    application_id: str
+    action: str  # approve, reject
+    student_id: Optional[str] = None  # ID студента для привязки (при approve)
+    owner_telegram_id: int  # ID старосты, который обрабатывает
+
+
 # ===== Response модели =====
 
 class JournalResponse(BaseModel):
