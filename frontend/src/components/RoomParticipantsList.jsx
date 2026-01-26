@@ -4,8 +4,8 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Crown, Shield, Eye, User, ChevronDown, Check, UserPlus } from 'lucide-react';
-import { updateParticipantRole, addFriendsToRoom } from '../services/roomsAPI';
+import { Users, Crown, Shield, Eye, User, ChevronDown, Check, UserPlus, Link2, Copy } from 'lucide-react';
+import { updateParticipantRole, addFriendsToRoom, generateInviteLink } from '../services/roomsAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 import SelectFriendsModal from './SelectFriendsModal';
 
@@ -28,6 +28,9 @@ const RoomParticipantsList = ({
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
   const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
   const [isAddingFriends, setIsAddingFriends] = useState(false);
+  const [inviteLink, setInviteLink] = useState(null);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const { webApp } = useTelegram();
 
   const currentUser = participants.find(p => p.telegram_id === currentUserId);
@@ -36,6 +39,44 @@ const RoomParticipantsList = ({
 
   const getRoleConfig = (roleId) => {
     return ROLES.find(r => r.id === roleId) || ROLES[3]; // default: member
+  };
+
+  // Генерация и копирование ссылки-приглашения
+  const handleCopyInviteLink = async () => {
+    if (webApp?.HapticFeedback) {
+      webApp.HapticFeedback.impactOccurred('light');
+    }
+
+    try {
+      setIsGeneratingLink(true);
+      
+      // Если ссылка еще не сгенерирована, генерируем
+      let link = inviteLink;
+      if (!link) {
+        const linkData = await generateInviteLink(roomId, currentUserId);
+        link = linkData.invite_link;
+        setInviteLink(link);
+      }
+      
+      // Копируем в буфер обмена
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.notificationOccurred('success');
+      }
+      
+      // Сброс состояния через 2 секунды
+      setTimeout(() => setLinkCopied(false), 2000);
+      
+    } catch (error) {
+      console.error('Error generating/copying invite link:', error);
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.notificationOccurred('error');
+      }
+    } finally {
+      setIsGeneratingLink(false);
+    }
   };
 
   const handleRoleChange = async (participant, newRole) => {
