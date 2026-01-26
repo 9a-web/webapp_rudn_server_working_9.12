@@ -275,6 +275,9 @@ export const ProfileModal = ({
         telegramLinkWsRef.current.close();
       }
       
+      // Сохраняем session_token для использования в callback
+      const currentSessionToken = sessionData.session_token;
+      
       telegramLinkWsRef.current = createSessionWebSocket(sessionData.session_token, {
         onConnected: () => {
           console.log('✅ WebSocket connected for Telegram link');
@@ -293,7 +296,7 @@ export const ProfileModal = ({
           }));
           
           // Сохраняем session_token для идентификации устройства
-          localStorage.setItem('session_token', telegramLinkSession.session_token);
+          localStorage.setItem('session_token', currentSessionToken);
           
           if (userData.user_settings) {
             localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
@@ -303,7 +306,9 @@ export const ProfileModal = ({
           if (hapticFeedback) hapticFeedback('notification', 'success');
           
           // Перезагружаем страницу через 2 секунды
+          console.log('🔄 Scheduling page reload in 2 seconds...');
           setTimeout(() => {
+            console.log('🔄 Reloading page now...');
             window.location.reload();
           }, 2000);
         },
