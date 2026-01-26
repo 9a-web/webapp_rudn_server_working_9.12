@@ -824,23 +824,33 @@ const NotificationsTab = () => {
                 </div>
               </div>
 
-              {/* Emoji */}
+              {/* Тип уведомления */}
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">Эмодзи</label>
-                <div className="flex flex-wrap gap-2">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => setNotificationEmoji(emoji)}
-                      className={`w-10 h-10 rounded-lg text-xl transition-all ${
-                        notificationEmoji === emoji
-                          ? 'bg-purple-500/30 ring-2 ring-purple-500'
-                          : 'bg-white/5 hover:bg-white/10'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+                <label className="text-sm text-gray-400 mb-2 block">Тип уведомления</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {NOTIFICATION_TYPES.map((type) => {
+                    const Icon = type.icon;
+                    const isSelected = notificationType === type.id;
+                    return (
+                      <button
+                        key={type.id}
+                        onClick={() => {
+                          setNotificationType(type.id);
+                          setNotificationCategory(type.category);
+                        }}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all ${
+                          isSelected
+                            ? 'bg-purple-500/30 ring-2 ring-purple-500'
+                            : 'bg-white/5 hover:bg-white/10'
+                        }`}
+                      >
+                        <Icon className={`w-5 h-5 ${isSelected ? 'text-purple-400' : 'text-gray-400'}`} />
+                        <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+                          {type.label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
