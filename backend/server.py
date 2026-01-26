@@ -11014,6 +11014,298 @@ async def update_extended_notification_settings(telegram_id: int, settings: Exte
 app.include_router(api_router)
 
 
+# ============ Web Sessions (связка Telegram профиля через QR) ============
+
+# Словарь для хранения активных WebSocket соединений по session_token
+web_session_connections: dict = {}
+
+
+@api_router.post("/web-sessions", response_model=WebSessionResponse)
+async def create_web_session():
+    """
+    Создать новую веб-сессию для связки с Telegram профилем.
+    Возвращает session_token и QR URL для сканирования.
+    """
+    try:
+        # Генерируем уникальный токен сессии
+        session_token = str(uuid.uuid4())
+        
+        # Получаем username бота для формирования ссылки
+        bot_username = get_telegram_bot_username()
+        
+        # Формируем URL для QR-кода (открывает Telegram Web App с параметром)
+        qr_url = f"https://t.me/{bot_username}/app?startapp=link_{session_token}"
+        
+        # Время истечения сессии (10 минут)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        
+        # Создаем сессию в БД
+        session_data = {
+            "id": str(uuid.uuid4()),
+            "session_token": session_token,
+            "status": WebSessionStatus.PENDING.value,
+            "telegram_id": None,
+            "first_name": None,
+            "last_name": None,
+            "username": None,
+            "photo_url": None,
+            "user_settings": None,
+            "created_at": datetime.utcnow(),
+            "expires_at": expires_at,
+            "linked_at": None
+        }
+        
+        await db.web_sessions.insert_one(session_data)
+        
+        logger.info(f"🔗 Created web session: {session_token[:8]}...")
+        
+        return WebSessionResponse(
+            session_token=session_token,
+            status=WebSessionStatus.PENDING,
+            qr_url=qr_url,
+            expires_at=expires_at
+        )
+        
+    except Exception as e:
+        logger.error(f"Create web session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/web-sessions/{session_token}/status", response_model=WebSessionResponse)
+async def get_web_session_status(session_token: str):
+    """
+    Получить статус веб-сессии.
+    Используется для polling или проверки после WebSocket disconnect.
+    """
+    try:
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        # Проверяем истечение срока
+        if session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+            if session["status"] == WebSessionStatus.PENDING.value:
+                await db.web_sessions.update_one(
+                    {"session_token": session_token},
+                    {"$set": {"status": WebSessionStatus.EXPIRED.value}}
+                )
+                session["status"] = WebSessionStatus.EXPIRED.value
+        
+        bot_username = get_telegram_bot_username()
+        qr_url = f"https://t.me/{bot_username}/app?startapp=link_{session_token}"
+        
+        return WebSessionResponse(
+            session_token=session_token,
+            status=WebSessionStatus(session["status"]),
+            qr_url=qr_url,
+            expires_at=session.get("expires_at"),
+            telegram_id=session.get("telegram_id"),
+            first_name=session.get("first_name"),
+            last_name=session.get("last_name"),
+            username=session.get("username"),
+            photo_url=session.get("photo_url"),
+            user_settings=session.get("user_settings")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get web session status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/link", response_model=WebSessionLinkResponse)
+async def link_web_session(session_token: str, request: WebSessionLinkRequest):
+    """
+    Связать веб-сессию с Telegram профилем.
+    Вызывается из Telegram Web App после подтверждения пользователем.
+    """
+    try:
+        # Находим сессию
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        
+        if not session:
+            return WebSessionLinkResponse(
+                success=False,
+                message="Сессия не найдена"
+            )
+        
+        # Проверяем статус
+        if session["status"] != WebSessionStatus.PENDING.value:
+            return WebSessionLinkResponse(
+                success=False,
+                message="Сессия уже использована или истекла"
+            )
+        
+        # Проверяем срок действия
+        if session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+            await db.web_sessions.update_one(
+                {"session_token": session_token},
+                {"$set": {"status": WebSessionStatus.EXPIRED.value}}
+            )
+            return WebSessionLinkResponse(
+                success=False,
+                message="Срок действия сессии истёк"
+            )
+        
+        # Получаем настройки пользователя из БД
+        user_settings = await db.user_settings.find_one({"telegram_id": request.telegram_id})
+        user_settings_dict = None
+        if user_settings:
+            # Убираем _id для сериализации
+            user_settings_dict = {k: v for k, v in user_settings.items() if k != "_id"}
+            # Конвертируем datetime в string для JSON
+            for key, value in user_settings_dict.items():
+                if isinstance(value, datetime):
+                    user_settings_dict[key] = value.isoformat()
+        
+        # Обновляем сессию
+        update_data = {
+            "status": WebSessionStatus.LINKED.value,
+            "telegram_id": request.telegram_id,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "username": request.username,
+            "photo_url": request.photo_url,
+            "user_settings": user_settings_dict,
+            "linked_at": datetime.utcnow()
+        }
+        
+        await db.web_sessions.update_one(
+            {"session_token": session_token},
+            {"$set": update_data}
+        )
+        
+        logger.info(f"✅ Web session linked: {session_token[:8]}... -> {request.telegram_id}")
+        
+        # Отправляем уведомление через WebSocket если есть активное соединение
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "linked",
+                    "data": {
+                        "telegram_id": request.telegram_id,
+                        "first_name": request.first_name,
+                        "last_name": request.last_name,
+                        "username": request.username,
+                        "photo_url": request.photo_url,
+                        "user_settings": user_settings_dict
+                    }
+                })
+                logger.info(f"📤 WebSocket notification sent for session {session_token[:8]}...")
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+        
+        return WebSessionLinkResponse(
+            success=True,
+            message="Профиль успешно подключен!",
+            session_token=session_token
+        )
+        
+    except Exception as e:
+        logger.error(f"Link web session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.websocket("/ws/session/{session_token}")
+async def websocket_session(websocket: WebSocket, session_token: str):
+    """
+    WebSocket для real-time уведомления о связке сессии.
+    Веб-клиент подключается и ждёт событие 'linked'.
+    """
+    await websocket.accept()
+    
+    # Проверяем существование сессии
+    session = await db.web_sessions.find_one({"session_token": session_token})
+    if not session:
+        await websocket.send_json({"event": "error", "message": "Сессия не найдена"})
+        await websocket.close()
+        return
+    
+    # Если сессия уже связана - сразу отправляем данные
+    if session["status"] == WebSessionStatus.LINKED.value:
+        await websocket.send_json({
+            "event": "linked",
+            "data": {
+                "telegram_id": session.get("telegram_id"),
+                "first_name": session.get("first_name"),
+                "last_name": session.get("last_name"),
+                "username": session.get("username"),
+                "photo_url": session.get("photo_url"),
+                "user_settings": session.get("user_settings")
+            }
+        })
+        await websocket.close()
+        return
+    
+    # Сохраняем соединение
+    web_session_connections[session_token] = websocket
+    logger.info(f"🔌 WebSocket connected for session {session_token[:8]}...")
+    
+    try:
+        # Отправляем подтверждение подключения
+        await websocket.send_json({"event": "connected", "session_token": session_token})
+        
+        # Ждём сообщений или отключения
+        while True:
+            try:
+                # Ждём ping/pong для поддержания соединения
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                
+                if data == "ping":
+                    await websocket.send_text("pong")
+                elif data == "check":
+                    # Проверяем статус сессии
+                    session = await db.web_sessions.find_one({"session_token": session_token})
+                    if session and session["status"] == WebSessionStatus.LINKED.value:
+                        await websocket.send_json({
+                            "event": "linked",
+                            "data": {
+                                "telegram_id": session.get("telegram_id"),
+                                "first_name": session.get("first_name"),
+                                "last_name": session.get("last_name"),
+                                "username": session.get("username"),
+                                "photo_url": session.get("photo_url"),
+                                "user_settings": session.get("user_settings")
+                            }
+                        })
+                        break
+                        
+            except asyncio.TimeoutError:
+                # Проверяем статус сессии при timeout
+                session = await db.web_sessions.find_one({"session_token": session_token})
+                if session:
+                    if session["status"] == WebSessionStatus.LINKED.value:
+                        await websocket.send_json({
+                            "event": "linked",
+                            "data": {
+                                "telegram_id": session.get("telegram_id"),
+                                "first_name": session.get("first_name"),
+                                "last_name": session.get("last_name"),
+                                "username": session.get("username"),
+                                "photo_url": session.get("photo_url"),
+                                "user_settings": session.get("user_settings")
+                            }
+                        })
+                        break
+                    elif session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+                        await websocket.send_json({"event": "expired"})
+                        break
+                # Отправляем ping для поддержания соединения
+                await websocket.send_text("ping")
+                
+    except WebSocketDisconnect:
+        logger.info(f"🔌 WebSocket disconnected for session {session_token[:8]}...")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+    finally:
+        # Удаляем соединение из словаря
+        if session_token in web_session_connections:
+            del web_session_connections[session_token]
+
+
 # ============ События жизненного цикла приложения ============
 
 @app.on_event("startup")
