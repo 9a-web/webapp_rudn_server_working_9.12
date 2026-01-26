@@ -257,6 +257,11 @@ const Home = () => {
   // Состояние для модального окна профиля друга
   const [isFriendProfileOpen, setIsFriendProfileOpen] = useState(false);
 
+  // Состояния для связки Telegram профиля через QR
+  const [showTelegramLinkScreen, setShowTelegramLinkScreen] = useState(false);
+  const [showTelegramLinkConfirm, setShowTelegramLinkConfirm] = useState(false);
+  const [linkSessionToken, setLinkSessionToken] = useState(null);
+
   // Открыть карточку артиста
   const handleArtistClick = useCallback((artistName) => {
     setSelectedArtist(artistName);
