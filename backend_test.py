@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Multiple Video Links Support
-Tests the tasks API with support for multiple video links (YouTube and VK)
+Backend API Testing Script for Friends Integration APIs
+Tests the new endpoints for adding friends to rooms and journals
 """
 
 import requests
 import json
 import sys
 from datetime import datetime
+import uuid
 
 # Configuration
 TELEGRAM_ID = 765963392
-BACKEND_URL = "http://localhost:8001"
+BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
 
 def print_test_header(test_name):
