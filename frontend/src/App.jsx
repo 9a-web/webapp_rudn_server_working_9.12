@@ -287,23 +287,56 @@ const Home = () => {
     isFullscreenPlayerOpen || // fullscreen music player
     isFriendProfileOpen; // friend profile modal
 
-  // Загрузка счётчика непрочитанных уведомлений
+  // Ref для отслеживания предыдущего счётчика уведомлений
+  const prevUnreadCountRef = React.useRef(0);
+  const newNotificationTimerRef = React.useRef(null);
+
+  // Загрузка счётчика непрочитанных уведомлений с детекцией новых
   const loadUnreadCount = useCallback(async () => {
     if (!user?.id) return;
     try {
       const data = await notificationsAPI.getUnreadCount(user.id);
-      setUnreadNotificationsCount(data.unread_count || 0);
+      const newCount = data.unread_count || 0;
+      
+      // Проверяем, появилось ли новое уведомление
+      if (newCount > prevUnreadCountRef.current && prevUnreadCountRef.current !== 0) {
+        // Новое уведомление! Запускаем анимацию
+        setHasNewNotification(true);
+        
+        // Haptic feedback при новом уведомлении
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        }
+        
+        // Очищаем предыдущий таймер если есть
+        if (newNotificationTimerRef.current) {
+          clearTimeout(newNotificationTimerRef.current);
+        }
+        
+        // Останавливаем анимацию через 5 секунд
+        newNotificationTimerRef.current = setTimeout(() => {
+          setHasNewNotification(false);
+        }, 5000);
+      }
+      
+      prevUnreadCountRef.current = newCount;
+      setUnreadNotificationsCount(newCount);
     } catch (error) {
       console.error('Error loading unread count:', error);
     }
   }, [user?.id]);
 
-  // Периодическая загрузка счётчика
+  // Периодическая загрузка счётчика - каждые 5 секунд для real-time обновления
   useEffect(() => {
     if (isReady && user?.id) {
       loadUnreadCount();
-      const interval = setInterval(loadUnreadCount, 30000); // Каждые 30 секунд
-      return () => clearInterval(interval);
+      const interval = setInterval(loadUnreadCount, 5000); // Каждые 5 секунд для real-time
+      return () => {
+        clearInterval(interval);
+        if (newNotificationTimerRef.current) {
+          clearTimeout(newNotificationTimerRef.current);
+        }
+      };
     }
   }, [isReady, user?.id, loadUnreadCount]);
 
