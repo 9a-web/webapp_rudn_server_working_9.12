@@ -704,12 +704,15 @@ const NotificationsTab = () => {
     setSending(true);
     setSendResult(null);
 
+    const selectedType = NOTIFICATION_TYPES.find(t => t.id === notificationType);
+
     try {
       const res = await axios.post(`${BACKEND_URL}/api/admin/send-notification`, {
         telegram_id: selectedUser.telegram_id,
         title: notificationTitle.trim() || 'Уведомление',
         message: notificationMessage.trim(),
-        emoji: notificationEmoji,
+        notification_type: notificationType,
+        category: selectedType?.category || 'system',
         send_in_app: sendInApp,
         send_telegram: sendTelegram
       });
