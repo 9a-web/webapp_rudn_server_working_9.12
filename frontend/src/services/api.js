@@ -673,4 +673,5 @@ export const plannerAPI = {
   },
 };
 
+export { getBackendURL };
 export default api;
