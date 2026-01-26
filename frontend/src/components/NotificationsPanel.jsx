@@ -197,8 +197,27 @@ const NotificationsPanel = ({
   // Рендер карточки уведомления
   const renderNotification = (notification) => {
     const config = CATEGORY_CONFIG[notification.category] || CATEGORY_CONFIG.system;
-    const Icon = config.icon;
+    const NotifIcon = getNotificationIcon(notification.type);
     const hasActions = notification.actions?.length > 0 && !notification.action_taken;
+    
+    // Цвета для иконок по категориям
+    const iconColors = {
+      study: 'text-blue-400',
+      social: 'text-purple-400',
+      rooms: 'text-green-400',
+      journal: 'text-indigo-400',
+      achievements: 'text-yellow-400',
+      system: 'text-gray-400'
+    };
+    
+    const bgColors = {
+      study: 'bg-blue-500/20',
+      social: 'bg-purple-500/20',
+      rooms: 'bg-green-500/20',
+      journal: 'bg-indigo-500/20',
+      achievements: 'bg-yellow-500/20',
+      system: 'bg-gray-500/20'
+    };
     
     return (
       <motion.div
@@ -220,8 +239,8 @@ const NotificationsPanel = ({
         
         <div className="flex gap-3">
           {/* Иконка */}
-          <div className={`p-2 rounded-xl bg-${config.color}-500/20 flex-shrink-0`}>
-            <span className="text-2xl">{notification.emoji}</span>
+          <div className={`w-10 h-10 rounded-xl ${bgColors[notification.category] || bgColors.system} flex items-center justify-center flex-shrink-0`}>
+            <NotifIcon className={`w-5 h-5 ${iconColors[notification.category] || iconColors.system}`} />
           </div>
           
           {/* Контент */}
