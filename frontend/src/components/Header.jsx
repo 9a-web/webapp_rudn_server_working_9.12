@@ -193,13 +193,106 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               <div className="absolute inset-0 bg-gradient-to-br from-pink-400/20 via-rose-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </div>
             
-            <Bell className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
+            {/* Pulse ripple waves animation - при новом уведомлении */}
+            <AnimatePresence>
+              {hasNewNotification && (
+                <>
+                  {/* Первая волна */}
+                  <motion.div
+                    key="ripple1"
+                    className="absolute inset-0 rounded-xl border-2 border-pink-500/60"
+                    initial={{ scale: 1, opacity: 0.8 }}
+                    animate={{ 
+                      scale: [1, 1.6, 1.6],
+                      opacity: [0.8, 0.3, 0]
+                    }}
+                    transition={{ 
+                      duration: 1.5, 
+                      repeat: 3,
+                      ease: "easeOut"
+                    }}
+                  />
+                  {/* Вторая волна с задержкой */}
+                  <motion.div
+                    key="ripple2"
+                    className="absolute inset-0 rounded-xl border-2 border-red-500/50"
+                    initial={{ scale: 1, opacity: 0.6 }}
+                    animate={{ 
+                      scale: [1, 1.8, 1.8],
+                      opacity: [0.6, 0.2, 0]
+                    }}
+                    transition={{ 
+                      duration: 1.5, 
+                      repeat: 3,
+                      delay: 0.3,
+                      ease: "easeOut"
+                    }}
+                  />
+                  {/* Третья волна */}
+                  <motion.div
+                    key="ripple3"
+                    className="absolute inset-0 rounded-xl border-2 border-purple-500/40"
+                    initial={{ scale: 1, opacity: 0.5 }}
+                    animate={{ 
+                      scale: [1, 2, 2],
+                      opacity: [0.5, 0.1, 0]
+                    }}
+                    transition={{ 
+                      duration: 1.5, 
+                      repeat: 3,
+                      delay: 0.6,
+                      ease: "easeOut"
+                    }}
+                  />
+                  {/* Свечение кнопки */}
+                  <motion.div
+                    key="glow"
+                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/30 via-red-500/30 to-purple-500/30"
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: [0.3, 0.6, 0.3]
+                    }}
+                    transition={{ 
+                      duration: 0.8, 
+                      repeat: 6,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </>
+              )}
+            </AnimatePresence>
+            
+            {/* Bell icon с анимацией покачивания */}
+            <motion.div
+              className="relative z-10"
+              animate={hasNewNotification ? {
+                rotate: [0, -20, 20, -15, 15, -10, 10, -5, 5, 0],
+                scale: [1, 1.1, 1.1, 1.05, 1.05, 1],
+              } : {}}
+              transition={hasNewNotification ? {
+                duration: 0.8,
+                repeat: 5,
+                repeatDelay: 0.2
+              } : {}}
+            >
+              <Bell className="w-5 h-5 md:w-6 md:h-6" style={{ color: hasNewNotification ? '#ff6b9d' : '#E7E7E7' }} />
+            </motion.div>
             
             {/* Unread notifications badge */}
             {unreadNotificationsCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg">
+              <motion.span 
+                className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg"
+                animate={hasNewNotification ? {
+                  scale: [1, 1.3, 1],
+                } : {}}
+                transition={hasNewNotification ? {
+                  duration: 0.5,
+                  repeat: 9,
+                  repeatDelay: 0.3
+                } : {}}
+              >
                 {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-              </span>
+              </motion.span>
             )}
           </motion.button>
 
