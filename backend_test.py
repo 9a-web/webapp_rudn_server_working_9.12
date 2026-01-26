@@ -12,7 +12,7 @@ import uuid
 
 # Configuration
 TELEGRAM_ID = 765963392
-BACKEND_URL = "https://rudn-schedule.ru"
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
 def print_test_header(test_name):
