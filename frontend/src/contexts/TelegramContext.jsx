@@ -327,9 +327,13 @@ export const TelegramProvider = ({ children }) => {
             })
             .catch(err => {
               console.warn('⚠️ Сессия не найдена или удалена:', err.message);
+              // Полная очистка данных пользователя
               localStorage.removeItem('telegram_user');
               localStorage.removeItem('session_token');
-              // Создаем гостевого пользователя
+              localStorage.removeItem('user_settings');
+              localStorage.removeItem('rudn_device_id'); // Сбрасываем device_id для нового пользователя
+              localStorage.removeItem('activeTab');
+              // Создаем нового гостевого пользователя с новым ID
               const { deviceId, numericId } = getOrCreateDeviceId();
               setUser({
                 id: numericId,
