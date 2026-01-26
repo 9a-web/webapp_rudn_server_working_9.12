@@ -89,6 +89,8 @@ export const JournalDetailModal = ({
   const [showLinkStudent, setShowLinkStudent] = useState(null); // student to link
   const [showInviteLink, setShowInviteLink] = useState(false);
   const [showEditStudent, setShowEditStudent] = useState(null); // student to edit
+  const [showApplications, setShowApplications] = useState(false); // Модал заявок
+  const [applicationsCount, setApplicationsCount] = useState(0); // Количество заявок
   const [inviteLink, setInviteLink] = useState('');
 
   const loadData = useCallback(async () => {
