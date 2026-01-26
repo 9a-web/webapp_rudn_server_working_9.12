@@ -6750,6 +6750,72 @@ async def add_students_bulk(journal_id: str, data: JournalStudentBulkCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/journals/{journal_id}/students/from-friends")
+async def add_students_from_friends(journal_id: str, data: JournalStudentsFromFriendsCreate):
+    """Добавить друзей как студентов журнала с автоматической привязкой"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получить максимальный order
+        max_order_student = await db.journal_students.find_one(
+            {"journal_id": journal_id},
+            sort=[("order", -1)]
+        )
+        next_order = (max_order_student["order"] + 1) if max_order_student else 0
+        
+        added = []
+        skipped = []
+        
+        for i, friend in enumerate(data.friends):
+            # Проверяем, не добавлен ли уже этот telegram_id
+            existing = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": friend.telegram_id
+            })
+            
+            if existing:
+                skipped.append(friend.full_name)
+                continue
+            
+            # Создаем студента с автоматической привязкой
+            student = JournalStudent(
+                journal_id=journal_id,
+                full_name=friend.full_name,
+                telegram_id=friend.telegram_id,
+                username=friend.username,
+                first_name=friend.first_name,
+                is_linked=True,
+                linked_at=datetime.utcnow(),
+                order=next_order + i
+            )
+            await db.journal_students.insert_one(student.model_dump())
+            added.append({
+                "full_name": friend.full_name,
+                "telegram_id": friend.telegram_id
+            })
+            
+            # Удаляем из pending если был
+            await db.journal_pending_members.delete_many({
+                "journal_id": journal_id,
+                "telegram_id": friend.telegram_id
+            })
+        
+        return {
+            "status": "success", 
+            "added_count": len(added), 
+            "skipped_count": len(skipped),
+            "added": added,
+            "skipped": skipped
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding students from friends: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/journals/{journal_id}/students", response_model=List[JournalStudentResponse])
 async def get_journal_students(journal_id: str):
     """Получить список студентов журнала"""
