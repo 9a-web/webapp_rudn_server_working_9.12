@@ -467,6 +467,11 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
                     currentUserId={userSettings?.telegram_id}
                     roomId={room.room_id}
                     onRoleChanged={loadRoomTasks}
+                    onParticipantsUpdated={() => {
+                      // Обновить данные комнаты при добавлении участников
+                      loadRoomTasks();
+                      if (onRoomUpdated) onRoomUpdated();
+                    }}
                   />
                 )}
 
