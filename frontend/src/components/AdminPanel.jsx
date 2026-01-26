@@ -4,7 +4,7 @@ import {
   X, Users, TrendingUp, Calendar, Award, 
   BarChart3, Clock, Activity, Star,
   BookOpen, Bell, Share2, CheckSquare, RefreshCw,
-  Search, User, GraduationCap, FileText
+  Search, User, GraduationCap, FileText, Send, MessageSquare, Check
 } from 'lucide-react';
 import axios from 'axios';
 import {
