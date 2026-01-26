@@ -11375,6 +11375,18 @@ async def startup_event():
             name="unread_notifications_index"
         )
         
+        # Индексы для web_sessions (связка Telegram профиля)
+        await db.web_sessions.create_index(
+            [("session_token", 1)],
+            unique=True,
+            name="session_token_index"
+        )
+        await db.web_sessions.create_index(
+            [("expires_at", 1)],
+            expireAfterSeconds=0,  # TTL index - автоудаление по expires_at
+            name="session_expiry_index"
+        )
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
