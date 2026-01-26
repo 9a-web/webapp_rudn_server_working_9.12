@@ -52,10 +52,10 @@ const TYPE_ICONS = {
   achievement_earned: Award,
   level_up: Star,
   
-  // Системные
+  // Системные / Админские
   app_update: Sparkles,
   announcement: Megaphone,
-  admin_message: Send,
+  admin_message: Megaphone,
   
   // Дефолт
   default: Bell
