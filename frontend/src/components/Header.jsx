@@ -266,13 +266,13 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             <motion.div
               className="relative z-10"
               animate={hasNewNotification ? {
-                rotate: [0, -12, 12, -8, 8, -4, 4, 0],
-                scale: [1, 1.08, 1.08, 1.04, 1.04, 1, 1, 1],
+                rotate: [0, -8, 8, -5, 5, -2, 2, 0],
+                scale: [1, 1.05, 1.05, 1.02, 1.02, 1, 1, 1],
               } : {}}
               transition={hasNewNotification ? {
-                duration: 0.9,
+                duration: 1.2,
                 repeat: Infinity,
-                repeatDelay: 0.9,
+                repeatDelay: 1.8,
                 ease: "easeInOut"
               } : {}}
             >
@@ -284,10 +284,10 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               <motion.span 
                 className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg"
                 animate={hasNewNotification ? {
-                  scale: [1, 1.15, 1],
+                  scale: [1, 1.1, 1],
                 } : {}}
                 transition={hasNewNotification ? {
-                  duration: 1.8,
+                  duration: 3,
                   repeat: Infinity,
                   ease: "easeInOut"
                 } : {}}
