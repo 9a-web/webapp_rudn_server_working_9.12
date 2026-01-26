@@ -176,8 +176,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "YouTube Info in Tasks"
-    - "YouTube Preview in Tasks"
+    - "Real-time Notification Counter with Animation"
+    - "Quick Add Friends to Journal API"
+    - "Quick Add Friends to Room API"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
