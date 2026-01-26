@@ -44,7 +44,8 @@ def test_room_add_friends_api():
     room_data = {
         "name": "Test Room for Friends",
         "description": "Testing room for adding friends",
-        "owner_id": TELEGRAM_ID
+        "telegram_id": TELEGRAM_ID,
+        "color": "blue"
     }
     
     try:
