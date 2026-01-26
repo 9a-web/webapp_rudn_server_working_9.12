@@ -140,7 +140,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
       >
         {/* Left side - Logo and text */}
         <motion.div 
-          className="flex items-center gap-3 md:gap-4 cursor-pointer select-none"
+          className="flex items-center gap-3 md:gap-4 cursor-pointer select-none relative"
           custom={0}
           initial="initial"
           animate="animate"
@@ -148,18 +148,92 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
           onClick={handleLogoClick}
           whileTap={{ scale: 0.95 }}
         >
+          {/* Индикатор прогресса кликов */}
+          <AnimatePresence>
+            {logoClickCount > 0 && logoClickCount < 10 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center"
+              >
+                {/* Кольцо прогресса */}
+                <svg className="w-5 h-5 -rotate-90" viewBox="0 0 20 20">
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="8"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth="2"
+                  />
+                  <motion.circle
+                    cx="10"
+                    cy="10"
+                    r="8"
+                    fill="none"
+                    stroke="url(#progressGradient)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={50.27}
+                    initial={{ strokeDashoffset: 50.27 }}
+                    animate={{ strokeDashoffset: 50.27 - (50.27 * logoClickCount / 10) }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  />
+                  <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#67E8F9" />
+                      <stop offset="50%" stopColor="#A78BFA" />
+                      <stop offset="100%" stopColor="#F472B6" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                {/* Число кликов */}
+                <span 
+                  className="absolute text-[9px] font-bold"
+                  style={{
+                    background: 'linear-gradient(135deg, #67E8F9, #A78BFA)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  {logoClickCount}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.div 
-            className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center"
+            className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center relative"
             animate={logoClickCount > 0 ? {
-              rotate: [0, -10, 10, -10, 10, 0],
-              scale: [1, 1.1, 1]
+              rotate: [0, -8, 8, -4, 4, 0],
+              scale: [1, 1.08, 1]
             } : {}}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
           >
+            {/* Свечение при кликах */}
+            <AnimatePresence>
+              {logoClickCount > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 0.4, scale: 1.2 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute inset-0 rounded-full blur-lg"
+                  style={{
+                    background: `linear-gradient(135deg, 
+                      rgba(103, 232, 249, ${0.1 + logoClickCount * 0.05}), 
+                      rgba(167, 139, 250, ${0.1 + logoClickCount * 0.05}), 
+                      rgba(244, 114, 182, ${0.1 + logoClickCount * 0.05})
+                    )`
+                  }}
+                />
+              )}
+            </AnimatePresence>
             <img 
               src="/logorudn.svg" 
               alt="RUDN Logo" 
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain relative z-10"
             />
           </motion.div>
           <h1 className="text-sm md:text-base lg:text-lg font-bold tracking-tight leading-tight" style={{ color: '#E7E7E7' }}>
