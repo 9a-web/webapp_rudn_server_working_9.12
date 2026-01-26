@@ -673,6 +673,45 @@ export const ProfileModal = ({
               </motion.div>
             )}
 
+            {/* Устройства - показываем для авторизованных пользователей (Telegram или связанных) */}
+            {isTelegramUser && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    setShowDevicesModal(true);
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.15) 100%)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}
+                  >
+                    <Monitor className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      Устройства
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Управление подключёнными устройствами
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-green-400" />
+                </button>
+              </motion.div>
+            )}
+
             {/* Связка с Telegram - показываем ТОЛЬКО для гостевых пользователей (не связанных) */}
             {isGuestUser && !loading && (
               <motion.div
