@@ -11020,7 +11020,10 @@ web_session_connections: dict = {}
 
 
 @api_router.post("/web-sessions", response_model=WebSessionResponse)
-async def create_web_session():
+async def create_web_session(
+    request: Request,
+    device_info: WebSessionCreateRequest = None
+):
     """
     Создать новую веб-сессию для связки с Telegram профилем.
     Возвращает session_token и QR URL для сканирования.
@@ -11038,6 +11041,58 @@ async def create_web_session():
         # Время истечения сессии (10 минут)
         expires_at = datetime.utcnow() + timedelta(minutes=10)
         
+        # Получаем информацию об устройстве из заголовков или тела запроса
+        user_agent = request.headers.get("User-Agent", "")
+        ip_address = request.client.host if request.client else None
+        
+        # Парсим User-Agent для определения браузера и ОС
+        browser_name = None
+        os_name = None
+        device_name = None
+        
+        if device_info:
+            browser_name = device_info.browser
+            os_name = device_info.os
+            device_name = device_info.device_name
+            if device_info.user_agent:
+                user_agent = device_info.user_agent
+        
+        # Автоматический парсинг User-Agent если не переданы данные
+        if not browser_name or not os_name:
+            ua_lower = user_agent.lower()
+            
+            # Определяем браузер
+            if "chrome" in ua_lower and "edg" not in ua_lower:
+                browser_name = browser_name or "Chrome"
+            elif "firefox" in ua_lower:
+                browser_name = browser_name or "Firefox"
+            elif "safari" in ua_lower and "chrome" not in ua_lower:
+                browser_name = browser_name or "Safari"
+            elif "edg" in ua_lower:
+                browser_name = browser_name or "Edge"
+            elif "opera" in ua_lower or "opr" in ua_lower:
+                browser_name = browser_name or "Opera"
+            else:
+                browser_name = browser_name or "Browser"
+            
+            # Определяем ОС
+            if "windows" in ua_lower:
+                os_name = os_name or "Windows"
+            elif "mac os" in ua_lower or "macos" in ua_lower:
+                os_name = os_name or "macOS"
+            elif "linux" in ua_lower:
+                os_name = os_name or "Linux"
+            elif "android" in ua_lower:
+                os_name = os_name or "Android"
+            elif "iphone" in ua_lower or "ipad" in ua_lower:
+                os_name = os_name or "iOS"
+            else:
+                os_name = os_name or "Unknown"
+        
+        # Формируем название устройства
+        if not device_name:
+            device_name = f"{browser_name} на {os_name}"
+        
         # Создаем сессию в БД
         session_data = {
             "id": str(uuid.uuid4()),
@@ -11048,15 +11103,21 @@ async def create_web_session():
             "last_name": None,
             "username": None,
             "photo_url": None,
+            "device_name": device_name,
+            "browser": browser_name,
+            "os": os_name,
+            "user_agent": user_agent,
+            "ip_address": ip_address,
             "user_settings": None,
             "created_at": datetime.utcnow(),
             "expires_at": expires_at,
-            "linked_at": None
+            "linked_at": None,
+            "last_active": datetime.utcnow()
         }
         
         await db.web_sessions.insert_one(session_data)
         
-        logger.info(f"🔗 Created web session: {session_token[:8]}...")
+        logger.info(f"🔗 Created web session: {session_token[:8]}... ({device_name})")
         
         return WebSessionResponse(
             session_token=session_token,
