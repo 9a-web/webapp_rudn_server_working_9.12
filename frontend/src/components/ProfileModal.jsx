@@ -292,6 +292,9 @@ export const ProfileModal = ({
             photo_url: userData.photo_url
           }));
           
+          // Сохраняем session_token для идентификации устройства
+          localStorage.setItem('session_token', telegramLinkSession.session_token);
+          
           if (userData.user_settings) {
             localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
           }
