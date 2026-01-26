@@ -991,6 +991,30 @@ const Home = () => {
     setShowGroupSelector(true);
   };
 
+  // Обработка успешной связки Telegram профиля
+  const handleTelegramLinked = (userData) => {
+    console.log('✅ Telegram профиль связан:', userData);
+    setShowTelegramLinkScreen(false);
+    
+    // Перезагружаем страницу для применения новых данных пользователя
+    window.location.reload();
+  };
+
+  // Обработка закрытия модального окна подтверждения связки
+  const handleLinkConfirmClose = () => {
+    setShowTelegramLinkConfirm(false);
+    setLinkSessionToken(null);
+  };
+
+  // Обработка успешного подтверждения связки в Telegram Web App
+  const handleLinkConfirmSuccess = () => {
+    console.log('✅ Связка подтверждена из Telegram Web App');
+    setShowTelegramLinkConfirm(false);
+    setLinkSessionToken(null);
+    // Показываем уведомление об успехе
+    showAlert('Веб-версия успешно подключена!');
+  };
+
   // Рендерим новогоднюю тему для всех экранов
   const renderNewYearTheme = () => {
     // Определяем, показывать ли снег
