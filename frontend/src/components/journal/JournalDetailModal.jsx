@@ -111,6 +111,16 @@ export const JournalDetailModal = ({
       setSessions(sessionsData);
       setSubjects(subjectsData);
       setPendingMembers(pendingData);
+      
+      // Загружаем количество заявок (только для владельца)
+      if (journalData?.owner_id === telegramId) {
+        try {
+          const appsData = await getJournalApplications(journalId, telegramId);
+          setApplicationsCount(appsData?.total || 0);
+        } catch (e) {
+          console.error('Error loading applications count:', e);
+        }
+      }
     } catch (error) {
       console.error('Error loading journal data:', error);
     } finally {
