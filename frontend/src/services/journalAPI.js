@@ -421,3 +421,34 @@ export const addStudentsFromFriends = async (journalId, friends) => {
     throw error;
   }
 };
+
+// ===== Заявки на вступление в журнал =====
+
+// Получить список заявок на вступление
+export const getJournalApplications = async (journalId, telegramId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/journals/${journalId}/applications`, {
+      params: { telegram_id: telegramId }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting journal applications:', error);
+    throw error;
+  }
+};
+
+// Обработать заявку на вступление
+export const processJournalApplication = async (applicationId, action, studentId, ownerTelegramId) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/journals/applications/${applicationId}/process`, {
+      application_id: applicationId,
+      action: action,
+      student_id: studentId,
+      owner_telegram_id: ownerTelegramId
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error processing journal application:', error);
+    throw error;
+  }
+};
