@@ -33,7 +33,7 @@ const getBackendURL = () => {
 const BACKEND_URL = getBackendURL();
 
 const AdminPanel = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'users', 'classes'
+  const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'users', 'classes', 'notifications'
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
 
