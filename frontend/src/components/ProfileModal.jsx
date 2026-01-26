@@ -74,7 +74,14 @@ export const ProfileModal = ({
 
   // Проверяем, является ли пользователь гостем (без привязки к Telegram)
   const isGuestUser = useMemo(() => {
+    // Если пользователь связан через QR-код - он НЕ гость
+    if (user?.is_linked) return false;
     return user?.is_guest || user?.device_id;
+  }, [user]);
+
+  // Проверяем, является ли пользователь "полноценным" (из Telegram или связанным)
+  const isFullUser = useMemo(() => {
+    return !!window.Telegram?.WebApp?.initDataUnsafe?.user || user?.is_linked;
   }, [user]);
 
   // Проверяем, открыто ли в Telegram WebApp
