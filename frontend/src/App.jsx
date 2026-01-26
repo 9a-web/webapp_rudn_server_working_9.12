@@ -45,6 +45,8 @@ import { AchievementNotificationContent } from './components/AchievementNotifica
 import { NotificationQueueProvider, useNotificationQueue } from './components/NotificationQueue';
 import { AnimatePresence } from 'framer-motion';
 import { notificationsAPI } from './services/notificationsAPI';
+import TelegramLinkScreen from './components/TelegramLinkScreen';
+import TelegramLinkConfirmModal from './components/TelegramLinkConfirmModal';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
