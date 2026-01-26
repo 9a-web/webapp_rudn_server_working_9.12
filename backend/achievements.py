@@ -454,6 +454,13 @@ async def check_and_award_achievements(db, telegram_id: int, stats: UserStats) -
             
             await db.user_achievements.insert_one(user_achievement.dict())
             
+            # Создаём in-app уведомление о достижении
+            try:
+                await create_achievement_notification(db, telegram_id, achievement_data)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to create achievement notification: {e}")
+            
             new_achievements.append(achievement)
             total_points += achievement.points
     
