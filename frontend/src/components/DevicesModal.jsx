@@ -67,10 +67,13 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
       // Удаляем из списка
       setDevices(prev => prev.filter(d => d.session_token !== sessionToken));
       
-      // Если отключили текущее устройство - очищаем localStorage
+      // Если отключили текущее устройство - полностью очищаем localStorage и перезагружаем
       if (sessionToken === currentSessionToken) {
         localStorage.removeItem('telegram_user');
         localStorage.removeItem('session_token');
+        localStorage.removeItem('user_settings');
+        localStorage.removeItem('rudn_device_id');
+        localStorage.removeItem('activeTab');
         window.location.reload();
       }
     } catch (err) {
