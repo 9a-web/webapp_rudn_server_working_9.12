@@ -4,7 +4,7 @@ Pydantic модели для API расписания РУДН
 
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Union
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 import uuid
 
