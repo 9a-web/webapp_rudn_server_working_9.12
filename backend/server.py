@@ -2847,6 +2847,30 @@ async def send_test_notification_endpoint(telegram_id: int = Body(..., embed=Tru
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/notifications/test-inapp", response_model=SuccessResponse)
+async def create_test_inapp_notification(telegram_id: int = Body(..., embed=True)):
+    """Создать тестовое in-app уведомление для проверки анимации"""
+    try:
+        notification_id = await create_notification(
+            telegram_id=telegram_id,
+            notification_type=NotificationType.ANNOUNCEMENT,
+            category=NotificationCategory.SYSTEM,
+            title="🔔 Тестовое уведомление",
+            message="Это тестовое уведомление для проверки анимации колокольчика!",
+            emoji="🔔",
+            priority=NotificationPriority.HIGH,
+            send_push=False  # Не отправляем в Telegram
+        )
+        
+        if notification_id:
+            return SuccessResponse(success=True, message=f"Тестовое уведомление создано: {notification_id}")
+        else:
+            raise HTTPException(status_code=500, detail="Не удалось создать уведомление")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при создании тестового уведомления: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @api_router.post("/group-tasks/{task_id}/accept", response_model=SuccessResponse)
 async def accept_group_task_invite(task_id: str, telegram_id: int = Body(..., embed=True)):
