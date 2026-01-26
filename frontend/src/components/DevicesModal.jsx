@@ -377,8 +377,41 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
 
             {!loading && devices.length > 0 && (
               <div className="space-y-3">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-                  Активные сессии
+                {/* Текущее устройство (Telegram) - если мы в Telegram WebApp */}
+                {isInTelegramWebApp && (
+                  <>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
+                      Текущее устройство
+                    </p>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 rounded-xl border bg-green-500/10 border-green-500/30"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-green-500/20 text-green-400">
+                          <Smartphone className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white">
+                              Telegram
+                            </p>
+                            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">
+                              Это устройство
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {webApp?.platform || 'Мобильное приложение'}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mt-4">
+                  Подключённые веб-сессии ({devices.length})
                 </p>
                 
                 {devices.map((device, index) => (
