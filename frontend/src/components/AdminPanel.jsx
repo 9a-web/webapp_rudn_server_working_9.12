@@ -629,4 +629,321 @@ const FeatureStatCard = ({ icon, label, value, color }) => (
   </div>
 );
 
+// --- Notifications Tab ---
+const NotificationsTab = () => {
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState(null);
+  
+  // Форма уведомления
+  const [notificationTitle, setNotificationTitle] = useState('');
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationEmoji, setNotificationEmoji] = useState('📢');
+  const [sendInApp, setSendInApp] = useState(true);
+  const [sendTelegram, setSendTelegram] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+
+  const EMOJI_OPTIONS = ['📢', '🔔', '⚠️', '✅', '❌', '💡', '🎉', '📌', '🚀', '💬', '📝', '🎁'];
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/users?limit=100`);
+      setUsers(res.data || []);
+      setFilteredUsers(res.data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки пользователей:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Поиск
+  useEffect(() => {
+    if (!search.trim()) {
+      setFilteredUsers(users);
+      return;
+    }
+    const q = search.toLowerCase();
+    setFilteredUsers(users.filter(u => 
+      (u.first_name || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.group_name || '').toLowerCase().includes(q) ||
+      String(u.telegram_id).includes(q)
+    ));
+  }, [search, users]);
+
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    setSendResult(null);
+  };
+
+  const handleSendNotification = async () => {
+    if (!selectedUser || (!notificationTitle.trim() && !notificationMessage.trim())) return;
+    if (!sendInApp && !sendTelegram) return;
+
+    setSending(true);
+    setSendResult(null);
+
+    try {
+      const res = await axios.post(`${BACKEND_URL}/api/admin/send-notification`, {
+        telegram_id: selectedUser.telegram_id,
+        title: notificationTitle.trim() || 'Уведомление',
+        message: notificationMessage.trim(),
+        emoji: notificationEmoji,
+        send_in_app: sendInApp,
+        send_telegram: sendTelegram
+      });
+
+      setSendResult({
+        success: true,
+        message: 'Уведомление отправлено!',
+        details: res.data
+      });
+
+      // Очистить форму
+      setNotificationTitle('');
+      setNotificationMessage('');
+
+    } catch (error) {
+      console.error('Ошибка отправки:', error);
+      setSendResult({
+        success: false,
+        message: error.response?.data?.detail || 'Ошибка отправки уведомления'
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Левая колонка - выбор пользователя */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Users className="w-5 h-5 text-purple-400" />
+            Выберите получателя
+          </h3>
+
+          {/* Поиск */}
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по имени, username, группе или ID..."
+              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+            />
+          </div>
+
+          {/* Список пользователей */}
+          <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-purple-500 border-t-transparent"></div>
+              </div>
+            ) : filteredUsers.length > 0 ? (
+              filteredUsers.map((user) => (
+                <motion.button
+                  key={user.telegram_id}
+                  onClick={() => handleSelectUser(user)}
+                  whileTap={{ scale: 0.98 }}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left ${
+                    selectedUser?.telegram_id === user.telegram_id
+                      ? 'bg-purple-500/20 border-2 border-purple-500/50'
+                      : 'bg-white/5 border border-transparent hover:bg-white/10'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                    {(user.first_name?.[0] || user.username?.[0] || '?').toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-white truncate">
+                      {user.first_name || 'Нет имени'}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {user.username ? `@${user.username}` : ''} 
+                      {user.group_name ? ` • ${user.group_name}` : ''}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      ID: {user.telegram_id}
+                    </div>
+                  </div>
+                  {selectedUser?.telegram_id === user.telegram_id && (
+                    <Check className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                  )}
+                </motion.button>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                Пользователи не найдены
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Правая колонка - форма уведомления */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-blue-400" />
+            Отправить уведомление
+          </h3>
+
+          {selectedUser ? (
+            <div className="space-y-4">
+              {/* Выбранный пользователь */}
+              <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                <div className="text-sm text-purple-300">Получатель:</div>
+                <div className="font-semibold text-white">
+                  {selectedUser.first_name || 'Пользователь'} 
+                  {selectedUser.username && <span className="text-gray-400"> (@{selectedUser.username})</span>}
+                </div>
+              </div>
+
+              {/* Emoji */}
+              <div>
+                <label className="text-sm text-gray-400 mb-2 block">Эмодзи</label>
+                <div className="flex flex-wrap gap-2">
+                  {EMOJI_OPTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => setNotificationEmoji(emoji)}
+                      className={`w-10 h-10 rounded-lg text-xl transition-all ${
+                        notificationEmoji === emoji
+                          ? 'bg-purple-500/30 ring-2 ring-purple-500'
+                          : 'bg-white/5 hover:bg-white/10'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Заголовок */}
+              <div>
+                <label className="text-sm text-gray-400 mb-2 block">Заголовок</label>
+                <input
+                  type="text"
+                  value={notificationTitle}
+                  onChange={(e) => setNotificationTitle(e.target.value)}
+                  placeholder="Заголовок уведомления"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+
+              {/* Сообщение */}
+              <div>
+                <label className="text-sm text-gray-400 mb-2 block">Сообщение</label>
+                <textarea
+                  value={notificationMessage}
+                  onChange={(e) => setNotificationMessage(e.target.value)}
+                  placeholder="Текст сообщения..."
+                  rows={4}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 resize-none"
+                />
+              </div>
+
+              {/* Опции отправки */}
+              <div className="space-y-3">
+                <label className="text-sm text-gray-400 block">Куда отправить</label>
+                
+                <label className="flex items-center gap-3 cursor-pointer p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={sendInApp}
+                    onChange={(e) => setSendInApp(e.target.checked)}
+                    className="w-5 h-5 rounded border-gray-600 text-purple-500 focus:ring-purple-500 bg-white/10"
+                  />
+                  <Bell className="w-5 h-5 text-purple-400" />
+                  <div>
+                    <div className="text-white font-medium">В приложение</div>
+                    <div className="text-xs text-gray-400">Появится в разделе уведомлений</div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={sendTelegram}
+                    onChange={(e) => setSendTelegram(e.target.checked)}
+                    className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500 bg-white/10"
+                  />
+                  <Send className="w-5 h-5 text-blue-400" />
+                  <div>
+                    <div className="text-white font-medium">В Telegram</div>
+                    <div className="text-xs text-gray-400">Личное сообщение от бота</div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Результат */}
+              {sendResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-4 rounded-xl ${
+                    sendResult.success 
+                      ? 'bg-green-500/20 border border-green-500/30' 
+                      : 'bg-red-500/20 border border-red-500/30'
+                  }`}
+                >
+                  <div className={`font-medium ${sendResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                    {sendResult.success ? '✅' : '❌'} {sendResult.message}
+                  </div>
+                  {sendResult.details && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      In-App: {sendResult.details.in_app_sent ? '✓' : '✗'} | 
+                      Telegram: {sendResult.details.telegram_sent ? '✓' : '✗'}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Кнопка отправки */}
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSendNotification}
+                disabled={sending || (!sendInApp && !sendTelegram) || (!notificationTitle.trim() && !notificationMessage.trim())}
+                className={`w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                  sending || (!sendInApp && !sendTelegram) || (!notificationTitle.trim() && !notificationMessage.trim())
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90'
+                }`}
+              >
+                {sending ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Отправка...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    Отправить уведомление
+                  </>
+                )}
+              </motion.button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <User className="w-16 h-16 mb-4 opacity-30" />
+              <p>Выберите пользователя слева</p>
+              <p className="text-sm text-gray-500 mt-1">для отправки уведомления</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default AdminPanel;
