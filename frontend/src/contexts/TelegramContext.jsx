@@ -336,23 +336,44 @@ export const TelegramProvider = ({ children }) => {
               setIsReady(true);
             })
             .catch(err => {
-              console.warn('⚠️ Сессия не найдена или удалена:', err.message);
-              // Полная очистка данных пользователя
-              localStorage.removeItem('telegram_user');
-              localStorage.removeItem('session_token');
-              localStorage.removeItem('user_settings');
-              localStorage.removeItem('rudn_device_id'); // Сбрасываем device_id для нового пользователя
-              localStorage.removeItem('activeTab');
-              // Создаем нового гостевого пользователя с новым ID
-              const { deviceId, numericId } = getOrCreateDeviceId();
-              setUser({
-                id: numericId,
-                first_name: 'Пользователь',
-                last_name: '',
-                username: `user_${deviceId.substring(0, 8)}`,
-                device_id: deviceId,
-                is_guest: true
-              });
+              console.warn('⚠️ Ошибка проверки сессии:', err.message);
+              
+              // Проверяем тип ошибки
+              const isNetworkError = err.message === 'Failed to fetch' || 
+                                     err.message.includes('network') ||
+                                     err.message.includes('Network');
+              
+              if (isNetworkError) {
+                // Сетевая ошибка - НЕ очищаем данные, используем сохранённого пользователя
+                console.log('🔄 Сетевая ошибка, используем сохранённые данные пользователя');
+                setUser({
+                  id: parsedUser.id,
+                  first_name: parsedUser.first_name || 'Пользователь',
+                  last_name: parsedUser.last_name || '',
+                  username: parsedUser.username || '',
+                  photo_url: parsedUser.photo_url,
+                  is_linked: true,
+                  offline_mode: true // Флаг что работаем в offline режиме
+                });
+              } else {
+                // Сессия реально не найдена на сервере (404) - очищаем
+                console.warn('⚠️ Сессия не найдена на сервере, очистка данных');
+                localStorage.removeItem('telegram_user');
+                localStorage.removeItem('session_token');
+                localStorage.removeItem('user_settings');
+                // НЕ удаляем rudn_device_id - сохраняем идентификатор устройства
+                localStorage.removeItem('activeTab');
+                // Создаем гостевого пользователя с СУЩЕСТВУЮЩИМ device_id
+                const { deviceId, numericId } = getOrCreateDeviceId();
+                setUser({
+                  id: numericId,
+                  first_name: 'Пользователь',
+                  last_name: '',
+                  username: `user_${deviceId.substring(0, 8)}`,
+                  device_id: deviceId,
+                  is_guest: true
+                });
+              }
               setIsReady(true);
             });
           
