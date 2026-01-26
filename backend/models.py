@@ -1045,7 +1045,8 @@ class AdminSendNotificationRequest(BaseModel):
     telegram_id: int  # Кому отправить
     title: str  # Заголовок
     message: str  # Текст сообщения
-    emoji: str = "📢"  # Эмодзи (по умолчанию мегафон)
+    notification_type: str = "admin_message"  # Тип уведомления
+    category: str = "system"  # Категория
     send_in_app: bool = True  # Отправить в приложение
     send_telegram: bool = False  # Отправить в Telegram
 
