@@ -76,7 +76,8 @@ export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpi
   const backendUrl = getBackendURL();
   const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
   const wsHost = backendUrl.replace(/^https?:\/\//, '');
-  const wsUrl = `${wsProtocol}://${wsHost}/ws/session/${sessionToken}`;
+  // Используем /api/ws/ для правильной маршрутизации через ingress
+  const wsUrl = `${wsProtocol}://${wsHost}/api/ws/session/${sessionToken}`;
   
   console.log('🔌 Connecting to WebSocket:', wsUrl);
   
