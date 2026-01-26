@@ -179,6 +179,25 @@ export const revokeDevice = async (sessionToken, telegramId) => {
 };
 
 /**
+ * Отключить все устройства пользователя
+ * @param {number} telegramId - ID пользователя в Telegram
+ * @returns {Promise<{success: boolean, message: string, deleted_count: number}>}
+ */
+export const revokeAllDevices = async (telegramId) => {
+  const backendUrl = getBackendURL();
+  const response = await fetch(`${backendUrl}/api/web-sessions/user/${telegramId}/all`, {
+    method: 'DELETE'
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to revoke all devices');
+  }
+  
+  return response.json();
+};
+
+/**
  * Отправить heartbeat для сессии
  * @param {string} sessionToken - токен сессии
  */
@@ -200,5 +219,6 @@ export default {
   createSessionWebSocket,
   getUserDevices,
   revokeDevice,
+  revokeAllDevices,
   sendHeartbeat
 };
