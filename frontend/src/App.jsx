@@ -655,6 +655,9 @@ const Home = () => {
         // Пользователь существует, но у него неполные настройки
         console.log('User has incomplete settings, showing welcome screen');
         setShowWelcomeScreen(true);
+        // Очищаем данные связки - пользователь должен заново настроить профиль
+        localStorage.removeItem('telegram_user');
+        localStorage.removeItem('session_token');
       } else {
         // Пользователь не найден
         setShowWelcomeScreen(true);
