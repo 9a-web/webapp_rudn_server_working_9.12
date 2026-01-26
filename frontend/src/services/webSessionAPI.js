@@ -65,11 +65,12 @@ export const linkWebSession = async (sessionToken, userData) => {
 
 /**
  * Создать WebSocket соединение для отслеживания связки сессии
+ * С автоматическим fallback на HTTP polling при ошибке WebSocket
  * @param {string} sessionToken - токен сессии
  * @param {Function} onLinked - колбэк при успешной связке
  * @param {Function} onError - колбэк при ошибке
  * @param {Function} onExpired - колбэк при истечении сессии
- * @returns {WebSocket}
+ * @returns {Object} - объект с методом close() для закрытия соединения/polling
  */
 export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpired, onConnected }) => {
   // Определяем WebSocket URL
@@ -81,10 +82,63 @@ export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpi
   
   console.log('🔌 Connecting to WebSocket:', wsUrl);
   
+  let pollingInterval = null;
+  let isClosed = false;
+  
+  // Функция для HTTP polling (fallback)
+  const startPolling = () => {
+    console.log('🔄 Starting HTTP polling fallback for session status...');
+    
+    pollingInterval = setInterval(async () => {
+      if (isClosed) {
+        clearInterval(pollingInterval);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/status`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.log('⏰ Session expired (polling)');
+            onExpired?.();
+            clearInterval(pollingInterval);
+          }
+          return;
+        }
+        
+        const data = await response.json();
+        console.log('📡 Polling status:', data.status);
+        
+        if (data.status === 'linked') {
+          console.log('✅ Session linked (polling)!', data);
+          onLinked?.({
+            telegram_id: data.telegram_id,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            username: data.username,
+            photo_url: data.photo_url,
+            user_settings: data.user_settings
+          });
+          clearInterval(pollingInterval);
+        } else if (data.status === 'expired') {
+          console.log('⏰ Session expired (polling)');
+          onExpired?.();
+          clearInterval(pollingInterval);
+        }
+      } catch (err) {
+        console.warn('📡 Polling error:', err.message);
+        // Продолжаем polling при сетевых ошибках
+      }
+    }, 2000); // Проверяем каждые 2 секунды
+  };
+  
   const ws = new WebSocket(wsUrl);
+  let wsConnected = false;
+  let wsErrorOccurred = false;
   
   ws.onopen = () => {
     console.log('✅ WebSocket connected');
+    wsConnected = true;
   };
   
   ws.onmessage = (event) => {
@@ -126,14 +180,52 @@ export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpi
   
   ws.onerror = (error) => {
     console.error('❌ WebSocket error:', error);
-    onError?.('Ошибка соединения');
+    wsErrorOccurred = true;
+    
+    // Если WebSocket не подключился - переключаемся на polling
+    if (!wsConnected && !pollingInterval) {
+      console.log('⚠️ WebSocket failed, switching to HTTP polling...');
+      startPolling();
+      onConnected?.(); // Сигнализируем что "соединение" установлено (через polling)
+    }
   };
   
-  ws.onclose = () => {
-    console.log('🔌 WebSocket closed');
+  ws.onclose = (event) => {
+    console.log('🔌 WebSocket closed, code:', event.code, 'reason:', event.reason);
+    
+    // Если WebSocket закрылся с ошибкой до подключения - переключаемся на polling
+    if (!wsConnected && !pollingInterval && !isClosed) {
+      console.log('⚠️ WebSocket closed before connecting, switching to HTTP polling...');
+      startPolling();
+      onConnected?.();
+    }
   };
   
-  return ws;
+  // Таймаут для переключения на polling если WebSocket не подключается
+  setTimeout(() => {
+    if (!wsConnected && !pollingInterval && !isClosed) {
+      console.log('⚠️ WebSocket connection timeout, switching to HTTP polling...');
+      startPolling();
+      onConnected?.();
+    }
+  }, 5000); // 5 секунд таймаут
+  
+  // Возвращаем объект с методом close для совместимости
+  return {
+    close: () => {
+      isClosed = true;
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    },
+    // Для совместимости с проверками типа ws.readyState
+    get readyState() {
+      return ws.readyState;
+    }
+  };
 };
 
 /**
