@@ -658,12 +658,18 @@ const Home = () => {
       } else {
         // Пользователь не найден
         setShowWelcomeScreen(true);
+        // Очищаем данные связки при показе формы регистрации
+        localStorage.removeItem('telegram_user');
+        localStorage.removeItem('session_token');
       }
     } catch (err) {
       console.error('Error loading user data:', err);
       // Если пользователь не найден (404), показываем welcome screen
       if (err.message === 'Пользователь не найден') {
         setShowWelcomeScreen(true);
+        // Очищаем данные связки при показе формы регистрации
+        localStorage.removeItem('telegram_user');
+        localStorage.removeItem('session_token');
       } else {
         setError(err.message);
       }
