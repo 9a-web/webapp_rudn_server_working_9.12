@@ -1,12 +1,13 @@
 /**
- * Список участников комнаты со статистикой и управлением ролями
+ * Список участников комнаты со статистикой, управлением ролями и быстрым добавлением друзей
  */
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Crown, Shield, Eye, User, ChevronDown, Check } from 'lucide-react';
-import { updateParticipantRole } from '../services/roomsAPI';
+import { Users, Crown, Shield, Eye, User, ChevronDown, Check, UserPlus } from 'lucide-react';
+import { updateParticipantRole, addFriendsToRoom } from '../services/roomsAPI';
 import { useTelegram } from '../contexts/TelegramContext';
+import SelectFriendsModal from './SelectFriendsModal';
 
 const ROLES = [
   { id: 'owner', name: 'Владелец', icon: Crown, color: 'text-yellow-400', bgColor: 'bg-yellow-500/10' },
@@ -20,14 +21,18 @@ const RoomParticipantsList = ({
   participants = [], 
   currentUserId, 
   roomId, 
-  onRoleChanged 
+  onRoleChanged,
+  onParticipantsUpdated
 }) => {
   const [changingRoleFor, setChangingRoleFor] = useState(null);
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
+  const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
+  const [isAddingFriends, setIsAddingFriends] = useState(false);
   const { webApp } = useTelegram();
 
   const currentUser = participants.find(p => p.telegram_id === currentUserId);
   const canChangeRoles = currentUser && (currentUser.role === 'owner' || currentUser.role === 'admin');
+  const canAddMembers = currentUser && (currentUser.role === 'owner' || currentUser.role === 'admin' || currentUser.role === 'moderator');
 
   const getRoleConfig = (roleId) => {
     return ROLES.find(r => r.id === roleId) || ROLES[3]; // default: member
@@ -79,6 +84,42 @@ const RoomParticipantsList = ({
     }
   };
 
+  const handleAddFriends = async (selectedFriends) => {
+    if (!selectedFriends.length) return;
+    
+    setIsAddingFriends(true);
+    try {
+      await addFriendsToRoom(roomId, currentUserId, selectedFriends);
+      
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.notificationOccurred('success');
+      }
+      
+      if (onParticipantsUpdated) {
+        await onParticipantsUpdated();
+      }
+      
+      setShowAddFriendsModal(false);
+    } catch (error) {
+      console.error('Error adding friends:', error);
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.notificationOccurred('error');
+      }
+      
+      // Show error message
+      const errorMessage = error.response?.data?.detail || 'Ошибка при добавлении друзей';
+      if (webApp?.showPopup) {
+        webApp.showPopup({
+          title: 'Ошибка',
+          message: errorMessage,
+          buttons: [{ type: 'ok' }]
+        });
+      }
+    } finally {
+      setIsAddingFriends(false);
+    }
+  };
+
   // Сортировка: владелец первый, затем по ролям, затем по алфавиту
   const sortedParticipants = [...participants].sort((a, b) => {
     const roleOrder = { owner: 0, admin: 1, moderator: 2, member: 3, viewer: 4 };
@@ -88,15 +129,46 @@ const RoomParticipantsList = ({
     return a.first_name.localeCompare(b.first_name);
   });
 
+  // IDs участников для исключения из списка друзей
+  const existingParticipantIds = participants.map(p => p.telegram_id);
+
   return (
     <div className="space-y-3">
-      {/* Заголовок */}
+      {/* Заголовок с кнопкой добавления */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
           <Users className="w-4 h-4" />
           Участники ({participants.length})
         </h4>
+        
+        {canAddMembers && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setShowAddFriendsModal(true);
+              if (webApp?.HapticFeedback) {
+                webApp.HapticFeedback.impactOccurred('light');
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 
+                     bg-gradient-to-r from-purple-500 to-pink-500 
+                     text-white text-xs font-medium rounded-lg
+                     hover:opacity-90 transition-all"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            Добавить друзей
+          </motion.button>
+        )}
       </div>
+
+      {/* Info banner */}
+      {canAddMembers && (
+        <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+          <p className="text-xs text-purple-300">
+            💡 Быстро добавьте друзей нажав на кнопку выше. Они автоматически присоединятся к комнате и всем задачам.
+          </p>
+        </div>
+      )}
 
       {/* Список участников */}
       <div className="space-y-2">
@@ -249,6 +321,16 @@ const RoomParticipantsList = ({
           </p>
         </div>
       )}
+
+      {/* Modal выбора друзей */}
+      <SelectFriendsModal
+        isOpen={showAddFriendsModal}
+        onClose={() => setShowAddFriendsModal(false)}
+        telegramId={currentUserId}
+        onSelectFriends={handleAddFriends}
+        excludeIds={existingParticipantIds}
+        title="Добавить друзей в комнату"
+      />
     </div>
   );
 };
