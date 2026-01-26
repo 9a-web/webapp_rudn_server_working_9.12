@@ -799,6 +799,20 @@ export const JournalDetailModal = ({
             userSettings={userSettings}
           />
         )}
+
+        {/* Модал заявок на вступление */}
+        <JournalApplicationsModal
+          isOpen={showApplications}
+          onClose={() => setShowApplications(false)}
+          journalId={journalId}
+          journalName={journal?.name}
+          telegramId={telegramId}
+          hapticFeedback={hapticFeedback}
+          onApplicationProcessed={() => {
+            loadData();
+            setShowApplications(false);
+          }}
+        />
       </motion.div>
     </AnimatePresence>
   );
