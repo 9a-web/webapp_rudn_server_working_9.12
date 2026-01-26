@@ -1,299 +1,601 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Friends Integration APIs
-Tests the new endpoints for adding friends to rooms and journals
+Backend Testing Suite for Web Sessions System
+Tests the Telegram Profile Link via QR-code functionality
 """
 
 import requests
 import json
-import sys
+import time
 from datetime import datetime
-import uuid
+from typing import Dict, Any, Optional
 
-# Configuration
-TELEGRAM_ID = 765963392
-BACKEND_URL = "http://localhost:8001"
+# Backend URL from environment
+BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
 
-def print_test_header(test_name):
-    print(f"\n{'='*60}")
-    print(f"🧪 {test_name}")
-    print(f"{'='*60}")
-
-def print_success(message):
-    print(f"✅ {message}")
-
-def print_error(message):
-    print(f"❌ {message}")
-
-def print_info(message):
-    print(f"ℹ️  {message}")
-
-def test_room_add_friends_api():
-    """Test POST /api/rooms/{room_id}/add-friends - Quick add friends to room"""
-    print_test_header("POST /api/rooms/{room_id}/add-friends - Quick add friends to room")
-    
-    # First, create test data: users, friendship, and room
-    print_info("Setting up test data...")
-    
-    # Create test users (friends)
-    friend1_id = 123456789
-    friend2_id = 987654321
-    
-    # Create a test room first
-    room_data = {
-        "name": "Test Room for Friends",
-        "description": "Testing room for adding friends",
-        "telegram_id": TELEGRAM_ID,
-        "color": "blue"
-    }
-    
-    try:
-        # Create room
-        response = requests.post(f"{API_BASE}/rooms", json=room_data)
-        print_info(f"Create room status: {response.status_code}")
+class WebSessionTester:
+    def __init__(self):
+        self.session_token: Optional[str] = None
+        self.test_results = []
         
-        if response.status_code != 200:
-            print_error(f"Failed to create test room: {response.text}")
-            return False
-            
-        room = response.json()
-        room_id = room.get('room_id')
-        print_success(f"Created test room: {room_id}")
-        
-        # Create friendship records in database (simulate existing friendships)
-        # Note: In real scenario, friendships would already exist
-        print_info("Simulating existing friendships...")
-        
-        # Test the add-friends endpoint
-        add_friends_data = {
-            "telegram_id": TELEGRAM_ID,
-            "friends": [
-                {
-                    "telegram_id": friend1_id,
-                    "username": "testfriend1",
-                    "first_name": "Test Friend 1"
-                },
-                {
-                    "telegram_id": friend2_id,
-                    "username": "testfriend2", 
-                    "first_name": "Test Friend 2"
-                }
-            ]
+    def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
+        """Log test result"""
+        result = {
+            "test": test_name,
+            "success": success,
+            "details": details,
+            "timestamp": datetime.now().isoformat(),
+            "response_data": response_data
         }
+        self.test_results.append(result)
         
-        response = requests.post(f"{API_BASE}/rooms/{room_id}/add-friends", json=add_friends_data)
-        print_info(f"Request: POST {API_BASE}/rooms/{room_id}/add-friends")
-        print_info(f"Status Code: {response.status_code}")
-        print_info(f"Request data: {json.dumps(add_friends_data, indent=2)}")
-        
-        if response.status_code == 200:
-            updated_room = response.json()
-            print_success("Friends added to room successfully")
-            print_info(f"Total participants: {updated_room.get('total_participants', 0)}")
-            
-            # Verify participants were added
-            participants = updated_room.get('participants', [])
-            added_friend_ids = {p['telegram_id'] for p in participants if p['telegram_id'] != TELEGRAM_ID}
-            
-            print_info(f"Participants in room: {[p['first_name'] for p in participants]}")
-            
-            # Check if friends were added (might fail if friendship doesn't exist)
-            if friend1_id in added_friend_ids or friend2_id in added_friend_ids:
-                print_success("✅ At least one friend was added to room")
-                return True
-            else:
-                print_info("ℹ️  No friends added - this is expected if friendship records don't exist")
-                return True  # This is not a failure, just missing test data
-                
-        elif response.status_code == 403:
-            print_error("❌ User not participant of room")
-            print_error(f"Response: {response.text}")
-            return False
-        elif response.status_code == 400:
-            print_info("ℹ️  Friends already in room or not actual friends - this is expected behavior")
-            print_info(f"Response: {response.text}")
-            return True  # This is expected behavior
-        else:
-            print_error(f"❌ Unexpected status code: {response.status_code}")
-            print_error(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print_error(f"Exception during room add-friends test: {str(e)}")
-        return False
-
-
-def test_journal_add_friends_api():
-    """Test POST /api/journals/{journal_id}/students/from-friends - Add friends to attendance journal"""
-    print_test_header("POST /api/journals/{journal_id}/students/from-friends - Add friends to journal")
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status}: {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        if not success and response_data:
+            print(f"   Response: {response_data}")
+        print()
     
-    print_info("Setting up test data...")
-    
-    # Create a test journal first
-    journal_data = {
-        "name": "Test Journal for Friends",
-        "group_name": "Test Group",
-        "description": "Testing journal for adding friends as students",
-        "telegram_id": TELEGRAM_ID,
-        "color": "purple"
-    }
-    
-    try:
-        # Create journal
-        response = requests.post(f"{API_BASE}/journals", json=journal_data)
-        print_info(f"Create journal status: {response.status_code}")
-        
-        if response.status_code != 200:
-            print_error(f"Failed to create test journal: {response.text}")
+    def test_create_web_session(self) -> bool:
+        """Test POST /api/web-sessions - создание новой сессии"""
+        try:
+            print("🧪 Testing: Create Web Session")
+            
+            response = requests.post(f"{API_BASE}/web-sessions", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Create Web Session", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate required fields
+            required_fields = ["session_token", "status", "qr_url", "expires_at"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test(
+                    "Create Web Session", 
+                    False, 
+                    f"Missing required fields: {missing_fields}",
+                    data
+                )
+                return False
+            
+            # Validate status is "pending"
+            if data["status"] != "pending":
+                self.log_test(
+                    "Create Web Session", 
+                    False, 
+                    f"Expected status 'pending', got '{data['status']}'",
+                    data
+                )
+                return False
+            
+            # Validate QR URL format
+            expected_qr_pattern = "https://t.me/"
+            if not data["qr_url"].startswith(expected_qr_pattern):
+                self.log_test(
+                    "Create Web Session", 
+                    False, 
+                    f"QR URL doesn't match expected pattern. Got: {data['qr_url']}",
+                    data
+                )
+                return False
+            
+            # Check if QR URL contains link_ parameter
+            if "startapp=link_" not in data["qr_url"]:
+                self.log_test(
+                    "Create Web Session", 
+                    False, 
+                    f"QR URL missing 'startapp=link_' parameter. Got: {data['qr_url']}",
+                    data
+                )
+                return False
+            
+            # Store session token for subsequent tests
+            self.session_token = data["session_token"]
+            
+            self.log_test(
+                "Create Web Session", 
+                True, 
+                f"Session created successfully. Token: {self.session_token[:8]}..., QR: {data['qr_url'][:50]}...",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Create Web Session", 
+                False, 
+                f"Network error: {str(e)}"
+            )
             return False
+        except Exception as e:
+            self.log_test(
+                "Create Web Session", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_get_session_status_pending(self) -> bool:
+        """Test GET /api/web-sessions/{session_token}/status - проверка статуса pending"""
+        if not self.session_token:
+            self.log_test(
+                "Get Session Status (Pending)", 
+                False, 
+                "No session token available from previous test"
+            )
+            return False
+        
+        try:
+            print("🧪 Testing: Get Session Status (Pending)")
             
-        journal = response.json()
-        journal_id = journal.get('journal_id')
-        print_success(f"Created test journal: {journal_id}")
-        
-        # Test the add friends as students endpoint
-        add_friends_data = {
-            "friends": [
-                {
-                    "telegram_id": 123456789,
-                    "full_name": "Test Student 1",
-                    "username": "teststudent1",
-                    "first_name": "Test"
-                },
-                {
-                    "telegram_id": 987654321,
-                    "full_name": "Test Student 2", 
-                    "username": "teststudent2",
-                    "first_name": "Student"
-                }
-            ]
-        }
-        
-        response = requests.post(f"{API_BASE}/journals/{journal_id}/students/from-friends", json=add_friends_data)
-        print_info(f"Request: POST {API_BASE}/journals/{journal_id}/students/from-friends")
-        print_info(f"Status Code: {response.status_code}")
-        print_info(f"Request data: {json.dumps(add_friends_data, indent=2)}")
-        
-        if response.status_code == 200:
-            result = response.json()
-            print_success("Friends added to journal successfully")
-            print_info(f"Added count: {result.get('added_count', 0)}")
-            print_info(f"Skipped count: {result.get('skipped_count', 0)}")
-            print_info(f"Added students: {result.get('added', [])}")
-            print_info(f"Skipped students: {result.get('skipped', [])}")
+            response = requests.get(f"{API_BASE}/web-sessions/{self.session_token}/status", timeout=10)
             
-            # Verify response structure
-            required_fields = ['status', 'added_count', 'skipped_count', 'added', 'skipped']
-            for field in required_fields:
-                if field in result:
-                    print_success(f"  ✅ Response has {field}: {result[field]}")
-                else:
-                    print_error(f"  ❌ Response missing {field}")
+            if response.status_code != 200:
+                self.log_test(
+                    "Get Session Status (Pending)", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate status is still "pending"
+            if data["status"] != "pending":
+                self.log_test(
+                    "Get Session Status (Pending)", 
+                    False, 
+                    f"Expected status 'pending', got '{data['status']}'",
+                    data
+                )
+                return False
+            
+            # Validate session_token matches
+            if data["session_token"] != self.session_token:
+                self.log_test(
+                    "Get Session Status (Pending)", 
+                    False, 
+                    f"Session token mismatch. Expected: {self.session_token}, Got: {data['session_token']}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Get Session Status (Pending)", 
+                True, 
+                f"Status correctly shows 'pending' for session {self.session_token[:8]}...",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Get Session Status (Pending)", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Get Session Status (Pending)", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_link_session_with_telegram(self) -> bool:
+        """Test POST /api/web-sessions/{session_token}/link - связывание сессии с Telegram"""
+        if not self.session_token:
+            self.log_test(
+                "Link Session with Telegram", 
+                False, 
+                "No session token available from previous test"
+            )
+            return False
+        
+        try:
+            print("🧪 Testing: Link Session with Telegram")
+            
+            # Test data - using realistic looking data as per instructions
+            link_data = {
+                "telegram_id": 765963392,  # Existing user from test_result.md
+                "first_name": "Александр",
+                "last_name": "Петров", 
+                "username": "alex_petrov",
+                "photo_url": "https://t.me/i/userpic/320/alex_petrov.jpg"
+            }
+            
+            response = requests.post(
+                f"{API_BASE}/web-sessions/{self.session_token}/link",
+                json=link_data,
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Link Session with Telegram", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate response structure
+            required_fields = ["success", "message"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test(
+                    "Link Session with Telegram", 
+                    False, 
+                    f"Missing required fields: {missing_fields}",
+                    data
+                )
+                return False
+            
+            # Validate success is True
+            if not data["success"]:
+                self.log_test(
+                    "Link Session with Telegram", 
+                    False, 
+                    f"Link failed. Message: {data.get('message', 'No message')}",
+                    data
+                )
+                return False
+            
+            # Validate success message
+            expected_message = "Профиль успешно подключен!"
+            if data["message"] != expected_message:
+                self.log_test(
+                    "Link Session with Telegram", 
+                    False, 
+                    f"Unexpected message. Expected: '{expected_message}', Got: '{data['message']}'",
+                    data
+                )
+                return False
+            
+            # Validate session_token is returned
+            if "session_token" not in data or data["session_token"] != self.session_token:
+                self.log_test(
+                    "Link Session with Telegram", 
+                    False, 
+                    f"Session token not returned or mismatch. Expected: {self.session_token}, Got: {data.get('session_token')}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Link Session with Telegram", 
+                True, 
+                f"Session successfully linked with Telegram ID {link_data['telegram_id']}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Link Session with Telegram", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Link Session with Telegram", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_get_session_status_linked(self) -> bool:
+        """Test GET /api/web-sessions/{session_token}/status - проверка статуса linked"""
+        if not self.session_token:
+            self.log_test(
+                "Get Session Status (Linked)", 
+                False, 
+                "No session token available from previous test"
+            )
+            return False
+        
+        try:
+            print("🧪 Testing: Get Session Status (Linked)")
+            
+            response = requests.get(f"{API_BASE}/web-sessions/{self.session_token}/status", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Get Session Status (Linked)", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate status is now "linked"
+            if data["status"] != "linked":
+                self.log_test(
+                    "Get Session Status (Linked)", 
+                    False, 
+                    f"Expected status 'linked', got '{data['status']}'",
+                    data
+                )
+                return False
+            
+            # Validate user data is present
+            expected_telegram_id = 765963392
+            if data.get("telegram_id") != expected_telegram_id:
+                self.log_test(
+                    "Get Session Status (Linked)", 
+                    False, 
+                    f"Expected telegram_id {expected_telegram_id}, got {data.get('telegram_id')}",
+                    data
+                )
+                return False
+            
+            # Validate user settings are loaded for existing user
+            if data.get("user_settings") is None:
+                self.log_test(
+                    "Get Session Status (Linked)", 
+                    False, 
+                    f"User settings not loaded for existing user {expected_telegram_id}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Get Session Status (Linked)", 
+                True, 
+                f"Status correctly shows 'linked' with user data for Telegram ID {expected_telegram_id}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Get Session Status (Linked)", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Get Session Status (Linked)", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_duplicate_link_attempt(self) -> bool:
+        """Test повторная попытка связки уже связанной сессии (должна вернуть ошибку)"""
+        if not self.session_token:
+            self.log_test(
+                "Duplicate Link Attempt", 
+                False, 
+                "No session token available from previous test"
+            )
+            return False
+        
+        try:
+            print("🧪 Testing: Duplicate Link Attempt")
+            
+            # Try to link the same session again
+            link_data = {
+                "telegram_id": 123456789,  # Different user
+                "first_name": "Иван",
+                "last_name": "Иванов"
+            }
+            
+            response = requests.post(
+                f"{API_BASE}/web-sessions/{self.session_token}/link",
+                json=link_data,
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Duplicate Link Attempt", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Should return success=False for already linked session
+            if data.get("success", True):  # Default True to catch missing field
+                self.log_test(
+                    "Duplicate Link Attempt", 
+                    False, 
+                    f"Expected success=False for already linked session, got success={data.get('success')}",
+                    data
+                )
+                return False
+            
+            # Should have appropriate error message
+            expected_messages = ["уже использована", "истекла", "already", "used"]
+            message = data.get("message", "").lower()
+            if not any(expected in message for expected in expected_messages):
+                self.log_test(
+                    "Duplicate Link Attempt", 
+                    False, 
+                    f"Error message doesn't indicate session already used. Got: '{data.get('message')}'",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Duplicate Link Attempt", 
+                True, 
+                f"Correctly rejected duplicate link attempt with message: '{data.get('message')}'",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Duplicate Link Attempt", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Duplicate Link Attempt", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_invalid_session_token(self) -> bool:
+        """Test запросы с несуществующим session_token"""
+        try:
+            print("🧪 Testing: Invalid Session Token")
+            
+            fake_token = "00000000-0000-0000-0000-000000000000"
+            
+            # Test status endpoint
+            response = requests.get(f"{API_BASE}/web-sessions/{fake_token}/status", timeout=10)
+            
+            if response.status_code != 404:
+                self.log_test(
+                    "Invalid Session Token", 
+                    False, 
+                    f"Expected HTTP 404 for invalid token, got {response.status_code}",
+                    response.text
+                )
+                return False
+            
+            # Test link endpoint
+            link_data = {"telegram_id": 123456789}
+            response = requests.post(
+                f"{API_BASE}/web-sessions/{fake_token}/link",
+                json=link_data,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success", True):  # Should be False for invalid session
+                    self.log_test(
+                        "Invalid Session Token", 
+                        False, 
+                        f"Link endpoint should return success=False for invalid token, got {data}",
+                        data
+                    )
                     return False
+            elif response.status_code != 404:
+                self.log_test(
+                    "Invalid Session Token", 
+                    False, 
+                    f"Expected HTTP 404 or success=False for invalid token, got {response.status_code}",
+                    response.text
+                )
+                return False
             
-            # Check that students were added with is_linked=True
-            if result.get('added_count', 0) > 0:
-                print_success("✅ Friends successfully added as linked students")
-            else:
-                print_info("ℹ️  No new students added (might be duplicates)")
-                
+            self.log_test(
+                "Invalid Session Token", 
+                True, 
+                "Correctly handled invalid session token requests"
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Invalid Session Token", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Invalid Session Token", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def run_all_tests(self):
+        """Run all Web Sessions tests in sequence"""
+        print("🚀 Starting Web Sessions API Testing")
+        print("=" * 50)
+        
+        tests = [
+            self.test_create_web_session,
+            self.test_get_session_status_pending,
+            self.test_link_session_with_telegram,
+            self.test_get_session_status_linked,
+            self.test_duplicate_link_attempt,
+            self.test_invalid_session_token
+        ]
+        
+        passed = 0
+        total = len(tests)
+        
+        for test in tests:
+            try:
+                if test():
+                    passed += 1
+                time.sleep(0.5)  # Small delay between tests
+            except Exception as e:
+                print(f"❌ Test failed with exception: {e}")
+        
+        print("=" * 50)
+        print(f"📊 Test Results: {passed}/{total} tests passed")
+        
+        if passed == total:
+            print("🎉 All Web Sessions tests PASSED!")
             return True
         else:
-            print_error(f"❌ Failed to add friends to journal: {response.status_code}")
-            print_error(f"Response: {response.text}")
+            print(f"⚠️  {total - passed} tests FAILED")
             return False
-            
-    except Exception as e:
-        print_error(f"Exception during journal add-friends test: {str(e)}")
-        return False
-
-
-def test_endpoint_validation():
-    """Test endpoint validation and error handling"""
-    print_test_header("API Validation and Error Handling")
     
-    try:
-        # Test 1: Invalid room ID
-        print_info("Testing invalid room ID...")
-        response = requests.post(f"{API_BASE}/rooms/invalid-room-id/add-friends", json={
-            "telegram_id": TELEGRAM_ID,
-            "friends": []
-        })
-        print_info(f"Invalid room ID status: {response.status_code}")
-        if response.status_code == 404:
-            print_success("✅ Correctly returns 404 for invalid room ID")
-        else:
-            print_error(f"❌ Expected 404, got {response.status_code}")
+    def print_detailed_results(self):
+        """Print detailed test results"""
+        print("\n📋 Detailed Test Results:")
+        print("-" * 50)
         
-        # Test 2: Invalid journal ID  
-        print_info("Testing invalid journal ID...")
-        response = requests.post(f"{API_BASE}/journals/invalid-journal-id/students/from-friends", json={
-            "friends": []
-        })
-        print_info(f"Invalid journal ID status: {response.status_code}")
-        if response.status_code == 404:
-            print_success("✅ Correctly returns 404 for invalid journal ID")
-        else:
-            print_error(f"❌ Expected 404, got {response.status_code}")
-            
-        # Test 3: Empty friends array
-        print_info("Testing empty friends array...")
-        # This would require a valid room/journal ID, so we'll skip for now
-        
-        return True
-        
-    except Exception as e:
-        print_error(f"Exception during validation test: {str(e)}")
-        return False
+        for result in self.test_results:
+            status = "✅" if result["success"] else "❌"
+            print(f"{status} {result['test']}")
+            if result["details"]:
+                print(f"   {result['details']}")
+            print()
+
 
 def main():
-    """Run all tests"""
-    print("🚀 Starting Backend API Tests for Friends Integration")
+    """Main test execution"""
+    print("🔗 Web Sessions System Testing")
     print(f"Backend URL: {BACKEND_URL}")
-    print(f"Telegram ID: {TELEGRAM_ID}")
+    print()
     
-    # Test 1: Room add-friends endpoint
-    room_test_result = test_room_add_friends_api()
+    tester = WebSessionTester()
     
-    # Test 2: Journal add-friends endpoint  
-    journal_test_result = test_journal_add_friends_api()
+    # Run all tests
+    success = tester.run_all_tests()
     
-    # Test 3: Validation and error handling
-    validation_test_result = test_endpoint_validation()
+    # Print detailed results
+    tester.print_detailed_results()
     
-    # Summary
-    print_test_header("TEST SUMMARY")
-    
-    tests_passed = 0
-    total_tests = 3
-    
-    if room_test_result:
-        print_success("✅ POST /api/rooms/{room_id}/add-friends - PASSED")
-        tests_passed += 1
-    else:
-        print_error("❌ POST /api/rooms/{room_id}/add-friends - FAILED")
-        
-    if journal_test_result:
-        print_success("✅ POST /api/journals/{journal_id}/students/from-friends - PASSED")
-        tests_passed += 1
-    else:
-        print_error("❌ POST /api/journals/{journal_id}/students/from-friends - FAILED")
-        
-    if validation_test_result:
-        print_success("✅ API Validation and Error Handling - PASSED")
-        tests_passed += 1
-    else:
-        print_error("❌ API Validation and Error Handling - FAILED")
-    
-    print(f"\n🎯 Tests passed: {tests_passed}/{total_tests}")
-    
-    if tests_passed == total_tests:
-        print_success("🎉 ALL TESTS PASSED!")
-        return 0
-    else:
-        print_error("💥 SOME TESTS FAILED!")
-        return 1
+    return success
+
 
 if __name__ == "__main__":
-    sys.exit(main())
+    success = main()
+    exit(0 if success else 1)
