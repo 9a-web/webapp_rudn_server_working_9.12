@@ -9587,6 +9587,604 @@ async def get_my_vk_audio(telegram_id: int, count: int = 50, offset: int = 0):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# ============ API для совместного прослушивания музыки (Listening Rooms) ============
+
+# Хранилище WebSocket соединений для комнат прослушивания
+listening_room_connections: Dict[str, Dict[int, WebSocket]] = {}  # room_id -> {telegram_id -> websocket}
+
+@api_router.post("/music/rooms", response_model=CreateListeningRoomResponse)
+async def create_listening_room(request: CreateListeningRoomRequest):
+    """
+    Создать комнату совместного прослушивания музыки.
+    """
+    try:
+        room_id = str(uuid.uuid4())
+        invite_code = str(uuid.uuid4())[:8].upper()
+        
+        # Создаём хоста как первого участника
+        host_participant = {
+            "telegram_id": request.telegram_id,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "username": request.username,
+            "photo_url": request.photo_url,
+            "joined_at": datetime.utcnow(),
+            "can_control": True
+        }
+        
+        room_data = {
+            "id": room_id,
+            "invite_code": invite_code,
+            "name": request.name,
+            "host_id": request.telegram_id,
+            "control_mode": request.control_mode.value,
+            "allowed_controllers": [],
+            "participants": [host_participant],
+            "state": {
+                "is_playing": False,
+                "current_track": None,
+                "position": 0,
+                "updated_at": datetime.utcnow()
+            },
+            "created_at": datetime.utcnow(),
+            "is_active": True
+        }
+        
+        await db.listening_rooms.insert_one(room_data)
+        
+        bot_username = get_telegram_bot_username()
+        invite_link = f"https://t.me/{bot_username}/app?startapp=listen_{invite_code}"
+        
+        logger.info(f"🎵 Created listening room {room_id[:8]}... by user {request.telegram_id}")
+        
+        return CreateListeningRoomResponse(
+            success=True,
+            room_id=room_id,
+            invite_code=invite_code,
+            invite_link=invite_link,
+            message="Комната создана!"
+        )
+        
+    except Exception as e:
+        logger.error(f"Create listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/{room_id}", response_model=ListeningRoomResponse)
+async def get_listening_room(room_id: str, telegram_id: int):
+    """
+    Получить информацию о комнате прослушивания.
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        is_host = room["host_id"] == telegram_id
+        
+        # Определяем, может ли пользователь управлять воспроизведением
+        can_control = False
+        if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+            can_control = True
+        elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+            can_control = is_host
+        elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+            can_control = is_host or telegram_id in room.get("allowed_controllers", [])
+        
+        # Конвертируем в Pydantic модель
+        room_model = ListeningRoom(
+            id=room["id"],
+            invite_code=room["invite_code"],
+            name=room["name"],
+            host_id=room["host_id"],
+            control_mode=ListeningRoomControlMode(room["control_mode"]),
+            allowed_controllers=room.get("allowed_controllers", []),
+            participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
+            state=ListeningRoomState(**room["state"]) if room.get("state") else ListeningRoomState(),
+            created_at=room["created_at"],
+            is_active=room["is_active"]
+        )
+        
+        return ListeningRoomResponse(
+            room=room_model,
+            is_host=is_host,
+            can_control=can_control
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/join/{invite_code}", response_model=JoinListeningRoomResponse)
+async def join_listening_room_by_code(invite_code: str, request: JoinListeningRoomRequest):
+    """
+    Присоединиться к комнате по коду приглашения.
+    """
+    try:
+        room = await db.listening_rooms.find_one({
+            "invite_code": invite_code.upper(),
+            "is_active": True
+        })
+        
+        if not room:
+            return JoinListeningRoomResponse(
+                success=False,
+                message="Комната не найдена или уже закрыта"
+            )
+        
+        # Проверяем, не находится ли пользователь уже в комнате
+        existing_participant = next(
+            (p for p in room["participants"] if p["telegram_id"] == request.telegram_id),
+            None
+        )
+        
+        if existing_participant:
+            # Уже в комнате - просто возвращаем её
+            room_model = ListeningRoom(
+                id=room["id"],
+                invite_code=room["invite_code"],
+                name=room["name"],
+                host_id=room["host_id"],
+                control_mode=ListeningRoomControlMode(room["control_mode"]),
+                allowed_controllers=room.get("allowed_controllers", []),
+                participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
+                state=ListeningRoomState(**room["state"]) if room.get("state") else ListeningRoomState(),
+                created_at=room["created_at"],
+                is_active=room["is_active"]
+            )
+            return JoinListeningRoomResponse(
+                success=True,
+                room=room_model,
+                message="Вы уже в этой комнате"
+            )
+        
+        # Определяем, может ли новый участник управлять
+        can_control = room["control_mode"] == ListeningRoomControlMode.EVERYONE.value
+        
+        # Добавляем нового участника
+        new_participant = {
+            "telegram_id": request.telegram_id,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "username": request.username,
+            "photo_url": request.photo_url,
+            "joined_at": datetime.utcnow(),
+            "can_control": can_control
+        }
+        
+        await db.listening_rooms.update_one(
+            {"id": room["id"]},
+            {"$push": {"participants": new_participant}}
+        )
+        
+        # Получаем обновлённую комнату
+        room = await db.listening_rooms.find_one({"id": room["id"]})
+        
+        room_model = ListeningRoom(
+            id=room["id"],
+            invite_code=room["invite_code"],
+            name=room["name"],
+            host_id=room["host_id"],
+            control_mode=ListeningRoomControlMode(room["control_mode"]),
+            allowed_controllers=room.get("allowed_controllers", []),
+            participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
+            state=ListeningRoomState(**room["state"]) if room.get("state") else ListeningRoomState(),
+            created_at=room["created_at"],
+            is_active=room["is_active"]
+        )
+        
+        # Уведомляем других участников через WebSocket
+        await broadcast_to_listening_room(room["id"], {
+            "event": "user_joined",
+            "user": new_participant,
+            "participants_count": len(room["participants"])
+        }, exclude_user=request.telegram_id)
+        
+        logger.info(f"🎵 User {request.telegram_id} joined room {room['id'][:8]}...")
+        
+        return JoinListeningRoomResponse(
+            success=True,
+            room=room_model,
+            message="Вы присоединились к комнате!"
+        )
+        
+    except Exception as e:
+        logger.error(f"Join listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/{room_id}/leave")
+async def leave_listening_room(room_id: str, telegram_id: int):
+    """
+    Выйти из комнаты прослушивания.
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Если выходит хост - закрываем комнату
+        if room["host_id"] == telegram_id:
+            await db.listening_rooms.update_one(
+                {"id": room_id},
+                {"$set": {"is_active": False}}
+            )
+            
+            # Уведомляем всех участников
+            await broadcast_to_listening_room(room_id, {
+                "event": "room_closed",
+                "message": "Хост закрыл комнату"
+            })
+            
+            # Закрываем все соединения
+            if room_id in listening_room_connections:
+                for ws in listening_room_connections[room_id].values():
+                    try:
+                        await ws.close()
+                    except:
+                        pass
+                del listening_room_connections[room_id]
+            
+            logger.info(f"🎵 Room {room_id[:8]}... closed by host")
+            return {"success": True, "message": "Комната закрыта"}
+        
+        # Удаляем участника
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        
+        # Удаляем WebSocket соединение
+        if room_id in listening_room_connections and telegram_id in listening_room_connections[room_id]:
+            try:
+                await listening_room_connections[room_id][telegram_id].close()
+            except:
+                pass
+            del listening_room_connections[room_id][telegram_id]
+        
+        # Уведомляем других
+        await broadcast_to_listening_room(room_id, {
+            "event": "user_left",
+            "telegram_id": telegram_id
+        })
+        
+        logger.info(f"🎵 User {telegram_id} left room {room_id[:8]}...")
+        return {"success": True, "message": "Вы вышли из комнаты"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Leave listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/music/rooms/{room_id}")
+async def delete_listening_room(room_id: str, telegram_id: int):
+    """
+    Удалить комнату (только для хоста).
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        if room["host_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Только хост может удалить комнату")
+        
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$set": {"is_active": False}}
+        )
+        
+        # Уведомляем всех и закрываем соединения
+        await broadcast_to_listening_room(room_id, {
+            "event": "room_closed",
+            "message": "Комната закрыта хостом"
+        })
+        
+        if room_id in listening_room_connections:
+            for ws in listening_room_connections[room_id].values():
+                try:
+                    await ws.close()
+                except:
+                    pass
+            del listening_room_connections[room_id]
+        
+        logger.info(f"🎵 Room {room_id[:8]}... deleted")
+        return {"success": True, "message": "Комната удалена"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/music/rooms/{room_id}/settings")
+async def update_listening_room_settings(
+    room_id: str, 
+    telegram_id: int,
+    request: UpdateListeningRoomSettingsRequest
+):
+    """
+    Изменить настройки комнаты (только для хоста).
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        if room["host_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Только хост может изменять настройки")
+        
+        update_data = {}
+        if request.name is not None:
+            update_data["name"] = request.name
+        if request.control_mode is not None:
+            update_data["control_mode"] = request.control_mode.value
+        if request.allowed_controllers is not None:
+            update_data["allowed_controllers"] = request.allowed_controllers
+        
+        if update_data:
+            await db.listening_rooms.update_one(
+                {"id": room_id},
+                {"$set": update_data}
+            )
+            
+            # Уведомляем участников об изменении настроек
+            await broadcast_to_listening_room(room_id, {
+                "event": "settings_changed",
+                "settings": update_data
+            })
+        
+        return {"success": True, "message": "Настройки обновлены"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update listening room settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/user/{telegram_id}")
+async def get_user_listening_rooms(telegram_id: int):
+    """
+    Получить активные комнаты пользователя.
+    """
+    try:
+        # Комнаты где пользователь является участником
+        cursor = db.listening_rooms.find({
+            "participants.telegram_id": telegram_id,
+            "is_active": True
+        })
+        
+        rooms = await cursor.to_list(length=50)
+        
+        result = []
+        for room in rooms:
+            result.append({
+                "id": room["id"],
+                "name": room["name"],
+                "invite_code": room["invite_code"],
+                "host_id": room["host_id"],
+                "is_host": room["host_id"] == telegram_id,
+                "participants_count": len(room["participants"]),
+                "is_playing": room.get("state", {}).get("is_playing", False),
+                "current_track": room.get("state", {}).get("current_track"),
+                "created_at": room["created_at"]
+            })
+        
+        return {"rooms": result, "count": len(result)}
+        
+    except Exception as e:
+        logger.error(f"Get user listening rooms error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def broadcast_to_listening_room(room_id: str, message: dict, exclude_user: int = None):
+    """
+    Отправить сообщение всем участникам комнаты через WebSocket.
+    """
+    if room_id not in listening_room_connections:
+        return
+    
+    disconnected = []
+    for user_id, ws in listening_room_connections[room_id].items():
+        if exclude_user and user_id == exclude_user:
+            continue
+        try:
+            await ws.send_json(message)
+        except:
+            disconnected.append(user_id)
+    
+    # Удаляем отключённые соединения
+    for user_id in disconnected:
+        del listening_room_connections[room_id][user_id]
+
+
+@app.websocket("/api/ws/listening-room/{room_id}/{telegram_id}")
+async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_id: int):
+    """
+    WebSocket для синхронизации воспроизведения в комнате.
+    """
+    await websocket.accept()
+    
+    # Проверяем существование комнаты
+    room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+    if not room:
+        await websocket.send_json({"event": "error", "message": "Комната не найдена"})
+        await websocket.close()
+        return
+    
+    # Проверяем, что пользователь является участником
+    is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+    if not is_participant:
+        await websocket.send_json({"event": "error", "message": "Вы не являетесь участником комнаты"})
+        await websocket.close()
+        return
+    
+    # Определяем права на управление
+    can_control = False
+    if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+        can_control = True
+    elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+        can_control = room["host_id"] == telegram_id
+    elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+        can_control = room["host_id"] == telegram_id or telegram_id in room.get("allowed_controllers", [])
+    
+    # Сохраняем соединение
+    if room_id not in listening_room_connections:
+        listening_room_connections[room_id] = {}
+    listening_room_connections[room_id][telegram_id] = websocket
+    
+    # Отправляем текущее состояние новому участнику
+    await websocket.send_json({
+        "event": "connected",
+        "room_id": room_id,
+        "can_control": can_control,
+        "state": room.get("state", {})
+    })
+    
+    logger.info(f"🎵 WebSocket connected: user {telegram_id} to room {room_id[:8]}...")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            event = data.get("event")
+            
+            # Проверяем права на управление для событий воспроизведения
+            control_events = ["play", "pause", "seek", "track_change"]
+            if event in control_events and not can_control:
+                await websocket.send_json({
+                    "event": "error",
+                    "message": "У вас нет прав на управление воспроизведением"
+                })
+                continue
+            
+            if event == "play":
+                # Воспроизведение
+                track_data = data.get("track")
+                position = data.get("position", 0)
+                
+                state_update = {
+                    "state.is_playing": True,
+                    "state.position": position,
+                    "state.updated_at": datetime.utcnow()
+                }
+                if track_data:
+                    state_update["state.current_track"] = track_data
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": state_update}
+                )
+                
+                # Отправляем всем участникам
+                await broadcast_to_listening_room(room_id, {
+                    "event": "play",
+                    "track": track_data,
+                    "position": position,
+                    "triggered_by": telegram_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "pause":
+                # Пауза
+                position = data.get("position", 0)
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {
+                        "state.is_playing": False,
+                        "state.position": position,
+                        "state.updated_at": datetime.utcnow()
+                    }}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "pause",
+                    "position": position,
+                    "triggered_by": telegram_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "seek":
+                # Перемотка
+                position = data.get("position", 0)
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {
+                        "state.position": position,
+                        "state.updated_at": datetime.utcnow()
+                    }}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "seek",
+                    "position": position,
+                    "triggered_by": telegram_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "track_change":
+                # Смена трека
+                track_data = data.get("track")
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {
+                        "state.current_track": track_data,
+                        "state.position": 0,
+                        "state.is_playing": True,
+                        "state.updated_at": datetime.utcnow()
+                    }}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "track_change",
+                    "track": track_data,
+                    "triggered_by": telegram_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "sync_request":
+                # Запрос синхронизации состояния
+                room = await db.listening_rooms.find_one({"id": room_id})
+                if room:
+                    await websocket.send_json({
+                        "event": "sync_state",
+                        "state": room.get("state", {})
+                    })
+                    
+            elif event == "ping":
+                await websocket.send_json({"event": "pong"})
+                
+    except WebSocketDisconnect:
+        logger.info(f"🎵 WebSocket disconnected: user {telegram_id} from room {room_id[:8]}...")
+    except Exception as e:
+        logger.error(f"Listening room WebSocket error: {e}")
+    finally:
+        # Удаляем соединение
+        if room_id in listening_room_connections and telegram_id in listening_room_connections[room_id]:
+            del listening_room_connections[room_id][telegram_id]
+            
+            # Уведомляем остальных об отключении
+            await broadcast_to_listening_room(room_id, {
+                "event": "user_disconnected",
+                "telegram_id": telegram_id
+            })
+
+
+
 # ============ API для системы друзей (Friends) ============
 
 # Вспомогательные функции для друзей
