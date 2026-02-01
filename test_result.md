@@ -198,6 +198,8 @@ agent_communication:
     message: "🔧 CRITICAL BUG FIXED: Task Update API with Skipped Field - Found and fixed missing 'skipped' field handling in PUT /api/tasks/{task_id} endpoint. The TaskUpdate model included the field but the update_task function was ignoring it. Added proper handling and explicit skipped field to planner endpoint. All tests now pass successfully. Task skipping functionality is now fully operational."
   - agent: "testing"
     message: "✅ WEB SESSIONS TESTING COMPLETE: Telegram Profile Link via QR Code system fully functional. All 3 main API endpoints working perfectly: POST /api/web-sessions (creates session with QR URL), GET /api/web-sessions/{token}/status (returns status and user data), POST /api/web-sessions/{token}/link (links with Telegram profile). Tested all scenarios from review request: session creation → pending status → linking → linked status → duplicate attempt rejection. User settings correctly loaded for existing users (telegram_id=765963392). WebSocket endpoint /ws/session/{token} also available for real-time notifications. System ready for production use."
+  - agent: "testing"
+    message: "✅ FRIENDS API TESTING COMPLETE: Quick Add Friends to Journal and Room APIs validated. Both endpoints (POST /api/journals/{journal_id}/students/from-friends and POST /api/rooms/{room_id}/add-friends) properly handle request validation, error responses, and model structures. APIs correctly return 404 for non-existent resources and accept proper request formats. Ready for integration with existing journal/room data and friend relationships."
 
 # Testing Protocol
 # - Test POST /api/tasks with YouTube URL - должен вернуть youtube_title, youtube_duration, youtube_thumbnail
