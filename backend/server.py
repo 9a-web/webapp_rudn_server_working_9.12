@@ -198,7 +198,20 @@ from models import (
     WebSessionLinkResponse,
     WebSessionCreateRequest,
     DeviceInfo,
-    DevicesListResponse
+    DevicesListResponse,
+    # Модели для совместного прослушивания музыки
+    ListeningRoomControlMode,
+    ListeningRoomParticipant,
+    ListeningRoomTrack,
+    ListeningRoomState,
+    ListeningRoom,
+    CreateListeningRoomRequest,
+    CreateListeningRoomResponse,
+    JoinListeningRoomRequest,
+    JoinListeningRoomResponse,
+    ListeningRoomResponse,
+    UpdateListeningRoomSettingsRequest,
+    ListeningRoomSyncEvent
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
