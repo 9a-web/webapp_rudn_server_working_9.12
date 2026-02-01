@@ -41,18 +41,27 @@ class BackendTester:
             print(f"   Response: {response_data}")
         print()
     
-    # ============ Device Activity Tracking Tests ============
+    # ============ Listening Rooms API Tests ============
     
-    def test_create_web_session(self) -> bool:
-        """Test POST /api/web-sessions - создание новой сессии"""
+    def test_create_listening_room(self) -> bool:
+        """Test POST /api/music/rooms - создание комнаты совместного прослушивания"""
         try:
-            print("🧪 Testing: Create Web Session")
+            print("🧪 Testing: Create Listening Room")
             
-            response = requests.post(f"{API_BASE}/web-sessions", timeout=10)
+            # Test data from review request
+            room_data = {
+                "telegram_id": self.host_telegram_id,
+                "first_name": "Test",
+                "username": "test_user",
+                "name": "Тестовая комната",
+                "control_mode": "everyone"
+            }
+            
+            response = requests.post(f"{API_BASE}/music/rooms", json=room_data, timeout=10)
             
             if response.status_code != 200:
                 self.log_test(
-                    "Create Web Session", 
+                    "Create Listening Room", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -62,49 +71,50 @@ class BackendTester:
             data = response.json()
             
             # Validate required fields
-            required_fields = ["session_token", "status", "qr_url", "expires_at"]
+            required_fields = ["success", "room_id", "invite_code", "invite_link"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Create Web Session", 
+                    "Create Listening Room", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate status is "pending"
-            if data["status"] != "pending":
+            # Validate success is True
+            if not data.get("success"):
                 self.log_test(
-                    "Create Web Session", 
+                    "Create Listening Room", 
                     False, 
-                    f"Expected status 'pending', got '{data['status']}'",
+                    f"Room creation failed. Response: {data}",
                     data
                 )
                 return False
             
-            # Store session token for subsequent tests
-            self.session_token = data["session_token"]
+            # Store room data for subsequent tests
+            self.room_id = data["room_id"]
+            self.invite_code = data["invite_code"]
             
             self.log_test(
-                "Create Web Session", 
+                "Create Listening Room", 
                 True, 
-                f"Session created successfully. Token: {self.session_token[:8]}...",
+                f"Room created successfully. ID: {self.room_id[:8]}..., Code: {self.invite_code}",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Create Web Session", 
+                "Create Listening Room", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Create Web Session", 
+                "Create Listening Room", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
