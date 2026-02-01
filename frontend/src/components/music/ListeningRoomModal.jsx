@@ -9,7 +9,7 @@ import {
   X, Users, Copy, Check, Share2, Crown, 
   Settings, UserPlus, LogOut, Trash2,
   Play, Pause, Music, Radio, QrCode,
-  ChevronRight, Loader2, Volume2
+  ChevronRight, ChevronLeft, Loader2, Volume2
 } from 'lucide-react';
 import { useTelegram } from '../../contexts/TelegramContext';
 import { usePlayer } from './PlayerContext';
