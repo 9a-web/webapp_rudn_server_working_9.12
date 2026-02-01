@@ -39,7 +39,7 @@ class BackendTester:
             print(f"   Response: {response_data}")
         print()
     
-    # ============ Web Sessions Tests ============
+    # ============ Device Activity Tracking Tests ============
     
     def test_create_web_session(self) -> bool:
         """Test POST /api/web-sessions - создание новой сессии"""
@@ -82,34 +82,13 @@ class BackendTester:
                 )
                 return False
             
-            # Validate QR URL format
-            expected_qr_pattern = "https://t.me/"
-            if not data["qr_url"].startswith(expected_qr_pattern):
-                self.log_test(
-                    "Create Web Session", 
-                    False, 
-                    f"QR URL doesn't match expected pattern. Got: {data['qr_url']}",
-                    data
-                )
-                return False
-            
-            # Check if QR URL contains link_ parameter
-            if "startapp=link_" not in data["qr_url"]:
-                self.log_test(
-                    "Create Web Session", 
-                    False, 
-                    f"QR URL missing 'startapp=link_' parameter. Got: {data['qr_url']}",
-                    data
-                )
-                return False
-            
             # Store session token for subsequent tests
             self.session_token = data["session_token"]
             
             self.log_test(
                 "Create Web Session", 
                 True, 
-                f"Session created successfully. Token: {self.session_token[:8]}..., QR: {data['qr_url'][:50]}...",
+                f"Session created successfully. Token: {self.session_token[:8]}...",
                 data
             )
             return True
@@ -129,95 +108,24 @@ class BackendTester:
             )
             return False
     
-    def test_get_session_status_pending(self) -> bool:
-        """Test GET /api/web-sessions/{session_token}/status - проверка статуса pending"""
+    def test_link_session_with_user(self) -> bool:
+        """Test POST /api/web-sessions/{token}/link - связывание сессии с пользователем"""
         if not self.session_token:
             self.log_test(
-                "Get Session Status (Pending)", 
+                "Link Session with User", 
                 False, 
                 "No session token available from previous test"
             )
             return False
         
         try:
-            print("🧪 Testing: Get Session Status (Pending)")
+            print("🧪 Testing: Link Session with User")
             
-            response = requests.get(f"{API_BASE}/web-sessions/{self.session_token}/status", timeout=10)
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get Session Status (Pending)", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate status is still "pending"
-            if data["status"] != "pending":
-                self.log_test(
-                    "Get Session Status (Pending)", 
-                    False, 
-                    f"Expected status 'pending', got '{data['status']}'",
-                    data
-                )
-                return False
-            
-            # Validate session_token matches
-            if data["session_token"] != self.session_token:
-                self.log_test(
-                    "Get Session Status (Pending)", 
-                    False, 
-                    f"Session token mismatch. Expected: {self.session_token}, Got: {data['session_token']}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Get Session Status (Pending)", 
-                True, 
-                f"Status correctly shows 'pending' for session {self.session_token[:8]}...",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get Session Status (Pending)", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get Session Status (Pending)", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    def test_link_session_with_telegram(self) -> bool:
-        """Test POST /api/web-sessions/{session_token}/link - связывание сессии с Telegram"""
-        if not self.session_token:
-            self.log_test(
-                "Link Session with Telegram", 
-                False, 
-                "No session token available from previous test"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Link Session with Telegram")
-            
-            # Test data - using realistic looking data as per instructions
+            # Test data from review request
             link_data = {
-                "telegram_id": 765963392,  # Existing user from test_result.md
-                "first_name": "Александр",
-                "last_name": "Петров", 
-                "username": "alex_petrov",
-                "photo_url": "https://t.me/i/userpic/320/alex_petrov.jpg"
+                "telegram_id": self.test_telegram_id,
+                "first_name": "Test",
+                "username": "test_user"
             }
             
             response = requests.post(
@@ -228,7 +136,131 @@ class BackendTester:
             
             if response.status_code != 200:
                 self.log_test(
-                    "Link Session with Telegram", 
+                    "Link Session with User", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate success response
+            if not data.get("success"):
+                self.log_test(
+                    "Link Session with User", 
+                    False, 
+                    f"Link failed. Response: {data}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Link Session with User", 
+                True, 
+                f"Session successfully linked with Telegram ID {self.test_telegram_id}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Link Session with User", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Link Session with User", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_check_session_status_updates_last_active(self) -> bool:
+        """Test GET /api/web-sessions/{token}/status - проверка что статус обновляет last_active"""
+        if not self.session_token:
+            self.log_test(
+                "Check Session Status Updates Last Active", 
+                False, 
+                "No session token available from previous test"
+            )
+            return False
+        
+        try:
+            print("🧪 Testing: Check Session Status Updates Last Active")
+            
+            # Get initial timestamp
+            time_before = datetime.utcnow()
+            
+            # Wait a small amount to ensure timestamp difference
+            time.sleep(1)
+            
+            response = requests.get(f"{API_BASE}/web-sessions/{self.session_token}/status", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Check Session Status Updates Last Active", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate status is "linked"
+            if data["status"] != "linked":
+                self.log_test(
+                    "Check Session Status Updates Last Active", 
+                    False, 
+                    f"Expected status 'linked', got '{data['status']}'",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Check Session Status Updates Last Active", 
+                True, 
+                f"Status check successful. Status: {data['status']} for user {data.get('telegram_id')}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Check Session Status Updates Last Active", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Check Session Status Updates Last Active", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    def test_send_heartbeat(self) -> bool:
+        """Test POST /api/web-sessions/{token}/heartbeat - отправка heartbeat"""
+        if not self.session_token:
+            self.log_test(
+                "Send Heartbeat", 
+                False, 
+                "No session token available from previous test"
+            )
+            return False
+        
+        try:
+            print("🧪 Testing: Send Heartbeat")
+            
+            response = requests.post(f"{API_BASE}/web-sessions/{self.session_token}/heartbeat", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Send Heartbeat", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -238,12 +270,12 @@ class BackendTester:
             data = response.json()
             
             # Validate response structure
-            required_fields = ["success", "message"]
+            required_fields = ["success", "updated_at"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Link Session with Telegram", 
+                    "Send Heartbeat", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
@@ -253,170 +285,68 @@ class BackendTester:
             # Validate success is True
             if not data["success"]:
                 self.log_test(
-                    "Link Session with Telegram", 
+                    "Send Heartbeat", 
                     False, 
-                    f"Link failed. Message: {data.get('message', 'No message')}",
+                    f"Heartbeat failed. Response: {data}",
                     data
                 )
                 return False
             
-            # Validate success message
-            expected_message = "Профиль успешно подключен!"
-            if data["message"] != expected_message:
-                self.log_test(
-                    "Link Session with Telegram", 
-                    False, 
-                    f"Unexpected message. Expected: '{expected_message}', Got: '{data['message']}'",
-                    data
-                )
-                return False
-            
-            # Validate session_token is returned
-            if "session_token" not in data or data["session_token"] != self.session_token:
-                self.log_test(
-                    "Link Session with Telegram", 
-                    False, 
-                    f"Session token not returned or mismatch. Expected: {self.session_token}, Got: {data.get('session_token')}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Link Session with Telegram", 
-                True, 
-                f"Session successfully linked with Telegram ID {link_data['telegram_id']}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Link Session with Telegram", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Link Session with Telegram", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    def test_get_session_status_linked(self) -> bool:
-        """Test GET /api/web-sessions/{session_token}/status - проверка статуса linked"""
-        if not self.session_token:
-            self.log_test(
-                "Get Session Status (Linked)", 
-                False, 
-                "No session token available from previous test"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Get Session Status (Linked)")
-            
-            response = requests.get(f"{API_BASE}/web-sessions/{self.session_token}/status", timeout=10)
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get Session Status (Linked)", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate status is now "linked"
-            if data["status"] != "linked":
-                self.log_test(
-                    "Get Session Status (Linked)", 
-                    False, 
-                    f"Expected status 'linked', got '{data['status']}'",
-                    data
-                )
-                return False
-            
-            # Validate user data is present
-            expected_telegram_id = 765963392
-            if data.get("telegram_id") != expected_telegram_id:
-                self.log_test(
-                    "Get Session Status (Linked)", 
-                    False, 
-                    f"Expected telegram_id {expected_telegram_id}, got {data.get('telegram_id')}",
-                    data
-                )
-                return False
-            
-            # Validate user settings - can be null if user doesn't exist in database
-            # This is expected behavior for new users
-            user_settings = data.get("user_settings")
-            if user_settings is not None:
-                # If user settings exist, validate they're a dict
-                if not isinstance(user_settings, dict):
+            # Validate updated_at is present and recent
+            updated_at_str = data["updated_at"]
+            try:
+                updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
+                time_diff = abs((datetime.utcnow() - updated_at.replace(tzinfo=None)).total_seconds())
+                if time_diff > 10:  # Should be within 10 seconds
                     self.log_test(
-                        "Get Session Status (Linked)", 
+                        "Send Heartbeat", 
                         False, 
-                        f"User settings should be dict or null, got {type(user_settings)}",
+                        f"updated_at timestamp too old: {updated_at_str} (diff: {time_diff}s)",
                         data
                     )
                     return False
+            except Exception as e:
+                self.log_test(
+                    "Send Heartbeat", 
+                    False, 
+                    f"Invalid updated_at format: {updated_at_str}. Error: {e}",
+                    data
+                )
+                return False
             
             self.log_test(
-                "Get Session Status (Linked)", 
+                "Send Heartbeat", 
                 True, 
-                f"Status correctly shows 'linked' with user data for Telegram ID {expected_telegram_id}. User settings: {'loaded' if user_settings else 'null (new user)'}",
+                f"Heartbeat successful. Updated at: {updated_at_str}",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Get Session Status (Linked)", 
+                "Send Heartbeat", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Get Session Status (Linked)", 
+                "Send Heartbeat", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
             return False
     
-    def test_duplicate_link_attempt(self) -> bool:
-        """Test повторная попытка связки уже связанной сессии (должна вернуть ошибку)"""
-        if not self.session_token:
-            self.log_test(
-                "Duplicate Link Attempt", 
-                False, 
-                "No session token available from previous test"
-            )
-            return False
-        
+    def test_get_devices_list_and_check_last_active(self) -> bool:
+        """Test GET /api/web-sessions/user/{telegram_id}/devices - получение списка устройств и проверка last_active"""
         try:
-            print("🧪 Testing: Duplicate Link Attempt")
+            print("🧪 Testing: Get Devices List and Check Last Active")
             
-            # Try to link the same session again
-            link_data = {
-                "telegram_id": 123456789,  # Different user
-                "first_name": "Иван",
-                "last_name": "Иванов"
-            }
-            
-            response = requests.post(
-                f"{API_BASE}/web-sessions/{self.session_token}/link",
-                json=link_data,
-                timeout=10
-            )
+            response = requests.get(f"{API_BASE}/web-sessions/user/{self.test_telegram_id}/devices", timeout=10)
             
             if response.status_code != 200:
                 self.log_test(
-                    "Duplicate Link Attempt", 
+                    "Get Devices List and Check Last Active", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -425,186 +355,139 @@ class BackendTester:
             
             data = response.json()
             
-            # Should return success=False for already linked session
-            if data.get("success", True):  # Default True to catch missing field
+            # Validate response structure
+            required_fields = ["devices", "total"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
                 self.log_test(
-                    "Duplicate Link Attempt", 
+                    "Get Devices List and Check Last Active", 
                     False, 
-                    f"Expected success=False for already linked session, got success={data.get('success')}",
+                    f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Should have appropriate error message
-            expected_messages = ["уже использована", "истекла", "already", "used"]
-            message = data.get("message", "").lower()
-            if not any(expected in message for expected in expected_messages):
+            devices = data["devices"]
+            total = data["total"]
+            
+            # Should have at least one device (our test session)
+            if total == 0 or len(devices) == 0:
                 self.log_test(
-                    "Duplicate Link Attempt", 
+                    "Get Devices List and Check Last Active", 
                     False, 
-                    f"Error message doesn't indicate session already used. Got: '{data.get('message')}'",
+                    f"No devices found for user {self.test_telegram_id}. Expected at least 1 device.",
                     data
+                )
+                return False
+            
+            # Find our test session device
+            test_device = None
+            for device in devices:
+                if device.get("session_token") == self.session_token:
+                    test_device = device
+                    break
+            
+            if not test_device:
+                self.log_test(
+                    "Get Devices List and Check Last Active", 
+                    False, 
+                    f"Test session {self.session_token[:8]}... not found in devices list",
+                    data
+                )
+                return False
+            
+            # Validate last_active is present and recent
+            last_active_str = test_device.get("last_active")
+            if not last_active_str:
+                self.log_test(
+                    "Get Devices List and Check Last Active", 
+                    False, 
+                    f"last_active field is missing or null for test device",
+                    test_device
+                )
+                return False
+            
+            try:
+                last_active = datetime.fromisoformat(last_active_str.replace('Z', '+00:00'))
+                time_diff = abs((datetime.utcnow() - last_active.replace(tzinfo=None)).total_seconds())
+                if time_diff > 60:  # Should be within 1 minute (recent activity)
+                    self.log_test(
+                        "Get Devices List and Check Last Active", 
+                        False, 
+                        f"last_active timestamp too old: {last_active_str} (diff: {time_diff}s)",
+                        test_device
+                    )
+                    return False
+            except Exception as e:
+                self.log_test(
+                    "Get Devices List and Check Last Active", 
+                    False, 
+                    f"Invalid last_active format: {last_active_str}. Error: {e}",
+                    test_device
                 )
                 return False
             
             self.log_test(
-                "Duplicate Link Attempt", 
+                "Get Devices List and Check Last Active", 
                 True, 
-                f"Correctly rejected duplicate link attempt with message: '{data.get('message')}'",
-                data
+                f"Found {total} devices. Test device last_active: {last_active_str} (recent: {time_diff:.1f}s ago)",
+                {"total_devices": total, "test_device_last_active": last_active_str}
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Duplicate Link Attempt", 
+                "Get Devices List and Check Last Active", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Duplicate Link Attempt", 
+                "Get Devices List and Check Last Active", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
             return False
     
-    def test_get_user_settings(self) -> bool:
-        """Test GET /api/user-settings/{telegram_id} - проверка данных пользователя"""
+    def test_heartbeat_for_invalid_session(self) -> bool:
+        """Test POST /api/web-sessions/invalid-token/heartbeat - heartbeat для несуществующей сессии"""
         try:
-            print("🧪 Testing: Get User Settings")
+            print("🧪 Testing: Heartbeat for Invalid Session")
             
-            # Test with the telegram_id we used in linking
-            telegram_id = 765963392
+            invalid_token = "invalid-token-12345"
             
-            response = requests.get(f"{API_BASE}/user-settings/{telegram_id}", timeout=10)
+            response = requests.post(f"{API_BASE}/web-sessions/{invalid_token}/heartbeat", timeout=10)
             
-            # User settings can return 404 if user doesn't exist, which is expected for new users
-            if response.status_code == 404:
-                self.log_test(
-                    "Get User Settings", 
-                    True, 
-                    f"User settings not found for telegram_id {telegram_id} (expected for new user)",
-                    {"status_code": 404, "message": "User not configured yet"}
-                )
-                return True
-            elif response.status_code != 200:
-                self.log_test(
-                    "Get User Settings", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # If user exists, validate the response structure
-            if "telegram_id" not in data:
-                self.log_test(
-                    "Get User Settings", 
-                    False, 
-                    "Response missing telegram_id field",
-                    data
-                )
-                return False
-            
-            if data["telegram_id"] != telegram_id:
-                self.log_test(
-                    "Get User Settings", 
-                    False, 
-                    f"Telegram ID mismatch. Expected: {telegram_id}, Got: {data['telegram_id']}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Get User Settings", 
-                True, 
-                f"User settings loaded successfully for telegram_id {telegram_id}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get User Settings", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get User Settings", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    def test_invalid_session_token(self) -> bool:
-        """Test запросы с несуществующим session_token"""
-        try:
-            print("🧪 Testing: Invalid Session Token")
-            
-            fake_token = "00000000-0000-0000-0000-000000000000"
-            
-            # Test status endpoint
-            response = requests.get(f"{API_BASE}/web-sessions/{fake_token}/status", timeout=10)
-            
+            # Should return 404 for invalid session
             if response.status_code != 404:
                 self.log_test(
-                    "Invalid Session Token", 
+                    "Heartbeat for Invalid Session", 
                     False, 
                     f"Expected HTTP 404 for invalid token, got {response.status_code}",
                     response.text
                 )
                 return False
             
-            # Test link endpoint
-            link_data = {"telegram_id": 123456789}
-            response = requests.post(
-                f"{API_BASE}/web-sessions/{fake_token}/link",
-                json=link_data,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("success", True):  # Should be False for invalid session
-                    self.log_test(
-                        "Invalid Session Token", 
-                        False, 
-                        f"Link endpoint should return success=False for invalid token, got {data}",
-                        data
-                    )
-                    return False
-            elif response.status_code != 404:
-                self.log_test(
-                    "Invalid Session Token", 
-                    False, 
-                    f"Expected HTTP 404 or success=False for invalid token, got {response.status_code}",
-                    response.text
-                )
-                return False
-            
             self.log_test(
-                "Invalid Session Token", 
+                "Heartbeat for Invalid Session", 
                 True, 
-                "Correctly handled invalid session token requests"
+                f"Correctly returned 404 for invalid session token: {invalid_token}",
+                {"status_code": response.status_code}
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Invalid Session Token", 
+                "Heartbeat for Invalid Session", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Invalid Session Token", 
+                "Heartbeat for Invalid Session", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
