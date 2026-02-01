@@ -23,7 +23,7 @@ import {
   createListeningRoomConnection
 } from '../../services/listeningRoomAPI';
 
-const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
+const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange }) => {
   const { hapticFeedback, user } = useTelegram();
   const { currentTrack, isPlaying, progress, play, pause, seek } = usePlayer();
   
