@@ -248,3 +248,52 @@ curl -s "http://localhost:8001/api/vkvideo/info?url=https://vk.com/video-12345_6
 - `vk.com/video/@username?z=video-123_456` - with @username
 - `vk.com/club123?z=video-456_789` - from group
 - `vk.com/music?z=video-111_222` - any path with z=video param
+
+
+## Latest Fix: Web Session Persistence on Page Reload (2025-07-16)
+
+### Problem
+При обновлении страницы в веб-браузере данные пользователя удалялись и открывалась страница регистрации (WelcomeScreen).
+
+### Root Cause
+1. В `App.jsx` функция `loadUserData` при получении `null` от API (пользователь не найден) или неполных настроек - очищала `localStorage` и показывала WelcomeScreen
+2. В `TelegramContext.jsx` если сессия невалидна или отсутствует - создавался новый гостевой пользователь вместо использования сохранённых данных
+3. Связанный Telegram пользователь (`is_linked=true`) терял авторизацию при каждой перезагрузке
+
+### Fix Applied
+1. **App.jsx** (`loadUserData` function):
+   - Добавлена проверка `isLinkedUser` для определения связанных Telegram пользователей
+   - Связанные пользователи теперь НЕ теряют `localStorage` данные
+   - Добавлено использование `user_settings` из localStorage как fallback при ошибках API
+   - При отсутствии настроек показывается GroupSelector вместо WelcomeScreen для связанных пользователей
+   - Настройки автоматически синхронизируются с сервером в фоне
+
+2. **TelegramContext.jsx**:
+   - Если есть `telegram_user` в localStorage - используется он, даже без валидной сессии
+   - При невалидной/истёкшей сессии - устанавливается флаг `session_expired`, но пользователь сохраняется
+   - Гостевой пользователь создаётся ТОЛЬКО если нет сохранённого telegram_user
+
+### Key Changes
+```javascript
+// App.jsx - loadUserData
+const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
+
+// Если связанный пользователь - НЕ очищаем localStorage
+if (isLinkedUser) {
+  setShowGroupSelector(true); // вместо WelcomeScreen
+}
+
+// TelegramContext.jsx - при невалидной сессии
+setUser({
+  ...parsedUser,
+  is_linked: true,
+  session_expired: true // флаг истёкшей сессии
+});
+```
+
+### Testing
+1. Открыть приложение в браузере (не в Telegram)
+2. Связать профиль через QR-код
+3. Обновить страницу (F5)
+4. Ожидаемый результат: пользователь остаётся авторизованным, видит расписание
+
