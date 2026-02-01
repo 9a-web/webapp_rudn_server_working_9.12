@@ -467,6 +467,78 @@ class WebSessionTester:
             )
             return False
     
+    def test_get_user_settings(self) -> bool:
+        """Test GET /api/user-settings/{telegram_id} - проверка данных пользователя"""
+        try:
+            print("🧪 Testing: Get User Settings")
+            
+            # Test with the telegram_id we used in linking
+            telegram_id = 765963392
+            
+            response = requests.get(f"{API_BASE}/user-settings/{telegram_id}", timeout=10)
+            
+            # User settings can return 404 if user doesn't exist, which is expected for new users
+            if response.status_code == 404:
+                self.log_test(
+                    "Get User Settings", 
+                    True, 
+                    f"User settings not found for telegram_id {telegram_id} (expected for new user)",
+                    {"status_code": 404, "message": "User not configured yet"}
+                )
+                return True
+            elif response.status_code != 200:
+                self.log_test(
+                    "Get User Settings", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # If user exists, validate the response structure
+            if "telegram_id" not in data:
+                self.log_test(
+                    "Get User Settings", 
+                    False, 
+                    "Response missing telegram_id field",
+                    data
+                )
+                return False
+            
+            if data["telegram_id"] != telegram_id:
+                self.log_test(
+                    "Get User Settings", 
+                    False, 
+                    f"Telegram ID mismatch. Expected: {telegram_id}, Got: {data['telegram_id']}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Get User Settings", 
+                True, 
+                f"User settings loaded successfully for telegram_id {telegram_id}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Get User Settings", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Get User Settings", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
     def test_invalid_session_token(self) -> bool:
         """Test запросы с несуществующим session_token"""
         try:
