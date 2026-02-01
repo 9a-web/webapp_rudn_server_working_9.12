@@ -574,6 +574,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
         isOpen={listeningRoomModalOpen}
         onClose={() => setListeningRoomModalOpen(false)}
         telegramId={telegramId}
+        onActiveRoomChange={setActiveListeningRoom}
       />
       
       {/* Floating Button for Listening Room */}
@@ -582,10 +583,17 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.3, type: 'spring' }}
         onClick={() => setListeningRoomModalOpen(true)}
-        className="fixed bottom-32 right-4 z-40 p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-shadow"
-        title="Совместное прослушивание"
+        className={`fixed bottom-32 right-4 z-40 p-4 rounded-full shadow-lg transition-shadow ${
+          activeListeningRoom 
+            ? 'bg-gradient-to-br from-green-500 to-emerald-500 shadow-green-500/30 hover:shadow-green-500/50' 
+            : 'bg-gradient-to-br from-purple-500 to-pink-500 shadow-purple-500/30 hover:shadow-purple-500/50'
+        }`}
+        title={activeListeningRoom ? `В комнате: ${activeListeningRoom.name}` : 'Совместное прослушивание'}
       >
         <Users className="w-6 h-6 text-white" />
+        {activeListeningRoom && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+        )}
       </motion.button>
     </div>
   );
