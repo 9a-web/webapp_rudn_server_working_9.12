@@ -10179,7 +10179,7 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                 if room:
                     await websocket.send_json({
                         "event": "sync_state",
-                        "state": room.get("state", {})
+                        "state": serialize_for_json(room.get("state", {}))
                     })
                     
             elif event == "ping":
