@@ -37,6 +37,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const [currentRoom, setCurrentRoom] = useState(null);
   const [canControl, setCanControl] = useState(false);
   
+  // Уведомляем родительский компонент об активной комнате
+  useEffect(() => {
+    onActiveRoomChange?.(currentRoom);
+  }, [currentRoom, onActiveRoomChange]);
+  
   // Состояние создания комнаты
   const [roomName, setRoomName] = useState('Совместное прослушивание');
   const [controlMode, setControlMode] = useState('everyone');
