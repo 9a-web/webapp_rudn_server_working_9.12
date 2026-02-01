@@ -600,6 +600,17 @@ export const JournalDetailModal = ({
                                     {student.attendance_percent}%
                                   </span>
                                 )}
+                                {/* Средняя оценка студента */}
+                                {student.average_grade !== null && student.average_grade !== undefined && (
+                                  <span className={`text-sm font-bold px-1.5 py-0.5 rounded ${
+                                    student.average_grade >= 4.5 ? 'bg-green-500/20 text-green-400' :
+                                    student.average_grade >= 3.5 ? 'bg-lime-500/20 text-lime-400' :
+                                    student.average_grade >= 2.5 ? 'bg-yellow-500/20 text-yellow-400' :
+                                    student.average_grade >= 1.5 ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'
+                                  }`} title={`Оценок: ${student.grades_count}`}>
+                                    {student.average_grade.toFixed(1)}
+                                  </span>
+                                )}
                                 {/* Кнопка копирования персональной ссылки */}
                                 {(student.invite_link_webapp || student.invite_link) && (
                                   <button
