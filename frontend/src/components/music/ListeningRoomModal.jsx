@@ -415,7 +415,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
                     }}
                     className="p-2 rounded-full bg-gray-800/50 text-gray-400 hover:text-white transition-colors"
                   >
-                    <X className="w-5 h-5" />
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
                 )}
                 <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
