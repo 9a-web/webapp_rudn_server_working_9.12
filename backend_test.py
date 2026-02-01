@@ -617,6 +617,7 @@ class WebSessionTester:
             self.test_get_session_status_pending,
             self.test_link_session_with_telegram,
             self.test_get_session_status_linked,
+            self.test_get_user_settings,
             self.test_duplicate_link_attempt,
             self.test_invalid_session_token
         ]
