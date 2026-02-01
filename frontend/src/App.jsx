@@ -295,7 +295,8 @@ const Home = () => {
     isAddTaskModalOpen || // from TasksSection's AddTaskModal
     isJournalModalOpen || // from JournalSection
     isFullscreenPlayerOpen || // fullscreen music player
-    isFriendProfileOpen; // friend profile modal
+    isFriendProfileOpen || // friend profile modal
+    isListeningRoomOpen; // listening room modal
 
   // Ref для отслеживания предыдущего счётчика уведомлений
   const prevUnreadCountRef = React.useRef(0);
