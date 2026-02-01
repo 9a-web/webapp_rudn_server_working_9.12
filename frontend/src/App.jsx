@@ -1392,6 +1392,7 @@ const Home = () => {
           <div className="px-4">
             <MusicSection 
               telegramId={user?.id}
+              onListeningRoomOpenChange={setIsListeningRoomOpen}
             />
           </div>
         )}
