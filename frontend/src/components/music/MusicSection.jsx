@@ -562,6 +562,25 @@ export const MusicSection = ({ telegramId }) => {
         onClose={handleVkAuthModalClose}
         telegramId={telegramId}
       />
+      
+      {/* Listening Room Modal */}
+      <ListeningRoomModal
+        isOpen={listeningRoomModalOpen}
+        onClose={() => setListeningRoomModalOpen(false)}
+        telegramId={telegramId}
+      />
+      
+      {/* Floating Button for Listening Room */}
+      <motion.button
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.3, type: 'spring' }}
+        onClick={() => setListeningRoomModalOpen(true)}
+        className="fixed bottom-32 right-4 z-40 p-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-shadow"
+        title="Совместное прослушивание"
+      >
+        <Users className="w-6 h-6 text-white" />
+      </motion.button>
     </div>
   );
 };
