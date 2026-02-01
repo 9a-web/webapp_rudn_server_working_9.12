@@ -4,7 +4,7 @@ import {
   X, ArrowLeft, Users, Calendar, BarChart3, Share2, Settings, 
   UserPlus, Plus, Check, Clock, Link2, Crown, Trash2,
   BookOpen, GraduationCap, FlaskConical, FileText, Copy, ExternalLink,
-  TrendingUp, Inbox
+  TrendingUp, Inbox, Send
 } from 'lucide-react';
 import {
   getJournalDetail,
@@ -34,6 +34,7 @@ import { SubjectDetailModal } from './SubjectDetailModal';
 import { AttendanceModal } from './AttendanceModal';
 import { LinkStudentModal } from './LinkStudentModal';
 import JournalApplicationsModal from './JournalApplicationsModal';
+import { ShareStudentLinkModal } from './ShareStudentLinkModal';
 
 import { EditStudentModal } from './EditStudentModal';
 import { JournalStatsTab } from './JournalStatsTab';
