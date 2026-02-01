@@ -289,6 +289,17 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
     }
   };
   
+  // Свернуть комнату (вернуться к списку, но остаться участником)
+  const handleMinimizeRoom = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setCurrentRoom(null);
+    setView('main');
+    loadMyRooms();
+  };
+  
   // Копирование ссылки
   const handleCopyInvite = async () => {
     if (!currentRoom?.invite_code) return;
