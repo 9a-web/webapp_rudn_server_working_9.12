@@ -601,8 +601,8 @@ class BackendTester:
 
 
 def main():
-    """Main test execution for Device Activity Tracking"""
-    print("🔗 Device Activity Tracking Testing")
+    """Main test execution for Listening Rooms API"""
+    print("🎵 Listening Rooms API Testing")
     print(f"Backend URL: {BACKEND_URL}")
     print()
     
