@@ -144,18 +144,30 @@ export const getUserListeningRooms = async (telegramId) => {
  */
 export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
   const backendUrl = getBackendURL();
-  const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
-  const wsHost = backendUrl.replace(/^https?:\/\//, '');
-  const wsUrl = `${wsProtocol}://${wsHost}/api/ws/listening-room/${roomId}/${telegramId}`;
+  
+  // Формируем WebSocket URL
+  // В production используем тот же хост, что и для HTTP
+  let wsUrl;
+  if (backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1')) {
+    // Локальная разработка
+    wsUrl = `ws://localhost:8001/api/ws/listening-room/${roomId}/${telegramId}`;
+  } else {
+    // Production - используем wss и текущий домен
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = `${wsProtocol}//${window.location.host}/api/ws/listening-room/${roomId}/${telegramId}`;
+  }
   
   console.log('🎵 Connecting to listening room WebSocket:', wsUrl);
   
   const ws = new WebSocket(wsUrl);
   let pingInterval = null;
   let isClosed = false;
+  let reconnectAttempts = 0;
+  const maxReconnectAttempts = 3;
   
   ws.onopen = () => {
     console.log('✅ Listening room WebSocket connected');
+    reconnectAttempts = 0;
     handlers.onConnected?.();
     
     // Периодический ping для поддержания соединения
