@@ -486,43 +486,63 @@ class BackendTester:
             )
             return False
     
-    def test_heartbeat_for_invalid_session(self) -> bool:
-        """Test POST /api/web-sessions/invalid-token/heartbeat - heartbeat для несуществующей сессии"""
+    def test_delete_room_host(self) -> bool:
+        """Test DELETE /api/music/rooms/{room_id}?telegram_id={telegram_id} - удаление комнаты (хост)"""
+        if not self.room_id:
+            self.log_test(
+                "Delete Room (Host)", 
+                False, 
+                "No room ID available from previous test"
+            )
+            return False
+        
         try:
-            print("🧪 Testing: Heartbeat for Invalid Session")
+            print("🧪 Testing: Delete Room (Host)")
             
-            invalid_token = "invalid-token-12345"
+            response = requests.delete(
+                f"{API_BASE}/music/rooms/{self.room_id}?telegram_id={self.host_telegram_id}",
+                timeout=10
+            )
             
-            response = requests.post(f"{API_BASE}/web-sessions/{invalid_token}/heartbeat", timeout=10)
-            
-            # Should return 404 for invalid session
-            if response.status_code != 404:
+            if response.status_code != 200:
                 self.log_test(
-                    "Heartbeat for Invalid Session", 
+                    "Delete Room (Host)", 
                     False, 
-                    f"Expected HTTP 404 for invalid token, got {response.status_code}",
+                    f"HTTP {response.status_code}: {response.text}",
                     response.text
                 )
                 return False
             
+            data = response.json()
+            
+            # Validate success response
+            if not data.get("success"):
+                self.log_test(
+                    "Delete Room (Host)", 
+                    False, 
+                    f"Delete failed. Response: {data}",
+                    data
+                )
+                return False
+            
             self.log_test(
-                "Heartbeat for Invalid Session", 
+                "Delete Room (Host)", 
                 True, 
-                f"Correctly returned 404 for invalid session token: {invalid_token}",
-                {"status_code": response.status_code}
+                f"Room successfully deleted by host. Message: {data.get('message', 'N/A')}",
+                data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Heartbeat for Invalid Session", 
+                "Delete Room (Host)", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Heartbeat for Invalid Session", 
+                "Delete Room (Host)", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
