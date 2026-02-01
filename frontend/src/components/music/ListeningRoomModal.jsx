@@ -66,13 +66,9 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
     }
   }, [isOpen, telegramId, loadMyRooms]);
   
-  // Очистка при закрытии
-  useEffect(() => {
-    if (!isOpen && wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  }, [isOpen]);
+  // НЕ закрываем соединение при закрытии модального окна
+  // Соединение остаётся активным пока пользователь в комнате
+  // Закрытие происходит только при реальном выходе из комнаты (handleLeaveRoom)
   
   // Подключение к комнате через WebSocket
   const connectToRoom = useCallback((room) => {
