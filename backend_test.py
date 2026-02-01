@@ -234,30 +234,27 @@ class BackendTester:
             )
             return False
     
-    def test_check_session_status_updates_last_active(self) -> bool:
-        """Test GET /api/web-sessions/{token}/status - проверка что статус обновляет last_active"""
-        if not self.session_token:
+    def test_get_room_info(self) -> bool:
+        """Test GET /api/music/rooms/{room_id}?telegram_id={telegram_id} - получение информации о комнате"""
+        if not self.room_id:
             self.log_test(
-                "Check Session Status Updates Last Active", 
+                "Get Room Info", 
                 False, 
-                "No session token available from previous test"
+                "No room ID available from previous test"
             )
             return False
         
         try:
-            print("🧪 Testing: Check Session Status Updates Last Active")
+            print("🧪 Testing: Get Room Info")
             
-            # Get initial timestamp
-            time_before = datetime.utcnow()
-            
-            # Wait a small amount to ensure timestamp difference
-            time.sleep(1)
-            
-            response = requests.get(f"{API_BASE}/web-sessions/{self.session_token}/status", timeout=10)
+            response = requests.get(
+                f"{API_BASE}/music/rooms/{self.room_id}?telegram_id={self.host_telegram_id}",
+                timeout=10
+            )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Check Session Status Updates Last Active", 
+                    "Get Room Info", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -266,34 +263,69 @@ class BackendTester:
             
             data = response.json()
             
-            # Validate status is "linked"
-            if data["status"] != "linked":
+            # Validate required fields
+            required_fields = ["room", "is_host", "can_control"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
                 self.log_test(
-                    "Check Session Status Updates Last Active", 
+                    "Get Room Info", 
                     False, 
-                    f"Expected status 'linked', got '{data['status']}'",
+                    f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
+            # Validate is_host is True for host user
+            if not data.get("is_host"):
+                self.log_test(
+                    "Get Room Info", 
+                    False, 
+                    f"Expected is_host=true for host user, got {data.get('is_host')}",
+                    data
+                )
+                return False
+            
+            # Validate can_control is True (control_mode is "everyone")
+            if not data.get("can_control"):
+                self.log_test(
+                    "Get Room Info", 
+                    False, 
+                    f"Expected can_control=true for everyone control mode, got {data.get('can_control')}",
+                    data
+                )
+                return False
+            
+            room = data["room"]
+            
+            # Validate room data
+            if room.get("id") != self.room_id:
+                self.log_test(
+                    "Get Room Info", 
+                    False, 
+                    f"Room ID mismatch. Expected: {self.room_id}, got: {room.get('id')}",
+                    room
+                )
+                return False
+            
             self.log_test(
-                "Check Session Status Updates Last Active", 
+                "Get Room Info", 
                 True, 
-                f"Status check successful. Status: {data['status']} for user {data.get('telegram_id')}",
+                f"Room info retrieved successfully. Host: {data['is_host']}, Can control: {data['can_control']}",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Check Session Status Updates Last Active", 
+                "Get Room Info", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Check Session Status Updates Last Active", 
+                "Get Room Info", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
