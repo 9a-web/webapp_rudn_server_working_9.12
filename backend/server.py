@@ -7160,6 +7160,37 @@ async def get_journal_students(journal_id: str):
                 "student_id": s["id"], "status": "late"
             })
             
+            # Рассчитать статистику оценок
+            grades_pipeline = [
+                {"$match": {"student_id": s["id"], "grade": {"$ne": None}}},
+                {"$group": {
+                    "_id": None,
+                    "count": {"$sum": 1},
+                    "sum": {"$sum": "$grade"},
+                    "grade_5": {"$sum": {"$cond": [{"$eq": ["$grade", 5]}, 1, 0]}},
+                    "grade_4": {"$sum": {"$cond": [{"$eq": ["$grade", 4]}, 1, 0]}},
+                    "grade_3": {"$sum": {"$cond": [{"$eq": ["$grade", 3]}, 1, 0]}},
+                    "grade_2": {"$sum": {"$cond": [{"$eq": ["$grade", 2]}, 1, 0]}},
+                    "grade_1": {"$sum": {"$cond": [{"$eq": ["$grade", 1]}, 1, 0]}}
+                }}
+            ]
+            grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+            
+            average_grade = None
+            grades_count = 0
+            grade_5_count = grade_4_count = grade_3_count = grade_2_count = grade_1_count = 0
+            
+            if grades_result:
+                g = grades_result[0]
+                grades_count = g["count"]
+                if grades_count > 0:
+                    average_grade = round(g["sum"] / grades_count, 2)
+                grade_5_count = g["grade_5"]
+                grade_4_count = g["grade_4"]
+                grade_3_count = g["grade_3"]
+                grade_2_count = g["grade_2"]
+                grade_1_count = g["grade_1"]
+            
             attendance_percent = None
             # Общее количество записей для этого студента (был ли он вообще отмечен)
             total_records = present_count + absent_count + excused_count + late_count
@@ -7200,7 +7231,14 @@ async def get_journal_students(journal_id: str):
                 absent_count=absent_count,
                 excused_count=excused_count,
                 late_count=late_count,
-                total_sessions=total_sessions
+                total_sessions=total_sessions,
+                average_grade=average_grade,
+                grades_count=grades_count,
+                grade_5_count=grade_5_count,
+                grade_4_count=grade_4_count,
+                grade_3_count=grade_3_count,
+                grade_2_count=grade_2_count,
+                grade_1_count=grade_1_count
             ))
         
         return result
