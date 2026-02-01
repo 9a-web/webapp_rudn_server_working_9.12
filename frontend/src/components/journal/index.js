@@ -9,3 +9,4 @@ export { AttendanceModal } from './AttendanceModal';
 export { LinkStudentModal } from './LinkStudentModal';
 export { JournalStatsTab } from './JournalStatsTab';
 export { MyAttendanceStats } from './MyAttendanceStats';
+export { ShareStudentLinkModal } from './ShareStudentLinkModal';
