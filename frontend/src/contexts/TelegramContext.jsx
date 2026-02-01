@@ -280,90 +280,102 @@ export const TelegramProvider = ({ children }) => {
       const savedTelegramUser = localStorage.getItem('telegram_user');
       const savedSessionToken = localStorage.getItem('session_token');
       
-      if (savedTelegramUser && savedSessionToken) {
+      if (savedTelegramUser) {
         try {
           const parsedUser = JSON.parse(savedTelegramUser);
-          console.log('📱 Проверка сохраненной сессии для:', parsedUser.first_name);
+          console.log('📱 Найден сохранённый пользователь:', parsedUser.first_name);
           
-          // Проверяем валидность сессии на сервере
-          // Используем ту же логику что в api.js
-          let backendUrl;
-          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            backendUrl = 'http://localhost:8001';
-          } else if (import.meta.env.REACT_APP_BACKEND_URL) {
-            backendUrl = import.meta.env.REACT_APP_BACKEND_URL;
-          } else if (process.env.REACT_APP_BACKEND_URL) {
-            backendUrl = process.env.REACT_APP_BACKEND_URL;
-          } else {
-            backendUrl = window.location.origin;
-          }
-          
-          console.log('🔗 Checking session at:', `${backendUrl}/api/web-sessions/${savedSessionToken}/status`);
-          
-          fetch(`${backendUrl}/api/web-sessions/${savedSessionToken}/status`)
-            .then(response => {
-              if (response.ok) {
-                return response.json();
-              }
-              throw new Error('Session not found');
-            })
-            .then(sessionData => {
-              if (sessionData.status === 'linked' && sessionData.telegram_id === parsedUser.id) {
-                console.log('✅ Сессия валидна, загружаем пользователя');
+          // Если есть session_token - проверяем сессию на сервере
+          if (savedSessionToken) {
+            // Проверяем валидность сессии на сервере
+            // Используем ту же логику что в api.js
+            let backendUrl;
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              backendUrl = 'http://localhost:8001';
+            } else if (import.meta.env.REACT_APP_BACKEND_URL) {
+              backendUrl = import.meta.env.REACT_APP_BACKEND_URL;
+            } else if (process.env.REACT_APP_BACKEND_URL) {
+              backendUrl = process.env.REACT_APP_BACKEND_URL;
+            } else {
+              backendUrl = window.location.origin;
+            }
+            
+            console.log('🔗 Checking session at:', `${backendUrl}/api/web-sessions/${savedSessionToken}/status`);
+            
+            fetch(`${backendUrl}/api/web-sessions/${savedSessionToken}/status`)
+              .then(response => {
+                if (response.ok) {
+                  return response.json();
+                }
+                throw new Error('Session not found');
+              })
+              .then(sessionData => {
+                if (sessionData.status === 'linked' && sessionData.telegram_id === parsedUser.id) {
+                  console.log('✅ Сессия валидна, загружаем пользователя');
+                  setUser({
+                    id: parsedUser.id,
+                    first_name: parsedUser.first_name || 'Пользователь',
+                    last_name: parsedUser.last_name || '',
+                    username: parsedUser.username || '',
+                    photo_url: parsedUser.photo_url,
+                    is_linked: true
+                  });
+                } else {
+                  // Сессия невалидна, но сохранённый пользователь есть - используем его
+                  console.warn('⚠️ Сессия невалидна, но используем сохранённого пользователя');
+                  setUser({
+                    id: parsedUser.id,
+                    first_name: parsedUser.first_name || 'Пользователь',
+                    last_name: parsedUser.last_name || '',
+                    username: parsedUser.username || '',
+                    photo_url: parsedUser.photo_url,
+                    is_linked: true,
+                    session_expired: true
+                  });
+                }
+                setIsReady(true);
+              })
+              .catch(err => {
+                console.warn('⚠️ Ошибка проверки сессии:', err.message);
+                
+                // ВАЖНО: При любой ошибке (включая 404) - используем сохранённого пользователя
+                // Это предотвращает потерю данных при перезагрузке страницы
+                // Сессия может не существовать на сервере, но пользователь уже авторизован
+                console.log('🔄 Используем сохранённые данные пользователя (сессия возможно истекла)');
                 setUser({
                   id: parsedUser.id,
                   first_name: parsedUser.first_name || 'Пользователь',
                   last_name: parsedUser.last_name || '',
                   username: parsedUser.username || '',
                   photo_url: parsedUser.photo_url,
-                  is_linked: true
+                  is_linked: true,
+                  session_expired: true // Флаг что сессия может быть истекшей
                 });
-              } else {
-                console.warn('⚠️ Сессия невалидна или принадлежит другому пользователю');
-                localStorage.removeItem('telegram_user');
-                localStorage.removeItem('session_token');
-                // Создаем гостевого пользователя
-                const { deviceId, numericId } = getOrCreateDeviceId();
-                setUser({
-                  id: numericId,
-                  first_name: 'Пользователь',
-                  last_name: '',
-                  username: `user_${deviceId.substring(0, 8)}`,
-                  device_id: deviceId,
-                  is_guest: true
-                });
-              }
-              setIsReady(true);
-            })
-            .catch(err => {
-              console.warn('⚠️ Ошибка проверки сессии:', err.message);
-              
-              // ВАЖНО: При любой ошибке (включая 404) - используем сохранённого пользователя
-              // Это предотвращает потерю данных при перезагрузке страницы
-              // Сессия может не существовать на сервере, но пользователь уже авторизован
-              console.log('🔄 Используем сохранённые данные пользователя (сессия возможно истекла)');
-              setUser({
-                id: parsedUser.id,
-                first_name: parsedUser.first_name || 'Пользователь',
-                last_name: parsedUser.last_name || '',
-                username: parsedUser.username || '',
-                photo_url: parsedUser.photo_url,
-                is_linked: true,
-                session_expired: true // Флаг что сессия может быть истекшей
+                setIsReady(true);
               });
-              setIsReady(true);
+            
+            return; // Ждём ответ от сервера
+          } else {
+            // Нет session_token, но есть сохранённый пользователь - используем его
+            // Это может произойти если сессия была очищена, но telegram_user остался
+            console.log('🔄 Используем сохранённого пользователя без проверки сессии');
+            setUser({
+              id: parsedUser.id,
+              first_name: parsedUser.first_name || 'Пользователь',
+              last_name: parsedUser.last_name || '',
+              username: parsedUser.username || '',
+              photo_url: parsedUser.photo_url,
+              is_linked: true,
+              session_expired: true
             });
-          
-          return; // Ждём ответ от сервера
+            setIsReady(true);
+            return;
+          }
         } catch (e) {
           console.error('Ошибка парсинга сохраненного пользователя:', e);
           localStorage.removeItem('telegram_user');
           localStorage.removeItem('session_token');
         }
-      } else if (savedTelegramUser) {
-        // Есть пользователь но нет токена сессии - очищаем
-        console.warn('⚠️ Нет токена сессии, очищаем данные');
-        localStorage.removeItem('telegram_user');
       }
       
       // Если нет сохраненного пользователя - создаем гостевого с device_id
