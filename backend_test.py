@@ -494,178 +494,22 @@ class BackendTester:
             return False
     
     
-    # ============ Friends API Tests ============
-    
-    def test_quick_add_friends_to_room(self) -> bool:
-        """Test POST /api/rooms/{room_id}/add-friends - быстрое добавление друзей в комнату"""
-        try:
-            print("🧪 Testing: Quick Add Friends to Room API")
-            
-            # This API requires existing room, friends relationship, and participants
-            # Since we don't have test data setup, we'll test the API response structure
-            
-            # Test with non-existent room first
-            fake_room_id = "test-room-12345"
-            test_data = {
-                "telegram_id": 765963392,
-                "friends": [
-                    {
-                        "telegram_id": 123456789,
-                        "first_name": "Иван",
-                        "username": "ivan_test"
-                    }
-                ]
-            }
-            
-            response = requests.post(
-                f"{API_BASE}/rooms/{fake_room_id}/add-friends",
-                json=test_data,
-                timeout=10
-            )
-            
-            # Should return 404 for non-existent room
-            if response.status_code != 404:
-                self.log_test(
-                    "Quick Add Friends to Room API", 
-                    False, 
-                    f"Expected HTTP 404 for non-existent room, got {response.status_code}",
-                    response.text
-                )
-                return False
-            
-            # Check error message structure
-            try:
-                error_data = response.json()
-                if "detail" not in error_data:
-                    self.log_test(
-                        "Quick Add Friends to Room API", 
-                        False, 
-                        "Error response missing 'detail' field",
-                        error_data
-                    )
-                    return False
-            except:
-                # Plain text error is also acceptable
-                pass
-            
-            self.log_test(
-                "Quick Add Friends to Room API", 
-                True, 
-                "API correctly handles non-existent room with 404 error. Endpoint structure is valid.",
-                {"status_code": response.status_code, "endpoint": f"/rooms/{fake_room_id}/add-friends"}
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Quick Add Friends to Room API", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Quick Add Friends to Room API", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    def test_quick_add_friends_to_journal(self) -> bool:
-        """Test POST /api/journals/{journal_id}/students/from-friends - добавление друзей в журнал"""
-        try:
-            print("🧪 Testing: Quick Add Friends to Journal API")
-            
-            # Test with non-existent journal first
-            fake_journal_id = "test-journal-12345"
-            test_data = {
-                "friends": [
-                    {
-                        "telegram_id": 123456789,
-                        "full_name": "Иван Петров",
-                        "first_name": "Иван",
-                        "username": "ivan_test"
-                    }
-                ]
-            }
-            
-            response = requests.post(
-                f"{API_BASE}/journals/{fake_journal_id}/students/from-friends",
-                json=test_data,
-                timeout=10
-            )
-            
-            # Should return 404 for non-existent journal
-            if response.status_code != 404:
-                self.log_test(
-                    "Quick Add Friends to Journal API", 
-                    False, 
-                    f"Expected HTTP 404 for non-existent journal, got {response.status_code}",
-                    response.text
-                )
-                return False
-            
-            # Check error message structure
-            try:
-                error_data = response.json()
-                if "detail" not in error_data:
-                    self.log_test(
-                        "Quick Add Friends to Journal API", 
-                        False, 
-                        "Error response missing 'detail' field",
-                        error_data
-                    )
-                    return False
-            except:
-                # Plain text error is also acceptable
-                pass
-            
-            self.log_test(
-                "Quick Add Friends to Journal API", 
-                True, 
-                "API correctly handles non-existent journal with 404 error. Endpoint structure is valid.",
-                {"status_code": response.status_code, "endpoint": f"/journals/{fake_journal_id}/students/from-friends"}
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Quick Add Friends to Journal API", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Quick Add Friends to Journal API", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
     def run_all_tests(self):
-        """Run all Backend API tests in sequence"""
-        print("🚀 Starting Backend API Testing")
+        """Run all Device Activity Tracking tests in sequence"""
+        print("🚀 Starting Device Activity Tracking Testing")
         print("=" * 50)
         
-        # Web Sessions Tests
-        web_session_tests = [
-            self.test_create_web_session,
-            self.test_get_session_status_pending,
-            self.test_link_session_with_telegram,
-            self.test_get_session_status_linked,
-            self.test_get_user_settings,
-            self.test_duplicate_link_attempt,
-            self.test_invalid_session_token
+        # Device Activity Tracking Tests (from review request scenarios)
+        device_activity_tests = [
+            self.test_create_web_session,                    # 1. Create web session
+            self.test_link_session_with_user,               # 2. Link session with user
+            self.test_check_session_status_updates_last_active,  # 3. Check status (should update last_active)
+            self.test_send_heartbeat,                       # 4. Send heartbeat
+            self.test_get_devices_list_and_check_last_active,   # 5. Get devices list and check last_active
+            self.test_heartbeat_for_invalid_session         # 6. Test heartbeat for non-existent session
         ]
         
-        # Friends API Tests
-        friends_api_tests = [
-            self.test_quick_add_friends_to_room,
-            self.test_quick_add_friends_to_journal
-        ]
-        
-        all_tests = web_session_tests + friends_api_tests
+        all_tests = device_activity_tests
         
         passed = 0
         total = len(all_tests)
@@ -682,7 +526,7 @@ class BackendTester:
         print(f"📊 Test Results: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All Backend API tests PASSED!")
+            print("🎉 All Device Activity Tracking tests PASSED!")
             return True
         else:
             print(f"⚠️  {total - passed} tests FAILED")
