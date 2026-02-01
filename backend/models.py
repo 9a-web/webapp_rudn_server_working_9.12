@@ -2157,3 +2157,106 @@ class UnreadCountResponse(BaseModel):
     unread_count: int
     by_category: dict = {}
 
+
+
+# ============ Модели для совместного прослушивания музыки ============
+
+class ListeningRoomControlMode(str, Enum):
+    """Режим управления воспроизведением"""
+    HOST_ONLY = "host_only"  # Только создатель
+    EVERYONE = "everyone"    # Все участники
+    SELECTED = "selected"    # Выбранные пользователи
+
+class ListeningRoomParticipant(BaseModel):
+    """Участник комнаты прослушивания"""
+    telegram_id: int
+    first_name: str = ""
+    last_name: str = ""
+    username: str = ""
+    photo_url: Optional[str] = None
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    can_control: bool = True  # Может ли управлять воспроизведением
+
+class ListeningRoomTrack(BaseModel):
+    """Текущий трек в комнате"""
+    id: str
+    title: str
+    artist: str
+    duration: int = 0  # в секундах
+    cover: Optional[str] = None
+    url: Optional[str] = None
+
+class ListeningRoomState(BaseModel):
+    """Состояние воспроизведения в комнате"""
+    is_playing: bool = False
+    current_track: Optional[ListeningRoomTrack] = None
+    position: float = 0  # позиция в секундах
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ListeningRoom(BaseModel):
+    """Комната совместного прослушивания"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invite_code: str = Field(default_factory=lambda: str(uuid.uuid4())[:8].upper())
+    name: str = "Совместное прослушивание"
+    host_id: int  # telegram_id создателя
+    control_mode: ListeningRoomControlMode = ListeningRoomControlMode.EVERYONE
+    allowed_controllers: List[int] = []  # telegram_id тех, кто может управлять (для SELECTED)
+    participants: List[ListeningRoomParticipant] = []
+    state: ListeningRoomState = Field(default_factory=ListeningRoomState)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+
+class CreateListeningRoomRequest(BaseModel):
+    """Запрос на создание комнаты"""
+    telegram_id: int
+    first_name: str = ""
+    last_name: str = ""
+    username: str = ""
+    photo_url: Optional[str] = None
+    name: str = "Совместное прослушивание"
+    control_mode: ListeningRoomControlMode = ListeningRoomControlMode.EVERYONE
+
+class CreateListeningRoomResponse(BaseModel):
+    """Ответ на создание комнаты"""
+    success: bool
+    room_id: str
+    invite_code: str
+    invite_link: str
+    message: str = ""
+
+class JoinListeningRoomRequest(BaseModel):
+    """Запрос на присоединение к комнате"""
+    telegram_id: int
+    first_name: str = ""
+    last_name: str = ""
+    username: str = ""
+    photo_url: Optional[str] = None
+
+class JoinListeningRoomResponse(BaseModel):
+    """Ответ на присоединение к комнате"""
+    success: bool
+    room: Optional[ListeningRoom] = None
+    message: str = ""
+
+class ListeningRoomResponse(BaseModel):
+    """Информация о комнате"""
+    room: ListeningRoom
+    is_host: bool
+    can_control: bool
+
+class UpdateListeningRoomSettingsRequest(BaseModel):
+    """Запрос на изменение настроек комнаты"""
+    name: Optional[str] = None
+    control_mode: Optional[ListeningRoomControlMode] = None
+    allowed_controllers: Optional[List[int]] = None
+
+class ListeningRoomSyncEvent(BaseModel):
+    """Событие синхронизации состояния"""
+    event: str  # play, pause, seek, track_change, sync_state
+    track: Optional[ListeningRoomTrack] = None
+    position: float = 0
+    is_playing: bool = False
+    triggered_by: int  # telegram_id того, кто вызвал событие
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
