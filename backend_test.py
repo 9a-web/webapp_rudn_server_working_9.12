@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Web Sessions System and Friends APIs
-Tests the Telegram Profile Link via QR-code functionality and Friends integration
+Backend Testing Suite for Web Sessions Device Activity Tracking
+Tests the device activity tracking fix for web sessions (last_active field updates)
 """
 
 import requests
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 # Backend URL from environment - using localhost for testing in container environment
