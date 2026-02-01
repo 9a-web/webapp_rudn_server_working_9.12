@@ -1302,6 +1302,7 @@ class AttendanceRecord(BaseModel):
     session_id: str
     student_id: str                      # ID из journal_students
     status: str = "unmarked"             # present, absent, excused, late, unmarked
+    grade: Optional[int] = None          # Оценка (1-5), None если не выставлена
     reason: Optional[str] = None         # Причина (если есть)
     note: Optional[str] = None           # Заметка
     marked_by: int                       # Кто отметил
