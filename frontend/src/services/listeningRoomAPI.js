@@ -230,8 +230,8 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
   poll();
   handlers.onConnected?.();
   
-  // Polling каждые 2 секунды
-  pollInterval = setInterval(poll, 2000);
+  // Polling каждую секунду
+  pollInterval = setInterval(poll, 1000);
   
   return {
     sendPlay: async (track, position = 0) => {
