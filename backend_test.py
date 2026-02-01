@@ -821,11 +821,11 @@ class BackendTester:
 
 def main():
     """Main test execution"""
-    print("🔗 Web Sessions System Testing")
+    print("🔗 Backend API System Testing")
     print(f"Backend URL: {BACKEND_URL}")
     print()
     
-    tester = WebSessionTester()
+    tester = BackendTester()
     
     # Run all tests
     success = tester.run_all_tests()
