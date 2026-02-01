@@ -285,13 +285,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
     }
   };
   
-  // Свернуть комнату (вернуться к списку, но остаться участником)
+  // Свернуть комнату (вернуться к списку, но остаться участником и сохранить соединение)
   const handleMinimizeRoom = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setCurrentRoom(null);
+    // НЕ закрываем соединение - оно остаётся активным для синхронизации
+    // wsRef.current остаётся активным
+    // currentRoom тоже сохраняем для отправки событий
     setView('main');
     loadMyRooms();
   };
