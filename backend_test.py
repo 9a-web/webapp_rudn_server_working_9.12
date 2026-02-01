@@ -10,8 +10,8 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Backend URL from environment
-BACKEND_URL = "http://localhost:8001"
+# Backend URL from environment - using production URL as per system instructions
+BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
 
 class WebSessionTester:
