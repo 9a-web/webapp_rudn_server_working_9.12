@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings, Key, Link2 } from 'lucide-react';
+import { Search, Music, TrendingUp, ListMusic, Heart, Loader2, ChevronDown, UserPlus, CheckCircle2, Settings, Key, Link2, Radio, Users } from 'lucide-react';
 import { Icon28LogoVkColor } from '@vkontakte/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
@@ -9,6 +9,7 @@ import { PlaylistCard } from './PlaylistCard';
 import { ArtistCard } from './ArtistCard';
 import { usePlayer } from './PlayerContext';
 import { VKAuthModal } from './VKAuthModal';
+import ListeningRoomModal from './ListeningRoomModal';
 
 // Стили анимации пульсации
 const pulseAnimation = {
