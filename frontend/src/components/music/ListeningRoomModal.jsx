@@ -303,40 +303,41 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
     hapticFeedback?.('impact', 'medium');
   };
   
+  // Отслеживание предыдущего состояния для определения изменений
+  const prevIsPlayingRef = useRef(isPlaying);
+  const prevTrackIdRef = useRef(currentTrack?.id);
+  
   // Отправка событий воспроизведения в комнату
   useEffect(() => {
-    if (!wsRef.current || !currentRoom || !canControl) return;
+    // Проверяем что мы в комнате и имеем права управления
+    if (!wsRef.current || !currentRoom || !canControl) {
+      console.log('🚫 Sync skipped: no connection, room or control rights');
+      return;
+    }
     
-    // При изменении состояния плеера отправляем в комнату
-    const handlePlayerChange = () => {
-      if (ignoreNextSyncRef.current) return;
-      
-      if (currentTrack) {
-        const trackData = {
-          id: currentTrack.id,
-          title: currentTrack.title,
-          artist: currentTrack.artist,
-          duration: currentTrack.duration || 0,
-          cover: currentTrack.cover,
-          url: currentTrack.url
-        };
-        
-        if (isPlaying) {
-          wsRef.current.sendPlay(trackData, progress);
-        } else {
-          wsRef.current.sendPause(progress);
-        }
-      }
-    };
+    // Игнорируем если это событие от другого участника
+    if (ignoreNextSyncRef.current) {
+      console.log('🔇 Sync skipped: ignoring remote event');
+      ignoreNextSyncRef.current = false;
+      return;
+    }
     
-    // Дебаунс чтобы не спамить событиями
-    const timeoutId = setTimeout(handlePlayerChange, 100);
-    return () => clearTimeout(timeoutId);
-  }, [isPlaying, currentRoom, canControl]);
-  
-  // При смене трека
-  useEffect(() => {
-    if (!wsRef.current || !currentRoom || !canControl || !currentTrack) return;
+    // Проверяем изменилось ли состояние воспроизведения
+    const playStateChanged = prevIsPlayingRef.current !== isPlaying;
+    const trackChanged = prevTrackIdRef.current !== currentTrack?.id;
+    
+    // Обновляем refs
+    prevIsPlayingRef.current = isPlaying;
+    prevTrackIdRef.current = currentTrack?.id;
+    
+    if (!playStateChanged && !trackChanged) {
+      return; // Ничего не изменилось
+    }
+    
+    if (!currentTrack) {
+      console.log('🚫 Sync skipped: no current track');
+      return;
+    }
     
     const trackData = {
       id: currentTrack.id,
@@ -347,8 +348,20 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
       url: currentTrack.url
     };
     
-    wsRef.current.sendTrackChange(trackData);
-  }, [currentTrack?.id]);
+    // Отправляем соответствующее событие
+    if (trackChanged) {
+      console.log('🔄 Sending track change:', trackData.title);
+      wsRef.current.sendTrackChange(trackData);
+    } else if (playStateChanged) {
+      if (isPlaying) {
+        console.log('▶️ Sending play event');
+        wsRef.current.sendPlay(trackData, progress);
+      } else {
+        console.log('⏸️ Sending pause event');
+        wsRef.current.sendPause(progress);
+      }
+    }
+  }, [isPlaying, currentTrack?.id, currentRoom, canControl, progress]);
   
   if (!isOpen) return null;
   
