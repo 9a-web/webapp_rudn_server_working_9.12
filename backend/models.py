@@ -1434,6 +1434,9 @@ class JournalSessionResponse(BaseModel):
     total_students: int = 0              # Всего студентов
     present_count: int = 0
     absent_count: int = 0
+    # Оценки
+    grades_count: int = 0                 # Сколько выставлено оценок
+    average_grade: Optional[float] = None # Средняя оценка за занятие
 
 
 class AttendanceRecordResponse(BaseModel):
