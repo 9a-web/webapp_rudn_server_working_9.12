@@ -14,6 +14,18 @@ backend:
         agent: "testing"
         comment: "✅ PASSED: Web Sessions API fully functional. Tested all 3 main endpoints: 1) POST /api/web-sessions - creates session with session_token, status='pending', qr_url (format https://t.me/rudn_pro_bot/app?startapp=link_{token}), expires_at, 2) GET /api/web-sessions/{token}/status - returns correct pending/linked status with user data, 3) POST /api/web-sessions/{token}/link - successfully links session with Telegram profile (telegram_id=765963392), returns success=true and message='Профиль успешно подключен!'. User settings correctly loaded for existing users. Duplicate link attempts properly rejected. Invalid session tokens handled correctly. All scenarios from review request working perfectly."
 
+  - task: "Device Activity Tracking for Web Sessions"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: Device activity tracking fix fully functional. Tested all 6 scenarios from review request: 1) POST /api/web-sessions - creates session successfully, 2) POST /api/web-sessions/{token}/link - links session with user (telegram_id=765963392), 3) GET /api/web-sessions/{token}/status - correctly updates last_active field, 4) POST /api/web-sessions/{token}/heartbeat - returns success=true with updated_at timestamp, 5) GET /api/web-sessions/user/765963392/devices - returns devices list with last_active field properly updated (recent activity within seconds), 6) POST /api/web-sessions/invalid-token/heartbeat - correctly returns 404 for non-existent session. All endpoints working perfectly, last_active tracking implemented correctly."
+
   - task: "Real-time Notification Counter with Animation"
     implemented: true
     working: pending
