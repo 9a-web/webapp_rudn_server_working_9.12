@@ -570,5 +570,9 @@ export default {
   deleteListeningRoom,
   updateListeningRoomSettings,
   getUserListeningRooms,
-  createListeningRoomWebSocket
+  createListeningRoomWebSocket,
+  createListeningRoomPolling,
+  createListeningRoomConnection,
+  getListeningRoomState,
+  syncListeningRoomState
 };
