@@ -63,6 +63,10 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
   useEffect(() => {
     if (isOpen && telegramId) {
       loadMyRooms();
+      // Если есть активная комната - показываем её
+      if (currentRoom && wsRef.current) {
+        setView('room');
+      }
     }
   }, [isOpen, telegramId, loadMyRooms]);
   
