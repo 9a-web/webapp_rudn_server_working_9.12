@@ -513,6 +513,19 @@ export const JournalDetailModal = ({
                             )}
                           </button>
                         )}
+                        {/* Кнопка привязки студентов через Telegram (только для владельца и если есть непривязанные) */}
+                        {isOwner && unlinkedStudents.length > 0 && (
+                          <button
+                            onClick={() => setShowShareStudentLink(true)}
+                            className="relative flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-sm hover:bg-blue-500/30 transition-colors"
+                          >
+                            <Send className="w-4 h-4" />
+                            Привязать
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                              {unlinkedStudents.length}
+                            </span>
+                          </button>
+                        )}
                         <div className="relative">
                           {/* Волны пульсации когда нет студентов */}
                           {students.length === 0 && (
