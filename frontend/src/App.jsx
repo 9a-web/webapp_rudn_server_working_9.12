@@ -635,6 +635,9 @@ const Home = () => {
       setLoading(true);
       const settings = await userAPI.getUserSettings(user.id);
       
+      // Проверяем, является ли пользователь связанным с Telegram (не гостевым)
+      const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
+      
       if (settings && settings.group_id && settings.facultet_id) {
         // Пользователь имеет полные настройки
         setUserSettings(settings);
@@ -654,33 +657,47 @@ const Home = () => {
         }
       } else if (settings) {
         // Пользователь существует, но у него неполные настройки
-        console.log('User has incomplete settings, showing welcome screen');
-        setShowWelcomeScreen(true);
-        // Очищаем все данные связки - пользователь должен заново настроить профиль
-        localStorage.removeItem('telegram_user');
-        localStorage.removeItem('session_token');
-        localStorage.removeItem('user_settings');
+        console.log('User has incomplete settings, showing group selector');
+        // Показываем выбор группы, НЕ очищая данные связки для связанных пользователей
+        setShowGroupSelector(true);
+        if (!isLinkedUser) {
+          // Только для гостевых пользователей очищаем данные
+          console.log('Guest user with incomplete settings');
+        }
       } else {
-        // Пользователь не найден
-        setShowWelcomeScreen(true);
-        // Полная очистка данных при показе формы регистрации
-        localStorage.removeItem('telegram_user');
-        localStorage.removeItem('session_token');
-        localStorage.removeItem('user_settings');
-        localStorage.removeItem('rudn_device_id');
-        localStorage.removeItem('activeTab');
+        // Пользователь не найден в БД
+        console.log('User not found in DB, isLinkedUser:', isLinkedUser);
+        
+        if (isLinkedUser) {
+          // Связанный Telegram пользователь, но настроек нет - показываем выбор группы
+          // НЕ очищаем localStorage - пользователь уже авторизован через Telegram
+          console.log('Linked user without settings - showing group selector');
+          setShowGroupSelector(true);
+        } else {
+          // Гостевой пользователь - показываем welcome screen
+          setShowWelcomeScreen(true);
+          // НЕ очищаем device_id - это идентификатор устройства
+          // Очищаем только данные связки если они есть
+          localStorage.removeItem('session_token');
+          localStorage.removeItem('user_settings');
+        }
       }
     } catch (err) {
       console.error('Error loading user data:', err);
-      // Если пользователь не найден (404), показываем welcome screen
+      
+      // Проверяем, является ли пользователь связанным с Telegram
+      const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
+      
+      // Если пользователь не найден (404)
       if (err.message === 'Пользователь не найден') {
-        setShowWelcomeScreen(true);
-        // Полная очистка данных при показе формы регистрации
-        localStorage.removeItem('telegram_user');
-        localStorage.removeItem('session_token');
-        localStorage.removeItem('user_settings');
-        localStorage.removeItem('rudn_device_id');
-        localStorage.removeItem('activeTab');
+        if (isLinkedUser) {
+          // Связанный пользователь без настроек - показываем выбор группы
+          console.log('Linked user not found - showing group selector');
+          setShowGroupSelector(true);
+        } else {
+          // Гостевой пользователь - показываем welcome screen
+          setShowWelcomeScreen(true);
+        }
       } else {
         setError(err.message);
       }
