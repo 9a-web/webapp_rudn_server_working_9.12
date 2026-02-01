@@ -1313,6 +1313,7 @@ class AttendanceRecordCreate(BaseModel):
     """Запрос на отметку посещаемости"""
     student_id: str
     status: str
+    grade: Optional[int] = None          # Оценка (1-5), None если не выставлена
     reason: Optional[str] = None
     note: Optional[str] = None
 
