@@ -257,6 +257,8 @@ const Home = () => {
   const [selectedArtist, setSelectedArtist] = useState(null);
   // Состояние для модального окна профиля друга
   const [isFriendProfileOpen, setIsFriendProfileOpen] = useState(false);
+  // Состояние для модального окна совместного прослушивания
+  const [isListeningRoomOpen, setIsListeningRoomOpen] = useState(false);
 
   // Состояния для связки Telegram профиля через QR
   const [showTelegramLinkScreen, setShowTelegramLinkScreen] = useState(false);
