@@ -48,6 +48,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
   
   // Listening Room State
   const [listeningRoomModalOpen, setListeningRoomModalOpen] = useState(false);
+  const [activeListeningRoom, setActiveListeningRoom] = useState(null);
   
   // Уведомляем родительский компонент об изменении состояния модального окна
   useEffect(() => {
