@@ -776,11 +776,10 @@ const Home = () => {
       return;
     }
     
-    console.log('🔒 Session check disabled - using persistent localStorage data');
+    console.log('💓 Starting heartbeat for session activity tracking');
     
     // Отправляем heartbeat для обновления last_active
     // Это позволяет отслеживать активность устройства
-    const { sendHeartbeat } = require('../services/webSessionAPI');
     
     // Отправляем heartbeat сразу при загрузке
     sendHeartbeat(sessionToken);
