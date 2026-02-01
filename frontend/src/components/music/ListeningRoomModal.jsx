@@ -93,29 +93,46 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
           setCanControl(canCtrl);
         }
         
-        // Синхронизируем состояние плеера если не мы вызвали событие
-        if (state && !ignoreNextSyncRef.current) {
-          if (state.current_track && state.is_playing) {
-            // Воспроизводим трек с нужной позиции
-            play(state.current_track, [state.current_track]);
-            setTimeout(() => seek(state.position || 0), 100);
+        // Синхронизируем состояние плеера
+        if (state && state.current_track) {
+          console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing);
+          // Устанавливаем флаг чтобы не отправить событие обратно
+          ignoreNextSyncRef.current = true;
+          play(state.current_track, [state.current_track]);
+          if (state.position > 0) {
+            setTimeout(() => seek(state.position), 200);
+          }
+          if (!state.is_playing) {
+            setTimeout(() => pause(), 300);
           }
         }
-        ignoreNextSyncRef.current = false;
       },
       onPlay: (track, position, triggeredBy) => {
-        if (triggeredBy !== telegramId) {
+        // triggeredBy может быть null при HTTP polling
+        if (triggeredBy !== telegramId && triggeredBy !== null) {
           console.log('🎵 Remote play:', track?.title);
+          // Устанавливаем флаг чтобы не отправить событие обратно
+          ignoreNextSyncRef.current = true;
           if (track) {
             play(track, [track]);
-            setTimeout(() => seek(position || 0), 100);
+            if (position > 0) {
+              setTimeout(() => seek(position), 200);
+            }
           }
           hapticFeedback?.('impact', 'light');
+        } else if (triggeredBy === null && track) {
+          // HTTP polling - проверяем отличается ли от текущего состояния
+          ignoreNextSyncRef.current = true;
+          play(track, [track]);
+          if (position > 0) {
+            setTimeout(() => seek(position), 200);
+          }
         }
       },
       onPause: (position, triggeredBy) => {
         if (triggeredBy !== telegramId) {
           console.log('⏸️ Remote pause');
+          ignoreNextSyncRef.current = true;
           pause();
           hapticFeedback?.('impact', 'light');
         }
@@ -127,8 +144,9 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
         }
       },
       onTrackChange: (track, triggeredBy) => {
-        if (triggeredBy !== telegramId && track) {
+        if (track) {
           console.log('🔄 Remote track change:', track.title);
+          ignoreNextSyncRef.current = true;
           play(track, [track]);
           hapticFeedback?.('impact', 'medium');
         }
