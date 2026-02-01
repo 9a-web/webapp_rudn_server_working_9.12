@@ -231,11 +231,13 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
   
   ws.onerror = (error) => {
     console.error('❌ Listening room WebSocket error:', error);
-    handlers.onError?.('WebSocket connection error');
+    console.error('WebSocket URL was:', wsUrl);
+    console.error('ReadyState:', ws.readyState);
+    handlers.onError?.('Ошибка подключения к комнате. Попробуйте обновить страницу.');
   };
   
   ws.onclose = (event) => {
-    console.log('🔌 Listening room WebSocket closed:', event.code);
+    console.log('🔌 Listening room WebSocket closed:', event.code, event.reason);
     if (pingInterval) {
       clearInterval(pingInterval);
     }
