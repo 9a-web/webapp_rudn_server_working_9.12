@@ -233,6 +233,16 @@ export const SubjectDetailModal = ({
                               {session.present_count}/{session.total_students}
                             </p>
                             <p className="text-xs text-gray-500">присутствуют</p>
+                            {/* Средняя оценка за сессию */}
+                            {session.average_grade !== null && session.average_grade !== undefined && (
+                              <p className={`text-xs mt-1 font-semibold ${
+                                session.average_grade >= 4.5 ? 'text-green-400' :
+                                session.average_grade >= 3.5 ? 'text-lime-400' :
+                                session.average_grade >= 2.5 ? 'text-yellow-400' : 'text-orange-400'
+                              }`}>
+                                ⭐ {session.average_grade.toFixed(1)} ({session.grades_count})
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="mt-3 flex items-center justify-between">
