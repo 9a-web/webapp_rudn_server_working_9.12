@@ -424,16 +424,27 @@ class BackendTester:
             )
             return False
     
-    def test_get_devices_list_and_check_last_active(self) -> bool:
-        """Test GET /api/web-sessions/user/{telegram_id}/devices - получение списка устройств и проверка last_active"""
+    def test_leave_room_non_host(self) -> bool:
+        """Test POST /api/music/rooms/{room_id}/leave?telegram_id={telegram_id} - выход из комнаты (не хост)"""
+        if not self.room_id:
+            self.log_test(
+                "Leave Room (Non-Host)", 
+                False, 
+                "No room ID available from previous test"
+            )
+            return False
+        
         try:
-            print("🧪 Testing: Get Devices List and Check Last Active")
+            print("🧪 Testing: Leave Room (Non-Host)")
             
-            response = requests.get(f"{API_BASE}/web-sessions/user/{self.test_telegram_id}/devices", timeout=10)
+            response = requests.post(
+                f"{API_BASE}/music/rooms/{self.room_id}/leave?telegram_id={self.friend_telegram_id}",
+                timeout=10
+            )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Get Devices List and Check Last Active", 
+                    "Leave Room (Non-Host)", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -442,97 +453,34 @@ class BackendTester:
             
             data = response.json()
             
-            # Validate response structure
-            required_fields = ["devices", "total"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
+            # Validate success response
+            if not data.get("success"):
                 self.log_test(
-                    "Get Devices List and Check Last Active", 
+                    "Leave Room (Non-Host)", 
                     False, 
-                    f"Missing required fields: {missing_fields}",
+                    f"Leave failed. Response: {data}",
                     data
-                )
-                return False
-            
-            devices = data["devices"]
-            total = data["total"]
-            
-            # Should have at least one device (our test session)
-            if total == 0 or len(devices) == 0:
-                self.log_test(
-                    "Get Devices List and Check Last Active", 
-                    False, 
-                    f"No devices found for user {self.test_telegram_id}. Expected at least 1 device.",
-                    data
-                )
-                return False
-            
-            # Find our test session device
-            test_device = None
-            for device in devices:
-                if device.get("session_token") == self.session_token:
-                    test_device = device
-                    break
-            
-            if not test_device:
-                self.log_test(
-                    "Get Devices List and Check Last Active", 
-                    False, 
-                    f"Test session {self.session_token[:8]}... not found in devices list",
-                    data
-                )
-                return False
-            
-            # Validate last_active is present and recent
-            last_active_str = test_device.get("last_active")
-            if not last_active_str:
-                self.log_test(
-                    "Get Devices List and Check Last Active", 
-                    False, 
-                    f"last_active field is missing or null for test device",
-                    test_device
-                )
-                return False
-            
-            try:
-                last_active = datetime.fromisoformat(last_active_str.replace('Z', '+00:00'))
-                time_diff = abs((datetime.utcnow() - last_active.replace(tzinfo=None)).total_seconds())
-                if time_diff > 60:  # Should be within 1 minute (recent activity)
-                    self.log_test(
-                        "Get Devices List and Check Last Active", 
-                        False, 
-                        f"last_active timestamp too old: {last_active_str} (diff: {time_diff}s)",
-                        test_device
-                    )
-                    return False
-            except Exception as e:
-                self.log_test(
-                    "Get Devices List and Check Last Active", 
-                    False, 
-                    f"Invalid last_active format: {last_active_str}. Error: {e}",
-                    test_device
                 )
                 return False
             
             self.log_test(
-                "Get Devices List and Check Last Active", 
+                "Leave Room (Non-Host)", 
                 True, 
-                f"Found {total} devices. Test device last_active: {last_active_str} (recent: {time_diff:.1f}s ago)",
-                {"total_devices": total, "test_device_last_active": last_active_str}
+                f"Friend successfully left room. Message: {data.get('message', 'N/A')}",
+                data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Get Devices List and Check Last Active", 
+                "Leave Room (Non-Host)", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Get Devices List and Check Last Active", 
+                "Leave Room (Non-Host)", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
