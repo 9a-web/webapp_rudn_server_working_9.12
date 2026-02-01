@@ -1410,6 +1410,14 @@ class JournalStudentResponse(BaseModel):
     excused_count: int = 0
     late_count: int = 0
     total_sessions: int = 0
+    # Оценки
+    average_grade: Optional[float] = None      # Средняя оценка
+    grades_count: int = 0                       # Количество оценок
+    grade_5_count: int = 0                      # Количество "5"
+    grade_4_count: int = 0                      # Количество "4"
+    grade_3_count: int = 0                      # Количество "3"
+    grade_2_count: int = 0                      # Количество "2"
+    grade_1_count: int = 0                      # Количество "1"
 
 
 class JournalSessionResponse(BaseModel):
