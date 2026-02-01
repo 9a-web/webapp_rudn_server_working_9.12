@@ -11379,6 +11379,34 @@ async def get_user_devices(telegram_id: int, current_token: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/web-sessions/{session_token}/heartbeat")
+async def session_heartbeat(session_token: str):
+    """
+    Обновить last_active для сессии (heartbeat/ping).
+    Вызывается периодически из frontend для отслеживания активности.
+    """
+    try:
+        result = await db.web_sessions.update_one(
+            {
+                "session_token": session_token,
+                "status": WebSessionStatus.LINKED.value
+            },
+            {"$set": {"last_active": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Сессия не найдена или не активна")
+        
+        return {"success": True, "updated_at": datetime.utcnow().isoformat()}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Session heartbeat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @api_router.delete("/web-sessions/{session_token}")
 async def revoke_device_session(session_token: str, telegram_id: int):
     """
