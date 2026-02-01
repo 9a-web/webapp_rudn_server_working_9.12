@@ -10019,11 +10019,28 @@ async def get_listening_room_state(room_id: str):
 
 
 @api_router.post("/music/rooms/{room_id}/sync")
-async def sync_listening_room_state(room_id: str, telegram_id: int, event: str, track: dict = None, position: float = 0):
+async def sync_listening_room_state(
+    room_id: str, 
+    telegram_id: int = Query(...),
+    event: str = Query(...),
+    position: float = Query(0),
+    request: Request = None
+):
     """
     Синхронизировать состояние комнаты через HTTP (fallback для WebSocket).
+    Track передаётся в body как JSON.
     """
     try:
+        # Получаем track из body
+        track = None
+        if request:
+            try:
+                body = await request.json()
+                if body and isinstance(body, dict) and body.get('id'):
+                    track = body
+            except:
+                pass
+        
         room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
         
         if not room:
@@ -10064,6 +10081,8 @@ async def sync_listening_room_state(room_id: str, telegram_id: int, event: str, 
             {"id": room_id},
             {"$set": state_update}
         )
+        
+        logger.info(f"🎵 Room {room_id[:8]}... sync: {event} by {telegram_id}")
         
         # Отправляем через WebSocket тем, кто подключен
         await broadcast_to_listening_room(room_id, {
