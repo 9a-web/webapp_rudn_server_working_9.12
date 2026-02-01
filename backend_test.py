@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Web Sessions Device Activity Tracking
-Tests the device activity tracking fix for web sessions (last_active field updates)
+Backend Testing Suite for Listening Rooms API (Совместное прослушивание музыки)
+Tests the music listening rooms functionality as specified in the review request
 """
 
 import requests
@@ -16,9 +16,11 @@ API_BASE = f"{BACKEND_URL}/api"
 
 class BackendTester:
     def __init__(self):
-        self.session_token: Optional[str] = None
+        self.room_id: Optional[str] = None
+        self.invite_code: Optional[str] = None
         self.test_results = []
-        self.test_telegram_id = 765963392  # Test user ID from review request
+        self.host_telegram_id = 765963392  # Host user ID from review request
+        self.friend_telegram_id = 123456789  # Friend user ID from review request
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
