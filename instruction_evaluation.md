@@ -44,13 +44,15 @@
 - ✅ Backend: GET /journals/sessions/{session_id}/attendance - возвращает grade
 - ✅ Backend: GET /journals/{journal_id}/students - возвращает статистику оценок (average_grade, grades_count, grade_5_count и т.д.)
 - ✅ Backend: GET /journals/{journal_id}/sessions - возвращает grades_count, average_grade
+- ✅ Frontend: AttendanceModal - UI для выставления оценок 1-5 с цветовой схемой
+- ✅ Frontend: JournalDetailModal - показ средней оценки студента
+- ✅ Frontend: SubjectDetailModal - показ средней оценки за сессию
 
 ### 🔄 В процессе:
-- Фаза 2: Frontend - UI для оценок в AttendanceModal
+- Фаза 4: Тестирование
 
 ### ⏳ Ожидает:
-- Фаза 3: Статистика (отображение в UI)
-- Фаза 4: Тестирование
+- Финальная проверка
 
 ---
 
