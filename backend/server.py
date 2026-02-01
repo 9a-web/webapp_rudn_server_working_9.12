@@ -10062,11 +10062,12 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
     listening_room_connections[room_id][telegram_id] = websocket
     
     # Отправляем текущее состояние новому участнику
+    # Сериализуем state для JSON (datetime -> ISO string)
     await websocket.send_json({
         "event": "connected",
         "room_id": room_id,
         "can_control": can_control,
-        "state": room.get("state", {})
+        "state": serialize_for_json(room.get("state", {}))
     })
     
     logger.info(f"🎵 WebSocket connected: user {telegram_id} to room {room_id[:8]}...")
