@@ -120,35 +120,35 @@ class BackendTester:
             )
             return False
     
-    def test_link_session_with_user(self) -> bool:
-        """Test POST /api/web-sessions/{token}/link - связывание сессии с пользователем"""
-        if not self.session_token:
+    def test_join_room_by_code(self) -> bool:
+        """Test POST /api/music/rooms/join/{invite_code} - присоединение по коду"""
+        if not self.invite_code:
             self.log_test(
-                "Link Session with User", 
+                "Join Room by Code", 
                 False, 
-                "No session token available from previous test"
+                "No invite code available from previous test"
             )
             return False
         
         try:
-            print("🧪 Testing: Link Session with User")
+            print("🧪 Testing: Join Room by Code")
             
             # Test data from review request
-            link_data = {
-                "telegram_id": self.test_telegram_id,
-                "first_name": "Test",
-                "username": "test_user"
+            join_data = {
+                "telegram_id": self.friend_telegram_id,
+                "first_name": "Friend",
+                "username": "friend_user"
             }
             
             response = requests.post(
-                f"{API_BASE}/web-sessions/{self.session_token}/link",
-                json=link_data,
+                f"{API_BASE}/music/rooms/join/{self.invite_code}",
+                json=join_data,
                 timeout=10
             )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Link Session with User", 
+                    "Join Room by Code", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -160,31 +160,75 @@ class BackendTester:
             # Validate success response
             if not data.get("success"):
                 self.log_test(
-                    "Link Session with User", 
+                    "Join Room by Code", 
                     False, 
-                    f"Link failed. Response: {data}",
+                    f"Join failed. Response: {data}",
                     data
                 )
                 return False
             
+            # Validate room data is present
+            if "room" not in data:
+                self.log_test(
+                    "Join Room by Code", 
+                    False, 
+                    f"Room data missing from response",
+                    data
+                )
+                return False
+            
+            room = data["room"]
+            
+            # Validate participants
+            if "participants" not in room:
+                self.log_test(
+                    "Join Room by Code", 
+                    False, 
+                    f"Participants data missing from room",
+                    room
+                )
+                return False
+            
+            # Should have 2 participants now (host + friend)
+            participants = room["participants"]
+            if len(participants) < 2:
+                self.log_test(
+                    "Join Room by Code", 
+                    False, 
+                    f"Expected at least 2 participants, got {len(participants)}",
+                    participants
+                )
+                return False
+            
+            # Check if friend is in participants
+            friend_found = any(p.get("telegram_id") == self.friend_telegram_id for p in participants)
+            if not friend_found:
+                self.log_test(
+                    "Join Room by Code", 
+                    False, 
+                    f"Friend (ID: {self.friend_telegram_id}) not found in participants",
+                    participants
+                )
+                return False
+            
             self.log_test(
-                "Link Session with User", 
+                "Join Room by Code", 
                 True, 
-                f"Session successfully linked with Telegram ID {self.test_telegram_id}",
+                f"Friend successfully joined room. Participants: {len(participants)}",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Link Session with User", 
+                "Join Room by Code", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Link Session with User", 
+                "Join Room by Code", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
