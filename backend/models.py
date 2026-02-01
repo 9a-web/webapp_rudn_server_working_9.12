@@ -1496,6 +1496,9 @@ class SubjectStudentStats(BaseModel):
     excused_count: int = 0
     total_sessions: int = 0
     attendance_percent: float = 0.0
+    # Оценки
+    average_grade: Optional[float] = None
+    grades_count: int = 0
 
 
 class SubjectSessionStats(BaseModel):
