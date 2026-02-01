@@ -762,11 +762,12 @@ class BackendTester:
             return False
     
     def run_all_tests(self):
-        """Run all Web Sessions tests in sequence"""
-        print("🚀 Starting Web Sessions API Testing")
+        """Run all Backend API tests in sequence"""
+        print("🚀 Starting Backend API Testing")
         print("=" * 50)
         
-        tests = [
+        # Web Sessions Tests
+        web_session_tests = [
             self.test_create_web_session,
             self.test_get_session_status_pending,
             self.test_link_session_with_telegram,
@@ -776,10 +777,18 @@ class BackendTester:
             self.test_invalid_session_token
         ]
         
-        passed = 0
-        total = len(tests)
+        # Friends API Tests
+        friends_api_tests = [
+            self.test_quick_add_friends_to_room,
+            self.test_quick_add_friends_to_journal
+        ]
         
-        for test in tests:
+        all_tests = web_session_tests + friends_api_tests
+        
+        passed = 0
+        total = len(all_tests)
+        
+        for test in all_tests:
             try:
                 if test():
                     passed += 1
@@ -791,7 +800,7 @@ class BackendTester:
         print(f"📊 Test Results: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All Web Sessions tests PASSED!")
+            print("🎉 All Backend API tests PASSED!")
             return True
         else:
             print(f"⚠️  {total - passed} tests FAILED")
