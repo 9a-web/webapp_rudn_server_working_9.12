@@ -613,6 +613,44 @@ const Home = () => {
     }
   }, [isReady, user, startParam, linkInviteProcessed]);
 
+  // Обработка приглашения в комнату прослушивания (startapp=listen_{invite_code})
+  const [listenInviteProcessed, setListenInviteProcessed] = useState(false);
+  const [pendingListenInvite, setPendingListenInvite] = useState(null);
+  useEffect(() => {
+    const processListenInvite = async () => {
+      if (!startParam || listenInviteProcessed || !user) {
+        return;
+      }
+      
+      // Формат: listen_{invite_code}
+      if (!startParam.startsWith('listen_')) {
+        return;
+      }
+      
+      const inviteCode = startParam.replace('listen_', '');
+      
+      if (!inviteCode) {
+        return;
+      }
+      
+      console.log('🎵 Обработка приглашения в комнату прослушивания:', inviteCode);
+      
+      // Сохраняем код для открытия в MusicSection
+      setPendingListenInvite(inviteCode);
+      setListenInviteProcessed(true);
+      
+      // Переключаемся на вкладку музыки
+      setActiveTab('music');
+      
+      hapticFeedback('success');
+      showAlert('Присоединение к комнате прослушивания...');
+    };
+    
+    if (isReady && user && startParam) {
+      processListenInvite();
+    }
+  }, [isReady, user, startParam, listenInviteProcessed]);
+
   // Загрузка расписания при изменении настроек или недели
   useEffect(() => {
     // Проверяем, что у пользователя есть полные настройки группы
