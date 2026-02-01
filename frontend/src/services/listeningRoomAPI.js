@@ -140,9 +140,259 @@ export const getUserListeningRooms = async (telegramId) => {
 };
 
 /**
- * Создать WebSocket соединение для комнаты
+ * Получить состояние комнаты (HTTP polling)
  */
-export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
+export const getListeningRoomState = async (roomId) => {
+  const backendUrl = getBackendURL();
+  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}/state`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get room state');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Синхронизировать состояние комнаты через HTTP
+ */
+export const syncListeningRoomState = async (roomId, telegramId, event, track = null, position = 0) => {
+  const backendUrl = getBackendURL();
+  const params = new URLSearchParams({
+    telegram_id: telegramId.toString(),
+    event,
+    position: position.toString()
+  });
+  
+  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}/sync?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: track ? JSON.stringify(track) : '{}'
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to sync state');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Создать HTTP polling соединение для комнаты (fallback для WebSocket)
+ */
+export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
+  let pollInterval = null;
+  let lastState = null;
+  let isStopped = false;
+  
+  console.log('🔄 Starting HTTP polling for listening room:', roomId);
+  
+  const poll = async () => {
+    if (isStopped) return;
+    
+    try {
+      const state = await getListeningRoomState(roomId);
+      
+      // Сравниваем с предыдущим состоянием
+      if (lastState) {
+        // Проверяем изменения
+        if (state.is_playing !== lastState.is_playing) {
+          if (state.is_playing) {
+            handlers.onPlay?.(state.current_track, state.position, null);
+          } else {
+            handlers.onPause?.(state.position, null);
+          }
+        }
+        
+        // Проверяем смену трека
+        if (state.current_track?.id !== lastState.current_track?.id) {
+          handlers.onTrackChange?.(state.current_track, null);
+        }
+      } else {
+        // Первая синхронизация
+        handlers.onStateSync?.(state, true);
+      }
+      
+      lastState = state;
+    } catch (error) {
+      console.error('Polling error:', error);
+      if (error.message.includes('не найдена')) {
+        handlers.onRoomClosed?.('Комната закрыта');
+        isStopped = true;
+        if (pollInterval) clearInterval(pollInterval);
+      }
+    }
+  };
+  
+  // Первый запрос сразу
+  poll();
+  handlers.onConnected?.();
+  
+  // Polling каждые 2 секунды
+  pollInterval = setInterval(poll, 2000);
+  
+  return {
+    sendPlay: async (track, position = 0) => {
+      try {
+        await syncListeningRoomState(roomId, telegramId, 'play', track, position);
+      } catch (e) {
+        console.error('Failed to sync play:', e);
+      }
+    },
+    
+    sendPause: async (position = 0) => {
+      try {
+        await syncListeningRoomState(roomId, telegramId, 'pause', null, position);
+      } catch (e) {
+        console.error('Failed to sync pause:', e);
+      }
+    },
+    
+    sendSeek: async (position) => {
+      try {
+        await syncListeningRoomState(roomId, telegramId, 'seek', null, position);
+      } catch (e) {
+        console.error('Failed to sync seek:', e);
+      }
+    },
+    
+    sendTrackChange: async (track) => {
+      try {
+        await syncListeningRoomState(roomId, telegramId, 'track_change', track, 0);
+      } catch (e) {
+        console.error('Failed to sync track change:', e);
+      }
+    },
+    
+    requestSync: poll,
+    
+    close: () => {
+      isStopped = true;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    },
+    
+    get readyState() {
+      return isStopped ? 3 : 1; // CLOSED or OPEN
+    }
+  };
+};
+
+/**
+ * Создать соединение для комнаты (автоматически выбирает WebSocket или HTTP polling)
+ */
+export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
+  // Попробуем WebSocket сначала
+  let wsConnection = null;
+  let pollingConnection = null;
+  let usePolling = false;
+  
+  const wrappedHandlers = {
+    ...handlers,
+    onConnected: () => {
+      console.log('✅ Connection established (WebSocket)');
+      handlers.onConnected?.();
+    },
+    onError: (message) => {
+      console.warn('⚠️ WebSocket error, falling back to HTTP polling');
+      // Переключаемся на polling
+      if (!usePolling && wsConnection) {
+        usePolling = true;
+        try {
+          wsConnection.close();
+        } catch (e) {}
+        
+        pollingConnection = createListeningRoomPolling(roomId, telegramId, {
+          ...handlers,
+          onConnected: () => {
+            console.log('✅ Connection established (HTTP polling)');
+            handlers.onConnected?.();
+          }
+        });
+      } else {
+        handlers.onError?.(message);
+      }
+    }
+  };
+  
+  wsConnection = createListeningRoomWebSocket(roomId, telegramId, wrappedHandlers);
+  
+  // Таймаут для переключения на polling если WebSocket не подключился
+  const fallbackTimeout = setTimeout(() => {
+    if (!usePolling && wsConnection.readyState !== WebSocket.OPEN) {
+      console.warn('⚠️ WebSocket connection timeout, falling back to HTTP polling');
+      usePolling = true;
+      try {
+        wsConnection.close();
+      } catch (e) {}
+      
+      pollingConnection = createListeningRoomPolling(roomId, telegramId, {
+        ...handlers,
+        onConnected: () => {
+          console.log('✅ Connection established (HTTP polling fallback)');
+          handlers.onConnected?.();
+        }
+      });
+    }
+  }, 5000);
+  
+  return {
+    sendPlay: (track, position) => {
+      if (usePolling && pollingConnection) {
+        pollingConnection.sendPlay(track, position);
+      } else {
+        wsConnection.sendPlay(track, position);
+      }
+    },
+    sendPause: (position) => {
+      if (usePolling && pollingConnection) {
+        pollingConnection.sendPause(position);
+      } else {
+        wsConnection.sendPause(position);
+      }
+    },
+    sendSeek: (position) => {
+      if (usePolling && pollingConnection) {
+        pollingConnection.sendSeek(position);
+      } else {
+        wsConnection.sendSeek(position);
+      }
+    },
+    sendTrackChange: (track) => {
+      if (usePolling && pollingConnection) {
+        pollingConnection.sendTrackChange(track);
+      } else {
+        wsConnection.sendTrackChange(track);
+      }
+    },
+    requestSync: () => {
+      if (usePolling && pollingConnection) {
+        pollingConnection.requestSync();
+      } else {
+        wsConnection.requestSync();
+      }
+    },
+    close: () => {
+      clearTimeout(fallbackTimeout);
+      if (pollingConnection) {
+        pollingConnection.close();
+      }
+      if (wsConnection) {
+        wsConnection.close();
+      }
+    },
+    get readyState() {
+      if (usePolling && pollingConnection) {
+        return pollingConnection.readyState;
+      }
+      return wsConnection.readyState;
+    }
+  };
+};
   const backendUrl = getBackendURL();
   
   // Формируем WebSocket URL
