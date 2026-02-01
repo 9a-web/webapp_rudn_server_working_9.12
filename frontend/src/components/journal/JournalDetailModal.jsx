@@ -921,6 +921,17 @@ export const JournalDetailModal = ({
             setShowApplications(false);
           }}
         />
+
+        {/* Модал отправки ссылки студенту через Telegram */}
+        <ShareStudentLinkModal
+          isOpen={showShareStudentLink}
+          onClose={() => setShowShareStudentLink(false)}
+          students={students}
+          journalName={journal?.name}
+          gradient={gradient}
+          hapticFeedback={hapticFeedback}
+          webApp={webApp}
+        />
       </motion.div>
     </AnimatePresence>
   );
