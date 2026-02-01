@@ -9989,6 +9989,102 @@ async def get_user_listening_rooms(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/music/rooms/{room_id}/state")
+async def get_listening_room_state(room_id: str):
+    """
+    Получить текущее состояние комнаты (для HTTP polling).
+    Используется как fallback когда WebSocket недоступен.
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        state = room.get("state", {})
+        
+        return {
+            "is_playing": state.get("is_playing", False),
+            "current_track": state.get("current_track"),
+            "position": state.get("position", 0),
+            "updated_at": state.get("updated_at").isoformat() if state.get("updated_at") else None,
+            "participants_count": len(room.get("participants", []))
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get listening room state error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/{room_id}/sync")
+async def sync_listening_room_state(room_id: str, telegram_id: int, event: str, track: dict = None, position: float = 0):
+    """
+    Синхронизировать состояние комнаты через HTTP (fallback для WebSocket).
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем права на управление
+        can_control = False
+        if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+            can_control = True
+        elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+            can_control = room["host_id"] == telegram_id
+        elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+            can_control = room["host_id"] == telegram_id or telegram_id in room.get("allowed_controllers", [])
+        
+        if event in ["play", "pause", "seek", "track_change"] and not can_control:
+            raise HTTPException(status_code=403, detail="У вас нет прав на управление воспроизведением")
+        
+        # Обновляем состояние
+        state_update = {"state.updated_at": datetime.utcnow()}
+        
+        if event == "play":
+            state_update["state.is_playing"] = True
+            state_update["state.position"] = position
+            if track:
+                state_update["state.current_track"] = track
+        elif event == "pause":
+            state_update["state.is_playing"] = False
+            state_update["state.position"] = position
+        elif event == "seek":
+            state_update["state.position"] = position
+        elif event == "track_change":
+            if track:
+                state_update["state.current_track"] = track
+                state_update["state.position"] = 0
+                state_update["state.is_playing"] = True
+        
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$set": state_update}
+        )
+        
+        # Отправляем через WebSocket тем, кто подключен
+        await broadcast_to_listening_room(room_id, {
+            "event": event,
+            "track": track,
+            "position": position,
+            "triggered_by": telegram_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }, exclude_user=telegram_id)
+        
+        return {"success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Sync listening room state error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
 def serialize_for_json(obj):
     """
     Рекурсивно конвертирует datetime объекты в ISO строки для JSON сериализации.
