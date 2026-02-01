@@ -1447,6 +1447,7 @@ class AttendanceRecordResponse(BaseModel):
     student_id: str
     student_name: str
     status: str
+    grade: Optional[int] = None           # Оценка (1-5)
     reason: Optional[str]
     note: Optional[str]
     marked_by: int
