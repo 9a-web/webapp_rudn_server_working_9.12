@@ -331,24 +331,16 @@ class BackendTester:
             )
             return False
     
-    def test_send_heartbeat(self) -> bool:
-        """Test POST /api/web-sessions/{token}/heartbeat - отправка heartbeat"""
-        if not self.session_token:
-            self.log_test(
-                "Send Heartbeat", 
-                False, 
-                "No session token available from previous test"
-            )
-            return False
-        
+    def test_get_user_rooms(self) -> bool:
+        """Test GET /api/music/rooms/user/{telegram_id} - получение комнат пользователя"""
         try:
-            print("🧪 Testing: Send Heartbeat")
+            print("🧪 Testing: Get User Rooms")
             
-            response = requests.post(f"{API_BASE}/web-sessions/{self.session_token}/heartbeat", timeout=10)
+            response = requests.get(f"{API_BASE}/music/rooms/user/{self.host_telegram_id}", timeout=10)
             
             if response.status_code != 200:
                 self.log_test(
-                    "Send Heartbeat", 
+                    "Get User Rooms", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -358,68 +350,75 @@ class BackendTester:
             data = response.json()
             
             # Validate response structure
-            required_fields = ["success", "updated_at"]
+            required_fields = ["rooms", "count"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Send Heartbeat", 
+                    "Get User Rooms", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate success is True
-            if not data["success"]:
+            rooms = data["rooms"]
+            count = data["count"]
+            
+            # Should have at least one room (our test room)
+            if count == 0 or len(rooms) == 0:
                 self.log_test(
-                    "Send Heartbeat", 
+                    "Get User Rooms", 
                     False, 
-                    f"Heartbeat failed. Response: {data}",
+                    f"No rooms found for user {self.host_telegram_id}. Expected at least 1 room.",
                     data
                 )
                 return False
             
-            # Validate updated_at is present and recent
-            updated_at_str = data["updated_at"]
-            try:
-                updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
-                time_diff = abs((datetime.utcnow() - updated_at.replace(tzinfo=None)).total_seconds())
-                if time_diff > 10:  # Should be within 10 seconds
-                    self.log_test(
-                        "Send Heartbeat", 
-                        False, 
-                        f"updated_at timestamp too old: {updated_at_str} (diff: {time_diff}s)",
-                        data
-                    )
-                    return False
-            except Exception as e:
+            # Find our test room
+            test_room = None
+            for room in rooms:
+                if room.get("id") == self.room_id:
+                    test_room = room
+                    break
+            
+            if not test_room:
                 self.log_test(
-                    "Send Heartbeat", 
+                    "Get User Rooms", 
                     False, 
-                    f"Invalid updated_at format: {updated_at_str}. Error: {e}",
+                    f"Test room {self.room_id[:8]}... not found in user's rooms list",
                     data
+                )
+                return False
+            
+            # Validate test room data
+            if not test_room.get("is_host"):
+                self.log_test(
+                    "Get User Rooms", 
+                    False, 
+                    f"Expected is_host=true for test room, got {test_room.get('is_host')}",
+                    test_room
                 )
                 return False
             
             self.log_test(
-                "Send Heartbeat", 
+                "Get User Rooms", 
                 True, 
-                f"Heartbeat successful. Updated at: {updated_at_str}",
-                data
+                f"Found {count} rooms for user. Test room present with is_host=true",
+                {"total_rooms": count, "test_room_found": True}
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Send Heartbeat", 
+                "Get User Rooms", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Send Heartbeat", 
+                "Get User Rooms", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
