@@ -20,7 +20,7 @@ import {
   deleteListeningRoom,
   getUserListeningRooms,
   updateListeningRoomSettings,
-  createListeningRoomWebSocket
+  createListeningRoomConnection
 } from '../../services/listeningRoomAPI';
 
 const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
