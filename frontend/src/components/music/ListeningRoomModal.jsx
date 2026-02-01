@@ -83,7 +83,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
     setCurrentRoom(room);
     setView('room');
     
-    wsRef.current = createListeningRoomWebSocket(room.id, telegramId, {
+    wsRef.current = createListeningRoomConnection(room.id, telegramId, {
       onConnected: () => {
         console.log('✅ Connected to listening room');
         hapticFeedback?.('notification', 'success');
