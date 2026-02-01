@@ -633,14 +633,31 @@ const Home = () => {
   const loadUserData = useCallback(async () => {
     try {
       setLoading(true);
-      const settings = await userAPI.getUserSettings(user.id);
       
       // Проверяем, является ли пользователь связанным с Telegram (не гостевым)
       const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
       
+      // Пробуем загрузить настройки из localStorage сначала (для быстрого восстановления)
+      const savedUserSettings = localStorage.getItem('user_settings');
+      let cachedSettings = null;
+      if (savedUserSettings) {
+        try {
+          cachedSettings = JSON.parse(savedUserSettings);
+          console.log('📦 Найдены сохранённые настройки в localStorage');
+        } catch (e) {
+          console.error('Ошибка парсинга сохранённых настроек:', e);
+          localStorage.removeItem('user_settings');
+        }
+      }
+      
+      const settings = await userAPI.getUserSettings(user.id);
+      
       if (settings && settings.group_id && settings.facultet_id) {
         // Пользователь имеет полные настройки
         setUserSettings(settings);
+        
+        // Сохраняем в localStorage для быстрого восстановления
+        localStorage.setItem('user_settings', JSON.stringify(settings));
         
         // Загружаем настройки темы
         try {
@@ -668,7 +685,24 @@ const Home = () => {
         // Пользователь не найден в БД
         console.log('User not found in DB, isLinkedUser:', isLinkedUser);
         
-        if (isLinkedUser) {
+        // Пробуем использовать сохранённые настройки для связанных пользователей
+        if (isLinkedUser && cachedSettings && cachedSettings.group_id && cachedSettings.facultet_id) {
+          console.log('🔄 Используем сохранённые настройки из localStorage');
+          setUserSettings(cachedSettings);
+          // Пытаемся синхронизировать с сервером в фоне
+          try {
+            await userAPI.saveUserSettings({
+              telegram_id: user.id,
+              username: user.username,
+              first_name: user.first_name,
+              last_name: user.last_name,
+              ...cachedSettings
+            });
+            console.log('✅ Настройки синхронизированы с сервером');
+          } catch (syncError) {
+            console.warn('⚠️ Не удалось синхронизировать настройки:', syncError);
+          }
+        } else if (isLinkedUser) {
           // Связанный Telegram пользователь, но настроек нет - показываем выбор группы
           // НЕ очищаем localStorage - пользователь уже авторизован через Telegram
           console.log('Linked user without settings - showing group selector');
@@ -687,6 +721,21 @@ const Home = () => {
       
       // Проверяем, является ли пользователь связанным с Telegram
       const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
+      
+      // Пробуем использовать сохранённые настройки из localStorage
+      const savedUserSettings = localStorage.getItem('user_settings');
+      if (isLinkedUser && savedUserSettings) {
+        try {
+          const cachedSettings = JSON.parse(savedUserSettings);
+          if (cachedSettings.group_id && cachedSettings.facultet_id) {
+            console.log('🔄 Ошибка API, используем сохранённые настройки');
+            setUserSettings(cachedSettings);
+            return;
+          }
+        } catch (e) {
+          console.error('Ошибка парсинга настроек:', e);
+        }
+      }
       
       // Если пользователь не найден (404)
       if (err.message === 'Пользователь не найден') {
