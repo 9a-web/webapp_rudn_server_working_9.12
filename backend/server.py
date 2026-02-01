@@ -11198,6 +11198,7 @@ async def get_web_session_status(session_token: str):
     """
     Получить статус веб-сессии.
     Используется для polling или проверки после WebSocket disconnect.
+    Обновляет last_active для связанных сессий.
     """
     try:
         session = await db.web_sessions.find_one({"session_token": session_token})
@@ -11213,6 +11214,13 @@ async def get_web_session_status(session_token: str):
                     {"$set": {"status": WebSessionStatus.EXPIRED.value}}
                 )
                 session["status"] = WebSessionStatus.EXPIRED.value
+        
+        # Обновляем last_active для связанных сессий при каждом запросе статуса
+        if session["status"] == WebSessionStatus.LINKED.value:
+            await db.web_sessions.update_one(
+                {"session_token": session_token},
+                {"$set": {"last_active": datetime.utcnow()}}
+            )
         
         bot_username = get_telegram_bot_username()
         qr_url = f"https://t.me/{bot_username}/app?startapp=link_{session_token}"
