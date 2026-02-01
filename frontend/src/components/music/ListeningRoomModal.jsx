@@ -418,7 +418,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId }) => {
                   <button
                     onClick={() => {
                       if (view === 'room') {
-                        handleLeaveRoom();
+                        handleMinimizeRoom(); // Свернуть, но остаться в комнате
                       } else {
                         setView('main');
                         setError(null);
