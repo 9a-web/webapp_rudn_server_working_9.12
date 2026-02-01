@@ -18,8 +18,7 @@ class BackendTester:
     def __init__(self):
         self.session_token: Optional[str] = None
         self.test_results = []
-        self.test_room_id: Optional[str] = None
-        self.test_journal_id: Optional[str] = None
+        self.test_telegram_id = 765963392  # Test user ID from review request
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
