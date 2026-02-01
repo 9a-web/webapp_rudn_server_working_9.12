@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, XCircle, Clock, HelpCircle, Users } from 'lucide-react';
+import { X, Check, XCircle, Clock, HelpCircle, Users, Star } from 'lucide-react';
 import { getSessionAttendance, markAttendance } from '../../services/journalAPI';
 
 const STATUSES = [
@@ -9,6 +9,15 @@ const STATUSES = [
   { id: 'late', label: 'Опоздал', icon: Clock, color: 'bg-yellow-500', textColor: 'text-yellow-400' },
   { id: 'excused', label: 'Уважит.', icon: HelpCircle, color: 'bg-gray-500', textColor: 'text-gray-400' },
 ];
+
+// Цвета для оценок согласно спецификации
+const GRADE_COLORS = {
+  5: { bg: 'bg-green-500', text: 'text-green-400', bgLight: 'bg-green-500/20' },
+  4: { bg: 'bg-lime-500', text: 'text-lime-400', bgLight: 'bg-lime-500/20' },
+  3: { bg: 'bg-yellow-500', text: 'text-yellow-400', bgLight: 'bg-yellow-500/20' },
+  2: { bg: 'bg-orange-500', text: 'text-orange-400', bgLight: 'bg-orange-500/20' },
+  1: { bg: 'bg-red-500', text: 'text-red-400', bgLight: 'bg-red-500/20' },
+};
 
 export const AttendanceModal = ({ 
   isOpen, 
@@ -49,7 +58,10 @@ export const AttendanceModal = ({
     
     setChanges(prev => ({
       ...prev,
-      [studentId]: { status: newStatus }
+      [studentId]: { 
+        ...prev[studentId],
+        status: newStatus 
+      }
     }));
     
     setAttendance(prev => prev.map(a => 
@@ -57,11 +69,40 @@ export const AttendanceModal = ({
     ));
   };
 
-  const handleSave = async () => {
-    const changedRecords = Object.entries(changes).map(([studentId, data]) => ({
-      student_id: studentId,
-      status: data.status
+  const handleGradeChange = (studentId, newGrade) => {
+    if (hapticFeedback?.impactOccurred) {
+      hapticFeedback.impactOccurred('light');
+    }
+    
+    // Получаем текущую оценку студента
+    const currentStudent = attendance.find(a => a.student_id === studentId);
+    const currentGrade = currentStudent?.grade;
+    
+    // Если нажали на ту же оценку - убираем её
+    const finalGrade = currentGrade === newGrade ? null : newGrade;
+    
+    setChanges(prev => ({
+      ...prev,
+      [studentId]: { 
+        ...prev[studentId],
+        grade: finalGrade 
+      }
     }));
+    
+    setAttendance(prev => prev.map(a => 
+      a.student_id === studentId ? { ...a, grade: finalGrade } : a
+    ));
+  };
+
+  const handleSave = async () => {
+    const changedRecords = Object.entries(changes).map(([studentId, data]) => {
+      const student = attendance.find(a => a.student_id === studentId);
+      return {
+        student_id: studentId,
+        status: data.status !== undefined ? data.status : student?.status || 'unmarked',
+        grade: data.grade !== undefined ? data.grade : student?.grade
+      };
+    });
     
     if (changedRecords.length === 0) {
       onClose();
@@ -90,7 +131,10 @@ export const AttendanceModal = ({
     
     const newChanges = {};
     attendance.forEach(a => {
-      newChanges[a.student_id] = { status };
+      newChanges[a.student_id] = { 
+        ...changes[a.student_id],
+        status 
+      };
     });
     setChanges(newChanges);
     setAttendance(prev => prev.map(a => ({ ...a, status })));
@@ -100,6 +144,9 @@ export const AttendanceModal = ({
 
   const presentCount = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
   const totalCount = attendance.length;
+  
+  // Подсчёт количества выставленных оценок
+  const gradesCount = attendance.filter(a => a.grade !== null && a.grade !== undefined).length;
 
   return (
     <AnimatePresence>
@@ -128,11 +175,21 @@ export const AttendanceModal = ({
                 </button>
                 <h2 className="text-xl font-bold text-white">Отметка посещаемости</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-400">
-                  {presentCount}/{totalCount}
-                </span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-400">
+                    {presentCount}/{totalCount}
+                  </span>
+                </div>
+                {gradesCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm text-yellow-400">
+                      {gradesCount}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -179,10 +236,19 @@ export const AttendanceModal = ({
                           </span>
                         )}
                       </div>
+                      {/* Показываем текущую оценку */}
+                      {student.grade && (
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${GRADE_COLORS[student.grade].bgLight}`}>
+                          <Star className={`w-3 h-3 ${GRADE_COLORS[student.grade].text}`} />
+                          <span className={`text-sm font-bold ${GRADE_COLORS[student.grade].text}`}>
+                            {student.grade}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Status Buttons */}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-3">
                       {STATUSES.map((status) => {
                         const Icon = status.icon;
                         const isSelected = student.status === status.id;
@@ -199,6 +265,32 @@ export const AttendanceModal = ({
                           >
                             <Icon className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">{status.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Grade Buttons */}
+                    <div className="flex gap-2">
+                      <div className="flex items-center gap-1 mr-2">
+                        <Star className="w-4 h-4 text-gray-500" />
+                        <span className="text-xs text-gray-500">Оценка:</span>
+                      </div>
+                      {[5, 4, 3, 2, 1].map((grade) => {
+                        const isSelected = student.grade === grade;
+                        const colors = GRADE_COLORS[grade];
+                        
+                        return (
+                          <button
+                            key={grade}
+                            onClick={() => handleGradeChange(student.student_id, grade)}
+                            className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold transition-all ${
+                              isSelected
+                                ? `${colors.bg} text-white shadow-lg scale-105`
+                                : `bg-white/5 ${colors.text} hover:${colors.bgLight}`
+                            }`}
+                          >
+                            {grade}
                           </button>
                         );
                       })}
