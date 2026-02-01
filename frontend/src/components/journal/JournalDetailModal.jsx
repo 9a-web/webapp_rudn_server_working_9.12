@@ -69,7 +69,8 @@ export const JournalDetailModal = ({
   telegramId, 
   hapticFeedback,
   onJournalUpdated,
-  userSettings
+  userSettings,
+  webApp // Telegram WebApp instance для отправки ссылок
 }) => {
   const [journal, setJournal] = useState(null);
   const [students, setStudents] = useState([]);
@@ -91,6 +92,7 @@ export const JournalDetailModal = ({
   const [showInviteLink, setShowInviteLink] = useState(false);
   const [showEditStudent, setShowEditStudent] = useState(null); // student to edit
   const [showApplications, setShowApplications] = useState(false); // Модал заявок
+  const [showShareStudentLink, setShowShareStudentLink] = useState(false); // Модал отправки ссылки студенту
   const [applicationsCount, setApplicationsCount] = useState(0); // Количество заявок
   const [inviteLink, setInviteLink] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
