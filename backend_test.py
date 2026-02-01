@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Web Sessions System
-Tests the Telegram Profile Link via QR-code functionality
+Backend Testing Suite for Web Sessions System and Friends APIs
+Tests the Telegram Profile Link via QR-code functionality and Friends integration
 """
 
 import requests
@@ -14,10 +14,12 @@ from typing import Dict, Any, Optional
 BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
-class WebSessionTester:
+class BackendTester:
     def __init__(self):
         self.session_token: Optional[str] = None
         self.test_results = []
+        self.test_room_id: Optional[str] = None
+        self.test_journal_id: Optional[str] = None
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
@@ -37,6 +39,8 @@ class WebSessionTester:
         if not success and response_data:
             print(f"   Response: {response_data}")
         print()
+    
+    # ============ Web Sessions Tests ============
     
     def test_create_web_session(self) -> bool:
         """Test POST /api/web-sessions - создание новой сессии"""
