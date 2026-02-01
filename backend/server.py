@@ -7831,6 +7831,25 @@ async def get_journal_sessions(journal_id: str):
                 "status": "absent"
             })
             
+            # Статистика оценок за сессию
+            grades_pipeline = [
+                {"$match": {"session_id": s["session_id"], "grade": {"$ne": None}}},
+                {"$group": {
+                    "_id": None,
+                    "count": {"$sum": 1},
+                    "sum": {"$sum": "$grade"}
+                }}
+            ]
+            grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+            
+            grades_count = 0
+            average_grade = None
+            if grades_result:
+                g = grades_result[0]
+                grades_count = g["count"]
+                if grades_count > 0:
+                    average_grade = round(g["sum"] / grades_count, 2)
+            
             result.append(JournalSessionResponse(
                 session_id=s["session_id"],
                 journal_id=s["journal_id"],
@@ -7843,7 +7862,9 @@ async def get_journal_sessions(journal_id: str):
                 attendance_filled=attendance_filled,
                 total_students=total_students,
                 present_count=present_count,
-                absent_count=absent_count
+                absent_count=absent_count,
+                grades_count=grades_count,
+                average_grade=average_grade
             ))
         
         return result
