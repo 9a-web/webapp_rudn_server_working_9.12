@@ -48,6 +48,11 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
   
   // Listening Room State
   const [listeningRoomModalOpen, setListeningRoomModalOpen] = useState(false);
+  
+  // Уведомляем родительский компонент об изменении состояния модального окна
+  useEffect(() => {
+    onListeningRoomOpenChange?.(listeningRoomModalOpen);
+  }, [listeningRoomModalOpen, onListeningRoomOpenChange]);
 
   // Используем useRef для offset чтобы избежать race conditions
   const offsetRef = useRef(0);
