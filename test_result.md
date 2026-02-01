@@ -149,6 +149,18 @@ backend:
         agent: "main"
         comment: "🔧 Updated POST /api/music/auth/{telegram_id} to accept token_url or access_token instead of login/password. Parses token from OAuth redirect URL, validates via VK API, checks audio access, and saves to MongoDB."
 
+  - task: "Listening Rooms API (Совместное прослушивание музыки)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: All Listening Rooms API endpoints working correctly. Tested all 6 scenarios from review request: 1) POST /api/music/rooms - creates room with success=true, room_id, invite_code, invite_link, 2) POST /api/music/rooms/join/{invite_code} - friend joins successfully with room data and participants, 3) GET /api/music/rooms/{room_id}?telegram_id={id} - returns room data with is_host=true, can_control=true for host, 4) GET /api/music/rooms/user/{telegram_id} - returns user's rooms list with test room present, 5) POST /api/music/rooms/{room_id}/leave?telegram_id={id} - non-host leaves successfully, 6) DELETE /api/music/rooms/{room_id}?telegram_id={id} - host deletes room successfully. All endpoints return proper success responses and handle business logic correctly."
+
 frontend:
   - task: "Telegram Profile Link via QR Code UI"
     implemented: true
