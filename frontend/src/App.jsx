@@ -45,7 +45,7 @@ import { AchievementNotificationContent } from './components/AchievementNotifica
 import { NotificationQueueProvider, useNotificationQueue } from './components/NotificationQueue';
 import { AnimatePresence } from 'framer-motion';
 import { notificationsAPI } from './services/notificationsAPI';
-import { getWebSessionStatus } from './services/webSessionAPI';
+import { getWebSessionStatus, sendHeartbeat } from './services/webSessionAPI';
 import TelegramLinkScreen from './components/TelegramLinkScreen';
 import TelegramLinkConfirmModal from './components/TelegramLinkConfirmModal';
 
