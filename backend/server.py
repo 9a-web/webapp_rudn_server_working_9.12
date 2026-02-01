@@ -8060,6 +8060,7 @@ async def get_session_attendance(session_id: str):
                 "full_name": s["full_name"],
                 "is_linked": s.get("is_linked", False),
                 "status": record["status"] if record else "unmarked",
+                "grade": record.get("grade") if record else None,
                 "reason": record.get("reason") if record else None,
                 "note": record.get("note") if record else None,
                 "marked_at": record.get("marked_at") if record else None
