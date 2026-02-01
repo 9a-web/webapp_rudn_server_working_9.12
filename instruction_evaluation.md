@@ -40,13 +40,16 @@
 - Изучена структура журнала посещаемости
 - Создан план реализации
 - Проверены модели - поле `grade` уже добавлено в AttendanceRecord и AttendanceRecordCreate
+- ✅ Backend: POST /journals/sessions/{session_id}/attendance - сохраняет grade
+- ✅ Backend: GET /journals/sessions/{session_id}/attendance - возвращает grade
+- ✅ Backend: GET /journals/{journal_id}/students - возвращает статистику оценок (average_grade, grades_count, grade_5_count и т.д.)
+- ✅ Backend: GET /journals/{journal_id}/sessions - возвращает grades_count, average_grade
 
 ### 🔄 В процессе:
-- Фаза 1: Backend - обновление endpoints для работы с оценками
+- Фаза 2: Frontend - UI для оценок в AttendanceModal
 
 ### ⏳ Ожидает:
-- Фаза 2: Frontend - UI для оценок
-- Фаза 3: Статистика
+- Фаза 3: Статистика (отображение в UI)
 - Фаза 4: Тестирование
 
 ---
