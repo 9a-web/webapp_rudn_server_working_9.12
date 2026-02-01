@@ -9989,6 +9989,19 @@ async def get_user_listening_rooms(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def serialize_for_json(obj):
+    """
+    Рекурсивно конвертирует datetime объекты в ISO строки для JSON сериализации.
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_json(item) for item in obj]
+    return obj
+
+
 async def broadcast_to_listening_room(room_id: str, message: dict, exclude_user: int = None):
     """
     Отправить сообщение всем участникам комнаты через WebSocket.
@@ -9996,12 +10009,15 @@ async def broadcast_to_listening_room(room_id: str, message: dict, exclude_user:
     if room_id not in listening_room_connections:
         return
     
+    # Сериализуем сообщение для JSON
+    serialized_message = serialize_for_json(message)
+    
     disconnected = []
     for user_id, ws in listening_room_connections[room_id].items():
         if exclude_user and user_id == exclude_user:
             continue
         try:
-            await ws.send_json(message)
+            await ws.send_json(serialized_message)
         except:
             disconnected.append(user_id)
     
