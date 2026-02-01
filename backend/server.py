@@ -8003,6 +8003,7 @@ async def mark_attendance(session_id: str, data: AttendanceBulkCreate):
                     {"id": existing["id"]},
                     {"$set": {
                         "status": record.status,
+                        "grade": record.grade,
                         "reason": record.reason,
                         "note": record.note,
                         "marked_by": data.telegram_id,
@@ -8016,6 +8017,7 @@ async def mark_attendance(session_id: str, data: AttendanceBulkCreate):
                     session_id=session_id,
                     student_id=record.student_id,
                     status=record.status,
+                    grade=record.grade,
                     reason=record.reason,
                     note=record.note,
                     marked_by=data.telegram_id
