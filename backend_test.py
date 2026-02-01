@@ -550,21 +550,21 @@ class BackendTester:
     
     
     def run_all_tests(self):
-        """Run all Device Activity Tracking tests in sequence"""
-        print("🚀 Starting Device Activity Tracking Testing")
+        """Run all Listening Rooms API tests in sequence"""
+        print("🚀 Starting Listening Rooms API Testing")
         print("=" * 50)
         
-        # Device Activity Tracking Tests (from review request scenarios)
-        device_activity_tests = [
-            self.test_create_web_session,                    # 1. Create web session
-            self.test_link_session_with_user,               # 2. Link session with user
-            self.test_check_session_status_updates_last_active,  # 3. Check status (should update last_active)
-            self.test_send_heartbeat,                       # 4. Send heartbeat
-            self.test_get_devices_list_and_check_last_active,   # 5. Get devices list and check last_active
-            self.test_heartbeat_for_invalid_session         # 6. Test heartbeat for non-existent session
+        # Listening Rooms API Tests (from review request scenarios)
+        listening_rooms_tests = [
+            self.test_create_listening_room,        # 1. Create room
+            self.test_join_room_by_code,           # 2. Join by code
+            self.test_get_room_info,               # 3. Get room info
+            self.test_get_user_rooms,              # 4. Get user rooms
+            self.test_leave_room_non_host,         # 5. Leave room (non-host)
+            self.test_delete_room_host             # 6. Delete room (host)
         ]
         
-        all_tests = device_activity_tests
+        all_tests = listening_rooms_tests
         
         passed = 0
         total = len(all_tests)
@@ -581,7 +581,7 @@ class BackendTester:
         print(f"📊 Test Results: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All Device Activity Tracking tests PASSED!")
+            print("🎉 All Listening Rooms API tests PASSED!")
             return True
         else:
             print(f"⚠️  {total - passed} tests FAILED")
