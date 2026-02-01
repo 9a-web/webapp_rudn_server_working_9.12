@@ -283,10 +283,151 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
 };
 
 /**
+ * Создать WebSocket соединение для комнаты
+ */
+export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
+  const backendUrl = getBackendURL();
+  
+  // Формируем WebSocket URL
+  let wsUrl;
+  if (backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1')) {
+    wsUrl = `ws://localhost:8001/api/ws/listening-room/${roomId}/${telegramId}`;
+  } else {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = `${wsProtocol}//${window.location.host}/api/ws/listening-room/${roomId}/${telegramId}`;
+  }
+  
+  console.log('🎵 Connecting to listening room WebSocket:', wsUrl);
+  
+  const ws = new WebSocket(wsUrl);
+  let pingInterval = null;
+  let isClosed = false;
+  
+  ws.onopen = () => {
+    console.log('✅ Listening room WebSocket connected');
+    handlers.onConnected?.();
+    
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'ping' }));
+      }
+    }, 30000);
+  };
+  
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('🎵 Listening room message:', data.event);
+      
+      switch (data.event) {
+        case 'connected':
+          handlers.onStateSync?.(data.state, data.can_control);
+          break;
+        case 'play':
+          handlers.onPlay?.(data.track, data.position, data.triggered_by);
+          break;
+        case 'pause':
+          handlers.onPause?.(data.position, data.triggered_by);
+          break;
+        case 'seek':
+          handlers.onSeek?.(data.position, data.triggered_by);
+          break;
+        case 'track_change':
+          handlers.onTrackChange?.(data.track, data.triggered_by);
+          break;
+        case 'sync_state':
+          handlers.onStateSync?.(data.state);
+          break;
+        case 'user_joined':
+          handlers.onUserJoined?.(data.user);
+          break;
+        case 'user_left':
+        case 'user_disconnected':
+          handlers.onUserLeft?.(data.telegram_id);
+          break;
+        case 'settings_changed':
+          handlers.onSettingsChanged?.(data.settings);
+          break;
+        case 'room_closed':
+          handlers.onRoomClosed?.(data.message);
+          break;
+        case 'error':
+          handlers.onError?.(data.message);
+          break;
+        case 'pong':
+          break;
+        default:
+          console.log('Unknown listening room event:', data.event);
+      }
+    } catch (e) {
+      console.warn('Failed to parse listening room message:', e);
+    }
+  };
+  
+  ws.onerror = (error) => {
+    console.error('❌ Listening room WebSocket error:', error);
+    handlers.onError?.('Ошибка подключения к комнате');
+  };
+  
+  ws.onclose = (event) => {
+    console.log('🔌 Listening room WebSocket closed:', event.code);
+    if (pingInterval) {
+      clearInterval(pingInterval);
+    }
+    if (!isClosed) {
+      handlers.onDisconnected?.();
+    }
+  };
+  
+  return {
+    sendPlay: (track, position = 0) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'play', track, position }));
+      }
+    },
+    
+    sendPause: (position = 0) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'pause', position }));
+      }
+    },
+    
+    sendSeek: (position) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'seek', position }));
+      }
+    },
+    
+    sendTrackChange: (track) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'track_change', track }));
+      }
+    },
+    
+    requestSync: () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'sync_request' }));
+      }
+    },
+    
+    close: () => {
+      isClosed = true;
+      if (pingInterval) clearInterval(pingInterval);
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    },
+    
+    get readyState() {
+      return ws.readyState;
+    }
+  };
+};
+
+/**
  * Создать соединение для комнаты (автоматически выбирает WebSocket или HTTP polling)
  */
 export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
-  // Попробуем WebSocket сначала
   let wsConnection = null;
   let pollingConnection = null;
   let usePolling = false;
@@ -299,12 +440,9 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
     },
     onError: (message) => {
       console.warn('⚠️ WebSocket error, falling back to HTTP polling');
-      // Переключаемся на polling
       if (!usePolling && wsConnection) {
         usePolling = true;
-        try {
-          wsConnection.close();
-        } catch (e) {}
+        try { wsConnection.close(); } catch (e) {}
         
         pollingConnection = createListeningRoomPolling(roomId, telegramId, {
           ...handlers,
@@ -321,14 +459,12 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
   
   wsConnection = createListeningRoomWebSocket(roomId, telegramId, wrappedHandlers);
   
-  // Таймаут для переключения на polling если WebSocket не подключился
+  // Таймаут для переключения на polling
   const fallbackTimeout = setTimeout(() => {
     if (!usePolling && wsConnection.readyState !== WebSocket.OPEN) {
-      console.warn('⚠️ WebSocket connection timeout, falling back to HTTP polling');
+      console.warn('⚠️ WebSocket timeout, falling back to HTTP polling');
       usePolling = true;
-      try {
-        wsConnection.close();
-      } catch (e) {}
+      try { wsConnection.close(); } catch (e) {}
       
       pollingConnection = createListeningRoomPolling(roomId, telegramId, {
         ...handlers,
@@ -378,186 +514,14 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
     },
     close: () => {
       clearTimeout(fallbackTimeout);
-      if (pollingConnection) {
-        pollingConnection.close();
-      }
-      if (wsConnection) {
-        wsConnection.close();
-      }
+      if (pollingConnection) pollingConnection.close();
+      if (wsConnection) wsConnection.close();
     },
     get readyState() {
       if (usePolling && pollingConnection) {
         return pollingConnection.readyState;
       }
       return wsConnection.readyState;
-    }
-  };
-};
-  const backendUrl = getBackendURL();
-  
-  // Формируем WebSocket URL
-  // В production используем тот же хост, что и для HTTP
-  let wsUrl;
-  if (backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1')) {
-    // Локальная разработка
-    wsUrl = `ws://localhost:8001/api/ws/listening-room/${roomId}/${telegramId}`;
-  } else {
-    // Production - используем wss и текущий домен
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    wsUrl = `${wsProtocol}//${window.location.host}/api/ws/listening-room/${roomId}/${telegramId}`;
-  }
-  
-  console.log('🎵 Connecting to listening room WebSocket:', wsUrl);
-  
-  const ws = new WebSocket(wsUrl);
-  let pingInterval = null;
-  let isClosed = false;
-  let reconnectAttempts = 0;
-  const maxReconnectAttempts = 3;
-  
-  ws.onopen = () => {
-    console.log('✅ Listening room WebSocket connected');
-    reconnectAttempts = 0;
-    handlers.onConnected?.();
-    
-    // Периодический ping для поддержания соединения
-    pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ event: 'ping' }));
-      }
-    }, 30000);
-  };
-  
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      console.log('🎵 Listening room message:', data.event);
-      
-      switch (data.event) {
-        case 'connected':
-          handlers.onStateSync?.(data.state, data.can_control);
-          break;
-        case 'play':
-          handlers.onPlay?.(data.track, data.position, data.triggered_by);
-          break;
-        case 'pause':
-          handlers.onPause?.(data.position, data.triggered_by);
-          break;
-        case 'seek':
-          handlers.onSeek?.(data.position, data.triggered_by);
-          break;
-        case 'track_change':
-          handlers.onTrackChange?.(data.track, data.triggered_by);
-          break;
-        case 'sync_state':
-          handlers.onStateSync?.(data.state);
-          break;
-        case 'user_joined':
-          handlers.onUserJoined?.(data.user);
-          break;
-        case 'user_left':
-        case 'user_disconnected':
-          handlers.onUserLeft?.(data.telegram_id);
-          break;
-        case 'settings_changed':
-          handlers.onSettingsChanged?.(data.settings);
-          break;
-        case 'room_closed':
-          handlers.onRoomClosed?.(data.message);
-          break;
-        case 'error':
-          handlers.onError?.(data.message);
-          break;
-        case 'pong':
-          // Ignore pong
-          break;
-        default:
-          console.log('Unknown listening room event:', data.event);
-      }
-    } catch (e) {
-      console.warn('Failed to parse listening room message:', e);
-    }
-  };
-  
-  ws.onerror = (error) => {
-    console.error('❌ Listening room WebSocket error:', error);
-    console.error('WebSocket URL was:', wsUrl);
-    console.error('ReadyState:', ws.readyState);
-    handlers.onError?.('Ошибка подключения к комнате. Попробуйте обновить страницу.');
-  };
-  
-  ws.onclose = (event) => {
-    console.log('🔌 Listening room WebSocket closed:', event.code, event.reason);
-    if (pingInterval) {
-      clearInterval(pingInterval);
-    }
-    if (!isClosed) {
-      handlers.onDisconnected?.();
-    }
-  };
-  
-  return {
-    // Отправить событие воспроизведения
-    sendPlay: (track, position = 0) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          event: 'play',
-          track,
-          position
-        }));
-      }
-    },
-    
-    // Отправить событие паузы
-    sendPause: (position = 0) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          event: 'pause',
-          position
-        }));
-      }
-    },
-    
-    // Отправить событие перемотки
-    sendSeek: (position) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          event: 'seek',
-          position
-        }));
-      }
-    },
-    
-    // Отправить событие смены трека
-    sendTrackChange: (track) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          event: 'track_change',
-          track
-        }));
-      }
-    },
-    
-    // Запросить синхронизацию состояния
-    requestSync: () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ event: 'sync_request' }));
-      }
-    },
-    
-    // Закрыть соединение
-    close: () => {
-      isClosed = true;
-      if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close();
-      }
-    },
-    
-    get readyState() {
-      return ws.readyState;
     }
   };
 };
@@ -570,9 +534,9 @@ export default {
   deleteListeningRoom,
   updateListeningRoomSettings,
   getUserListeningRooms,
-  createListeningRoomWebSocket,
-  createListeningRoomPolling,
-  createListeningRoomConnection,
   getListeningRoomState,
-  syncListeningRoomState
+  syncListeningRoomState,
+  createListeningRoomPolling,
+  createListeningRoomWebSocket,
+  createListeningRoomConnection
 };
