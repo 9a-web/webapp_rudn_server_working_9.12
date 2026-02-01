@@ -45,6 +45,9 @@ export const MusicSection = ({ telegramId }) => {
   const [vkAuthModalOpen, setVkAuthModalOpen] = useState(false);
   const [vkAuthStatus, setVkAuthStatus] = useState(null);
   const [checkingVkAuth, setCheckingVkAuth] = useState(true);
+  
+  // Listening Room State
+  const [listeningRoomModalOpen, setListeningRoomModalOpen] = useState(false);
 
   // Используем useRef для offset чтобы избежать race conditions
   const offsetRef = useRef(0);
