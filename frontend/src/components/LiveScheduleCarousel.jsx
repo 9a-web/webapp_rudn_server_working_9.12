@@ -21,11 +21,13 @@ export const LiveScheduleCarousel = ({
   userAchievements,
   userStats,
   user,
-  schedule
+  schedule,
+  isAchievementsOpen,
+  setIsAchievementsOpen,
+  isAnalyticsOpen,
+  setIsAnalyticsOpen
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   // Рассчитываем статистику для карточки
   const stats = useMemo(() => {
