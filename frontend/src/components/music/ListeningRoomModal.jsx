@@ -218,7 +218,16 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         setIsConnected(false);
       }
     });
-  }, [telegramId, play, pause, seek, hapticFeedback, loadMyRooms]);
+  }, [currentRoom, telegramId, play, pause, seek, hapticFeedback, loadMyRooms]);
+  
+  // Отключиться от синхронизации (но остаться в комнате)
+  const disconnectFromSync = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+  }, []);
   
   // Создание комнаты
   const handleCreateRoom = async () => {
