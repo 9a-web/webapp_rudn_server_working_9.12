@@ -36,11 +36,13 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const [myRooms, setMyRooms] = useState([]);
   const [currentRoom, setCurrentRoom] = useState(null);
   const [canControl, setCanControl] = useState(false);
+  const [isConnected, setIsConnected] = useState(false); // Подключён ли к синхронизации
+  const [onlineCount, setOnlineCount] = useState(0); // Количество онлайн участников
   
-  // Уведомляем родительский компонент об активной комнате
+  // Уведомляем родительский компонент об активной комнате (только когда подключён)
   useEffect(() => {
-    onActiveRoomChange?.(currentRoom);
-  }, [currentRoom, onActiveRoomChange]);
+    onActiveRoomChange?.(isConnected ? currentRoom : null);
+  }, [currentRoom, isConnected, onActiveRoomChange]);
   
   // Состояние создания комнаты
   const [roomName, setRoomName] = useState('Совместное прослушивание');
