@@ -1313,6 +1313,7 @@ const Home = () => {
                   userAchievements={userAchievements}
                   userStats={userStats}
                   user={user}
+                  schedule={schedule}
                 />
               
                 <WeekDaySelector 
