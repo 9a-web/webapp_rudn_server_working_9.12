@@ -827,7 +827,7 @@ const NotificationsTab = () => {
               {/* Тип уведомления */}
               <div>
                 <label className="text-sm text-gray-400 mb-2 block">Тип уведомления</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-4 gap-1.5 sm:gap-2">
                   {NOTIFICATION_TYPES.map((type) => {
                     const Icon = type.icon;
                     const isSelected = notificationType === type.id;
@@ -838,14 +838,14 @@ const NotificationsTab = () => {
                           setNotificationType(type.id);
                           setNotificationCategory(type.category);
                         }}
-                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all ${
+                        className={`flex flex-col items-center gap-1 sm:gap-1.5 p-2 sm:p-3 rounded-xl transition-all ${
                           isSelected
                             ? 'bg-purple-500/30 ring-2 ring-purple-500'
                             : 'bg-white/5 hover:bg-white/10'
                         }`}
                       >
-                        <Icon className={`w-5 h-5 ${isSelected ? 'text-purple-400' : 'text-gray-400'}`} />
-                        <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+                        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isSelected ? 'text-purple-400' : 'text-gray-400'}`} />
+                        <span className={`text-[10px] sm:text-xs leading-tight text-center ${isSelected ? 'text-white' : 'text-gray-400'}`}>
                           {type.label}
                         </span>
                       </button>
