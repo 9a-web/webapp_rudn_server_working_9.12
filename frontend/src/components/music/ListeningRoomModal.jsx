@@ -55,6 +55,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const wsRef = useRef(null);
   const ignoreUntilRef = useRef(0); // Timestamp до которого игнорировать локальные события
   const lastRemoteEventRef = useRef(0); // Timestamp последнего удалённого события
+  const prevProgressRef = useRef(0); // Предыдущая позиция для отслеживания перемотки
+  const seekDebounceRef = useRef(null); // Debounce для отправки seek
   
   // Загрузка комнат пользователя
   const loadMyRooms = useCallback(async () => {
