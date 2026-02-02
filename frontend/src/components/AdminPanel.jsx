@@ -213,14 +213,14 @@ const AdminPanel = ({ isOpen, onClose }) => {
 const TabButton = ({ active, onClick, icon, label }) => (
   <button
     onClick={onClick}
-    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+    className={`flex-shrink-0 flex-1 min-w-[70px] sm:min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
       active 
         ? 'bg-white/10 text-white shadow-sm' 
         : 'text-gray-400 hover:text-white hover:bg-white/5'
     }`}
   >
     {icon}
-    {label}
+    <span className="hidden xs:inline sm:inline">{label}</span>
   </button>
 );
 
