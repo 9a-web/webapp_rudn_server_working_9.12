@@ -606,12 +606,16 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     prevProgressRef.current = progress;
   }, [progress, currentRoom, canControl, isConnected, currentTrack]);
   
-  // Очистка debounce при размонтировании
+  // Очистка debounce и reconnect при размонтировании
   useEffect(() => {
     return () => {
       if (seekDebounceRef.current) {
         clearTimeout(seekDebounceRef.current);
       }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      shouldReconnectRef.current = false;
     };
   }, []);
   
