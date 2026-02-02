@@ -580,12 +580,20 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       return;
     }
     
+    // FIX #7: Игнорируем seek если последний был менее 500мс назад (защита от буферизации)
+    const timeSinceLastSeek = Date.now() - lastSeekTimeRef.current;
+    if (timeSinceLastSeek < 500) {
+      prevProgressRef.current = progress;
+      return;
+    }
+    
     // Определяем разницу позиции
     const progressDiff = Math.abs(progress - prevProgressRef.current);
     
     // Если разница больше 2 секунд - это перемотка (не обычное воспроизведение)
     // Обычное воспроизведение меняет progress примерно на 0.05-0.1 сек за тик
-    const isSeek = progressDiff > 2;
+    // FIX #7: Также проверяем что это не скачок назад на маленькое значение (буферизация)
+    const isSeek = progressDiff > 2 && progressDiff < 300; // Max reasonable seek = 5 min
     
     if (isSeek && currentTrack) {
       console.log('📤 Detected seek:', prevProgressRef.current.toFixed(1), '->', progress.toFixed(1), 'diff:', progressDiff.toFixed(1));
@@ -598,9 +606,10 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       seekDebounceRef.current = setTimeout(() => {
         if (wsRef.current && Date.now() >= ignoreUntilRef.current) {
           console.log('📤 Sending seek event:', progress.toFixed(1));
+          lastSeekTimeRef.current = Date.now(); // Фиксируем время отправки
           wsRef.current.sendSeek(progress);
         }
-      }, 100);
+      }, 150); // Увеличили debounce с 100 до 150мс для лучшей фильтрации
     }
     
     prevProgressRef.current = progress;
