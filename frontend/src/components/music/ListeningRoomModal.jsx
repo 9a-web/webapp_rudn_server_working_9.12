@@ -158,7 +158,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         
         if (track) {
           console.log('🔄 Remote track change:', track.title, 'from:', triggeredBy);
-          ignoreUntilRef.current = Date.now() + 2000;
+          ignoreUntilRef.current = Date.now() + 800;
           lastRemoteEventRef.current = Date.now();
           play(track, [track]);
           hapticFeedback?.('impact', 'medium');
