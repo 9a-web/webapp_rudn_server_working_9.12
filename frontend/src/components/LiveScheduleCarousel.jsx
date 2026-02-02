@@ -468,15 +468,7 @@ export const LiveScheduleCarousel = ({
 
         {/* Вертикальная карусель справа - скрыта на десктопах (md и больше) */}
         <div 
-          className={`flex flex-col items-center gap-3 md:hidden ${
-            currentCard.type === 'weather' 
-              ? 'mt-[44px] pr-[5px] pl-[6px]' 
-              : currentCard.type === 'achievements'
-              ? 'mt-[44px] pr-[10px] pl-[5px]'
-              : currentCard.type === 'stats'
-              ? 'mt-[44px] pr-[10px] pl-[5px]'
-              : 'mt-8 pr-[10px]'
-          }`}
+          className="flex flex-col items-center justify-center gap-3 md:hidden self-center pr-[10px]"
         >
           {/* Кнопка вверх */}
           <motion.button
