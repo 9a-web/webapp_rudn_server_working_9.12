@@ -496,7 +496,7 @@ export const JournalDetailModal = ({
 
                     {/* Students List */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                      <h3 className="text-lg font-semibold text-white">Список студентов</h3>
+                      <h3 className="text-xl font-semibold text-white">Список студентов</h3>
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Кнопка заявок (только для владельца) */}
                         {isOwner && (
