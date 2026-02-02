@@ -352,8 +352,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
               {/* Previous */}
               <button
                 onClick={prev}
-                disabled={queueIndex <= 0 && repeatMode !== 'queue'}
-                className="p-3 text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-3 text-white hover:scale-110 active:scale-95 transition-all text-white/80 hover:text-white"
               >
                 <SkipBack className="w-7 h-7 fill-current" />
               </button>
@@ -376,8 +375,7 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
               {/* Next */}
               <button
                 onClick={next}
-                disabled={(queue.length === 0 || queueIndex >= queue.length - 1) && repeatMode !== 'queue'}
-                className="p-3 text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-3 text-white hover:scale-110 active:scale-95 transition-all text-white/80 hover:text-white"
               >
                 <SkipForward className="w-7 h-7 fill-current" />
               </button>
