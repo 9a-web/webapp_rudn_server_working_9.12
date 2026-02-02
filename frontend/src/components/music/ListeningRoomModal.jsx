@@ -160,7 +160,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       onSeek: (position, triggeredBy) => {
         if (triggeredBy === telegramId) return;
         console.log('⏩ Remote seek:', position);
+        // Игнорируем локальные события на 800мс после удалённого seek
+        ignoreUntilRef.current = Date.now() + 800;
+        lastRemoteEventRef.current = Date.now();
         seek(position);
+        hapticFeedback?.('impact', 'light');
       },
       onTrackChange: (track, triggeredBy) => {
         if (triggeredBy === telegramId) {
