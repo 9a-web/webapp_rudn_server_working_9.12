@@ -82,18 +82,26 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   // Соединение остаётся активным пока пользователь в комнате
   // Закрытие происходит только при реальном выходе из комнаты (handleLeaveRoom)
   
-  // Подключение к комнате через WebSocket
-  const connectToRoom = useCallback((room) => {
+  // Открыть комнату для просмотра (без синхронизации)
+  const openRoom = useCallback((room) => {
+    setCurrentRoom(room);
+    setIsConnected(false);
+    setOnlineCount(room.online_count || 0);
+    setView('room');
+  }, []);
+  
+  // Подключиться к синхронизации комнаты
+  const connectToSync = useCallback(() => {
+    if (!currentRoom) return;
+    
     if (wsRef.current) {
       wsRef.current.close();
     }
     
-    setCurrentRoom(room);
-    setView('room');
-    
-    wsRef.current = createListeningRoomConnection(room.id, telegramId, {
+    wsRef.current = createListeningRoomConnection(currentRoom.id, telegramId, {
       onConnected: () => {
-        console.log('✅ Connected to listening room');
+        console.log('✅ Connected to listening room sync');
+        setIsConnected(true);
         hapticFeedback?.('notification', 'success');
       },
       onStateSync: (state, canCtrl) => {
