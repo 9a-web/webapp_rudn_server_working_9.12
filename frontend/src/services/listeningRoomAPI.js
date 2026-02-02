@@ -326,11 +326,12 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log('🎵 Listening room message:', data.event);
+      console.log('🎵 Listening room message:', data.event, data.online_count !== undefined ? `(online: ${data.online_count})` : '');
       
       switch (data.event) {
         case 'connected':
-          handlers.onStateSync?.(data.state, data.can_control);
+          // Передаём online_count из события connected
+          handlers.onStateSync?.(data.state, data.can_control, data.online_count);
           break;
         case 'play':
           handlers.onPlay?.(data.track, data.position, data.triggered_by);
@@ -348,11 +349,20 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
           handlers.onStateSync?.(data.state);
           break;
         case 'user_joined':
-          handlers.onUserJoined?.(data.user);
+          handlers.onUserJoined?.(data.user, data.participants_count);
+          break;
+        case 'user_connected':
+          // Новое событие - пользователь подключился к sync (не присоединился к комнате)
+          handlers.onOnlineCount?.(data.online_count);
           break;
         case 'user_left':
         case 'user_disconnected':
-          handlers.onUserLeft?.(data.telegram_id);
+          // Передаём online_count с сервера (FIX #4)
+          handlers.onUserLeft?.(data.telegram_id, data.online_count);
+          // Также вызываем onOnlineCount если есть
+          if (data.online_count !== undefined) {
+            handlers.onOnlineCount?.(data.online_count);
+          }
           break;
         case 'settings_changed':
           handlers.onSettingsChanged?.(data.settings);
