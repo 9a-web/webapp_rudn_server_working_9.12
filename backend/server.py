@@ -10357,9 +10357,10 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                 # Запрос синхронизации состояния
                 room = await db.listening_rooms.find_one({"id": room_id})
                 if room:
+                    state_with_actual_position = get_state_with_actual_position(room.get("state", {}))
                     await websocket.send_json({
                         "event": "sync_state",
-                        "state": serialize_for_json(room.get("state", {}))
+                        "state": serialize_for_json(state_with_actual_position)
                     })
                     
             elif event == "ping":
