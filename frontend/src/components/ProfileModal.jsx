@@ -9,6 +9,9 @@ import DevicesModal from './DevicesModal';
 import { friendsAPI } from '../services/friendsAPI';
 import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
 
+// Admin UIDs для доступа к специальным функциям
+const ADMIN_UIDS = ['765963392', '1311283832'];
+
 // Определяем URL backend в зависимости от окружения
 const getBackendURL = () => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
