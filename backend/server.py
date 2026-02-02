@@ -10241,6 +10241,9 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
         listening_room_connections[room_id] = {}
     listening_room_connections[room_id][telegram_id] = websocket
     
+    # Получаем актуальное количество онлайн
+    online_count = len(listening_room_connections[room_id])
+    
     # Отправляем текущее состояние новому участнику
     # Рассчитываем актуальную позицию с учётом времени прошедшего с последнего обновления
     # Это важно для синхронизации - новый участник должен начать с той же позиции что и остальные
@@ -10251,10 +10254,18 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
         "event": "connected",
         "room_id": room_id,
         "can_control": can_control,
-        "state": serialize_for_json(state_with_actual_position)
+        "state": serialize_for_json(state_with_actual_position),
+        "online_count": online_count
     })
     
-    logger.info(f"🎵 WebSocket connected: user {telegram_id} to room {room_id[:8]}...")
+    # Уведомляем остальных участников о новом подключении с актуальным online_count
+    await broadcast_to_listening_room(room_id, {
+        "event": "user_connected",
+        "telegram_id": telegram_id,
+        "online_count": online_count
+    }, exclude_user=telegram_id)
+    
+    logger.info(f"🎵 WebSocket connected: user {telegram_id} to room {room_id[:8]}... (online: {online_count})")
     
     try:
         while True:
