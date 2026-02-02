@@ -102,8 +102,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         // Синхронизируем состояние плеера
         if (state && state.current_track) {
           console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing);
-          // Устанавливаем флаг чтобы не отправить событие обратно
-          ignoreNextSyncRef.current = true;
+          // Игнорируем локальные события на 2 секунды
+          ignoreUntilRef.current = Date.now() + 2000;
           play(state.current_track, [state.current_track]);
           if (state.position > 0) {
             setTimeout(() => seek(state.position), 200);
@@ -114,45 +114,52 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         }
       },
       onPlay: (track, position, triggeredBy) => {
-        // triggeredBy может быть null при HTTP polling
-        if (triggeredBy !== telegramId && triggeredBy !== null) {
-          console.log('🎵 Remote play:', track?.title);
-          // Устанавливаем флаг чтобы не отправить событие обратно
-          ignoreNextSyncRef.current = true;
-          if (track) {
-            play(track, [track]);
-            if (position > 0) {
-              setTimeout(() => seek(position), 200);
-            }
-          }
-          hapticFeedback?.('impact', 'light');
-        } else if (triggeredBy === null && track) {
-          // HTTP polling - проверяем отличается ли от текущего состояния
-          ignoreNextSyncRef.current = true;
+        // Проверяем что это не наше собственное событие
+        if (triggeredBy === telegramId) {
+          console.log('🔇 Ignoring own play event');
+          return;
+        }
+        
+        console.log('🎵 Remote play:', track?.title, 'from:', triggeredBy);
+        // Игнорируем локальные события на 2 секунды
+        ignoreUntilRef.current = Date.now() + 2000;
+        lastRemoteEventRef.current = Date.now();
+        
+        if (track) {
           play(track, [track]);
           if (position > 0) {
             setTimeout(() => seek(position), 200);
           }
         }
+        hapticFeedback?.('impact', 'light');
       },
       onPause: (position, triggeredBy) => {
-        if (triggeredBy !== telegramId) {
-          console.log('⏸️ Remote pause');
-          ignoreNextSyncRef.current = true;
-          pause();
-          hapticFeedback?.('impact', 'light');
+        if (triggeredBy === telegramId) {
+          console.log('🔇 Ignoring own pause event');
+          return;
         }
+        
+        console.log('⏸️ Remote pause from:', triggeredBy);
+        ignoreUntilRef.current = Date.now() + 2000;
+        lastRemoteEventRef.current = Date.now();
+        pause();
+        hapticFeedback?.('impact', 'light');
       },
       onSeek: (position, triggeredBy) => {
-        if (triggeredBy !== telegramId) {
-          console.log('⏩ Remote seek:', position);
-          seek(position);
-        }
+        if (triggeredBy === telegramId) return;
+        console.log('⏩ Remote seek:', position);
+        seek(position);
       },
       onTrackChange: (track, triggeredBy) => {
+        if (triggeredBy === telegramId) {
+          console.log('🔇 Ignoring own track change');
+          return;
+        }
+        
         if (track) {
-          console.log('🔄 Remote track change:', track.title);
-          ignoreNextSyncRef.current = true;
+          console.log('🔄 Remote track change:', track.title, 'from:', triggeredBy);
+          ignoreUntilRef.current = Date.now() + 2000;
+          lastRemoteEventRef.current = Date.now();
           play(track, [track]);
           hapticFeedback?.('impact', 'medium');
         }
