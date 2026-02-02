@@ -462,7 +462,7 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
       console.warn('⚠️ WebSocket error, falling back to HTTP polling');
       if (!usePolling && wsConnection) {
         usePolling = true;
-        try { wsConnection.close(); } catch (e) {}
+        try { wsConnection.close(); } catch (e) { /* ignore close errors */ }
         
         pollingConnection = createListeningRoomPolling(roomId, telegramId, {
           ...handlers,
@@ -484,7 +484,7 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
     if (!usePolling && wsConnection.readyState !== WebSocket.OPEN) {
       console.warn('⚠️ WebSocket timeout, falling back to HTTP polling');
       usePolling = true;
-      try { wsConnection.close(); } catch (e) {}
+      try { wsConnection.close(); } catch (e) { /* ignore close errors */ }
       
       pollingConnection = createListeningRoomPolling(roomId, telegramId, {
         ...handlers,
