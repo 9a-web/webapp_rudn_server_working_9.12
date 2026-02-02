@@ -351,14 +351,12 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   useEffect(() => {
     // Проверяем что мы в комнате и имеем права управления
     if (!wsRef.current || !currentRoom || !canControl) {
-      console.log('🚫 Sync skipped: no connection, room or control rights');
       return;
     }
     
-    // Игнорируем если это событие от другого участника
-    if (ignoreNextSyncRef.current) {
-      console.log('🔇 Sync skipped: ignoring remote event');
-      ignoreNextSyncRef.current = false;
+    // Игнорируем если недавно получили удалённое событие (предотвращает эхо)
+    if (Date.now() < ignoreUntilRef.current) {
+      console.log('🔇 Sync skipped: within ignore window');
       return;
     }
     
@@ -375,7 +373,6 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
     
     if (!currentTrack) {
-      console.log('🚫 Sync skipped: no current track');
       return;
     }
     
@@ -390,14 +387,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     
     // Отправляем соответствующее событие
     if (trackChanged) {
-      console.log('🔄 Sending track change:', trackData.title);
+      console.log('📤 Sending track change:', trackData.title);
       wsRef.current.sendTrackChange(trackData);
     } else if (playStateChanged) {
       if (isPlaying) {
-        console.log('▶️ Sending play event');
+        console.log('📤 Sending play event');
         wsRef.current.sendPlay(trackData, progress);
       } else {
-        console.log('⏸️ Sending pause event');
+        console.log('📤 Sending pause event');
         wsRef.current.sendPause(progress);
       }
     }
