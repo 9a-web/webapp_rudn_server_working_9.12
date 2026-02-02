@@ -38,6 +38,18 @@ backend:
         agent: "main"
         comment: "🔧 Реализован real-time счётчик уведомлений с интервалом 5 секунд. При появлении нового уведомления запускается анимация на 5 секунд: пульсация (3 волны ripple), свечение кнопки и покачивание колокольчика. Добавлен тестовый endpoint POST /api/notifications/test-inapp."
 
+  - task: "Listening Rooms UI Changes (Совместное прослушивание музыки)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/music/ListeningRoomModal.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED: Listening Rooms UI changes successfully implemented. Code review confirms all requested features: 1) Green 'Подключиться' (Connect) button with gradient styling (from-green-500 to-emerald-500) for activating synchronization, 2) Online users count display showing 'X онлайн' in green text with proper formatting, 3) Connection status display showing 'Синхронизация активна' (sync active) vs 'не подключен к синхронизации' (not connected), 4) Header shows 'X подключено / Y участников' format, 5) Participants list shows '(X участников, Y подключено)' format, 6) 'Отключиться от синхронизации' (Disconnect from sync) button appears when connected. All UI elements properly implemented with correct styling and state management. Backend API integration working correctly as confirmed in previous tests."
+
   - task: "Quick Add Friends to Journal API"
     implemented: true
     working: true
