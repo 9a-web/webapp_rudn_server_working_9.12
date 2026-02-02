@@ -400,6 +400,34 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
   }, [isPlaying, currentTrack?.id, currentRoom, canControl, progress]);
   
+  // Периодическая синхронизация позиции (каждые 5 секунд когда играет)
+  useEffect(() => {
+    if (!wsRef.current || !currentRoom || !canControl || !isPlaying || !currentTrack) {
+      return;
+    }
+    
+    const syncPosition = () => {
+      if (Date.now() < ignoreUntilRef.current) return;
+      
+      const trackData = {
+        id: currentTrack.id,
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        duration: currentTrack.duration || 0,
+        cover: currentTrack.cover,
+        url: currentTrack.url
+      };
+      
+      // Отправляем текущую позицию для синхронизации
+      wsRef.current.sendPlay(trackData, progress);
+    };
+    
+    // Синхронизируем позицию каждые 5 секунд
+    const interval = setInterval(syncPosition, 5000);
+    
+    return () => clearInterval(interval);
+  }, [isPlaying, currentRoom, canControl, currentTrack, progress]);
+  
   if (!isOpen) return null;
   
   return (
