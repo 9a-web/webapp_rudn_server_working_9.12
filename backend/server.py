@@ -9593,6 +9593,67 @@ async def get_my_vk_audio(telegram_id: int, count: int = 50, offset: int = 0):
 # Хранилище WebSocket соединений для комнат прослушивания
 listening_room_connections: Dict[str, Dict[int, WebSocket]] = {}  # room_id -> {telegram_id -> websocket}
 
+
+def calculate_actual_position(state: dict) -> float:
+    """
+    Рассчитывает актуальную позицию воспроизведения с учётом времени.
+    
+    Если музыка играет (is_playing=True), то актуальная позиция = 
+    сохранённая позиция + время прошедшее с последнего обновления.
+    
+    Returns:
+        Актуальная позиция в секундах
+    """
+    if not state:
+        return 0
+    
+    position = state.get("position", 0)
+    is_playing = state.get("is_playing", False)
+    updated_at = state.get("updated_at")
+    
+    # Если не играет или нет времени обновления - возвращаем сохранённую позицию
+    if not is_playing or not updated_at:
+        return position
+    
+    # Рассчитываем время прошедшее с последнего обновления
+    try:
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+        
+        now = datetime.utcnow()
+        if updated_at.tzinfo:
+            now = datetime.utcnow().replace(tzinfo=updated_at.tzinfo)
+        
+        elapsed = (now - updated_at.replace(tzinfo=None) if updated_at.tzinfo else now - updated_at).total_seconds()
+        
+        # Ограничиваем elapsed чтобы не уходить слишком далеко (макс 30 секунд drift)
+        elapsed = max(0, min(elapsed, 30))
+        
+        actual_position = position + elapsed
+        
+        # Ограничиваем позицию длительностью трека (если известна)
+        current_track = state.get("current_track")
+        if current_track and current_track.get("duration"):
+            actual_position = min(actual_position, current_track["duration"])
+        
+        return actual_position
+        
+    except Exception as e:
+        logger.warning(f"Error calculating actual position: {e}")
+        return position
+
+
+def get_state_with_actual_position(state: dict) -> dict:
+    """
+    Возвращает копию состояния с актуальной позицией воспроизведения.
+    """
+    if not state:
+        return {}
+    
+    result = dict(state)
+    result["position"] = calculate_actual_position(state)
+    return result
+
 @api_router.post("/music/rooms", response_model=CreateListeningRoomResponse)
 async def create_listening_room(request: CreateListeningRoomRequest):
     """
