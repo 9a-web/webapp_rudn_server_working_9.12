@@ -51,7 +51,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   
   // WebSocket
   const wsRef = useRef(null);
-  const ignoreNextSyncRef = useRef(false);
+  const ignoreUntilRef = useRef(0); // Timestamp до которого игнорировать локальные события
+  const lastRemoteEventRef = useRef(0); // Timestamp последнего удалённого события
   
   // Загрузка комнат пользователя
   const loadMyRooms = useCallback(async () => {
