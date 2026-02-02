@@ -197,18 +197,27 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
       
       // Сравниваем с предыдущим состоянием
       if (lastState) {
-        // Проверяем изменения
-        if (state.is_playing !== lastState.is_playing) {
+        // Проверяем смену трека
+        if (state.current_track?.id !== lastState.current_track?.id) {
+          handlers.onTrackChange?.(state.current_track, null);
+        }
+        // Проверяем изменения play/pause
+        else if (state.is_playing !== lastState.is_playing) {
           if (state.is_playing) {
             handlers.onPlay?.(state.current_track, state.position, null);
           } else {
             handlers.onPause?.(state.position, null);
           }
         }
-        
-        // Проверяем смену трека
-        if (state.current_track?.id !== lastState.current_track?.id) {
-          handlers.onTrackChange?.(state.current_track, null);
+        // Проверяем рассинхронизацию позиции (если разница > 3 секунд)
+        else if (state.is_playing && state.current_track?.id === lastState.current_track?.id) {
+          const positionDiff = Math.abs(state.position - lastState.position);
+          // Если позиция изменилась больше чем на 3 секунды - синхронизируем
+          // (нормальное изменение за 500мс polling = ~0.5 сек)
+          if (positionDiff > 3) {
+            console.log('🔄 Position drift detected:', positionDiff.toFixed(1), 'sec, syncing...');
+            handlers.onSeek?.(state.position, null);
+          }
         }
       } else {
         // Первая синхронизация
