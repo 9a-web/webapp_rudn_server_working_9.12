@@ -209,12 +209,13 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
             handlers.onPause?.(state.position, null);
           }
         }
-        // Проверяем рассинхронизацию позиции (если разница > 3 секунд)
+        // Проверяем рассинхронизацию позиции (если разница > 5 секунд)
+        // FIX #10: Увеличили threshold с 3 до 5 секунд для уменьшения ложных срабатываний
         else if (state.is_playing && state.current_track?.id === lastState.current_track?.id) {
           const positionDiff = Math.abs(state.position - lastState.position);
-          // Если позиция изменилась больше чем на 3 секунды - синхронизируем
-          // (нормальное изменение за 500мс polling = ~0.5 сек)
-          if (positionDiff > 3) {
+          // Ожидаемое изменение за 500мс polling = ~0.5 сек, учитываем возможную задержку сети
+          // 5 секунд достаточно для определения реальной перемотки
+          if (positionDiff > 5) {
             console.log('🔄 Position drift detected:', positionDiff.toFixed(1), 'sec, syncing...');
             handlers.onSeek?.(state.position, null);
           }
