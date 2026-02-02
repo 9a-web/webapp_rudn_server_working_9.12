@@ -100,139 +100,198 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     setView('room');
   }, []);
   
+  // Создаём полный набор handlers для WebSocket (используется и при создании, и при подключении)
+  const createSyncHandlers = useCallback((roomId) => ({
+    onConnected: () => {
+      console.log('✅ Connected to listening room sync');
+      setIsConnected(true);
+      reconnectAttemptRef.current = 0; // Сбрасываем счётчик при успешном подключении
+      hapticFeedback?.('notification', 'success');
+    },
+    onStateSync: (state, canCtrl, onlineCountFromServer) => {
+      if (canCtrl !== undefined) {
+        setCanControl(canCtrl);
+      }
+      
+      // Обновляем online_count с сервера (если передан)
+      if (onlineCountFromServer !== undefined) {
+        setOnlineCount(onlineCountFromServer);
+      }
+      
+      // Синхронизируем состояние плеера
+      if (state && state.current_track) {
+        console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing, 'position:', state.position);
+        // Игнорируем локальные события на 800мс
+        ignoreUntilRef.current = Date.now() + 800;
+        play(state.current_track, [state.current_track]);
+        if (state.position > 0) {
+          setTimeout(() => seek(state.position), 100);
+        }
+        if (!state.is_playing) {
+          setTimeout(() => pause(), 150);
+        }
+      }
+    },
+    onPlay: (track, position, triggeredBy) => {
+      // Проверяем что это не наше собственное событие
+      if (triggeredBy === telegramId) {
+        console.log('🔇 Ignoring own play event');
+        return;
+      }
+      
+      console.log('🎵 Remote play:', track?.title, 'from:', triggeredBy);
+      // Игнорируем локальные события на 800мс
+      ignoreUntilRef.current = Date.now() + 800;
+      lastRemoteEventRef.current = Date.now();
+      
+      if (track) {
+        play(track, [track]);
+        if (position > 0) {
+          setTimeout(() => seek(position), 100);
+        }
+      }
+      hapticFeedback?.('impact', 'light');
+    },
+    onPause: (position, triggeredBy) => {
+      if (triggeredBy === telegramId) {
+        console.log('🔇 Ignoring own pause event');
+        return;
+      }
+      
+      console.log('⏸️ Remote pause from:', triggeredBy);
+      ignoreUntilRef.current = Date.now() + 800;
+      lastRemoteEventRef.current = Date.now();
+      pause();
+      hapticFeedback?.('impact', 'light');
+    },
+    onSeek: (position, triggeredBy) => {
+      if (triggeredBy === telegramId) return;
+      console.log('⏩ Remote seek:', position);
+      // Игнорируем локальные события на 800мс после удалённого seek
+      ignoreUntilRef.current = Date.now() + 800;
+      lastRemoteEventRef.current = Date.now();
+      lastSeekTimeRef.current = Date.now(); // Фиксируем время seek
+      seek(position);
+      hapticFeedback?.('impact', 'light');
+    },
+    onTrackChange: (track, triggeredBy) => {
+      if (triggeredBy === telegramId) {
+        console.log('🔇 Ignoring own track change');
+        return;
+      }
+      
+      if (track) {
+        console.log('🔄 Remote track change:', track.title, 'from:', triggeredBy);
+        ignoreUntilRef.current = Date.now() + 800;
+        lastRemoteEventRef.current = Date.now();
+        play(track, [track]);
+        hapticFeedback?.('impact', 'medium');
+      }
+    },
+    onUserJoined: (newUser, onlineCountFromServer) => {
+      console.log('👤 User joined room:', newUser?.first_name);
+      // Используем online_count с сервера если передан
+      if (onlineCountFromServer !== undefined) {
+        setOnlineCount(onlineCountFromServer);
+      }
+      setCurrentRoom(prev => prev ? {
+        ...prev,
+        participants: [...(prev.participants || []), newUser],
+        participants_count: (prev.participants_count || 0) + 1
+      } : prev);
+      hapticFeedback?.('notification', 'success');
+    },
+    onUserLeft: (leftUserId, onlineCountFromServer) => {
+      console.log('👤 User disconnected:', leftUserId);
+      // Используем online_count с сервера если передан
+      if (onlineCountFromServer !== undefined) {
+        setOnlineCount(onlineCountFromServer);
+      } else {
+        setOnlineCount(prev => Math.max(0, prev - 1));
+      }
+      // НЕ удаляем из participants - пользователь вышел из sync, но всё ещё в комнате
+    },
+    onOnlineCount: (count) => {
+      console.log('📊 Online count updated:', count);
+      setOnlineCount(count);
+    },
+    onSettingsChanged: (settings) => {
+      console.log('⚙️ Settings changed:', settings);
+      setCurrentRoom(prev => prev ? { ...prev, ...settings } : prev);
+    },
+    onRoomClosed: (message) => {
+      console.log('🚪 Room closed:', message);
+      shouldReconnectRef.current = false; // Не пытаемся переподключиться к закрытой комнате
+      hapticFeedback?.('notification', 'warning');
+      setCurrentRoom(null);
+      setIsConnected(false);
+      setView('main');
+      loadMyRooms();
+    },
+    onError: (message) => {
+      console.error('❌ Room error:', message);
+      setError(message);
+      // Не отключаем, если это временная ошибка
+    },
+    onDisconnected: () => {
+      console.log('🔌 Disconnected from room');
+      setIsConnected(false);
+      
+      // Пытаемся переподключиться если это не преднамеренное отключение
+      if (shouldReconnectRef.current && currentRoomIdRef.current) {
+        attemptReconnect(roomId);
+      }
+    }
+  }), [telegramId, play, pause, seek, hapticFeedback, loadMyRooms]);
+  
+  // Функция для reconnect с exponential backoff
+  const attemptReconnect = useCallback((roomId) => {
+    if (!shouldReconnectRef.current) return;
+    if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+      console.log('❌ Max reconnect attempts reached');
+      setError('Не удалось восстановить соединение. Попробуйте переподключиться вручную.');
+      shouldReconnectRef.current = false;
+      return;
+    }
+    
+    reconnectAttemptRef.current += 1;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current - 1), 30000); // max 30 sec
+    
+    console.log(`🔄 Reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttempts} in ${delay}ms`);
+    
+    reconnectTimeoutRef.current = setTimeout(() => {
+      if (!shouldReconnectRef.current) return;
+      
+      console.log('🔄 Attempting reconnect...');
+      
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch (e) {}
+      }
+      
+      wsRef.current = createListeningRoomConnection(roomId, telegramId, createSyncHandlers(roomId));
+    }, delay);
+  }, [telegramId, createSyncHandlers]);
+  
   // Подключиться к синхронизации комнаты
   const connectToSync = useCallback(() => {
     if (!currentRoom) return;
+    
+    // Очищаем предыдущие таймауты
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
     
     if (wsRef.current) {
       wsRef.current.close();
     }
     
-    wsRef.current = createListeningRoomConnection(currentRoom.id, telegramId, {
-      onConnected: () => {
-        console.log('✅ Connected to listening room sync');
-        setIsConnected(true);
-        hapticFeedback?.('notification', 'success');
-      },
-      onStateSync: (state, canCtrl) => {
-        if (canCtrl !== undefined) {
-          setCanControl(canCtrl);
-        }
-        
-        // Синхронизируем состояние плеера
-        if (state && state.current_track) {
-          console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing);
-          // Игнорируем локальные события на 800мс
-          ignoreUntilRef.current = Date.now() + 800;
-          play(state.current_track, [state.current_track]);
-          if (state.position > 0) {
-            setTimeout(() => seek(state.position), 100);
-          }
-          if (!state.is_playing) {
-            setTimeout(() => pause(), 150);
-          }
-        }
-      },
-      onPlay: (track, position, triggeredBy) => {
-        // Проверяем что это не наше собственное событие
-        if (triggeredBy === telegramId) {
-          console.log('🔇 Ignoring own play event');
-          return;
-        }
-        
-        console.log('🎵 Remote play:', track?.title, 'from:', triggeredBy);
-        // Игнорируем локальные события на 800мс
-        ignoreUntilRef.current = Date.now() + 800;
-        lastRemoteEventRef.current = Date.now();
-        
-        if (track) {
-          play(track, [track]);
-          if (position > 0) {
-            setTimeout(() => seek(position), 100);
-          }
-        }
-        hapticFeedback?.('impact', 'light');
-      },
-      onPause: (position, triggeredBy) => {
-        if (triggeredBy === telegramId) {
-          console.log('🔇 Ignoring own pause event');
-          return;
-        }
-        
-        console.log('⏸️ Remote pause from:', triggeredBy);
-        ignoreUntilRef.current = Date.now() + 800;
-        lastRemoteEventRef.current = Date.now();
-        pause();
-        hapticFeedback?.('impact', 'light');
-      },
-      onSeek: (position, triggeredBy) => {
-        if (triggeredBy === telegramId) return;
-        console.log('⏩ Remote seek:', position);
-        // Игнорируем локальные события на 800мс после удалённого seek
-        ignoreUntilRef.current = Date.now() + 800;
-        lastRemoteEventRef.current = Date.now();
-        seek(position);
-        hapticFeedback?.('impact', 'light');
-      },
-      onTrackChange: (track, triggeredBy) => {
-        if (triggeredBy === telegramId) {
-          console.log('🔇 Ignoring own track change');
-          return;
-        }
-        
-        if (track) {
-          console.log('🔄 Remote track change:', track.title, 'from:', triggeredBy);
-          ignoreUntilRef.current = Date.now() + 800;
-          lastRemoteEventRef.current = Date.now();
-          play(track, [track]);
-          hapticFeedback?.('impact', 'medium');
-        }
-      },
-      onUserJoined: (newUser) => {
-        console.log('👤 User connected:', newUser?.first_name);
-        setOnlineCount(prev => prev + 1);
-        setCurrentRoom(prev => prev ? {
-          ...prev,
-          participants: [...(prev.participants || []), newUser],
-          participants_count: (prev.participants_count || 0) + 1
-        } : prev);
-        hapticFeedback?.('notification', 'success');
-      },
-      onUserLeft: (leftUserId) => {
-        console.log('👤 User disconnected:', leftUserId);
-        setOnlineCount(prev => Math.max(0, prev - 1));
-        setCurrentRoom(prev => prev ? {
-          ...prev,
-          participants: (prev.participants || []).filter(p => p.telegram_id !== leftUserId),
-          participants_count: Math.max(0, (prev.participants_count || 1) - 1)
-        } : prev);
-      },
-      onOnlineCount: (count) => {
-        setOnlineCount(count);
-      },
-      onSettingsChanged: (settings) => {
-        console.log('⚙️ Settings changed:', settings);
-        setCurrentRoom(prev => prev ? { ...prev, ...settings } : prev);
-      },
-      onRoomClosed: (message) => {
-        console.log('🚪 Room closed:', message);
-        hapticFeedback?.('notification', 'warning');
-        setCurrentRoom(null);
-        setIsConnected(false);
-        setView('main');
-        loadMyRooms();
-      },
-      onError: (message) => {
-        console.error('❌ Room error:', message);
-        setError(message);
-        setIsConnected(false);
-      },
-      onDisconnected: () => {
-        console.log('🔌 Disconnected from room');
-        setIsConnected(false);
-      }
-    });
-  }, [currentRoom, telegramId, play, pause, seek, hapticFeedback, loadMyRooms]);
+    // Включаем reconnect
+    shouldReconnectRef.current = true;
+    currentRoomIdRef.current = currentRoom.id;
+    reconnectAttemptRef.current = 0;
+    
+    wsRef.current = createListeningRoomConnection(currentRoom.id, telegramId, createSyncHandlers(currentRoom.id));
+  }, [currentRoom, telegramId, createSyncHandlers]);
   
   // Отключиться от синхронизации (но остаться в комнате)
   const disconnectFromSync = useCallback(() => {
