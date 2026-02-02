@@ -1314,6 +1314,10 @@ const Home = () => {
                   userStats={userStats}
                   user={user}
                   schedule={schedule}
+                  isAchievementsOpen={isAchievementsOpen}
+                  setIsAchievementsOpen={setIsAchievementsOpen}
+                  isAnalyticsOpen={isAnalyticsOpen}
+                  setIsAnalyticsOpen={setIsAnalyticsOpen}
                 />
               
                 <WeekDaySelector 
