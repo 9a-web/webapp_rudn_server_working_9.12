@@ -68,6 +68,12 @@ export const ProfileModal = ({
   const [qrData, setQrData] = useState(null);
   const [showDevicesModal, setShowDevicesModal] = useState(false);
 
+  // Проверка на админа
+  const isAdmin = useMemo(() => {
+    if (!user?.id) return false;
+    return ADMIN_UIDS.includes(String(user.id));
+  }, [user?.id]);
+
   // Состояния для связки Telegram профиля
   const [showTelegramLink, setShowTelegramLink] = useState(false);
   const [telegramLinkSession, setTelegramLinkSession] = useState(null);
