@@ -588,7 +588,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                       {myRooms.map(room => (
                         <button
                           key={room.id}
-                          onClick={() => connectToRoom(room)}
+                          onClick={() => openRoom(room)}
                           className="w-full flex items-center gap-3 p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors"
                         >
                           <div className={`p-2 rounded-lg ${room.is_playing ? 'bg-green-500/20' : 'bg-gray-700/50'}`}>
@@ -606,7 +606,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                               )}
                             </div>
                             <p className="text-xs text-gray-400">
-                              {room.participants_count} участник{room.participants_count === 1 ? '' : 'ов'}
+                              <span className="text-green-400">{room.online_count || 0} онлайн</span>
+                              <span className="text-gray-500"> / {room.participants_count} участник{room.participants_count === 1 ? '' : 'ов'}</span>
                               {room.current_track && ` • ${room.current_track.title}`}
                             </p>
                           </div>
