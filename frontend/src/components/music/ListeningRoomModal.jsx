@@ -102,14 +102,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         // Синхронизируем состояние плеера
         if (state && state.current_track) {
           console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing);
-          // Игнорируем локальные события на 2 секунды
-          ignoreUntilRef.current = Date.now() + 2000;
+          // Игнорируем локальные события на 800мс
+          ignoreUntilRef.current = Date.now() + 800;
           play(state.current_track, [state.current_track]);
           if (state.position > 0) {
-            setTimeout(() => seek(state.position), 200);
+            setTimeout(() => seek(state.position), 100);
           }
           if (!state.is_playing) {
-            setTimeout(() => pause(), 300);
+            setTimeout(() => pause(), 150);
           }
         }
       },
