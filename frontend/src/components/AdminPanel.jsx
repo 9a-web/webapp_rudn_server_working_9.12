@@ -145,7 +145,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
               </div>
 
               {/* Navigation Tabs */}
-              <div className="flex p-1 bg-black/20 rounded-xl">
+              <div className="flex p-1 bg-black/20 rounded-xl overflow-x-auto scrollbar-hide">
                 <TabButton 
                   active={activeTab === 'stats'} 
                   onClick={() => setActiveTab('stats')} 
