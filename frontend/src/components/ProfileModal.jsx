@@ -641,8 +641,8 @@ export const ProfileModal = ({
               </div>
             )}
 
-            {/* Подключение ЛК РУДН - только для админов */}
-            {isTelegramUser && isAdmin && (
+            {/* Подключение ЛК РУДН - только для главного админа */}
+            {isTelegramUser && String(user?.id) === '765963392' && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
