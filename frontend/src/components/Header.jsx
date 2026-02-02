@@ -371,8 +371,8 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             )}
           </motion.button>
 
-          {/* Menu button */}
-          <motion.button
+          {/* Menu button - скрыта */}
+          {/* <motion.button
             onClick={handleMenuClick}
             className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative overflow-hidden group"
             style={{
@@ -386,11 +386,10 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             animate="animate"
             variants={headerItemVariants}
           >
-            {/* Gradient glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 via-pink-400/20 to-blue-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             
             <Menu className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
-          </motion.button>
+          </motion.button> */}
 
           {/* Profile button */}
           {user && (
