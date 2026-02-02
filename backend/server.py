@@ -10055,6 +10055,7 @@ async def get_listening_room_state(room_id: str):
     """
     Получить текущее состояние комнаты (для HTTP polling).
     Используется как fallback когда WebSocket недоступен.
+    Возвращает актуальную позицию с учётом времени прошедшего с последнего обновления.
     """
     try:
         room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
@@ -10064,10 +10065,13 @@ async def get_listening_room_state(room_id: str):
         
         state = room.get("state", {})
         
+        # Рассчитываем актуальную позицию
+        actual_position = calculate_actual_position(state)
+        
         return {
             "is_playing": state.get("is_playing", False),
             "current_track": state.get("current_track"),
-            "position": state.get("position", 0),
+            "position": actual_position,
             "updated_at": state.get("updated_at").isoformat() if state.get("updated_at") else None,
             "participants_count": len(room.get("participants", []))
         }
