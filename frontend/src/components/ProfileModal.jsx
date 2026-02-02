@@ -700,8 +700,7 @@ export const ProfileModal = ({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.11 }}
-                className={String(user?.id) === '765963392' ? "w-full mt-3" : "w-full mt-4 pt-4"}
-                style={String(user?.id) === '765963392' ? {} : { borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+                className="w-full mt-3"
               >
                 <button
                   onClick={() => {
