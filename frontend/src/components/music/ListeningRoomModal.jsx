@@ -332,7 +332,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
   };
   
-  // Выход из комнаты
+  // Выход из комнаты (полный выход из списка участников)
   const handleLeaveRoom = async () => {
     if (!currentRoom) return;
     
@@ -346,6 +346,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       }
       
       setCurrentRoom(null);
+      setIsConnected(false);
+      setOnlineCount(0);
       setView('main');
       loadMyRooms();
     } catch (err) {
@@ -354,11 +356,10 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
   };
   
-  // Свернуть комнату (вернуться к списку, но остаться участником и сохранить соединение)
+  // Свернуть комнату (вернуться к списку, сохранить подключение если было)
   const handleMinimizeRoom = () => {
-    // НЕ закрываем соединение - оно остаётся активным для синхронизации
-    // wsRef.current остаётся активным
-    // currentRoom тоже сохраняем для отправки событий
+    // Если подключён - соединение остаётся активным
+    // currentRoom и isConnected сохраняем
     setView('main');
     loadMyRooms();
   };
