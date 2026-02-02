@@ -530,7 +530,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                   </h2>
                   {view === 'room' && currentRoom && (
                     <p className="text-xs text-gray-400">
-                      {currentRoom.participants_count || 1} слушател{currentRoom.participants_count === 1 ? 'ь' : 'ей'}
+                      <span className="text-green-400">{onlineCount} подключено</span>
+                      <span className="text-gray-500"> / {currentRoom.participants_count || 1} участников</span>
                     </p>
                   )}
                 </div>
