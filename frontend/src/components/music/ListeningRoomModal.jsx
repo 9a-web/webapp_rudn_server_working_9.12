@@ -483,6 +483,55 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     return () => clearInterval(interval);
   }, [isPlaying, currentRoom, canControl, currentTrack, progress]);
   
+  // Отслеживание перемотки (seek) и отправка в комнату
+  useEffect(() => {
+    // Проверяем что мы подключены к комнате и имеем права управления
+    if (!wsRef.current || !currentRoom || !canControl || !isConnected) {
+      prevProgressRef.current = progress;
+      return;
+    }
+    
+    // Игнорируем если недавно получили удалённое событие (предотвращает эхо)
+    if (Date.now() < ignoreUntilRef.current) {
+      prevProgressRef.current = progress;
+      return;
+    }
+    
+    // Определяем разницу позиции
+    const progressDiff = Math.abs(progress - prevProgressRef.current);
+    
+    // Если разница больше 2 секунд - это перемотка (не обычное воспроизведение)
+    // Обычное воспроизведение меняет progress примерно на 0.05-0.1 сек за тик
+    const isSeek = progressDiff > 2;
+    
+    if (isSeek && currentTrack) {
+      console.log('📤 Detected seek:', prevProgressRef.current.toFixed(1), '->', progress.toFixed(1), 'diff:', progressDiff.toFixed(1));
+      
+      // Debounce отправки seek (если пользователь быстро двигает слайдер)
+      if (seekDebounceRef.current) {
+        clearTimeout(seekDebounceRef.current);
+      }
+      
+      seekDebounceRef.current = setTimeout(() => {
+        if (wsRef.current && Date.now() >= ignoreUntilRef.current) {
+          console.log('📤 Sending seek event:', progress.toFixed(1));
+          wsRef.current.sendSeek(progress);
+        }
+      }, 100);
+    }
+    
+    prevProgressRef.current = progress;
+  }, [progress, currentRoom, canControl, isConnected, currentTrack]);
+  
+  // Очистка debounce при размонтировании
+  useEffect(() => {
+    return () => {
+      if (seekDebounceRef.current) {
+        clearTimeout(seekDebounceRef.current);
+      }
+    };
+  }, []);
+  
   if (!isOpen) return null;
   
   return (
