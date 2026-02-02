@@ -413,6 +413,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const handleLeaveRoom = async () => {
     if (!currentRoom) return;
     
+    // Отключаем автоматический reconnect перед выходом
+    shouldReconnectRef.current = false;
+    currentRoomIdRef.current = null;
+    
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    
     try {
       await leaveListeningRoom(currentRoom.id, telegramId);
       hapticFeedback?.('notification', 'success');
