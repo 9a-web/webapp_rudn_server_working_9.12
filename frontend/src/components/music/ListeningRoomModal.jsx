@@ -295,6 +295,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   
   // Отключиться от синхронизации (но остаться в комнате)
   const disconnectFromSync = useCallback(() => {
+    // Отключаем автоматический reconnect
+    shouldReconnectRef.current = false;
+    currentRoomIdRef.current = null;
+    
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -334,29 +342,25 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         is_host: true,
         participants_count: 1,
         online_count: 1,
-        control_mode: controlMode
+        control_mode: controlMode,
+        participants: [{
+          telegram_id: telegramId,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          username: user.username
+        }]
       };
       setCurrentRoom(newRoom);
       setView('room');
-      setIsConnected(true);
-      setOnlineCount(1);
+      setCanControl(true); // Хост всегда может управлять
       
-      // Подключаемся к синхронизации после установки currentRoom
+      // Подключаемся к синхронизации с ПОЛНЫМ набором handlers (FIX #2, #3)
+      shouldReconnectRef.current = true;
+      currentRoomIdRef.current = result.room_id;
+      reconnectAttemptRef.current = 0;
+      
       setTimeout(() => {
-        wsRef.current = createListeningRoomConnection(result.room_id, telegramId, {
-          onConnected: () => console.log('✅ Host connected'),
-          onStateSync: (state, canCtrl) => {
-            if (canCtrl !== undefined) setCanControl(canCtrl);
-          },
-          onUserJoined: () => setOnlineCount(prev => prev + 1),
-          onUserLeft: () => setOnlineCount(prev => Math.max(0, prev - 1)),
-          onRoomClosed: () => {
-            setCurrentRoom(null);
-            setIsConnected(false);
-            setView('main');
-          },
-          onDisconnected: () => setIsConnected(false)
-        });
+        wsRef.current = createListeningRoomConnection(result.room_id, telegramId, createSyncHandlers(result.room_id));
       }, 100);
       
     } catch (err) {
