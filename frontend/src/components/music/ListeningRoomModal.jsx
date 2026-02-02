@@ -870,7 +870,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                 <div>
                   <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
                     <Users className="w-4 h-4" />
-                    Слушатели ({currentRoom.participants?.length || currentRoom.participants_count || 1})
+                    Участники комнаты
+                    <span className="text-xs text-gray-500">
+                      ({currentRoom.participants?.length || currentRoom.participants_count || 1} участников, 
+                      <span className="text-green-400 ml-1">{onlineCount} подключено</span>)
+                    </span>
                   </h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {(currentRoom.participants || []).map(participant => (
@@ -878,8 +882,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                         key={participant.telegram_id}
                         className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/30"
                       >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
-                          {participant.first_name?.[0] || '?'}
+                        <div className="relative">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
+                            {participant.first_name?.[0] || '?'}
+                          </div>
+                          {/* Индикатор онлайн статуса - показываем если это текущий пользователь и он подключен */}
+                          {participant.telegram_id === telegramId && isConnected && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-[#1C1C1E]" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-sm truncate">
