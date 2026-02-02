@@ -265,7 +265,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       console.log('🔄 Attempting reconnect...');
       
       if (wsRef.current) {
-        try { wsRef.current.close(); } catch (e) {}
+        try { wsRef.current.close(); } catch (e) { /* ignore close errors */ }
       }
       
       wsRef.current = createListeningRoomConnection(roomId, telegramId, createSyncHandlers(roomId));
