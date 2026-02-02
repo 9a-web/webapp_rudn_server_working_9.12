@@ -175,7 +175,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         }
       },
       onUserJoined: (newUser) => {
-        console.log('👤 User joined:', newUser.first_name);
+        console.log('👤 User connected:', newUser?.first_name);
+        setOnlineCount(prev => prev + 1);
         setCurrentRoom(prev => prev ? {
           ...prev,
           participants: [...(prev.participants || []), newUser],
@@ -184,12 +185,16 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         hapticFeedback?.('notification', 'success');
       },
       onUserLeft: (leftUserId) => {
-        console.log('👤 User left:', leftUserId);
+        console.log('👤 User disconnected:', leftUserId);
+        setOnlineCount(prev => Math.max(0, prev - 1));
         setCurrentRoom(prev => prev ? {
           ...prev,
           participants: (prev.participants || []).filter(p => p.telegram_id !== leftUserId),
           participants_count: Math.max(0, (prev.participants_count || 1) - 1)
         } : prev);
+      },
+      onOnlineCount: (count) => {
+        setOnlineCount(count);
       },
       onSettingsChanged: (settings) => {
         console.log('⚙️ Settings changed:', settings);
@@ -199,15 +204,18 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         console.log('🚪 Room closed:', message);
         hapticFeedback?.('notification', 'warning');
         setCurrentRoom(null);
+        setIsConnected(false);
         setView('main');
         loadMyRooms();
       },
       onError: (message) => {
         console.error('❌ Room error:', message);
         setError(message);
+        setIsConnected(false);
       },
       onDisconnected: () => {
         console.log('🔌 Disconnected from room');
+        setIsConnected(false);
       }
     });
   }, [telegramId, play, pause, seek, hapticFeedback, loadMyRooms]);
