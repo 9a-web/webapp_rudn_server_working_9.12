@@ -121,14 +121,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         }
         
         console.log('🎵 Remote play:', track?.title, 'from:', triggeredBy);
-        // Игнорируем локальные события на 2 секунды
-        ignoreUntilRef.current = Date.now() + 2000;
+        // Игнорируем локальные события на 800мс
+        ignoreUntilRef.current = Date.now() + 800;
         lastRemoteEventRef.current = Date.now();
         
         if (track) {
           play(track, [track]);
           if (position > 0) {
-            setTimeout(() => seek(position), 200);
+            setTimeout(() => seek(position), 100);
           }
         }
         hapticFeedback?.('impact', 'light');
@@ -140,7 +140,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         }
         
         console.log('⏸️ Remote pause from:', triggeredBy);
-        ignoreUntilRef.current = Date.now() + 2000;
+        ignoreUntilRef.current = Date.now() + 800;
         lastRemoteEventRef.current = Date.now();
         pause();
         hapticFeedback?.('impact', 'light');
