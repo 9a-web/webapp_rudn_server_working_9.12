@@ -9631,10 +9631,13 @@ def calculate_actual_position(state: dict) -> float:
         
         actual_position = position + elapsed
         
-        # Ограничиваем позицию длительностью трека (если известна)
+        # Ограничиваем позицию длительностью трека (если известна и валидна)
         current_track = state.get("current_track")
-        if current_track and current_track.get("duration"):
-            actual_position = min(actual_position, current_track["duration"])
+        if current_track:
+            duration = current_track.get("duration")
+            # Проверяем что duration валидный (больше 0)
+            if duration and isinstance(duration, (int, float)) and duration > 0:
+                actual_position = min(actual_position, duration)
         
         return actual_position
         
