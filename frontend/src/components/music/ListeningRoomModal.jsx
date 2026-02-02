@@ -251,8 +251,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       
       hapticFeedback?.('notification', 'success');
       
-      // Подключаемся к созданной комнате
-      connectToRoom({
+      // Открываем созданную комнату и сразу подключаемся
+      const newRoom = {
         id: result.room_id,
         name: roomName,
         invite_code: result.invite_code,
@@ -260,8 +260,31 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         host_id: telegramId,
         is_host: true,
         participants_count: 1,
+        online_count: 1,
         control_mode: controlMode
-      });
+      };
+      setCurrentRoom(newRoom);
+      setView('room');
+      setIsConnected(true);
+      setOnlineCount(1);
+      
+      // Подключаемся к синхронизации после установки currentRoom
+      setTimeout(() => {
+        wsRef.current = createListeningRoomConnection(result.room_id, telegramId, {
+          onConnected: () => console.log('✅ Host connected'),
+          onStateSync: (state, canCtrl) => {
+            if (canCtrl !== undefined) setCanControl(canCtrl);
+          },
+          onUserJoined: () => setOnlineCount(prev => prev + 1),
+          onUserLeft: () => setOnlineCount(prev => Math.max(0, prev - 1)),
+          onRoomClosed: () => {
+            setCurrentRoom(null);
+            setIsConnected(false);
+            setView('main');
+          },
+          onDisconnected: () => setIsConnected(false)
+        });
+      }, 100);
       
     } catch (err) {
       console.error('Create room error:', err);
