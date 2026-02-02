@@ -736,8 +736,57 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
             {/* Room View */}
             {view === 'room' && currentRoom && (
               <div className="space-y-4">
+                {/* Connection Status & Button */}
+                <div className={`p-4 rounded-2xl ${isConnected 
+                  ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30' 
+                  : 'bg-gradient-to-br from-gray-700/30 to-gray-800/30 border border-gray-600/30'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {isConnected ? (
+                        <>
+                          <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+                          <span className="text-green-400 font-medium">Синхронизация активна</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-3 h-3 rounded-full bg-gray-500" />
+                          <span className="text-gray-400 font-medium">Не подключен к синхронизации</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">
+                      <Users className="w-3 h-3" />
+                      {onlineCount} онлайн
+                    </div>
+                  </div>
+                  
+                  {!isConnected ? (
+                    <button
+                      onClick={connectToSync}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium flex items-center justify-center gap-2 hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg shadow-green-500/20"
+                    >
+                      <Radio className="w-5 h-5" />
+                      Подключиться
+                    </button>
+                  ) : (
+                    <button
+                      onClick={disconnectFromSync}
+                      className="w-full py-2.5 rounded-xl bg-gray-700/50 text-gray-300 text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-700 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      Отключиться от синхронизации
+                    </button>
+                  )}
+                  
+                  {!isConnected && (
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Подключитесь для синхронного прослушивания музыки с другими участниками
+                    </p>
+                  )}
+                </div>
+                
                 {/* Current Track */}
-                {currentTrack && (
+                {currentTrack && isConnected && (
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden">
@@ -770,7 +819,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                   </div>
                 )}
                 
-                {!currentTrack && (
+                {!currentTrack && isConnected && (
                   <div className="p-6 rounded-2xl bg-gray-800/30 border border-gray-700/30 text-center">
                     <Music className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                     <p className="text-gray-400">Выберите трек для прослушивания</p>
