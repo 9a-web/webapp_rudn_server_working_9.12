@@ -502,9 +502,9 @@ export const JournalDetailModal = ({
                         {isOwner && (
                           <button
                             onClick={() => setShowApplications(true)}
-                            className="relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-xs sm:text-sm hover:bg-orange-500/30 transition-colors"
+                            className="relative flex items-center gap-1.5 px-3 py-2 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-sm hover:bg-orange-500/30 transition-colors"
                           >
-                            <Inbox className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <Inbox className="w-4 h-4" />
                             <span>Заявки</span>
                             {applicationsCount > 0 && (
                               <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
@@ -517,9 +517,9 @@ export const JournalDetailModal = ({
                         {isOwner && unlinkedStudents.length > 0 && (
                           <button
                             onClick={() => setShowShareStudentLink(true)}
-                            className="relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-xs sm:text-sm hover:bg-blue-500/30 transition-colors"
+                            className="relative flex items-center gap-1.5 px-3 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-sm hover:bg-blue-500/30 transition-colors"
                           >
-                            <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <Send className="w-4 h-4" />
                             <span>Привязать</span>
                             <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
                               {unlinkedStudents.length}
@@ -558,9 +558,9 @@ export const JournalDetailModal = ({
                           )}
                           <button
                             onClick={() => setShowAddStudents(true)}
-                            className={`relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-xs sm:text-sm text-white`}
+                            className={`relative flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
                           >
-                            <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <UserPlus className="w-4 h-4" />
                             <span>Добавить</span>
                           </button>
                         </div>
