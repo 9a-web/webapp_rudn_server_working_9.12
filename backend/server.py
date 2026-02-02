@@ -10379,10 +10379,14 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
         if room_id in listening_room_connections and telegram_id in listening_room_connections[room_id]:
             del listening_room_connections[room_id][telegram_id]
             
-            # Уведомляем остальных об отключении
+            # Получаем актуальное количество онлайн
+            online_count = len(listening_room_connections.get(room_id, {}))
+            
+            # Уведомляем остальных об отключении и актуальном online_count
             await broadcast_to_listening_room(room_id, {
                 "event": "user_disconnected",
-                "telegram_id": telegram_id
+                "telegram_id": telegram_id,
+                "online_count": online_count
             })
 
 
