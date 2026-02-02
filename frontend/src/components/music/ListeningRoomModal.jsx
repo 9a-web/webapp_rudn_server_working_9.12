@@ -295,7 +295,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
   };
   
-  // Присоединение к комнате
+  // Присоединение к комнате (добавление в список участников)
   const handleJoinRoom = async () => {
     if (!telegramId || !user || !inviteCode.trim()) return;
     
@@ -313,9 +313,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       
       if (result.success && result.room) {
         hapticFeedback?.('notification', 'success');
-        connectToRoom({
+        // Открываем комнату для просмотра (без синхронизации)
+        openRoom({
           ...result.room,
-          is_host: result.room.host_id === telegramId
+          is_host: result.room.host_id === telegramId,
+          online_count: result.room.online_count || 0
         });
       } else {
         setError(result.message || 'Не удалось присоединиться');
