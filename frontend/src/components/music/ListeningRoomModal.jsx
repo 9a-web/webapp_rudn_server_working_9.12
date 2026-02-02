@@ -908,16 +908,18 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                 </div>
                 
                 {/* Controls Info */}
-                <div className="p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
-                  <p className="text-xs text-gray-400">
-                    {canControl 
-                      ? '✅ Вы можете управлять воспроизведением'
-                      : '🔒 Управление только у хоста комнаты'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    💡 Нажмите ← чтобы свернуть, вы останетесь в комнате
-                  </p>
-                </div>
+                {isConnected && (
+                  <div className="p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
+                    <p className="text-xs text-gray-400">
+                      {canControl 
+                        ? '✅ Вы можете управлять воспроизведением'
+                        : '🔒 Управление только у хоста комнаты'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Нажмите ← чтобы свернуть, вы останетесь подключены к комнате
+                    </p>
+                  </div>
+                )}
                 
                 {/* Leave Button */}
                 <button
