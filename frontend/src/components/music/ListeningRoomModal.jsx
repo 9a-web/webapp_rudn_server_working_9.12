@@ -57,6 +57,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const lastRemoteEventRef = useRef(0); // Timestamp последнего удалённого события
   const prevProgressRef = useRef(0); // Предыдущая позиция для отслеживания перемотки
   const seekDebounceRef = useRef(null); // Debounce для отправки seek
+  const lastSeekTimeRef = useRef(0); // Время последнего seek для предотвращения ложных срабатываний
+  
+  // Reconnect логика
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimeoutRef = useRef(null);
+  const maxReconnectAttempts = 10;
+  const shouldReconnectRef = useRef(false);
+  const currentRoomIdRef = useRef(null); // Сохраняем room_id для reconnect
   
   // Загрузка комнат пользователя
   const loadMyRooms = useCallback(async () => {
