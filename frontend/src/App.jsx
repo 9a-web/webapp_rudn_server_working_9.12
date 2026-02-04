@@ -688,6 +688,21 @@ const Home = () => {
     }
   }, [schedule]);
 
+  // Загрузка syncedUser из localStorage при старте (для QR синхронизации)
+  useEffect(() => {
+    const savedSyncedUser = localStorage.getItem('synced_user');
+    if (savedSyncedUser && !user) {
+      try {
+        const parsedUser = JSON.parse(savedSyncedUser);
+        console.log('📱 Загружены данные синхронизированного пользователя из localStorage');
+        setSyncedUser(parsedUser);
+      } catch (e) {
+        console.error('Ошибка парсинга synced_user:', e);
+        localStorage.removeItem('synced_user');
+      }
+    }
+  }, [user]);
+
   const loadUserData = useCallback(async () => {
     try {
       setLoading(true);
