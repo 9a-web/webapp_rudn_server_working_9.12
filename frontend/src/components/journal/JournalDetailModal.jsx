@@ -347,6 +347,42 @@ export const JournalDetailModal = ({
     }
   };
 
+  // Удаление журнала (только для владельца)
+  const handleDeleteJournal = async () => {
+    try {
+      setActionLoading(true);
+      hapticFeedback?.('medium');
+      await deleteJournal(journalId, telegramId);
+      hapticFeedback?.('success');
+      setShowDeleteConfirm(false);
+      onJournalUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting journal:', error);
+      hapticFeedback?.('error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Выход из журнала (для студентов)
+  const handleLeaveJournal = async () => {
+    try {
+      setActionLoading(true);
+      hapticFeedback?.('medium');
+      await leaveJournal(journalId, telegramId);
+      hapticFeedback?.('success');
+      setShowLeaveConfirm(false);
+      onJournalUpdated?.();
+      onClose();
+    } catch (error) {
+      console.error('Error leaving journal:', error);
+      hapticFeedback?.('error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const gradient = journal ? COLORS[journal.color] || COLORS.purple : COLORS.purple;
