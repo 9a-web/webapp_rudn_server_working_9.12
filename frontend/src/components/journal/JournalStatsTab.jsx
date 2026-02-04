@@ -519,16 +519,9 @@ export const JournalStatsTab = ({
                 />
                 <Bar 
                   dataKey="attendance" 
-                  fill="url(#attendanceGradient)" 
-                  radius={[0, 4, 4, 0]}
+                  shape={<HeatmapBar />}
                   barSize={20}
                 />
-                <defs>
-                  <linearGradient id="attendanceGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#a855f7" />
-                    <stop offset="100%" stopColor="#ec4899" />
-                  </linearGradient>
-                </defs>
               </BarChart>
             </ResponsiveContainer>
           </div>
