@@ -710,8 +710,9 @@ const Home = () => {
   }, [user, syncedUser]);
 
   const loadUserData = useCallback(async () => {
-    // Используем effectiveUser (user из Telegram или syncedUser из QR)
-    const currentUser = user || syncedUser;
+    // Используем effectiveUser (syncedUser из QR имеет приоритет над user из Telegram)
+    // Важно: syncedUser содержит is_linked: true после синхронизации через QR
+    const currentUser = syncedUser || user;
     if (!currentUser) {
       console.log('No user available for loadUserData');
       setLoading(false);
