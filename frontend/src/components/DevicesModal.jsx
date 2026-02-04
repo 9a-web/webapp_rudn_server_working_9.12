@@ -13,8 +13,9 @@ import {
   Trash2, QrCode, Loader2, AlertCircle, 
   CheckCircle, Clock, RefreshCw, Camera, LogOut
 } from 'lucide-react';
-import { getUserDevices, revokeDevice, revokeAllDevices, linkWebSession } from '../services/webSessionAPI';
+import { getUserDevices, revokeDevice, revokeAllDevices } from '../services/webSessionAPI';
 import { useTelegram } from '../contexts/TelegramContext';
+import TelegramLinkConfirmModal from './TelegramLinkConfirmModal';
 
 const DevicesModal = ({ isOpen, onClose, user }) => {
   const { hapticFeedback, webApp } = useTelegram();
@@ -26,6 +27,10 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
   const [scanningQR, setScanningQR] = useState(false);
   const [linkStatus, setLinkStatus] = useState(null); // null, 'linking', 'success', 'error'
   const [linkMessage, setLinkMessage] = useState('');
+  
+  // Состояние для модального окна подтверждения связки
+  const [showLinkConfirm, setShowLinkConfirm] = useState(false);
+  const [pendingSessionToken, setPendingSessionToken] = useState(null);
 
   // Получаем текущий session_token из localStorage
   const currentSessionToken = localStorage.getItem('session_token');
