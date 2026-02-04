@@ -389,16 +389,38 @@ const TelegramLinkScreen = ({ onLinked }) => {
                 exit={{ opacity: 0 }}
                 className="flex flex-col items-center justify-center py-12"
               >
+                {/* Аватар с галочкой */}
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", delay: 0.1 }}
-                  className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-4"
+                  className="relative w-24 h-24 mb-4"
                 >
-                  <CheckCircle className="w-10 h-10 text-green-500" />
+                  {scannedUser?.photo_url ? (
+                    <img 
+                      src={scannedUser.photo_url} 
+                      alt={scannedUser?.first_name}
+                      className="w-24 h-24 rounded-full object-cover ring-4 ring-green-500/30"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center ring-4 ring-green-500/30">
+                      <span className="text-3xl font-bold text-white">
+                        {(scannedUser?.first_name || 'U')[0]}
+                      </span>
+                    </div>
+                  )}
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", delay: 0.3 }}
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg"
+                  >
+                    <CheckCircle className="w-6 h-6 text-white" />
+                  </motion.div>
                 </motion.div>
-                <h2 className="text-xl font-bold text-white mb-2">
-                  Профиль подключен!
+                
+                <h2 className="text-xl font-bold text-white mb-1">
+                  {scannedUser?.first_name ? `Привет, ${scannedUser.first_name}!` : 'Профиль подключен!'}
                 </h2>
                 <p className="text-gray-400 text-sm">
                   Загрузка приложения...
