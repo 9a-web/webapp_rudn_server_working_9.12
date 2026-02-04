@@ -597,7 +597,8 @@ const Home = () => {
   const [linkInviteProcessed, setLinkInviteProcessed] = useState(false);
   useEffect(() => {
     const processLinkInvite = async () => {
-      if (!startParam || linkInviteProcessed || !user) {
+      const currentUser = user || syncedUser;
+      if (!startParam || linkInviteProcessed || !currentUser) {
         return;
       }
       
@@ -633,10 +634,10 @@ const Home = () => {
       setLinkInviteProcessed(true);
     };
     
-    if (isReady && user && startParam) {
+    if (isReady && (user || syncedUser) && startParam) {
       processLinkInvite();
     }
-  }, [isReady, user, startParam, linkInviteProcessed]);
+  }, [isReady, user, syncedUser, startParam, linkInviteProcessed]);
 
   // Обработка приглашения в комнату прослушивания (startapp=listen_{invite_code})
   const [listenInviteProcessed, setListenInviteProcessed] = useState(false);
