@@ -1064,11 +1064,11 @@ const Home = () => {
       showAlert(t('common.groupSelected', { groupName: groupData.group_name }));
 
       // Отслеживаем выбор группы для достижений
-      if (user) {
+      if (effectiveUser) {
         try {
-          const result = await achievementsAPI.trackAction(user.id, 'select_group');
+          const result = await achievementsAPI.trackAction(effectiveUser.id, 'select_group');
           // Также отслеживаем просмотр группы
-          await achievementsAPI.trackAction(user.id, 'view_group', { group_id: groupData.group_id });
+          await achievementsAPI.trackAction(effectiveUser.id, 'view_group', { group_id: groupData.group_id });
           
           if (result.new_achievements && result.new_achievements.length > 0) {
             showAchievementInQueue(result.new_achievements[0]);
@@ -1089,9 +1089,9 @@ const Home = () => {
     setIsCalendarOpen(true);
     
     // Отслеживаем открытие календаря
-    if (user) {
+    if (effectiveUser) {
       try {
-        const result = await achievementsAPI.trackAction(user.id, 'open_calendar');
+        const result = await achievementsAPI.trackAction(effectiveUser.id, 'open_calendar');
         if (result.new_achievements && result.new_achievements.length > 0) {
           showAchievementInQueue(result.new_achievements[0]);
           loadAchievementsData();
