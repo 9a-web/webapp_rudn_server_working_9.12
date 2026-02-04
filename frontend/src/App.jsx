@@ -368,7 +368,7 @@ const Home = () => {
   // 🔗 Обработка реферального кода из Web App ссылки
   useEffect(() => {
     const processReferral = async () => {
-      const currentUser = user || syncedUser;
+      const currentUser = syncedUser || user;
       // Проверяем условия: есть startParam, начинается с ref_, не обработан ещё
       if (!startParam || !startParam.startsWith('ref_') || referralProcessed || !currentUser) {
         return;
@@ -413,7 +413,7 @@ const Home = () => {
   // 📚 Обработка приглашения в журнал из Web App ссылки
   useEffect(() => {
     const processJournalInvite = async () => {
-      const currentUser = user || syncedUser;
+      const currentUser = syncedUser || user;
       // Проверяем условия: есть startParam, начинается с journal_ или jstudent_, не обработан ещё
       if (!startParam || journalInviteProcessed || !currentUser) {
         return;
@@ -478,7 +478,7 @@ const Home = () => {
   // 🚪 Обработка приглашения в комнату из Web App ссылки
   useEffect(() => {
     const processRoomInvite = async () => {
-      const currentUser = user || syncedUser;
+      const currentUser = syncedUser || user;
       // Проверяем условия: есть startParam, содержит room_, не обработан ещё
       if (!startParam || roomInviteProcessed || !currentUser) {
         return;
@@ -545,7 +545,7 @@ const Home = () => {
   const [friendInviteProcessed, setFriendInviteProcessed] = useState(false);
   useEffect(() => {
     const processFriendInvite = async () => {
-      const currentUser = user || syncedUser;
+      const currentUser = syncedUser || user;
       if (!startParam || friendInviteProcessed || !currentUser) {
         return;
       }
@@ -597,7 +597,7 @@ const Home = () => {
   const [linkInviteProcessed, setLinkInviteProcessed] = useState(false);
   useEffect(() => {
     const processLinkInvite = async () => {
-      const currentUser = user || syncedUser;
+      const currentUser = syncedUser || user;
       if (!startParam || linkInviteProcessed || !currentUser) {
         return;
       }
@@ -943,7 +943,7 @@ const Home = () => {
 
   // Загрузка данных достижений
   const loadAchievementsData = async () => {
-    const currentUser = user || syncedUser;
+    const currentUser = syncedUser || user;
     if (!currentUser) return;
     
     try {
@@ -963,7 +963,7 @@ const Home = () => {
 
   // Отслеживание достижений по времени
   const trackTimeBasedAchievements = async () => {
-    const currentUser = user || syncedUser;
+    const currentUser = syncedUser || user;
     if (!currentUser) return;
     
     const hour = new Date().getHours();
@@ -1002,7 +1002,7 @@ const Home = () => {
 
   // Отслеживание просмотра расписания
   const trackScheduleView = async () => {
-    const currentUser = user || syncedUser;
+    const currentUser = syncedUser || user;
     if (!currentUser || !userSettings) return;
     
     try {
@@ -1058,7 +1058,7 @@ const Home = () => {
   }, [schedule]);
 
   const handleGroupSelected = async (groupData) => {
-    const currentUser = user || syncedUser;
+    const currentUser = syncedUser || user;
     try {
       hapticFeedback('impact', 'medium');
       
