@@ -111,6 +111,7 @@ export const MyAttendanceStats = ({
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllRecords, setShowAllRecords] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState(null); // Выбранный предмет для просмотра оценок
 
   useEffect(() => {
     const loadStats = async () => {
