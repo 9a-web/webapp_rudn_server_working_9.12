@@ -14,7 +14,6 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
   const [status, setStatus] = useState('confirm'); // confirm, loading, success, error
   const [error, setError] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
-  const [photoLoading, setPhotoLoading] = useState(false);
 
   // Загружаем фото профиля при открытии
   useEffect(() => {
