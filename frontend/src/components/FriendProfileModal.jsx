@@ -413,7 +413,7 @@ const FriendProfileModal = ({
                   </div>
 
                   {/* Контент расписания */}
-                  {scheduleLoading ? (
+                  {scheduleLoading || (!schedule && activeTab === 'schedule') ? (
                     <div className="flex justify-center py-8">
                       <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
                     </div>
