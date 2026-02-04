@@ -967,6 +967,237 @@ export const JournalStatsTab = ({
         telegramId={telegramId}
         hapticFeedback={hapticFeedback}
       />
+
+      {/* Модал статистики студента */}
+      <AnimatePresence>
+        {selectedStudent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+            onClick={closeStudentModal}
+          >
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-[#1C1C1E] rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className={`bg-gradient-to-br ${gradient} p-4`}>
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={closeStudentModal}
+                    className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+                <h2 className="text-xl font-bold text-white">{selectedStudent.fullName}</h2>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className={`text-sm font-medium px-2 py-1 rounded-lg ${
+                    selectedStudent.attendance >= 80 ? 'bg-green-500/20 text-green-300' :
+                    selectedStudent.attendance >= 60 ? 'bg-yellow-500/20 text-yellow-300' : 'bg-red-500/20 text-red-300'
+                  }`}>
+                    {selectedStudent.attendance}% посещ.
+                  </span>
+                  {selectedStudent.averageGrade && (
+                    <span className="text-white/80 text-sm flex items-center gap-1">
+                      <Star className="w-4 h-4" />
+                      <span className="font-bold">{selectedStudent.averageGrade.toFixed(2)}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 overflow-y-auto max-h-[70vh]">
+                {loadingStudentStats ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  </div>
+                ) : studentStats ? (
+                  <div className="space-y-4">
+                    {/* Краткая статистика */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="bg-green-500/10 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-green-400">{studentStats.present_count}</p>
+                        <p className="text-xs text-gray-400">Был</p>
+                      </div>
+                      <div className="bg-red-500/10 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-red-400">{studentStats.absent_count}</p>
+                        <p className="text-xs text-gray-400">Пропуск</p>
+                      </div>
+                      <div className="bg-yellow-500/10 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-yellow-400">{studentStats.late_count}</p>
+                        <p className="text-xs text-gray-400">Опозд.</p>
+                      </div>
+                      <div className="bg-gray-500/10 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-gray-400">{studentStats.excused_count}</p>
+                        <p className="text-xs text-gray-400">Ув.</p>
+                      </div>
+                    </div>
+
+                    {/* Стрик */}
+                    <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                          <Trophy className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{studentStats.current_streak} пар подряд</p>
+                          <p className="text-xs text-gray-400">Лучший: {studentStats.best_streak}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Оценки */}
+                    {studentStats.grades_count > 0 && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Star className="w-5 h-5 text-amber-400" />
+                            <span className="text-white font-medium">Оценки</span>
+                          </div>
+                          <span className={`text-xl font-bold ${
+                            studentStats.average_grade >= 4.5 ? 'text-green-400' :
+                            studentStats.average_grade >= 3.5 ? 'text-lime-400' :
+                            studentStats.average_grade >= 2.5 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {studentStats.average_grade?.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          {studentStats.grade_5_count > 0 && (
+                            <div className="flex-1 bg-green-500 rounded-lg p-2 text-center">
+                              <p className="font-bold text-white">{studentStats.grade_5_count}</p>
+                              <p className="text-xs text-white/70">пятёрок</p>
+                            </div>
+                          )}
+                          {studentStats.grade_4_count > 0 && (
+                            <div className="flex-1 bg-lime-500 rounded-lg p-2 text-center">
+                              <p className="font-bold text-white">{studentStats.grade_4_count}</p>
+                              <p className="text-xs text-white/70">четвёрок</p>
+                            </div>
+                          )}
+                          {studentStats.grade_3_count > 0 && (
+                            <div className="flex-1 bg-yellow-500 rounded-lg p-2 text-center">
+                              <p className="font-bold text-white">{studentStats.grade_3_count}</p>
+                              <p className="text-xs text-white/70">троек</p>
+                            </div>
+                          )}
+                          {studentStats.grade_2_count > 0 && (
+                            <div className="flex-1 bg-red-500 rounded-lg p-2 text-center">
+                              <p className="font-bold text-white">{studentStats.grade_2_count}</p>
+                              <p className="text-xs text-white/70">двоек</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* По предметам */}
+                    {studentStats.subjects_stats && studentStats.subjects_stats.length > 0 && (
+                      <div className="bg-white/5 rounded-xl p-4">
+                        <h3 className="text-sm font-medium text-white mb-3">По предметам</h3>
+                        <div className="space-y-2">
+                          {studentStats.subjects_stats.map((subject, index) => (
+                            <div
+                              key={subject.subject_id}
+                              className="flex items-center justify-between p-2 rounded-lg bg-white/5"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <BookOpen className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                <span className="text-white text-sm truncate">{subject.subject_name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`text-xs font-medium ${
+                                  subject.attendance_percent >= 80 ? 'text-green-400' :
+                                  subject.attendance_percent >= 60 ? 'text-yellow-400' : 'text-red-400'
+                                }`}>
+                                  {subject.attendance_percent}%
+                                </span>
+                                {subject.average_grade && (
+                                  <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                                    <Star className="w-3 h-3" />
+                                    {subject.average_grade.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Последние занятия */}
+                    {studentStats.records && studentStats.records.length > 0 && (
+                      <div className="bg-white/5 rounded-xl p-4">
+                        <h3 className="text-sm font-medium text-white mb-3">Последние занятия</h3>
+                        <div className="space-y-1">
+                          {studentStats.records.slice(0, 10).map((record, index) => {
+                            const statusColors = {
+                              present: 'bg-green-500/20 text-green-400',
+                              absent: 'bg-red-500/20 text-red-400',
+                              late: 'bg-yellow-500/20 text-yellow-400',
+                              excused: 'bg-gray-500/20 text-gray-400',
+                              unmarked: 'bg-gray-700/20 text-gray-500'
+                            };
+                            const statusLabels = {
+                              present: '✓',
+                              absent: '✗',
+                              late: '⏰',
+                              excused: 'У',
+                              unmarked: '—'
+                            };
+                            return (
+                              <div
+                                key={record.session_id}
+                                className="flex items-center justify-between p-2 rounded-lg bg-white/5"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`w-6 h-6 rounded flex items-center justify-center text-xs ${statusColors[record.status]}`}>
+                                    {statusLabels[record.status]}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-white text-sm truncate">{record.title}</p>
+                                    <p className="text-xs text-gray-500">{record.subject_name}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {record.grade && (
+                                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                      record.grade >= 4 ? 'bg-green-500/20 text-green-400' :
+                                      record.grade >= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                                    }`}>
+                                      {record.grade}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(record.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-10">
+                    <AlertCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">Не удалось загрузить статистику</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
