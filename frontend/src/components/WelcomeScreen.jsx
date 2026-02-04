@@ -54,10 +54,15 @@ const WelcomeScreen = ({ onGetStarted, onSyncComplete }) => {
           if (hapticFeedback) {
             hapticFeedback('notification', 'success');
           }
-          // Через 2 секунды закрываем модал и переходим дальше
+          // Через 2 секунды закрываем модал и обрабатываем синхронизацию
           setTimeout(() => {
             setShowQRModal(false);
-            onGetStarted();
+            // Если есть данные пользователя с настройками - передаём их
+            if (onSyncComplete && data) {
+              onSyncComplete(data);
+            } else {
+              onGetStarted();
+            }
           }, 2000);
         },
         onRejected: () => {
