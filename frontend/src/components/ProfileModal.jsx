@@ -459,8 +459,8 @@ export const ProfileModal = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay с затемнением - скрываем когда открыто окно устройств */}
-          {!showDevicesModal && (
+          {/* Overlay с затемнением - скрываем когда открыто окно устройств или настроек */}
+          {!showDevicesModal && !showProfileSettings && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -472,8 +472,8 @@ export const ProfileModal = ({
             />
           )}
 
-          {/* Модальное окно профиля - скрываем когда открыто окно устройств */}
-          {!showDevicesModal && (
+          {/* Модальное окно профиля - скрываем когда открыто окно устройств или настроек */}
+          {!showDevicesModal && !showProfileSettings && (
             <motion.div
               ref={modalRef}
               initial={{ opacity: 0, scale: 0.85, y: -10 }}
