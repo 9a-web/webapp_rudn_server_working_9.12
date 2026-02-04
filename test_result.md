@@ -34,6 +34,42 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ GET /api/web-sessions/user/{telegram_id}/devices endpoint working correctly. Returns proper DevicesListResponse with devices array and total count. Handles empty device list correctly for admin user 765963392."
+  
+  - task: "Test Privacy Settings API - Get Privacy Settings"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/profile/765963392/privacy endpoint working correctly. Returns proper PrivacySettings with all required boolean fields (show_online_status, show_in_search, show_friends_list, show_achievements, show_schedule)."
+  
+  - task: "Test Privacy Settings API - Update Privacy Settings"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PUT /api/profile/765963392/privacy endpoint working correctly. Successfully updates privacy settings with specified values (show_online_status: false, show_in_search: true, show_friends_list: false, show_achievements: true, show_schedule: false) and returns updated settings."
+  
+  - task: "Test Privacy Settings API - Verify Settings Persistence"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ Privacy settings persistence verified. GET /api/profile/765963392/privacy after PUT correctly returns the updated values, confirming that settings are properly saved to database."
 
 frontend:
   # No frontend testing required for this review request
