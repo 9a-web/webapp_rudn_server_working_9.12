@@ -837,4 +837,195 @@ export const PlannerTimeline = ({
   );
 };
 
+// Полноэкранная версия Timeline планировщика
+export const FullscreenPlannerTimeline = ({ 
+  events = [], 
+  onToggleComplete, 
+  onDelete,
+  onEdit,
+  onQuickCreate,
+  onMarkSkipped,
+  onTimeChange,
+  hapticFeedback,
+  currentDate 
+}) => {
+  const timelineRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Обновление текущего времени каждую минуту
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Автопрокрутка к текущему времени или первому событию
+  useEffect(() => {
+    if (timelineRef.current) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      
+      if (events.length > 0) {
+        const firstEventTime = Math.min(...events.map(e => parseTime(e.time_start)));
+        const scrollTarget = Math.max(0, (firstEventTime / 60 - 1)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      } else {
+        const scrollTarget = Math.max(0, (currentMinutes / 60 - 2)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      }
+    }
+  }, [events]);
+  
+  // Вычисление позиции текущего времени
+  const currentTimePosition = useMemo(() => {
+    const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    return (minutes / 60) * HOUR_HEIGHT;
+  }, [currentTime]);
+  
+  // Проверка, является ли сегодняшний день выбранным
+  const isToday = useMemo(() => {
+    if (!currentDate) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return currentDate === today;
+  }, [currentDate]);
+  
+  // Обработка наложения событий
+  const processedEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => parseTime(a.time_start) - parseTime(b.time_start));
+    const result = [];
+    
+    sorted.forEach(event => {
+      const startMinutes = parseTime(event.time_start);
+      const endMinutes = parseTime(event.time_end) || startMinutes + 60;
+      
+      const overlapping = result.filter(e => {
+        const eStart = parseTime(e.time_start);
+        const eEnd = parseTime(e.time_end) || eStart + 60;
+        return startMinutes < eEnd && endMinutes > eStart;
+      });
+      
+      const overlapGroup = overlapping.length > 0 ? overlapping[0].overlapGroup : result.length;
+      const overlapIndex = overlapping.length;
+      
+      result.push({
+        ...event,
+        overlapGroup,
+        overlapIndex,
+        startMinutes,
+        endMinutes,
+      });
+    });
+    
+    const groups = {};
+    result.forEach(e => {
+      if (!groups[e.overlapGroup]) groups[e.overlapGroup] = [];
+      groups[e.overlapGroup].push(e);
+    });
+    
+    return result.map(e => ({
+      ...e,
+      totalOverlaps: groups[e.overlapGroup].length,
+      isOverlapping: groups[e.overlapGroup].length > 1,
+    }));
+  }, [events]);
+
+  return (
+    <div 
+      ref={timelineRef}
+      className="relative overflow-y-auto h-full"
+    >
+      <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
+        {/* Часовые линии */}
+        {HOURS.map((hour) => (
+          <div
+            key={hour}
+            className="absolute left-0 right-0 flex border-t border-gray-200/70 group"
+            style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+            onClick={(e) => {
+              if (onQuickCreate) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const clickY = e.clientY - rect.top;
+                const minutesOffset = Math.floor((clickY / HOUR_HEIGHT) * 60);
+                const totalMinutes = hour * 60 + minutesOffset;
+                const roundedMinutes = Math.round(totalMinutes / 15) * 15;
+                const endMinutes = roundedMinutes + 60;
+                
+                hapticFeedback && hapticFeedback('impact', 'light');
+                onQuickCreate(formatMinutesToTime(roundedMinutes), formatMinutesToTime(endMinutes));
+              }
+            }}
+          >
+            <div className="w-16 flex-shrink-0 pr-3 -mt-2.5">
+              <span className="text-sm text-gray-400 font-medium">
+                {formatHour(hour)}
+              </span>
+            </div>
+            <div className={`flex-1 border-l border-gray-100 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
+          </div>
+        ))}
+        
+        {/* Индикатор текущего времени */}
+        {isToday && events.length > 0 && (
+          <div
+            className="absolute left-16 right-0 z-20 flex items-center"
+            style={{ top: `${currentTimePosition}px` }}
+          >
+            <div className="w-3 h-3 bg-red-500 rounded-full -ml-1.5 shadow-md" />
+            <div className="flex-1 h-0.5 bg-red-500 shadow-sm" />
+          </div>
+        )}
+        
+        {/* События */}
+        <div className="absolute left-16 right-0 top-0 bottom-0 pr-4">
+          <AnimatePresence>
+            {processedEvents.map((event) => {
+              const top = (event.startMinutes / 60) * HOUR_HEIGHT;
+              const height = Math.max(
+                ((event.endMinutes - event.startMinutes) / 60) * HOUR_HEIGHT,
+                40
+              );
+              
+              return (
+                <TimelineEventCard
+                  key={event.id}
+                  event={event}
+                  style={{ top: `${top}px`, height: `${height}px` }}
+                  onToggleComplete={onToggleComplete}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  onMarkSkipped={onMarkSkipped}
+                  onTimeChange={onTimeChange}
+                  hapticFeedback={hapticFeedback}
+                  isOverlapping={event.isOverlapping}
+                  overlapIndex={event.overlapIndex}
+                  totalOverlaps={event.totalOverlaps}
+                  hourHeight={HOUR_HEIGHT}
+                />
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+      
+      {/* Пустое состояние */}
+      {events.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+          <div className="text-center py-8">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-10 h-10 text-gray-400" />
+            </div>
+            <p className="text-gray-500 font-medium">
+              Нет событий на этот день
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              Нажмите на время или + чтобы добавить
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default PlannerTimeline;
