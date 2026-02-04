@@ -441,16 +441,36 @@ export const JournalDetailModal = ({
               >
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
-              {isOwner && (
-                <div className="flex gap-2">
+              <div className="flex gap-2">
+                {/* Кнопка выхода для студентов (не владельцев) */}
+                {!isOwner && (isLinked || pendingMembers.some(m => m.telegram_id === telegramId)) && (
                   <button
-                    onClick={handleGenerateInviteLink}
-                    className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                    onClick={() => setShowLeaveConfirm(true)}
+                    className="p-2 rounded-full bg-black/20 backdrop-blur-sm hover:bg-red-500/30 transition-colors"
+                    title="Выйти из журнала"
                   >
-                    <Share2 className="w-5 h-5 text-white" />
+                    <LogOut className="w-5 h-5 text-white" />
                   </button>
-                </div>
-              )}
+                )}
+                {/* Кнопки владельца */}
+                {isOwner && (
+                  <>
+                    <button
+                      onClick={handleGenerateInviteLink}
+                      className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                    >
+                      <Share2 className="w-5 h-5 text-white" />
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="p-2 rounded-full bg-black/20 backdrop-blur-sm hover:bg-red-500/30 transition-colors"
+                      title="Удалить журнал"
+                    >
+                      <Trash2 className="w-5 h-5 text-white" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             
             {journal && (
