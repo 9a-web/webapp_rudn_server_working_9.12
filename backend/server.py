@@ -701,6 +701,60 @@ async def delete_user_account(telegram_id: int):
             ]
         })
         
+        # 13. Удаляем веб-сессии (привязанные устройства)
+        # Сначала закрываем активные WebSocket соединения
+        sessions = await db.web_sessions.find({"telegram_id": telegram_id}).to_list(length=100)
+        for session in sessions:
+            session_token = session.get("session_token")
+            if session_token and session_token in web_session_connections:
+                try:
+                    ws = web_session_connections[session_token]
+                    await ws.send_json({"event": "revoked", "message": "Аккаунт удалён"})
+                    await ws.close()
+                except:
+                    pass
+                finally:
+                    if session_token in web_session_connections:
+                        del web_session_connections[session_token]
+        
+        result = await db.web_sessions.delete_many({"telegram_id": telegram_id})
+        deleted_counts["web_sessions"] = result.deleted_count
+        
+        # 14. Удаляем VK токены
+        result = await db.user_vk_tokens.delete_many({"telegram_id": telegram_id})
+        deleted_counts["vk_tokens"] = result.deleted_count
+        
+        # 15. Удаляем избранные треки
+        result = await db.music_favorites.delete_many({"telegram_id": telegram_id})
+        deleted_counts["music_favorites"] = result.deleted_count
+        
+        # 16. Удаляем уведомления
+        await db.scheduled_notifications.delete_many({"telegram_id": telegram_id})
+        await db.notification_history.delete_many({"telegram_id": telegram_id})
+        await db.in_app_notifications.delete_many({"telegram_id": telegram_id})
+        
+        # 17. Удаляем друзей и запросы в друзья
+        await db.friends.delete_many({
+            "$or": [
+                {"user_id": telegram_id},
+                {"friend_id": telegram_id}
+            ]
+        })
+        await db.friend_requests.delete_many({
+            "$or": [
+                {"from_user_id": telegram_id},
+                {"to_user_id": telegram_id}
+            ]
+        })
+        
+        # 18. Удаляем блокировки
+        await db.user_blocks.delete_many({
+            "$or": [
+                {"blocker_id": telegram_id},
+                {"blocked_id": telegram_id}
+            ]
+        })
+        
         logger.info(f"✅ Аккаунт пользователя {telegram_id} полностью удален. Статистика: {deleted_counts}")
         
         return SuccessResponse(
