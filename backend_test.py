@@ -16,9 +16,9 @@ API_BASE = f"{BACKEND_URL}/api"
 
 class BackendTester:
     def __init__(self):
-        self.session_token: Optional[str] = None
         self.test_results = []
         self.admin_telegram_id = 765963392  # Admin telegram_id from review request
+        self.original_privacy_settings = None  # Store original settings to restore later
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
