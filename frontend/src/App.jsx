@@ -470,16 +470,17 @@ const Home = () => {
       }
     };
     
-    if (isReady && user && startParam) {
+    if (isReady && (user || syncedUser) && startParam) {
       processJournalInvite();
     }
-  }, [isReady, user, startParam, journalInviteProcessed]);
+  }, [isReady, user, syncedUser, startParam, journalInviteProcessed]);
 
   // 🚪 Обработка приглашения в комнату из Web App ссылки
   useEffect(() => {
     const processRoomInvite = async () => {
+      const currentUser = user || syncedUser;
       // Проверяем условия: есть startParam, содержит room_, не обработан ещё
-      if (!startParam || roomInviteProcessed || !user) {
+      if (!startParam || roomInviteProcessed || !currentUser) {
         return;
       }
       
@@ -502,9 +503,9 @@ const Home = () => {
       
       try {
         const result = await joinRoomByToken(inviteToken, {
-          telegram_id: user.id,
-          username: user.username,
-          first_name: user.first_name,
+          telegram_id: currentUser.id,
+          username: currentUser.username,
+          first_name: currentUser.first_name,
           referral_code: referralCode
         });
         
