@@ -585,6 +585,29 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
+   * Изменить время события (после перетаскивания)
+   */
+  const handleEventTimeChange = async (event, newStartTime, newEndTime) => {
+    if (!user?.id || !event?.id) return;
+    
+    try {
+      hapticFeedback && hapticFeedback('notification', 'success');
+      
+      // Обновляем событие через API
+      await plannerAPI.updateEvent(event.id, {
+        time_start: newStartTime,
+        time_end: newEndTime
+      });
+      
+      // Перезагружаем события
+      await loadPlannerEvents(tasksSelectedDate);
+    } catch (error) {
+      console.error('Error updating event time:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+    }
+  };
+
+  /**
    * Открыть модальное окно редактирования события
    */
   const handleEditEvent = (event) => {
