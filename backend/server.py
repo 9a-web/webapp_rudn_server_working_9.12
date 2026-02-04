@@ -8381,7 +8381,15 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
             "current_streak": current_streak,
             "best_streak": best_streak,
             "subjects_stats": subjects_list,  # Статистика по предметам
-            "records": attendance_records
+            "records": attendance_records,
+            # Статистика по оценкам
+            "average_grade": average_grade,
+            "grades_count": grades_count,
+            "grade_5_count": grade_5_count,
+            "grade_4_count": grade_4_count,
+            "grade_3_count": grade_3_count,
+            "grade_2_count": grade_2_count,
+            "grade_1_count": grade_1_count
         }
     except HTTPException:
         raise
