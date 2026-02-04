@@ -9,7 +9,7 @@ import {
 /**
  * Timeline-вид планировщика с часами слева
  * События отображаются как блоки на временной шкале
- * Поддерживает: просмотр, редактирование, удаление, быстрое создание
+ * Поддерживает: просмотр, редактирование, удаление, быстрое создание, перетаскивание
  */
 
 const HOUR_HEIGHT = 60; // Высота одного часа в пикселях
@@ -42,17 +42,100 @@ const TimelineEventCard = ({
   onDelete,
   onEdit,
   onMarkSkipped,
+  onTimeChange,
   hapticFeedback,
   isOverlapping,
   overlapIndex,
-  totalOverlaps
+  totalOverlaps,
+  timelineRef,
+  hourHeight
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const longPressTimer = useRef(null);
+  const startY = useRef(0);
+  const cardRef = useRef(null);
   
   const isScheduleEvent = event.origin === 'schedule';
   const isCompleted = event.completed;
   const isSkipped = event.skipped;
   const isUserEvent = event.origin === 'user';
+  
+  // Long press для активации перетаскивания
+  const handlePointerDown = (e) => {
+    if (isScheduleEvent) return; // Не перетаскиваем события из расписания
+    
+    startY.current = e.clientY;
+    
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+    
+    longPressTimer.current = setTimeout(() => {
+      setIsDragging(true);
+      if (hapticFeedback) {
+        hapticFeedback('impact', 'heavy');
+      }
+    }, 500);
+  };
+  
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    
+    const deltaY = e.clientY - startY.current;
+    setDragOffset(deltaY);
+  };
+  
+  const handlePointerUp = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    
+    if (isDragging && onTimeChange) {
+      // Вычисляем новое время на основе смещения
+      const minutesDelta = Math.round(dragOffset / (hourHeight / 60));
+      const currentStartMinutes = parseTime(event.time_start);
+      const currentEndMinutes = parseTime(event.time_end);
+      const duration = currentEndMinutes - currentStartMinutes;
+      
+      let newStartMinutes = currentStartMinutes + minutesDelta;
+      // Ограничиваем в пределах дня
+      newStartMinutes = Math.max(0, Math.min(24 * 60 - duration, newStartMinutes));
+      // Округляем до 5 минут
+      newStartMinutes = Math.round(newStartMinutes / 5) * 5;
+      
+      const newEndMinutes = newStartMinutes + duration;
+      
+      const newStartTime = formatMinutesToTime(newStartMinutes);
+      const newEndTime = formatMinutesToTime(newEndMinutes);
+      
+      if (newStartTime !== event.time_start) {
+        onTimeChange(event, newStartTime, newEndTime);
+      }
+    }
+    
+    setIsDragging(false);
+    setDragOffset(0);
+  };
+  
+  const handlePointerCancel = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    setIsDragging(false);
+    setDragOffset(0);
+  };
+  
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
   
   // Цвета в зависимости от типа события
   const getEventColors = () => {
