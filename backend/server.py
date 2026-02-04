@@ -12592,6 +12592,10 @@ async def startup_event():
             bot_application.add_handler(CommandHandler("users", users_command))
             bot_application.add_handler(CommandHandler("clear_db", clear_db_command))
             
+            # Регистрируем обработчик callback_query для inline-кнопок устройств
+            from telegram_bot import handle_revoke_device_callback
+            bot_application.add_handler(CallbackQueryHandler(handle_revoke_device_callback, pattern=r"^revoke_device_"))
+            
             # Запускаем бота в фоне
             async def start_bot():
                 await bot_application.initialize()
