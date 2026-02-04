@@ -12778,29 +12778,6 @@ async def revoke_all_devices(telegram_id: int):
         logger.error(f"Revoke all devices error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@api_router.post("/web-sessions/{session_token}/heartbeat")
-async def session_heartbeat(session_token: str):
-    """
-    Обновить время последней активности сессии.
-    Вызывается периодически с клиента.
-    """
-    try:
-        result = await db.web_sessions.update_one(
-            {"session_token": session_token, "status": WebSessionStatus.LINKED.value},
-            {"$set": {"last_active": datetime.utcnow()}}
-        )
-        
-        if result.modified_count > 0:
-            return {"success": True}
-        else:
-            return {"success": False, "message": "Сессия не найдена"}
-        
-    except Exception as e:
-        logger.error(f"Session heartbeat error: {e}")
-        return {"success": False, "message": str(e)}
-
-
 # Include the router in the main app
 app.include_router(api_router)
 
