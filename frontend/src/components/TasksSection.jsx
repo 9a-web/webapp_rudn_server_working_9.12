@@ -2282,29 +2282,29 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             className="fixed inset-0 z-[9998] bg-white"
           >
             {/* Шапка */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-shrink">
                 <button
                   onClick={() => setIsFullscreenPlannerOpen(false)}
-                  className="p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors"
+                  className="p-1.5 -ml-1 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
                 >
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
-                <div>
-                  <h2 className="font-semibold text-gray-900">Планировщик</h2>
-                  <p className="text-xs text-gray-500">
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-gray-900 text-sm">Планировщик</h2>
+                  <p className="text-xs text-gray-500 truncate">
                     {tasksSelectedDate.toLocaleDateString('ru-RU', { 
-                      weekday: 'long', 
+                      weekday: 'short', 
                       day: 'numeric', 
-                      month: 'long' 
+                      month: 'short' 
                     })}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 {plannerEvents.length > 0 && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                    {plannerEvents.length} {plannerEvents.length === 1 ? 'событие' : plannerEvents.length < 5 ? 'события' : 'событий'}
+                  <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap">
+                    {plannerEvents.length} {plannerEvents.length === 1 ? 'соб.' : 'соб.'}
                   </span>
                 )}
                 <button
