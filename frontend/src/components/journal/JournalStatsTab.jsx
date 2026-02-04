@@ -1041,19 +1041,6 @@ export const JournalStatsTab = ({
                       </div>
                     </div>
 
-                    {/* Стрик */}
-                    <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                          <Trophy className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">{studentStats.current_streak} пар подряд</p>
-                          <p className="text-xs text-gray-400">Лучший: {studentStats.best_streak}</p>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Оценки */}
                     {studentStats.grades_count > 0 && (
                       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
@@ -1132,6 +1119,19 @@ export const JournalStatsTab = ({
                         </div>
                       </div>
                     )}
+
+                    {/* Стрик */}
+                    <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                          <Trophy className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{studentStats.current_streak} пар подряд</p>
+                          <p className="text-xs text-gray-400">Лучший: {studentStats.best_streak}</p>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Последние занятия */}
                     {studentStats.records && studentStats.records.length > 0 && (
