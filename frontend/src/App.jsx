@@ -1563,21 +1563,21 @@ const Home = () => {
           />
         </Suspense>
 
-        {user && (
+        {effectiveUser && (
           <Suspense fallback={null}>
             <NotificationsPanel
               isOpen={isNotificationsPanelOpen}
               onClose={handleNotificationsPanelClose}
-              telegramId={user.id}
+              telegramId={effectiveUser.id}
               hapticFeedback={hapticFeedback}
             />
           </Suspense>
         )}
 
-        {user && (
+        {effectiveUser && (
           <Suspense fallback={null}>
             <NotificationSettings
-              telegramId={user.id}
+              telegramId={effectiveUser.id}
               onClose={() => setIsNotificationSettingsOpen(false)}
               hapticFeedback={hapticFeedback}
               showAlert={showAlert}
@@ -1586,7 +1586,7 @@ const Home = () => {
           </Suspense>
         )}
 
-        {user && (
+        {effectiveUser && (
           <Suspense fallback={null}>
             <AchievementsModal
               isOpen={isAchievementsOpen}
