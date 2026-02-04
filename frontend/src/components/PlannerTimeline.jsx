@@ -149,7 +149,9 @@ const TimelineEventCard = ({
   const handlePointerCancel = (e) => {
     try {
       e.target.releasePointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch (err) {
+      // Ignore - pointer may not be captured
+    }
     
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
