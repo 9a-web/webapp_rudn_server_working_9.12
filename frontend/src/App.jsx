@@ -791,10 +791,9 @@ const Home = () => {
             console.warn('⚠️ Не удалось синхронизировать настройки:', syncError);
           }
         } else if (isLinkedUser) {
-          // Связанный Telegram пользователь, но настроек нет - показываем выбор группы
-          // НЕ очищаем localStorage - пользователь уже авторизован через Telegram
-          console.log('Linked user without settings - showing group selector');
-          setShowGroupSelector(true);
+          // Связанный Telegram пользователь, но настроек нет - показываем Welcome Screen
+          console.log('Linked user without settings - showing welcome screen');
+          setShowWelcomeScreen(true);
         } else {
           // Гостевой пользователь - показываем welcome screen
           setShowWelcomeScreen(true);
@@ -827,14 +826,9 @@ const Home = () => {
       
       // Если пользователь не найден (404)
       if (err.message === 'Пользователь не найден') {
-        if (isLinkedUser) {
-          // Связанный пользователь без настроек - показываем выбор группы
-          console.log('Linked user not found - showing group selector');
-          setShowGroupSelector(true);
-        } else {
-          // Гостевой пользователь - показываем welcome screen
-          setShowWelcomeScreen(true);
-        }
+        // Показываем Welcome Screen для всех новых пользователей
+        console.log('User not found - showing welcome screen');
+        setShowWelcomeScreen(true);
       } else {
         setError(err.message);
       }
