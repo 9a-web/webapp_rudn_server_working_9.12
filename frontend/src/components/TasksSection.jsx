@@ -10,7 +10,7 @@ import { PrepareForLectureModal } from './PrepareForLectureModal';
 import { CreateEventModal } from './CreateEventModal';
 import { EditEventModal } from './EditEventModal';
 import { PlannerEventCard } from './PlannerEventCard';
-import { PlannerTimeline } from './PlannerTimeline';
+import { PlannerTimeline, FullscreenPlannerTimeline } from './PlannerTimeline';
 import { WeekDateSelector } from './WeekDateSelector';
 import { tasksCompleteConfetti } from '../utils/confetti';
 import { GroupTaskCard } from './GroupTaskCard';
