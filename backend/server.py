@@ -12286,6 +12286,37 @@ async def get_user_devices(telegram_id: int, current_token: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/web-sessions/{session_token}/notify-revoked")
+async def notify_session_revoked(session_token: str):
+    """
+    Уведомить веб-клиент о том, что сессия была отозвана.
+    Вызывается из telegram_bot при удалении через inline-кнопку.
+    """
+    try:
+        # Отправляем через WebSocket
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "revoked",
+                    "message": "Сессия отключена"
+                })
+                logger.info(f"🔌 Revoked notification sent for session {session_token[:8]}...")
+                # Закрываем соединение
+                await ws.close()
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+            finally:
+                if session_token in web_session_connections:
+                    del web_session_connections[session_token]
+        
+        return {"success": True, "message": "Уведомление отправлено"}
+        
+    except Exception as e:
+        logger.error(f"Notify revoked error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/web-sessions/{session_token}/heartbeat")
 async def session_heartbeat(session_token: str):
     """
