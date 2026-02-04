@@ -1790,6 +1790,14 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         if task_update.order is not None:
             update_data["order"] = task_update.order
         
+        # Обновление времени (для событий планировщика)
+        if task_update.time_start is not None:
+            update_data["time_start"] = task_update.time_start
+        if task_update.time_end is not None:
+            update_data["time_end"] = task_update.time_end
+        if task_update.is_fixed is not None:
+            update_data["is_fixed"] = task_update.is_fixed
+        
         # Массив видео (новый формат)
         if task_update.videos is not None:
             update_data["videos"] = [v.model_dump() if hasattr(v, 'model_dump') else v for v in task_update.videos]
