@@ -226,20 +226,44 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
   // Форматирование даты
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Неизвестно';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now - date;
     
-    if (diff < 60000) return 'Только что';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} мин. назад`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} ч. назад`;
-    
-    return date.toLocaleDateString('ru-RU', { 
-      day: 'numeric', 
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      // Парсим дату - если это строка без timezone, добавляем Z (UTC)
+      let date;
+      if (typeof dateStr === 'string') {
+        // Если нет timezone indicator, добавляем Z для UTC
+        if (!dateStr.endsWith('Z') && !dateStr.includes('+')) {
+          date = new Date(dateStr + 'Z');
+        } else {
+          date = new Date(dateStr);
+        }
+      } else {
+        date = new Date(dateStr);
+      }
+      
+      if (isNaN(date.getTime())) return 'Неизвестно';
+      
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      
+      // Защита от отрицательных значений (если время в будущем из-за рассинхрона)
+      if (diff < 0) return 'Только что';
+      
+      if (diff < 60000) return 'Только что';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)} мин. назад`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)} ч. назад`;
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)} дн. назад`;
+      
+      return date.toLocaleDateString('ru-RU', { 
+        day: 'numeric', 
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return 'Неизвестно';
+    }
   };
 
   if (!isOpen) return null;
