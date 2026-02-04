@@ -2226,7 +2226,13 @@ const TodayTaskItem = ({
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Контент задачи */}
-      <div className="relative bg-white rounded-lg p-2 group shadow-sm"
+      <div 
+        className={`relative bg-white rounded-lg p-2 group shadow-sm transition-all ${isDragEnabled ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerCancel}
+        onPointerCancel={handlePointerCancel}
+        style={{ touchAction: 'none' }}
       >
         {isEditing ? (
           // Режим редактирования
