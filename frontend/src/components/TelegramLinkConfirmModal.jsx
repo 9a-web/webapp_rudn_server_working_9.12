@@ -153,15 +153,38 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
                 {/* Информация о профиле */}
                 <div className="bg-gray-700/50 rounded-2xl p-4 mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-white" />
+                    {/* Аватар профиля */}
+                    <div className="relative w-14 h-14 flex-shrink-0">
+                      {photoLoading ? (
+                        <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
+                          <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
+                        </div>
+                      ) : photoUrl ? (
+                        <img 
+                          src={photoUrl} 
+                          alt={user?.first_name}
+                          className="w-14 h-14 rounded-full object-cover ring-2 ring-indigo-500/50"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            setPhotoUrl(null);
+                          }}
+                        />
+                      ) : (
+                        <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center ring-2 ring-indigo-500/30">
+                          <User className="w-7 h-7 text-white" />
+                        </div>
+                      )}
+                      {/* Индикатор верификации */}
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-gray-800">
+                        <CheckCircle className="w-3 h-3 text-white" />
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <p className="font-medium text-white">
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="font-semibold text-white text-lg truncate">
                         {user?.first_name} {user?.last_name}
                       </p>
                       {user?.username && (
-                        <p className="text-gray-400 text-sm">@{user.username}</p>
+                        <p className="text-indigo-400 text-sm">@{user.username}</p>
                       )}
                     </div>
                   </div>
