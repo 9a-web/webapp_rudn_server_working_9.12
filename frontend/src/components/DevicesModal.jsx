@@ -510,6 +510,14 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Модальное окно подтверждения связки */}
+      <TelegramLinkConfirmModal
+        isOpen={showLinkConfirm}
+        onClose={handleLinkConfirmClose}
+        sessionToken={pendingSessionToken}
+        onSuccess={handleLinkSuccess}
+      />
     </AnimatePresence>
   );
 };
