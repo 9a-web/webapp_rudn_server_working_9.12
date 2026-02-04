@@ -340,18 +340,92 @@ export const revokeAllDevices = async (telegramId) => {
 };
 
 /**
- * Отправить heartbeat для сессии
+ * Отправить heartbeat для сессии и проверить её валидность
  * @param {string} sessionToken - токен сессии
+ * @returns {Promise<{valid: boolean}>} - валидна ли сессия
  */
 export const sendHeartbeat = async (sessionToken) => {
   const backendUrl = getBackendURL();
   try {
-    await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/heartbeat`, {
+    const response = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/heartbeat`, {
       method: 'POST'
     });
+    
+    // Если 404 - сессия не найдена (удалена)
+    if (response.status === 404) {
+      return { valid: false, reason: 'not_found' };
+    }
+    
+    if (!response.ok) {
+      return { valid: false, reason: 'error' };
+    }
+    
+    return { valid: true };
   } catch (e) {
     console.warn('Heartbeat failed:', e);
+    return { valid: true }; // При сетевой ошибке считаем сессию валидной
   }
+};
+
+/**
+ * Создать WebSocket соединение для мониторинга текущей сессии (revoked, etc)
+ * @param {string} sessionToken - токен сессии
+ * @param {Object} callbacks - колбэки событий
+ * @returns {Object} - объект с методом close()
+ */
+export const createSessionMonitorWebSocket = (sessionToken, { onRevoked, onError }) => {
+  const backendUrl = getBackendURL();
+  const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
+  const wsHost = backendUrl.replace(/^https?:\/\//, '');
+  const wsUrl = `${wsProtocol}://${wsHost}/api/ws/session/${sessionToken}`;
+  
+  console.log('🔌 Connecting monitor WebSocket:', wsUrl);
+  
+  let isClosed = false;
+  
+  const ws = new WebSocket(wsUrl);
+  
+  ws.onopen = () => {
+    console.log('✅ Session monitor WebSocket connected');
+  };
+  
+  ws.onmessage = (event) => {
+    try {
+      if (event.data === 'ping') {
+        ws.send('pong');
+        return;
+      }
+      
+      const data = JSON.parse(event.data);
+      console.log('📨 Monitor WebSocket message:', data);
+      
+      if (data.event === 'revoked') {
+        console.log('🔌 Session revoked!');
+        onRevoked?.();
+      } else if (data.event === 'error') {
+        onError?.(data.message);
+      }
+    } catch (e) {
+      console.log('📨 Monitor WebSocket raw message:', event.data);
+    }
+  };
+  
+  ws.onerror = (error) => {
+    console.error('❌ Monitor WebSocket error:', error);
+  };
+  
+  ws.onclose = (event) => {
+    console.log('🔌 Monitor WebSocket closed, code:', event.code);
+  };
+  
+  return {
+    close: () => {
+      isClosed = true;
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    }
+  };
 };
 
 export default {
@@ -361,6 +435,7 @@ export default {
   notifySessionScanned,
   notifySessionRejected,
   createSessionWebSocket,
+  createSessionMonitorWebSocket,
   getUserDevices,
   revokeDevice,
   revokeAllDevices,
