@@ -2302,6 +2302,11 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {plannerEvents.length > 0 && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                    {plannerEvents.length} {plannerEvents.length === 1 ? 'событие' : plannerEvents.length < 5 ? 'события' : 'событий'}
+                  </span>
+                )}
                 <button
                   onClick={() => {
                     hapticFeedback && hapticFeedback('impact', 'medium');
