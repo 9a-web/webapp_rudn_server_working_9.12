@@ -320,7 +320,7 @@ const GroupSelector = ({ onGroupSelected, onCancel }) => {
           <div className="mt-3 text-center text-xs text-white/50">
             {selectedFaculty.name}
             {selectedLevel && ` • ${selectedLevel.label || selectedLevel.name}`}
-            {selectedCourse && ` • ${selectedCourse.label || selectedCourse.name} курс`}
+            {selectedCourse && ` • ${selectedCourse.label || selectedCourse.name}`}
             {selectedForm && ` • ${selectedForm.label || selectedForm.name}`}
           </div>
         )}
