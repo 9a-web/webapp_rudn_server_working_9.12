@@ -12184,6 +12184,68 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/web-sessions/{session_token}/scanned")
+async def notify_session_scanned(session_token: str, telegram_id: int = Body(...), first_name: str = Body(None), photo_url: str = Body(None)):
+    """
+    Уведомить веб-клиент о том, что QR-код отсканирован и ожидается подтверждение.
+    Вызывается мобильным клиентом при показе модального окна подтверждения.
+    """
+    try:
+        # Проверяем существование сессии
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        if not session:
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        # Отправляем через WebSocket
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "scanned",
+                    "data": {
+                        "telegram_id": telegram_id,
+                        "first_name": first_name,
+                        "photo_url": photo_url
+                    }
+                })
+                logger.info(f"📱 Session scanned notification sent: {session_token[:8]}...")
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+        
+        return {"success": True, "message": "Уведомление отправлено"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Scanned notification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/rejected")
+async def notify_session_rejected(session_token: str):
+    """
+    Уведомить веб-клиент о том, что пользователь отклонил подключение.
+    Вызывается мобильным клиентом при нажатии "Отмена".
+    """
+    try:
+        # Отправляем через WebSocket
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "rejected"
+                })
+                logger.info(f"❌ Session rejected notification sent: {session_token[:8]}...")
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+        
+        return {"success": True, "message": "Уведомление отправлено"}
+        
+    except Exception as e:
+        logger.error(f"Rejected notification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/web-sessions/user/{telegram_id}/devices", response_model=DevicesListResponse)
 async def get_user_devices(telegram_id: int, current_token: str = None):
     """
