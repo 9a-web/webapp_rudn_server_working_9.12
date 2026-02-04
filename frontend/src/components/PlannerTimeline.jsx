@@ -715,19 +715,16 @@ export const PlannerTimeline = ({
                 {events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}
               </span>
             )}
-            {onQuickCreate && (
+            {onExpand && (
               <button
                 onClick={() => {
                   hapticFeedback && hapticFeedback('impact', 'light');
-                  // По умолчанию создаем событие на текущий час
-                  const now = new Date();
-                  const startHour = now.getHours();
-                  onQuickCreate(formatMinutesToTime(startHour * 60), formatMinutesToTime((startHour + 1) * 60));
+                  onExpand();
                 }}
-                className="p-1.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
-                title="Быстрое создание события"
+                className="p-1.5 bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow hover:from-gray-300 hover:to-gray-400"
+                title="Развернуть"
               >
-                <Plus className="w-4 h-4" />
+                <Expand className="w-4 h-4" />
               </button>
             )}
           </div>
