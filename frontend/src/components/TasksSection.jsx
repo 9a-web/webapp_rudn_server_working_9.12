@@ -2158,20 +2158,71 @@ const TodayTaskItem = ({
   hapticFeedback
 }) => {
   const dragControls = useDragControls();
+  const [isDragEnabled, setIsDragEnabled] = useState(false);
+  const longPressTimer = useRef(null);
+  const itemRef = useRef(null);
+
+  // Обработка long press для активации перетаскивания
+  const handlePointerDown = (e) => {
+    // Очищаем предыдущий таймер
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+    
+    // Запускаем таймер на 2 секунды
+    longPressTimer.current = setTimeout(() => {
+      setIsDragEnabled(true);
+      // Микровибрация - сигнал что можно перетаскивать
+      if (hapticFeedback) {
+        hapticFeedback('impact', 'heavy');
+      }
+      // Запускаем перетаскивание
+      dragControls.start(e);
+    }, 2000);
+  };
+
+  const handlePointerUp = () => {
+    // Отменяем таймер если отпустили раньше
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    setIsDragEnabled(false);
+  };
+
+  const handlePointerCancel = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    setIsDragEnabled(false);
+  };
+
+  // Очистка при размонтировании
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
 
   return (
     <Reorder.Item
+      ref={itemRef}
       value={task}
       id={task.id}
-      dragListener={true}
+      dragListener={false}
       dragControls={dragControls}
-      className="mb-2 touch-none"
+      className={`mb-2 touch-none ${isDragEnabled ? 'z-50' : ''}`}
       style={{ listStyle: 'none', touchAction: 'none' }}
       whileDrag={{ 
-        scale: 1.02, 
-        boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-        zIndex: 50 
+        scale: 1.05, 
+        boxShadow: "0 8px 25px rgba(0,0,0,0.2)",
+        zIndex: 100,
+        cursor: 'grabbing'
       }}
+      onDragEnd={() => setIsDragEnabled(false)}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Контент задачи */}
