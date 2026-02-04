@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, User, Sparkles } from 'lucide-react';
+import { Menu, Bell, User, Sparkles, ScanLine } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { headerItemVariants } from '../utils/animations';
@@ -8,7 +8,7 @@ import { ProfileModal } from './ProfileModal';
 import { rainbowConfetti } from '../utils/confetti';
 import { botAPI } from '../services/api';
 
-export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false }) => {
+export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false, onQRScanned }) => {
   const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
