@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Listening Rooms API (Совместное прослушивание музыки)
-Tests the music listening rooms functionality as specified in the review request
+Backend Testing Suite for Web Sessions API (Device Management)
+Tests the web-sessions endpoints for device linking functionality as specified in the review request
 """
 
 import requests
@@ -16,11 +16,9 @@ API_BASE = f"{BACKEND_URL}/api"
 
 class BackendTester:
     def __init__(self):
-        self.room_id: Optional[str] = None
-        self.invite_code: Optional[str] = None
+        self.session_token: Optional[str] = None
         self.test_results = []
-        self.host_telegram_id = 765963392  # Host user ID from review request
-        self.friend_telegram_id = 123456789  # Friend user ID from review request
+        self.admin_telegram_id = 765963392  # Admin telegram_id from review request
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
