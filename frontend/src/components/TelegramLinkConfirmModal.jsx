@@ -14,42 +14,44 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
   const [status, setStatus] = useState('confirm'); // confirm, loading, success, error
   const [error, setError] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
-  const [photoLoading, setPhotoLoading] = useState(true);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   // Загружаем фото профиля при открытии
   useEffect(() => {
-    if (isOpen && user?.id) {
-      setPhotoLoading(true);
-      // Пробуем получить фото из user объекта
-      if (user.photo_url) {
-        setPhotoUrl(user.photo_url);
-        setPhotoLoading(false);
-      } else {
-        // Получаем фото через API
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 
-          (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '/api');
-        const apiUrl = `${backendUrl}/api/user-profile-photo-proxy/${user.id}`;
-        
-        fetch(apiUrl)
-          .then(res => {
-            if (res.ok) {
-              return res.blob();
-            }
-            return null;
-          })
-          .then(blob => {
-            if (blob && blob.size > 0) {
-              setPhotoUrl(URL.createObjectURL(blob));
-            }
-          })
-          .catch(err => {
-            console.log('Could not load profile photo:', err);
-          })
-          .finally(() => {
-            setPhotoLoading(false);
-          });
-      }
+    if (!isOpen || !user?.id) return;
+    
+    let isCancelled = false;
+    
+    // Пробуем получить фото из user объекта
+    if (user.photo_url) {
+      setPhotoUrl(user.photo_url);
+      return;
     }
+    
+    // Получаем фото через API
+    const loadPhoto = async () => {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 
+        (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '/api');
+      const apiUrl = `${backendUrl}/api/user-profile-photo-proxy/${user.id}`;
+      
+      try {
+        const res = await fetch(apiUrl);
+        if (res.ok && !isCancelled) {
+          const blob = await res.blob();
+          if (blob && blob.size > 0 && !isCancelled) {
+            setPhotoUrl(URL.createObjectURL(blob));
+          }
+        }
+      } catch (err) {
+        console.log('Could not load profile photo:', err);
+      }
+    };
+    
+    loadPhoto();
+    
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, user?.id, user?.photo_url]);
 
   const handleConfirm = async () => {
