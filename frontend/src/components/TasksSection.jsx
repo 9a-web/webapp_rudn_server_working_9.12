@@ -2206,6 +2206,20 @@ const TodayTaskItem = ({
                   <Plus className="w-3.5 h-3.5" />
                 </button>
                 
+                {/* Кнопка синхронизации с планировщиком */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'light');
+                    if (onSyncToPlanner) {
+                      onSyncToPlanner(task);
+                    }
+                  }}
+                  className="p-1.5 text-purple-500 hover:bg-purple-50 rounded-lg transition-colors"
+                  title="Добавить в планировщик"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                </button>
+                
                 {/* Кнопка редактирования - открывает модальное окно для изменения метаданных */}
                 <button
                   onClick={() => {
