@@ -801,7 +801,7 @@ const Home = () => {
       console.error('Error loading user data:', err);
       
       // Проверяем, является ли пользователь связанным с Telegram
-      const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
+      const isLinkedUser = currentUser.is_linked || (!currentUser.is_guest && !currentUser.device_id);
       
       // Пробуем использовать сохранённые настройки из localStorage
       const savedUserSettings = localStorage.getItem('user_settings');
