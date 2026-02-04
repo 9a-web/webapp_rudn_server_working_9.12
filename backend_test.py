@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Web Sessions API (Device Management)
-Tests the web-sessions endpoints for device linking functionality as specified in the review request
+Backend Testing Suite for Privacy Settings API
+Tests the privacy settings endpoints as specified in the review request
 """
 
 import requests
