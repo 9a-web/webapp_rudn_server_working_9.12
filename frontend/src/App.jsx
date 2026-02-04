@@ -701,7 +701,7 @@ const Home = () => {
         localStorage.removeItem('synced_user');
       }
     }
-  }, [user]);
+  }, [user, syncedUser]);
 
   const loadUserData = useCallback(async () => {
     // Используем effectiveUser (user из Telegram или syncedUser из QR)
@@ -834,7 +834,7 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, syncedUser]);
 
   // Обработчик изменения настройки новогодней темы
   const handleThemeChange = useCallback((mode) => {
