@@ -285,6 +285,12 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [syncTaskTime, setSyncTaskTime] = useState({ start: '09:00', end: '10:00' });
   const [syncingTask, setSyncingTask] = useState(false);
   
+  // Модальное окно для изменения времени события после перетаскивания
+  const [isTimeChangeModalOpen, setIsTimeChangeModalOpen] = useState(false);
+  const [eventToChangeTime, setEventToChangeTime] = useState(null);
+  const [newEventTime, setNewEventTime] = useState({ start: '', end: '' });
+  const [savingTimeChange, setSavingTimeChange] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
