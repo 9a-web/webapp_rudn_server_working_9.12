@@ -588,10 +588,10 @@ const Home = () => {
       }
     };
     
-    if (isReady && user && startParam) {
+    if (isReady && (user || syncedUser) && startParam) {
       processFriendInvite();
     }
-  }, [isReady, user, startParam, friendInviteProcessed]);
+  }, [isReady, user, syncedUser, startParam, friendInviteProcessed]);
 
   // Обработка связки Telegram профиля (startapp=link_{token})
   const [linkInviteProcessed, setLinkInviteProcessed] = useState(false);
