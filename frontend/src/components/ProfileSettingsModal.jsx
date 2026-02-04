@@ -203,6 +203,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, telegramId, hapticFeedback, onT
             exit={{ opacity: 0, y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-x-0 bottom-0 z-[111] bg-gray-900 rounded-t-3xl max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-2">
