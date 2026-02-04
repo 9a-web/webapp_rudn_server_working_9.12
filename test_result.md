@@ -85,6 +85,9 @@ test_plan:
     - "Test Web Sessions API - Create Session"
     - "Test Web Sessions API - Check Session Status"
     - "Test Web Sessions API - Get User Devices"
+    - "Test Privacy Settings API - Get Privacy Settings"
+    - "Test Privacy Settings API - Update Privacy Settings"
+    - "Test Privacy Settings API - Verify Settings Persistence"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
