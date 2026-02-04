@@ -1875,6 +1875,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               onQuickCreate={handleQuickCreate}
               onMarkSkipped={handleToggleSkipped}
               onTimeChange={handleEventTimeChange}
+              onExpand={() => setIsFullscreenPlannerOpen(true)}
               hapticFeedback={hapticFeedback}
             />
           )}
