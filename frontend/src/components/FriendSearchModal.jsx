@@ -83,6 +83,7 @@ const FriendSearchModal = ({
   }, [isOpen, selectedFaculty, selectedGroup, searchQuery, handleSearch]);
 
   const handleSendRequest = async (targetId) => {
+    setSendingRequest(targetId);
     try {
       await onSendRequest(targetId);
       // Обновляем статус в результатах
@@ -93,11 +94,14 @@ const FriendSearchModal = ({
       ));
     } catch (error) {
       console.error('Error sending request:', error);
+    } finally {
+      setSendingRequest(null);
     }
   };
 
   const getStatusButton = (result) => {
     const status = result.friendship_status;
+    const isSending = sendingRequest === result.telegram_id;
     
     if (status === 'friend') {
       return (
@@ -110,10 +114,14 @@ const FriendSearchModal = ({
     
     if (status?.includes('pending')) {
       return (
-        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-full text-sm">
+        <motion.span 
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-full text-sm"
+        >
           <Clock className="w-4 h-4" />
-          Ожидание
-        </span>
+          Отправлено
+        </motion.span>
       );
     }
     
@@ -122,12 +130,22 @@ const FriendSearchModal = ({
     }
     
     return (
-      <button
+      <motion.button
         onClick={() => handleSendRequest(result.telegram_id)}
-        className="p-2 bg-purple-500/20 text-purple-400 rounded-xl hover:bg-purple-500/30 transition-colors"
+        disabled={isSending}
+        whileTap={{ scale: 0.9 }}
+        className={`p-2 rounded-xl transition-colors ${
+          isSending 
+            ? 'bg-purple-500/10 text-purple-300' 
+            : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+        }`}
       >
-        <UserPlus className="w-5 h-5" />
-      </button>
+        {isSending ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : (
+          <UserPlus className="w-5 h-5" />
+        )}
+      </motion.button>
     );
   };
 
