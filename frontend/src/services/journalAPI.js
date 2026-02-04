@@ -365,6 +365,17 @@ export const getMyAttendance = async (journalId, telegramId) => {
   }
 };
 
+// Получить статистику студента по student_id (для владельца)
+export const getStudentStats = async (journalId, studentId, telegramId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/journals/${journalId}/student-stats/${studentId}?telegram_id=${telegramId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting student stats:', error);
+    throw error;
+  }
+};
+
 // Получить статистику журнала (доступ только для owner и stats_viewers)
 export const getJournalStats = async (journalId, telegramId) => {
   try {
