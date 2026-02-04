@@ -360,11 +360,64 @@ const FriendProfileModal = ({
               {/* Schedule Tab */}
               {activeTab === 'schedule' && (
                 <div className="space-y-3">
-                  {!schedule ? (
+                  {/* Навигация по дням */}
+                  <div className="flex items-center justify-between bg-white/5 rounded-2xl p-2">
+                    <button
+                      onClick={() => changeDate(-1)}
+                      className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-gray-400" />
+                    </button>
+                    
+                    <div className="text-center">
+                      <p className="font-medium text-white">{formatDate(selectedDate)}</p>
+                      <p className="text-xs text-gray-500">
+                        {selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={() => changeDate(1)}
+                      className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Быстрые кнопки */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedDate(new Date())}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        selectedDate.toDateString() === new Date().toDateString()
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      }`}
+                    >
+                      Сегодня
+                    </button>
+                    <button
+                      onClick={() => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        setSelectedDate(tomorrow);
+                      }}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+                        selectedDate.toDateString() === new Date(Date.now() + 86400000).toDateString()
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                      }`}
+                    >
+                      Завтра
+                    </button>
+                  </div>
+
+                  {/* Контент расписания */}
+                  {scheduleLoading ? (
                     <div className="flex justify-center py-8">
                       <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
                     </div>
-                  ) : schedule.error ? (
+                  ) : schedule?.error ? (
                     <div className="text-center py-8">
                       <EyeOff className="w-12 h-12 mx-auto text-gray-600 mb-3" />
                       <p className="text-gray-400">Расписание недоступно</p>
@@ -372,14 +425,17 @@ const FriendProfileModal = ({
                         {schedule.message || 'Пользователь скрыл расписание или группа не настроена'}
                       </p>
                     </div>
-                  ) : schedule.schedule?.length > 0 ? (
+                  ) : schedule?.schedule?.length > 0 ? (
                     <>
                       <p className="text-sm text-gray-400 mb-2">
-                        Расписание {schedule.friend_name} • {schedule.group_name}
+                        {schedule.friend_name} • {schedule.group_name}
                       </p>
                       {schedule.schedule.map((event, index) => (
-                        <div
+                        <motion.div
                           key={index}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
                           className="bg-white/5 rounded-2xl p-4 border border-white/10"
                         >
                           <div className="flex items-start gap-3">
@@ -406,13 +462,13 @@ const FriendProfileModal = ({
                               )}
                             </div>
                           </div>
-                        </div>
+                        </motion.div>
                       ))}
                     </>
                   ) : (
                     <div className="text-center py-8">
                       <Calendar className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                      <p className="text-gray-400">Сегодня нет пар</p>
+                      <p className="text-gray-400">Нет пар на {formatDate(selectedDate).toLowerCase()}</p>
                     </div>
                   )}
                 </div>
