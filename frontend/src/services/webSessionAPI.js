@@ -64,6 +64,48 @@ export const linkWebSession = async (sessionToken, userData) => {
 };
 
 /**
+ * Уведомить об отсканированном QR-коде (показ модального окна)
+ * @param {string} sessionToken - токен сессии
+ * @param {Object} userData - данные пользователя
+ */
+export const notifySessionScanned = async (sessionToken, userData) => {
+  const backendUrl = getBackendURL();
+  try {
+    await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/scanned`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        telegram_id: userData.telegram_id,
+        first_name: userData.first_name,
+        photo_url: userData.photo_url
+      })
+    });
+  } catch (e) {
+    console.warn('Scanned notification failed:', e);
+  }
+};
+
+/**
+ * Уведомить об отклонении подключения
+ * @param {string} sessionToken - токен сессии
+ */
+export const notifySessionRejected = async (sessionToken) => {
+  const backendUrl = getBackendURL();
+  try {
+    await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/rejected`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (e) {
+    console.warn('Rejected notification failed:', e);
+  }
+};
+
+/**
  * Создать WebSocket соединение для отслеживания связки сессии
  * С автоматическим fallback на HTTP polling при ошибке WebSocket
  * @param {string} sessionToken - токен сессии
