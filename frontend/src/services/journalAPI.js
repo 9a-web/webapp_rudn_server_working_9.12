@@ -90,6 +90,17 @@ export const deleteJournal = async (journalId, telegramId) => {
   }
 };
 
+// Выйти из журнала (для студентов)
+export const leaveJournal = async (journalId, telegramId) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/journals/${journalId}/leave?telegram_id=${telegramId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error leaving journal:', error);
+    throw error;
+  }
+};
+
 // Сгенерировать ссылку-приглашение
 export const generateJournalInviteLink = async (journalId) => {
   try {
