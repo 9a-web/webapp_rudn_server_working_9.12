@@ -115,6 +115,15 @@ const TimelineEventCard = ({
       longPressTimer.current = null;
     }
     
+    // Если было перетаскивание - устанавливаем флаг чтобы не открывать модалку
+    if (isDragging) {
+      wasDragging.current = true;
+      // Сбрасываем флаг через небольшую задержку (после срабатывания onClick)
+      setTimeout(() => {
+        wasDragging.current = false;
+      }, 100);
+    }
+    
     if (isDragging && dragOffset !== 0) {
       console.log('📍 Drag ended, offset:', dragOffset);
       
