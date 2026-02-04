@@ -591,26 +591,55 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   /**
-   * Изменить время события (после перетаскивания)
+   * Показать модальное окно для изменения времени события (после перетаскивания)
    */
-  const handleEventTimeChange = async (event, newStartTime, newEndTime) => {
+  const handleEventTimeChange = (event, newStartTime, newEndTime) => {
     if (!user?.id || !event?.id) return;
     
+    // Показываем модальное окно с предложенным временем
+    setEventToChangeTime(event);
+    setNewEventTime({ start: newStartTime, end: newEndTime });
+    setIsTimeChangeModalOpen(true);
+  };
+  
+  /**
+   * Подтвердить изменение времени события
+   */
+  const confirmEventTimeChange = async () => {
+    if (!eventToChangeTime?.id) return;
+    
+    setSavingTimeChange(true);
+    
     try {
-      hapticFeedback && hapticFeedback('notification', 'success');
-      
       // Обновляем событие через API
-      await plannerAPI.updateEvent(event.id, {
-        time_start: newStartTime,
-        time_end: newEndTime
+      await plannerAPI.updateEvent(eventToChangeTime.id, {
+        time_start: newEventTime.start,
+        time_end: newEventTime.end
       });
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
       
       // Перезагружаем события
       await loadPlannerEvents(tasksSelectedDate);
+      
+      setIsTimeChangeModalOpen(false);
+      setEventToChangeTime(null);
     } catch (error) {
       console.error('Error updating event time:', error);
       hapticFeedback && hapticFeedback('notification', 'error');
+    } finally {
+      setSavingTimeChange(false);
     }
+  };
+  
+  /**
+   * Отмена изменения времени события
+   */
+  const cancelEventTimeChange = () => {
+    setIsTimeChangeModalOpen(false);
+    setEventToChangeTime(null);
+    // Перезагружаем события чтобы вернуть исходную позицию
+    loadPlannerEvents(tasksSelectedDate);
   };
 
   /**
