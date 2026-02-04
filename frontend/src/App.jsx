@@ -1001,7 +1001,8 @@ const Home = () => {
 
   // Отслеживание просмотра расписания
   const trackScheduleView = async () => {
-    if (!user || !userSettings) return;
+    const currentUser = user || syncedUser;
+    if (!currentUser || !userSettings) return;
     
     try {
       // Подсчитываем уникальные пары (группируем по ДНЮ + ВРЕМЕНИ, чтобы одинаковое время в разные дни считалось отдельно)
@@ -1015,7 +1016,7 @@ const Home = () => {
       
       const classesCount = uniqueTimeSlots.size;
       
-      const result = await achievementsAPI.trackAction(user.id, 'view_schedule', {
+      const result = await achievementsAPI.trackAction(currentUser.id, 'view_schedule', {
         classes_count: classesCount
       });
       if (result.new_achievements && result.new_achievements.length > 0) {
@@ -1056,14 +1057,15 @@ const Home = () => {
   }, [schedule]);
 
   const handleGroupSelected = async (groupData) => {
+    const currentUser = user || syncedUser;
     try {
       hapticFeedback('impact', 'medium');
       
       const settings = await userAPI.saveUserSettings({
-        telegram_id: user.id,
-        username: user.username,
-        first_name: user.first_name,
-        last_name: user.last_name,
+        telegram_id: currentUser?.id,
+        username: currentUser?.username,
+        first_name: currentUser?.first_name,
+        last_name: currentUser?.last_name,
         ...groupData,
       });
       
