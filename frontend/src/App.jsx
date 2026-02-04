@@ -1379,13 +1379,24 @@ const Home = () => {
             loading: true
           });
           
-          // Загружаем данные о пользователе
+          // Загружаем данные о пользователе и аватарку
           try {
             const { friendsAPI } = await import('./services/friendsAPI');
-            const userData = await friendsAPI.getUserProfile(parseInt(friendId), effectiveUser.id);
+            const { getBackendURL } = await import('./services/api');
+            const backendUrl = getBackendURL();
+            
+            // Загружаем профиль и аватарку параллельно
+            const [userData, photoResponse] = await Promise.all([
+              friendsAPI.getUserProfile(parseInt(friendId), effectiveUser.id),
+              fetch(`${backendUrl}/api/user-profile-photo/${friendId}`).then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
+            
             setFriendRequestModal(prev => ({
               ...prev,
-              friendData: userData,
+              friendData: {
+                ...userData,
+                photo_url: photoResponse?.photo_url || null
+              },
               loading: false
             }));
           } catch (err) {
