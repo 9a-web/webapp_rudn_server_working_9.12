@@ -187,9 +187,18 @@ const TelegramLinkScreen = ({ onLinked }) => {
 
   // Создаём сессию при монтировании
   useEffect(() => {
-    createSession();
+    let isActive = true;
+    
+    const initSession = async () => {
+      if (isActive) {
+        await createSession();
+      }
+    };
+    
+    initSession();
     
     return () => {
+      isActive = false;
       if (wsRef.current) {
         wsRef.current.close();
       }
@@ -200,7 +209,7 @@ const TelegramLinkScreen = ({ onLinked }) => {
         clearInterval(pollingRef.current);
       }
     };
-  }, [createSession]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Форматирование времени
   const formatTime = (seconds) => {
