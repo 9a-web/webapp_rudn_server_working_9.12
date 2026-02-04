@@ -112,6 +112,8 @@ test_plan:
     - "Test Privacy Settings API - Get Privacy Settings"
     - "Test Privacy Settings API - Update Privacy Settings"
     - "Test Privacy Settings API - Verify Settings Persistence"
+    - "Test Journal API - Leave Journal as Owner (Should Fail)"
+    - "Test Journal API - Delete Journal as Owner"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
