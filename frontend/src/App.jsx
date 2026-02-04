@@ -408,13 +408,14 @@ const Home = () => {
     if (isReady && (user || syncedUser) && startParam) {
       processReferral();
     }
-  }, [isReady, user, startParam, referralProcessed]);
+  }, [isReady, user, syncedUser, startParam, referralProcessed]);
 
   // 📚 Обработка приглашения в журнал из Web App ссылки
   useEffect(() => {
     const processJournalInvite = async () => {
+      const currentUser = user || syncedUser;
       // Проверяем условия: есть startParam, начинается с journal_ или jstudent_, не обработан ещё
-      if (!startParam || journalInviteProcessed || !user) {
+      if (!startParam || journalInviteProcessed || !currentUser) {
         return;
       }
       
@@ -435,10 +436,10 @@ const Home = () => {
       
       try {
         const result = await processJournalWebAppInvite({
-          telegram_id: user.id,
-          username: user.username,
-          first_name: user.first_name,
-          last_name: user.last_name,
+          telegram_id: currentUser.id,
+          username: currentUser.username,
+          first_name: currentUser.first_name,
+          last_name: currentUser.last_name,
           invite_type: inviteType,
           invite_code: inviteCode
         });
