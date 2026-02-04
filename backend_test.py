@@ -317,18 +317,19 @@ class BackendTester:
     
     
     def run_all_tests(self):
-        """Run all Web Sessions API tests in sequence"""
-        print("🚀 Starting Web Sessions API Testing")
+        """Run all Privacy Settings API tests in sequence"""
+        print("🚀 Starting Privacy Settings API Testing")
         print("=" * 50)
         
-        # Web Sessions API Tests (from review request)
-        web_sessions_tests = [
-            self.test_create_web_session,        # 1. Create web session
-            self.test_get_session_status,        # 2. Check session status
-            self.test_get_user_devices,          # 3. Get user devices
+        # Privacy Settings API Tests (from review request)
+        privacy_tests = [
+            self.test_get_privacy_settings_initial,     # 1. GET /api/profile/765963392/privacy - get current privacy settings
+            self.test_update_privacy_settings,          # 2. PUT /api/profile/765963392/privacy - update privacy settings
+            self.test_verify_privacy_settings_saved,    # 3. GET /api/profile/765963392/privacy - verify the settings were saved correctly
+            self.test_restore_original_privacy_settings # 4. Restore original settings (cleanup)
         ]
         
-        all_tests = web_sessions_tests
+        all_tests = privacy_tests
         
         passed = 0
         total = len(all_tests)
@@ -345,7 +346,7 @@ class BackendTester:
         print(f"📊 Test Results: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All Web Sessions API tests PASSED!")
+            print("🎉 All Privacy Settings API tests PASSED!")
             return True
         else:
             print(f"⚠️  {total - passed} tests FAILED")
