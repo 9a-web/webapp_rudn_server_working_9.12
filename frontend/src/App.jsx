@@ -603,6 +603,19 @@ const Home = () => {
         return;
       }
       
+      // Проверяем, не был ли этот токен уже обработан (сохранено в localStorage)
+      const processedTokens = JSON.parse(localStorage.getItem('processed_link_tokens') || '{}');
+      if (processedTokens[sessionToken]) {
+        // Токен уже обработан, проверяем не истек ли срок (1 час)
+        const processedAt = processedTokens[sessionToken];
+        const hourAgo = Date.now() - 60 * 60 * 1000;
+        if (processedAt > hourAgo) {
+          console.log('🔗 Токен связки уже был обработан, пропускаем:', sessionToken.slice(0, 8));
+          setLinkInviteProcessed(true);
+          return;
+        }
+      }
+      
       console.log('🔗 Обработка запроса на связку профиля:', sessionToken);
       
       // Показываем модальное окно подтверждения
