@@ -121,21 +121,27 @@ const TimelineEventCard = ({
       const pixelsPerMinute = (hourHeight || HOUR_HEIGHT) / 60;
       const minutesDelta = Math.round(dragOffset / pixelsPerMinute);
       const currentStartMinutes = parseTime(event.time_start);
-      const currentEndMinutes = parseTime(event.time_end);
+      // Защита от пустого time_end - используем 60 минут по умолчанию
+      const currentEndMinutes = parseTime(event.time_end) || (currentStartMinutes + 60);
+      
+      // Сохраняем ТОЧНУЮ длительность события (разницу между началом и концом)
       const duration = currentEndMinutes - currentStartMinutes;
       
+      console.log('📏 Duration preserved:', duration, 'minutes');
+      
       let newStartMinutes = currentStartMinutes + minutesDelta;
-      // Ограничиваем в пределах дня
-      newStartMinutes = Math.max(0, Math.min(24 * 60 - duration, newStartMinutes));
-      // Округляем до 5 минут
+      // Ограничиваем в пределах дня (0:00 - 24:00)
+      newStartMinutes = Math.max(0, Math.min(24 * 60 - Math.max(duration, 0), newStartMinutes));
+      // Округляем начало до 5 минут для удобства
       newStartMinutes = Math.round(newStartMinutes / 5) * 5;
       
+      // Конечное время = новое начало + ИСХОДНАЯ длительность (duration НЕ меняется!)
       const newEndMinutes = newStartMinutes + duration;
       
       const newStartTime = formatMinutesToTime(newStartMinutes);
-      const newEndTime = formatMinutesToTime(newEndMinutes);
+      const newEndTime = formatMinutesToTime(Math.max(0, newEndMinutes));
       
-      console.log('⏰ Time change:', event.time_start, '->', newStartTime);
+      console.log('⏰ Time change:', event.time_start, '->', newStartTime, '| End:', event.time_end, '->', newEndTime, '| Duration kept:', duration, 'min');
       
       if (newStartTime !== event.time_start && onTimeChange) {
         onTimeChange(event, newStartTime, newEndTime);
