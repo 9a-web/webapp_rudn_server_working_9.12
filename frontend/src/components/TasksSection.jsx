@@ -2268,22 +2268,6 @@ const TodayTaskItem = ({
           // Обычный режим
           <div className="flex flex-col gap-1.5">
             <div className="flex items-start gap-2">
-              {/* Drag Handle (3 полоски) */}
-              <div
-                onPointerDown={(e) => {
-                  console.log('👆 Drag handle clicked for task:', task.id, task.text);
-                  e.stopPropagation();
-                  e.preventDefault();
-                  if (hapticFeedback) hapticFeedback('impact', 'light');
-                  dragControls.start(e);
-                  console.log('🚀 Drag controls started');
-                }}
-                className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1.5 -ml-1 touch-none select-none rounded hover:bg-yellow-100"
-                style={{ touchAction: 'none', userSelect: 'none' }}
-              >
-                <GripVertical className="w-4 h-4 text-gray-400 hover:text-yellow-500 transition-colors" />
-              </div>
-              
               {/* Checkbox с анимацией когда все подзадачи выполнены */}
               {(() => {
                 const hasSubtasks = task.subtasks && task.subtasks.length > 0;
@@ -2292,7 +2276,10 @@ const TodayTaskItem = ({
                 
                 return (
                   <motion.div 
-                    onClick={() => onToggle(task.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggle(task.id);
+                    }}
                     animate={shouldPulse ? {
                       scale: [1, 1.2, 1],
                       boxShadow: [
