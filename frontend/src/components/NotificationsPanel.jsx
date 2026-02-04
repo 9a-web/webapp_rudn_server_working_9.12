@@ -273,9 +273,22 @@ const NotificationsPanel = ({
             
             {/* Показываем выполненное действие */}
             {notification.action_taken && (
-              <div className="mt-2 flex items-center gap-1.5 text-sm text-green-400">
-                <Check className="w-4 h-4" />
-                {notification.actions?.find(a => a.id === notification.action_taken)?.label || 'Выполнено'}
+              <div className={`mt-2 flex items-center gap-1.5 text-sm ${
+                notification.action_taken === 'reject' || notification.action_taken === 'decline'
+                  ? 'text-red-400'
+                  : 'text-green-400'
+              }`}>
+                {notification.action_taken === 'reject' || notification.action_taken === 'decline' ? (
+                  <>
+                    <X className="w-4 h-4" />
+                    Отклонено
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    {notification.actions?.find(a => a.id === notification.action_taken)?.label || 'Выполнено'}
+                  </>
+                )}
               </div>
             )}
           </div>
