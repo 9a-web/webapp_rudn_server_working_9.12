@@ -195,57 +195,117 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   };
 
   // Рендер карточки запроса
-  const renderRequestCard = (request, isIncoming) => (
-    <motion.div
-      key={request.request_id}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10"
-    >
-      <div className="flex items-center gap-3">
-        {/* Аватар */}
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-medium">
-          {(request.first_name?.[0] || request.username?.[0] || '?').toUpperCase()}
-        </div>
-        
-        {/* Информация */}
-        <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-white truncate">
-            {request.first_name} {request.last_name}
-          </h4>
-          <p className="text-sm text-gray-400 truncate">
-            {request.group_name || request.username ? `@${request.username}` : 'Группа не указана'}
-          </p>
-          {request.mutual_friends_count > 0 && (
-            <p className="text-xs text-purple-400 mt-0.5">
-              {request.mutual_friends_count} общих друзей
+  const renderRequestCard = (request, isIncoming) => {
+    const processedStatus = processedRequests[request.request_id];
+    const isProcessed = !!processedStatus;
+    
+    return (
+      <motion.div
+        key={request.request_id}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: isProcessed ? 0.7 : 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className={`bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10 transition-opacity ${isProcessed ? 'opacity-70' : ''}`}
+      >
+        <div className="flex items-center gap-3">
+          {/* Аватар */}
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-medium ${
+            processedStatus === 'accepted' 
+              ? 'bg-gradient-to-br from-green-500 to-emerald-500' 
+              : processedStatus === 'rejected' || processedStatus === 'cancelled'
+              ? 'bg-gradient-to-br from-gray-500 to-gray-600'
+              : 'bg-gradient-to-br from-purple-500 to-pink-500'
+          }`}>
+            {(request.first_name?.[0] || request.username?.[0] || '?').toUpperCase()}
+          </div>
+          
+          {/* Информация */}
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-white truncate">
+              {request.first_name} {request.last_name}
+            </h4>
+            <p className="text-sm text-gray-400 truncate">
+              {request.group_name || request.username ? `@${request.username}` : 'Группа не указана'}
             </p>
-          )}
-        </div>
+            {request.mutual_friends_count > 0 && !isProcessed && (
+              <p className="text-xs text-purple-400 mt-0.5">
+                {request.mutual_friends_count} общих друзей
+              </p>
+            )}
+            {/* Статус обработки */}
+            {processedStatus === 'accepted' && (
+              <p className="text-xs text-green-400 mt-0.5 font-medium">
+                ✓ Запрос принят
+              </p>
+            )}
+            {processedStatus === 'rejected' && (
+              <p className="text-xs text-red-400 mt-0.5 font-medium">
+                ✗ Запрос отклонён
+              </p>
+            )}
+            {processedStatus === 'cancelled' && (
+              <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                Запрос отменён
+              </p>
+            )}
+          </div>
 
-        {/* Действия */}
-        <div className="flex gap-2">
-          {isIncoming ? (
-            <>
-              <button
-                onClick={() => handleAcceptRequest(request.request_id)}
-                className="p-2 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-colors"
-              >
-                <UserCheck className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => handleRejectRequest(request.request_id)}
-                className="p-2 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors"
-              >
-                <UserX className="w-5 h-5" />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => handleCancelRequest(request.request_id)}
-              className="p-2 bg-gray-500/20 text-gray-400 rounded-xl hover:bg-gray-500/30 transition-colors"
-            >
+          {/* Действия */}
+          <div className="flex gap-2">
+            {isIncoming ? (
+              isProcessed ? (
+                // Показываем выбранное действие неактивным
+                <div className="flex gap-2">
+                  <div
+                    className={`p-2 rounded-xl transition-colors ${
+                      processedStatus === 'accepted' 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-green-500/10 text-green-400/40'
+                    }`}
+                  >
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div
+                    className={`p-2 rounded-xl transition-colors ${
+                      processedStatus === 'rejected' 
+                        ? 'bg-red-500 text-white' 
+                        : 'bg-red-500/10 text-red-400/40'
+                    }`}
+                  >
+                    <UserX className="w-5 h-5" />
+                  </div>
+                </div>
+              ) : (
+                // Активные кнопки
+                <>
+                  <button
+                    onClick={() => handleAcceptRequest(request.request_id)}
+                    className="p-2 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-colors"
+                  >
+                    <UserCheck className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleRejectRequest(request.request_id)}
+                    className="p-2 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors"
+                  >
+                    <UserX className="w-5 h-5" />
+                  </button>
+                </>
+              )
+            ) : (
+              isProcessed ? (
+                <div className={`p-2 rounded-xl ${
+                  processedStatus === 'cancelled' 
+                    ? 'bg-gray-500 text-white' 
+                    : 'bg-gray-500/10 text-gray-400/40'
+                }`}>
+                  <Clock className="w-5 h-5" />
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleCancelRequest(request.request_id)}
+                  className="p-2 bg-gray-500/20 text-gray-400 rounded-xl hover:bg-gray-500/30 transition-colors"
+                >
               <Clock className="w-5 h-5" />
             </button>
           )}
