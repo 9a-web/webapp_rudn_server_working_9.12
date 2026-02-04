@@ -2271,6 +2271,74 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Полноэкранное модальное окно планировщика */}
+      <AnimatePresence>
+        {isFullscreenPlannerOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9998] bg-white"
+          >
+            {/* Шапка */}
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsFullscreenPlannerOpen(false)}
+                  className="p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Планировщик</h2>
+                  <p className="text-xs text-gray-500">
+                    {tasksSelectedDate.toLocaleDateString('ru-RU', { 
+                      weekday: 'long', 
+                      day: 'numeric', 
+                      month: 'long' 
+                    })}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  hapticFeedback && hapticFeedback('impact', 'light');
+                  const now = new Date();
+                  const startHour = now.getHours();
+                  const formatTime = (minutes) => {
+                    const h = Math.floor(minutes / 60);
+                    const m = minutes % 60;
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                  };
+                  handleQuickCreate(formatTime(startHour * 60), formatTime((startHour + 1) * 60));
+                }}
+                className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm"
+                title="Добавить событие"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Полноэкранный Timeline */}
+            <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50">
+              <FullscreenPlannerTimeline
+                events={plannerEvents}
+                currentDate={formatDateToYYYYMMDD(tasksSelectedDate)}
+                onToggleComplete={handleTogglePlannerEvent}
+                onDelete={async (eventId) => {
+                  await handleDeleteEvent(eventId);
+                }}
+                onEdit={handleEditEvent}
+                onQuickCreate={handleQuickCreate}
+                onMarkSkipped={handleToggleSkipped}
+                onTimeChange={handleEventTimeChange}
+                hapticFeedback={hapticFeedback}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
