@@ -153,6 +153,7 @@ const FriendProfileModal = ({
       setAvatarError(false);
       setSelectedDate(new Date());
       setScheduleLoading(false);
+      setExpandedIndex(null);
     }
   }, [isOpen]);
 
