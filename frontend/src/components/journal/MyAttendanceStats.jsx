@@ -246,9 +246,9 @@ export const MyAttendanceStats = ({
         className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4 relative overflow-hidden"
       >
         {/* Фоновый эффект */}
-        <div className="absolute -right-4 -top-4 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl" />
+        <div className="absolute -right-4 -top-4 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl pointer-events-none" />
         
-        <div className="flex items-center gap-4 relative z-10">
+        <div className="flex items-center gap-4 relative">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 flex-shrink-0">
             <Trophy className="w-6 h-6 text-white" />
           </div>
