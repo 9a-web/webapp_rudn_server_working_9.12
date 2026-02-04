@@ -34,6 +34,9 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Состояние для обработанных запросов (request_id -> 'accepted' | 'rejected' | 'cancelled')
+  const [processedRequests, setProcessedRequests] = useState({});
 
   const hapticFeedback = useCallback((type = 'impact', style = 'light') => {
     if (webApp?.HapticFeedback) {
