@@ -144,6 +144,14 @@ const Home = () => {
   const [userStats, setUserStats] = useState(null);
   const [newAchievement, setNewAchievement] = useState(null); // Для показа уведомления
   
+  // Состояние для модального окна подтверждения добавления в друзья
+  const [friendRequestModal, setFriendRequestModal] = useState({
+    isOpen: false,
+    friendId: null,
+    friendData: null,
+    loading: false
+  });
+  
   // Очередь уведомлений (greeting, achievement и т.д.)
   const [notificationQueue, setNotificationQueue] = useState([]);
   const [activeQueueNotification, setActiveQueueNotification] = useState(null);
