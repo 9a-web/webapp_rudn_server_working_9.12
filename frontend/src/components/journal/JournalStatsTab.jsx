@@ -7,9 +7,9 @@ import {
 import { 
   Users, TrendingUp, Calendar, Award, 
   UserCheck, UserX, Clock, AlertCircle, ChevronDown, ChevronUp,
-  Shield, ShieldCheck, X, Plus, BookOpen, ChevronRight
+  Shield, ShieldCheck, X, Plus, BookOpen, ChevronRight, Star, Trophy, ArrowLeft
 } from 'lucide-react';
-import { getJournalStats } from '../../services/journalAPI';
+import { getJournalStats, getStudentStats } from '../../services/journalAPI';
 import { SubjectAttendanceModal } from './SubjectAttendanceModal';
 
 // Цветовая палитра для графиков
