@@ -536,16 +536,17 @@ const Home = () => {
       }
     };
     
-    if (isReady && user && startParam) {
+    if (isReady && (user || syncedUser) && startParam) {
       processRoomInvite();
     }
-  }, [isReady, user, startParam, roomInviteProcessed]);
+  }, [isReady, user, syncedUser, startParam, roomInviteProcessed]);
 
   // Обработка приглашения от друга
   const [friendInviteProcessed, setFriendInviteProcessed] = useState(false);
   useEffect(() => {
     const processFriendInvite = async () => {
-      if (!startParam || friendInviteProcessed || !user) {
+      const currentUser = user || syncedUser;
+      if (!startParam || friendInviteProcessed || !currentUser) {
         return;
       }
       
@@ -557,14 +558,14 @@ const Home = () => {
       const inviterIdStr = startParam.replace('friend_', '');
       const inviterId = parseInt(inviterIdStr, 10);
       
-      if (isNaN(inviterId) || inviterId === user.id) {
+      if (isNaN(inviterId) || inviterId === currentUser.id) {
         return;
       }
       
       console.log('👥 Обработка приглашения от друга:', inviterId);
       
       try {
-        const result = await friendsAPI.processFriendInvite(user.id, inviterId, false);
+        const result = await friendsAPI.processFriendInvite(currentUser.id, inviterId, false);
         
         setFriendInviteProcessed(true);
         
