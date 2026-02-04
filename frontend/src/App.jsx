@@ -1335,6 +1335,92 @@ const Home = () => {
     showAlert('Веб-версия успешно подключена!');
   };
 
+  // Обработка отсканированного QR-кода
+  const handleQRScanned = async (scannedText) => {
+    console.log('🔍 Processing QR code:', scannedText);
+    
+    try {
+      // 1. QR для синхронизации с веб-версией (link_XXXXX)
+      if (scannedText.includes('link_')) {
+        const sessionToken = scannedText.split('link_').pop()?.split(/[?&#]/)[0];
+        if (sessionToken) {
+          console.log('📱 Web session QR detected:', sessionToken);
+          setLinkSessionToken(sessionToken);
+          setShowTelegramLinkConfirm(true);
+          return;
+        }
+      }
+      
+      // 2. QR для добавления в друзья (friend_XXXXX или rudn://friend/XXXXX)
+      if (scannedText.includes('friend_') || scannedText.includes('friend/')) {
+        const friendId = scannedText.match(/friend[_\/](\d+)/)?.[1];
+        if (friendId && effectiveUser?.id) {
+          console.log('👥 Friend QR detected:', friendId);
+          // Отправляем запрос в друзья
+          const { friendsAPI } = await import('./services/friendsAPI');
+          const result = await friendsAPI.sendFriendRequest(effectiveUser.id, parseInt(friendId));
+          if (result.status === 'sent') {
+            showAlert('Запрос в друзья отправлен!');
+          } else if (result.status === 'already_friends') {
+            showAlert('Вы уже друзья!');
+          } else if (result.status === 'already_sent') {
+            showAlert('Запрос уже отправлен!');
+          } else {
+            showAlert(result.message || 'Запрос отправлен');
+          }
+          return;
+        }
+      }
+      
+      // 3. QR для присоединения к комнате (room_XXXXX)
+      if (scannedText.includes('room_')) {
+        const roomId = scannedText.match(/room_([a-zA-Z0-9-]+)/)?.[1];
+        if (roomId) {
+          console.log('🚪 Room QR detected:', roomId);
+          // TODO: Реализовать присоединение к комнате
+          showAlert('Комната найдена: ' + roomId);
+          return;
+        }
+      }
+      
+      // 4. QR для журнала посещений (journal_XXXXX или содержит /journal/)
+      if (scannedText.includes('journal_') || scannedText.includes('/journal/')) {
+        const journalId = scannedText.match(/journal[_\/]([a-zA-Z0-9-]+)/)?.[1];
+        if (journalId) {
+          console.log('📓 Journal QR detected:', journalId);
+          // TODO: Реализовать присоединение к журналу
+          showAlert('Журнал найден: ' + journalId);
+          return;
+        }
+      }
+      
+      // 5. Реферальный QR (ref_XXXXX)
+      if (scannedText.includes('ref_')) {
+        const refCode = scannedText.match(/ref_([a-zA-Z0-9]+)/)?.[1];
+        if (refCode) {
+          console.log('🔗 Referral QR detected:', refCode);
+          showAlert('Реферальный код: ' + refCode);
+          return;
+        }
+      }
+      
+      // 6. URL - открываем в браузере
+      if (scannedText.startsWith('http://') || scannedText.startsWith('https://')) {
+        console.log('🌐 URL QR detected:', scannedText);
+        window.Telegram?.WebApp?.openLink(scannedText);
+        return;
+      }
+      
+      // Неизвестный формат QR
+      console.log('❓ Unknown QR format:', scannedText);
+      showAlert('QR-код: ' + scannedText.substring(0, 100));
+      
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      showAlert('Ошибка обработки QR-кода');
+    }
+  };
+
   // Рендерим новогоднюю тему для всех экранов
   const renderNewYearTheme = () => {
     // Определяем, показывать ли снег
