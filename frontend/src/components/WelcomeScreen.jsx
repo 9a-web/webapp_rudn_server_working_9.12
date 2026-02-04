@@ -58,8 +58,12 @@ const WelcomeScreen = ({ onGetStarted, onSyncComplete }) => {
           setTimeout(() => {
             setShowQRModal(false);
             // Если есть данные пользователя с настройками - передаём их
+            // Добавляем session_token для сохранения сессии
             if (onSyncComplete && data) {
-              onSyncComplete(data);
+              onSyncComplete({
+                ...data,
+                session_token: newSession.session_token
+              });
             } else {
               onGetStarted();
             }
