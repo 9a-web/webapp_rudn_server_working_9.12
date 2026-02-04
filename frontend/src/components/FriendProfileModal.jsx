@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Star, UserMinus, Calendar, Users, 
   Clock, MapPin, ChevronRight, AlertTriangle,
-  Eye, EyeOff, Shield, Ban
+  Eye, EyeOff, Shield, Ban, ChevronLeft
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 
