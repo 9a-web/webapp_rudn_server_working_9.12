@@ -70,6 +70,30 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ Privacy settings persistence verified. GET /api/profile/765963392/privacy after PUT correctly returns the updated values, confirming that settings are properly saved to database."
+  
+  - task: "Test Journal API - Leave Journal as Owner (Should Fail)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/journals/{journal_id}/leave endpoint working correctly. Properly returns 403 Forbidden when owner tries to leave their own journal, with appropriate error message 'Owner cannot leave their journal. Delete it instead.'"
+  
+  - task: "Test Journal API - Delete Journal as Owner"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ DELETE /api/journals/{journal_id}?telegram_id=XXX endpoint working correctly. Successfully deletes journal when called by owner, returns proper success response with status 'success'."
 
 frontend:
   # No frontend testing required for this review request
