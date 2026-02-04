@@ -2163,10 +2163,10 @@ const TodayTaskItem = ({
     <Reorder.Item
       value={task}
       id={task.id}
-      dragListener={false}
+      dragListener={true}
       dragControls={dragControls}
-      className="mb-2"
-      style={{ listStyle: 'none' }}
+      className="mb-2 touch-none"
+      style={{ listStyle: 'none', touchAction: 'none' }}
       whileDrag={{ 
         scale: 1.02, 
         boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
