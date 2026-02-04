@@ -2186,6 +2186,87 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Модальное окно изменения времени события после перетаскивания */}
+      <AnimatePresence>
+        {isTimeChangeModalOpen && eventToChangeTime && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={cancelEventTimeChange}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Изменить время</h3>
+                    <p className="text-sm text-gray-500">Укажите новое время события</p>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-3 mb-4">
+                  <p className="text-sm text-gray-700 font-medium truncate">
+                    {eventToChangeTime.text}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Было: {eventToChangeTime.time_start} — {eventToChangeTime.time_end}
+                  </p>
+                </div>
+                
+                {/* Выбор нового времени */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Начало</label>
+                    <input
+                      type="time"
+                      value={newEventTime.start}
+                      onChange={(e) => setNewEventTime(prev => ({ ...prev, start: e.target.value }))}
+                      className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Конец</label>
+                    <input
+                      type="time"
+                      value={newEventTime.end}
+                      onChange={(e) => setNewEventTime(prev => ({ ...prev, end: e.target.value }))}
+                      className="w-full px-3 py-2.5 bg-gray-100 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={cancelEventTimeChange}
+                    className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={confirmEventTimeChange}
+                    disabled={savingTimeChange}
+                    className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl font-medium text-sm disabled:opacity-50"
+                  >
+                    {savingTimeChange ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
