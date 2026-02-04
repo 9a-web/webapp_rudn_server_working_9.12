@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -9,7 +9,7 @@ import {
   UserCheck, UserX, Clock, AlertCircle, 
   BookOpen, GraduationCap, FlaskConical, FileText,
   CheckCircle, XCircle, AlertTriangle,
-  Trophy, Star,
+  Trophy, Star, ChevronRight, X, ArrowLeft,
 } from 'lucide-react';
 import { getMyAttendance } from '../../services/journalAPI';
 
