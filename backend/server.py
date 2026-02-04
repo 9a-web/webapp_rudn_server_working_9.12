@@ -12140,6 +12140,20 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
         
         logger.info(f"✅ Web session linked: {session_token[:8]}... -> {request.telegram_id}")
         
+        # Отправляем уведомление в Telegram о новом устройстве
+        try:
+            from telegram_bot import send_device_linked_notification
+            device_name = session.get("device_name", "Неизвестное устройство")
+            await send_device_linked_notification(
+                telegram_id=request.telegram_id,
+                device_name=device_name,
+                session_token=session_token,
+                photo_url=request.photo_url,
+                first_name=request.first_name
+            )
+        except Exception as notify_err:
+            logger.warning(f"⚠️ Не удалось отправить Telegram уведомление: {notify_err}")
+        
         # Отправляем уведомление через WebSocket если есть активное соединение
         if session_token in web_session_connections:
             try:
