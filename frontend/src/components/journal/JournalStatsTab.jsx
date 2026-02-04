@@ -59,6 +59,44 @@ const PieTooltip = ({ active, payload }) => {
   return null;
 };
 
+// Функция для получения цвета градиента по проценту посещаемости
+const getAttendanceGradient = (percent) => {
+  if (percent >= 80) {
+    return { start: '#22c55e', end: '#10b981' }; // green
+  } else if (percent >= 60) {
+    return { start: '#eab308', end: '#f59e0b' }; // yellow
+  } else {
+    return { start: '#ef4444', end: '#f97316' }; // red
+  }
+};
+
+// Кастомный Bar для тепловой карты
+const HeatmapBar = (props) => {
+  const { x, y, width, height, payload } = props;
+  const gradient = getAttendanceGradient(payload?.attendance || 0);
+  const gradientId = `heatmap-${payload?.name?.replace(/\s/g, '-') || 'default'}-${payload?.attendance || 0}`;
+  
+  return (
+    <g>
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={gradient.start} />
+          <stop offset="100%" stopColor={gradient.end} />
+        </linearGradient>
+      </defs>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={`url(#${gradientId})`}
+        rx={4}
+        ry={4}
+      />
+    </g>
+  );
+};
+
 export const JournalStatsTab = ({ 
   journalId, 
   telegramId,
