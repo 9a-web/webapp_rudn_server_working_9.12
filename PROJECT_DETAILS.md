@@ -1,18 +1,24 @@
 # 📘 PROJECT DETAILS - Техническая документация
 
-**Обновлено:** 2025-07-16 | **Статус:** Актуализирован
+**Обновлено:** 2025-07-16 | **Статус:** ✅ ПОЛНОСТЬЮ АКТУАЛИЗИРОВАН
+
+---
 
 ## 📋 Содержание
-1. [Архитектура системы](#архитектура-системы)
-2. [Backend структура](#backend-структура)
-3. [Frontend структура](#frontend-структура)
-4. [Модели данных](#модели-данных)
-5. [API интеграции](#api-интеграции)
-6. [Workflow и сценарии](#workflow-и-сценарии)
-7. [Deployment](#deployment)
-8. [VK Music интеграция](#vk-music-интеграция)
-9. [Система друзей](#система-друзей)
-10. [In-App уведомления](#in-app-уведомления)
+
+1. [Архитектура системы](#1-архитектура-системы)
+2. [Backend структура](#2-backend-структура)
+3. [Frontend структура](#3-frontend-структура)
+4. [Модели данных](#4-модели-данных)
+5. [API интеграции](#5-api-интеграции)
+6. [Workflow и сценарии](#6-workflow-и-сценарии)
+7. [Deployment](#7-deployment)
+8. [VK Music интеграция](#8-vk-music-интеграция)
+9. [Система друзей](#9-система-друзей)
+10. [In-App уведомления](#10-in-app-уведомления)
+11. [Web Sessions (QR-авторизация)](#11-web-sessions-qr-авторизация)
+12. [Privacy Settings](#12-privacy-settings)
+13. [MongoDB коллекции](#13-mongodb-коллекции)
 
 ---
 
@@ -20,12 +26,12 @@
 
 ### 1.1 Общая схема
 
-Приложение состоит из 4 основных слоев:
+Приложение состоит из 4 основных слоёв:
 
-1. **Presentation Layer** - React Telegram Web App
-2. **API Layer** - FastAPI REST API
+1. **Presentation Layer** - React 19 Telegram Web App
+2. **API Layer** - FastAPI REST API (200 endpoints)
 3. **Business Logic Layer** - Python модули (achievements, notifications, scheduler)
-4. **Data Layer** - MongoDB + External APIs
+4. **Data Layer** - MongoDB (33 коллекции) + External APIs
 
 ### 1.2 Технологический стек
 
@@ -65,40 +71,25 @@
 
 ## 2. Backend структура
 
-### 2.1 Главные модули
+### 2.1 Главные модули (LOC statistics)
 
-#### server.py (10,432 LOC)
+| Файл | LOC | Описание |
+|------|-----|----------|
+| `server.py` | **12,753** | ВСЕ API endpoints (200) |
+| `models.py` | **2,262** | Pydantic схемы |
+| `telegram_bot.py` | **1,347** | Telegram Bot логика |
+| `scheduler_v2.py` | **828** | Уведомления V2 |
+| `achievements.py` | **770** | 24 достижения |
+| `scheduler.py` | 383 | Старый планировщик (резерв) |
+| `lk_parser.py` | 380 | Парсинг ЛК РУДН |
+| `vk_auth_service.py` | 350 | VK авторизация |
+| `music_service.py` | 333 | VK Music сервис |
+| `rudn_parser.py` | 311 | Парсинг API РУДН |
+| `cover_service.py` | 270 | Обложки треков |
+| `notifications.py` | 194 | Telegram уведомления |
+| **ИТОГО** | **~25,000** | |
 
-**Назначение:** Главный FastAPI сервер со всеми endpoints (173)
-
-**Основные разделы:**
-```python
-# 1. Инициализация
-app = FastAPI()
-api_router = APIRouter(prefix="/api")
-db = client[DB_NAME]
-
-# 2. CORS настройки
-app.add_middleware(CORSMiddleware, ...)
-
-# 3. Endpoints (173):
-# - Расписание РУДН (6 endpoints)
-# - Пользователи (15 endpoints)
-# - Планировщик (5 endpoints)
-# - Задачи (9 endpoints)
-# - Комнаты (12 endpoints)
-# - Групповые задачи (16 endpoints)
-# - Журнал посещений (23 endpoints)
-# - VK Music (20 endpoints)
-# - Друзья (15 endpoints)
-# - In-App уведомления (8 endpoints)
-# - Достижения (5 endpoints)
-# - Реферальная система (4 endpoints)
-# - ЛК РУДН (4 endpoints)
-# - Админ статистика (12 endpoints)
-# - Бэкапы (3 endpoints)
-# - Прочее (5 endpoints)
-```
+### 2.2 server.py - Главный файл
 
 **Ключевые зависимости:**
 ```python
@@ -115,85 +106,23 @@ from cover_service import CoverService  # Обложки треков
 ```
 
 **Основные функции:**
-- `get_user_settings(telegram_id)` - получить настройки юзера
-- `update_last_activity(telegram_id)` - обновить last_activity
-- `get_or_create_user_stats(telegram_id)` - получить/создать статистику
-- `create_in_app_notification(...)` - создать внутреннее уведомление
-
-#### models.py (1,959 LOC)
-
-**Все Pydantic модели:**
-
 ```python
-# Расписание
-class Faculty(BaseModel): ...
-class FilterOption(BaseModel): ...
-class FilterDataRequest(BaseModel): ...
-class ScheduleRequest(BaseModel): ...
-class ScheduleEvent(BaseModel): ...
-class ScheduleResponse(BaseModel): ...
-
-# Пользователи
-class UserSettings(BaseModel): ...
-class UserSettingsResponse(BaseModel): ...
-class NotificationSettings(BaseModel): ...
-class UserStats(BaseModel): ...
-
-# Задачи
-class Task(BaseModel): ...
-class TaskCreate(BaseModel): ...
-class TaskUpdate(BaseModel): ...
-
-# Комнаты
-class Room(BaseModel): ...
-class RoomCreate(BaseModel): ...
-class RoomParticipant(BaseModel): ...
-class RoomInviteLinkResponse(BaseModel): ...
-
-# Групповые задачи
-class GroupTask(BaseModel): ...
-class GroupTaskCreate(BaseModel): ...
-class GroupTaskUpdate(BaseModel): ...
-
-# Достижения
-class Achievement(BaseModel): ...
-class UserAchievement(BaseModel): ...
-
-# Трекинг
-class ActionTrack(BaseModel): ...
+async def get_user_settings(telegram_id)
+async def update_last_activity(telegram_id)
+async def get_or_create_user_stats(telegram_id)
+async def create_in_app_notification(...)
 ```
 
-#### achievements.py (733 LOC)
+### 2.3 achievements.py - 24 достижения
 
-**24 достижения в словаре ACHIEVEMENTS:**
-
-```python
-ACHIEVEMENTS = {
-    "first_group": {
-        "id": "first_group",
-        "name": "Первопроходец",
-        "description": "Выбор первой группы",
-        "emoji": "🎯",
-        "points": 10,
-        "type": "basic",
-        "requirement": "Выбрать группу расписания"
-    },
-    # ... еще 24 достижения
-}
-```
-
-**Категории достижений:**
+**Категории:**
 1. **Basic** - базовые действия (выбор группы, первая неделя)
 2. **Social** - социальные (приглашения друзей)
 3. **Exploration** - исследование (открытие всех разделов)
 4. **Milestone** - milestone (получить все ачивки)
 5. **Activity** - активность (ночное/раннее использование)
 
-**Главные функции:**
-- `check_and_award_achievements(telegram_id, user_stats, action_type, metadata=None)` - проверка и выдача ачивок
-- `track_user_action(telegram_id, action_type, metadata=None)` - трекинг действий
-
-**Триггеры достижений:**
+**Триггеры:**
 ```python
 "select_group" -> first_group
 "view_schedule" -> schedule_explorer (10x), schedule_master (50x)
@@ -201,534 +130,245 @@ ACHIEVEMENTS = {
 "night_usage" -> night_owl (5x)
 "early_usage" -> early_bird (5x)
 "view_analytics" -> analyst (1x), chart_lover (5x)
-"open_calendar" -> organizer (1x)
-"configure_notifications" -> settings_master (1x)
-"share_schedule" -> knowledge_sharer (1x), ambassador (5x)
-"visit_menu_item" -> explorer (все разделы)
-"daily_activity" -> first_week (7 дней), perfectionist (все ачивки)
 ```
 
-#### telegram_bot.py (1,204 LOC)
+### 2.4 scheduler_v2.py - Уведомления V2
 
-**Telegram Bot функции:**
+**Трёхуровневая архитектура:**
+1. **Daily Planner** (06:00) - подготовка уведомлений
+2. **Notification Executor** - отправка
+3. **Retry Handler** (2 мин) - повтор
 
-1. **Команды:**
-   - `/start` - регистрация юзера, показ welcome message
-   - Deep linking: `/start room_{token}_ref_{user_id}` - присоединение к комнате
-
-2. **Функции:**
-   - `start_command(update, context)` - обработка /start
-   - `send_telegram_message(telegram_id, message, reply_markup=None)` - отправка сообщений
-   - `send_class_notification(telegram_id, class_info)` - уведомление о паре
-   - `notify_room_member(telegram_id, room_name, inviter_name, room_id)` - уведомление о приглашении
-
-3. **Inline клавиатура:**
-```python
-button = InlineKeyboardButton(
-    "Открыть расписание ✨",
-    web_app=WebAppInfo(url="https://rudn-schedule.ru")
-)
-```
-
-#### rudn_parser.py (310 LOC)
-
-**Интеграция с API РУДН:**
-
-```python
-BASE_URL = "http://www.rudn.ru"
-API_ENDPOINT = "/rasp/lessons/view"
-
-# Функции:
-async def get_faculties() -> List[Faculty]
-async def get_filter_data(facultet_id: str, level_id="", kurs="", form_code="") -> dict
-async def get_schedule(facultet_id, level_id, kurs, form_code, group_id, week_number=1) -> dict
-```
-
-**Особенности:**
-- Парсинг HTML через BeautifulSoup
-- Асинхронные запросы (httpx)
-- Обработка ошибок и таймаутов
-- Нормализация данных (например, int -> str для курсов)
-
-#### weather.py (120 LOC)
-
-**OpenWeatherMap интеграция:**
-
-```python
-API_KEY = os.environ.get('WEATHER_API_KEY')
-BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
-
-async def get_weather_data() -> dict:
-    # Запрос погоды для Москвы (lat=55.7558, lon=37.6173)
-    # Возвращает: temperature, feels_like, humidity, wind_speed, description, icon
-```
-
-#### notifications.py (140 LOC)
-
-**Система уведомлений:**
-
-```python
-async def send_class_notification(telegram_id: int, class_info: dict):
-    # Отправка уведомления о предстоящей паре
-    # class_info: {discipline, time, teacher, auditory, lessonType}
-```
-
-**Интеграция с scheduler.py для периодической проверки:**
-
-#### scheduler.py (460 LOC)
-
-**APScheduler задачи:**
-
-```python
-scheduler = AsyncIOScheduler()
-
-# Задача 1: Проверка предстоящих пар (каждую минуту)
-@scheduler.scheduled_job('cron', minute='*')
-async def check_upcoming_classes():
-    # Получить всех юзеров с notifications_enabled=True
-    # Для каждого: получить расписание на сегодня
-    # Найти пары, которые начинаются через notification_time минут
-    # Отправить уведомление через Telegram Bot
-
-# Задача 2: Обновление кэша (каждый час)
-@scheduler.scheduled_job('cron', hour='*')
-async def update_cache():
-    # Очистка устаревших данных из кэша
-```
-
-#### cache.py (40 LOC)
-
-**In-memory кэш:**
-
-```python
-cache = {}  # {key: {"data": ..., "timestamp": ...}}
-
-def get_cached(key: str, max_age: int = 3600) -> Optional[Any]
-def set_cached(key: str, data: Any)
-```
+**Точность:** ±10 секунд  
+**Retry:** 3 попытки (1, 3, 5 минут)
 
 ---
 
 ## 3. Frontend структура
 
-### 3.1 App.js (Root Component)
+### 3.1 Статистика
 
-**Основная структура:**
+| Категория | Количество |
+|-----------|------------|
+| Основные компоненты | **72** |
+| Journal компоненты | **15** |
+| Music компоненты | **12** |
+| Services (API клиенты) | **10** |
+| Utils | **8** |
+| Contexts | 2 + PlayerContext |
+| **ИТОГО LOC** | **~46,000** |
 
-```javascript
-function App() {
-  // 1. State управление
-  const [activeTab, setActiveTab] = useState('home'); // home | tasks | journal
-  const [userSettings, setUserSettings] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [weekNumber, setWeekNumber] = useState(1);
-  const [schedule, setSchedule] = useState([]);
-  const [loading, setLoading] = useState(true);
-  // + 10+ других state переменных для модальных окон
+### 3.2 Ключевые компоненты (по размеру)
 
-  // 2. Telegram WebApp инициализация
-  const { user, webApp } = useTelegram();
+| Компонент | LOC | Описание |
+|-----------|-----|----------|
+| `TasksSection.jsx` | **2,464** | Личные задачи |
+| `App.jsx` | **1,610** | Главный компонент |
+| `ProfileModal.jsx` | **1,542** | Профиль пользователя |
+| `ListeningRoomModal.jsx` | **1,089** | Комнаты прослушивания |
+| `AdminPanel.jsx` | **974** | Админ панель |
+| `JournalDetailModal.jsx` | **938** | Детали журнала |
+| `JournalStatsTab.jsx` | **871** | Статистика журнала |
+| `RoomDetailModal.jsx` | **784** | Детали комнаты |
 
-  // 3. Load user settings
-  useEffect(() => {
-    if (user?.id) {
-      loadUserSettings(user.id);
-    }
-  }, [user]);
+### 3.3 Services (API клиенты)
 
-  // 4. Load schedule
-  useEffect(() => {
-    if (userSettings) {
-      fetchSchedule();
-    }
-  }, [userSettings, selectedDate, weekNumber]);
+| Service | Описание |
+|---------|----------|
+| `api.js` | Основной API клиент |
+| `roomsAPI.js` | Комнаты |
+| `groupTasksAPI.js` | Групповые задачи |
+| `journalAPI.js` | Журнал посещений |
+| `musicAPI.js` | VK Music |
+| `friendsAPI.js` | Друзья |
+| `notificationsAPI.js` | Уведомления |
+| `referralAPI.js` | Реферальная система |
+| `webSessionAPI.js` | Web Sessions |
+| `listeningRoomAPI.js` | Комнаты прослушивания |
 
-  // 5. Achievement system
-  const checkAchievements = async (achievements) => { ... };
+### 3.4 Journal компоненты (15)
 
-  // 6. Rendering
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0F0F0F] to-[#1A1A1A]">
-      {/* Welcome Screen для новых юзеров */}
-      {!userSettings && <WelcomeScreen />}
-
-      {/* Main App */}
-      {userSettings && (
-        <>
-          <Header {...props} />
-
-          {/* Content по activeTab */}
-          {activeTab === 'home' && (
-            <>
-              <LiveScheduleCarousel />
-              <WeekDaySelector />
-              <LiveScheduleSection />
-            </>
-          )}
-          {activeTab === 'tasks' && <TasksSection {...props} />}
-          {activeTab === 'journal' && <JournalSection />}
-
-          {/* Modals */}
-          <CalendarModal />
-          <AnalyticsModal />
-          <AchievementsModal />
-          <NotificationSettings />
-          {/* ... другие модалки */}
-
-          {/* Bottom Navigation */}
-          <BottomNavigation activeTab={activeTab} onChange={setActiveTab} />
-
-          {/* Achievement Notification */}
-          <AchievementNotification />
-        </>
-      )}
-    </div>
-  );
-}
+```
+/components/journal/
+├── JournalCard.jsx
+├── JournalDetailModal.jsx
+├── JournalStatsTab.jsx
+├── CreateJournalModal.jsx
+├── CreateSessionModal.jsx
+├── CreateSubjectModal.jsx
+├── SubjectDetailModal.jsx
+├── SubjectAttendanceModal.jsx
+├── AttendanceModal.jsx
+├── AddStudentsModal.jsx
+├── EditStudentModal.jsx
+├── LinkStudentModal.jsx
+├── ShareStudentLinkModal.jsx
+├── JournalApplicationsModal.jsx
+└── MyAttendanceStats.jsx
 ```
 
-### 3.2 Ключевые компоненты
+### 3.5 Music компоненты (12)
 
-#### TasksSection.jsx (900+ LOC)
-
-**Самый большой компонент - управление личными задачами**
-
-**Функции:**
-1. Список задач с фильтрацией (категория, приоритет, дедлайн)
-2. Drag & Drop для изменения порядка
-3. Создание/редактирование/удаление задач
-4. Группировка по дате (сегодня, завтра, на этой неделе)
-5. Интеграция с расписанием (привязка к предметам)
-6. Быстрые действия (шаблоны задач)
-7. Прогресс-бар завершенности
-
-**State:**
-```javascript
-const [tasks, setTasks] = useState([]);
-const [tasksSelectedDate, setTasksSelectedDate] = useState(new Date());
-const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-const [filterCategory, setFilterCategory] = useState('all');
-const [filterPriority, setFilterPriority] = useState('all');
-const [sortBy, setSortBy] = useState('priority'); // priority | deadline
+```
+/components/music/
+├── MusicSection.jsx         # Главный компонент
+├── MusicSearch.jsx          # Поиск треков
+├── TrackCard.jsx            # Карточка трека
+├── TrackCover.jsx           # Обложка трека
+├── TrackList.jsx            # Список треков
+├── ArtistCard.jsx           # Карточка исполнителя
+├── PlaylistCard.jsx         # Карточка плейлиста
+├── MiniPlayer.jsx           # Мини-плеер
+├── FullscreenPlayer.jsx     # Полноэкранный плеер
+├── VKAuthModal.jsx          # Авторизация VK
+├── PlayerContext.jsx        # Контекст плеера
+└── ListeningRoomModal.jsx   # Комнаты прослушивания
 ```
 
-#### LiveScheduleSection.jsx (560 LOC)
+### 3.6 Utils (8)
 
-**Отображение списка пар на день**
-
-**Функции:**
-1. Карточки пар с деталями (время, предмет, преподаватель, аудитория)
-2. Статус пары (закончилась, в процессе, предстоит)
-3. Expand/collapse для деталей
-4. Кнопка "Поделиться расписанием"
-5. Смена группы
-6. Empty state если нет пар
-
-#### RoomDetailModal.jsx (600+ LOC)
-
-**Детали комнаты + управление групповыми задачами**
-
-**Функции:**
-1. Информация о комнате (название, описание, цвет, эмодзи)
-2. Список участников с ролями (owner/member)
-3. Список задач комнаты
-4. Создание/редактирование/удаление задач
-5. Прогресс комнаты (completed/total tasks)
-6. Генерация/копирование invite ссылки
-7. Покинуть/удалить комнату
-
-### 3.3 Utils
-
-#### analytics.js
-
-**Функции для аналитики:**
-
-```javascript
-export function calculateScheduleStats(schedule) {
-  // Подсчет уникальных пар (по день+время)
-  const uniqueTimeSlots = new Set();
-  schedule.forEach(event => {
-    uniqueTimeSlots.add(`${event.day}|${event.time}`);
-  });
-
-  return {
-    totalClasses: uniqueTimeSlots.size,
-    totalHours: uniqueTimeSlots.size * 1.5, // 1 пара = 1.5 часа
-    averageClassesPerDay: uniqueTimeSlots.size / 6, // на 6 дней
-    // ...
-  };
-}
-
-export function getWeekLoadChart(schedule) {
-  // График загрузки по дням недели
-  const dayMap = { 'Пн': 0, 'Вт': 1, ... };
-  // Возвращает массив объектов {day, classes, hours}
-}
-
-export function getClassTypeStats(schedule) {
-  // Статистика по типам занятий (лекция, практика, лаб)
-}
 ```
-
-#### dateUtils.js
-
-**Утилиты для работы с датами:**
-
-```javascript
-export function getCurrentWeekNumber(date) {
-  // Возвращает 1 или 2 (четная/нечетная неделя)
-}
-
-export function getWeekDateRange(date, weekNumber) {
-  // Возвращает понедельник и воскресенье для недели
-}
-
-export function isSameDay(date1, date2) { ... }
-export function isToday(date) { ... }
-export function isTomorrow(date) { ... }
-```
-
-#### animations.js
-
-**Preset анимации для Framer Motion:**
-
-```javascript
-export const modalVariants = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 0.9 }
-};
-
-export const slideUpVariants = {
-  hidden: { y: '100%' },
-  visible: { y: 0 },
-  exit: { y: '100%' }
-};
-
-export const fadeInVariants = { ... };
-```
-
-#### confetti.js
-
-**Генерация конфетти при получении достижения:**
-
-```javascript
-export function generateConfetti(count = 50) {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: Math.random() * window.innerWidth,
-    delay: Math.random() * 0.5,
-    duration: 2 + Math.random() * 2,
-    rotation: Math.random() * 360
-  }));
-}
-```
-
-### 3.4 Services (API клиенты)
-
-#### api.js
-
-**Базовый API клиент:**
-
-```javascript
-import axios from 'axios';
-
-const API_BASE = process.env.REACT_APP_BACKEND_URL;
-
-export const api = {
-  // Расписание
-  getFaculties: () => axios.get(`${API_BASE}/api/faculties`),
-  getFilterData: (data) => axios.post(`${API_BASE}/api/filter-data`, data),
-  getSchedule: (data) => axios.post(`${API_BASE}/api/schedule`, data),
-
-  // Пользователи
-  getUserSettings: (telegramId) => axios.get(`${API_BASE}/api/user-settings/${telegramId}`),
-  saveUserSettings: (data) => axios.post(`${API_BASE}/api/user-settings`, data),
-
-  // Задачи
-  getTasks: (telegramId) => axios.get(`${API_BASE}/api/tasks/${telegramId}`),
-  createTask: (data) => axios.post(`${API_BASE}/api/tasks`, data),
-  updateTask: (taskId, data) => axios.put(`${API_BASE}/api/tasks/${taskId}`, data),
-  deleteTask: (taskId) => axios.delete(`${API_BASE}/api/tasks/${taskId}`),
-
-  // Достижения
-  getAchievements: () => axios.get(`${API_BASE}/api/achievements`),
-  getUserAchievements: (telegramId) => axios.get(`${API_BASE}/api/user-achievements/${telegramId}`),
-  trackAction: (data) => axios.post(`${API_BASE}/api/track-action`, data),
-
-  // Погода
-  getWeather: () => axios.get(`${API_BASE}/api/weather`),
-
-  // ...
-};
-```
-
-#### roomsAPI.js
-
-**API для комнат:**
-
-```javascript
-export const roomsAPI = {
-  createRoom: (data) => axios.post(`${API_BASE}/api/rooms`, data),
-  getRooms: (telegramId) => axios.get(`${API_BASE}/api/rooms/${telegramId}`),
-  getRoomDetail: (roomId) => axios.get(`${API_BASE}/api/rooms/detail/${roomId}`),
-  generateInviteLink: (roomId) => axios.post(`${API_BASE}/api/rooms/${roomId}/invite-link`),
-  joinRoom: (inviteToken, data) => axios.post(`${API_BASE}/api/rooms/join/${inviteToken}`, data),
-  leaveRoom: (roomId, telegramId) => axios.delete(`${API_BASE}/api/rooms/${roomId}/leave`, { data: { telegram_id: telegramId } }),
-  deleteRoom: (roomId, telegramId) => axios.delete(`${API_BASE}/api/rooms/${roomId}`, { data: { telegram_id: telegramId } }),
-};
-```
-
-#### groupTasksAPI.js
-
-**API для групповых задач:**
-
-```javascript
-export const groupTasksAPI = {
-  createGroupTask: (roomId, data) => axios.post(`${API_BASE}/api/rooms/${roomId}/tasks`, data),
-  getRoomTasks: (roomId) => axios.get(`${API_BASE}/api/rooms/${roomId}/tasks`),
-  updateGroupTask: (taskId, data) => axios.put(`${API_BASE}/api/group-tasks/${taskId}`, data),
-  deleteGroupTask: (taskId) => axios.delete(`${API_BASE}/api/group-tasks/${taskId}`),
-};
+/utils/
+├── analytics.js      # Аналитика расписания
+├── animations.js     # Framer Motion presets
+├── confetti.js       # Конфетти для достижений
+├── dateUtils.js      # Работа с датами
+├── gestures.js       # Жесты свайпов
+├── pluralize.js      # Склонение слов
+├── scheduleUtils.js  # Утилиты расписания
+└── textUtils.js      # Работа с текстом
 ```
 
 ---
 
-## 4. Модели данных (подробно)
+## 4. Модели данных
 
 ### 4.1 UserSettings
 
-**Назначение:** Хранит выбранную группу и настройки юзера
+```python
+{
+    "id": UUID,
+    "telegram_id": int,           # ID в Telegram
+    "username": str?,
+    "first_name": str?,
+    "last_name": str?,
+    "group_id": str,              # ID группы РУДН
+    "group_name": str,            # Название группы
+    "facultet_id": str,
+    "facultet_name": str?,
+    "level_id": str,
+    "kurs": str,
+    "form_code": str,
+    "notifications_enabled": bool,
+    "notification_time": int,     # 5-30 минут
+    "referral_code": str,
+    "referred_by": int?,
+    "invited_count": int,
+    "created_at": datetime,
+    "last_activity": datetime,
+    "privacy_settings": {         # НОВОЕ
+        "show_online_status": bool,
+        "show_in_search": bool,
+        "show_friends_list": bool,
+        "show_achievements": bool,
+        "show_schedule": bool
+    }
+}
+```
 
-**Поля:**
-- `id` (UUID) - уникальный идентификатор
-- `telegram_id` (int) - ID юзера в Telegram
-- `username` (str, optional) - @username
-- `first_name` (str, optional) - имя
-- `last_name` (str, optional) - фамилия
-- `group_id` (str) - ID группы в API РУДН
-- `group_name` (str) - название группы (например, "СААад-01-24")
-- `facultet_id` (str) - ID факультета
-- `facultet_name` (str, optional) - название факультета
-- `level_id` (str) - уровень образования
-- `kurs` (str) - курс ("1", "2", ...)
-- `form_code` (str) - форма обучения
-- `notifications_enabled` (bool) - включены ли уведомления
-- `notification_time` (int, 5-30) - за сколько минут присылать уведомление
-- `referral_code` (str) - код для реферальной системы
-- `referred_by` (int, optional) - кто пригласил
-- `invited_count` (int) - сколько друзей пригласил
-- `created_at` (datetime) - дата регистрации
-- `last_activity` (datetime) - последняя активность
+### 4.2 Task
 
-**Индексы:** `telegram_id` (unique)
+```python
+{
+    "id": UUID,
+    "telegram_id": int,
+    "text": str,
+    "completed": bool,
+    "category": str,              # учеба, личное, спорт, проекты
+    "priority": str,              # high, medium, low
+    "deadline": datetime?,
+    "target_date": datetime?,
+    "notes": str?,
+    "tags": List[str],
+    "order": int,
+    "subtasks": List[Subtask],
+    "created_at": datetime,
+    "updated_at": datetime
+}
+```
 
-### 4.2 UserStats
+### 4.3 Room
 
-**Назначение:** Статистика для достижений и аналитики
+```python
+{
+    "id": UUID,
+    "name": str,
+    "color": str,                 # #hex
+    "emoji": str,
+    "description": str?,
+    "owner_id": int,
+    "participants": List[{
+        "telegram_id": int,
+        "username": str?,
+        "first_name": str?,
+        "role": str,              # owner, member
+        "joined_at": datetime
+    }],
+    "total_tasks": int,
+    "completed_tasks": int,
+    "created_at": datetime
+}
+```
 
-**Поля:**
-- `telegram_id` (int, unique) - ID юзера
-- `groups_viewed` (int) - сколько раз смотрел разные группы
-- `friends_invited` (int) - сколько друзей пригласил
-- `schedule_views` (int) - сколько раз просмотрел расписание
-- `night_usage_count` (int) - ночное использование (22:00-06:00)
-- `early_usage_count` (int) - раннее использование (06:00-08:00)
-- `total_points` (int) - общее количество очков
-- `achievements_count` (int) - количество полученных достижений
-- `analytics_views` (int) - просмотры аналитики
-- `calendar_opens` (int) - открытия календаря
-- `notifications_configured` (int) - настроек уведомлений
-- `schedule_shares` (int) - поделился расписанием
-- `menu_items_visited` (int) - посещено разделов меню
-- `active_days` (int) - дней подряд активности
+### 4.4 WebSession (НОВОЕ)
 
-**Индексы:** `telegram_id` (unique)
+```python
+{
+    "session_token": UUID,
+    "telegram_id": int?,          # После привязки
+    "status": str,                # pending, scanned, linked, expired, revoked
+    "device_info": {
+        "browser": str,
+        "os": str,
+        "device": str
+    },
+    "qr_url": str,
+    "created_at": datetime,
+    "expires_at": datetime,
+    "linked_at": datetime?,
+    "last_active": datetime?
+}
+```
 
-### 4.3 Task
+### 4.5 ListeningRoom (НОВОЕ)
 
-**Назначение:** Личная задача юзера
-
-**Поля:**
-- `id` (UUID) - уникальный идентификатор
-- `telegram_id` (int) - владелец
-- `text` (str) - текст задачи
-- `completed` (bool) - выполнена ли
-- `category` (str) - категория ('учеба', 'личное', 'спорт', 'проекты')
-- `priority` (str) - приоритет ('high', 'medium', 'low')
-- `deadline` (datetime, optional) - дедлайн
-- `target_date` (datetime, optional) - целевая дата (для привязки к дню)
-- `notes` (str, optional) - заметки
-- `tags` (List[str]) - теги
-- `order` (int) - порядок в списке (для drag & drop)
-- `created_at` (datetime) - дата создания
-- `updated_at` (datetime) - дата обновления
-
-**Индексы:** `telegram_id`, `deadline`, `target_date`
-
-**Важно:** 
-- `deadline` - реальный дедлайн (используется для уведомлений и группировки)
-- `target_date` - дата, к которой привязана задача (для показа в определенный день)
-
-### 4.4 Room
-
-**Назначение:** Комната для групповой работы
-
-**Поля:**
-- `id` (UUID) - уникальный идентификатор
-- `name` (str) - название комнаты
-- `color` (str) - цвет (#hex)
-- `emoji` (str) - эмодзи
-- `description` (str, optional) - описание
-- `owner_id` (int) - владелец (telegram_id)
-- `created_at` (datetime) - дата создания
-- `total_participants` (int) - количество участников
-- `total_tasks` (int) - общее количество задач
-- `completed_tasks` (int) - выполненных задач
-
-**Индексы:** `owner_id`, `id`
-
-### 4.5 RoomParticipant
-
-**Назначение:** Участник комнаты
-
-**Поля:**
-- `room_id` (str) - ID комнаты
-- `telegram_id` (int) - ID участника
-- `username` (str, optional) - @username
-- `first_name` (str, optional) - имя
-- `avatar_url` (str, optional) - аватар
-- `role` (str) - роль ('owner', 'member')
-- `joined_at` (datetime) - дата присоединения
-- `referral_code` (int, optional) - кто пригласил
-
-**Индексы:** `room_id`, `telegram_id`, composite: (`room_id`, `telegram_id`) unique
-
-### 4.6 GroupTask
-
-**Назначение:** Групповая задача в комнате
-
-**Поля:**
-- `id` (UUID) - уникальный идентификатор
-- `room_id` (str) - ID комнаты
-- `text` (str) - текст задачи
-- `description` (str, optional) - описание
-- `completed` (bool) - выполнена ли
-- `priority` (str) - приоритет
-- `deadline` (datetime, optional) - дедлайн
-- `created_by` (int) - кто создал (telegram_id)
-- `assigned_to` (List[int]) - кому назначена (telegram_ids)
-- `category` (str, optional) - категория
-- `tags` (List[str]) - теги
-- `order` (int) - порядок в списке
-- `created_at` (datetime) - дата создания
-- `updated_at` (datetime) - дата обновления
-- `completed_by` (int, optional) - кто выполнил
-- `completed_at` (datetime, optional) - когда выполнена
-
-**Индексы:** `room_id`, `deadline`, `assigned_to`
-
-**Особенность:** При создании задачи все участники комнаты автоматически добавляются в `assigned_to`
+```python
+{
+    "id": UUID,
+    "name": str,
+    "owner_id": int,
+    "invite_code": str,
+    "participants": List[{
+        "telegram_id": int,
+        "username": str?,
+        "joined_at": datetime,
+        "is_ready": bool
+    }],
+    "current_track": {
+        "track_id": str,
+        "title": str,
+        "artist": str,
+        "position": float,
+        "is_playing": bool,
+        "updated_at": datetime
+    },
+    "settings": {
+        "allow_skip": bool,
+        "private": bool
+    },
+    "created_at": datetime
+}
+```
 
 ---
 
@@ -738,149 +378,48 @@ export const groupTasksAPI = {
 
 **Base URL:** `http://www.rudn.ru/rasp/lessons/view`
 
-**Endpoint 1: Получить факультеты**
 ```
+# Факультеты
 GET /rasp/lessons/view
-Response: HTML с списком факультетов в <select id="facultet">
+→ HTML с <select id="facultet">
 
-Парсинг:
-<option value="{facultet_id}">{facultet_name}</option>
-
-Результат: List[Faculty]
-```
-
-**Endpoint 2: Получить фильтры (уровень, курс, форма, группы)**
-```
+# Фильтры
 POST /rasp/lessons/view
-Body (form-data):
-  facultet: {facultet_id}
-  level: {level_id}  # опционально
-  kurs: {kurs}       # опционально
-  forma: {form_code} # опционально
+Body: {facultet, level?, kurs?, forma?}
+→ HTML с обновленными <select>
 
-Response: HTML с обновленными <select> элементами
-
-Парсинг:
-- <select id="level"> для уровней
-- <select id="kurs"> для курсов
-- <select id="forma"> для форм
-- <select id="group"> для групп
-
-Результат: FilterDataResponse {levels, courses, forms, groups}
-```
-
-**Endpoint 3: Получить расписание**
-```
+# Расписание
 POST /rasp/lessons/view
-Body (form-data):
-  facultet: {facultet_id}
-  level: {level_id}
-  kurs: {kurs}
-  forma: {form_code}
-  group: {group_id}
-  week: {week_number}  # 1 или 2
-
-Response: HTML таблица с расписанием
-
-Парсинг:
-<table id="schedule">
-  <tr class="schedule-row" data-day="{day}" data-time="{time}">
-    <td class="discipline">{discipline}</td>
-    <td class="lesson-type">{lessonType}</td>
-    <td class="teacher">{teacher}</td>
-    <td class="auditory">{auditory}</td>
-  </tr>
-</table>
-
-Результат: ScheduleResponse {events: List[ScheduleEvent], group_id, week_number}
+Body: {facultet, level, kurs, forma, group, week}
+→ HTML таблица с расписанием
 ```
-
-**Особенности:**
-- API возвращает HTML (нет JSON)
-- Нужен BeautifulSoup для парсинга
-- Данные не всегда консистентны (например, kurs может быть int или str)
-- Таймаут запросов: 30 секунд
 
 ### 5.2 OpenWeatherMap API
 
-**Base URL:** `http://api.openweathermap.org/data/2.5`
-
-**Endpoint: Текущая погода**
 ```
-GET /weather
-Params:
-  lat: 55.7558        # Москва
-  lon: 37.6173        # Москва
-  appid: {API_KEY}
-  units: metric       # Цельсии
-  lang: ru            # Русский язык
-
-Response: JSON
-{
-  "main": {
-    "temp": 5.0,
-    "feels_like": 2.0,
-    "humidity": 93
-  },
-  "wind": {"speed": 3.5},
-  "weather": [{
-    "description": "ясно",
-    "icon": "01d"
-  }]
-}
-
-Результат:
-{
-  "temperature": 5,
-  "feels_like": 2,
-  "humidity": 93,
-  "wind_speed": 3.5,
-  "description": "Ясно",
-  "icon": "01d"
-}
+GET /weather?lat=55.7558&lon=37.6173&appid={KEY}&units=metric&lang=ru
+→ {temp, feels_like, humidity, wind_speed, description, icon}
 ```
-
-**Кэширование:** 30 минут
 
 ### 5.3 Telegram Bot API
 
-**Base URL:** `https://api.telegram.org/bot{TOKEN}`
-
-**Используемые методы:**
-
-1. **getMe** - информация о боте
-```
-GET /bot{TOKEN}/getMe
-Response: {"ok": true, "result": {"id", "username", "first_name", ...}}
+```python
+# Основные методы
+bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=...)
+bot.get_me()
+bot.get_user_profile_photos(user_id)
 ```
 
-2. **sendMessage** - отправка сообщения
-```
-POST /bot{TOKEN}/sendMessage
-Body:
-{
-  "chat_id": {telegram_id},
-  "text": "Привет!",
-  "parse_mode": "HTML",
-  "reply_markup": {"inline_keyboard": [[...]]}
-}
-```
+### 5.4 VK Music API
 
-3. **WebAppInfo** - кнопка для открытия Web App
-```json
-{
-  "inline_keyboard": [[
-    {
-      "text": "Открыть расписание ✨",
-      "web_app": {"url": "https://rudn-schedule.ru"}
-    }
-  ]]
-}
+```python
+# vkpymusic
+service = MusicService(token)
+service.search(query)          # Поиск
+service.get_audio(user_id)     # Мои аудио
+service.get_popular()          # Популярные
+service.get_playlists(user_id) # Плейлисты
 ```
-
-**Используется в:**
-- `telegram_bot.py` - основная логика бота
-- `notifications.py` - отправка уведомлений о парах
 
 ---
 
@@ -889,443 +428,52 @@ Body:
 ### 6.1 Первый запуск (новый пользователь)
 
 ```
-1. Пользователь открывает бота @rudn_pro_bot в Telegram
-2. Нажимает /start
-3. Bot:
-   - Получает telegram_id, username, first_name, last_name
-   - Проверяет, есть ли юзер в БД (collection: user_settings)
-   - Если НЕТ:
-     - Создает запись в user_settings (без группы)
-     - Создает запись в user_stats (все счетчики = 0)
-   - Если ЕСТЬ:
-     - Обновляет last_activity
-   - Отправляет welcome message с кнопкой "Открыть расписание ✨"
-
-4. Пользователь нажимает кнопку "Открыть расписание"
-5. Открывается Telegram Web App (React приложение)
-6. Frontend:
-   - Получает telegram_id из window.Telegram.WebApp.initDataUnsafe.user.id
-   - Запрос GET /api/user-settings/{telegram_id}
-   - Получает user_settings (но group_id = null)
-   - Показывает WelcomeScreen
-
-7. WelcomeScreen:
-   - Анимированная заставка "Let's go"
-   - Кнопка "Get Started"
-   - Пользователь нажимает -> переход к GroupSelector
-
-8. GroupSelector (4 шага):
-   Шаг 1: Выбор факультета
-     - Запрос GET /api/faculties
-     - Показывает список ~16 факультетов
-     - Пользователь выбирает -> selectedFaculty
-
-   Шаг 2: Выбор уровня и курса
-     - Запрос POST /api/filter-data {facultet_id}
-     - Получает levels и courses
-     - Пользователь выбирает -> selectedLevel, selectedCourse
-
-   Шаг 3: Выбор формы обучения
-     - Запрос POST /api/filter-data {facultet_id, level_id, kurs}
-     - Получает forms
-     - Пользователь выбирает -> selectedForm
-
-   Шаг 4: Выбор группы
-     - Запрос POST /api/filter-data {facultet_id, level_id, kurs, form_code}
-     - Получает groups
-     - Пользователь выбирает -> selectedGroup
-     - Нажимает "Сохранить"
-
-9. Сохранение группы:
-   - Запрос POST /api/user-settings
-   Body: {
-     telegram_id,
-     username,
-     first_name,
-     last_name,
-     group_id: selectedGroup.value,
-     group_name: selectedGroup.label,
-     facultet_id: selectedFaculty.id,
-     facultet_name: selectedFaculty.name,
-     level_id: selectedLevel.value,
-     kurs: selectedCourse.value,
-     form_code: selectedForm.value
-   }
-   - Backend:
-     - Сохраняет в user_settings
-     - Трекает действие "select_group"
-     - Проверяет достижения -> выдает "Первопроходец" (10 очков)
-     - Возвращает UserSettingsResponse
-
-10. Frontend:
-    - Получает userSettings с group_id
-    - Показывает AchievementNotification (конфетти!)
-    - Переход к главному экрану
-
-11. Главный экран:
-    - Запрос POST /api/schedule {group_id, week_number: 1}
-    - Получает расписание на текущую неделю
-    - Отображает:
-      - Header с кнопками
-      - LiveScheduleCarousel (текущие пары)
-      - WeekDaySelector (выбор дня)
-      - LiveScheduleSection (список пар)
-      - BottomNavigation
+1. Пользователь → /start в @rudn_pro_bot
+2. Bot создает user_settings (без группы)
+3. Показывает кнопку "Открыть расписание"
+4. WebApp → WelcomeScreen → GroupSelector
+5. 4 шага выбора: факультет → уровень/курс → форма → группа
+6. POST /api/user-settings → сохранение
+7. Достижение "Первопроходец" (10 очков)
+8. Главный экран с расписанием
 ```
 
-### 6.2 Просмотр расписания (существующий пользователь)
+### 6.2 Просмотр расписания
 
 ```
-1. Пользователь открывает Web App (через бота или прямую ссылку)
-2. Frontend:
-   - Получает telegram_id
-   - Запрос GET /api/user-settings/{telegram_id}
-   - Получает userSettings с сохраненной группой
-   - Запрос POST /api/schedule {group_id, week_number: getCurrentWeekNumber()}
-   - Получает schedule: List[ScheduleEvent]
-
-3. Отображение:
-   LiveScheduleCarousel:
-     - Фильтрует пары на СЕЙЧАС (текущий день + текущее время)
-     - Определяет статус:
-       - "Закончилась" (end_time < now) - зеленый
-       - "В процессе" (start_time <= now <= end_time) - желтый
-       - "Предстоит" (start_time > now) - красный
-     - Показывает карусель (Swiper) с карточками
-     - Живой таймер обновляется каждую секунду
-
-   LiveScheduleSection:
-     - Фильтрует пары на выбранный день (selectedDate)
-     - Группирует по времени (например, "10:30 - 12:00")
-     - Показывает список карточек
-     - Каждая карточка:
-       - Время
-       - Дисциплина
-       - Тип занятия (лекция, практика, лаб)
-       - Преподаватель
-       - Аудитория
-       - Статус (цветная метка)
-       - Expand для деталей
-
-4. Трекинг:
-   - При загрузке расписания:
-     - Подсчет уникальных пар (по день+время)
-     - Запрос POST /api/track-action
-     Body: {
-       telegram_id,
-       action_type: "view_schedule",
-       metadata: {classes_count: uniqueTimeSlotsCount}
-     }
-   - Backend:
-     - Обновляет user_stats.schedule_views += classes_count
-     - Проверяет достижения:
-       - 10 просмотров -> "Исследователь расписания" (15 очков)
-       - 50 просмотров -> "Мастер расписания" (25 очков)
+1. GET /api/user-settings/{telegram_id}
+2. POST /api/schedule {group_id, week_number}
+3. Отображение LiveScheduleCarousel + LiveScheduleSection
+4. POST /api/track-action {action: "view_schedule"}
+5. Проверка достижений
 ```
 
-### 6.3 Создание личной задачи
+### 6.3 QR-авторизация (Web Sessions)
 
 ```
-1. Пользователь переходит на вкладку "Задачи" (activeTab = 'tasks')
-2. TasksSection:
-   - Запрос GET /api/tasks/{telegram_id}
-   - Получает список задач
-   - Отображает:
-     - Карточка "Сегодня" (компактный список задач на сегодня)
-     - Основной список задач (с фильтрами и группировкой)
-     - Кнопка "+" для создания
-
-3. Пользователь нажимает "+"
-4. Открывается AddTaskModal:
-   - Поле текста задачи (обязательное)
-   - Выбор категории (учеба, личное, спорт, проекты)
-   - Выбор приоритета (высокий, средний, низкий)
-   - Выбор дедлайна (date + time picker, опционально)
-   - Поле заметок (опционально)
-   - Теги (через TagsInput, опционально)
-   - Кнопка "Создать"
-
-5. Пользователь заполняет и нажимает "Создать"
-6. Запрос POST /api/tasks
-   Body: {
-     telegram_id,
-     text: "Подготовиться к экзамену по математике",
-     category: "учеба",
-     priority: "high",
-     deadline: "2025-11-25T10:00:00",
-     target_date: "2025-11-25T00:00:00",
-     notes: "Повторить главы 1-5",
-     tags: ["экзамен", "математика"],
-     completed: false,
-     order: 0
-   }
-
-7. Backend:
-   - Создает документ в collection: tasks
-   - Генерирует UUID для id
-   - Устанавливает created_at, updated_at
-   - Возвращает созданную задачу
-
-8. Frontend:
-   - Добавляет задачу в локальный state
-   - Закрывает модальное окно
-   - Задача появляется в списке (в соответствующей группе по дедлайну)
+1. Desktop: POST /api/web-sessions → session_token, qr_url
+2. Показ QR-кода
+3. Mobile: сканирование → POST /api/web-sessions/{token}/scanned
+4. Mobile: подтверждение → POST /api/web-sessions/{token}/link
+5. Desktop: polling GET /api/web-sessions/{token}/status
+6. status: "linked" → авторизован
 ```
 
-### 6.4 Создание комнаты и групповая работа
+### 6.4 Создание комнаты прослушивания
 
 ```
-1. Пользователь переходит на вкладку "Журнал" (раздел Rooms в разработке)
-2. Нажимает "Создать комнату"
-3. Открывается CreateRoomModal:
-   - Название комнаты
-   - Выбор цвета (из preset палитры)
-   - Выбор эмодзи
-   - Описание (опционально)
-   - Кнопка "Создать"
-
-4. Пользователь заполняет и создает
-5. Запрос POST /api/rooms
-   Body: {
-     name: "Проект по Python",
-     color: "#A3F7BF",
-     emoji: "🐍",
-     description: "Совместная работа над финальным проектом",
-     owner_id: telegram_id
-   }
-
-6. Backend:
-   - Создает документ в collection: rooms (генерирует UUID)
-   - Создает первого участника в collection: room_participants
-   {
-     room_id,
-     telegram_id,
-     username,
-     first_name,
-     role: "owner",
-     joined_at: now()
-   }
-   - Возвращает созданную комнату
-
-7. Приглашение участников:
-   - Владелец открывает RoomDetailModal
-   - Нажимает "Пригласить участников"
-   - Запрос POST /api/rooms/{room_id}/invite-link
-   - Backend:
-     - Генерирует уникальный token (UUID)
-     - Формирует ссылку: https://t.me/{bot_username}?start=room_{token}_ref_{owner_id}
-     - Возвращает {invite_link, token}
-   - Frontend показывает ссылку, кнопка "Копировать"
-
-8. Новый участник:
-   - Получает ссылку от владельца
-   - Открывает в Telegram -> запускает бота с deep link
-   - Bot получает /start room_{token}_ref_{owner_id}
-   - Парсит параметры: invite_token, referral_code
-   - Запрос POST /api/rooms/join/{invite_token}
-   Body: {
-     telegram_id: new_user_id,
-     username,
-     first_name,
-     referral_code: owner_id
-   }
-   - Backend:
-     - Находит комнату по token
-     - Проверяет, не участник ли уже
-     - Добавляет в room_participants (role: "member")
-     - Обновляет room.total_participants += 1
-     - Отправляет уведомления:
-       - Владельцу: "Новый участник {first_name} присоединился к комнате {room_name}"
-       - Участнику: "Добро пожаловать в комнату {room_name}"
-   - Возвращает информацию о комнате
-
-9. Создание групповой задачи:
-   - Любой участник открывает RoomDetailModal
-   - Нажимает "+" в секции задач
-   - Открывается AddRoomTaskModal
-   - Заполняет: текст, приоритет, дедлайн, категория, теги
-   - Запрос POST /api/rooms/{room_id}/tasks
-   Body: {
-     text: "Написать функцию обработки данных",
-     priority: "high",
-     deadline: "2025-11-30T23:59:00",
-     category: "Разработка",
-     tags: ["python", "backend"],
-     created_by: telegram_id
-   }
-   - Backend:
-     - Создает документ в collection: group_tasks
-     - АВТОМАТИЧЕСКИ добавляет всех участников комнаты в assigned_to
-     - Обновляет room.total_tasks += 1
-     - Возвращает созданную задачу
-
-10. Выполнение задачи:
-    - Участник открывает GroupTaskDetailModal
-    - Нажимает checkbox "Выполнено"
-    - Запрос PUT /api/group-tasks/{task_id}
-    Body: {completed: true}
-    - Backend:
-      - Обновляет task.completed = true
-      - Устанавливает task.completed_by = telegram_id
-      - Устанавливает task.completed_at = now()
-      - Обновляет room.completed_tasks += 1
-    - Frontend:
-      - Обновляет прогресс комнаты (например, "5 / 10 задач")
-      - Показывает галочку на карточке задачи
-```
-
-### 6.5 Получение достижения
-
-```
-1. Любое действие пользователя -> трекинг:
-   - Запрос POST /api/track-action {telegram_id, action_type, metadata}
-
-2. Backend (achievements.py):
-   function track_user_action(telegram_id, action_type, metadata):
-     # Обновить user_stats в зависимости от action_type
-     if action_type == "view_schedule":
-       user_stats.schedule_views += metadata.get("classes_count", 1)
-     elif action_type == "invite_friend":
-       user_stats.friends_invited += 1
-     # ... другие actions
-
-     # Проверить достижения
-     new_achievements = check_and_award_achievements(telegram_id, user_stats, action_type, metadata)
-
-     # Вернуть список новых достижений
-     return new_achievements
-
-   function check_and_award_achievements(telegram_id, user_stats, action_type, metadata):
-     new_achievements = []
-
-     # Перебрать все ACHIEVEMENTS
-     for achievement_id, achievement in ACHIEVEMENTS.items():
-       # Проверить, не получено ли уже
-       if already_awarded(telegram_id, achievement_id):
-         continue
-
-       # Проверить условие получения
-       if check_achievement_condition(achievement, user_stats, action_type, metadata):
-         # Выдать достижение
-         user_achievements.insert_one({
-           "telegram_id": telegram_id,
-           "achievement_id": achievement_id,
-           "earned_at": datetime.now(),
-           "seen": False
-         })
-
-         # Обновить статистику
-         user_stats.achievements_count += 1
-         user_stats.total_points += achievement["points"]
-
-         # Добавить в список новых
-         new_achievements.append(achievement)
-
-     return new_achievements
-
-3. Backend возвращает response:
-   {
-     "new_achievements": [
-       {
-         "id": "schedule_explorer",
-         "name": "Исследователь расписания",
-         "description": "Просмотрел расписание 10 раз",
-         "emoji": "📚",
-         "points": 15,
-         "type": "activity",
-         "requirement": "Просмотреть расписание 10 раз"
-       }
-     ]
-   }
-
-4. Frontend (App.js):
-   function checkAchievements(achievements) {
-     if (achievements && achievements.length > 0) {
-       // Показать уведомление для каждого достижения
-       achievements.forEach((achievement, index) => {
-         setTimeout(() => {
-           setNewAchievement(achievement);
-           setShowAchievement(true);
-         }, index * 3000); // По очереди с задержкой 3 сек
-       });
-     }
-   }
-
-5. AchievementNotification компонент:
-   - Показывается сверху экрана (position: fixed, top: 8px)
-   - Анимация появления (spring animation)
-   - Отображает:
-     - Эмодзи (большой, 3xl)
-     - Текст "Достижение разблокировано!"
-     - Название достижения (градиентный текст)
-     - Описание
-     - Очки (с иконкой звезды)
-   - Конфетти падают по всему экрану (generateConfetti())
-   - Автоматическое скрытие через 5 секунд
-   - Кнопка "Закрыть" (X)
-   - Haptic feedback при показе
-```
-
-### 6.6 Уведомления о парах
-
-```
-1. Scheduler (scheduler.py) запускает задачу каждую минуту:
-   @scheduler.scheduled_job('cron', minute='*')
-   async def check_upcoming_classes():
-
-2. Логика:
-   - Получить текущее время (now)
-   - Получить всех пользователей с notifications_enabled=True
-
-   for user in users_with_notifications:
-     - Получить userSettings (group_id, notification_time)
-     - Получить расписание на сегодня: POST /api/schedule
-
-     for event in schedule:
-       - Распарсить время пары (например, "10:30")
-       - Вычислить время уведомления: class_time - notification_time минут
-
-       if notification_time <= now < class_time:
-         - Проверить, не отправлялось ли уже уведомление (кэш или БД)
-         - Если НЕТ:
-           - Отправить уведомление через Telegram Bot
-           - Запомнить, что уведомление отправлено
-
-3. Отправка уведомления (notifications.py):
-   async def send_class_notification(telegram_id, class_info):
-     message = f"""
-     🔔 <b>Скоро пара!</b>
-
-     📚 <b>{class_info['discipline']}</b>
-     🕒 Время: {class_info['time']}
-     👨‍🏫 Преподаватель: {class_info['teacher']}
-     🏢 Аудитория: {class_info['auditory']}
-     📝 Тип: {class_info['lessonType']}
-     """
-
-     # Отправка через Bot API
-     bot.send_message(
-       chat_id=telegram_id,
-       text=message,
-       parse_mode='HTML'
-     )
-
-4. Пользователь получает уведомление в Telegram:
-   - Сообщение от @rudn_pro_bot
-   - Может открыть Web App и посмотреть расписание
+1. POST /api/music/rooms → {id, invite_code}
+2. Приглашение друзей через invite_code
+3. POST /api/music/rooms/join/{code}
+4. POST /api/music/rooms/{id}/sync → синхронизация воспроизведения
+5. WebSocket-like polling для обновлений
 ```
 
 ---
 
 ## 7. Deployment
 
-### 7.1 Текущая конфигурация
-
-**Environment:** Docker/Kubernetes контейнер
-
-**Process Manager:** Supervisor
-
-**Конфигурация Supervisor:**
+### 7.1 Конфигурация Supervisor
 
 ```ini
 [program:backend]
@@ -1343,183 +491,80 @@ autostart=true
 autorestart=true
 stdout_logfile=/var/log/supervisor/frontend.out.log
 stderr_logfile=/var/log/supervisor/frontend.err.log
-
-[program:telegram_bot]
-command=python telegram_bot.py
-directory=/app/backend
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/supervisor/telegram_bot.out.log
-stderr_logfile=/var/log/supervisor/telegram_bot.err.log
 ```
 
-### 7.2 Сервисы
+### 7.2 Порты и URL
 
-**Backend:**
-- Внутренний порт: 8001
-- Доступ: через Kubernetes ingress
-- Префикс: /api/*
-- Hot reload: enabled (uvicorn --reload)
+- **Backend:** 8001 (internal) → через ingress с `/api/` prefix
+- **Frontend:** 3000 (internal) → root URL
+- **MongoDB:** 27017 (local)
 
-**Frontend:**
-- Внутренний порт: 3000
-- Доступ: через Kubernetes ingress
-- Root URL: https://class-progress-1.preview.emergentagent.com
-- Hot reload: enabled (Vite)
+### 7.3 Команды управления
 
-**MongoDB:**
-- Внутренний доступ: mongodb://localhost:27017/rudn_schedule
-- Database: rudn_schedule
-- Коллекции: 7 (см. раздел "База данных")
-
-**Telegram Bot:**
-- Запускается отдельным процессом (telegram_bot.py)
-- Polling mode (не webhook)
-- Обрабатывает команды и отправляет уведомления
-
-### 7.3 Kubernetes Ingress Rules
-
-```yaml
-# Упрощенная схема
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-spec:
-  rules:
-  - host: class-progress-1.preview.emergentagent.com
-    http:
-      paths:
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            port: 8001  # Backend
-
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            port: 3000  # Frontend
-```
-
-**Критично:**
-- Все API запросы ДОЛЖНЫ начинаться с `/api/`
-- Frontend роуты НЕ должны начинаться с `/api/`
-- Hardcoding URLs/ports запрещен - только через .env
-
-### 7.4 Мониторинг
-
-**Логи:**
 ```bash
-# Backend
-tail -f /var/log/supervisor/backend.out.log
-tail -f /var/log/supervisor/backend.err.log
-
-# Frontend
-tail -f /var/log/supervisor/frontend.out.log
-tail -f /var/log/supervisor/frontend.err.log
-
-# Telegram Bot
-tail -f /var/log/supervisor/telegram_bot.out.log
-```
-
-**Health Check:**
-```bash
-curl http://localhost:8001/api/health
-# Response: {"status": "ok"}
-```
-
-**Supervisor Status:**
-```bash
+# Статус
 sudo supervisorctl status
-# Output:
-backend                          RUNNING   pid 1234, uptime 1:23:45
-frontend                         RUNNING   pid 5678, uptime 1:23:45
-telegram_bot                     RUNNING   pid 9012, uptime 1:23:45
-```
 
-### 7.5 Рестарт сервисов
-
-```bash
-# Рестарт всех
+# Перезапуск
 sudo supervisorctl restart all
-
-# Рестарт отдельных
 sudo supervisorctl restart backend
 sudo supervisorctl restart frontend
-sudo supervisorctl restart telegram_bot
 
-# Только при установке зависимостей:
-cd /app/backend && pip install -r requirements.txt && sudo supervisorctl restart backend
-cd /app/frontend && yarn install && sudo supervisorctl restart frontend
+# Логи
+tail -f /var/log/supervisor/backend.*.log
+tail -f /var/log/supervisor/frontend.*.log
+tail -50 /var/log/supervisor/backend.err.log | grep -i error
 ```
 
 ---
 
 ## 8. VK Music интеграция
 
-### 8.1 Архитектура
+### 8.1 Компоненты
 
-**Компоненты:**
 - `vk_auth_service.py` - авторизация VK (логин/пароль)
 - `music_service.py` - API для работы с музыкой
 - `cover_service.py` - получение обложек треков
 
-**Библиотеки:**
-- `vkpymusic` - VK Music API
-- `vkaudiotoken` - получение аудио токенов
-- `yt-dlp` - резервное скачивание
-
 ### 8.2 Авторизация
 
 ```python
-# POST /api/music/auth/{telegram_id}
-# Body: {"login": "...", "password": "..."}
-# Response: {"success": true, "audio_count": 150}
+POST /api/music/auth/{telegram_id}
+Body: {"login": "...", "password": "..."}
+Response: {"success": true, "audio_count": 150}
 
-# Токен сохраняется в коллекции user_vk_tokens
-{
-    "telegram_id": int,
-    "vk_user_id": int,
-    "vk_token": str,
-    "user_agent": str,
-    "audio_count": int,
-    "created_at": datetime,
-    "updated_at": datetime
-}
+# Токен сохраняется в user_vk_tokens
 ```
 
-### 8.3 API Endpoints
+### 8.3 API Endpoints (25)
 
 ```
-GET    /api/music/search?q={query}        - поиск треков
-GET    /api/music/stream/{track_id}       - стрим трека
-GET    /api/music/my                      - мои аудио (Kate Mobile)
-GET    /api/music/my-vk/{telegram_id}     - мои аудио (персональный токен)
-GET    /api/music/popular                 - популярные треки
-GET    /api/music/playlists               - плейлисты
-GET    /api/music/playlist/{owner_id}/{id} - конкретный плейлист
-GET    /api/music/artist/{name}           - треки исполнителя
-GET    /api/music/favorites/{telegram_id} - избранное
-POST   /api/music/favorites/{telegram_id} - добавить в избранное
-DELETE /api/music/favorites/{telegram_id}/{track_id} - удалить из избранного
-```
-
-### 8.4 Frontend компоненты
-
-```
-components/music/
-├── MusicSection.jsx       # Главный компонент
-├── MusicSearch.jsx        # Поиск треков
-├── TrackCard.jsx          # Карточка трека
-├── TrackCover.jsx         # Обложка трека
-├── TrackList.jsx          # Список треков
-├── ArtistCard.jsx         # Карточка исполнителя
-├── PlaylistCard.jsx       # Карточка плейлиста
-├── MiniPlayer.jsx         # Мини-плеер (снизу)
-├── FullscreenPlayer.jsx   # Полноэкранный плеер
-├── VKAuthModal.jsx        # Модалка авторизации VK
-├── PlayerContext.jsx      # Контекст плеера (state)
-└── index.js               # Экспорты
+GET    /api/music/search?q={query}
+GET    /api/music/stream/{track_id}
+GET    /api/music/redirect/{track_id}
+GET    /api/music/my
+GET    /api/music/my-vk/{telegram_id}
+GET    /api/music/popular
+GET    /api/music/playlists
+GET    /api/music/playlists-vk/{telegram_id}
+GET    /api/music/playlist/{owner_id}/{playlist_id}
+GET    /api/music/artist/{artist_name}
+GET    /api/music/favorites/{telegram_id}
+POST   /api/music/favorites/{telegram_id}
+DELETE /api/music/favorites/{telegram_id}/{track_id}
+POST   /api/music/auth/{telegram_id}
+GET    /api/music/auth/status/{telegram_id}
+DELETE /api/music/auth/{telegram_id}
+# Listening Rooms
+POST   /api/music/rooms
+GET    /api/music/rooms/{room_id}
+POST   /api/music/rooms/join/{invite_code}
+POST   /api/music/rooms/{room_id}/leave
+DELETE /api/music/rooms/{room_id}
+PUT    /api/music/rooms/{room_id}/settings
+GET    /api/music/rooms/user/{telegram_id}
+GET    /api/music/rooms/{room_id}/state
+POST   /api/music/rooms/{room_id}/sync
 ```
 
 ---
@@ -1528,8 +573,7 @@ components/music/
 
 ### 9.1 Функциональность
 
-- Отправка запросов в друзья
-- Принятие/отклонение запросов
+- Отправка/принятие/отклонение запросов
 - Удаление из друзей
 - Блокировка пользователей
 - Поиск друзей
@@ -1538,69 +582,23 @@ components/music/
 - QR-коды для добавления
 - Просмотр расписания друзей (с учётом приватности)
 
-### 9.2 MongoDB коллекции
-
-**friends:**
-```python
-{
-    "user1_telegram_id": int,
-    "user2_telegram_id": int,
-    "is_favorite_by_user1": bool,
-    "is_favorite_by_user2": bool,
-    "created_at": datetime
-}
-```
-
-**friend_requests:**
-```python
-{
-    "id": UUID,
-    "from_telegram_id": int,
-    "to_telegram_id": int,
-    "status": str,  # "pending", "accepted", "rejected", "cancelled"
-    "created_at": datetime,
-    "responded_at": datetime?
-}
-```
-
-**user_blocks:**
-```python
-{
-    "blocker_telegram_id": int,
-    "blocked_telegram_id": int,
-    "created_at": datetime
-}
-```
-
-### 9.3 API Endpoints
+### 9.2 API Endpoints (15)
 
 ```
-POST   /api/friends/request/{target_id}   - отправить запрос
-POST   /api/friends/accept/{request_id}   - принять
-POST   /api/friends/reject/{request_id}   - отклонить
-POST   /api/friends/cancel/{request_id}   - отменить
-DELETE /api/friends/{friend_id}           - удалить
-POST   /api/friends/block/{target_id}     - заблокировать
-DELETE /api/friends/block/{target_id}     - разблокировать
-POST   /api/friends/{friend_id}/favorite  - избранное
-GET    /api/friends/search?q={query}      - поиск
-GET    /api/friends/{telegram_id}         - список друзей
-GET    /api/friends/{telegram_id}/requests - запросы
-GET    /api/friends/mutual/{id1}/{id2}    - взаимные
-GET    /api/friends/{telegram_id}/blocked - заблокированные
-POST   /api/friends/process-invite        - обработка ссылки
-```
-
-### 9.4 Frontend компоненты
-
-```
-components/
-├── FriendsSection.jsx      # Секция друзей
-├── FriendCard.jsx          # Карточка друга
-├── FriendProfileModal.jsx  # Профиль друга
-├── FriendSearchModal.jsx   # Поиск друзей
-├── SelectFriendsModal.jsx  # Выбор друзей (для приглашений)
-└── PrivacySettingsModal.jsx # Настройки приватности
+POST   /api/friends/request/{target_id}
+POST   /api/friends/accept/{request_id}
+POST   /api/friends/reject/{request_id}
+POST   /api/friends/cancel/{request_id}
+DELETE /api/friends/{friend_id}
+POST   /api/friends/block/{target_id}
+DELETE /api/friends/block/{target_id}
+POST   /api/friends/{friend_id}/favorite
+GET    /api/friends/search?q={query}
+GET    /api/friends/{telegram_id}
+GET    /api/friends/{telegram_id}/requests
+GET    /api/friends/mutual/{id1}/{id2}
+GET    /api/friends/{telegram_id}/blocked
+POST   /api/friends/process-invite
 ```
 
 ---
@@ -1617,111 +615,196 @@ components/
 - `achievement` - новое достижение
 - `system` - системные
 
-### 10.2 MongoDB коллекция
-
-**in_app_notifications:**
-```python
-{
-    "id": UUID,
-    "telegram_id": int,            # получатель
-    "type": str,                   # тип уведомления
-    "title": str,
-    "message": str,
-    "data": dict,                  # дополнительные данные
-    "action_type": str?,           # тип действия
-    "action_target_id": str?,      # ID цели действия
-    "is_read": bool,
-    "created_at": datetime,
-    "read_at": datetime?
-}
-```
-
-### 10.3 API Endpoints
+### 10.2 API Endpoints (8)
 
 ```
-GET    /api/notifications/{telegram_id}           - список
-GET    /api/notifications/{telegram_id}/unread-count - количество непрочитанных
-PUT    /api/notifications/{notification_id}/read  - пометить прочитанным
-PUT    /api/notifications/{telegram_id}/read-all  - прочитать все
-DELETE /api/notifications/{notification_id}       - удалить
-PUT    /api/notifications/{notification_id}/action - выполнить действие
-GET    /api/notifications/{telegram_id}/settings  - настройки
-PUT    /api/notifications/{telegram_id}/settings  - обновить настройки
-```
-
-### 10.4 Frontend компоненты
-
-```
-components/
-├── NotificationsPanel.jsx       # Панель уведомлений
-├── NotificationQueue.jsx        # Очередь всплывающих
-└── notificationsAPI.js          # API клиент (services/)
+GET    /api/notifications/{telegram_id}
+GET    /api/notifications/{telegram_id}/unread-count
+PUT    /api/notifications/{notification_id}/read
+PUT    /api/notifications/{telegram_id}/read-all
+DELETE /api/notifications/{notification_id}
+PUT    /api/notifications/{notification_id}/action
+GET    /api/notifications/{telegram_id}/settings
+PUT    /api/notifications/{telegram_id}/settings
 ```
 
 ---
 
-## 11. MongoDB коллекции (полный список - 30)
+## 11. Web Sessions (QR-авторизация)
 
-### Пользователи (5)
+### 11.1 Описание
+
+Система позволяет авторизоваться на другом устройстве (например, десктоп) через сканирование QR-кода с мобильного телефона.
+
+### 11.2 Статусы сессии
+
+- `pending` - ожидает сканирования
+- `scanned` - QR отсканирован
+- `linked` - сессия привязана к пользователю
+- `expired` - сессия истекла
+- `revoked` - сессия отозвана
+
+### 11.3 API Endpoints (11)
+
+```
+POST   /api/web-sessions                       # Создать сессию
+GET    /api/web-sessions/{token}/status        # Статус сессии
+POST   /api/web-sessions/{token}/link          # Привязать устройство
+POST   /api/web-sessions/{token}/scanned       # Отметить как отсканированную
+POST   /api/web-sessions/{token}/rejected      # Отклонить
+GET    /api/web-sessions/user/{id}/devices     # Список устройств
+POST   /api/web-sessions/{token}/notify-revoked
+POST   /api/web-sessions/{token}/heartbeat     # Keep-alive
+DELETE /api/web-sessions/{token}               # Завершить сессию
+DELETE /api/web-sessions/user/{id}/all         # Завершить все сессии
+```
+
+### 11.4 Frontend компонент
+
+- `DevicesModal.jsx` - управление устройствами
+
+---
+
+## 12. Privacy Settings
+
+### 12.1 Описание
+
+Настройки приватности профиля пользователя.
+
+### 12.2 Поля
+
+```python
+{
+    "show_online_status": bool,    # Показывать онлайн статус
+    "show_in_search": bool,        # Показывать в поиске
+    "show_friends_list": bool,     # Показывать список друзей
+    "show_achievements": bool,     # Показывать достижения
+    "show_schedule": bool          # Показывать расписание
+}
+```
+
+### 12.3 API Endpoints (2)
+
+```
+GET  /api/profile/{telegram_id}/privacy
+PUT  /api/profile/{telegram_id}/privacy
+```
+
+### 12.4 Frontend компонент
+
+- `PrivacySettingsModal.jsx`
+
+---
+
+## 13. MongoDB коллекции (33)
+
+### Пользователи (6)
 | Коллекция | Описание |
 |-----------|----------|
-| `user_settings` | Настройки и группа пользователя |
+| `user_settings` | Настройки и группа |
 | `user_stats` | Статистика для достижений |
 | `user_achievements` | Полученные достижения |
 | `user_vk_tokens` | VK токены для музыки |
-| `user_blocks` | Заблокированные пользователи |
+| `user_blocks` | Заблокированные |
+| `web_sessions` | Веб-сессии (QR авторизация) |
 
 ### Задачи (4)
 | Коллекция | Описание |
 |-----------|----------|
 | `tasks` | Личные задачи |
 | `group_tasks` | Групповые задачи |
-| `group_task_comments` | Комментарии к групповым |
-| `group_task_invites` | Приглашения в задачи |
+| `group_task_comments` | Комментарии |
+| `group_task_invites` | Приглашения |
 
-### Комнаты (2)
+### Комнаты (3)
 | Коллекция | Описание |
 |-----------|----------|
 | `rooms` | Комнаты (участники встроены) |
 | `room_activities` | История активности |
+| `listening_rooms` | Комнаты прослушивания музыки |
 
 ### Журнал посещений (7)
 | Коллекция | Описание |
 |-----------|----------|
-| `attendance_journals` / `journals` | Журналы |
+| `journals` | Журналы |
 | `journal_students` | Студенты |
 | `journal_subjects` | Предметы |
 | `journal_sessions` | Занятия |
 | `attendance_records` | Записи посещаемости |
-| `journal_pending_members` | Ожидающие участники |
+| `journal_pending_members` | Ожидающие |
+| `journal_applications` | Заявки |
 
 ### Друзья (2)
 | Коллекция | Описание |
 |-----------|----------|
 | `friends` | Связи друзей |
-| `friend_requests` | Запросы в друзья |
+| `friend_requests` | Запросы |
 
 ### Уведомления (4)
 | Коллекция | Описание |
 |-----------|----------|
-| `scheduled_notifications` | Запланированные (V2) |
-| `notification_history` | История отправок |
+| `scheduled_notifications` | V2 запланированные |
+| `notification_history` | История |
 | `sent_notifications` | Отправленные |
-| `in_app_notifications` | Внутренние уведомления |
+| `in_app_notifications` | Внутренние |
 
 ### Реферальная система (2)
 | Коллекция | Описание |
 |-----------|----------|
-| `referral_connections` | Связи рефералов |
-| `referral_events` | События переходов |
+| `referral_connections` | Связи |
+| `referral_events` | События |
 
-### Кэш и прочее (4)
+### Кэш и прочее (5)
 | Коллекция | Описание |
 |-----------|----------|
 | `schedule_cache` | Кэш расписаний |
-| `cover_cache` | Кэш обложек треков |
+| `cover_cache` | Кэш обложек |
 | `music_favorites` | Избранные треки |
 | `status_checks` | Проверки статуса |
+| `lk_connections` | Подключения ЛК |
+
+---
+
+## 14. Ключевые зависимости
+
+### Backend (requirements.txt)
+```
+fastapi==0.110.1
+uvicorn==0.25.0
+pymongo==4.5.0
+motor==3.3.1
+pydantic>=2.6.4
+requests>=2.31.0
+aiohttp>=3.9.0
+httpx>=0.24.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+python-telegram-bot>=20.7
+apscheduler>=3.10.4
+vkpymusic
+vkaudiotoken
+yt-dlp
+Pillow>=10.0.0
+qrcode
+```
+
+### Frontend (package.json)
+```json
+"react": "^19.0.0"
+"framer-motion": "^12.23.24"
+"axios": "^1.12.2"
+"@twa-dev/sdk": "^8.0.2"
+"lucide-react": "^0.546.0"
+"recharts": "^3.4.1"
+"i18next": "^25.6.0"
+"react-i18next": "^16.2.0"
+"react-router-dom": "^7.5.1"
+"canvas-confetti": "^1.9.4"
+"qrcode.react": "^4.2.0"
+"@vkontakte/icons": "^3.33.0"
+"vite": "^7.2.2"
+"tailwindcss": "^3.4.17"
+```
 
 ---
 
