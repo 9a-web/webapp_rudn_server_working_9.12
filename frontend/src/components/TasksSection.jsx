@@ -1975,6 +1975,147 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         hapticFeedback={hapticFeedback}
         isDeleting={isDeleting}
       />
+
+      {/* Модальное окно подтверждения перетаскивания */}
+      <AnimatePresence>
+        {isReorderConfirmOpen && reorderData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={cancelReorder}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <GripVertical className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Изменить порядок?</h3>
+                    <p className="text-sm text-gray-500">Подтвердите перемещение задачи</p>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-3 mb-4">
+                  <p className="text-sm text-gray-700 font-medium truncate">
+                    {reorderData.task?.text}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Позиция: {reorderData.oldIndex + 1} → {reorderData.newIndex + 1}
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={cancelReorder}
+                    className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={confirmReorder}
+                    className="flex-1 py-2.5 bg-yellow-500 text-white rounded-xl font-medium text-sm"
+                  >
+                    Подтвердить
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Модальное окно синхронизации задачи с планировщиком */}
+      <AnimatePresence>
+        {isSyncTaskModalOpen && taskToSync && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={() => setIsSyncTaskModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Добавить в планировщик</h3>
+                    <p className="text-sm text-gray-500">Укажите время для задачи</p>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-3 mb-4">
+                  <p className="text-sm text-gray-700 font-medium">
+                    {taskToSync.text}
+                  </p>
+                  {taskToSync.category && (
+                    <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                      {getCategoryEmoji(taskToSync.category)} {taskToSync.category}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Выбор времени */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Начало</label>
+                    <input
+                      type="time"
+                      value={syncTaskTime.start}
+                      onChange={(e) => setSyncTaskTime(prev => ({ ...prev, start: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Конец</label>
+                    <input
+                      type="time"
+                      value={syncTaskTime.end}
+                      onChange={(e) => setSyncTaskTime(prev => ({ ...prev, end: e.target.value }))}
+                      className="w-full px-3 py-2 bg-gray-100 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsSyncTaskModalOpen(false)}
+                    className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={confirmSyncTaskToPlanner}
+                    disabled={syncingTask}
+                    className="flex-1 py-2.5 bg-purple-500 text-white rounded-xl font-medium text-sm disabled:opacity-50"
+                  >
+                    {syncingTask ? 'Добавление...' : 'Добавить'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
