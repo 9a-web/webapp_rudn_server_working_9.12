@@ -354,22 +354,23 @@ const Home = () => {
         }
       };
     }
-  }, [isReady, user?.id, loadUnreadCount]);
+  }, [isReady, user?.id, syncedUser?.id, loadUnreadCount]);
 
   // Загрузка данных пользователя при монтировании
   useEffect(() => {
-    if (isReady && user) {
+    if (isReady && (user || syncedUser)) {
       loadUserData();
       loadAchievementsData();
       trackTimeBasedAchievements();
     }
-  }, [isReady, user]);
+  }, [isReady, user, syncedUser]);
   
   // 🔗 Обработка реферального кода из Web App ссылки
   useEffect(() => {
     const processReferral = async () => {
+      const currentUser = user || syncedUser;
       // Проверяем условия: есть startParam, начинается с ref_, не обработан ещё
-      if (!startParam || !startParam.startsWith('ref_') || referralProcessed || !user) {
+      if (!startParam || !startParam.startsWith('ref_') || referralProcessed || !currentUser) {
         return;
       }
       
