@@ -81,7 +81,7 @@ const TimelineEventCard = ({
       if (hapticFeedback) {
         hapticFeedback('impact', 'heavy');
       }
-    }, 500);
+    }, 300); // 0.3 секунды для активации перетаскивания
   };
   
   const handlePointerMove = (e) => {
