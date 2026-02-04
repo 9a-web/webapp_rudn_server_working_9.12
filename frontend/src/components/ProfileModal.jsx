@@ -9,17 +9,10 @@ import DevicesModal from './DevicesModal';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import { friendsAPI } from '../services/friendsAPI';
 import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
+import { getBackendURL } from '../services/api';
 
 // Admin UIDs для доступа к специальным функциям
 const ADMIN_UIDS = ['765963392', '1311283832'];
-
-// Определяем URL backend в зависимости от окружения
-const getBackendURL = () => {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
-  }
-  return window.location.origin;
-};
 
 // Функция для получения корректного ФИО
 // Если full_name содержит "Персональные данные" (ошибка парсинга), 
