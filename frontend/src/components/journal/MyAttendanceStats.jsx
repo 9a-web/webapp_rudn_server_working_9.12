@@ -516,6 +516,74 @@ export const MyAttendanceStats = ({
         </motion.div>
       )}
 
+      {/* Статистика по предметам */}
+      {stats.subjects_stats && stats.subjects_stats.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white/5 rounded-xl p-4"
+        >
+          <h3 className="text-sm font-medium text-white mb-4">По предметам</h3>
+          
+          <div className="space-y-2">
+            {stats.subjects_stats.map((subject, index) => {
+              const subjectGradient = SUBJECT_GRADIENTS[subject.subject_color] || SUBJECT_GRADIENTS.blue;
+              const hasGrades = subject.grades_count > 0;
+              
+              return (
+                <motion.button
+                  key={subject.subject_id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  onClick={() => setSelectedSubject(subject)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${subjectGradient} flex items-center justify-center flex-shrink-0`}>
+                      <BookOpen className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm truncate">{subject.subject_name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-xs ${
+                          subject.attendance_percent >= 80 ? 'text-green-400' :
+                          subject.attendance_percent >= 60 ? 'text-yellow-400' : 'text-red-400'
+                        }`}>
+                          {subject.attendance_percent}% посещ.
+                        </span>
+                        {hasGrades && (
+                          <>
+                            <span className="text-gray-600">•</span>
+                            <span className={`text-xs flex items-center gap-1 ${
+                              subject.average_grade >= 4.5 ? 'text-green-400' :
+                              subject.average_grade >= 3.5 ? 'text-lime-400' :
+                              subject.average_grade >= 2.5 ? 'text-yellow-400' : 'text-red-400'
+                            }`}>
+                              <Star className="w-3 h-3" />
+                              {subject.average_grade?.toFixed(1)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {hasGrades && (
+                      <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded-lg">
+                        {subject.grades_count} {getNoun(subject.grades_count, 'оценка', 'оценки', 'оценок')}
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* История занятий */}
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
