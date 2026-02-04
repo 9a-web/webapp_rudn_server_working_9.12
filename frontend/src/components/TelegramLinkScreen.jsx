@@ -11,11 +11,13 @@ import { createWebSession, createSessionWebSocket, getWebSessionStatus } from '.
 
 const TelegramLinkScreen = ({ onLinked }) => {
   const [session, setSession] = useState(null);
-  const [status, setStatus] = useState('loading'); // loading, pending, linked, expired, error
+  const [status, setStatus] = useState('loading'); // loading, pending, waiting, linked, expired, error
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
+  const [scannedUser, setScannedUser] = useState(null); // Данные пользователя при сканировании
   const wsRef = useRef(null);
   const timerRef = useRef(null);
+  const pollingRef = useRef(null);
 
   // Создание новой сессии
   const createSession = useCallback(async () => {
