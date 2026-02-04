@@ -993,6 +993,102 @@ export const JournalDetailModal = ({
           hapticFeedback={hapticFeedback}
           webApp={webApp}
         />
+
+        {/* Модал подтверждения удаления журнала */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteConfirm(false)}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-[#1C1C1E] rounded-2xl p-6 w-full max-w-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Удалить журнал?</h3>
+                  <p className="text-sm text-gray-400">Это действие необратимо</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 mb-6">
+                Все данные журнала будут удалены: студенты, занятия, посещаемость и статистика.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors"
+                  disabled={actionLoading}
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleDeleteJournal}
+                  disabled={actionLoading}
+                  className="flex-1 py-3 rounded-xl font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  {actionLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="w-5 h-5" />
+                      Удалить
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Модал подтверждения выхода из журнала */}
+        {showLeaveConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowLeaveConfirm(false)}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-[#1C1C1E] rounded-2xl p-6 w-full max-w-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <LogOut className="w-6 h-6 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Выйти из журнала?</h3>
+                  <p className="text-sm text-gray-400">{journal?.name}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 mb-6">
+                Вы будете отвязаны от записи в журнале. Чтобы вернуться, вам понадобится новое приглашение от старосты.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors"
+                  disabled={actionLoading}
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleLeaveJournal}
+                  disabled={actionLoading}
+                  className="flex-1 py-3 rounded-xl font-semibold text-white bg-orange-500 hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  {actionLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <LogOut className="w-5 h-5" />
+                      Выйти
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );
