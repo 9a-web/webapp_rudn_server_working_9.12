@@ -522,6 +522,7 @@ export const PlannerTimeline = ({
   onQuickCreate,
   onMarkSkipped,
   onTimeChange,
+  onExpand,
   hapticFeedback,
   currentDate 
 }) => {
