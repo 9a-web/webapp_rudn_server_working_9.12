@@ -2390,13 +2390,15 @@ const TodayTaskItem = ({
               <div className="flex items-center gap-1 flex-shrink-0">
                 {/* Кнопка добавления подзадачи */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     hapticFeedback && hapticFeedback('impact', 'light');
                     // Открываем EditTaskModal для добавления подзадач
                     if (onAddSubtask) {
                       onAddSubtask(task);
                     }
                   }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
                   title="Добавить подзадачу"
                 >
@@ -2405,12 +2407,14 @@ const TodayTaskItem = ({
                 
                 {/* Кнопка синхронизации с планировщиком */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     hapticFeedback && hapticFeedback('impact', 'light');
                     if (onSyncToPlanner) {
                       onSyncToPlanner(task);
                     }
                   }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="p-1.5 text-purple-500 hover:bg-purple-50 rounded-lg transition-colors"
                   title="Добавить в планировщик"
                 >
@@ -2419,7 +2423,8 @@ const TodayTaskItem = ({
                 
                 {/* Кнопка редактирования - открывает модальное окно для изменения метаданных */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     hapticFeedback && hapticFeedback('impact', 'light');
                     // Открываем модальное окно EditTaskModal для редактирования метаданных
                     if (onEdit) {
@@ -2427,6 +2432,7 @@ const TodayTaskItem = ({
                       onEdit(task);
                     }
                   }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                   title="Редактировать метаданные (категория, приоритет, дедлайн)"
                 >
@@ -2435,10 +2441,12 @@ const TodayTaskItem = ({
                 
                 {/* Кнопка удаления */}
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     hapticFeedback && hapticFeedback('impact', 'medium');
                     onDelete();
                   }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title="Удалить задачу"
                 >
