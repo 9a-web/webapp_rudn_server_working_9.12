@@ -2316,7 +2316,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                   className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl shadow-sm disabled:opacity-50"
                   title="Синхронизировать с парами"
                 >
-                  <RefreshCw className={`w-5 h-5 ${(syncingSchedule || syncPreviewLoading) ? 'animate-spin' : ''}`} />
+                  <Link2 className={`w-5 h-5 ${(syncingSchedule || syncPreviewLoading) ? 'animate-pulse' : ''}`} />
                 </button>
                 <button
                   onClick={() => {
