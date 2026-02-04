@@ -81,27 +81,30 @@ const FriendProfileModal = ({
   }, [isOpen, friend?.telegram_id, currentUserId]);
 
   // Загрузка расписания с учётом выбранной даты
-  const loadSchedule = useCallback(async (date = selectedDate) => {
+  const loadSchedule = useCallback(async (date) => {
     if (!friend?.telegram_id || !currentUserId) return;
     
     setScheduleLoading(true);
     try {
       const dateStr = date.toISOString().split('T')[0];
+      console.log('Loading friend schedule for date:', dateStr);
       const scheduleData = await friendsAPI.getFriendSchedule(friend.telegram_id, currentUserId, dateStr);
+      console.log('Friend schedule loaded:', scheduleData);
       setSchedule(scheduleData);
     } catch (error) {
       console.error('Error loading schedule:', error);
-      setSchedule({ error: true, message: error.message });
+      setSchedule({ error: true, message: error.message || 'Ошибка загрузки расписания' });
     } finally {
       setScheduleLoading(false);
     }
-  }, [friend?.telegram_id, currentUserId, selectedDate]);
+  }, [friend?.telegram_id, currentUserId]);
 
+  // Загружаем расписание при переключении на таб или смене даты
   useEffect(() => {
-    if (activeTab === 'schedule') {
+    if (activeTab === 'schedule' && friend?.telegram_id && currentUserId) {
       loadSchedule(selectedDate);
     }
-  }, [activeTab, selectedDate, loadSchedule]);
+  }, [activeTab, selectedDate, friend?.telegram_id, currentUserId, loadSchedule]);
 
   // Навигация по дням
   const changeDate = (days) => {
