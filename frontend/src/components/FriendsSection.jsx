@@ -35,6 +35,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   
   // Состояние для обработанных запросов (request_id -> 'accepted' | 'rejected' | 'cancelled')
   // Загружаем из localStorage при инициализации
