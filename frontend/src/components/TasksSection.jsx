@@ -1998,6 +1998,7 @@ const TodayTaskItem = ({
   onSaveEdit,
   onCancelEdit,
   onDelete,
+  onSyncToPlanner, // Для синхронизации с планировщиком
   getCategoryEmoji,
   getPriorityColor,
   getDeadlineStatus,
