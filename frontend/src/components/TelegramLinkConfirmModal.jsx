@@ -173,7 +173,11 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
                   <div className="flex items-center gap-3">
                     {/* Аватар профиля */}
                     <div className="relative w-14 h-14 flex-shrink-0">
-                      {photoUrl ? (
+                      {photoLoading ? (
+                        <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center ring-2 ring-indigo-500/30 animate-pulse">
+                          <Loader2 className="w-6 h-6 text-white/60 animate-spin" />
+                        </div>
+                      ) : photoUrl ? (
                         <img 
                           src={photoUrl} 
                           alt={user?.first_name}
@@ -187,7 +191,7 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
                         <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center ring-2 ring-indigo-500/30">
                           <User className="w-7 h-7 text-white" />
                         </div>
-                      )}
+                      )}}
                       {/* Индикатор верификации */}
                       <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-gray-800">
                         <CheckCircle className="w-3 h-3 text-white" />
