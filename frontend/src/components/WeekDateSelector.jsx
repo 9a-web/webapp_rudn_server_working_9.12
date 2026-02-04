@@ -134,12 +134,12 @@ export const WeekDateSelector = ({
   return (
     <div className="mb-2 -mx-2">
       {/* Контейнер с кнопками и датами - только горизонтальная прокрутка */}
-      <div className="flex items-center gap-2 px-2" style={{ touchAction: 'pan-x' }}>
+      <div className="flex items-center gap-2 px-2 w-full" style={{ touchAction: 'pan-x' }}>
         {/* Кнопка предыдущей недели */}
         <motion.button
           onClick={handlePreviousWeek}
           whileTap={{ scale: 0.9 }}
-          className="flex-shrink-0 transition-transform hover:scale-105 active:scale-95"
+          className="flex-none w-[34px] transition-transform hover:scale-105 active:scale-95"
           aria-label="Предыдущая неделя"
           style={{ touchAction: 'manipulation' }}
         >
@@ -157,12 +157,13 @@ export const WeekDateSelector = ({
         
         {/* Контейнер с горизонтальной прокруткой (только по горизонтали) */}
         <div 
-          className="flex-1 min-w-0 overflow-x-auto overflow-y-visible scrollbar-hide -my-2 py-2"
+          className="flex-1 overflow-x-auto overflow-y-visible scrollbar-hide -my-2 py-2"
           style={{ 
             overscrollBehaviorX: 'contain',
             WebkitOverflowScrolling: 'touch',
             scrollbarWidth: 'none',
-            msOverflowStyle: 'none'
+            msOverflowStyle: 'none',
+            minWidth: 0
           }}
         >
           <div className="flex gap-2 min-w-max py-3 px-1" style={{ touchAction: 'pan-x' }}>
