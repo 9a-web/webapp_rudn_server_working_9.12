@@ -39,26 +39,100 @@ class BackendTester:
             print(f"   Response: {response_data}")
         print()
     
-    # ============ Web Sessions API Tests ============
+    # ============ Privacy Settings API Tests ============
     
-    def test_create_web_session(self) -> bool:
-        """Test POST /api/web-sessions - create a new web session"""
+    def test_get_privacy_settings_initial(self) -> bool:
+        """Test GET /api/profile/765963392/privacy - get current privacy settings"""
         try:
-            print("🧪 Testing: Create Web Session")
+            print("🧪 Testing: Get Initial Privacy Settings")
             
-            # Test data for device info (optional)
-            device_data = {
-                "device_name": "Test Device",
-                "browser": "Chrome",
-                "os": "Linux",
-                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+            response = requests.get(f"{API_BASE}/profile/{self.admin_telegram_id}/privacy", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Get Initial Privacy Settings", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate required fields
+            required_fields = ["show_online_status", "show_in_search", "show_friends_list", "show_achievements", "show_schedule"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test(
+                    "Get Initial Privacy Settings", 
+                    False, 
+                    f"Missing required fields: {missing_fields}",
+                    data
+                )
+                return False
+            
+            # Validate all fields are boolean
+            for field in required_fields:
+                if not isinstance(data[field], bool):
+                    self.log_test(
+                        "Get Initial Privacy Settings", 
+                        False, 
+                        f"Field '{field}' should be boolean, got {type(data[field]).__name__}: {data[field]}",
+                        data
+                    )
+                    return False
+            
+            # Store original settings for restoration later
+            self.original_privacy_settings = data.copy()
+            
+            self.log_test(
+                "Get Initial Privacy Settings", 
+                True, 
+                f"Privacy settings retrieved successfully. Settings: {data}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Get Initial Privacy Settings", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Get Initial Privacy Settings", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    
+    def test_update_privacy_settings(self) -> bool:
+        """Test PUT /api/profile/765963392/privacy - update privacy settings"""
+        try:
+            print("🧪 Testing: Update Privacy Settings")
+            
+            # Test data as specified in review request
+            update_data = {
+                "show_online_status": False,
+                "show_in_search": True,
+                "show_friends_list": False,
+                "show_achievements": True,
+                "show_schedule": False
             }
             
-            response = requests.post(f"{API_BASE}/web-sessions", json=device_data, timeout=10)
+            response = requests.put(
+                f"{API_BASE}/profile/{self.admin_telegram_id}/privacy", 
+                json=update_data,
+                timeout=10
+            )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Create Web Session", 
+                    "Update Privacy Settings", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -68,221 +142,174 @@ class BackendTester:
             data = response.json()
             
             # Validate required fields
-            required_fields = ["session_token", "status", "qr_url", "expires_at"]
+            required_fields = ["show_online_status", "show_in_search", "show_friends_list", "show_achievements", "show_schedule"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Create Web Session", 
+                    "Update Privacy Settings", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate status is PENDING
-            if data.get("status") != "pending":
-                self.log_test(
-                    "Create Web Session", 
-                    False, 
-                    f"Expected status 'pending', got '{data.get('status')}'",
-                    data
-                )
-                return False
-            
-            # Store session token for subsequent tests
-            self.session_token = data["session_token"]
-            
-            self.log_test(
-                "Create Web Session", 
-                True, 
-                f"Session created successfully. Token: {self.session_token[:8]}..., Status: {data['status']}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Create Web Session", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Create Web Session", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_get_session_status(self) -> bool:
-        """Test GET /api/web-sessions/{token}/status - check session status"""
-        if not self.session_token:
-            self.log_test(
-                "Get Session Status", 
-                False, 
-                "No session token available from previous test"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Get Session Status")
-            
-            response = requests.get(
-                f"{API_BASE}/web-sessions/{self.session_token}/status",
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get Session Status", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate required fields
-            required_fields = ["session_token", "status", "qr_url", "expires_at"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get Session Status", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            # Validate session token matches
-            if data.get("session_token") != self.session_token:
-                self.log_test(
-                    "Get Session Status", 
-                    False, 
-                    f"Session token mismatch. Expected: {self.session_token}, got: {data.get('session_token')}",
-                    data
-                )
-                return False
-            
-            # Status should be pending (since we haven't linked it yet)
-            expected_status = "pending"
-            if data.get("status") != expected_status:
-                self.log_test(
-                    "Get Session Status", 
-                    False, 
-                    f"Expected status '{expected_status}', got '{data.get('status')}'",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Get Session Status", 
-                True, 
-                f"Session status retrieved successfully. Status: {data['status']}, Token: {data['session_token'][:8]}...",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get Session Status", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get Session Status", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_get_user_devices(self) -> bool:
-        """Test GET /api/web-sessions/user/{telegram_id}/devices - get user devices"""
-        try:
-            print("🧪 Testing: Get User Devices")
-            
-            response = requests.get(
-                f"{API_BASE}/web-sessions/user/{self.admin_telegram_id}/devices",
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get User Devices", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate response structure
-            required_fields = ["devices", "total"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get User Devices", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            devices = data["devices"]
-            total = data["total"]
-            
-            # Validate total matches devices length
-            if total != len(devices):
-                self.log_test(
-                    "Get User Devices", 
-                    False, 
-                    f"Total count mismatch. Expected: {len(devices)}, got: {total}",
-                    data
-                )
-                return False
-            
-            # Validate each device has required fields
-            for i, device in enumerate(devices):
-                device_required_fields = ["session_token", "device_name", "linked_at", "last_active"]
-                device_missing_fields = [field for field in device_required_fields if field not in device]
-                
-                if device_missing_fields:
+            # Validate updated values match what we sent
+            for field, expected_value in update_data.items():
+                if data.get(field) != expected_value:
                     self.log_test(
-                        "Get User Devices", 
+                        "Update Privacy Settings", 
                         False, 
-                        f"Device {i} missing required fields: {device_missing_fields}",
-                        device
+                        f"Field '{field}' not updated correctly. Expected: {expected_value}, got: {data.get(field)}",
+                        data
                     )
                     return False
             
             self.log_test(
-                "Get User Devices", 
+                "Update Privacy Settings", 
                 True, 
-                f"Found {total} devices for user {self.admin_telegram_id}. All devices have required fields.",
-                {"total_devices": total, "devices_sample": devices[:2] if devices else []}
+                f"Privacy settings updated successfully. New settings: {data}",
+                data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Get User Devices", 
+                "Update Privacy Settings", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Get User Devices", 
+                "Update Privacy Settings", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    
+    def test_verify_privacy_settings_saved(self) -> bool:
+        """Test GET /api/profile/765963392/privacy - verify the settings were saved correctly"""
+        try:
+            print("🧪 Testing: Verify Privacy Settings Saved")
+            
+            response = requests.get(f"{API_BASE}/profile/{self.admin_telegram_id}/privacy", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Verify Privacy Settings Saved", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Expected values from the update test
+            expected_values = {
+                "show_online_status": False,
+                "show_in_search": True,
+                "show_friends_list": False,
+                "show_achievements": True,
+                "show_schedule": False
+            }
+            
+            # Validate all values match what we set
+            for field, expected_value in expected_values.items():
+                if data.get(field) != expected_value:
+                    self.log_test(
+                        "Verify Privacy Settings Saved", 
+                        False, 
+                        f"Field '{field}' not persisted correctly. Expected: {expected_value}, got: {data.get(field)}",
+                        data
+                    )
+                    return False
+            
+            self.log_test(
+                "Verify Privacy Settings Saved", 
+                True, 
+                f"Privacy settings verified successfully. All values persisted correctly: {data}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Verify Privacy Settings Saved", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Verify Privacy Settings Saved", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    
+    def test_restore_original_privacy_settings(self) -> bool:
+        """Restore original privacy settings after testing"""
+        if not self.original_privacy_settings:
+            self.log_test(
+                "Restore Original Privacy Settings", 
+                True, 
+                "No original settings to restore"
+            )
+            return True
+        
+        try:
+            print("🧪 Testing: Restore Original Privacy Settings")
+            
+            response = requests.put(
+                f"{API_BASE}/profile/{self.admin_telegram_id}/privacy", 
+                json=self.original_privacy_settings,
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Restore Original Privacy Settings", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate restored values match original
+            for field, expected_value in self.original_privacy_settings.items():
+                if data.get(field) != expected_value:
+                    self.log_test(
+                        "Restore Original Privacy Settings", 
+                        False, 
+                        f"Field '{field}' not restored correctly. Expected: {expected_value}, got: {data.get(field)}",
+                        data
+                    )
+                    return False
+            
+            self.log_test(
+                "Restore Original Privacy Settings", 
+                True, 
+                f"Original privacy settings restored successfully: {data}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Restore Original Privacy Settings", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Restore Original Privacy Settings", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
