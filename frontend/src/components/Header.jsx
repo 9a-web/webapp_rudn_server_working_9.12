@@ -129,6 +129,41 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
     }, 4000);
   };
 
+  // Обработчик сканирования QR-кода
+  const handleScanQR = () => {
+    if (hapticFeedback) hapticFeedback('impact', 'medium');
+    
+    // Проверяем доступность Telegram WebApp API
+    const webApp = window.Telegram?.WebApp;
+    if (!webApp?.showScanQrPopup) {
+      console.warn('QR Scanner not available');
+      return;
+    }
+    
+    webApp.showScanQrPopup(
+      { text: 'Наведите камеру на QR-код' },
+      (scannedText) => {
+        if (!scannedText) return;
+        
+        console.log('📷 QR Scanned:', scannedText);
+        if (hapticFeedback) hapticFeedback('notification', 'success');
+        
+        // Закрываем сканер
+        webApp.closeScanQrPopup();
+        
+        // Обрабатываем QR-код
+        if (onQRScanned) {
+          onQRScanned(scannedText);
+        }
+        
+        return true; // Закрыть сканер
+      }
+    );
+  };
+
+  // Проверяем доступность сканера QR
+  const isQRScannerAvailable = Boolean(window.Telegram?.WebApp?.showScanQrPopup);
+
   return (
     <>
       <header 
