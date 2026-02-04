@@ -157,11 +157,7 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
                   <div className="flex items-center gap-3">
                     {/* Аватар профиля */}
                     <div className="relative w-14 h-14 flex-shrink-0">
-                      {photoLoading ? (
-                        <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
-                          <Loader2 className="w-6 h-6 text-white/50 animate-spin" />
-                        </div>
-                      ) : photoUrl ? (
+                      {photoUrl ? (
                         <img 
                           src={photoUrl} 
                           alt={user?.first_name}
