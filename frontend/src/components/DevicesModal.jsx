@@ -180,45 +180,34 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
           return;
         }
         
-        // Связываем сессию
-        setLinkStatus('linking');
-        
-        try {
-          const result = await linkWebSession(sessionToken, {
-            telegram_id: user.id,
-            first_name: user.first_name || '',
-            last_name: user.last_name || '',
-            username: user.username || '',
-            photo_url: user.photo_url || null
-          });
-          
-          if (result.success) {
-            setLinkStatus('success');
-            setLinkMessage('Устройство подключено!');
-            hapticFeedback?.('notification', 'success');
-            
-            // Обновляем список устройств
-            setTimeout(() => {
-              loadDevices();
-              setLinkStatus(null);
-            }, 2000);
-          } else {
-            setLinkStatus('error');
-            setLinkMessage(result.message || 'Не удалось подключить устройство');
-            hapticFeedback?.('notification', 'error');
-          }
-        } catch (err) {
-          console.error('Link error:', err);
-          setLinkStatus('error');
-          setLinkMessage('Ошибка при подключении');
-          hapticFeedback?.('notification', 'error');
-        }
+        // Показываем модальное окно подтверждения вместо прямого вызова
+        setPendingSessionToken(sessionToken);
+        setShowLinkConfirm(true);
       });
     } catch (err) {
       console.error('QR scan error:', err);
       setScanningQR(false);
       setError('Ошибка при сканировании');
     }
+  };
+
+  // Обработчик успешной связки из модального окна
+  const handleLinkSuccess = () => {
+    setLinkStatus('success');
+    setLinkMessage('Устройство подключено!');
+    hapticFeedback?.('notification', 'success');
+    
+    // Обновляем список устройств
+    setTimeout(() => {
+      loadDevices();
+      setLinkStatus(null);
+    }, 2000);
+  };
+
+  // Закрытие модального окна подтверждения
+  const handleLinkConfirmClose = () => {
+    setShowLinkConfirm(false);
+    setPendingSessionToken(null);
   };
 
   // Иконка устройства по ОС
