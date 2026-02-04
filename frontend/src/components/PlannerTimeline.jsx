@@ -56,6 +56,7 @@ const TimelineEventCard = ({
   const longPressTimer = useRef(null);
   const startY = useRef(0);
   const cardRef = useRef(null);
+  const wasDragging = useRef(false); // Флаг для предотвращения открытия модалки после drag
   
   const isScheduleEvent = event.origin === 'schedule';
   const isCompleted = event.completed;
