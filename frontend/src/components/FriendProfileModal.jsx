@@ -442,11 +442,13 @@ const FriendProfileModal = ({
                       <p className="text-sm text-gray-400 mb-2">
                         {schedule.friend_name} • {schedule.group_name}
                       </p>
-                      {schedule.schedule.map((event, index) => {
+                      {groupedSchedule.map((event, index) => {
                         // Парсим время из формата "09:00 - 10:20"
                         const timeParts = event.time?.split(' - ') || [];
                         const startTime = timeParts[0] || event.time_start?.slice(0, 5) || '';
                         const endTime = timeParts[1] || event.time_end?.slice(0, 5) || '';
+                        const isExpanded = expandedIndex === index;
+                        const hasMultipleSubItems = event.subItems && event.subItems.length > 1;
                         
                         return (
                           <motion.div
@@ -454,7 +456,8 @@ const FriendProfileModal = ({
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
-                            className="bg-white/5 rounded-2xl p-4 border border-white/10"
+                            className={`bg-white/5 rounded-2xl p-4 border border-white/10 ${hasMultipleSubItems ? 'cursor-pointer' : ''}`}
+                            onClick={() => hasMultipleSubItems && setExpandedIndex(isExpanded ? null : index)}
                           >
                             <div className="flex items-start gap-3">
                               <div className="bg-purple-500/20 rounded-xl px-3 py-2 text-center min-w-[60px]">
@@ -472,16 +475,69 @@ const FriendProfileModal = ({
                                 {event.lessonType && (
                                   <p className="text-xs text-purple-400 mb-1">{event.lessonType}</p>
                                 )}
-                                {(event.teacher || event.professor) && (
-                                  <p className="text-sm text-gray-400 truncate">{event.teacher || event.professor}</p>
-                                )}
-                                {(event.auditory || event.room || event.location) && (
-                                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                    <MapPin className="w-3 h-3" />
-                                    {event.auditory || event.room || event.location}
-                                  </p>
+                                
+                                {/* Если несколько преподавателей/аудиторий - показываем с разворачиванием */}
+                                {hasMultipleSubItems ? (
+                                  <>
+                                    <p className="text-sm text-gray-400">
+                                      {event.subItems.length} варианта
+                                    </p>
+                                    
+                                    {/* Развёрнутые детали */}
+                                    <AnimatePresence>
+                                      {isExpanded && (
+                                        <motion.div
+                                          initial={{ opacity: 0, height: 0 }}
+                                          animate={{ opacity: 1, height: 'auto' }}
+                                          exit={{ opacity: 0, height: 0 }}
+                                          className="mt-3 space-y-2 overflow-hidden"
+                                        >
+                                          {event.subItems.map((subItem, subIndex) => (
+                                            <div 
+                                              key={subIndex} 
+                                              className={`${subIndex > 0 ? 'pt-2 border-t border-white/10' : ''}`}
+                                            >
+                                              {subItem.teacher && (
+                                                <p className="text-sm text-gray-300">{subItem.teacher}</p>
+                                              )}
+                                              {subItem.auditory && (
+                                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                  <MapPin className="w-3 h-3" />
+                                                  {subItem.auditory}
+                                                </p>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Один вариант - показываем сразу */}
+                                    {event.subItems?.[0]?.teacher && (
+                                      <p className="text-sm text-gray-400 truncate">{event.subItems[0].teacher}</p>
+                                    )}
+                                    {event.subItems?.[0]?.auditory && (
+                                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                        <MapPin className="w-3 h-3" />
+                                        {event.subItems[0].auditory}
+                                      </p>
+                                    )}
+                                  </>
                                 )}
                               </div>
+                              
+                              {/* Иконка раскрытия */}
+                              {hasMultipleSubItems && (
+                                <div className="flex-shrink-0">
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </motion.div>
                         );
