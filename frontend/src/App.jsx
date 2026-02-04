@@ -43,7 +43,7 @@ import { UpcomingClassNotification } from './components/UpcomingClassNotificatio
 import { GreetingNotification, GreetingNotificationContent } from './components/GreetingNotification';
 import { AchievementNotificationContent } from './components/AchievementNotification';
 import { NotificationQueueProvider, useNotificationQueue } from './components/NotificationQueue';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { notificationsAPI } from './services/notificationsAPI';
 import { getWebSessionStatus, sendHeartbeat, createSessionMonitorWebSocket } from './services/webSessionAPI';
 import TelegramLinkScreen from './components/TelegramLinkScreen';
