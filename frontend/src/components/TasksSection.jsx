@@ -1751,6 +1751,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     onSaveEdit={handleSaveEdit}
                     onCancelEdit={handleCancelEdit}
                     onDelete={() => handleOpenDeleteConfirm(task)}
+                    onSyncToPlanner={handleSyncTaskToPlanner}
                     getCategoryEmoji={getCategoryEmoji}
                     getPriorityColor={getPriorityColor}
                     getDeadlineStatus={getDeadlineStatus}
