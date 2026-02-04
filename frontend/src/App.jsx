@@ -743,7 +743,7 @@ const Home = () => {
         // Загружаем настройки темы
         try {
           const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
-          const themeResponse = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
+          const themeResponse = await fetch(`${backendUrl}/api/user-settings/${currentUser.id}/theme`);
           if (themeResponse.ok) {
             const themeData = await themeResponse.json();
             setNewYearThemeMode(themeData.new_year_theme_mode || 'auto');
@@ -773,10 +773,10 @@ const Home = () => {
           // Пытаемся синхронизировать с сервером в фоне
           try {
             await userAPI.saveUserSettings({
-              telegram_id: user.id,
-              username: user.username,
-              first_name: user.first_name,
-              last_name: user.last_name,
+              telegram_id: currentUser.id,
+              username: currentUser.username,
+              first_name: currentUser.first_name,
+              last_name: currentUser.last_name,
               ...cachedSettings
             });
             console.log('✅ Настройки синхронизированы с сервером');
