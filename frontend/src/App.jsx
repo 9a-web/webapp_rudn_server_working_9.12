@@ -1355,12 +1355,16 @@ const Home = () => {
 
   // Показываем Welcome Screen
   if (showWelcomeScreen) {
+    // Определяем, открыто ли приложение из Telegram WebApp
+    const isInTelegram = Boolean(window.Telegram?.WebApp?.initDataUnsafe?.user);
+    
     return (
       <>
         {renderNewYearTheme()}
         <WelcomeScreen 
           onGetStarted={handleWelcomeGetStarted} 
           onSyncComplete={handleWelcomeSyncComplete}
+          hideSyncButton={isInTelegram}
         />
       </>
     );
