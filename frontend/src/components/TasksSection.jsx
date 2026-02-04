@@ -2312,11 +2312,15 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     hapticFeedback && hapticFeedback('impact', 'medium');
                     handleSyncSchedule();
                   }}
-                  disabled={syncingSchedule || syncPreviewLoading}
-                  className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl shadow-sm disabled:opacity-50"
+                  disabled={syncingSchedule || syncPreviewLoading || !userSettings?.group_id}
+                  className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Синхронизировать с парами"
                 >
-                  <Link2 className={`w-5 h-5 ${(syncingSchedule || syncPreviewLoading) ? 'animate-pulse' : ''}`} />
+                  {(syncingSchedule || syncPreviewLoading) ? (
+                    <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                  ) : (
+                    <Link2 className="w-5 h-5" />
+                  )}
                 </button>
                 <button
                   onClick={() => {
