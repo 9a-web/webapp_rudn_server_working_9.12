@@ -39,27 +39,26 @@ class BackendTester:
             print(f"   Response: {response_data}")
         print()
     
-    # ============ Listening Rooms API Tests ============
+    # ============ Web Sessions API Tests ============
     
-    def test_create_listening_room(self) -> bool:
-        """Test POST /api/music/rooms - создание комнаты совместного прослушивания"""
+    def test_create_web_session(self) -> bool:
+        """Test POST /api/web-sessions - create a new web session"""
         try:
-            print("🧪 Testing: Create Listening Room")
+            print("🧪 Testing: Create Web Session")
             
-            # Test data from review request
-            room_data = {
-                "telegram_id": self.host_telegram_id,
-                "first_name": "Test",
-                "username": "test_user",
-                "name": "Тестовая комната",
-                "control_mode": "everyone"
+            # Test data for device info (optional)
+            device_data = {
+                "device_name": "Test Device",
+                "browser": "Chrome",
+                "os": "Linux",
+                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
             }
             
-            response = requests.post(f"{API_BASE}/music/rooms", json=room_data, timeout=10)
+            response = requests.post(f"{API_BASE}/web-sessions", json=device_data, timeout=10)
             
             if response.status_code != 200:
                 self.log_test(
-                    "Create Listening Room", 
+                    "Create Web Session", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -69,50 +68,49 @@ class BackendTester:
             data = response.json()
             
             # Validate required fields
-            required_fields = ["success", "room_id", "invite_code", "invite_link"]
+            required_fields = ["session_token", "status", "qr_url", "expires_at"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Create Listening Room", 
+                    "Create Web Session", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate success is True
-            if not data.get("success"):
+            # Validate status is PENDING
+            if data.get("status") != "pending":
                 self.log_test(
-                    "Create Listening Room", 
+                    "Create Web Session", 
                     False, 
-                    f"Room creation failed. Response: {data}",
+                    f"Expected status 'pending', got '{data.get('status')}'",
                     data
                 )
                 return False
             
-            # Store room data for subsequent tests
-            self.room_id = data["room_id"]
-            self.invite_code = data["invite_code"]
+            # Store session token for subsequent tests
+            self.session_token = data["session_token"]
             
             self.log_test(
-                "Create Listening Room", 
+                "Create Web Session", 
                 True, 
-                f"Room created successfully. ID: {self.room_id[:8]}..., Code: {self.invite_code}",
+                f"Session created successfully. Token: {self.session_token[:8]}..., Status: {data['status']}",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Create Listening Room", 
+                "Create Web Session", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Create Listening Room", 
+                "Create Web Session", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
