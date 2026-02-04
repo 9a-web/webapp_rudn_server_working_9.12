@@ -36,7 +36,22 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const [refreshing, setRefreshing] = useState(false);
   
   // Состояние для обработанных запросов (request_id -> 'accepted' | 'rejected' | 'cancelled')
-  const [processedRequests, setProcessedRequests] = useState({});
+  // Загружаем из localStorage при инициализации
+  const [processedRequests, setProcessedRequests] = useState(() => {
+    try {
+      const saved = localStorage.getItem('processed_friend_requests');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  
+  // Сохраняем обработанные запросы в localStorage при изменении
+  useEffect(() => {
+    if (Object.keys(processedRequests).length > 0) {
+      localStorage.setItem('processed_friend_requests', JSON.stringify(processedRequests));
+    }
+  }, [processedRequests]);
 
   const hapticFeedback = useCallback((type = 'impact', style = 'light') => {
     if (webApp?.HapticFeedback) {
