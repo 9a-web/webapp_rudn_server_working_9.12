@@ -740,19 +740,54 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   // Обновление порядка задач после перетаскивания в карточке "Сегодня"
+  // С подтверждением через модальное окно
   const handleReorderTasks = async (newOrder) => {
     console.log('🔄 Reorder triggered!', {
       oldOrder: todayTasks.map(t => ({ id: t.id, text: t.text, order: t.order })),
       newOrder: newOrder.map(t => ({ id: t.id, text: t.text }))
     });
     
-    // Немедленно обновляем UI для плавности
+    // Находим перемещённую задачу
+    const oldIds = todayTasks.map(t => t.id);
+    const newIds = newOrder.map(t => t.id);
+    
+    // Ищем задачу которая изменила позицию
+    let movedTask = null;
+    let oldIndex = -1;
+    let newIndex = -1;
+    
+    for (let i = 0; i < newIds.length; i++) {
+      if (oldIds[i] !== newIds[i]) {
+        // Нашли различие - ищем какая задача переместилась
+        const taskId = newIds[i];
+        oldIndex = oldIds.indexOf(taskId);
+        newIndex = i;
+        movedTask = newOrder[i];
+        break;
+      }
+    }
+    
+    // Показываем модальное окно подтверждения
+    if (movedTask && oldIndex !== newIndex) {
+      setReorderData({
+        task: movedTask,
+        oldIndex,
+        newIndex,
+        newOrder
+      });
+      setIsReorderConfirmOpen(true);
+      hapticFeedback && hapticFeedback('impact', 'medium');
+    }
+  };
+  
+  // Подтверждение перетаскивания
+  const confirmReorder = async () => {
+    if (!reorderData) return;
+    
+    const { newOrder } = reorderData;
+    
+    // Обновляем UI
     const reorderedTaskIds = newOrder.map(t => t.id);
-    
-    // Создаем Map для быстрого поиска
-    const taskMap = new Map(tasks.map(t => [t.id, t]));
-    
-    // Собираем новый порядок: сначала перетянутые задачи, потом остальные
     const updatedTasks = [
       ...newOrder.map((task, index) => ({ ...task, order: index })),
       ...tasks.filter(t => !reorderedTaskIds.includes(t.id))
@@ -770,11 +805,76 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       console.log('💾 Saving order to server:', taskOrders);
       await tasksAPI.reorderTasks(taskOrders);
       console.log('✅ Tasks reordered and saved to server');
-      hapticFeedback && hapticFeedback('impact', 'light');
+      hapticFeedback && hapticFeedback('notification', 'success');
     } catch (error) {
       console.error('❌ Error saving task order:', error);
-      // В случае ошибки перезагружаем задачи
       loadTasks();
+    }
+    
+    setIsReorderConfirmOpen(false);
+    setReorderData(null);
+  };
+  
+  // Отмена перетаскивания
+  const cancelReorder = () => {
+    setIsReorderConfirmOpen(false);
+    setReorderData(null);
+    // Перезагружаем задачи для восстановления порядка
+    loadTasks();
+  };
+  
+  // Синхронизация задачи с планировщиком
+  const handleSyncTaskToPlanner = (task) => {
+    setTaskToSync(task);
+    // Устанавливаем время по умолчанию - следующий час
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+    const endHour = new Date(nextHour);
+    endHour.setHours(endHour.getHours() + 1);
+    
+    setSyncTaskTime({
+      start: `${nextHour.getHours().toString().padStart(2, '0')}:00`,
+      end: `${endHour.getHours().toString().padStart(2, '0')}:00`
+    });
+    setIsSyncTaskModalOpen(true);
+    hapticFeedback && hapticFeedback('impact', 'light');
+  };
+  
+  // Подтверждение синхронизации задачи с планировщиком
+  const confirmSyncTaskToPlanner = async () => {
+    if (!taskToSync || !user?.id) return;
+    
+    setSyncingTask(true);
+    
+    try {
+      const dateString = tasksSelectedDate.toISOString().split('T')[0];
+      
+      const eventData = {
+        title: taskToSync.text,
+        date: dateString,
+        start_time: syncTaskTime.start,
+        end_time: syncTaskTime.end,
+        category: taskToSync.category || 'personal',
+        description: taskToSync.description || '',
+        location: '',
+        origin: 'user'
+      };
+      
+      await plannerAPI.createEvent(user.id, eventData);
+      
+      hapticFeedback && hapticFeedback('notification', 'success');
+      
+      // Перезагружаем события планировщика
+      await loadPlannerEvents(tasksSelectedDate);
+      
+      setIsSyncTaskModalOpen(false);
+      setTaskToSync(null);
+    } catch (error) {
+      console.error('Error syncing task to planner:', error);
+      hapticFeedback && hapticFeedback('notification', 'error');
+    } finally {
+      setSyncingTask(false);
     }
   };
 
