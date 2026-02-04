@@ -2313,13 +2313,13 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     handleSyncSchedule();
                   }}
                   disabled={syncingSchedule || syncPreviewLoading || !userSettings?.group_id}
-                  className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Синхронизировать с парами"
                 >
                   {(syncingSchedule || syncPreviewLoading) ? (
-                    <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
                   ) : (
-                    <Link2 className="w-5 h-5" />
+                    <Link2 className="w-4 h-4" />
                   )}
                 </button>
                 <button
@@ -2334,10 +2334,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     };
                     handleQuickCreate(formatTime(startHour * 60), formatTime((startHour + 1) * 60));
                   }}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm text-sm font-medium"
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-lg shadow-sm text-xs font-medium"
                   title="Добавить событие"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Событие</span>
                 </button>
               </div>
