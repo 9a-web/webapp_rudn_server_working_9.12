@@ -247,10 +247,6 @@ const TimelineEventCard = ({
           ${!isScheduleEvent ? 'cursor-grab active:cursor-grabbing' : ''}
         `}
       >
-          ${(isCompleted || isSkipped) ? 'opacity-50' : ''}
-          ${isOverlapping ? '' : 'left-0 right-2'}
-        `}
-      >
         <div className="p-2 h-full flex flex-col">
           {/* Название события */}
           <h4 className={`text-xs font-semibold ${colors.text} leading-tight line-clamp-2 flex items-start gap-1`}>
