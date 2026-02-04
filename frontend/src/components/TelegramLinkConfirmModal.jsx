@@ -3,16 +3,54 @@
  * Показывается в Telegram Web App когда пользователь сканирует QR-код
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, User, Shield, CheckCircle, X, Loader2, AlertCircle } from 'lucide-react';
 import { linkWebSession } from '../services/webSessionAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 
 const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) => {
-  const { user, hapticFeedback } = useTelegram();
+  const { user, hapticFeedback, webApp } = useTelegram();
   const [status, setStatus] = useState('confirm'); // confirm, loading, success, error
   const [error, setError] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [photoLoading, setPhotoLoading] = useState(true);
+
+  // Загружаем фото профиля при открытии
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      setPhotoLoading(true);
+      // Пробуем получить фото из user объекта
+      if (user.photo_url) {
+        setPhotoUrl(user.photo_url);
+        setPhotoLoading(false);
+      } else {
+        // Получаем фото через API
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 
+          (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '/api');
+        const apiUrl = `${backendUrl}/api/user-profile-photo-proxy/${user.id}`;
+        
+        fetch(apiUrl)
+          .then(res => {
+            if (res.ok) {
+              return res.blob();
+            }
+            return null;
+          })
+          .then(blob => {
+            if (blob && blob.size > 0) {
+              setPhotoUrl(URL.createObjectURL(blob));
+            }
+          })
+          .catch(err => {
+            console.log('Could not load profile photo:', err);
+          })
+          .finally(() => {
+            setPhotoLoading(false);
+          });
+      }
+    }
+  }, [isOpen, user?.id, user?.photo_url]);
 
   const handleConfirm = async () => {
     if (!user?.id || !sessionToken) return;
@@ -26,7 +64,7 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
         first_name: user.first_name || '',
         last_name: user.last_name || '',
         username: user.username || '',
-        photo_url: user.photo_url || null
+        photo_url: user.photo_url || photoUrl || null
       });
       
       if (result.success) {
