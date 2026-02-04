@@ -1364,17 +1364,37 @@ const Home = () => {
         const friendId = scannedText.match(/friend[_\/](\d+)/)?.[1];
         if (friendId && effectiveUser?.id) {
           console.log('👥 Friend QR detected:', friendId);
-          // Отправляем запрос в друзья
-          const { friendsAPI } = await import('./services/friendsAPI');
-          const result = await friendsAPI.sendFriendRequest(effectiveUser.id, parseInt(friendId));
-          if (result.status === 'sent') {
-            showAlert('Запрос в друзья отправлен!');
-          } else if (result.status === 'already_friends') {
-            showAlert('Вы уже друзья!');
-          } else if (result.status === 'already_sent') {
-            showAlert('Запрос уже отправлен!');
-          } else {
-            showAlert(result.message || 'Запрос отправлен');
+          
+          // Проверяем, что это не свой QR-код
+          if (parseInt(friendId) === effectiveUser.id) {
+            showAlert('Это ваш собственный QR-код');
+            return;
+          }
+          
+          // Показываем модальное окно подтверждения
+          setFriendRequestModal({
+            isOpen: true,
+            friendId: parseInt(friendId),
+            friendData: null,
+            loading: true
+          });
+          
+          // Загружаем данные о пользователе
+          try {
+            const { friendsAPI } = await import('./services/friendsAPI');
+            const userData = await friendsAPI.getUserProfile(parseInt(friendId), effectiveUser.id);
+            setFriendRequestModal(prev => ({
+              ...prev,
+              friendData: userData,
+              loading: false
+            }));
+          } catch (err) {
+            console.error('Error loading friend data:', err);
+            setFriendRequestModal(prev => ({
+              ...prev,
+              friendData: { telegram_id: parseInt(friendId) },
+              loading: false
+            }));
           }
           return;
         }
