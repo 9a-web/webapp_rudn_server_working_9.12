@@ -10947,7 +10947,9 @@ async def search_users(
         results = []
         for user in users:
             privacy = await get_user_privacy_settings(user["telegram_id"])
-            if not privacy.show_in_search and not query:  # Если ищем конкретно по имени - показываем
+            
+            # Если пользователь скрыл себя из поиска - не показываем его
+            if not privacy.show_in_search:
                 continue
             
             friendship_status = await get_friendship_status(telegram_id, user["telegram_id"])
