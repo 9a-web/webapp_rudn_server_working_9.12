@@ -252,7 +252,8 @@ const TimelineEventCard = ({
         onPointerLeave={!isDragging ? handlePointerCancel : undefined}
         onPointerCancel={handlePointerCancel}
         onClick={(e) => {
-          if (isDragging) return;
+          // Не открываем модалку если было перетаскивание
+          if (isDragging || wasDragging.current) return;
           e.stopPropagation();
           hapticFeedback && hapticFeedback('selection');
           setIsExpanded(true);
