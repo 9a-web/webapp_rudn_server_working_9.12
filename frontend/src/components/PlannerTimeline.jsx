@@ -754,10 +754,12 @@ export const PlannerTimeline = ({
                     onDelete={onDelete}
                     onEdit={onEdit}
                     onMarkSkipped={onMarkSkipped}
+                    onTimeChange={onTimeChange}
                     hapticFeedback={hapticFeedback}
                     isOverlapping={event.isOverlapping}
                     overlapIndex={event.overlapIndex}
                     totalOverlaps={event.totalOverlaps}
+                    hourHeight={HOUR_HEIGHT}
                   />
                 );
               })}
