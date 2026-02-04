@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle, QrCode, Smartphone, RefreshCw, Clock, Loader2, Monitor } from 'lucide-react';
+import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle, QrCode, Smartphone, RefreshCw, Clock, Loader2, Monitor, Sliders } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { ReferralTree } from './ReferralTree';
 import LKConnectionModal from './LKConnectionModal';
 import DevicesModal from './DevicesModal';
+import ProfileSettingsModal from './ProfileSettingsModal';
 import { friendsAPI } from '../services/friendsAPI';
 import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
 
