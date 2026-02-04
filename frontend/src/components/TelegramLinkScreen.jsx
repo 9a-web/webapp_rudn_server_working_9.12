@@ -11,13 +11,126 @@ import { createWebSession, createSessionWebSocket, getWebSessionStatus } from '.
 
 const TelegramLinkScreen = ({ onLinked }) => {
   const [session, setSession] = useState(null);
-  const [status, setStatus] = useState('loading'); // loading, pending, waiting, linked, expired, error
+  const [status, setStatus] = useState('loading'); // loading, pending, waiting, linked, rejected, expired, error
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [scannedUser, setScannedUser] = useState(null); // Данные пользователя при сканировании
   const wsRef = useRef(null);
   const timerRef = useRef(null);
   const pollingRef = useRef(null);
+
+  // Polling статуса сессии (backup для WebSocket)
+  const startStatusPolling = useCallback((sessionToken) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const sessionStatus = await getWebSessionStatus(sessionToken);
+        console.log('📊 Polling status:', sessionStatus.status);
+        
+        if (sessionStatus.status === 'linked') {
+          setStatus('linked');
+          if (sessionStatus.telegram_id) {
+            setScannedUser({
+              telegram_id: sessionStatus.telegram_id,
+              first_name: sessionStatus.first_name,
+              last_name: sessionStatus.last_name,
+              username: sessionStatus.username,
+              photo_url: sessionStatus.photo_url
+            });
+            
+            // Сохраняем данные
+            localStorage.setItem('telegram_user', JSON.stringify({
+              id: sessionStatus.telegram_id,
+              first_name: sessionStatus.first_name,
+              last_name: sessionStatus.last_name,
+              username: sessionStatus.username,
+              photo_url: sessionStatus.photo_url
+            }));
+            localStorage.setItem('session_token', sessionToken);
+            
+            if (sessionStatus.user_settings) {
+              localStorage.setItem('user_settings', JSON.stringify(sessionStatus.user_settings));
+            }
+            
+            setTimeout(() => {
+              onLinked?.(sessionStatus);
+            }, 1500);
+          }
+          clearInterval(pollingRef.current);
+        } else if (sessionStatus.status === 'expired') {
+          setStatus('expired');
+          clearInterval(pollingRef.current);
+        }
+      } catch (err) {
+        console.log('Polling error:', err);
+      }
+    }, 2000); // Проверяем каждые 2 секунды
+  }, [onLinked]);
+
+  // Подключение к WebSocket
+  const connectWebSocket = useCallback((sessionToken) => {
+    // Закрываем предыдущее соединение
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+    
+    wsRef.current = createSessionWebSocket(sessionToken, {
+      onConnected: () => {
+        console.log('✅ WebSocket connected for session');
+      },
+      onScanned: (userData) => {
+        console.log('📱 Session scanned, waiting for confirmation...', userData);
+        setStatus('waiting');
+        setScannedUser(userData);
+      },
+      onLinked: (userData) => {
+        console.log('🎉 Session linked!', userData);
+        setStatus('linked');
+        setScannedUser(userData);
+        
+        // Сохраняем данные пользователя в localStorage
+        localStorage.setItem('telegram_user', JSON.stringify({
+          id: userData.telegram_id,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          username: userData.username,
+          photo_url: userData.photo_url
+        }));
+        
+        // Сохраняем session_token
+        localStorage.setItem('session_token', sessionToken);
+        
+        if (userData.user_settings) {
+          localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
+        }
+        
+        // Вызываем callback
+        setTimeout(() => {
+          onLinked?.(userData);
+        }, 1500);
+      },
+      onRejected: () => {
+        console.log('❌ Session rejected by user');
+        setStatus('rejected');
+        setScannedUser(null);
+      },
+      onExpired: () => {
+        console.log('⏰ Session expired');
+        setStatus('expired');
+      },
+      onError: (message) => {
+        console.error('❌ WebSocket error:', message);
+        setError(message);
+        setStatus('error');
+      }
+    });
+
+    // Запускаем polling как backup для WebSocket
+    startStatusPolling(sessionToken);
+  }, [onLinked, startStatusPolling]);
 
   // Создание новой сессии
   const createSession = useCallback(async () => {
