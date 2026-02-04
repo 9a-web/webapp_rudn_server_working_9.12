@@ -203,30 +203,32 @@ const WelcomeScreen = ({ onGetStarted, onSyncComplete, hideSyncButton = false })
         />
       </motion.button>
 
-      {/* Sync with Telegram Button */}
-      <motion.button
-        onClick={handleSyncClick}
-        className="mt-4 cursor-pointer"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8, delay: 1.1, ease: "easeOut" }}
-      >
-        <motion.span
-          className="text-blue-400 text-sm font-medium flex items-center gap-2"
-          animate={{ 
-            opacity: [0.6, 1, 0.6],
-            scale: [1, 1.02, 1]
-          }}
-          transition={{ 
-            duration: 2, 
-            repeat: Infinity, 
-            ease: "easeInOut" 
-          }}
+      {/* Sync with Telegram Button - только для веб-версии */}
+      {!hideSyncButton && (
+        <motion.button
+          onClick={handleSyncClick}
+          className="mt-4 cursor-pointer"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 1.1, ease: "easeOut" }}
         >
-          <Smartphone className="w-4 h-4" />
-          Синхронизировать с Telegram аккаунтом
-        </motion.span>
-      </motion.button>
+          <motion.span
+            className="text-blue-400 text-sm font-medium flex items-center gap-2"
+            animate={{ 
+              opacity: [0.6, 1, 0.6],
+              scale: [1, 1.02, 1]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+          >
+            <Smartphone className="w-4 h-4" />
+            Синхронизировать с Telegram аккаунтом
+          </motion.span>
+        </motion.button>
+      )}
 
       {/* QR Code Modal */}
       <AnimatePresence>
