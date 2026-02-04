@@ -1520,6 +1520,15 @@ export const ProfileModal = ({
             }}
           />
 
+          {/* Модальное окно настроек профиля */}
+          <ProfileSettingsModal
+            isOpen={showProfileSettings}
+            onClose={() => setShowProfileSettings(false)}
+            telegramId={user?.id}
+            hapticFeedback={hapticFeedback}
+            onThemeChange={onThemeChange}
+          />
+
           {/* Модальное окно управления устройствами */}
           <DevicesModal
             isOpen={showDevicesModal}
