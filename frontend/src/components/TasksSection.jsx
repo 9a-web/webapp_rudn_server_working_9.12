@@ -291,6 +291,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [newEventTime, setNewEventTime] = useState({ start: '', end: '' });
   const [savingTimeChange, setSavingTimeChange] = useState(false);
   
+  // Полноэкранный режим планировщика
+  const [isFullscreenPlannerOpen, setIsFullscreenPlannerOpen] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
