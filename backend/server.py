@@ -12661,18 +12661,25 @@ async def session_heartbeat(session_token: str):
     """
     Обновить last_active для сессии (heartbeat/ping).
     Вызывается периодически из frontend для отслеживания активности.
+    Возвращает 404 если сессия удалена или не активна.
     """
     try:
-        result = await db.web_sessions.update_one(
-            {
-                "session_token": session_token,
-                "status": WebSessionStatus.LINKED.value
-            },
+        # Сначала проверяем существует ли сессия вообще
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        
+        if not session:
+            # Сессия удалена (revoked)
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        if session.get("status") != WebSessionStatus.LINKED.value:
+            # Сессия существует, но не активна (expired или pending)
+            raise HTTPException(status_code=404, detail="Сессия не активна")
+        
+        # Обновляем last_active
+        await db.web_sessions.update_one(
+            {"session_token": session_token},
             {"$set": {"last_active": datetime.utcnow()}}
         )
-        
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Сессия не найдена или не активна")
         
         return {"success": True, "updated_at": datetime.utcnow().isoformat()}
         
