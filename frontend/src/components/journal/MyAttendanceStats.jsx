@@ -188,31 +188,48 @@ export const MyAttendanceStats = ({
     ? stats.records 
     : stats.records?.slice(0, 10) || [];
 
-  // Определяем статус посещаемости
+  // Определяем статус посещаемости и цвет окантовки
   const getAttendanceStatus = (percent) => {
-    if (percent >= 90) return { text: 'Отлично!', emoji: '🏆', color: 'text-green-400' };
-    if (percent >= 70) return { text: 'Хорошо', emoji: '👍', color: 'text-blue-400' };
-    if (percent >= 50) return { text: 'Нормально', emoji: '📊', color: 'text-yellow-400' };
-    return { text: 'Требует внимания', emoji: '⚠️', color: 'text-red-400' };
+    if (percent >= 80) return { 
+      text: 'Отлично!', 
+      emoji: '🏆', 
+      color: 'text-green-400',
+      borderColor: 'border-green-500/50',
+      bgColor: 'bg-green-500/5'
+    };
+    if (percent >= 60) return { 
+      text: 'Хорошо', 
+      emoji: '👍', 
+      color: 'text-yellow-400',
+      borderColor: 'border-yellow-500/50',
+      bgColor: 'bg-yellow-500/5'
+    };
+    return { 
+      text: 'Требует внимания', 
+      emoji: '⚠️', 
+      color: 'text-red-400',
+      borderColor: 'border-red-500/50',
+      bgColor: 'bg-red-500/5'
+    };
   };
 
   const attendanceStatus = getAttendanceStatus(stats.attendance_percent);
 
   return (
     <div className="space-y-6">
-      {/* Заголовок с именем */}
+      {/* Заголовок с именем - сдержанный фон с цветной окантовкой */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`bg-gradient-to-br ${gradient} rounded-2xl p-5`}
+        className={`${attendanceStatus.bgColor} border-2 ${attendanceStatus.borderColor} rounded-2xl p-5`}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-white/70 text-sm">Ваша статистика</p>
-            <h2 className="text-xl font-bold text-white mt-1">{stats.full_name}</h2>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-gray-400 text-sm">Ваша статистика</p>
+            <h2 className="text-lg font-bold text-white mt-1 truncate">{stats.full_name}</h2>
           </div>
-          <div className="text-right">
-            <p className="text-4xl font-bold text-white">{stats.attendance_percent}%</p>
+          <div className="text-right flex-shrink-0">
+            <p className="text-3xl font-bold text-white">{stats.attendance_percent}%</p>
             <p className={`text-sm ${attendanceStatus.color}`}>
               {attendanceStatus.emoji} {attendanceStatus.text}
             </p>
@@ -232,15 +249,15 @@ export const MyAttendanceStats = ({
         <div className="absolute -right-4 -top-4 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl" />
         
         <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 flex-shrink-0">
             <Trophy className="w-6 h-6 text-white" />
           </div>
-          <div>
-            <div className="flex items-baseline gap-2">
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <h3 className="text-2xl font-bold text-white">
                 {stats.current_streak || 0}
               </h3>
-              <span className="text-sm font-medium text-yellow-200/80">
+              <span className="text-sm font-medium text-yellow-200/80 whitespace-nowrap">
                 {getNoun(stats.current_streak || 0, 'пара', 'пары', 'пар')} подряд
               </span>
             </div>
