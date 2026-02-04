@@ -1285,7 +1285,10 @@ const Home = () => {
     return (
       <>
         {renderNewYearTheme()}
-        <WelcomeScreen onGetStarted={handleWelcomeGetStarted} />
+        <WelcomeScreen 
+          onGetStarted={handleWelcomeGetStarted} 
+          onSyncComplete={handleWelcomeSyncComplete}
+        />
       </>
     );
   }
