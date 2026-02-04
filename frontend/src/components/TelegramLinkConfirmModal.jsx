@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, User, Shield, CheckCircle, X, Loader2, AlertCircle } from 'lucide-react';
-import { linkWebSession } from '../services/webSessionAPI';
+import { linkWebSession, notifySessionScanned, notifySessionRejected } from '../services/webSessionAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 
 const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) => {
@@ -19,14 +19,21 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
   // Используем фото из user или загруженное через API
   const photoUrl = user?.photo_url || fetchedPhotoUrl;
 
-  // Сбрасываем состояние при открытии/закрытии
+  // Сбрасываем состояние при открытии и отправляем уведомление "scanned"
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && sessionToken && user?.id) {
       setStatus('confirm');
       setError(null);
       setFetchedPhotoUrl(null);
+      
+      // Отправляем уведомление, что QR-код отсканирован
+      notifySessionScanned(sessionToken, {
+        telegram_id: user.id,
+        first_name: user.first_name,
+        photo_url: user.photo_url
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, sessionToken, user?.id, user?.first_name, user?.photo_url]);
 
   // Загружаем фото профиля через API только если нет в user
   useEffect(() => {
