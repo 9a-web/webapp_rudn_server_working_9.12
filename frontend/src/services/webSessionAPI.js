@@ -369,6 +369,7 @@ export const sendHeartbeat = async (sessionToken) => {
 
 /**
  * Создать WebSocket соединение для мониторинга текущей сессии (revoked, etc)
+ * С автоматическим fallback на HTTP polling при ошибке WebSocket
  * @param {string} sessionToken - токен сессии
  * @param {Object} callbacks - колбэки событий
  * @returns {Object} - объект с методом close()
@@ -382,11 +383,56 @@ export const createSessionMonitorWebSocket = (sessionToken, { onRevoked, onError
   console.log('🔌 Connecting monitor WebSocket:', wsUrl);
   
   let isClosed = false;
+  let pollingInterval = null;
+  let wsConnected = false;
+  
+  // HTTP polling fallback - проверяем статус сессии
+  const startPolling = () => {
+    if (pollingInterval) return;
+    
+    console.log('🔄 Starting HTTP polling fallback for session monitoring...');
+    
+    pollingInterval = setInterval(async () => {
+      if (isClosed) {
+        clearInterval(pollingInterval);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/status`);
+        
+        // Если 404 - сессия удалена (revoked)
+        if (response.status === 404) {
+          console.log('🔌 Session not found (revoked) via polling');
+          onRevoked?.();
+          clearInterval(pollingInterval);
+          return;
+        }
+        
+        if (!response.ok) {
+          return;
+        }
+        
+        const data = await response.json();
+        
+        // Проверяем статус сессии
+        if (data.status === 'expired' || data.status === 'revoked') {
+          console.log('🔌 Session revoked/expired via polling');
+          onRevoked?.();
+          clearInterval(pollingInterval);
+        }
+      } catch (err) {
+        console.warn('📡 Session monitor polling error:', err.message);
+        // Продолжаем polling при сетевых ошибках
+      }
+    }, 5000); // Проверяем каждые 5 секунд для быстрой реакции
+  };
   
   const ws = new WebSocket(wsUrl);
   
   ws.onopen = () => {
     console.log('✅ Session monitor WebSocket connected');
+    wsConnected = true;
   };
   
   ws.onmessage = (event) => {
@@ -412,15 +458,38 @@ export const createSessionMonitorWebSocket = (sessionToken, { onRevoked, onError
   
   ws.onerror = (error) => {
     console.error('❌ Monitor WebSocket error:', error);
+    // Если WebSocket не подключился - переключаемся на polling
+    if (!wsConnected && !pollingInterval && !isClosed) {
+      startPolling();
+    }
   };
   
   ws.onclose = (event) => {
     console.log('🔌 Monitor WebSocket closed, code:', event.code);
+    // Если WebSocket закрылся до подключения или неожиданно - переключаемся на polling
+    if (!wsConnected && !pollingInterval && !isClosed) {
+      startPolling();
+    } else if (wsConnected && !isClosed && !pollingInterval) {
+      // WebSocket был подключен, но закрылся - переключаемся на polling
+      console.log('⚠️ WebSocket disconnected, switching to polling...');
+      startPolling();
+    }
   };
+  
+  // Таймаут для переключения на polling если WebSocket не подключается
+  setTimeout(() => {
+    if (!wsConnected && !pollingInterval && !isClosed) {
+      console.log('⚠️ WebSocket connection timeout, switching to HTTP polling...');
+      startPolling();
+    }
+  }, 5000); // 5 секунд таймаут
   
   return {
     close: () => {
       isClosed = true;
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }
