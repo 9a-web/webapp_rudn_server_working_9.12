@@ -157,9 +157,17 @@ export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpi
           console.log('🔗 Session WebSocket ready');
           onConnected?.();
           break;
+        case 'scanned':
+          console.log('📱 Session scanned, waiting for confirmation...');
+          onScanned?.(data.data);
+          break;
         case 'linked':
           console.log('✅ Session linked!', data.data);
           onLinked?.(data.data);
+          break;
+        case 'rejected':
+          console.log('❌ Session rejected by user');
+          onRejected?.();
           break;
         case 'expired':
           console.log('⏰ Session expired');
