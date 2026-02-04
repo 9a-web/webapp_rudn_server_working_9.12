@@ -1300,6 +1300,9 @@ def main() -> None:
     application.add_handler(CommandHandler("users", users_command))
     application.add_handler(CommandHandler("clear_db", clear_db_command))
     
+    # Регистрируем обработчик callback_query для inline-кнопок
+    application.add_handler(CallbackQueryHandler(handle_revoke_device_callback, pattern=r"^revoke_device_"))
+    
     logger.info("✅ Бот успешно запущен и готов к работе!")
     logger.info("📝 Доступные команды: /start, /users (только для админов), /clear_db (только для админов)")
     
