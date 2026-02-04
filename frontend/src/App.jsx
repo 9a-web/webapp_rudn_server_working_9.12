@@ -1107,10 +1107,10 @@ const Home = () => {
     setIsAnalyticsOpen(true);
     
     // Отслеживаем открытие аналитики и посещение пункта меню
-    if (user) {
+    if (effectiveUser) {
       try {
-        const result = await achievementsAPI.trackAction(user.id, 'view_analytics');
-        await achievementsAPI.trackAction(user.id, 'visit_menu_item', { menu_item: 'analytics' });
+        const result = await achievementsAPI.trackAction(effectiveUser.id, 'view_analytics');
+        await achievementsAPI.trackAction(effectiveUser.id, 'visit_menu_item', { menu_item: 'analytics' });
         if (result.new_achievements && result.new_achievements.length > 0) {
           showAchievementInQueue(result.new_achievements[0]);
           loadAchievementsData();
@@ -1126,9 +1126,9 @@ const Home = () => {
     setIsAchievementsOpen(true);
     
     // Отслеживаем посещение пункта меню достижений
-    if (user) {
+    if (effectiveUser) {
       try {
-        await achievementsAPI.trackAction(user.id, 'visit_menu_item', { menu_item: 'achievements' });
+        await achievementsAPI.trackAction(effectiveUser.id, 'visit_menu_item', { menu_item: 'achievements' });
       } catch (err) {
         console.error('Error tracking achievements view:', err);
       }
@@ -1140,9 +1140,9 @@ const Home = () => {
     setIsNotificationsPanelOpen(true);
     
     // Отслеживаем посещение пункта меню уведомлений
-    if (user) {
+    if (effectiveUser) {
       try {
-        await achievementsAPI.trackAction(user.id, 'visit_menu_item', { menu_item: 'notifications' });
+        await achievementsAPI.trackAction(effectiveUser.id, 'visit_menu_item', { menu_item: 'notifications' });
       } catch (err) {
         console.error('Error tracking notifications view:', err);
       }
