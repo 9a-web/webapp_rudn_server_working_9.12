@@ -10,7 +10,7 @@ import { createWebSession, createSessionWebSocket, linkWebSession, notifySession
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Smartphone, CheckCircle, Loader2 } from 'lucide-react';
 
-const WelcomeScreen = ({ onGetStarted }) => {
+const WelcomeScreen = ({ onGetStarted, onSyncComplete }) => {
   const { hapticFeedback, webApp, user } = useTelegram();
   const [showQRModal, setShowQRModal] = useState(false);
   const [session, setSession] = useState(null);
