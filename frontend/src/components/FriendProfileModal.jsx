@@ -140,6 +140,8 @@ const FriendProfileModal = ({
       setShowRemoveConfirm(false);
       setAvatarUrl(null);
       setAvatarError(false);
+      setSelectedDate(new Date());
+      setScheduleLoading(false);
     }
   }, [isOpen]);
 
