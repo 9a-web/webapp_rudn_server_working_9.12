@@ -62,9 +62,15 @@ const TelegramLinkScreen = ({ onLinked }) => {
       onConnected: () => {
         console.log('✅ WebSocket connected for session');
       },
+      onScanned: (userData) => {
+        console.log('📱 Session scanned, waiting for confirmation...', userData);
+        setStatus('waiting');
+        setScannedUser(userData);
+      },
       onLinked: (userData) => {
         console.log('🎉 Session linked!', userData);
         setStatus('linked');
+        setScannedUser(userData);
         
         // Сохраняем данные пользователя в localStorage
         localStorage.setItem('telegram_user', JSON.stringify({
@@ -75,6 +81,9 @@ const TelegramLinkScreen = ({ onLinked }) => {
           photo_url: userData.photo_url
         }));
         
+        // Сохраняем session_token
+        localStorage.setItem('session_token', sessionToken);
+        
         if (userData.user_settings) {
           localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
         }
@@ -83,6 +92,11 @@ const TelegramLinkScreen = ({ onLinked }) => {
         setTimeout(() => {
           onLinked?.(userData);
         }, 1500);
+      },
+      onRejected: () => {
+        console.log('❌ Session rejected by user');
+        setStatus('rejected');
+        setScannedUser(null);
       },
       onExpired: () => {
         console.log('⏰ Session expired');
@@ -94,6 +108,9 @@ const TelegramLinkScreen = ({ onLinked }) => {
         setStatus('error');
       }
     });
+
+    // Запускаем polling как backup для WebSocket
+    startStatusPolling(sessionToken);
   }, [onLinked]);
 
   // Таймер обратного отсчёта
