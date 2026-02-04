@@ -68,6 +68,7 @@ export const ProfileModal = ({
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrData, setQrData] = useState(null);
   const [showDevicesModal, setShowDevicesModal] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
 
   // Проверка на админа
   const isAdmin = useMemo(() => {
