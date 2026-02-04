@@ -2303,8 +2303,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {plannerEvents.length > 0 && (
-                  <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap">
-                    {plannerEvents.length} {plannerEvents.length === 1 ? 'соб.' : 'соб.'}
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium whitespace-nowrap">
+                    {plannerEvents.length} {plannerEvents.length === 1 ? 'событие' : plannerEvents.length < 5 ? 'события' : 'событий'}
                   </span>
                 )}
                 <button
