@@ -3,29 +3,28 @@
  * Показывается в Telegram Web App когда пользователь сканирует QR-код
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, User, Shield, CheckCircle, X, Loader2, AlertCircle } from 'lucide-react';
 import { linkWebSession } from '../services/webSessionAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 
 const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) => {
-  const { user, hapticFeedback, webApp } = useTelegram();
+  const { user, hapticFeedback } = useTelegram();
   const [status, setStatus] = useState('confirm'); // confirm, loading, success, error
   const [error, setError] = useState(null);
-  const [photoUrl, setPhotoUrl] = useState(null);
+  const [fetchedPhotoUrl, setFetchedPhotoUrl] = useState(null);
+  const hasFetchedRef = useRef(false);
 
-  // Загружаем фото профиля при открытии
+  // Используем фото из user или загруженное
+  const photoUrl = user?.photo_url || fetchedPhotoUrl;
+
+  // Загружаем фото профиля через API только если нет в user
   useEffect(() => {
-    if (!isOpen || !user?.id) return;
+    if (!isOpen || !user?.id || user?.photo_url || hasFetchedRef.current) return;
     
+    hasFetchedRef.current = true;
     let isCancelled = false;
-    
-    // Пробуем получить фото из user объекта
-    if (user.photo_url) {
-      setPhotoUrl(user.photo_url);
-      return;
-    }
     
     // Получаем фото через API
     const loadPhoto = async () => {
@@ -38,7 +37,7 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
         if (res.ok && !isCancelled) {
           const blob = await res.blob();
           if (blob && blob.size > 0 && !isCancelled) {
-            setPhotoUrl(URL.createObjectURL(blob));
+            setFetchedPhotoUrl(URL.createObjectURL(blob));
           }
         }
       } catch (err) {
