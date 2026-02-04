@@ -127,6 +127,32 @@ export const JournalStatsTab = ({
     setSelectedSubjectId(subjectId);
   };
 
+  // Обработчик клика по студенту для просмотра его статистики
+  const handleStudentClick = async (studentData) => {
+    if (!isOwner) return; // Только владелец может просматривать
+    
+    if (hapticFeedback?.impactOccurred) {
+      hapticFeedback.impactOccurred('light');
+    }
+    
+    setSelectedStudent(studentData);
+    setLoadingStudentStats(true);
+    
+    try {
+      const stats = await getStudentStats(journalId, studentData.studentId, telegramId);
+      setStudentStats(stats);
+    } catch (error) {
+      console.error('Error loading student stats:', error);
+    } finally {
+      setLoadingStudentStats(false);
+    }
+  };
+
+  const closeStudentModal = () => {
+    setSelectedStudent(null);
+    setStudentStats(null);
+  };
+
   useEffect(() => {
     const loadStats = async () => {
       if (!journalId) return;
