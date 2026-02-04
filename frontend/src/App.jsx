@@ -869,9 +869,12 @@ const Home = () => {
     // Функция для разлогинивания при удалении сессии
     const handleSessionRevoked = () => {
       console.log('🔌 Session revoked - logging out...');
+      // Очищаем все данные авторизации
       localStorage.removeItem('telegram_user');
       localStorage.removeItem('user_settings');
       localStorage.removeItem('session_token');
+      localStorage.removeItem('synced_user');
+      localStorage.removeItem('linked_telegram_id');
       // Перезагружаем страницу для показа экрана связки
       window.location.reload();
     };
