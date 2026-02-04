@@ -512,7 +512,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                         className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 text-white rounded-xl border border-white/10"
                       >
                         <QrCode className="w-4 h-4" />
-                        Мой QR-код
+                        QR-код
                       </button>
                     </div>
                   )}
