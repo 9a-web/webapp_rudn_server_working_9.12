@@ -2330,10 +2330,11 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     };
                     handleQuickCreate(formatTime(startHour * 60), formatTime((startHour + 1) * 60));
                   }}
-                  className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm text-sm font-medium"
                   title="Добавить событие"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-4 h-4" />
+                  <span>Событие</span>
                 </button>
               </div>
             </div>
