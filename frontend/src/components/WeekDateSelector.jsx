@@ -284,7 +284,7 @@ export const WeekDateSelector = ({
         <motion.button
           onClick={handleNextWeek}
           whileTap={{ scale: 0.9 }}
-          className="flex-shrink-0 transition-transform hover:scale-105 active:scale-95"
+          className="flex-none w-[34px] transition-transform hover:scale-105 active:scale-95"
           aria-label="Следующая неделя"
           style={{ touchAction: 'manipulation' }}
         >
