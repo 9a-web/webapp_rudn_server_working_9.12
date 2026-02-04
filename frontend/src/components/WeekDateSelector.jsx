@@ -157,7 +157,7 @@ export const WeekDateSelector = ({
         
         {/* Контейнер с горизонтальной прокруткой (только по горизонтали) */}
         <div 
-          className="flex-1 overflow-x-auto overflow-y-visible scrollbar-hide -my-2 py-2"
+          className="flex-1 min-w-0 overflow-x-auto overflow-y-visible scrollbar-hide -my-2 py-2"
           style={{ 
             overscrollBehaviorX: 'contain',
             WebkitOverflowScrolling: 'touch',
