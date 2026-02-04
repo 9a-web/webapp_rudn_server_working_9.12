@@ -209,13 +209,15 @@ export const JournalStatsTab = ({
       return 0;
     })
     .map(s => ({
+      studentId: s.student_id,
       name: s.full_name.length > 15 ? s.full_name.substring(0, 15) + '...' : s.full_name,
       fullName: s.full_name,
       attendance: s.attendance_percent || 0,
       present: s.present_count,
       absent: s.absent_count,
       late: s.late_count,
-      excused: s.excused_count
+      excused: s.excused_count,
+      averageGrade: s.average_grade
     }));
 
   // Данные для отображения (с учетом "показать все")
