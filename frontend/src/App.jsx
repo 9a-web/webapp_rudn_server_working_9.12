@@ -308,7 +308,7 @@ const Home = () => {
 
   // Загрузка счётчика непрочитанных уведомлений с детекцией новых
   const loadUnreadCount = useCallback(async () => {
-    const currentUser = user || syncedUser;
+    const currentUser = syncedUser || user;
     if (!currentUser?.id) return;
     try {
       const data = await notificationsAPI.getUnreadCount(currentUser.id);
