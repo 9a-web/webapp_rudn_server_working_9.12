@@ -12570,7 +12570,7 @@ async def startup_event():
     try:
         global bot_application
         from telegram import Update
-        from telegram.ext import Application, CommandHandler
+        from telegram.ext import Application, CommandHandler, CallbackQueryHandler
         
         # Импортируем обработчики команд
         import sys
