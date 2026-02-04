@@ -147,6 +147,132 @@ async def award_referral_bonus(referrer_id: int, referred_id: int, points: int, 
         logger.error(f"❌ Ошибка при начислении бонуса: {e}", exc_info=True)
 
 
+async def send_device_linked_notification(
+    telegram_id: int,
+    device_name: str,
+    session_token: str,
+    photo_url: str = None,
+    first_name: str = None
+):
+    """
+    Отправляет уведомление пользователю о подключении нового устройства
+    с inline-кнопкой для удаления сеанса
+    """
+    try:
+        bot = Bot(token=TELEGRAM_BOT_TOKEN)
+        
+        # Форматируем время подключения
+        now = datetime.utcnow()
+        formatted_time = now.strftime("%d.%m.%Y в %H:%M")
+        
+        # Формируем сообщение
+        message_text = f"""🔗 <b>Новое устройство подключено</b>
+
+📱 <b>{device_name}</b>
+🕐 Подключено: {formatted_time} UTC
+
+<i>Если это были не вы, немедленно удалите этот сеанс.</i>"""
+
+        # Создаём inline-кнопку для удаления сеанса
+        keyboard = [
+            [InlineKeyboardButton(
+                text="🗑️ Удалить сеанс",
+                callback_data=f"revoke_device_{session_token[:32]}"
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Пытаемся получить фото профиля пользователя и отправить с ним
+        try:
+            photos = await bot.get_user_profile_photos(telegram_id, limit=1)
+            
+            if photos.total_count > 0:
+                # Берём самое маленькое фото для превью (первое в списке sizes)
+                photo = photos.photos[0][0]  # Маленькое превью
+                
+                # Отправляем фото с подписью
+                await bot.send_photo(
+                    chat_id=telegram_id,
+                    photo=photo.file_id,
+                    caption=message_text,
+                    parse_mode='HTML',
+                    reply_markup=reply_markup
+                )
+                logger.info(f"📱 Уведомление об устройстве с фото отправлено: {telegram_id}")
+                return True
+        except Exception as photo_err:
+            logger.warning(f"⚠️ Не удалось получить фото профиля: {photo_err}")
+        
+        # Если фото нет - отправляем просто текст
+        await bot.send_message(
+            chat_id=telegram_id,
+            text=message_text,
+            parse_mode='HTML',
+            reply_markup=reply_markup
+        )
+        logger.info(f"📱 Уведомление об устройстве отправлено: {telegram_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке уведомления об устройстве: {e}", exc_info=True)
+        return False
+
+
+async def handle_revoke_device_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обработчик inline-кнопки для удаления сеанса устройства
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    telegram_id = update.effective_user.id
+    callback_data = query.data
+    
+    # Извлекаем session_token из callback_data
+    # Формат: revoke_device_{session_token[:32]}
+    if not callback_data.startswith("revoke_device_"):
+        return
+    
+    session_token_prefix = callback_data.replace("revoke_device_", "")
+    
+    try:
+        # Ищем сессию по началу токена и telegram_id
+        session = await db.web_sessions.find_one({
+            "session_token": {"$regex": f"^{session_token_prefix}"},
+            "telegram_id": telegram_id
+        })
+        
+        if not session:
+            await query.edit_message_text(
+                text="❌ <b>Сеанс не найден</b>\n\n<i>Возможно, он уже был удалён.</i>",
+                parse_mode='HTML'
+            )
+            return
+        
+        # Удаляем сеанс
+        result = await db.web_sessions.delete_one({"_id": session["_id"]})
+        
+        if result.deleted_count > 0:
+            device_name = session.get("device_name", "Неизвестное устройство")
+            await query.edit_message_text(
+                text=f"✅ <b>Сеанс удалён</b>\n\n📱 {device_name}\n\n<i>Устройство отключено от вашего профиля.</i>",
+                parse_mode='HTML'
+            )
+            logger.info(f"🗑️ Пользователь {telegram_id} удалил сеанс {session_token_prefix}...")
+        else:
+            await query.edit_message_text(
+                text="❌ <b>Ошибка</b>\n\n<i>Не удалось удалить сеанс.</i>",
+                parse_mode='HTML'
+            )
+            
+    except Exception as e:
+        logger.error(f"❌ Ошибка при удалении сеанса: {e}", exc_info=True)
+        await query.edit_message_text(
+            text="❌ <b>Произошла ошибка</b>\n\n<i>Попробуйте позже.</i>",
+            parse_mode='HTML'
+        )
+
+
 async def join_user_to_room(telegram_id: int, username: str, first_name: str, invite_token: str, referrer_id: int) -> dict:
     """
     Добавляет пользователя в комнату по токену приглашения
