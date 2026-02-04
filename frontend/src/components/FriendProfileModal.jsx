@@ -38,6 +38,8 @@ const FriendProfileModal = ({
   const [isFavorite, setIsFavorite] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [avatarError, setAvatarError] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   // Синхронизация is_favorite при открытии
   useEffect(() => {
