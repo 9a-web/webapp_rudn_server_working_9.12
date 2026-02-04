@@ -1173,6 +1173,19 @@ const Home = () => {
 
   // Обработка закрытия модального окна подтверждения связки
   const handleLinkConfirmClose = () => {
+    // Сохраняем токен как обработанный, чтобы при обновлении страницы модальное окно не появлялось
+    if (linkSessionToken) {
+      const processedTokens = JSON.parse(localStorage.getItem('processed_link_tokens') || '{}');
+      processedTokens[linkSessionToken] = Date.now();
+      // Очищаем старые токены (старше 1 часа)
+      const hourAgo = Date.now() - 60 * 60 * 1000;
+      Object.keys(processedTokens).forEach(token => {
+        if (processedTokens[token] < hourAgo) {
+          delete processedTokens[token];
+        }
+      });
+      localStorage.setItem('processed_link_tokens', JSON.stringify(processedTokens));
+    }
     setShowTelegramLinkConfirm(false);
     setLinkSessionToken(null);
   };
@@ -1180,6 +1193,19 @@ const Home = () => {
   // Обработка успешного подтверждения связки в Telegram Web App
   const handleLinkConfirmSuccess = () => {
     console.log('✅ Связка подтверждена из Telegram Web App');
+    // Сохраняем токен как обработанный
+    if (linkSessionToken) {
+      const processedTokens = JSON.parse(localStorage.getItem('processed_link_tokens') || '{}');
+      processedTokens[linkSessionToken] = Date.now();
+      // Очищаем старые токены (старше 1 часа)
+      const hourAgo = Date.now() - 60 * 60 * 1000;
+      Object.keys(processedTokens).forEach(token => {
+        if (processedTokens[token] < hourAgo) {
+          delete processedTokens[token];
+        }
+      });
+      localStorage.setItem('processed_link_tokens', JSON.stringify(processedTokens));
+    }
     setShowTelegramLinkConfirm(false);
     setLinkSessionToken(null);
     // Показываем уведомление об успехе
