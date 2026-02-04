@@ -3,7 +3,7 @@
  * Показывается в Telegram Web App когда пользователь сканирует QR-код
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, User, Shield, CheckCircle, X, Loader2, AlertCircle } from 'lucide-react';
 import { linkWebSession } from '../services/webSessionAPI';
@@ -14,34 +14,52 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
   const [status, setStatus] = useState('confirm'); // confirm, loading, success, error
   const [error, setError] = useState(null);
   const [fetchedPhotoUrl, setFetchedPhotoUrl] = useState(null);
-  const hasFetchedRef = useRef(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
-  // Используем фото из user или загруженное
+  // Используем фото из user или загруженное через API
   const photoUrl = user?.photo_url || fetchedPhotoUrl;
+
+  // Сбрасываем состояние при открытии/закрытии
+  useEffect(() => {
+    if (isOpen) {
+      setStatus('confirm');
+      setError(null);
+      setFetchedPhotoUrl(null);
+    }
+  }, [isOpen]);
 
   // Загружаем фото профиля через API только если нет в user
   useEffect(() => {
-    if (!isOpen || !user?.id || user?.photo_url || hasFetchedRef.current) return;
+    if (!isOpen || !user?.id || user?.photo_url || photoLoading) return;
     
-    hasFetchedRef.current = true;
     let isCancelled = false;
+    setPhotoLoading(true);
     
     // Получаем фото через API
     const loadPhoto = async () => {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 
-        (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '/api');
-      const apiUrl = `${backendUrl}/api/user-profile-photo-proxy/${user.id}`;
-      
       try {
+        // Определяем базовый URL для API
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 
+          (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '');
+        const apiUrl = `${backendUrl}/api/user-profile-photo-proxy/${user.id}`;
+        
+        console.log('Loading profile photo from:', apiUrl);
+        
         const res = await fetch(apiUrl);
         if (res.ok && !isCancelled) {
           const blob = await res.blob();
           if (blob && blob.size > 0 && !isCancelled) {
-            setFetchedPhotoUrl(URL.createObjectURL(blob));
+            const url = URL.createObjectURL(blob);
+            setFetchedPhotoUrl(url);
+            console.log('Profile photo loaded successfully');
           }
         }
       } catch (err) {
         console.log('Could not load profile photo:', err);
+      } finally {
+        if (!isCancelled) {
+          setPhotoLoading(false);
+        }
       }
     };
     
@@ -50,7 +68,7 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
     return () => {
       isCancelled = true;
     };
-  }, [isOpen, user?.id, user?.photo_url]);
+  }, [isOpen, user?.id, user?.photo_url, photoLoading]);
 
   const handleConfirm = async () => {
     if (!user?.id || !sessionToken) return;
