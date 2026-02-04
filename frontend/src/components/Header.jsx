@@ -406,6 +406,33 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             )}
           </motion.button>
 
+          {/* QR Scanner button - только в Telegram */}
+          {isQRScannerAvailable && (
+            <motion.button
+              onClick={handleScanQR}
+              className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative group"
+              style={{
+                backgroundColor: 'rgba(52, 52, 52, 0.6)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+              }}
+              aria-label="Scan QR code"
+              custom={2.5}
+              initial="initial"
+              animate="animate"
+              variants={headerItemVariants}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {/* Gradient glow effect */}
+              <div className="absolute inset-0 rounded-xl overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/20 via-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </div>
+              
+              <ScanLine className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
+            </motion.button>
+          )}
+
           {/* Menu button - скрыта */}
           {/* <motion.button
             onClick={handleMenuClick}
