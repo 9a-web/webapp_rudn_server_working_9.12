@@ -162,7 +162,7 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
                           className="w-14 h-14 rounded-full object-cover ring-2 ring-indigo-500/50"
                           onError={(e) => {
                             e.target.onerror = null;
-                            setPhotoUrl(null);
+                            setFetchedPhotoUrl(null);
                           }}
                         />
                       ) : (
