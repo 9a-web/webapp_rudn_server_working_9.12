@@ -848,7 +848,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     setSyncingTask(true);
     
     try {
-      const dateString = tasksSelectedDate.toISOString().split('T')[0];
+      // Формируем дату в ISO формате для бэкенда
+      const targetDate = new Date(tasksSelectedDate);
+      targetDate.setHours(0, 0, 0, 0);
+      const targetDateISO = targetDate.toISOString();
       
       // Используем правильный формат API
       await plannerAPI.createEvent(
@@ -856,7 +859,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         taskToSync.text,
         syncTaskTime.start,
         syncTaskTime.end,
-        dateString,
+        targetDateISO,
         {
           category: taskToSync.category || 'personal',
           description: taskToSync.description || '',
