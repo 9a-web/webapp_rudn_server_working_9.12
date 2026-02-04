@@ -379,10 +379,10 @@ const Home = () => {
       
       try {
         const result = await processReferralWebApp({
-          telegram_id: user.id,
-          username: user.username,
-          first_name: user.first_name,
-          last_name: user.last_name,
+          telegram_id: currentUser.id,
+          username: currentUser.username,
+          first_name: currentUser.first_name,
+          last_name: currentUser.last_name,
           referral_code: referralCode
         });
         
@@ -405,7 +405,7 @@ const Home = () => {
       }
     };
     
-    if (isReady && user && startParam) {
+    if (isReady && (user || syncedUser) && startParam) {
       processReferral();
     }
   }, [isReady, user, startParam, referralProcessed]);
