@@ -132,8 +132,8 @@ const Home = () => {
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [syncedUser, setSyncedUser] = useState(null); // Данные пользователя из QR синхронизации
   
-  // Эффективный user - либо из Telegram SDK, либо из синхронизации
-  const effectiveUser = user || syncedUser;
+  // Эффективный user - syncedUser имеет приоритет (содержит is_linked: true)
+  const effectiveUser = syncedUser || user;
   
   // Состояние для новогодней темы
   const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
