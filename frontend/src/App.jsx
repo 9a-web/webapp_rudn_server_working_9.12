@@ -942,13 +942,14 @@ const Home = () => {
 
   // Загрузка данных достижений
   const loadAchievementsData = async () => {
-    if (!user) return;
+    const currentUser = user || syncedUser;
+    if (!currentUser) return;
     
     try {
       const [achievements, userAchs, stats] = await Promise.all([
         achievementsAPI.getAllAchievements(),
-        achievementsAPI.getUserAchievements(user.id),
-        achievementsAPI.getUserStats(user.id),
+        achievementsAPI.getUserAchievements(currentUser.id),
+        achievementsAPI.getUserStats(currentUser.id),
       ]);
       
       setAllAchievements(achievements);
@@ -961,7 +962,8 @@ const Home = () => {
 
   // Отслеживание достижений по времени
   const trackTimeBasedAchievements = async () => {
-    if (!user) return;
+    const currentUser = user || syncedUser;
+    if (!currentUser) return;
     
     const hour = new Date().getHours();
     let actionType = null;
@@ -977,7 +979,7 @@ const Home = () => {
     
     if (actionType) {
       try {
-        const result = await achievementsAPI.trackAction(user.id, actionType);
+        const result = await achievementsAPI.trackAction(currentUser.id, actionType);
         if (result.new_achievements && result.new_achievements.length > 0) {
           // Показываем первое новое достижение через очередь
           showAchievementInQueue(result.new_achievements[0]);
@@ -991,7 +993,7 @@ const Home = () => {
     
     // Отслеживаем ежедневную активность
     try {
-      await achievementsAPI.trackAction(user.id, 'daily_activity');
+      await achievementsAPI.trackAction(currentUser.id, 'daily_activity');
     } catch (err) {
       console.error('Error tracking daily activity:', err);
     }
