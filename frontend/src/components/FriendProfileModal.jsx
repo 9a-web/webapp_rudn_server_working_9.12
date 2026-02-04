@@ -80,24 +80,55 @@ const FriendProfileModal = ({
     loadProfile();
   }, [isOpen, friend?.telegram_id, currentUserId]);
 
-  // Загрузка расписания
-  const loadSchedule = async () => {
+  // Загрузка расписания с учётом выбранной даты
+  const loadSchedule = useCallback(async (date = selectedDate) => {
     if (!friend?.telegram_id || !currentUserId) return;
     
+    setScheduleLoading(true);
     try {
-      const scheduleData = await friendsAPI.getFriendSchedule(friend.telegram_id, currentUserId);
+      const dateStr = date.toISOString().split('T')[0];
+      const scheduleData = await friendsAPI.getFriendSchedule(friend.telegram_id, currentUserId, dateStr);
       setSchedule(scheduleData);
     } catch (error) {
       console.error('Error loading schedule:', error);
       setSchedule({ error: true, message: error.message });
+    } finally {
+      setScheduleLoading(false);
     }
-  };
+  }, [friend?.telegram_id, currentUserId, selectedDate]);
 
   useEffect(() => {
-    if (activeTab === 'schedule' && !schedule) {
-      loadSchedule();
+    if (activeTab === 'schedule') {
+      loadSchedule(selectedDate);
     }
-  }, [activeTab]);
+  }, [activeTab, selectedDate, loadSchedule]);
+
+  // Навигация по дням
+  const changeDate = (days) => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+  };
+
+  // Форматирование даты
+  const formatDate = (date) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const dateStr = date.toDateString();
+    if (dateStr === today.toDateString()) return 'Сегодня';
+    if (dateStr === tomorrow.toDateString()) return 'Завтра';
+    if (dateStr === yesterday.toDateString()) return 'Вчера';
+    
+    return date.toLocaleDateString('ru-RU', { 
+      weekday: 'short', 
+      day: 'numeric', 
+      month: 'short' 
+    });
+  };
 
   // Сброс при закрытии
   useEffect(() => {
