@@ -830,21 +830,42 @@ const Home = () => {
       return;
     }
     
-    console.log('💓 Starting heartbeat for session activity tracking');
+    console.log('💓 Starting session monitoring and heartbeat');
     
-    // Отправляем heartbeat для обновления last_active
-    // Это позволяет отслеживать активность устройства
+    // Функция для разлогинивания при удалении сессии
+    const handleSessionRevoked = () => {
+      console.log('🔌 Session revoked - logging out...');
+      localStorage.removeItem('telegram_user');
+      localStorage.removeItem('user_settings');
+      localStorage.removeItem('session_token');
+      // Перезагружаем страницу для показа экрана связки
+      window.location.reload();
+    };
+    
+    // Подключаем WebSocket для мониторинга сессии в реальном времени
+    const wsMonitor = createSessionMonitorWebSocket(sessionToken, {
+      onRevoked: handleSessionRevoked,
+      onError: (msg) => console.warn('Session monitor error:', msg)
+    });
+    
+    // Отправляем heartbeat и проверяем валидность сессии
+    const checkSession = async () => {
+      const result = await sendHeartbeat(sessionToken);
+      if (!result.valid) {
+        console.log('❌ Session invalid:', result.reason);
+        handleSessionRevoked();
+      }
+    };
     
     // Отправляем heartbeat сразу при загрузке
-    sendHeartbeat(sessionToken);
+    checkSession();
     
-    // Периодически отправляем heartbeat каждые 60 секунд
-    const heartbeatInterval = setInterval(() => {
-      sendHeartbeat(sessionToken);
-    }, 60000);
+    // Периодически отправляем heartbeat каждые 30 секунд
+    const heartbeatInterval = setInterval(checkSession, 30000);
     
     return () => {
       clearInterval(heartbeatInterval);
+      wsMonitor.close();
     };
   }, []);
 
