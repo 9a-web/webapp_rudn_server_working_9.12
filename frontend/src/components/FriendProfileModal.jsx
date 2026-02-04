@@ -433,40 +433,50 @@ const FriendProfileModal = ({
                       <p className="text-sm text-gray-400 mb-2">
                         {schedule.friend_name} • {schedule.group_name}
                       </p>
-                      {schedule.schedule.map((event, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="bg-white/5 rounded-2xl p-4 border border-white/10"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="bg-purple-500/20 rounded-xl px-3 py-2 text-center min-w-[60px]">
-                              <p className="text-lg font-bold text-purple-400">
-                                {event.time_start?.split(':').slice(0, 2).join(':') || event.startTime?.slice(0, 5)}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {event.time_end?.split(':').slice(0, 2).join(':') || event.endTime?.slice(0, 5)}
-                              </p>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-white truncate">
-                                {event.discipline || event.title || event.subject}
-                              </h4>
-                              {(event.teacher || event.professor) && (
-                                <p className="text-sm text-gray-400 truncate">{event.teacher || event.professor}</p>
-                              )}
-                              {(event.auditory || event.room || event.location) && (
-                                <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                  <MapPin className="w-3 h-3" />
-                                  {event.auditory || event.room || event.location}
+                      {schedule.schedule.map((event, index) => {
+                        // Парсим время из формата "09:00 - 10:20"
+                        const timeParts = event.time?.split(' - ') || [];
+                        const startTime = timeParts[0] || event.time_start?.slice(0, 5) || '';
+                        const endTime = timeParts[1] || event.time_end?.slice(0, 5) || '';
+                        
+                        return (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="bg-white/5 rounded-2xl p-4 border border-white/10"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="bg-purple-500/20 rounded-xl px-3 py-2 text-center min-w-[60px]">
+                                <p className="text-lg font-bold text-purple-400">
+                                  {startTime}
                                 </p>
-                              )}
+                                <p className="text-xs text-gray-500">
+                                  {endTime}
+                                </p>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-white truncate">
+                                  {event.discipline || event.title || event.subject}
+                                </h4>
+                                {event.lessonType && (
+                                  <p className="text-xs text-purple-400 mb-1">{event.lessonType}</p>
+                                )}
+                                {(event.teacher || event.professor) && (
+                                  <p className="text-sm text-gray-400 truncate">{event.teacher || event.professor}</p>
+                                )}
+                                {(event.auditory || event.room || event.location) && (
+                                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {event.auditory || event.room || event.location}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      ))}
+                          </motion.div>
+                        );
+                      })}
                     </>
                   ) : (
                     <div className="text-center py-8">
