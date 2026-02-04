@@ -1836,6 +1836,93 @@ const Home = () => {
         </Suspense>
       )}
 
+      {/* Friend Request Confirm Modal - подтверждение запроса в друзья */}
+      <AnimatePresence>
+        {friendRequestModal.isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+            onClick={handleFriendRequestCancel}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl overflow-hidden"
+              style={{
+                backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6">
+                {/* Header */}
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    {friendRequestModal.loading ? (
+                      <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : friendRequestModal.friendData?.photo_url ? (
+                      <img 
+                        src={friendRequestModal.friendData.photo_url} 
+                        alt="Avatar" 
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl font-bold text-white">
+                        {friendRequestModal.friendData?.first_name?.[0] || '?'}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    Добавить в друзья?
+                  </h3>
+                  {friendRequestModal.loading ? (
+                    <p className="text-gray-400 text-sm">Загрузка...</p>
+                  ) : (
+                    <p className="text-gray-300 text-base">
+                      {friendRequestModal.friendData?.first_name || 'Пользователь'}{' '}
+                      {friendRequestModal.friendData?.last_name || ''}
+                      {friendRequestModal.friendData?.username && (
+                        <span className="text-gray-500 text-sm block">
+                          @{friendRequestModal.friendData.username}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleFriendRequestCancel}
+                    className="flex-1 py-3 rounded-xl text-sm font-semibold text-gray-300 transition-all active:scale-95"
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleFriendRequestConfirm}
+                    disabled={friendRequestModal.loading}
+                    className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)'
+                    }}
+                  >
+                    {friendRequestModal.loading ? 'Отправка...' : 'Добавить'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Telegram Link Confirm Modal - показывается при открытии через QR-код */}
       <TelegramLinkConfirmModal
         isOpen={showTelegramLinkConfirm}
