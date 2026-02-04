@@ -288,240 +288,20 @@ class BackendTester:
             )
             return False
     
-    def test_get_user_rooms(self) -> bool:
-        """Test GET /api/music/rooms/user/{telegram_id} - получение комнат пользователя"""
-        try:
-            print("🧪 Testing: Get User Rooms")
-            
-            response = requests.get(f"{API_BASE}/music/rooms/user/{self.host_telegram_id}", timeout=10)
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate response structure
-            required_fields = ["rooms", "count"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            rooms = data["rooms"]
-            count = data["count"]
-            
-            # Should have at least one room (our test room)
-            if count == 0 or len(rooms) == 0:
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"No rooms found for user {self.host_telegram_id}. Expected at least 1 room.",
-                    data
-                )
-                return False
-            
-            # Find our test room
-            test_room = None
-            for room in rooms:
-                if room.get("id") == self.room_id:
-                    test_room = room
-                    break
-            
-            if not test_room:
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"Test room {self.room_id[:8]}... not found in user's rooms list",
-                    data
-                )
-                return False
-            
-            # Validate test room data
-            if not test_room.get("is_host"):
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"Expected is_host=true for test room, got {test_room.get('is_host')}",
-                    test_room
-                )
-                return False
-            
-            self.log_test(
-                "Get User Rooms", 
-                True, 
-                f"Found {count} rooms for user. Test room present with is_host=true",
-                {"total_rooms": count, "test_room_found": True}
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get User Rooms", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get User Rooms", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    def test_leave_room_non_host(self) -> bool:
-        """Test POST /api/music/rooms/{room_id}/leave?telegram_id={telegram_id} - выход из комнаты (не хост)"""
-        if not self.room_id:
-            self.log_test(
-                "Leave Room (Non-Host)", 
-                False, 
-                "No room ID available from previous test"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Leave Room (Non-Host)")
-            
-            response = requests.post(
-                f"{API_BASE}/music/rooms/{self.room_id}/leave?telegram_id={self.friend_telegram_id}",
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Leave Room (Non-Host)", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate success response
-            if not data.get("success"):
-                self.log_test(
-                    "Leave Room (Non-Host)", 
-                    False, 
-                    f"Leave failed. Response: {data}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Leave Room (Non-Host)", 
-                True, 
-                f"Friend successfully left room. Message: {data.get('message', 'N/A')}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Leave Room (Non-Host)", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Leave Room (Non-Host)", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    def test_delete_room_host(self) -> bool:
-        """Test DELETE /api/music/rooms/{room_id}?telegram_id={telegram_id} - удаление комнаты (хост)"""
-        if not self.room_id:
-            self.log_test(
-                "Delete Room (Host)", 
-                False, 
-                "No room ID available from previous test"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Delete Room (Host)")
-            
-            response = requests.delete(
-                f"{API_BASE}/music/rooms/{self.room_id}?telegram_id={self.host_telegram_id}",
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Delete Room (Host)", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate success response
-            if not data.get("success"):
-                self.log_test(
-                    "Delete Room (Host)", 
-                    False, 
-                    f"Delete failed. Response: {data}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Delete Room (Host)", 
-                True, 
-                f"Room successfully deleted by host. Message: {data.get('message', 'N/A')}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Delete Room (Host)", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Delete Room (Host)", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
     
     def run_all_tests(self):
-        """Run all Listening Rooms API tests in sequence"""
-        print("🚀 Starting Listening Rooms API Testing")
+        """Run all Web Sessions API tests in sequence"""
+        print("🚀 Starting Web Sessions API Testing")
         print("=" * 50)
         
-        # Listening Rooms API Tests (from review request scenarios)
-        listening_rooms_tests = [
-            self.test_create_listening_room,        # 1. Create room
-            self.test_join_room_by_code,           # 2. Join by code
-            self.test_get_room_info,               # 3. Get room info
-            self.test_get_user_rooms,              # 4. Get user rooms
-            self.test_leave_room_non_host,         # 5. Leave room (non-host)
-            self.test_delete_room_host             # 6. Delete room (host)
+        # Web Sessions API Tests (from review request)
+        web_sessions_tests = [
+            self.test_create_web_session,        # 1. Create web session
+            self.test_get_session_status,        # 2. Check session status
+            self.test_get_user_devices,          # 3. Get user devices
         ]
         
-        all_tests = listening_rooms_tests
+        all_tests = web_sessions_tests
         
         passed = 0
         total = len(all_tests)
@@ -538,7 +318,7 @@ class BackendTester:
         print(f"📊 Test Results: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All Listening Rooms API tests PASSED!")
+            print("🎉 All Web Sessions API tests PASSED!")
             return True
         else:
             print(f"⚠️  {total - passed} tests FAILED")
