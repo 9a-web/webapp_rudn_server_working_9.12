@@ -249,6 +249,20 @@ async def handle_revoke_device_callback(update: Update, context: ContextTypes.DE
             )
             return
         
+        full_session_token = session.get("session_token")
+        
+        # Отправляем WebSocket уведомление о revoke через HTTP API
+        # Это работает потому что web_session_connections хранится в server.py
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"http://localhost:8001/api/web-sessions/{full_session_token}/notify-revoked",
+                    timeout=5.0
+                )
+        except Exception as ws_err:
+            logger.warning(f"⚠️ Не удалось отправить WS уведомление: {ws_err}")
+        
         # Удаляем сеанс
         result = await db.web_sessions.delete_one({"_id": session["_id"]})
         
