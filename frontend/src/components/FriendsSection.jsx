@@ -8,8 +8,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Search, UserPlus, Bell, Star, 
   ChevronRight, RefreshCw, Filter,
-  UserCheck, UserX, Clock, Send
+  UserCheck, UserX, Clock, Send, QrCode, ScanLine, X
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
 import { friendsAPI } from '../services/friendsAPI';
 import FriendCard from './FriendCard';
