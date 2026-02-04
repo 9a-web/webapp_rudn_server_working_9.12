@@ -39,6 +39,16 @@ const STATUS_CONFIG = {
   unmarked: { label: 'Не отмечено', icon: AlertCircle, color: 'text-gray-600', bg: 'bg-gray-700/20' },
 };
 
+// Градиенты для предметов
+const SUBJECT_GRADIENTS = {
+  purple: 'from-purple-400 to-pink-400',
+  blue: 'from-blue-400 to-cyan-400',
+  green: 'from-green-400 to-emerald-400',
+  orange: 'from-orange-400 to-amber-400',
+  red: 'from-red-400 to-rose-400',
+  indigo: 'from-indigo-400 to-violet-400',
+};
+
 // Кастомный тултип для Pie chart
 const PieTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
