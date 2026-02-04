@@ -1873,17 +1873,17 @@ const Home = () => {
               <div className="p-6">
                 {/* Header */}
                 <div className="text-center mb-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center overflow-hidden">
                     {friendRequestModal.loading ? (
                       <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : friendRequestModal.friendData?.photo_url ? (
                       <img 
                         src={friendRequestModal.friendData.photo_url} 
                         alt="Avatar" 
-                        className="w-full h-full rounded-full object-cover"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-2xl font-bold text-white">
+                      <span className="text-3xl font-bold text-white">
                         {friendRequestModal.friendData?.first_name?.[0] || '?'}
                       </span>
                     )}
@@ -1898,7 +1898,7 @@ const Home = () => {
                       {friendRequestModal.friendData?.first_name || 'Пользователь'}{' '}
                       {friendRequestModal.friendData?.last_name || ''}
                       {friendRequestModal.friendData?.username && (
-                        <span className="text-gray-500 text-sm block">
+                        <span className="text-gray-500 text-sm block mt-1">
                           @{friendRequestModal.friendData.username}
                         </span>
                       )}
