@@ -2169,7 +2169,7 @@ const TodayTaskItem = ({
       clearTimeout(longPressTimer.current);
     }
     
-    // Запускаем таймер на 2 секунды
+    // Запускаем таймер на 0.5 секунды
     longPressTimer.current = setTimeout(() => {
       setIsDragEnabled(true);
       // Микровибрация - сигнал что можно перетаскивать
@@ -2178,7 +2178,7 @@ const TodayTaskItem = ({
       }
       // Запускаем перетаскивание
       dragControls.start(e);
-    }, 2000);
+    }, 500);
   };
 
   const handlePointerUp = () => {
