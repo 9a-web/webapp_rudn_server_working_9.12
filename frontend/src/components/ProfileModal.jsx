@@ -643,6 +643,44 @@ export const ProfileModal = ({
               </div>
             )}
 
+            {/* Кнопка настроить профиль - первая кнопка после аватарки и имени */}
+            {isTelegramUser && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="w-full"
+              >
+                <button
+                  onClick={() => {
+                    setShowProfileSettings(true);
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all active:scale-95"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' }}
+                  >
+                    <Sliders className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      Настроить профиль
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Конфиденциальность и дизайн
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-purple-400" />
+                </button>
+              </motion.div>
+            )}
+
             {/* Подключение ЛК РУДН - только для главного админа */}
             {isTelegramUser && String(user?.id) === '765963392' && (
               <motion.div
