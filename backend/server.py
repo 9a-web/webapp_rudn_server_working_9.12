@@ -8420,6 +8420,227 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/journals/{journal_id}/student-stats/{student_id}")
+async def get_student_stats_by_id(journal_id: str, student_id: str, telegram_id: int = 0):
+    """Получить статистику студента по student_id (для владельца журнала)"""
+    try:
+        # Проверяем права доступа
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        is_owner = journal["owner_id"] == telegram_id
+        stats_viewers = journal.get("stats_viewers", [])
+        can_view = is_owner or telegram_id in stats_viewers
+        
+        if not can_view:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Найти студента
+        student = await db.journal_students.find_one({
+            "journal_id": journal_id,
+            "id": student_id
+        })
+        
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Получить все предметы журнала
+        subjects = await db.journal_subjects.find(
+            {"journal_id": journal_id}
+        ).to_list(100)
+        subjects_map = {s["subject_id"]: s for s in subjects}
+        
+        # Получить все занятия
+        sessions = await db.journal_sessions.find(
+            {"journal_id": journal_id}
+        ).sort("date", -1).to_list(500)
+        
+        # Получить записи посещаемости
+        records = await db.attendance_records.find(
+            {"student_id": student_id}
+        ).to_list(500)
+        
+        records_map = {r["session_id"]: r for r in records}
+        
+        # Общая статистика
+        present_count = sum(1 for r in records if r["status"] in ["present", "late"])
+        absent_count = sum(1 for r in records if r["status"] == "absent")
+        excused_count = sum(1 for r in records if r["status"] == "excused")
+        late_count = sum(1 for r in records if r["status"] == "late")
+        total_sessions = len(sessions)
+        
+        attendance_percent = round((present_count / total_sessions) * 100, 1) if total_sessions > 0 else 0
+        
+        # Стрики
+        current_streak = 0
+        best_streak = 0
+        temp_streak = 0
+        
+        sorted_sessions = sorted(sessions, key=lambda x: x["date"])
+        for s in sorted_sessions:
+            record = records_map.get(s["session_id"])
+            if record and record["status"] in ["present", "late"]:
+                temp_streak += 1
+                if temp_streak > best_streak:
+                    best_streak = temp_streak
+            else:
+                temp_streak = 0
+        
+        # Подсчёт текущего стрика с конца
+        for s in reversed(sorted_sessions):
+            record = records_map.get(s["session_id"])
+            if record and record["status"] in ["present", "late"]:
+                current_streak += 1
+            else:
+                break
+        
+        # Статистика по предметам с оценками
+        subjects_stats = {}
+        for s in sessions:
+            subject_id = s.get("subject_id")
+            if subject_id not in subjects_stats:
+                subject = subjects_map.get(subject_id, {})
+                subjects_stats[subject_id] = {
+                    "subject_id": subject_id,
+                    "subject_name": subject.get("name", "Без предмета"),
+                    "subject_color": subject.get("color", "blue"),
+                    "total_sessions": 0,
+                    "present_count": 0,
+                    "absent_count": 0,
+                    "late_count": 0,
+                    "excused_count": 0,
+                    "attendance_percent": 0,
+                    "sessions": [],
+                    "grades": [],
+                    "average_grade": None,
+                    "grades_count": 0
+                }
+            
+            subjects_stats[subject_id]["total_sessions"] += 1
+            
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            grade = record.get("grade") if record else None
+            
+            if status in ["present", "late"]:
+                subjects_stats[subject_id]["present_count"] += 1
+            if status == "absent":
+                subjects_stats[subject_id]["absent_count"] += 1
+            if status == "late":
+                subjects_stats[subject_id]["late_count"] += 1
+            if status == "excused":
+                subjects_stats[subject_id]["excused_count"] += 1
+            
+            if grade is not None:
+                subjects_stats[subject_id]["grades"].append({
+                    "grade": grade,
+                    "date": s["date"],
+                    "session_title": s["title"],
+                    "session_type": s.get("type", "lecture")
+                })
+            
+            subjects_stats[subject_id]["sessions"].append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "status": status,
+                "grade": grade
+            })
+        
+        # Вычисляем процент и среднюю оценку по каждому предмету
+        subjects_list = []
+        for subject_id, subj_stats in subjects_stats.items():
+            if subj_stats["total_sessions"] > 0:
+                subj_stats["attendance_percent"] = round(
+                    (subj_stats["present_count"] / subj_stats["total_sessions"]) * 100, 1
+                )
+            
+            if subj_stats["grades"]:
+                subj_stats["grades_count"] = len(subj_stats["grades"])
+                total_grade = sum(g["grade"] for g in subj_stats["grades"])
+                subj_stats["average_grade"] = round(total_grade / subj_stats["grades_count"], 2)
+            
+            subjects_list.append(subj_stats)
+        
+        subjects_list.sort(key=lambda x: x["subject_name"])
+        
+        # Статистика по оценкам
+        grades_pipeline = [
+            {"$match": {"student_id": student_id, "grade": {"$ne": None}}},
+            {"$group": {
+                "_id": None,
+                "count": {"$sum": 1},
+                "sum": {"$sum": "$grade"},
+                "grade_5": {"$sum": {"$cond": [{"$eq": ["$grade", 5]}, 1, 0]}},
+                "grade_4": {"$sum": {"$cond": [{"$eq": ["$grade", 4]}, 1, 0]}},
+                "grade_3": {"$sum": {"$cond": [{"$eq": ["$grade", 3]}, 1, 0]}},
+                "grade_2": {"$sum": {"$cond": [{"$eq": ["$grade", 2]}, 1, 0]}},
+                "grade_1": {"$sum": {"$cond": [{"$eq": ["$grade", 1]}, 1, 0]}}
+            }}
+        ]
+        grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+        
+        average_grade = None
+        grades_count = 0
+        grade_5_count = grade_4_count = grade_3_count = grade_2_count = grade_1_count = 0
+        
+        if grades_result:
+            g = grades_result[0]
+            grades_count = g["count"]
+            if grades_count > 0:
+                average_grade = round(g["sum"] / grades_count, 2)
+            grade_5_count = g["grade_5"]
+            grade_4_count = g["grade_4"]
+            grade_3_count = g["grade_3"]
+            grade_2_count = g["grade_2"]
+            grade_1_count = g["grade_1"]
+        
+        # Формируем общие записи
+        attendance_records = []
+        for s in sessions[:50]:
+            record = records_map.get(s["session_id"])
+            attendance_records.append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "subject_name": subjects_map.get(s.get("subject_id"), {}).get("name", "Без предмета"),
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "status": record["status"] if record else "unmarked",
+                "grade": record.get("grade") if record else None
+            })
+        
+        return {
+            "student_id": student["id"],
+            "full_name": student["full_name"],
+            "telegram_id": student.get("telegram_id"),
+            "is_linked": student.get("is_linked", False),
+            "attendance_percent": attendance_percent,
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "excused_count": excused_count,
+            "late_count": late_count,
+            "total_sessions": total_sessions,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
+            "subjects_stats": subjects_list,
+            "records": attendance_records,
+            "average_grade": average_grade,
+            "grades_count": grades_count,
+            "grade_5_count": grade_5_count,
+            "grade_4_count": grade_4_count,
+            "grade_3_count": grade_3_count,
+            "grade_2_count": grade_2_count,
+            "grade_1_count": grade_1_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting student stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/journals/{journal_id}/stats", response_model=JournalStatsResponse)
 async def get_journal_stats(journal_id: str, telegram_id: int = 0):
     """
