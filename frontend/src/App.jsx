@@ -1240,6 +1240,28 @@ const Home = () => {
       // Сохраняем в localStorage для восстановления после перезагрузки
       localStorage.setItem('synced_user', JSON.stringify(syncedUserData));
       localStorage.setItem('linked_telegram_id', userData.telegram_id?.toString());
+      
+      // ВАЖНО: Сохраняем telegram_user для TelegramContext
+      // Это нужно чтобы при перезагрузке страницы пользователь не был гостем
+      const telegramUserData = {
+        id: userData.telegram_id,
+        first_name: userData.first_name || 'Пользователь',
+        last_name: userData.last_name || '',
+        username: userData.username || '',
+        photo_url: userData.photo_url,
+        is_linked: true
+      };
+      localStorage.setItem('telegram_user', JSON.stringify(telegramUserData));
+      
+      // Сохраняем session_token для проверки валидности сессии
+      if (userData.session_token) {
+        localStorage.setItem('session_token', userData.session_token);
+      }
+      
+      // Сохраняем user_settings если они есть
+      if (userData.user_settings) {
+        localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
+      }
     }
     
     // Проверяем есть ли у пользователя уже настройки с группой
