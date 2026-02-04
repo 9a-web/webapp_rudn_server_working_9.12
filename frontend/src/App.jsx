@@ -130,6 +130,10 @@ const Home = () => {
   const [userSettings, setUserSettings] = useState(null);
   const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
   const [showGroupSelector, setShowGroupSelector] = useState(false);
+  const [syncedUser, setSyncedUser] = useState(null); // Данные пользователя из QR синхронизации
+  
+  // Эффективный user - либо из Telegram SDK, либо из синхронизации
+  const effectiveUser = user || syncedUser;
   
   // Состояние для новогодней темы
   const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
