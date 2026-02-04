@@ -297,6 +297,89 @@ const TelegramLinkScreen = ({ onLinked }) => {
               </motion.div>
             )}
 
+            {/* Ожидание подтверждения */}
+            {status === 'waiting' && (
+              <motion.div
+                key="waiting"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center"
+              >
+                {/* Аватар с пульсацией */}
+                <div className="relative mb-6">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute inset-0 bg-blue-500/30 rounded-full blur-xl"
+                  />
+                  <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center ring-4 ring-blue-500/30">
+                    {scannedUser?.photo_url ? (
+                      <img 
+                        src={scannedUser.photo_url} 
+                        alt="User"
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <Smartphone className="w-10 h-10 text-white" />
+                    )}
+                  </div>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="absolute -inset-2 border-2 border-dashed border-blue-400/50 rounded-full"
+                  />
+                </div>
+
+                <h2 className="text-xl font-bold text-white mb-2">
+                  Ожидание подтверждения
+                </h2>
+                <p className="text-gray-400 text-sm text-center mb-4">
+                  Подтвердите подключение на мобильном устройстве
+                </p>
+
+                {/* Таймер */}
+                <div className="flex items-center gap-2 text-gray-400 text-sm mb-4">
+                  <Clock className="w-4 h-4" />
+                  <span>Осталось: {formatTime(timeLeft || 0)}</span>
+                </div>
+
+                {/* Индикатор загрузки */}
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                  <span className="text-blue-400 text-sm">Ожидание действий...</span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Отклонено пользователем */}
+            {status === 'rejected' && (
+              <motion.div
+                key="rejected"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-12"
+              >
+                <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
+                  <AlertCircle className="w-8 h-8 text-orange-500" />
+                </div>
+                <h2 className="text-lg font-bold text-white mb-2">
+                  Подключение отклонено
+                </h2>
+                <p className="text-gray-400 text-sm mb-4 text-center">
+                  Вы отменили подключение на мобильном устройстве
+                </p>
+                <button
+                  onClick={createSession}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Попробовать снова
+                </button>
+              </motion.div>
+            )}
+
             {/* Успешно подключено */}
             {status === 'linked' && (
               <motion.div
