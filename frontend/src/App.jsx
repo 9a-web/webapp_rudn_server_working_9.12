@@ -704,11 +704,19 @@ const Home = () => {
   }, [user]);
 
   const loadUserData = useCallback(async () => {
+    // Используем effectiveUser (user из Telegram или syncedUser из QR)
+    const currentUser = user || syncedUser;
+    if (!currentUser) {
+      console.log('No user available for loadUserData');
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       
       // Проверяем, является ли пользователь связанным с Telegram (не гостевым)
-      const isLinkedUser = user.is_linked || (!user.is_guest && !user.device_id);
+      const isLinkedUser = currentUser.is_linked || (!currentUser.is_guest && !currentUser.device_id);
       
       // Пробуем загрузить настройки из localStorage сначала (для быстрого восстановления)
       const savedUserSettings = localStorage.getItem('user_settings');
@@ -723,7 +731,7 @@ const Home = () => {
         }
       }
       
-      const settings = await userAPI.getUserSettings(user.id);
+      const settings = await userAPI.getUserSettings(currentUser.id);
       
       if (settings && settings.group_id && settings.facultet_id) {
         // Пользователь имеет полные настройки
