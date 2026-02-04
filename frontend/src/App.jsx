@@ -1192,6 +1192,23 @@ const Home = () => {
     console.log('✅ Синхронизация через Welcome Screen:', userData);
     setShowWelcomeScreen(false);
     
+    // Сохраняем данные синхронизированного пользователя
+    if (userData) {
+      const syncedUserData = {
+        id: userData.telegram_id,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        username: userData.username,
+        photo_url: userData.photo_url,
+        is_linked: true
+      };
+      setSyncedUser(syncedUserData);
+      
+      // Сохраняем в localStorage для восстановления после перезагрузки
+      localStorage.setItem('synced_user', JSON.stringify(syncedUserData));
+      localStorage.setItem('linked_telegram_id', userData.telegram_id?.toString());
+    }
+    
     // Проверяем есть ли у пользователя уже настройки с группой
     if (userData && userData.user_settings) {
       const settings = userData.user_settings;
@@ -1203,7 +1220,6 @@ const Home = () => {
         // Сохраняем в localStorage для кэширования
         if (userData.telegram_id) {
           localStorage.setItem(`user_settings_${userData.telegram_id}`, JSON.stringify(settings));
-          localStorage.setItem('linked_telegram_id', userData.telegram_id.toString());
         }
         
         // Не показываем GroupSelector - сразу к главному экрану
