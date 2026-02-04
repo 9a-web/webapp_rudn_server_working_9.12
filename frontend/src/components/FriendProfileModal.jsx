@@ -437,7 +437,7 @@ const FriendProfileModal = ({
                         {schedule.message || 'Пользователь скрыл расписание или группа не настроена'}
                       </p>
                     </div>
-                  ) : schedule?.schedule?.length > 0 ? (
+                  ) : groupedSchedule.length > 0 ? (
                     <>
                       <p className="text-sm text-gray-400 mb-2">
                         {schedule.friend_name} • {schedule.group_name}
