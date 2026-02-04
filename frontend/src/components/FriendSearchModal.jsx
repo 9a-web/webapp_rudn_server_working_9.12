@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, Users, Building2, UserPlus, Check, Clock } from 'lucide-react';
+import { X, Search, Users, Building2, UserPlus, Check, Clock, Loader2 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 import { scheduleAPI } from '../services/api';
 
@@ -23,6 +23,7 @@ const FriendSearchModal = ({
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingFaculties, setLoadingFaculties] = useState(false);
+  const [sendingRequest, setSendingRequest] = useState(null); // ID пользователя, которому отправляется запрос
 
   // Загрузка факультетов
   useEffect(() => {
