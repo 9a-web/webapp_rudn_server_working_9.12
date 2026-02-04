@@ -9,7 +9,7 @@ import {
   UserCheck, UserX, Clock, AlertCircle, 
   BookOpen, GraduationCap, FlaskConical, FileText,
   CheckCircle, XCircle, AlertTriangle,
-  Trophy,
+  Trophy, Star,
 } from 'lucide-react';
 import { getMyAttendance } from '../../services/journalAPI';
 
