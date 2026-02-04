@@ -116,6 +116,12 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
 
   const handleCancel = () => {
     hapticFeedback('impact', 'light');
+    
+    // Отправляем уведомление об отклонении
+    if (sessionToken) {
+      notifySessionRejected(sessionToken);
+    }
+    
     onClose?.();
   };
 
