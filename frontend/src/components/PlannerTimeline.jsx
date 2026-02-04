@@ -66,6 +66,8 @@ const TimelineEventCard = ({
   const handlePointerDown = (e) => {
     if (isScheduleEvent) return; // Не перетаскиваем события из расписания
     
+    // Захватываем pointer для отслеживания движения
+    e.target.setPointerCapture(e.pointerId);
     startY.current = e.clientY;
     
     if (longPressTimer.current) {
@@ -73,6 +75,7 @@ const TimelineEventCard = ({
     }
     
     longPressTimer.current = setTimeout(() => {
+      console.log('🎯 Drag enabled for event:', event.text);
       setIsDragging(true);
       if (hapticFeedback) {
         hapticFeedback('impact', 'heavy');
@@ -81,6 +84,17 @@ const TimelineEventCard = ({
   };
   
   const handlePointerMove = (e) => {
+    // Если таймер ещё не сработал и палец двигается - отменяем
+    if (!isDragging && longPressTimer.current) {
+      const deltaY = Math.abs(e.clientY - startY.current);
+      if (deltaY > 10) {
+        // Слишком большое движение - отменяем long press
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+        return;
+      }
+    }
+    
     if (!isDragging) return;
     
     const deltaY = e.clientY - startY.current;
@@ -88,14 +102,22 @@ const TimelineEventCard = ({
   };
   
   const handlePointerUp = (e) => {
+    // Освобождаем pointer capture
+    try {
+      e.target.releasePointerCapture(e.pointerId);
+    } catch (err) {}
+    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
     
-    if (isDragging && onTimeChange) {
+    if (isDragging && dragOffset !== 0) {
+      console.log('📍 Drag ended, offset:', dragOffset);
+      
       // Вычисляем новое время на основе смещения
-      const minutesDelta = Math.round(dragOffset / (hourHeight / 60));
+      const pixelsPerMinute = (hourHeight || HOUR_HEIGHT) / 60;
+      const minutesDelta = Math.round(dragOffset / pixelsPerMinute);
       const currentStartMinutes = parseTime(event.time_start);
       const currentEndMinutes = parseTime(event.time_end);
       const duration = currentEndMinutes - currentStartMinutes;
@@ -111,7 +133,9 @@ const TimelineEventCard = ({
       const newStartTime = formatMinutesToTime(newStartMinutes);
       const newEndTime = formatMinutesToTime(newEndMinutes);
       
-      if (newStartTime !== event.time_start) {
+      console.log('⏰ Time change:', event.time_start, '->', newStartTime);
+      
+      if (newStartTime !== event.time_start && onTimeChange) {
         onTimeChange(event, newStartTime, newEndTime);
       }
     }
@@ -120,7 +144,11 @@ const TimelineEventCard = ({
     setDragOffset(0);
   };
   
-  const handlePointerCancel = () => {
+  const handlePointerCancel = (e) => {
+    try {
+      e.target.releasePointerCapture(e.pointerId);
+    } catch (err) {}
+    
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
