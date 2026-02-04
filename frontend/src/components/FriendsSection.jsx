@@ -96,7 +96,10 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
       hapticFeedback('impact', 'medium');
       await friendsAPI.acceptFriendRequest(requestId, user.id);
       hapticFeedback('notification', 'success');
-      await loadData();
+      // Помечаем запрос как принятый вместо удаления
+      setProcessedRequests(prev => ({ ...prev, [requestId]: 'accepted' }));
+      // Обновляем список друзей
+      await loadFriends();
     } catch (error) {
       hapticFeedback('notification', 'error');
       console.error('Error accepting request:', error);
@@ -107,7 +110,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     try {
       hapticFeedback('impact', 'light');
       await friendsAPI.rejectFriendRequest(requestId, user.id);
-      await loadRequests();
+      // Помечаем запрос как отклонённый вместо удаления
+      setProcessedRequests(prev => ({ ...prev, [requestId]: 'rejected' }));
     } catch (error) {
       console.error('Error rejecting request:', error);
     }
@@ -117,7 +121,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     try {
       hapticFeedback('impact', 'light');
       await friendsAPI.cancelFriendRequest(requestId, user.id);
-      await loadRequests();
+      // Помечаем запрос как отменённый вместо удаления
+      setProcessedRequests(prev => ({ ...prev, [requestId]: 'cancelled' }));
     } catch (error) {
       console.error('Error canceling request:', error);
     }
