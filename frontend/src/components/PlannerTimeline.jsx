@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clock, ChevronDown, ChevronUp, Check, Trash2, MapPin, User, 
-  BookOpen, Info, X, GripVertical, Edit2, Plus, Copy, AlarmClock
+  BookOpen, Info, X, GripVertical, Edit2, Plus, Copy, AlarmClock, Expand
 } from 'lucide-react';
 
 /**
