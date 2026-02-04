@@ -2221,10 +2221,10 @@ const TodayTaskItem = ({
                   dragControls.start(e);
                   console.log('🚀 Drag controls started');
                 }}
-                className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none select-none"
+                className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1.5 -ml-1 touch-none select-none rounded hover:bg-yellow-100"
                 style={{ touchAction: 'none', userSelect: 'none' }}
               >
-                <GripVertical className="w-4 h-4 text-gray-400 hover:text-yellow-500 transition-colors pointer-events-none" />
+                <GripVertical className="w-4 h-4 text-gray-400 hover:text-yellow-500 transition-colors" />
               </div>
               
               {/* Checkbox с анимацией когда все подзадачи выполнены */}
