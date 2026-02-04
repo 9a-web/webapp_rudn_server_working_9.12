@@ -116,35 +116,28 @@ class BackendTester:
             )
             return False
     
-    def test_join_room_by_code(self) -> bool:
-        """Test POST /api/music/rooms/join/{invite_code} - присоединение по коду"""
-        if not self.invite_code:
+    
+    def test_get_session_status(self) -> bool:
+        """Test GET /api/web-sessions/{token}/status - check session status"""
+        if not self.session_token:
             self.log_test(
-                "Join Room by Code", 
+                "Get Session Status", 
                 False, 
-                "No invite code available from previous test"
+                "No session token available from previous test"
             )
             return False
         
         try:
-            print("🧪 Testing: Join Room by Code")
+            print("🧪 Testing: Get Session Status")
             
-            # Test data from review request
-            join_data = {
-                "telegram_id": self.friend_telegram_id,
-                "first_name": "Friend",
-                "username": "friend_user"
-            }
-            
-            response = requests.post(
-                f"{API_BASE}/music/rooms/join/{self.invite_code}",
-                json=join_data,
+            response = requests.get(
+                f"{API_BASE}/web-sessions/{self.session_token}/status",
                 timeout=10
             )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Join Room by Code", 
+                    "Get Session Status", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -153,78 +146,58 @@ class BackendTester:
             
             data = response.json()
             
-            # Validate success response
-            if not data.get("success"):
+            # Validate required fields
+            required_fields = ["session_token", "status", "qr_url", "expires_at"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
                 self.log_test(
-                    "Join Room by Code", 
+                    "Get Session Status", 
                     False, 
-                    f"Join failed. Response: {data}",
+                    f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate room data is present
-            if "room" not in data:
+            # Validate session token matches
+            if data.get("session_token") != self.session_token:
                 self.log_test(
-                    "Join Room by Code", 
+                    "Get Session Status", 
                     False, 
-                    f"Room data missing from response",
+                    f"Session token mismatch. Expected: {self.session_token}, got: {data.get('session_token')}",
                     data
                 )
                 return False
             
-            room = data["room"]
-            
-            # Validate participants
-            if "participants" not in room:
+            # Status should be pending (since we haven't linked it yet)
+            expected_status = "pending"
+            if data.get("status") != expected_status:
                 self.log_test(
-                    "Join Room by Code", 
+                    "Get Session Status", 
                     False, 
-                    f"Participants data missing from room",
-                    room
-                )
-                return False
-            
-            # Should have 2 participants now (host + friend)
-            participants = room["participants"]
-            if len(participants) < 2:
-                self.log_test(
-                    "Join Room by Code", 
-                    False, 
-                    f"Expected at least 2 participants, got {len(participants)}",
-                    participants
-                )
-                return False
-            
-            # Check if friend is in participants
-            friend_found = any(p.get("telegram_id") == self.friend_telegram_id for p in participants)
-            if not friend_found:
-                self.log_test(
-                    "Join Room by Code", 
-                    False, 
-                    f"Friend (ID: {self.friend_telegram_id}) not found in participants",
-                    participants
+                    f"Expected status '{expected_status}', got '{data.get('status')}'",
+                    data
                 )
                 return False
             
             self.log_test(
-                "Join Room by Code", 
+                "Get Session Status", 
                 True, 
-                f"Friend successfully joined room. Participants: {len(participants)}",
+                f"Session status retrieved successfully. Status: {data['status']}, Token: {data['session_token'][:8]}...",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Join Room by Code", 
+                "Get Session Status", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Join Room by Code", 
+                "Get Session Status", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
