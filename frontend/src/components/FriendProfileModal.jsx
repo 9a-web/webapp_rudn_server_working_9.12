@@ -41,6 +41,13 @@ const FriendProfileModal = ({
   const [avatarError, setAvatarError] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState(null);
+
+  // Группировка расписания по дисциплине и времени
+  const groupedSchedule = useMemo(() => {
+    if (!schedule?.schedule?.length) return [];
+    return groupScheduleItems(schedule.schedule);
+  }, [schedule]);
 
   // Синхронизация is_favorite при открытии
   useEffect(() => {
