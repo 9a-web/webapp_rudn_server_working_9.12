@@ -358,6 +358,8 @@ export default {
   createWebSession,
   getWebSessionStatus,
   linkWebSession,
+  notifySessionScanned,
+  notifySessionRejected,
   createSessionWebSocket,
   getUserDevices,
   revokeDevice,
