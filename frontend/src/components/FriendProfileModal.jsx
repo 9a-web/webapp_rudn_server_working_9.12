@@ -3,14 +3,15 @@
  * Показывает: информацию о друге, расписание, общих друзей
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Star, UserMinus, Calendar, Users, 
   Clock, MapPin, ChevronRight, AlertTriangle,
-  Eye, EyeOff, Shield, Ban, ChevronLeft
+  Eye, EyeOff, Shield, Ban, ChevronLeft, ChevronDown
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
+import { groupScheduleItems } from '../utils/scheduleUtils';
 
 // Получение URL для фото профиля
 const getBackendURL = () => {
