@@ -850,18 +850,18 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     try {
       const dateString = tasksSelectedDate.toISOString().split('T')[0];
       
-      const eventData = {
-        title: taskToSync.text,
-        date: dateString,
-        start_time: syncTaskTime.start,
-        end_time: syncTaskTime.end,
-        category: taskToSync.category || 'personal',
-        description: taskToSync.description || '',
-        location: '',
-        origin: 'user'
-      };
-      
-      await plannerAPI.createEvent(user.id, eventData);
+      // Используем правильный формат API
+      await plannerAPI.createEvent(
+        user.id,
+        taskToSync.text,
+        syncTaskTime.start,
+        syncTaskTime.end,
+        dateString,
+        {
+          category: taskToSync.category || 'personal',
+          description: taskToSync.description || '',
+        }
+      );
       
       hapticFeedback && hapticFeedback('notification', 'success');
       
