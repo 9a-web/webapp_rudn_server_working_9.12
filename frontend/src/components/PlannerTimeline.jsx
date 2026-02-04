@@ -180,24 +180,40 @@ const TimelineEventCard = ({
     left: `calc(${overlapIndex} * (100% - 8px) / ${totalOverlaps})`,
   } : {};
 
+  // Стиль при перетаскивании
+  const dragStyle = isDragging ? {
+    transform: `translateY(${dragOffset}px)`,
+    zIndex: 100,
+    boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+    opacity: 0.9,
+  } : {};
+
   return (
     <>
       {/* Карточка события на timeline */}
       <motion.div
-        layout
+        ref={cardRef}
+        layout={!isDragging}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        style={{ ...style, ...overlapStyle }}
+        style={{ ...style, ...overlapStyle, ...dragStyle }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerCancel}
+        onPointerCancel={handlePointerCancel}
         onClick={(e) => {
+          if (isDragging) return;
           e.stopPropagation();
           hapticFeedback && hapticFeedback('selection');
           setIsExpanded(true);
         }}
         className={`
-          absolute rounded-lg cursor-pointer overflow-hidden
+          absolute rounded-lg cursor-pointer overflow-hidden touch-none
           border-l-4 ${colors.border} ${colors.bg}
           shadow-md hover:shadow-lg transition-shadow
+          ${isDragging ? 'ring-2 ring-blue-400' : ''}
           ${(isCompleted || isSkipped) ? 'opacity-50' : ''}
           ${isOverlapping ? '' : 'left-0 right-2'}
         `}
