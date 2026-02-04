@@ -1547,6 +1547,7 @@ const Home = () => {
           onThemeChange={handleThemeChange}
           unreadNotificationsCount={unreadNotificationsCount}
           hasNewNotification={hasNewNotification}
+          onQRScanned={handleQRScanned}
         />
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
