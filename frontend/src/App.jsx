@@ -1449,6 +1449,41 @@ const Home = () => {
     }
   };
 
+  // Обработка подтверждения запроса в друзья
+  const handleFriendRequestConfirm = async () => {
+    if (!friendRequestModal.friendId || !effectiveUser?.id) return;
+    
+    setFriendRequestModal(prev => ({ ...prev, loading: true }));
+    
+    try {
+      const { friendsAPI } = await import('./services/friendsAPI');
+      const result = await friendsAPI.sendFriendRequest(effectiveUser.id, friendRequestModal.friendId);
+      
+      setFriendRequestModal({ isOpen: false, friendId: null, friendData: null, loading: false });
+      
+      if (result.status === 'sent') {
+        showAlert('Запрос в друзья отправлен!');
+        if (hapticFeedback) hapticFeedback('notification', 'success');
+      } else if (result.status === 'already_friends') {
+        showAlert('Вы уже друзья!');
+      } else if (result.status === 'already_sent') {
+        showAlert('Запрос уже отправлен!');
+      } else {
+        showAlert(result.message || 'Запрос отправлен');
+      }
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+      showAlert('Ошибка отправки запроса');
+      if (hapticFeedback) hapticFeedback('notification', 'error');
+      setFriendRequestModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Закрытие модального окна запроса в друзья
+  const handleFriendRequestCancel = () => {
+    setFriendRequestModal({ isOpen: false, friendId: null, friendData: null, loading: false });
+  };
+
   // Рендерим новогоднюю тему для всех экранов
   const renderNewYearTheme = () => {
     // Определяем, показывать ли снег
