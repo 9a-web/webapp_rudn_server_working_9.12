@@ -25,7 +25,9 @@ import {
   getSessionAttendance,
   markAttendance,
   getJournalStats,
-  getJournalApplications
+  getJournalApplications,
+  deleteJournal,
+  leaveJournal
 } from '../../services/journalAPI';
 import { AddStudentsModal } from './AddStudentsModal';
 import { CreateSessionModal } from './CreateSessionModal';
