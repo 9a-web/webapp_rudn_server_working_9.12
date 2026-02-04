@@ -8284,13 +8284,18 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
                     "late_count": 0,
                     "excused_count": 0,
                     "attendance_percent": 0,
-                    "sessions": []
+                    "sessions": [],
+                    # Оценки по предмету
+                    "grades": [],
+                    "average_grade": None,
+                    "grades_count": 0
                 }
             
             subjects_stats[subject_id]["total_sessions"] += 1
             
             record = records_map.get(s["session_id"])
             status = record["status"] if record else "unmarked"
+            grade = record.get("grade") if record else None
             
             if status in ["present", "late"]:
                 subjects_stats[subject_id]["present_count"] += 1
@@ -8301,22 +8306,39 @@ async def get_my_attendance(journal_id: str, telegram_id: int):
             if status == "excused":
                 subjects_stats[subject_id]["excused_count"] += 1
             
+            # Добавляем оценку если есть
+            if grade is not None:
+                subjects_stats[subject_id]["grades"].append({
+                    "grade": grade,
+                    "date": s["date"],
+                    "session_title": s["title"],
+                    "session_type": s.get("type", "lecture")
+                })
+            
             subjects_stats[subject_id]["sessions"].append({
                 "session_id": s["session_id"],
                 "date": s["date"],
                 "title": s["title"],
                 "type": s.get("type", "lecture"),
-                "status": status
+                "status": status,
+                "grade": grade
             })
         
-        # Вычисляем процент по каждому предмету
+        # Вычисляем процент и среднюю оценку по каждому предмету
         subjects_list = []
-        for subject_id, stats in subjects_stats.items():
-            if stats["total_sessions"] > 0:
-                stats["attendance_percent"] = round(
-                    (stats["present_count"] / stats["total_sessions"]) * 100, 1
+        for subject_id, subj_stats in subjects_stats.items():
+            if subj_stats["total_sessions"] > 0:
+                subj_stats["attendance_percent"] = round(
+                    (subj_stats["present_count"] / subj_stats["total_sessions"]) * 100, 1
                 )
-            subjects_list.append(stats)
+            
+            # Средняя оценка по предмету
+            if subj_stats["grades"]:
+                subj_stats["grades_count"] = len(subj_stats["grades"])
+                total_grade = sum(g["grade"] for g in subj_stats["grades"])
+                subj_stats["average_grade"] = round(total_grade / subj_stats["grades_count"], 2)
+            
+            subjects_list.append(subj_stats)
         
         # Сортируем предметы по имени
         subjects_list.sort(key=lambda x: x["subject_name"])
