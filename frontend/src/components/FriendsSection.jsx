@@ -496,13 +496,25 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                       : 'Найдите одногруппников и добавьте их в друзья'}
                   </p>
                   {!showFavoritesOnly && (
-                    <button
-                      onClick={() => setActiveTab('search')}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-xl"
-                    >
-                      <Search className="w-4 h-4" />
-                      Найти друзей
-                    </button>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => setActiveTab('search')}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500 text-white rounded-xl"
+                      >
+                        <Search className="w-4 h-4" />
+                        Найти друзей
+                      </button>
+                      <button
+                        onClick={() => {
+                          hapticFeedback('impact', 'light');
+                          setShowQRModal(true);
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 text-white rounded-xl border border-white/10"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        Мой QR-код
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
