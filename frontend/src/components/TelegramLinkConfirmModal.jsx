@@ -253,13 +253,32 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
                 exit={{ opacity: 0 }}
                 className="text-center py-8"
               >
+                {/* Аватар с галочкой успеха */}
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", delay: 0.1 }}
-                  className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4"
+                  className="relative w-24 h-24 mx-auto mb-4"
                 >
-                  <CheckCircle className="w-10 h-10 text-green-500" />
+                  {photoUrl ? (
+                    <img 
+                      src={photoUrl} 
+                      alt={user?.first_name}
+                      className="w-24 h-24 rounded-full object-cover ring-4 ring-green-500/30"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center ring-4 ring-green-500/30">
+                      <User className="w-12 h-12 text-white" />
+                    </div>
+                  )}
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", delay: 0.3 }}
+                    className="absolute -bottom-2 -right-2 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg"
+                  >
+                    <CheckCircle className="w-6 h-6 text-white" />
+                  </motion.div>
                 </motion.div>
                 <h2 className="text-xl font-bold text-white mb-2">
                   Профиль подключен!
