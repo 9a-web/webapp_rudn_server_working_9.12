@@ -695,6 +695,173 @@ export const MyAttendanceStats = ({
           </div>
         </motion.div>
       )}
+
+      {/* Модальное окно оценок по предмету */}
+      <AnimatePresence>
+        {selectedSubject && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+            onClick={() => setSelectedSubject(null)}
+          >
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-[#1C1C1E] rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className={`bg-gradient-to-br ${SUBJECT_GRADIENTS[selectedSubject.subject_color] || SUBJECT_GRADIENTS.blue} p-4`}>
+                <div className="flex items-center justify-between mb-3">
+                  <button
+                    onClick={() => setSelectedSubject(null)}
+                    className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+                <h2 className="text-xl font-bold text-white">{selectedSubject.subject_name}</h2>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-white/80 text-sm">
+                    Посещаемость: <span className="font-bold">{selectedSubject.attendance_percent}%</span>
+                  </span>
+                  {selectedSubject.average_grade && (
+                    <span className="text-white/80 text-sm flex items-center gap-1">
+                      <Star className="w-4 h-4" />
+                      <span className="font-bold">{selectedSubject.average_grade.toFixed(2)}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 overflow-y-auto max-h-[60vh]">
+                {/* Краткая статистика */}
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  <div className="bg-green-500/10 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-green-400">{selectedSubject.present_count}</p>
+                    <p className="text-xs text-gray-400">Был</p>
+                  </div>
+                  <div className="bg-red-500/10 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-red-400">{selectedSubject.absent_count}</p>
+                    <p className="text-xs text-gray-400">Пропуск</p>
+                  </div>
+                  <div className="bg-yellow-500/10 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-yellow-400">{selectedSubject.late_count}</p>
+                    <p className="text-xs text-gray-400">Опозд.</p>
+                  </div>
+                  <div className="bg-gray-500/10 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-gray-400">{selectedSubject.excused_count}</p>
+                    <p className="text-xs text-gray-400">Ув.</p>
+                  </div>
+                </div>
+
+                {/* Оценки */}
+                {selectedSubject.grades && selectedSubject.grades.length > 0 ? (
+                  <div>
+                    <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                      <Star className="w-4 h-4 text-amber-400" />
+                      Оценки ({selectedSubject.grades_count})
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedSubject.grades
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .map((grade, index) => {
+                          const SessionIcon = SESSION_ICONS[grade.session_type] || BookOpen;
+                          return (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="flex items-center justify-between p-3 rounded-xl bg-white/5"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                                  <SessionIcon className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <div>
+                                  <p className="text-white text-sm font-medium">{grade.session_title}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(grade.date).toLocaleDateString('ru-RU', { 
+                                      day: 'numeric', 
+                                      month: 'long'
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-lg ${
+                                grade.grade >= 5 ? 'bg-green-500' :
+                                grade.grade >= 4 ? 'bg-lime-500' :
+                                grade.grade >= 3 ? 'bg-yellow-500' :
+                                grade.grade >= 2 ? 'bg-orange-500' : 'bg-red-500'
+                              }`}>
+                                {grade.grade}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Star className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">Нет оценок по этому предмету</p>
+                    <p className="text-gray-500 text-sm mt-1">Оценки появятся после проверочных работ</p>
+                  </div>
+                )}
+
+                {/* Занятия по предмету */}
+                {selectedSubject.sessions && selectedSubject.sessions.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-400" />
+                      История занятий ({selectedSubject.total_sessions})
+                    </h3>
+                    <div className="space-y-1">
+                      {selectedSubject.sessions
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .slice(0, 10)
+                        .map((session, index) => {
+                          const statusConfig = STATUS_CONFIG[session.status] || STATUS_CONFIG.unmarked;
+                          const StatusIcon = statusConfig.icon;
+                          return (
+                            <div
+                              key={session.session_id}
+                              className={`flex items-center justify-between p-2 rounded-lg ${statusConfig.bg}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
+                                <span className="text-white text-sm">{session.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {session.grade && (
+                                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                                    session.grade >= 4 ? 'bg-green-500/20 text-green-400' :
+                                    session.grade >= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {session.grade}
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  {new Date(session.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
