@@ -115,6 +115,9 @@ export const JournalStatsTab = ({
   const [sortBy, setSortBy] = useState('attendance'); // 'attendance' | 'name' | 'present'
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null); // Выбранный студент для просмотра статистики
+  const [studentStats, setStudentStats] = useState(null); // Статистика выбранного студента
+  const [loadingStudentStats, setLoadingStudentStats] = useState(false);
 
   // Обработчик клика по предмету для просмотра детальной статистики
   const handleSubjectClick = (subjectId) => {
