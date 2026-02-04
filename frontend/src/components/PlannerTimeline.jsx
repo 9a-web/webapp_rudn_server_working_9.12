@@ -275,7 +275,7 @@ const TimelineEventCard = ({
         <div className={`absolute bottom-1 right-1 ${colors.accent} opacity-60`}>
           <Info className="w-3 h-3" />
         </div>
-      </motion.div>
+      </div>
 
       {/* Модальное окно с подробной информацией - рендерится через Portal */}
       {isExpanded && createPortal(
