@@ -6387,6 +6387,54 @@ async def delete_journal(journal_id: str, telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/journals/{journal_id}/leave")
+async def leave_journal(journal_id: str, telegram_id: int):
+    """Выйти из журнала (для студентов, не владельцев)"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Владелец не может выйти из своего журнала
+        if journal["owner_id"] == telegram_id:
+            raise HTTPException(status_code=403, detail="Owner cannot leave their journal. Delete it instead.")
+        
+        # Найти студента, привязанного к этому telegram_id
+        student = await db.journal_students.find_one({
+            "journal_id": journal_id,
+            "telegram_id": telegram_id
+        })
+        
+        if student:
+            # Отвязать студента (но не удалять запись - только сбросить привязку)
+            await db.journal_students.update_one(
+                {"id": student["id"]},
+                {"$set": {"telegram_id": None, "is_linked": False, "username": None, "first_name": None}}
+            )
+        
+        # Удалить из ожидающих привязки
+        await db.journal_pending_members.delete_many({
+            "journal_id": journal_id,
+            "telegram_id": telegram_id
+        })
+        
+        # Удалить из stats_viewers если был там
+        if telegram_id in journal.get("stats_viewers", []):
+            new_viewers = [v for v in journal.get("stats_viewers", []) if v != telegram_id]
+            await db.attendance_journals.update_one(
+                {"journal_id": journal_id},
+                {"$set": {"stats_viewers": new_viewers}}
+            )
+        
+        logger.info(f"User {telegram_id} left journal: {journal_id}")
+        return {"status": "success", "message": "Successfully left the journal"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error leaving journal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/journals/{journal_id}/invite-link", response_model=JournalInviteLinkResponse)
 async def generate_journal_invite_link(journal_id: str):
     """Сгенерировать пригласительную ссылку"""
