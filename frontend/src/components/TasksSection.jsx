@@ -275,6 +275,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  // Модальное окно подтверждения после перетаскивания
+  const [isReorderConfirmOpen, setIsReorderConfirmOpen] = useState(false);
+  const [reorderData, setReorderData] = useState(null); // {task, oldIndex, newIndex, newOrder}
+  
+  // Модальное окно для добавления задачи в планировщик
+  const [isSyncTaskModalOpen, setIsSyncTaskModalOpen] = useState(false);
+  const [taskToSync, setTaskToSync] = useState(null);
+  const [syncTaskTime, setSyncTaskTime] = useState({ start: '09:00', end: '10:00' });
+  const [syncingTask, setSyncingTask] = useState(false);
+  
   // Категории задач с эмодзи
   const getCategoryEmoji = (category) => {
     const categories = {
