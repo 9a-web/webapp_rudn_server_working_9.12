@@ -95,3 +95,5 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "✅ All web-sessions API endpoints tested successfully. The device management backend is working correctly. All 3 endpoints (POST /api/web-sessions, GET /api/web-sessions/{token}/status, GET /api/web-sessions/user/{telegram_id}/devices) return valid responses and handle requests properly. No critical issues found."
+  - agent: "testing"
+    message: "✅ All privacy settings API endpoints tested successfully. Privacy settings management backend is working correctly. All 3 main operations tested: 1) GET /api/profile/765963392/privacy - retrieves current settings with all required fields, 2) PUT /api/profile/765963392/privacy - updates settings with specified values (show_online_status: false, show_in_search: true, show_friends_list: false, show_achievements: true, show_schedule: false), 3) GET verification - confirms settings are properly persisted to database. No critical issues found."
