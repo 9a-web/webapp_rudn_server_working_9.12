@@ -63,7 +63,7 @@ export const SwipeHint = ({ onSwipe }) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 50 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="fixed bottom-20 md:bottom-24 left-4 right-4 z-50 pointer-events-auto flex justify-center"
+          className="fixed bottom-20 md:bottom-24 left-0 right-0 z-50 pointer-events-auto px-4"
         >
           <div
             onClick={handleDismiss}
