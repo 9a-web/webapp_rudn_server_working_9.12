@@ -1408,11 +1408,11 @@ const Home = () => {
       <div className="relative mx-auto max-w-[430px] md:max-w-3xl lg:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
         {/* Header - full width */}
         <Header 
-          user={user}
+          user={effectiveUser}
           userSettings={userSettings}
           onAnalyticsClick={schedule.length > 0 ? handleAnalyticsClick : null}
-          onAchievementsClick={user ? handleAchievementsClick : null}
-          onNotificationsClick={user ? handleNotificationsClick : null}
+          onAchievementsClick={effectiveUser ? handleAchievementsClick : null}
+          onNotificationsClick={effectiveUser ? handleNotificationsClick : null}
           hapticFeedback={hapticFeedback}
           onMenuStateChange={setIsMenuOpen}
           onProfileStateChange={setIsProfileOpen}
