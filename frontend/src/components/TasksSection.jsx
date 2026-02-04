@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, Reorder, useDragControls, AnimatePresence } from 'framer-motion';
-import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users, TrendingUp, Link2, ListChecks, Play } from 'lucide-react';
+import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users, TrendingUp, Link2, ListChecks, Play, RefreshCw } from 'lucide-react';
 import { tasksAPI, scheduleAPI, achievementsAPI, plannerAPI } from '../services/api';
 import { groupTasksAPI } from '../services/groupTasksAPI';
 import { useTelegram } from '../contexts/TelegramContext';
