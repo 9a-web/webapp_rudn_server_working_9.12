@@ -652,6 +652,95 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
         currentUserId={user?.id}
         onSendRequest={handleSendRequest}
       />
+
+      {/* Модальное окно QR-кода */}
+      <AnimatePresence>
+        {showQRModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
+            onClick={() => setShowQRModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-3xl overflow-hidden"
+              style={{
+                backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <h3 className="text-lg font-semibold text-white">Мой QR-код</h3>
+                <button
+                  onClick={() => setShowQRModal(false)}
+                  className="p-2 bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* QR Code */}
+              <div className="p-6">
+                <div className="bg-white rounded-2xl p-4 mx-auto w-fit">
+                  <QRCodeSVG
+                    value={`friend_${user?.id}`}
+                    size={200}
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
+                
+                <p className="text-center text-gray-400 text-sm mt-4">
+                  Покажите этот QR-код другу, чтобы он мог добавить вас
+                </p>
+
+                {/* Кнопка сканирования - только в Telegram */}
+                {webApp?.showScanQrPopup && (
+                  <button
+                    onClick={() => {
+                      hapticFeedback('impact', 'medium');
+                      setShowQRModal(false);
+                      
+                      webApp.showScanQrPopup(
+                        { text: 'Наведите камеру на QR-код друга' },
+                        (scannedText) => {
+                          if (!scannedText) return;
+                          
+                          // Проверяем формат friend_XXXXX
+                          const friendId = scannedText.match(/friend[_\/](\d+)/)?.[1];
+                          if (friendId) {
+                            hapticFeedback('notification', 'success');
+                            webApp.closeScanQrPopup();
+                            
+                            // Отправляем запрос в друзья
+                            if (parseInt(friendId) !== user?.id) {
+                              handleSendRequest(parseInt(friendId));
+                            }
+                            return true;
+                          }
+                          return false;
+                        }
+                      );
+                    }}
+                    className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-purple-500 text-white rounded-xl font-medium"
+                  >
+                    <ScanLine className="w-5 h-5" />
+                    Сканировать QR друга
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
