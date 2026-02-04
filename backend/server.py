@@ -11209,9 +11209,16 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
         if not isinstance(schedule_events, list):
             schedule_events = []
         
-        # Фильтруем по дате если нужно
+        # Фильтруем по дню недели (расписание содержит day, а не date)
         if date and schedule_events:
-            schedule_events = [e for e in schedule_events if e.get("date") == date]
+            # Конвертируем дату в день недели
+            try:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+                days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+                day_name = days_ru[date_obj.weekday()]
+                schedule_events = [e for e in schedule_events if e.get("day") == day_name]
+            except Exception as e:
+                logger.warning(f"Error filtering schedule by date: {e}")
         
         # Получаем расписание просматривающего для сравнения
         viewer = await db.user_settings.find_one({"telegram_id": viewer_telegram_id})
