@@ -306,13 +306,15 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                   onClick={() => handleCancelRequest(request.request_id)}
                   className="p-2 bg-gray-500/20 text-gray-400 rounded-xl hover:bg-gray-500/30 transition-colors"
                 >
-              <Clock className="w-5 h-5" />
-            </button>
-          )}
+                  <Clock className="w-5 h-5" />
+                </button>
+              )
+            )}
+          </div>
         </div>
-      </div>
-    </motion.div>
-  );
+      </motion.div>
+    );
+  };
 
   // Рендер результата поиска
   const renderSearchResult = (result) => {
