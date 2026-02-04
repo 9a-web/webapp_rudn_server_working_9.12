@@ -327,6 +327,72 @@ export const MyAttendanceStats = ({
         </motion.div>
       </div>
 
+      {/* Статистика по оценкам */}
+      {stats.grades_count > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-xl p-4"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center">
+              <Star className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-white">Оценки</h3>
+              <p className="text-xs text-gray-400">{stats.grades_count} {getNoun(stats.grades_count, 'оценка', 'оценки', 'оценок')}</p>
+            </div>
+            {stats.average_grade && (
+              <div className="ml-auto text-right">
+                <p className={`text-2xl font-bold ${
+                  stats.average_grade >= 4.5 ? 'text-green-400' :
+                  stats.average_grade >= 3.5 ? 'text-lime-400' :
+                  stats.average_grade >= 2.5 ? 'text-yellow-400' : 'text-red-400'
+                }`}>
+                  {stats.average_grade.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-400">средний балл</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Распределение оценок */}
+          <div className="space-y-2">
+            {[
+              { grade: 5, count: stats.grade_5_count, color: 'bg-green-500', label: 'Отлично' },
+              { grade: 4, count: stats.grade_4_count, color: 'bg-lime-500', label: 'Хорошо' },
+              { grade: 3, count: stats.grade_3_count, color: 'bg-yellow-500', label: 'Удовл.' },
+              { grade: 2, count: stats.grade_2_count, color: 'bg-orange-500', label: 'Неудовл.' },
+              { grade: 1, count: stats.grade_1_count, color: 'bg-red-500', label: 'Плохо' },
+            ].filter(g => g.count > 0).map(({ grade, count, color, label }) => {
+              const percent = stats.grades_count > 0 ? Math.round((count / stats.grades_count) * 100) : 0;
+              return (
+                <div key={grade} className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center font-bold text-white text-sm`}>
+                    {grade}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-400">{label}</span>
+                      <span className="text-white font-medium">{count} ({percent}%)</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        className={`h-full ${color} rounded-full`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       {/* Круговая диаграмма */}
       {pieData.length > 0 && (
         <motion.div 
