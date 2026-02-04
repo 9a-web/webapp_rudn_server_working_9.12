@@ -569,6 +569,47 @@ export const JournalStatsTab = ({
               )}
             </button>
           )}
+
+          {/* Список студентов (кликабельный для владельца) */}
+          {isOwner && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-xs text-gray-400 mb-3">Нажмите на студента для просмотра детальной статистики</p>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {displayedStudents.map((student, index) => (
+                  <button
+                    key={student.studentId}
+                    onClick={() => handleStudentClick(student)}
+                    className="w-full flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-medium ${
+                        student.attendance >= 80 ? 'bg-green-500/20 text-green-400' :
+                        student.attendance >= 60 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <span className="text-white text-sm truncate">{student.fullName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-sm font-medium ${
+                        student.attendance >= 80 ? 'text-green-400' :
+                        student.attendance >= 60 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {student.attendance}%
+                      </span>
+                      {student.averageGrade && (
+                        <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                          <Star className="w-3 h-3" />
+                          {student.averageGrade.toFixed(1)}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 
