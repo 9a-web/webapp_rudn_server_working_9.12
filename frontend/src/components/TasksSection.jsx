@@ -2301,23 +2301,36 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  hapticFeedback && hapticFeedback('impact', 'light');
-                  const now = new Date();
-                  const startHour = now.getHours();
-                  const formatTime = (minutes) => {
-                    const h = Math.floor(minutes / 60);
-                    const m = minutes % 60;
-                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                  };
-                  handleQuickCreate(formatTime(startHour * 60), formatTime((startHour + 1) * 60));
-                }}
-                className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm"
-                title="Добавить событие"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'medium');
+                    handleSyncSchedule();
+                  }}
+                  disabled={syncingSchedule || syncPreviewLoading}
+                  className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl shadow-sm disabled:opacity-50"
+                  title="Синхронизировать с парами"
+                >
+                  <RefreshCw className={`w-5 h-5 ${(syncingSchedule || syncPreviewLoading) ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'light');
+                    const now = new Date();
+                    const startHour = now.getHours();
+                    const formatTime = (minutes) => {
+                      const h = Math.floor(minutes / 60);
+                      const m = minutes % 60;
+                      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    };
+                    handleQuickCreate(formatTime(startHour * 60), formatTime((startHour + 1) * 60));
+                  }}
+                  className="p-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-xl shadow-sm"
+                  title="Добавить событие"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
             </div>
             
             {/* Полноэкранный Timeline */}
