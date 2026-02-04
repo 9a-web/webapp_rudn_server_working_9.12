@@ -72,7 +72,7 @@ export const linkWebSession = async (sessionToken, userData) => {
  * @param {Function} onExpired - колбэк при истечении сессии
  * @returns {Object} - объект с методом close() для закрытия соединения/polling
  */
-export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpired, onConnected }) => {
+export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpired, onConnected, onScanned, onRejected }) => {
   // Определяем WebSocket URL
   const backendUrl = getBackendURL();
   const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
