@@ -166,7 +166,7 @@ const TelegramLinkScreen = ({ onLinked }) => {
 
   // Таймер обратного отсчёта
   useEffect(() => {
-    if (status !== 'pending' || timeLeft === null) return;
+    if ((status !== 'pending' && status !== 'waiting') || timeLeft === null) return;
     
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
