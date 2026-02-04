@@ -1466,11 +1466,21 @@ export const ProfileModal = ({
                                 });
                                 if (response.ok) {
                                   if (hapticFeedback) hapticFeedback('notification', 'success');
+                                  
+                                  // Очищаем все данные из localStorage
+                                  localStorage.removeItem('telegram_user');
+                                  localStorage.removeItem('synced_user');
+                                  localStorage.removeItem('user_settings');
+                                  localStorage.removeItem('session_token');
+                                  localStorage.removeItem('linked_telegram_id');
+                                  localStorage.removeItem(`user_settings_${user.id}`);
+                                  
                                   // Закрываем все модалки
                                   setShowDeleteConfirm(false);
                                   setShowSettings(false);
                                   onClose();
-                                  // Перезагружаем страницу для очистки состояния
+                                  
+                                  // Перезагружаем страницу для показа Welcome Screen
                                   window.location.reload();
                                 } else {
                                   throw new Error('Ошибка удаления');
