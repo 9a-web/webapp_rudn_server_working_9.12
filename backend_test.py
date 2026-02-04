@@ -203,27 +203,20 @@ class BackendTester:
             )
             return False
     
-    def test_get_room_info(self) -> bool:
-        """Test GET /api/music/rooms/{room_id}?telegram_id={telegram_id} - получение информации о комнате"""
-        if not self.room_id:
-            self.log_test(
-                "Get Room Info", 
-                False, 
-                "No room ID available from previous test"
-            )
-            return False
-        
+    
+    def test_get_user_devices(self) -> bool:
+        """Test GET /api/web-sessions/user/{telegram_id}/devices - get user devices"""
         try:
-            print("🧪 Testing: Get Room Info")
+            print("🧪 Testing: Get User Devices")
             
             response = requests.get(
-                f"{API_BASE}/music/rooms/{self.room_id}?telegram_id={self.host_telegram_id}",
+                f"{API_BASE}/web-sessions/user/{self.admin_telegram_id}/devices",
                 timeout=10
             )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Get Room Info", 
+                    "Get User Devices", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -232,69 +225,64 @@ class BackendTester:
             
             data = response.json()
             
-            # Validate required fields
-            required_fields = ["room", "is_host", "can_control"]
+            # Validate response structure
+            required_fields = ["devices", "total"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Get Room Info", 
+                    "Get User Devices", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate is_host is True for host user
-            if not data.get("is_host"):
+            devices = data["devices"]
+            total = data["total"]
+            
+            # Validate total matches devices length
+            if total != len(devices):
                 self.log_test(
-                    "Get Room Info", 
+                    "Get User Devices", 
                     False, 
-                    f"Expected is_host=true for host user, got {data.get('is_host')}",
+                    f"Total count mismatch. Expected: {len(devices)}, got: {total}",
                     data
                 )
                 return False
             
-            # Validate can_control is True (control_mode is "everyone")
-            if not data.get("can_control"):
-                self.log_test(
-                    "Get Room Info", 
-                    False, 
-                    f"Expected can_control=true for everyone control mode, got {data.get('can_control')}",
-                    data
-                )
-                return False
-            
-            room = data["room"]
-            
-            # Validate room data
-            if room.get("id") != self.room_id:
-                self.log_test(
-                    "Get Room Info", 
-                    False, 
-                    f"Room ID mismatch. Expected: {self.room_id}, got: {room.get('id')}",
-                    room
-                )
-                return False
+            # Validate each device has required fields
+            for i, device in enumerate(devices):
+                device_required_fields = ["session_token", "device_name", "linked_at", "last_active"]
+                device_missing_fields = [field for field in device_required_fields if field not in device]
+                
+                if device_missing_fields:
+                    self.log_test(
+                        "Get User Devices", 
+                        False, 
+                        f"Device {i} missing required fields: {device_missing_fields}",
+                        device
+                    )
+                    return False
             
             self.log_test(
-                "Get Room Info", 
+                "Get User Devices", 
                 True, 
-                f"Room info retrieved successfully. Host: {data['is_host']}, Can control: {data['can_control']}",
-                data
+                f"Found {total} devices for user {self.admin_telegram_id}. All devices have required fields.",
+                {"total_devices": total, "devices_sample": devices[:2] if devices else []}
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Get Room Info", 
+                "Get User Devices", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Get Room Info", 
+                "Get User Devices", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
