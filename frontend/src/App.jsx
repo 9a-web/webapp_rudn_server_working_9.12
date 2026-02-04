@@ -1183,6 +1183,35 @@ const Home = () => {
     setShowGroupSelector(true);
   };
 
+  // Обработка успешной синхронизации через QR-код на Welcome Screen
+  const handleWelcomeSyncComplete = async (userData) => {
+    console.log('✅ Синхронизация через Welcome Screen:', userData);
+    setShowWelcomeScreen(false);
+    
+    // Проверяем есть ли у пользователя уже настройки с группой
+    if (userData && userData.user_settings) {
+      const settings = userData.user_settings;
+      if (settings.group_id && settings.facultet_id) {
+        // У пользователя уже есть группа - загружаем его данные
+        console.log('✅ Пользователь уже зарегистрирован, загружаем данные');
+        setUserSettings(settings);
+        
+        // Сохраняем в localStorage для кэширования
+        if (userData.telegram_id) {
+          localStorage.setItem(`user_settings_${userData.telegram_id}`, JSON.stringify(settings));
+          localStorage.setItem('linked_telegram_id', userData.telegram_id.toString());
+        }
+        
+        // Не показываем GroupSelector - сразу к главному экрану
+        setShowGroupSelector(false);
+        return;
+      }
+    }
+    
+    // Если группа не выбрана - показываем GroupSelector
+    setShowGroupSelector(true);
+  };
+
   // Обработка успешной связки Telegram профиля
   const handleTelegramLinked = (userData) => {
     console.log('✅ Telegram профиль связан:', userData);
