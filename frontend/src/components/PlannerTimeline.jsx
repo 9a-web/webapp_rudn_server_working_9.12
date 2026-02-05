@@ -950,7 +950,8 @@ export const FullscreenPlannerTimeline = ({
   return (
     <div 
       ref={timelineRef}
-      className="relative overflow-y-auto h-full"
+      className="relative overflow-y-auto h-full overscroll-contain"
+      style={{ WebkitOverflowScrolling: 'touch' }}
     >
       <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
         {/* Часовые линии */}
