@@ -147,6 +147,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       setConnectionStatus('connected');
       reconnectAttemptRef.current = 0;
       hapticFeedback?.('notification', 'success');
+      
+      // Активируем режим listening room в плеере
+      enterListeningRoomMode(queue, {
+        playNextFromQueue: handlePlayNextFromQueue
+      });
     },
     onStateSync: (state, canCtrl, onlineCountFromServer, queueFromServer, historyFromServer) => {
       if (!isMountedRef.current) return;
