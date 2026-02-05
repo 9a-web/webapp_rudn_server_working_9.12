@@ -367,6 +367,27 @@ const Home = () => {
     }
   }, [isReady, user?.id, syncedUser?.id, loadUnreadCount]);
 
+  // 📊 Отслеживание активности пользователя (для админ панели - онлайн статус)
+  useEffect(() => {
+    const currentUser = syncedUser || user;
+    if (!isReady || !currentUser?.id) return;
+    
+    // Отправляем heartbeat с текущим разделом
+    const sendActivityHeartbeat = () => {
+      activityAPI.trackActivity(currentUser.id, activeTab);
+    };
+    
+    // Отправляем сразу при загрузке/смене вкладки
+    sendActivityHeartbeat();
+    
+    // Периодически отправляем heartbeat каждые 30 секунд
+    const heartbeatInterval = setInterval(sendActivityHeartbeat, 30000);
+    
+    return () => {
+      clearInterval(heartbeatInterval);
+    };
+  }, [isReady, user?.id, syncedUser?.id, activeTab]);
+
   // Загрузка данных пользователя при монтировании
   useEffect(() => {
     if (isReady && (user || syncedUser)) {
