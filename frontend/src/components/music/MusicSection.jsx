@@ -27,7 +27,7 @@ const linkPulseAnimation = {
   opacity: [0.8, 1, 0.8]
 };
 
-export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
+export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListeningRoomRef }) => {
   // По умолчанию открываем вкладку "Мои"
   const [activeTab, setActiveTab] = useState('my');
   const [tracks, setTracks] = useState([]);
