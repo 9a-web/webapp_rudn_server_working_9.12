@@ -88,6 +88,33 @@ const AdminPanel = ({ isOpen, onClose }) => {
     }
   };
 
+  // Функция для получения онлайн пользователей
+  const fetchOnlineUsers = useCallback(async () => {
+    setOnlineLoading(true);
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/admin/online-users?minutes=5`);
+      setOnlineData(response.data);
+    } catch (error) {
+      console.error('Ошибка загрузки онлайн пользователей:', error);
+    } finally {
+      setOnlineLoading(false);
+    }
+  }, []);
+
+  // Автообновление онлайн данных каждые 5 секунд
+  useEffect(() => {
+    if (isOpen && activeTab === 'online') {
+      fetchOnlineUsers();
+      onlineIntervalRef.current = setInterval(fetchOnlineUsers, 5000);
+    }
+    
+    return () => {
+      if (onlineIntervalRef.current) {
+        clearInterval(onlineIntervalRef.current);
+      }
+    };
+  }, [isOpen, activeTab, fetchOnlineUsers]);
+
   useEffect(() => {
     if (isOpen && activeTab === 'stats') {
       fetchStats();
