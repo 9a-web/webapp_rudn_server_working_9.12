@@ -5814,6 +5814,127 @@ async def get_admin_journals(limit: int = 50, skip: int = 0, search: Optional[st
     return result
 
 
+# ============ API для отслеживания онлайн пользователей в реальном времени ============
+
+@api_router.get("/admin/online-users")
+async def get_online_users(minutes: int = 5):
+    """
+    Получить список пользователей онлайн в реальном времени.
+    Пользователь считается онлайн если его last_activity было в течение указанных минут.
+    """
+    try:
+        threshold = datetime.utcnow() - timedelta(minutes=minutes)
+        
+        # Получаем пользователей с недавней активностью
+        pipeline = [
+            {
+                "$match": {
+                    "last_activity": {"$gte": threshold}
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "telegram_id": 1,
+                    "first_name": 1,
+                    "last_name": 1,
+                    "username": 1,
+                    "photo_url": 1,
+                    "faculty": 1,
+                    "course": 1,
+                    "last_activity": 1,
+                    "current_section": 1
+                }
+            },
+            {
+                "$sort": {"last_activity": -1}
+            },
+            {
+                "$limit": 100
+            }
+        ]
+        
+        online_users = await db.user_settings.aggregate(pipeline).to_list(100)
+        
+        # Форматируем данные
+        result = []
+        for user in online_users:
+            last_activity = user.get("last_activity")
+            if last_activity:
+                seconds_ago = (datetime.utcnow() - last_activity).total_seconds()
+                if seconds_ago < 60:
+                    activity_text = "только что"
+                elif seconds_ago < 120:
+                    activity_text = "1 мин назад"
+                else:
+                    activity_text = f"{int(seconds_ago // 60)} мин назад"
+            else:
+                activity_text = "неизвестно"
+            
+            result.append({
+                "telegram_id": user.get("telegram_id"),
+                "first_name": user.get("first_name", ""),
+                "last_name": user.get("last_name", ""),
+                "username": user.get("username", ""),
+                "photo_url": user.get("photo_url"),
+                "faculty": user.get("faculty", ""),
+                "course": user.get("course"),
+                "last_activity": last_activity.isoformat() if last_activity else None,
+                "activity_text": activity_text,
+                "current_section": user.get("current_section", "")
+            })
+        
+        # Также получаем общую статистику
+        total_online = await db.user_settings.count_documents({
+            "last_activity": {"$gte": threshold}
+        })
+        
+        # Онлайн за последний час
+        hour_threshold = datetime.utcnow() - timedelta(hours=1)
+        online_last_hour = await db.user_settings.count_documents({
+            "last_activity": {"$gte": hour_threshold}
+        })
+        
+        # Онлайн за последние 24 часа
+        day_threshold = datetime.utcnow() - timedelta(hours=24)
+        online_last_day = await db.user_settings.count_documents({
+            "last_activity": {"$gte": day_threshold}
+        })
+        
+        return {
+            "online_now": total_online,
+            "online_last_hour": online_last_hour,
+            "online_last_day": online_last_day,
+            "users": result,
+            "threshold_minutes": minutes,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting online users: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/track-activity")
+async def track_user_activity(telegram_id: int, section: str = None):
+    """
+    Обновить активность пользователя (вызывается с фронтенда периодически).
+    """
+    try:
+        update_data = {"last_activity": datetime.utcnow()}
+        if section:
+            update_data["current_section"] = section
+            
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": update_data}
+        )
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error tracking activity: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ API для ЛК РУДН (lk.rudn.ru) ============
 
 @api_router.post("/lk/connect", response_model=LKConnectionResponse)
