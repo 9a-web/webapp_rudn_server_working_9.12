@@ -644,18 +644,25 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   // Отправка событий воспроизведения
   useEffect(() => {
     if (!wsRef.current || !currentRoom || !canControl || !isConnected) {
-      return;
-    }
-    
-    if (Date.now() < ignoreUntilRef.current) {
+      // Всё равно обновляем refs чтобы не было ложных срабатываний позже
+      prevIsPlayingRef.current = isPlaying;
+      prevTrackIdRef.current = currentTrack?.id;
       return;
     }
     
     const playStateChanged = prevIsPlayingRef.current !== isPlaying;
     const trackChanged = prevTrackIdRef.current !== currentTrack?.id;
     
+    // ВАЖНО: обновляем refs ПЕРЕД проверкой ignore
+    // чтобы после истечения ignore не было ложного срабатывания
     prevIsPlayingRef.current = isPlaying;
     prevTrackIdRef.current = currentTrack?.id;
+    
+    // Если в режиме ignore - не отправляем события (тихая синхронизация)
+    if (Date.now() < ignoreUntilRef.current) {
+      console.log('🔇 Ignoring event (silent sync mode)');
+      return;
+    }
     
     if (!playStateChanged && !trackChanged) {
       return;
@@ -674,7 +681,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       url: currentTrack.url
     };
     
-    // ИСПРАВЛЕНИЕ: отправляем только track_change если трек изменился
+    // Отправляем только track_change если трек изменился
     // play/pause отправляем только если трек НЕ изменился
     if (trackChanged) {
       console.log('📤 Sending track change:', trackData.title);
