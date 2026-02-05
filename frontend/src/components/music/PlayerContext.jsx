@@ -515,6 +515,25 @@ export const PlayerProvider = ({ children }) => {
     setShuffle(prev => !prev);
   }, []);
 
+  // Функции для интеграции с Listening Room
+  const enterListeningRoomMode = useCallback((roomQueue = [], callbacks = null) => {
+    console.log('🎵 Entering listening room mode');
+    setListeningRoomMode(true);
+    setListeningRoomQueue(roomQueue);
+    listeningRoomCallbackRef.current = callbacks;
+  }, []);
+
+  const exitListeningRoomMode = useCallback(() => {
+    console.log('🎵 Exiting listening room mode');
+    setListeningRoomMode(false);
+    setListeningRoomQueue([]);
+    listeningRoomCallbackRef.current = null;
+  }, []);
+
+  const updateListeningRoomQueue = useCallback((newQueue) => {
+    setListeningRoomQueue(newQueue || []);
+  }, []);
+
   // Audio события
   useEffect(() => {
     const audio = audioRef.current;
