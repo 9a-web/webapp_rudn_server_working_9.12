@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Journal Attendance API
-Tests the journal endpoints as specified in the review request
+Backend Testing Suite for Listening Rooms API
+Tests the listening rooms endpoints as specified in the review request
 """
 
 import requests
@@ -10,8 +10,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
-# Backend URL from environment - using localhost for testing in container environment
-BACKEND_URL = "http://localhost:8001"
+# Backend URL from environment - using production URL for testing
+BACKEND_URL = "https://rudn-schedule.ru"
 API_BASE = f"{BACKEND_URL}/api"
 
 class BackendTester:
