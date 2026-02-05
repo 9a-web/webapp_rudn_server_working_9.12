@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig(({ mode }) => {
+  // Загружаем только VITE_ переменные (безопасные для клиента)
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
@@ -26,16 +27,26 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          // 🔄 Хеширование файлов для обхода кэша Telegram
+          // Хеширование файлов для обхода кэша Telegram
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom'],
-            'router': ['react-router-dom'],
-            'i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
-            'motion': ['framer-motion'],
-            'charts': ['recharts'],
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/react-router-dom') || id.includes('node_modules/react-router')) {
+              return 'router';
+            }
+            if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next')) {
+              return 'i18n';
+            }
+            if (id.includes('node_modules/framer-motion')) {
+              return 'motion';
+            }
+            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+              return 'charts';
+            }
           },
         },
       },
@@ -55,7 +66,10 @@ export default defineConfig(({ mode }) => {
     },
     
     define: {
-      'process.env': env,
+      // Передаём только нужные переменные, не весь process.env
+      'process.env.VITE_BACKEND_URL': JSON.stringify(env.VITE_BACKEND_URL || ''),
+      'process.env.VITE_ENABLE_VISUAL_EDITS': JSON.stringify(env.VITE_ENABLE_VISUAL_EDITS || 'false'),
+      'process.env.NODE_ENV': JSON.stringify(mode),
     },
   };
 });
