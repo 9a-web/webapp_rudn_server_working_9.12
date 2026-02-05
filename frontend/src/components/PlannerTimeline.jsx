@@ -957,7 +957,7 @@ export const FullscreenPlannerTimeline = ({
         {HOURS.map((hour) => (
           <div
             key={hour}
-            className="absolute left-0 right-0 flex border-t border-gray-200/70 group"
+            className="absolute left-0 right-0 flex group"
             style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
             onClick={(e) => {
               if (onQuickCreate) {
@@ -978,7 +978,7 @@ export const FullscreenPlannerTimeline = ({
                 {formatHour(hour)}
               </span>
             </div>
-            <div className={`flex-1 border-l border-gray-100 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
+            <div className={`flex-1 border-t border-gray-200/70 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
           </div>
         ))}
         
