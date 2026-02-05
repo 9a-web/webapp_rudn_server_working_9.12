@@ -2518,7 +2518,6 @@ const TodayTaskItem = ({
         ) : (
           // Обычный режим
           <div className="flex flex-col gap-1.5">
-            {/* Первая строка: чекбокс + текст */}
             <div className="flex items-start gap-2">
               {/* Checkbox с анимацией когда все подзадачи выполнены */}
               {(() => {
@@ -2566,7 +2565,7 @@ const TodayTaskItem = ({
                 );
               })()}
 
-              {/* Текст задачи - занимает всё доступное пространство */}
+              {/* Текст задачи */}
               <div className="flex-1 min-w-0">
                 {/* Текст задачи с inline YouTube badge */}
                 <TaskTextWithBadge 
@@ -2580,15 +2579,9 @@ const TodayTaskItem = ({
                   }}
                   hapticFeedback={hapticFeedback}
                 />
-              </div>
-            </div>
-            
-            {/* Вторая строка: метки + кнопки действий */}
-            <div className="flex items-center justify-between gap-2 pl-6">
-              {/* Левая часть: метки */}
-              <div className="flex-1 min-w-0">
+                
                 {/* Метки: категория, приоритет, предмет */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {task.category && (
                     <span className="text-xs">
                       {getCategoryEmoji(task.category)}
@@ -2644,7 +2637,7 @@ const TodayTaskItem = ({
                 )}
               </div>
               
-              {/* Правая часть: кнопки действий */}
+              {/* Кнопки действий */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 {/* Кнопка добавления подзадачи */}
                 <button
