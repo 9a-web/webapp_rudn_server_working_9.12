@@ -432,6 +432,13 @@ export const PlayerProvider = ({ children }) => {
     }
   }, [queue, queueIndex, play, isTrackBlocked, listeningRoomMode, listeningRoomQueue, repeatMode]);
 
+  // Перемотка
+  const seek = useCallback((time) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = time;
+    setProgress(time);
+  }, []);
+
   // Предыдущий трек (пропускает заблокированные)
   const prev = useCallback(async () => {
     if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -474,13 +481,6 @@ export const PlayerProvider = ({ children }) => {
       }
     }
   }, [queue, queueIndex, play, isTrackBlocked, listeningRoomMode, seek, progress, repeatMode]);
-
-  // Перемотка
-  const seek = useCallback((time) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = time;
-    setProgress(time);
-  }, []);
 
   // Изменение громкости
   const changeVolume = useCallback((newVolume) => {
