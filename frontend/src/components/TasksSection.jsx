@@ -924,9 +924,6 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       targetDate.setHours(0, 0, 0, 0);
       const targetDateISO = targetDate.toISOString();
       
-      // Сохраняем время начала для прокрутки
-      const eventStartTime = syncTaskTime.start;
-      
       // Используем правильный формат API
       await plannerAPI.createEvent(
         user.id,
