@@ -1323,6 +1323,15 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                           <Share2 className="w-4 h-4" />
                           Поделиться
                         </button>
+                        <button
+                          onClick={() => {
+                            setShowQRModal(true);
+                            hapticFeedback?.('impact', 'light');
+                          }}
+                          className="py-2 px-3 rounded-xl bg-purple-500/20 text-purple-400 text-sm font-medium flex items-center justify-center gap-2 hover:bg-purple-500/30 transition-colors"
+                        >
+                          <QrCode className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                     
