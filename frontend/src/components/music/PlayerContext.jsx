@@ -84,6 +84,11 @@ export const PlayerProvider = ({ children }) => {
   const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'track' | 'queue'
   const [shuffle, setShuffle] = useState(false);
   
+  // Listening Room состояние
+  const [listeningRoomMode, setListeningRoomMode] = useState(false);
+  const [listeningRoomQueue, setListeningRoomQueue] = useState([]);
+  const listeningRoomCallbackRef = useRef(null); // Callback для отправки событий в комнату
+  
   // Кэш для сгенерированных обложек
   const coverCacheRef = useRef({});
 
