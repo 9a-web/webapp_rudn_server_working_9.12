@@ -588,8 +588,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     hapticFeedback?.('impact', 'medium');
   }, [canControl, queue.length, hapticFeedback]);
   
-  // Ref для callback в плеере (обновляется при изменении handlePlayNextFromQueue)
-  const playNextCallbackRef = useRef(handlePlayNextFromQueue);
+  // Обновляем ref при изменении callback
   useEffect(() => {
     playNextCallbackRef.current = handlePlayNextFromQueue;
   }, [handlePlayNextFromQueue]);
