@@ -759,7 +759,7 @@ export const PlannerTimeline = ({
           {HOURS.map((hour) => (
             <div
               key={hour}
-              className="absolute left-0 right-0 flex border-t border-gray-200/70 group"
+              className="absolute left-0 right-0 flex group"
               style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
               onClick={(e) => {
                 // Вычисляем точное время по клику
@@ -779,14 +779,14 @@ export const PlannerTimeline = ({
               }}
             >
               {/* Время слева */}
-              <div className="w-14 flex-shrink-0 pr-2 -mt-2.5">
+              <div className="w-14 flex-shrink-0 pl-2 pr-2 -translate-y-[25%]">
                 <span className="text-xs text-gray-400 font-medium">
                   {formatHour(hour)}
                 </span>
               </div>
               
               {/* Разделительная линия с подсветкой при наведении */}
-              <div className={`flex-1 border-l border-gray-100 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
+              <div className={`flex-1 border-t border-gray-200/70 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
             </div>
           ))}
           
