@@ -152,6 +152,9 @@ const Home = () => {
     loading: false
   });
   
+  // Ref для открытия ListeningRoom из MiniPlayer
+  const openListeningRoomRef = useRef(null);
+  
   // Очередь уведомлений (greeting, achievement и т.д.)
   const [notificationQueue, setNotificationQueue] = useState([]);
   const [activeQueueNotification, setActiveQueueNotification] = useState(null);
