@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Users, TrendingUp, Calendar, Award, 
   BarChart3, Clock, Activity, Star,
   BookOpen, Bell, Share2, CheckSquare, RefreshCw,
   Search, User, GraduationCap, FileText, Send, MessageSquare, Check,
-  Megaphone, AlertCircle, Info, Gift, Sparkles, Zap, Home
+  Megaphone, AlertCircle, Info, Gift, Sparkles, Zap, Home, Wifi, Circle
 } from 'lucide-react';
 import axios from 'axios';
 import {
