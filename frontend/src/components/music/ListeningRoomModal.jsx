@@ -1,6 +1,14 @@
 /**
  * ListeningRoomModal - Модальное окно совместного прослушивания музыки
- * Позволяет создавать комнаты, приглашать друзей и синхронно слушать музыку
+ * 
+ * Улучшения v2:
+ * - Исправлен race condition при создании комнаты
+ * - Исправлены memory leaks в reconnect
+ * - Улучшена логика определения seek
+ * - Добавлена очередь треков
+ * - Добавлена история прослушивания
+ * - Добавлен индикатор "сейчас играет" с именем
+ * - Улучшен UX при потере соединения
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -9,7 +17,9 @@ import {
   X, Users, Copy, Check, Share2, Crown, 
   Settings, UserPlus, LogOut, Trash2,
   Play, Pause, Music, Radio, QrCode,
-  ChevronRight, ChevronLeft, Loader2, Volume2
+  ChevronRight, ChevronLeft, Loader2, Volume2,
+  ListMusic, History, Plus, SkipForward, Clock,
+  Wifi, WifiOff
 } from 'lucide-react';
 import { useTelegram } from '../../contexts/TelegramContext';
 import { usePlayer } from './PlayerContext';
@@ -28,6 +38,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const { currentTrack, isPlaying, progress, play, pause, seek } = usePlayer();
   
   const [view, setView] = useState('main'); // main, create, join, room
+  const [subView, setSubView] = useState('info'); // info, queue, history (внутри room)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -36,10 +47,17 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const [myRooms, setMyRooms] = useState([]);
   const [currentRoom, setCurrentRoom] = useState(null);
   const [canControl, setCanControl] = useState(false);
-  const [isConnected, setIsConnected] = useState(false); // Подключён ли к синхронизации
-  const [onlineCount, setOnlineCount] = useState(0); // Количество онлайн участников
+  const [isConnected, setIsConnected] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected'); // disconnected, connecting, connected, error
   
-  // Уведомляем родительский компонент об активной комнате (только когда подключён)
+  // Новые состояния для очереди и истории
+  const [queue, setQueue] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [initiatedBy, setInitiatedBy] = useState(null);
+  const [initiatedByName, setInitiatedByName] = useState('');
+  
+  // Уведомляем родительский компонент об активной комнате
   useEffect(() => {
     onActiveRoomChange?.(isConnected ? currentRoom : null);
   }, [currentRoom, isConnected, onActiveRoomChange]);
@@ -51,20 +69,36 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   // Состояние присоединения
   const [inviteCode, setInviteCode] = useState('');
   
-  // WebSocket
+  // WebSocket и синхронизация
   const wsRef = useRef(null);
-  const ignoreUntilRef = useRef(0); // Timestamp до которого игнорировать локальные события
-  const lastRemoteEventRef = useRef(0); // Timestamp последнего удалённого события
-  const prevProgressRef = useRef(0); // Предыдущая позиция для отслеживания перемотки
-  const seekDebounceRef = useRef(null); // Debounce для отправки seek
-  const lastSeekTimeRef = useRef(0); // Время последнего seek для предотвращения ложных срабатываний
+  const ignoreUntilRef = useRef(0);
+  const lastRemoteEventRef = useRef(0);
+  const prevProgressRef = useRef(0);
+  const seekDebounceRef = useRef(null);
+  const lastSeekTimeRef = useRef(0);
+  const isMountedRef = useRef(true); // Отслеживание монтирования
   
   // Reconnect логика
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const maxReconnectAttempts = 10;
   const shouldReconnectRef = useRef(false);
-  const currentRoomIdRef = useRef(null); // Сохраняем room_id для reconnect
+  const currentRoomIdRef = useRef(null);
+  
+  // Cleanup при размонтировании
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      shouldReconnectRef.current = false;
+      if (seekDebounceRef.current) {
+        clearTimeout(seekDebounceRef.current);
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // Загрузка комнат пользователя
   const loadMyRooms = useCallback(async () => {
@@ -72,7 +106,9 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     
     try {
       const result = await getUserListeningRooms(telegramId);
-      setMyRooms(result.rooms || []);
+      if (isMountedRef.current) {
+        setMyRooms(result.rooms || []);
+      }
     } catch (err) {
       console.error('Failed to load rooms:', err);
     }
@@ -81,211 +117,258 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   useEffect(() => {
     if (isOpen && telegramId) {
       loadMyRooms();
-      // Если есть активная комната - показываем её
       if (currentRoom && wsRef.current) {
         setView('room');
       }
     }
-  }, [isOpen, telegramId, loadMyRooms]);
+  }, [isOpen, telegramId, loadMyRooms, currentRoom]);
   
-  // НЕ закрываем соединение при закрытии модального окна
-  // Соединение остаётся активным пока пользователь в комнате
-  // Закрытие происходит только при реальном выходе из комнаты (handleLeaveRoom)
-  
-  // Открыть комнату для просмотра (без синхронизации)
+  // Открыть комнату для просмотра
   const openRoom = useCallback((room) => {
     setCurrentRoom(room);
     setIsConnected(false);
+    setConnectionStatus('disconnected');
     setOnlineCount(room.online_count || 0);
+    setQueue(room.queue || []);
+    setHistory(room.history || []);
+    setSubView('info');
     setView('room');
   }, []);
   
-  // Создаём полный набор handlers для WebSocket (используется и при создании, и при подключении)
+  // Создаём handlers для WebSocket
   const createSyncHandlers = useCallback((roomId) => ({
     onConnected: () => {
+      if (!isMountedRef.current) return;
       console.log('✅ Connected to listening room sync');
       setIsConnected(true);
-      reconnectAttemptRef.current = 0; // Сбрасываем счётчик при успешном подключении
+      setConnectionStatus('connected');
+      reconnectAttemptRef.current = 0;
       hapticFeedback?.('notification', 'success');
     },
-    onStateSync: (state, canCtrl, onlineCountFromServer) => {
+    onStateSync: (state, canCtrl, onlineCountFromServer, queueFromServer, historyFromServer) => {
+      if (!isMountedRef.current) return;
+      
       if (canCtrl !== undefined) {
         setCanControl(canCtrl);
       }
-      
-      // Обновляем online_count с сервера (если передан)
       if (onlineCountFromServer !== undefined) {
         setOnlineCount(onlineCountFromServer);
+      }
+      if (queueFromServer) {
+        setQueue(queueFromServer);
+      }
+      if (historyFromServer) {
+        setHistory(historyFromServer);
+      }
+      
+      // Обновляем initiated_by
+      if (state?.initiated_by) {
+        setInitiatedBy(state.initiated_by);
+        setInitiatedByName(state.initiated_by_name || '');
       }
       
       // Синхронизируем состояние плеера
       if (state && state.current_track) {
         console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing, 'position:', state.position);
-        // Игнорируем локальные события на 800мс
-        ignoreUntilRef.current = Date.now() + 800;
+        ignoreUntilRef.current = Date.now() + 1000; // Увеличено до 1 секунды
+        lastSeekTimeRef.current = Date.now();
         play(state.current_track, [state.current_track]);
         if (state.position > 0) {
-          setTimeout(() => seek(state.position), 100);
+          setTimeout(() => {
+            if (isMountedRef.current) seek(state.position);
+          }, 150);
         }
         if (!state.is_playing) {
-          setTimeout(() => pause(), 150);
+          setTimeout(() => {
+            if (isMountedRef.current) pause();
+          }, 200);
         }
       }
     },
-    onPlay: (track, position, triggeredBy) => {
-      // Проверяем что это не наше собственное событие
+    onPlay: (track, position, triggeredBy, triggeredByName) => {
+      if (!isMountedRef.current) return;
       if (triggeredBy === telegramId) {
         console.log('🔇 Ignoring own play event');
         return;
       }
       
-      console.log('🎵 Remote play:', track?.title, 'from:', triggeredBy);
-      // Игнорируем локальные события на 800мс
-      ignoreUntilRef.current = Date.now() + 800;
+      console.log('🎵 Remote play:', track?.title, 'from:', triggeredByName || triggeredBy);
+      ignoreUntilRef.current = Date.now() + 1000;
       lastRemoteEventRef.current = Date.now();
+      lastSeekTimeRef.current = Date.now();
+      
+      setInitiatedBy(triggeredBy);
+      setInitiatedByName(triggeredByName || '');
       
       if (track) {
         play(track, [track]);
         if (position > 0) {
-          setTimeout(() => seek(position), 100);
+          setTimeout(() => {
+            if (isMountedRef.current) seek(position);
+          }, 150);
         }
       }
       hapticFeedback?.('impact', 'light');
     },
-    onPause: (position, triggeredBy) => {
+    onPause: (position, triggeredBy, triggeredByName) => {
+      if (!isMountedRef.current) return;
       if (triggeredBy === telegramId) {
         console.log('🔇 Ignoring own pause event');
         return;
       }
       
-      console.log('⏸️ Remote pause from:', triggeredBy);
-      ignoreUntilRef.current = Date.now() + 800;
+      console.log('⏸️ Remote pause from:', triggeredByName || triggeredBy);
+      ignoreUntilRef.current = Date.now() + 1000;
       lastRemoteEventRef.current = Date.now();
       pause();
       hapticFeedback?.('impact', 'light');
     },
     onSeek: (position, triggeredBy) => {
+      if (!isMountedRef.current) return;
       if (triggeredBy === telegramId) return;
       console.log('⏩ Remote seek:', position);
-      // Игнорируем локальные события на 800мс после удалённого seek
-      ignoreUntilRef.current = Date.now() + 800;
+      ignoreUntilRef.current = Date.now() + 1000;
       lastRemoteEventRef.current = Date.now();
-      lastSeekTimeRef.current = Date.now(); // Фиксируем время seek
+      lastSeekTimeRef.current = Date.now();
       seek(position);
       hapticFeedback?.('impact', 'light');
     },
-    onTrackChange: (track, triggeredBy) => {
+    onTrackChange: (track, triggeredBy, triggeredByName, fromQueue) => {
+      if (!isMountedRef.current) return;
       if (triggeredBy === telegramId) {
         console.log('🔇 Ignoring own track change');
         return;
       }
       
       if (track) {
-        console.log('🔄 Remote track change:', track.title, 'from:', triggeredBy);
-        ignoreUntilRef.current = Date.now() + 800;
+        console.log('🔄 Remote track change:', track.title, 'from:', triggeredByName || triggeredBy, fromQueue ? '(from queue)' : '');
+        ignoreUntilRef.current = Date.now() + 1000;
         lastRemoteEventRef.current = Date.now();
+        lastSeekTimeRef.current = Date.now();
+        
+        setInitiatedBy(triggeredBy);
+        setInitiatedByName(triggeredByName || '');
+        
         play(track, [track]);
         hapticFeedback?.('impact', 'medium');
       }
     },
-    onUserJoined: (newUser, onlineCountFromServer) => {
+    onQueueUpdated: (newQueue, action, track, triggeredBy, triggeredByName) => {
+      if (!isMountedRef.current) return;
+      console.log('📋 Queue updated:', action, newQueue?.length, 'tracks');
+      setQueue(newQueue || []);
+      
+      if (action === 'add' && triggeredBy !== telegramId) {
+        hapticFeedback?.('notification', 'success');
+      }
+    },
+    onUserJoined: (newUser, participantsCount, onlineCountFromServer) => {
+      if (!isMountedRef.current) return;
       console.log('👤 User joined room:', newUser?.first_name);
-      // Используем online_count с сервера если передан
       if (onlineCountFromServer !== undefined) {
         setOnlineCount(onlineCountFromServer);
       }
       setCurrentRoom(prev => prev ? {
         ...prev,
         participants: [...(prev.participants || []), newUser],
-        participants_count: (prev.participants_count || 0) + 1
+        participants_count: participantsCount || (prev.participants_count || 0) + 1
       } : prev);
       hapticFeedback?.('notification', 'success');
     },
     onUserLeft: (leftUserId, onlineCountFromServer) => {
+      if (!isMountedRef.current) return;
       console.log('👤 User disconnected:', leftUserId);
-      // Используем online_count с сервера если передан
       if (onlineCountFromServer !== undefined) {
         setOnlineCount(onlineCountFromServer);
       } else {
         setOnlineCount(prev => Math.max(0, prev - 1));
       }
-      // НЕ удаляем из participants - пользователь вышел из sync, но всё ещё в комнате
     },
     onOnlineCount: (count) => {
+      if (!isMountedRef.current) return;
       console.log('📊 Online count updated:', count);
       setOnlineCount(count);
     },
     onSettingsChanged: (settings) => {
+      if (!isMountedRef.current) return;
       console.log('⚙️ Settings changed:', settings);
       setCurrentRoom(prev => prev ? { ...prev, ...settings } : prev);
     },
     onRoomClosed: (message) => {
+      if (!isMountedRef.current) return;
       console.log('🚪 Room closed:', message);
-      shouldReconnectRef.current = false; // Не пытаемся переподключиться к закрытой комнате
+      shouldReconnectRef.current = false;
       hapticFeedback?.('notification', 'warning');
       setCurrentRoom(null);
       setIsConnected(false);
+      setConnectionStatus('disconnected');
       setView('main');
       loadMyRooms();
     },
     onError: (message) => {
+      if (!isMountedRef.current) return;
       console.error('❌ Room error:', message);
       setError(message);
-      // Не отключаем, если это временная ошибка
+      setConnectionStatus('error');
     },
     onDisconnected: () => {
+      if (!isMountedRef.current) return;
       console.log('🔌 Disconnected from room');
       setIsConnected(false);
+      setConnectionStatus('disconnected');
       
-      // Пытаемся переподключиться если это не преднамеренное отключение
       if (shouldReconnectRef.current && currentRoomIdRef.current) {
+        setConnectionStatus('connecting');
         attemptReconnect(roomId);
       }
     }
   }), [telegramId, play, pause, seek, hapticFeedback, loadMyRooms]);
   
-  // Функция для reconnect с exponential backoff
+  // Reconnect с exponential backoff
   const attemptReconnect = useCallback((roomId) => {
-    if (!shouldReconnectRef.current) return;
+    if (!shouldReconnectRef.current || !isMountedRef.current) return;
     if (reconnectAttemptRef.current >= maxReconnectAttempts) {
       console.log('❌ Max reconnect attempts reached');
-      setError('Не удалось восстановить соединение. Попробуйте переподключиться вручную.');
+      if (isMountedRef.current) {
+        setError('Не удалось восстановить соединение. Попробуйте переподключиться.');
+        setConnectionStatus('error');
+      }
       shouldReconnectRef.current = false;
       return;
     }
     
     reconnectAttemptRef.current += 1;
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current - 1), 30000); // max 30 sec
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current - 1), 30000);
     
     console.log(`🔄 Reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttempts} in ${delay}ms`);
     
     reconnectTimeoutRef.current = setTimeout(() => {
-      if (!shouldReconnectRef.current) return;
+      if (!shouldReconnectRef.current || !isMountedRef.current) return;
       
       console.log('🔄 Attempting reconnect...');
       
       if (wsRef.current) {
-        try { wsRef.current.close(); } catch (e) { /* ignore close errors */ }
+        try { wsRef.current.close(); } catch (e) { /* ignore */ }
       }
       
       wsRef.current = createListeningRoomConnection(roomId, telegramId, createSyncHandlers(roomId));
     }, delay);
   }, [telegramId, createSyncHandlers]);
   
-  // Подключиться к синхронизации комнаты
+  // Подключиться к синхронизации
   const connectToSync = useCallback(() => {
     if (!currentRoom) return;
     
-    // Очищаем предыдущие таймауты
+    setConnectionStatus('connecting');
+    
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
     
     if (wsRef.current) {
-      wsRef.current.close();
+      try { wsRef.current.close(); } catch (e) { /* ignore */ }
     }
     
-    // Включаем reconnect
     shouldReconnectRef.current = true;
     currentRoomIdRef.current = currentRoom.id;
     reconnectAttemptRef.current = 0;
@@ -293,9 +376,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     wsRef.current = createListeningRoomConnection(currentRoom.id, telegramId, createSyncHandlers(currentRoom.id));
   }, [currentRoom, telegramId, createSyncHandlers]);
   
-  // Отключиться от синхронизации (но остаться в комнате)
+  // Отключиться от синхронизации
   const disconnectFromSync = useCallback(() => {
-    // Отключаем автоматический reconnect
     shouldReconnectRef.current = false;
     currentRoomIdRef.current = null;
     
@@ -304,13 +386,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
     
     if (wsRef.current) {
-      wsRef.current.close();
+      try { wsRef.current.close(); } catch (e) { /* ignore */ }
       wsRef.current = null;
     }
     setIsConnected(false);
+    setConnectionStatus('disconnected');
   }, []);
   
-  // Создание комнаты
+  // Создание комнаты (ИСПРАВЛЕН race condition)
   const handleCreateRoom = async () => {
     if (!telegramId || !user) return;
     
@@ -332,7 +415,6 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       
       hapticFeedback?.('notification', 'success');
       
-      // Открываем созданную комнату и сразу подключаемся
       const newRoom = {
         id: result.room_id,
         name: roomName,
@@ -348,31 +430,45 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
           first_name: user.first_name,
           last_name: user.last_name,
           username: user.username
-        }]
+        }],
+        queue: [],
+        history: []
       };
+      
       setCurrentRoom(newRoom);
       setView('room');
-      setCanControl(true); // Хост всегда может управлять
+      setSubView('info');
+      setCanControl(true);
+      setQueue([]);
+      setHistory([]);
       
-      // Подключаемся к синхронизации с ПОЛНЫМ набором handlers (FIX #2, #3)
-      shouldReconnectRef.current = true;
-      currentRoomIdRef.current = result.room_id;
-      reconnectAttemptRef.current = 0;
+      // Подключаемся с небольшой задержкой после установки состояния
+      // Используем Promise для гарантии последовательности
+      await new Promise(resolve => setTimeout(resolve, 50));
       
-      setTimeout(() => {
+      if (isMountedRef.current) {
+        shouldReconnectRef.current = true;
+        currentRoomIdRef.current = result.room_id;
+        reconnectAttemptRef.current = 0;
+        setConnectionStatus('connecting');
+        
         wsRef.current = createListeningRoomConnection(result.room_id, telegramId, createSyncHandlers(result.room_id));
-      }, 100);
+      }
       
     } catch (err) {
       console.error('Create room error:', err);
-      setError(err.message);
+      if (isMountedRef.current) {
+        setError(err.message);
+      }
       hapticFeedback?.('notification', 'error');
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
   
-  // Присоединение к комнате (добавление в список участников)
+  // Присоединение к комнате
   const handleJoinRoom = async () => {
     if (!telegramId || !user || !inviteCode.trim()) return;
     
@@ -390,7 +486,6 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       
       if (result.success && result.room) {
         hapticFeedback?.('notification', 'success');
-        // Открываем комнату для просмотра (без синхронизации)
         openRoom({
           ...result.room,
           is_host: result.room.host_id === telegramId,
@@ -409,11 +504,10 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
   };
   
-  // Выход из комнаты (полный выход из списка участников)
+  // Выход из комнаты
   const handleLeaveRoom = async () => {
     if (!currentRoom) return;
     
-    // Отключаем автоматический reconnect перед выходом
     shouldReconnectRef.current = false;
     currentRoomIdRef.current = null;
     
@@ -426,13 +520,16 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       hapticFeedback?.('notification', 'success');
       
       if (wsRef.current) {
-        wsRef.current.close();
+        try { wsRef.current.close(); } catch (e) { /* ignore */ }
         wsRef.current = null;
       }
       
       setCurrentRoom(null);
       setIsConnected(false);
+      setConnectionStatus('disconnected');
       setOnlineCount(0);
+      setQueue([]);
+      setHistory([]);
       setView('main');
       loadMyRooms();
     } catch (err) {
@@ -441,13 +538,35 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
   };
   
-  // Свернуть комнату (вернуться к списку, сохранить подключение если было)
+  // Свернуть комнату
   const handleMinimizeRoom = () => {
-    // Если подключён - соединение остаётся активным
-    // currentRoom и isConnected сохраняем
     setView('main');
     loadMyRooms();
   };
+  
+  // Добавить трек в очередь
+  const handleAddToQueue = useCallback((track) => {
+    if (!wsRef.current || !canControl) return;
+    
+    wsRef.current.sendQueueAdd(track);
+    hapticFeedback?.('impact', 'light');
+  }, [canControl, hapticFeedback]);
+  
+  // Удалить трек из очереди
+  const handleRemoveFromQueue = useCallback((index) => {
+    if (!wsRef.current || !canControl) return;
+    
+    wsRef.current.sendQueueRemove(index);
+    hapticFeedback?.('impact', 'light');
+  }, [canControl, hapticFeedback]);
+  
+  // Воспроизвести следующий из очереди
+  const handlePlayNextFromQueue = useCallback(() => {
+    if (!wsRef.current || !canControl || queue.length === 0) return;
+    
+    wsRef.current.sendQueuePlayNext();
+    hapticFeedback?.('impact', 'medium');
+  }, [canControl, queue.length, hapticFeedback]);
   
   // Копирование ссылки
   const handleCopyInvite = async () => {
@@ -481,33 +600,28 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     hapticFeedback?.('impact', 'medium');
   };
   
-  // Отслеживание предыдущего состояния для определения изменений
+  // Отслеживание изменений воспроизведения
   const prevIsPlayingRef = useRef(isPlaying);
   const prevTrackIdRef = useRef(currentTrack?.id);
   
-  // Отправка событий воспроизведения в комнату
+  // Отправка событий воспроизведения
   useEffect(() => {
-    // Проверяем что мы в комнате и имеем права управления
-    if (!wsRef.current || !currentRoom || !canControl) {
+    if (!wsRef.current || !currentRoom || !canControl || !isConnected) {
       return;
     }
     
-    // Игнорируем если недавно получили удалённое событие (предотвращает эхо)
     if (Date.now() < ignoreUntilRef.current) {
-      console.log('🔇 Sync skipped: within ignore window');
       return;
     }
     
-    // Проверяем изменилось ли состояние воспроизведения
     const playStateChanged = prevIsPlayingRef.current !== isPlaying;
     const trackChanged = prevTrackIdRef.current !== currentTrack?.id;
     
-    // Обновляем refs
     prevIsPlayingRef.current = isPlaying;
     prevTrackIdRef.current = currentTrack?.id;
     
     if (!playStateChanged && !trackChanged) {
-      return; // Ничего не изменилось
+      return;
     }
     
     if (!currentTrack) {
@@ -523,7 +637,8 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       url: currentTrack.url
     };
     
-    // Отправляем соответствующее событие
+    // ИСПРАВЛЕНИЕ: отправляем только track_change если трек изменился
+    // play/pause отправляем только если трек НЕ изменился
     if (trackChanged) {
       console.log('📤 Sending track change:', trackData.title);
       wsRef.current.sendTrackChange(trackData);
@@ -536,16 +651,16 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         wsRef.current.sendPause(progress);
       }
     }
-  }, [isPlaying, currentTrack?.id, currentRoom, canControl, progress]);
+  }, [isPlaying, currentTrack?.id, currentRoom, canControl, isConnected, progress]);
   
-  // Периодическая синхронизация позиции (каждые 5 секунд когда играет)
+  // Периодическая синхронизация позиции
   useEffect(() => {
-    if (!wsRef.current || !currentRoom || !canControl || !isPlaying || !currentTrack) {
+    if (!wsRef.current || !currentRoom || !canControl || !isPlaying || !currentTrack || !isConnected) {
       return;
     }
     
     const syncPosition = () => {
-      if (Date.now() < ignoreUntilRef.current) return;
+      if (Date.now() < ignoreUntilRef.current || !isMountedRef.current) return;
       
       const trackData = {
         id: currentTrack.id,
@@ -556,79 +671,71 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         url: currentTrack.url
       };
       
-      // Отправляем текущую позицию для синхронизации
       wsRef.current.sendPlay(trackData, progress);
     };
     
-    // Синхронизируем позицию каждые 5 секунд
     const interval = setInterval(syncPosition, 5000);
     
     return () => clearInterval(interval);
-  }, [isPlaying, currentRoom, canControl, currentTrack, progress]);
+  }, [isPlaying, currentRoom, canControl, currentTrack, progress, isConnected]);
   
-  // Отслеживание перемотки (seek) и отправка в комнату
+  // Отслеживание seek (УЛУЧШЕННАЯ ЛОГИКА)
   useEffect(() => {
-    // Проверяем что мы подключены к комнате и имеем права управления
     if (!wsRef.current || !currentRoom || !canControl || !isConnected) {
       prevProgressRef.current = progress;
       return;
     }
     
-    // Игнорируем если недавно получили удалённое событие (предотвращает эхо)
     if (Date.now() < ignoreUntilRef.current) {
       prevProgressRef.current = progress;
       return;
     }
     
-    // FIX #7: Игнорируем seek если последний был менее 500мс назад (защита от буферизации)
+    // Защита от ложных срабатываний при буферизации
     const timeSinceLastSeek = Date.now() - lastSeekTimeRef.current;
-    if (timeSinceLastSeek < 500) {
+    if (timeSinceLastSeek < 600) {
       prevProgressRef.current = progress;
       return;
     }
     
-    // Определяем разницу позиции
     const progressDiff = Math.abs(progress - prevProgressRef.current);
     
-    // Если разница больше 2 секунд - это перемотка (не обычное воспроизведение)
-    // Обычное воспроизведение меняет progress примерно на 0.05-0.1 сек за тик
-    // FIX #7: Также проверяем что это не скачок назад на маленькое значение (буферизация)
-    const isSeek = progressDiff > 2 && progressDiff < 300; // Max reasonable seek = 5 min
+    // Перемотка: разница > 2.5 сек и < 5 минут (защита от некорректных значений)
+    const isSeek = progressDiff > 2.5 && progressDiff < 300;
     
     if (isSeek && currentTrack) {
       console.log('📤 Detected seek:', prevProgressRef.current.toFixed(1), '->', progress.toFixed(1), 'diff:', progressDiff.toFixed(1));
       
-      // Debounce отправки seek (если пользователь быстро двигает слайдер)
       if (seekDebounceRef.current) {
         clearTimeout(seekDebounceRef.current);
       }
       
       seekDebounceRef.current = setTimeout(() => {
-        if (wsRef.current && Date.now() >= ignoreUntilRef.current) {
+        if (wsRef.current && Date.now() >= ignoreUntilRef.current && isMountedRef.current) {
           console.log('📤 Sending seek event:', progress.toFixed(1));
-          lastSeekTimeRef.current = Date.now(); // Фиксируем время отправки
+          lastSeekTimeRef.current = Date.now();
           wsRef.current.sendSeek(progress);
         }
-      }, 150); // Увеличили debounce с 100 до 150мс для лучшей фильтрации
+      }, 200);
     }
     
     prevProgressRef.current = progress;
   }, [progress, currentRoom, canControl, isConnected, currentTrack]);
   
-  // Очистка debounce и reconnect при размонтировании
-  useEffect(() => {
-    return () => {
-      if (seekDebounceRef.current) {
-        clearTimeout(seekDebounceRef.current);
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      shouldReconnectRef.current = false;
-    };
-  }, []);
-  
   if (!isOpen) return null;
+  
+  const formatTime = (sec) => {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+  
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+  };
   
   return (
     <AnimatePresence>
@@ -654,7 +761,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                   <button
                     onClick={() => {
                       if (view === 'room') {
-                        handleMinimizeRoom(); // Свернуть, но остаться в комнате
+                        handleMinimizeRoom();
                       } else {
                         setView('main');
                         setError(null);
@@ -676,10 +783,25 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                     {view === 'room' && (currentRoom?.name || 'Комната')}
                   </h2>
                   {view === 'room' && currentRoom && (
-                    <p className="text-xs text-gray-400">
-                      <span className="text-green-400">{onlineCount} подключено</span>
-                      <span className="text-gray-500"> / {currentRoom.participants_count || 1} участников</span>
-                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      {connectionStatus === 'connected' ? (
+                        <span className="flex items-center gap-1 text-green-400">
+                          <Wifi className="w-3 h-3" />
+                          {onlineCount} онлайн
+                        </span>
+                      ) : connectionStatus === 'connecting' ? (
+                        <span className="flex items-center gap-1 text-yellow-400">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Подключение...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <WifiOff className="w-3 h-3" />
+                          Не подключен
+                        </span>
+                      )}
+                      <span className="text-gray-500">/ {currentRoom.participants_count || 1} участников</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -895,10 +1017,15 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                           <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
                           <span className="text-green-400 font-medium">Синхронизация активна</span>
                         </>
+                      ) : connectionStatus === 'connecting' ? (
+                        <>
+                          <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />
+                          <span className="text-yellow-400 font-medium">Подключение...</span>
+                        </>
                       ) : (
                         <>
                           <div className="w-3 h-3 rounded-full bg-gray-500" />
-                          <span className="text-gray-400 font-medium">Не подключен к синхронизации</span>
+                          <span className="text-gray-400 font-medium">Не подключен</span>
                         </>
                       )}
                     </div>
@@ -911,9 +1038,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                   {!isConnected ? (
                     <button
                       onClick={connectToSync}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium flex items-center justify-center gap-2 hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg shadow-green-500/20"
+                      disabled={connectionStatus === 'connecting'}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium flex items-center justify-center gap-2 hover:from-green-600 hover:to-emerald-600 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"
                     >
-                      <Radio className="w-5 h-5" />
+                      {connectionStatus === 'connecting' ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Radio className="w-5 h-5" />
+                      )}
                       Подключиться
                     </button>
                   ) : (
@@ -925,19 +1057,13 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                       Отключиться от синхронизации
                     </button>
                   )}
-                  
-                  {!isConnected && (
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      Подключитесь для синхронного прослушивания музыки с другими участниками
-                    </p>
-                  )}
                 </div>
                 
-                {/* Current Track */}
+                {/* Current Track with "Initiated By" */}
                 {currentTrack && isConnected && (
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden">
+                      <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden flex-shrink-0">
                         {currentTrack.cover ? (
                           <img src={currentTrack.cover} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -961,6 +1087,11 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                               Пауза
                             </div>
                           )}
+                          {initiatedByName && (
+                            <span className="text-xs text-gray-500">
+                              • включил {initiatedByName}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -979,84 +1110,215 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
                   </div>
                 )}
                 
-                {/* Invite Section */}
-                <div className="p-4 rounded-xl bg-gray-800/50">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-gray-400">Код комнаты</span>
-                    <span className="text-lg font-mono font-bold text-white tracking-wider">
-                      {currentRoom.invite_code}
-                    </span>
-                  </div>
+                {/* Sub-navigation tabs (Queue, History) */}
+                {isConnected && (
                   <div className="flex gap-2">
                     <button
-                      onClick={handleCopyInvite}
-                      className="flex-1 py-2 rounded-xl bg-gray-700/50 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-700 transition-colors"
+                      onClick={() => setSubView('info')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                        subView === 'info' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-800/50 text-gray-400 hover:text-white'
+                      }`}
                     >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 text-green-400" />
-                          Скопировано
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Копировать
-                        </>
-                      )}
+                      <Users className="w-4 h-4" />
+                      Участники
                     </button>
                     <button
-                      onClick={handleShare}
-                      className="flex-1 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-500/30 transition-colors"
+                      onClick={() => setSubView('queue')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                        subView === 'queue' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-800/50 text-gray-400 hover:text-white'
+                      }`}
                     >
-                      <Share2 className="w-4 h-4" />
-                      Поделиться
+                      <ListMusic className="w-4 h-4" />
+                      Очередь {queue.length > 0 && `(${queue.length})`}
+                    </button>
+                    <button
+                      onClick={() => setSubView('history')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                        subView === 'history' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-800/50 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <History className="w-4 h-4" />
+                      История
                     </button>
                   </div>
-                </div>
+                )}
                 
-                {/* Participants */}
-                <div>
-                  <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Участники комнаты
-                    <span className="text-xs text-gray-500">
-                      ({currentRoom.participants?.length || currentRoom.participants_count || 1} участников, 
-                      <span className="text-green-400 ml-1">{onlineCount} подключено</span>)
-                    </span>
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {(currentRoom.participants || []).map(participant => (
-                      <div
-                        key={participant.telegram_id}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/30"
-                      >
-                        <div className="relative">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
-                            {participant.first_name?.[0] || '?'}
-                          </div>
-                          {/* Индикатор онлайн статуса - показываем если это текущий пользователь и он подключен */}
-                          {participant.telegram_id === telegramId && isConnected && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-[#1C1C1E]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm truncate">
-                            {participant.first_name} {participant.last_name}
-                          </p>
-                        </div>
-                        {participant.telegram_id === currentRoom.host_id && (
-                          <Crown className="w-4 h-4 text-yellow-400" />
+                {/* Queue Sub-view */}
+                {isConnected && subView === 'queue' && (
+                  <div className="space-y-2">
+                    {queue.length > 0 ? (
+                      <>
+                        {canControl && (
+                          <button
+                            onClick={handlePlayNextFromQueue}
+                            className="w-full py-2 px-3 rounded-xl bg-green-500/10 text-green-400 text-sm font-medium flex items-center justify-center gap-2 hover:bg-green-500/20 transition-colors"
+                          >
+                            <SkipForward className="w-4 h-4" />
+                            Воспроизвести следующий
+                          </button>
                         )}
-                        {participant.telegram_id === telegramId && (
-                          <span className="text-xs text-gray-400">Вы</span>
-                        )}
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {queue.map((track, index) => (
+                            <div
+                              key={`${track.id}-${index}`}
+                              className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/30 group"
+                            >
+                              <span className="w-6 text-center text-xs text-gray-500">{index + 1}</span>
+                              <div className="w-10 h-10 rounded bg-gray-700 overflow-hidden">
+                                {track.cover ? (
+                                  <img src={track.cover} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Music className="w-4 h-4 text-gray-500" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-white truncate">{track.title}</p>
+                                <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+                              </div>
+                              {canControl && (
+                                <button
+                                  onClick={() => handleRemoveFromQueue(index)}
+                                  className="p-1.5 rounded text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-6 text-center text-gray-500">
+                        <ListMusic className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Очередь пуста</p>
+                        <p className="text-xs mt-1">Добавьте треки из раздела Музыка</p>
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
+                )}
+                
+                {/* History Sub-view */}
+                {isConnected && subView === 'history' && (
+                  <div className="space-y-2">
+                    {history.length > 0 ? (
+                      <div className="max-h-60 overflow-y-auto space-y-1">
+                        {history.map((item, index) => (
+                          <div
+                            key={`${item.track?.id}-${index}`}
+                            className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/30"
+                          >
+                            <div className="w-10 h-10 rounded bg-gray-700 overflow-hidden">
+                              {item.track?.cover ? (
+                                <img src={item.track.cover} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Music className="w-4 h-4 text-gray-500" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white truncate">{item.track?.title}</p>
+                              <p className="text-xs text-gray-400 truncate">{item.track?.artist}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">{formatDate(item.played_at)}</p>
+                              {item.played_by_name && (
+                                <p className="text-xs text-gray-600">{item.played_by_name}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-gray-500">
+                        <History className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">История пуста</p>
+                        <p className="text-xs mt-1">Здесь будут последние прослушанные треки</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Participants Sub-view (default) */}
+                {(!isConnected || subView === 'info') && (
+                  <>
+                    {/* Invite Section */}
+                    <div className="p-4 rounded-xl bg-gray-800/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-gray-400">Код комнаты</span>
+                        <span className="text-lg font-mono font-bold text-white tracking-wider">
+                          {currentRoom.invite_code}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCopyInvite}
+                          className="flex-1 py-2 rounded-xl bg-gray-700/50 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-700 transition-colors"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="w-4 h-4 text-green-400" />
+                              Скопировано
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4" />
+                              Копировать
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleShare}
+                          className="flex-1 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-500/30 transition-colors"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          Поделиться
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Participants */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Участники комнаты
+                      </h3>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {(currentRoom.participants || []).map(participant => (
+                          <div
+                            key={participant.telegram_id}
+                            className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/30"
+                          >
+                            <div className="relative">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
+                                {participant.first_name?.[0] || '?'}
+                              </div>
+                              {participant.telegram_id === telegramId && isConnected && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-[#1C1C1E]" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-sm truncate">
+                                {participant.first_name} {participant.last_name}
+                              </p>
+                            </div>
+                            {participant.telegram_id === currentRoom.host_id && (
+                              <Crown className="w-4 h-4 text-yellow-400" />
+                            )}
+                            {participant.telegram_id === telegramId && (
+                              <span className="text-xs text-gray-400">Вы</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
                 
                 {/* Controls Info */}
-                {isConnected && (
+                {isConnected && subView === 'info' && (
                   <div className="p-3 rounded-xl bg-gray-800/30 border border-gray-700/30">
                     <p className="text-xs text-gray-400">
                       {canControl 
