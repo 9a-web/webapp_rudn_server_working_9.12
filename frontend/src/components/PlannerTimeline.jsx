@@ -276,10 +276,10 @@ const TimelineEventCard = ({
           setIsExpanded(true);
         }}
         className={`
-          absolute rounded-lg cursor-pointer overflow-hidden select-none
+          absolute rounded-lg cursor-pointer overflow-hidden select-none touch-none
           border-l-4 ${colors.border} ${colors.bg}
           shadow-md hover:shadow-lg transition-shadow
-          ${isDragging ? 'ring-2 ring-purple-400 scale-[1.02] touch-none' : 'touch-pan-y'}
+          ${isDragging ? 'ring-2 ring-purple-400 scale-[1.02]' : ''}
           ${(isCompleted || isSkipped) ? 'opacity-50' : ''}
           ${isOverlapping ? '' : 'left-0 right-2'}
           ${!isScheduleEvent ? 'cursor-grab active:cursor-grabbing' : ''}
