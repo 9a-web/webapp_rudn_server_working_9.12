@@ -2193,12 +2193,21 @@ class ListeningRoomTrack(BaseModel):
     cover: Optional[str] = None
     url: Optional[str] = None
 
+class ListeningRoomHistoryItem(BaseModel):
+    """Элемент истории прослушивания в комнате"""
+    track: ListeningRoomTrack
+    played_by: int  # telegram_id того, кто включил
+    played_by_name: str = ""  # имя того, кто включил
+    played_at: datetime = Field(default_factory=datetime.utcnow)
+
 class ListeningRoomState(BaseModel):
     """Состояние воспроизведения в комнате"""
     is_playing: bool = False
     current_track: Optional[ListeningRoomTrack] = None
     position: float = 0  # позиция в секундах
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    initiated_by: Optional[int] = None  # telegram_id того, кто включил текущий трек
+    initiated_by_name: str = ""  # имя того, кто включил
 
 class ListeningRoom(BaseModel):
     """Комната совместного прослушивания"""
@@ -2210,8 +2219,11 @@ class ListeningRoom(BaseModel):
     allowed_controllers: List[int] = []  # telegram_id тех, кто может управлять (для SELECTED)
     participants: List[ListeningRoomParticipant] = []
     state: ListeningRoomState = Field(default_factory=ListeningRoomState)
+    queue: List[ListeningRoomTrack] = []  # Очередь треков
+    history: List[ListeningRoomHistoryItem] = []  # История последних 20 треков
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = True
+    max_participants: int = 50  # Максимальное количество участников
 
 class CreateListeningRoomRequest(BaseModel):
     """Запрос на создание комнаты"""
