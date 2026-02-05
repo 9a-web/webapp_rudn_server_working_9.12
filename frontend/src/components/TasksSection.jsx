@@ -2352,10 +2352,15 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                   <span>Событие</span>
                 </button>
               </div>
-            </div>
+            </motion.div>
             
             {/* Полноэкранный Timeline */}
-            <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.15, duration: 0.25 }}
+              className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50"
+            >
               <FullscreenPlannerTimeline
                 events={plannerEvents}
                 currentDate={formatDateToYYYYMMDD(tasksSelectedDate)}
@@ -2369,7 +2374,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                 onTimeChange={handleEventTimeChange}
                 hapticFeedback={hapticFeedback}
               />
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
