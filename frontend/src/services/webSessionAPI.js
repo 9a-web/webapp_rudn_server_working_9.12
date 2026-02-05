@@ -366,19 +366,43 @@ export const sendHeartbeat = async (sessionToken) => {
       method: 'POST'
     });
     
+    // Сохраняем статус до любых операций с response
+    const status = response.status;
+    
     // Если 404 - сессия не найдена (удалена)
-    if (response.status === 404) {
+    if (status === 404) {
+      console.log('🔌 Heartbeat: session not found (404)');
       return { valid: false, reason: 'not_found' };
     }
     
-    if (!response.ok) {
+    // Если другая ошибка
+    if (status >= 400) {
+      console.log('🔌 Heartbeat: error status', status);
       return { valid: false, reason: 'error' };
     }
     
     return { valid: true };
   } catch (e) {
-    console.warn('Heartbeat failed:', e);
-    return { valid: true }; // При сетевой ошибке считаем сессию валидной
+    // При сетевой ошибке "Response body is already used" от rrweb - 
+    // проверяем есть ли сессия в localStorage
+    if (e.message?.includes('Response body is already used')) {
+      console.warn('Heartbeat: Response already used, checking localStorage...');
+      const sessionExists = localStorage.getItem('session_token') === sessionToken;
+      // Делаем дополнительную проверку через простой HEAD запрос
+      try {
+        const checkResp = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/status`, {
+          method: 'HEAD'
+        });
+        if (checkResp.status === 404) {
+          console.log('🔌 Session confirmed deleted via HEAD check');
+          return { valid: false, reason: 'not_found' };
+        }
+      } catch {
+        // Игнорируем ошибки вторичной проверки
+      }
+    }
+    console.warn('Heartbeat failed:', e.message);
+    return { valid: true }; // При других сетевых ошибках считаем сессию валидной
   }
 };
 
