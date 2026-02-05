@@ -2287,9 +2287,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           >
             {/* Шапка */}
             <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.2 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15 }}
               className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-2"
             >
               <div className="flex items-center gap-2 min-w-0 flex-shrink">
