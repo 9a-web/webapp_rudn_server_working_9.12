@@ -144,6 +144,49 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     setView('room');
   }, []);
   
+  // Polling для обновления информации о комнате (когда не подключён к WebSocket)
+  useEffect(() => {
+    if (!currentRoom || isConnected || view !== 'room') {
+      return;
+    }
+    
+    const pollRoomInfo = async () => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL}/api/music/rooms/${currentRoom.id}?telegram_id=${telegramId}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (data.room && isMountedRef.current) {
+            // Обновляем только online_count и participants_count
+            const wsOnlineCount = Object.keys(data.room.participants || []).filter(p => p.is_online).length;
+            setOnlineCount(data.room.online_count || wsOnlineCount || 0);
+            setCurrentRoom(prev => prev ? {
+              ...prev,
+              participants: data.room.participants || prev.participants,
+              participants_count: data.room.participants?.length || prev.participants_count,
+              queue: data.room.queue || prev.queue,
+              state: data.room.state || prev.state
+            } : prev);
+            if (data.room.queue) {
+              setQueue(data.room.queue);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Room info polling error:', err);
+      }
+    };
+    
+    // Первый запрос сразу
+    pollRoomInfo();
+    
+    // Polling каждые 3 секунды
+    const interval = setInterval(pollRoomInfo, 3000);
+    
+    return () => clearInterval(interval);
+  }, [currentRoom?.id, isConnected, view, telegramId]);
+  
   // Создаём handlers для WebSocket
   const createSyncHandlers = useCallback((roomId) => ({
     onConnected: () => {
