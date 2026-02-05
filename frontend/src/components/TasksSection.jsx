@@ -2276,13 +2276,24 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       <AnimatePresence>
         {isFullscreenPlannerOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 300, 
+              damping: 30,
+              duration: 0.3
+            }}
             className="fixed inset-0 z-[9998] bg-white"
           >
             {/* Шапка */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-2">
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.2 }}
+              className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-2"
+            >
               <div className="flex items-center gap-2 min-w-0 flex-shrink">
                 <button
                   onClick={() => setIsFullscreenPlannerOpen(false)}
