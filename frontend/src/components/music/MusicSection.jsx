@@ -583,7 +583,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.3, type: 'spring' }}
         onClick={() => setListeningRoomModalOpen(true)}
-        className={`fixed bottom-32 right-4 z-40 p-4 rounded-full shadow-lg transition-shadow ${
+        className={`fixed bottom-36 right-6 z-50 p-4 rounded-full shadow-lg transition-shadow ${
           activeListeningRoom 
             ? 'bg-gradient-to-br from-green-500 to-emerald-500 shadow-green-500/30 hover:shadow-green-500/50' 
             : 'bg-gradient-to-br from-purple-500 to-pink-500 shadow-purple-500/30 hover:shadow-purple-500/50'
