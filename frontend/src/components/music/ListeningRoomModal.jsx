@@ -1400,6 +1400,87 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
           </div>
         </motion.div>
       </motion.div>
+      
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {showQRModal && currentRoom && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[70] flex items-center justify-center p-4"
+            onClick={() => setShowQRModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1C1C1E] rounded-3xl p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white">QR-код комнаты</h3>
+                <button
+                  onClick={() => setShowQRModal(false)}
+                  className="p-2 rounded-full bg-gray-800/50 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="bg-white rounded-2xl p-4 mb-4">
+                <QRCodeSVG
+                  value={`https://t.me/rudn_pro_bot/app?startapp=listen_${currentRoom.invite_code}`}
+                  size={250}
+                  level="M"
+                  includeMargin={false}
+                  className="w-full h-auto"
+                />
+              </div>
+              
+              <div className="text-center mb-4">
+                <p className="text-white font-medium mb-1">{currentRoom.name}</p>
+                <p className="text-gray-400 text-sm">
+                  Отсканируйте QR-код для вступления в комнату
+                </p>
+                <p className="text-purple-400 font-mono text-lg mt-2 tracking-wider">
+                  {currentRoom.invite_code}
+                </p>
+              </div>
+              
+              <button
+                onClick={() => {
+                  // Скачать QR-код как изображение
+                  const svg = document.querySelector('.bg-white.rounded-2xl svg');
+                  if (svg) {
+                    const svgData = new XMLSerializer().serializeToString(svg);
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+                    img.onload = () => {
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      ctx.fillStyle = 'white';
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                      ctx.drawImage(img, 0, 0);
+                      const link = document.createElement('a');
+                      link.download = `room-${currentRoom.invite_code}.png`;
+                      link.href = canvas.toDataURL('image/png');
+                      link.click();
+                    };
+                    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                  }
+                  hapticFeedback?.('notification', 'success');
+                }}
+                className="w-full py-3 rounded-xl bg-purple-500/20 text-purple-400 font-medium flex items-center justify-center gap-2 hover:bg-purple-500/30 transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Сохранить QR-код
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };
