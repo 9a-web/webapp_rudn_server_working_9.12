@@ -2263,6 +2263,7 @@ class ListeningRoomResponse(BaseModel):
     room: ListeningRoom
     is_host: bool
     can_control: bool
+    online_count: int = 0  # Количество подключённых к sync
 
 class UpdateListeningRoomSettingsRequest(BaseModel):
     """Запрос на изменение настроек комнаты"""
