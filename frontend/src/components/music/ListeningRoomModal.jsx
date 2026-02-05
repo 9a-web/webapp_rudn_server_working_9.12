@@ -9,6 +9,7 @@
  * - Добавлена история прослушивания
  * - Добавлен индикатор "сейчас играет" с именем
  * - Улучшен UX при потере соединения
+ * - Добавлен QR-код для приглашения
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -19,8 +20,9 @@ import {
   Play, Pause, Music, Radio, QrCode,
   ChevronRight, ChevronLeft, Loader2, Volume2,
   ListMusic, History, Plus, SkipForward, Clock,
-  Wifi, WifiOff
+  Wifi, WifiOff, Download
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../../contexts/TelegramContext';
 import { usePlayer } from './PlayerContext';
 import {
