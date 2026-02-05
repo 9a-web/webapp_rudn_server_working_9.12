@@ -638,19 +638,6 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
           
           {/* Icon - static, no animation */}
           <Users className="relative w-6 h-6 text-white drop-shadow-lg" />
-          
-          {/* Active room indicator */}
-          {activeListeningRoom && (
-            <motion.span
-              animate={{ scale: [1, 2], opacity: [0.6, 0] }}
-              transition={{ 
-                duration: 1.5, 
-                repeat: Infinity,
-                ease: "easeOut"
-              }}
-              className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 rounded-full"
-            />
-          )}
         </motion.button>
       </motion.div>
     </div>
