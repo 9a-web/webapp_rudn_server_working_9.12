@@ -308,16 +308,31 @@ export const getUserDevices = async (telegramId, currentToken = null) => {
  */
 export const revokeDevice = async (sessionToken, telegramId) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}?telegram_id=${telegramId}`, {
+  const url = `${backendUrl}/api/web-sessions/${sessionToken}?telegram_id=${telegramId}`;
+  
+  console.log('🗑️ revokeDevice request:', { url, sessionToken, telegramId });
+  
+  const response = await fetch(url, {
     method: 'DELETE'
   });
   
+  console.log('🗑️ revokeDevice response status:', response.status, response.statusText);
+  
   if (!response.ok) {
-    const error = await response.json();
+    const errorText = await response.text();
+    console.error('🗑️ revokeDevice error response:', errorText);
+    let error;
+    try {
+      error = JSON.parse(errorText);
+    } catch {
+      error = { detail: errorText };
+    }
     throw new Error(error.detail || 'Failed to revoke device');
   }
   
-  return response.json();
+  const result = await response.json();
+  console.log('🗑️ revokeDevice success:', result);
+  return result;
 };
 
 /**
