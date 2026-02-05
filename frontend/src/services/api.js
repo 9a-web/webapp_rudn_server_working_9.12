@@ -691,5 +691,30 @@ export const plannerAPI = {
   },
 };
 
+/**
+ * API для отслеживания активности пользователя (для админ панели - онлайн статус)
+ */
+export const activityAPI = {
+  /**
+   * Отправить heartbeat - обновить активность пользователя
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} section - Текущий раздел приложения (schedule, tasks, journal, music, friends)
+   */
+  trackActivity: async (telegramId, section = null) => {
+    try {
+      const params = new URLSearchParams({ telegram_id: telegramId });
+      if (section) {
+        params.append('section', section);
+      }
+      const response = await api.post(`/admin/track-activity?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      // Тихо игнорируем ошибки трекинга, чтобы не мешать основному функционалу
+      console.debug('Activity tracking error:', error.message);
+      return null;
+    }
+  },
+};
+
 export { getBackendURL };
 export default api;
