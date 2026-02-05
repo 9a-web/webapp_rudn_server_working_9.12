@@ -147,6 +147,10 @@ POST /api/web-sessions/{token}/link    # Привязать устройство
 # Приватность
 GET  /api/profile/{id}/privacy   # Получить настройки
 PUT  /api/profile/{id}/privacy   # Обновить настройки
+
+# Онлайн мониторинг (Админ)
+GET  /api/admin/online-users     # Список онлайн пользователей (realtime)
+POST /api/admin/track-activity   # Heartbeat активности пользователя
 ```
 
 ---
