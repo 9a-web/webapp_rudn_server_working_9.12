@@ -241,12 +241,14 @@ const TimelineEventCard = ({
   const overlapStyle = isOverlapping ? {
     width: `calc((100% - 8px) / ${totalOverlaps})`,
     left: `calc(${overlapIndex} * (100% - 8px) / ${totalOverlaps})`,
+    zIndex: overlapIndex + 1, // Каждая следующая карточка выше предыдущей
   } : {};
 
   // Комбинированный стиль
   const combinedStyle = {
     ...style,
     ...overlapStyle,
+    // При перетаскивании поднимаем карточку выше всех
     ...(isDragging ? {
       transform: `translateY(${dragOffset}px)`,
       zIndex: 100,
