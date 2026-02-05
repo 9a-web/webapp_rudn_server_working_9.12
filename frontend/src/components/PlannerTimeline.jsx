@@ -67,8 +67,15 @@ const TimelineEventCard = ({
   const handlePointerDown = (e) => {
     if (isScheduleEvent) return; // Не перетаскиваем события из расписания
     
-    // Захватываем pointer для отслеживания движения
-    e.target.setPointerCapture(e.pointerId);
+    // Захватываем pointer на самой карточке (не на e.target который может быть дочерним)
+    if (cardRef.current) {
+      try {
+        cardRef.current.setPointerCapture(e.pointerId);
+      } catch (err) {
+        // Fallback на e.target
+        e.target.setPointerCapture(e.pointerId);
+      }
+    }
     startY.current = e.clientY;
     
     if (longPressTimer.current) {
