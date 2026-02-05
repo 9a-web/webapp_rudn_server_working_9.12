@@ -896,6 +896,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   
   // Синхронизация задачи с планировщиком
   const handleSyncTaskToPlanner = (task) => {
+    // Проверяем, не добавлена ли уже эта задача в планировщик
+    const alreadyInPlanner = plannerEvents.some(event => event.source_task_id === task.id);
+    
+    if (alreadyInPlanner) {
+      hapticFeedback && hapticFeedback('notification', 'warning');
+      // Показываем уведомление что задача уже в планировщике
+      alert('Эта задача уже добавлена в планировщик');
+      return;
+    }
+    
     setTaskToSync(task);
     // Устанавливаем время по умолчанию - следующий час
     const now = new Date();
@@ -924,7 +934,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       targetDate.setHours(0, 0, 0, 0);
       const targetDateISO = targetDate.toISOString();
       
-      // Используем правильный формат API
+      // Используем правильный формат API - добавляем source_task_id для связи
       await plannerAPI.createEvent(
         user.id,
         taskToSync.text,
@@ -934,6 +944,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         {
           category: taskToSync.category || 'personal',
           description: taskToSync.description || '',
+          source_task_id: taskToSync.id, // Связь с исходной задачей
         }
       );
       
