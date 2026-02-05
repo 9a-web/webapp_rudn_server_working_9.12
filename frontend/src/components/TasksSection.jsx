@@ -2324,64 +2324,17 @@ const TodayTaskItem = ({
   hapticFeedback
 }) => {
   const dragControls = useDragControls();
-  const [isDragEnabled, setIsDragEnabled] = useState(false);
-  const longPressTimer = useRef(null);
   const itemRef = useRef(null);
-
-  // Обработка long press для активации перетаскивания
-  const handlePointerDown = (e) => {
-    // Очищаем предыдущий таймер
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-    
-    // Запускаем таймер на 0.5 секунды
-    longPressTimer.current = setTimeout(() => {
-      setIsDragEnabled(true);
-      // Микровибрация - сигнал что можно перетаскивать
-      if (hapticFeedback) {
-        hapticFeedback('impact', 'heavy');
-      }
-      // Запускаем перетаскивание
-      dragControls.start(e);
-    }, 500);
-  };
-
-  const handlePointerUp = () => {
-    // Отменяем таймер если отпустили раньше
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    setIsDragEnabled(false);
-  };
-
-  const handlePointerCancel = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    setIsDragEnabled(false);
-  };
-
-  // Очистка при размонтировании
-  useEffect(() => {
-    return () => {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-      }
-    };
-  }, []);
 
   return (
     <Reorder.Item
       ref={itemRef}
       value={task}
       id={task.id}
-      dragListener={false}
+      dragListener={true}
       dragControls={dragControls}
-      className={`mb-2 touch-none ${isDragEnabled ? 'z-50' : ''}`}
-      style={{ listStyle: 'none', touchAction: 'none', position: 'relative' }}
+      className="mb-2 cursor-grab active:cursor-grabbing"
+      style={{ listStyle: 'none', position: 'relative' }}
       whileDrag={{ 
         scale: 1.02, 
         boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
@@ -2390,17 +2343,11 @@ const TodayTaskItem = ({
       }}
       layout
       layoutId={task.id}
-      onDragEnd={() => setIsDragEnabled(false)}
       transition={{ type: "spring", stiffness: 400, damping: 35 }}
     >
       {/* Контент задачи */}
       <div 
-        className={`relative bg-white rounded-lg p-2 group shadow-sm transition-all overflow-hidden ${isDragEnabled ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}`}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerCancel}
-        onPointerCancel={handlePointerCancel}
-        style={{ touchAction: 'none' }}
+        className="relative bg-white rounded-lg p-2 group shadow-sm transition-all overflow-hidden"
       >
         {isEditing ? (
           // Режим редактирования
