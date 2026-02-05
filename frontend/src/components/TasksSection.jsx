@@ -2516,6 +2516,7 @@ const TodayTaskItem = ({
         ) : (
           // Обычный режим
           <div className="flex flex-col gap-1.5">
+            {/* Первая строка: чекбокс + текст */}
             <div className="flex items-start gap-2">
               {/* Checkbox с анимацией когда все подзадачи выполнены */}
               {(() => {
@@ -2563,7 +2564,7 @@ const TodayTaskItem = ({
                 );
               })()}
 
-              {/* Текст задачи */}
+              {/* Текст задачи - занимает всё доступное пространство */}
               <div className="flex-1 min-w-0">
                 {/* Текст задачи с inline YouTube badge */}
                 <TaskTextWithBadge 
@@ -2577,9 +2578,15 @@ const TodayTaskItem = ({
                   }}
                   hapticFeedback={hapticFeedback}
                 />
-                
+              </div>
+            </div>
+            
+            {/* Вторая строка: метки + кнопки действий */}
+            <div className="flex items-center justify-between gap-2 pl-6">
+              {/* Левая часть: метки */}
+              <div className="flex-1 min-w-0">
                 {/* Метки: категория, приоритет, предмет */}
-                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {task.category && (
                     <span className="text-xs">
                       {getCategoryEmoji(task.category)}
@@ -2635,14 +2642,13 @@ const TodayTaskItem = ({
                 )}
               </div>
               
-              {/* Кнопки действий */}
+              {/* Правая часть: кнопки действий */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 {/* Кнопка добавления подзадачи */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     hapticFeedback && hapticFeedback('impact', 'light');
-                    // Открываем EditTaskModal для добавления подзадач
                     if (onAddSubtask) {
                       onAddSubtask(task);
                     }
@@ -2670,20 +2676,18 @@ const TodayTaskItem = ({
                   <Calendar className="w-3.5 h-3.5" />
                 </button>
                 
-                {/* Кнопка редактирования - открывает модальное окно для изменения метаданных */}
+                {/* Кнопка редактирования */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     hapticFeedback && hapticFeedback('impact', 'light');
-                    // Открываем модальное окно EditTaskModal для редактирования метаданных
                     if (onEdit) {
-                      // Если onEdit принимает task, значит это handleOpenEditModal
                       onEdit(task);
                     }
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                   className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Редактировать метаданные (категория, приоритет, дедлайн)"
+                  title="Редактировать метаданные"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
