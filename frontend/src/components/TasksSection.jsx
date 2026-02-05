@@ -924,6 +924,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       targetDate.setHours(0, 0, 0, 0);
       const targetDateISO = targetDate.toISOString();
       
+      // Сохраняем время начала для прокрутки
+      const eventStartTime = syncTaskTime.start;
+      
       // Используем правильный формат API
       await plannerAPI.createEvent(
         user.id,
@@ -944,6 +947,28 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       
       setIsSyncTaskModalOpen(false);
       setTaskToSync(null);
+      
+      // Открываем полноэкранный планировщик
+      setIsFullscreenPlannerOpen(true);
+      
+      // Прокручиваем к времени добавленного события через небольшую задержку
+      setTimeout(() => {
+        // Парсим время начала события (формат HH:MM)
+        const [hours, minutes] = eventStartTime.split(':').map(Number);
+        const targetMinutes = hours * 60 + minutes;
+        const HOUR_HEIGHT = 60; // Высота одного часа в пикселях
+        
+        // Находим контейнер планировщика и прокручиваем
+        const plannerContainer = document.querySelector('.h-\\[calc\\(100vh-64px\\)\\]');
+        if (plannerContainer) {
+          const scrollTarget = Math.max(0, (targetMinutes / 60 - 1) * HOUR_HEIGHT);
+          plannerContainer.scrollTo({
+            top: scrollTarget,
+            behavior: 'smooth'
+          });
+        }
+      }, 300);
+      
     } catch (error) {
       console.error('Error syncing task to planner:', error);
       hapticFeedback && hapticFeedback('notification', 'error');
