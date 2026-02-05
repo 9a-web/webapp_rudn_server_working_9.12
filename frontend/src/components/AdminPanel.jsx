@@ -34,9 +34,14 @@ const getBackendURL = () => {
 const BACKEND_URL = getBackendURL();
 
 const AdminPanel = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'users', 'classes', 'notifications'
+  const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'users', 'classes', 'notifications', 'online'
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+
+  // --- Online Users Data ---
+  const [onlineData, setOnlineData] = useState(null);
+  const [onlineLoading, setOnlineLoading] = useState(false);
+  const onlineIntervalRef = useRef(null);
 
   // --- Stats Data ---
   const [selectedPeriod, setSelectedPeriod] = useState(30);
