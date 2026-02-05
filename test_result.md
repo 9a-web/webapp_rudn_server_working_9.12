@@ -242,6 +242,8 @@ test_plan:
     - "Test Listening Rooms API - Get Room State"
     - "Test Listening Rooms API - Get User Rooms"
     - "Test Listening Rooms API - Leave Room"
+    - "Test Admin Online Users API - Track Activity"
+    - "Test Admin Online Users API - Get Online Users"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
