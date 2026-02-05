@@ -2637,20 +2637,12 @@ async def get_planner_day_events(telegram_id: int, date: str):
             events.append(task_response)
         
         # Сортируем события по времени начала
-        # События без времени идут в конец
-        events_with_time = [e for e in events if e.time_start]
-        events_without_time = [e for e in events if not e.time_start]
-        
-        # Сортируем по времени
-        events_with_time.sort(key=lambda x: x.time_start)
-        
-        # Объединяем
-        sorted_events = events_with_time + events_without_time
+        events.sort(key=lambda x: x.time_start or "23:59")
         
         return PlannerDayResponse(
             date=date,
-            events=sorted_events,
-            total_count=len(sorted_events)
+            events=events,
+            total_count=len(events)
         )
     
     except HTTPException:
