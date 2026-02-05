@@ -205,6 +205,69 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick, onOpenLi
               </button>
             </div>
           </div>
+          
+          {/* Promo Card - Listen Together */}
+          <AnimatePresence>
+            {showPromo && (
+              <motion.div
+                initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                animate={{ height: 'auto', opacity: 1, marginTop: 12 }}
+                exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                className="overflow-hidden"
+              >
+                <motion.button
+                  initial={{ scale: 0.95 }}
+                  animate={{ scale: 1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPromo(false);
+                    if (window.Telegram?.WebApp?.HapticFeedback) {
+                      window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                    }
+                    onOpenListeningRoom?.();
+                  }}
+                  className="w-full p-3 rounded-xl relative overflow-hidden group"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)'
+                  }}
+                >
+                  {/* Animated background shimmer */}
+                  <motion.div
+                    className="absolute inset-0 opacity-30"
+                    animate={{
+                      background: [
+                        'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
+                        'linear-gradient(90deg, transparent 100%, rgba(255,255,255,0.1) 150%, transparent 200%)'
+                      ],
+                      x: ['-100%', '100%']
+                    }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                  />
+                  
+                  <div className="flex items-center gap-3 relative z-10">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 shadow-lg shadow-purple-500/30">
+                      <Users className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-white font-medium text-sm flex items-center gap-1.5">
+                        Слушай вместе с друзьями
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                      </p>
+                      <p className="text-white/50 text-xs">
+                        Синхронное прослушивание в реальном времени
+                      </p>
+                    </div>
+                    <div className="text-purple-400 text-xs font-medium">
+                      Открыть →
+                    </div>
+                  </div>
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
       )}
