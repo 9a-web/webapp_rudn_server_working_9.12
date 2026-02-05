@@ -10106,6 +10106,7 @@ async def create_listening_room(request: CreateListeningRoomRequest):
 async def get_listening_room(room_id: str, telegram_id: int):
     """
     Получить информацию о комнате прослушивания.
+    Улучшено: добавлен online_count, queue, history
     """
     try:
         room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
@@ -10124,6 +10125,20 @@ async def get_listening_room(room_id: str, telegram_id: int):
         elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
             can_control = is_host or telegram_id in room.get("allowed_controllers", [])
         
+        # Получаем актуальный online_count из WebSocket соединений
+        online_count = len(listening_room_connections.get(room_id, {}))
+        
+        # Безопасное создание state с новыми полями
+        state_data = room.get("state", {})
+        state = ListeningRoomState(
+            is_playing=state_data.get("is_playing", False),
+            current_track=ListeningRoomTrack(**state_data["current_track"]) if state_data.get("current_track") else None,
+            position=state_data.get("position", 0),
+            updated_at=state_data.get("updated_at", datetime.utcnow()),
+            initiated_by=state_data.get("initiated_by"),
+            initiated_by_name=state_data.get("initiated_by_name", "")
+        )
+        
         # Конвертируем в Pydantic модель
         room_model = ListeningRoom(
             id=room["id"],
@@ -10133,9 +10148,12 @@ async def get_listening_room(room_id: str, telegram_id: int):
             control_mode=ListeningRoomControlMode(room["control_mode"]),
             allowed_controllers=room.get("allowed_controllers", []),
             participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
-            state=ListeningRoomState(**room["state"]) if room.get("state") else ListeningRoomState(),
+            state=state,
+            queue=[ListeningRoomTrack(**t) for t in room.get("queue", [])],
+            history=room.get("history", [])[:20],  # Последние 20 треков
             created_at=room["created_at"],
-            is_active=room["is_active"]
+            is_active=room["is_active"],
+            max_participants=room.get("max_participants", 50)
         )
         
         return ListeningRoomResponse(
