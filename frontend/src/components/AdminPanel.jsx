@@ -214,6 +214,14 @@ const AdminPanel = ({ isOpen, onClose }) => {
 
           {/* Content */}
           <div className="flex-1 overflow-hidden relative">
+             {activeTab === 'online' && (
+               <OnlineTab 
+                 onlineData={onlineData} 
+                 loading={onlineLoading} 
+                 onRefresh={fetchOnlineUsers}
+               />
+             )}
+             
              {activeTab === 'stats' && (
                <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6 space-y-6">
                  {loading ? (
