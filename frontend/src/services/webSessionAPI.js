@@ -440,28 +440,61 @@ export const createSessionMonitorWebSocket = (sessionToken, { onRevoked, onError
       try {
         const response = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/status`);
         
+        // Сохраняем статус сразу
+        const status = response.status;
+        
         // Если 404 - сессия удалена (revoked)
-        if (response.status === 404) {
-          console.log('🔌 Session not found (revoked) via polling');
-          onRevoked?.();
+        if (status === 404) {
+          console.log('🔌 Session not found (revoked) via polling - status 404');
           clearInterval(pollingInterval);
+          pollingInterval = null;
+          onRevoked?.();
           return;
         }
         
-        if (!response.ok) {
+        // Если другая ошибка - пропускаем
+        if (status >= 400) {
+          console.log('🔌 Session polling error status:', status);
           return;
         }
         
-        const data = await response.json();
-        
-        // Проверяем статус сессии
-        if (data.status === 'expired' || data.status === 'revoked') {
-          console.log('🔌 Session revoked/expired via polling');
-          onRevoked?.();
-          clearInterval(pollingInterval);
+        // Пытаемся прочитать JSON только для успешных ответов
+        try {
+          const data = await response.json();
+          
+          // Проверяем статус сессии
+          if (data.status === 'expired' || data.status === 'revoked') {
+            console.log('🔌 Session revoked/expired via polling - status:', data.status);
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            onRevoked?.();
+          }
+        } catch (jsonErr) {
+          // Игнорируем ошибки парсинга JSON
+          console.warn('📡 Session polling JSON parse error:', jsonErr.message);
         }
       } catch (err) {
-        console.warn('📡 Session monitor polling error:', err.message);
+        // Обрабатываем ошибку "Response body is already used"
+        if (err.message?.includes('Response body is already used') || err.message?.includes('clone')) {
+          console.warn('📡 Session polling: Response already used, doing HEAD check...');
+          // Делаем HEAD запрос для проверки существования сессии
+          try {
+            const headResp = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/status`, {
+              method: 'HEAD'
+            });
+            if (headResp.status === 404) {
+              console.log('🔌 Session confirmed deleted via HEAD check');
+              clearInterval(pollingInterval);
+              pollingInterval = null;
+              onRevoked?.();
+              return;
+            }
+          } catch {
+            // Игнорируем ошибки HEAD запроса
+          }
+        } else {
+          console.warn('📡 Session monitor polling error:', err.message);
+        }
         // Продолжаем polling при сетевых ошибках
       }
     }, 5000); // Проверяем каждые 5 секунд для быстрой реакции
