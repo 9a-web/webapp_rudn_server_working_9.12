@@ -29,8 +29,8 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick, onOpenLi
     // Не показываем слишком часто (максимум 3 раза за сессию)
     if (promoShownCountRef.current >= 3) return;
     
-    // Рандомный шанс показа (100% для тестирования, потом вернуть 0.2)
-    const shouldShow = true;
+    // Рандомный шанс показа (30%)
+    const shouldShow = Math.random() < 0.3;
     
     if (shouldShow) {
       // Рандомная задержка от 2 до 8 секунд после начала трека
