@@ -585,6 +585,12 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     hapticFeedback?.('impact', 'medium');
   }, [canControl, queue.length, hapticFeedback]);
   
+  // Ref для callback в плеере (обновляется при изменении handlePlayNextFromQueue)
+  const playNextCallbackRef = useRef(handlePlayNextFromQueue);
+  useEffect(() => {
+    playNextCallbackRef.current = handlePlayNextFromQueue;
+  }, [handlePlayNextFromQueue]);
+  
   // Копирование ссылки
   const handleCopyInvite = async () => {
     if (!currentRoom?.invite_code) return;
