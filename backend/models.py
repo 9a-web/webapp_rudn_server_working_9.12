@@ -2183,6 +2183,7 @@ class ListeningRoomParticipant(BaseModel):
     photo_url: Optional[str] = None
     joined_at: datetime = Field(default_factory=datetime.utcnow)
     can_control: bool = True  # Может ли управлять воспроизведением
+    is_online: bool = False  # Подключён ли к синхронизации
 
 class ListeningRoomTrack(BaseModel):
     """Текущий трек в комнате"""
