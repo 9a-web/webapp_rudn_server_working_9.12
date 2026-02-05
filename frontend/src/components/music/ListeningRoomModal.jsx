@@ -88,6 +88,9 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const shouldReconnectRef = useRef(false);
   const currentRoomIdRef = useRef(null);
   
+  // Ref для callback в плеере (обновляется позже)
+  const playNextCallbackRef = useRef(null);
+  
   // Cleanup при размонтировании
   useEffect(() => {
     isMountedRef.current = true;
