@@ -50,6 +50,13 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
   const [listeningRoomModalOpen, setListeningRoomModalOpen] = useState(false);
   const [activeListeningRoom, setActiveListeningRoom] = useState(null);
   
+  // Expose openListeningRoom function via ref
+  useEffect(() => {
+    if (openListeningRoomRef) {
+      openListeningRoomRef.current = () => setListeningRoomModalOpen(true);
+    }
+  }, [openListeningRoomRef]);
+  
   // Уведомляем родительский компонент об изменении состояния модального окна
   useEffect(() => {
     onListeningRoomOpenChange?.(listeningRoomModalOpen);
