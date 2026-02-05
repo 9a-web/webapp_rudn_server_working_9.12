@@ -10173,6 +10173,7 @@ async def get_listening_room(room_id: str, telegram_id: int):
 async def join_listening_room_by_code(invite_code: str, request: JoinListeningRoomRequest):
     """
     Присоединиться к комнате по коду приглашения.
+    Улучшено: проверка max_participants, is_online статус
     """
     try:
         room = await db.listening_rooms.find_one({
@@ -10186,6 +10187,14 @@ async def join_listening_room_by_code(invite_code: str, request: JoinListeningRo
                 message="Комната не найдена или уже закрыта"
             )
         
+        # Проверяем лимит участников
+        max_participants = room.get("max_participants", 50)
+        if len(room["participants"]) >= max_participants:
+            return JoinListeningRoomResponse(
+                success=False,
+                message=f"Комната заполнена (макс. {max_participants} участников)"
+            )
+        
         # Проверяем, не находится ли пользователь уже в комнате
         existing_participant = next(
             (p for p in room["participants"] if p["telegram_id"] == request.telegram_id),
@@ -10194,6 +10203,16 @@ async def join_listening_room_by_code(invite_code: str, request: JoinListeningRo
         
         if existing_participant:
             # Уже в комнате - просто возвращаем её
+            online_count = len(listening_room_connections.get(room["id"], {}))
+            state_data = room.get("state", {})
+            state = ListeningRoomState(
+                is_playing=state_data.get("is_playing", False),
+                current_track=ListeningRoomTrack(**state_data["current_track"]) if state_data.get("current_track") else None,
+                position=state_data.get("position", 0),
+                updated_at=state_data.get("updated_at", datetime.utcnow()),
+                initiated_by=state_data.get("initiated_by"),
+                initiated_by_name=state_data.get("initiated_by_name", "")
+            )
             room_model = ListeningRoom(
                 id=room["id"],
                 invite_code=room["invite_code"],
@@ -10202,9 +10221,12 @@ async def join_listening_room_by_code(invite_code: str, request: JoinListeningRo
                 control_mode=ListeningRoomControlMode(room["control_mode"]),
                 allowed_controllers=room.get("allowed_controllers", []),
                 participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
-                state=ListeningRoomState(**room["state"]) if room.get("state") else ListeningRoomState(),
+                state=state,
+                queue=[ListeningRoomTrack(**t) for t in room.get("queue", [])],
+                history=room.get("history", [])[:20],
                 created_at=room["created_at"],
-                is_active=room["is_active"]
+                is_active=room["is_active"],
+                max_participants=max_participants
             )
             return JoinListeningRoomResponse(
                 success=True,
@@ -10223,7 +10245,8 @@ async def join_listening_room_by_code(invite_code: str, request: JoinListeningRo
             "username": request.username,
             "photo_url": request.photo_url,
             "joined_at": datetime.utcnow(),
-            "can_control": can_control
+            "can_control": can_control,
+            "is_online": False  # Станет True при подключении к WebSocket
         }
         
         await db.listening_rooms.update_one(
@@ -10233,6 +10256,17 @@ async def join_listening_room_by_code(invite_code: str, request: JoinListeningRo
         
         # Получаем обновлённую комнату
         room = await db.listening_rooms.find_one({"id": room["id"]})
+        online_count = len(listening_room_connections.get(room["id"], {}))
+        
+        state_data = room.get("state", {})
+        state = ListeningRoomState(
+            is_playing=state_data.get("is_playing", False),
+            current_track=ListeningRoomTrack(**state_data["current_track"]) if state_data.get("current_track") else None,
+            position=state_data.get("position", 0),
+            updated_at=state_data.get("updated_at", datetime.utcnow()),
+            initiated_by=state_data.get("initiated_by"),
+            initiated_by_name=state_data.get("initiated_by_name", "")
+        )
         
         room_model = ListeningRoom(
             id=room["id"],
@@ -10242,16 +10276,20 @@ async def join_listening_room_by_code(invite_code: str, request: JoinListeningRo
             control_mode=ListeningRoomControlMode(room["control_mode"]),
             allowed_controllers=room.get("allowed_controllers", []),
             participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
-            state=ListeningRoomState(**room["state"]) if room.get("state") else ListeningRoomState(),
+            state=state,
+            queue=[ListeningRoomTrack(**t) for t in room.get("queue", [])],
+            history=room.get("history", [])[:20],
             created_at=room["created_at"],
-            is_active=room["is_active"]
+            is_active=room["is_active"],
+            max_participants=room.get("max_participants", 50)
         )
         
         # Уведомляем других участников через WebSocket
         await broadcast_to_listening_room(room["id"], {
             "event": "user_joined",
             "user": new_participant,
-            "participants_count": len(room["participants"])
+            "participants_count": len(room["participants"]),
+            "online_count": online_count
         }, exclude_user=request.telegram_id)
         
         logger.info(f"🎵 User {request.telegram_id} joined room {room['id'][:8]}...")
