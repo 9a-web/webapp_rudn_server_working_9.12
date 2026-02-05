@@ -10478,6 +10478,9 @@ async def get_user_listening_rooms(telegram_id: int):
         
         result = []
         for room in rooms:
+            # Получаем актуальный online_count из WebSocket соединений
+            room_online_count = len(listening_room_connections.get(room["id"], {}))
+            
             result.append({
                 "id": room["id"],
                 "name": room["name"],
@@ -10485,6 +10488,7 @@ async def get_user_listening_rooms(telegram_id: int):
                 "host_id": room["host_id"],
                 "is_host": room["host_id"] == telegram_id,
                 "participants_count": len(room["participants"]),
+                "online_count": room_online_count,  # Актуальное количество онлайн
                 "is_playing": room.get("state", {}).get("is_playing", False),
                 "current_track": room.get("state", {}).get("current_track"),
                 "created_at": room["created_at"]
