@@ -551,23 +551,21 @@ class BackendTester:
     
     
     def run_all_tests(self):
-        """Run all Listening Rooms API tests in sequence"""
-        print("🚀 Starting Listening Rooms API Testing")
+        """Run all Admin Online Users API tests in sequence"""
+        print("🚀 Starting Admin Online Users API Testing")
         print("=" * 50)
         
-        # Listening Rooms API Tests (from review request)
-        listening_room_tests = [
-            self.test_create_listening_room,           # 1. POST /api/music/rooms - Create listening room
-            self.test_get_room_info,                   # 2. GET /api/music/rooms/{room_id}?telegram_id={id} - Get room info
-            self.test_join_room_by_invite_code,        # 3. POST /api/music/rooms/join/{invite_code} - Join room by invite code
-            self.test_get_room_queue,                  # 4. GET /api/music/rooms/{room_id}/queue?telegram_id={id} - Get queue
-            self.test_get_room_history,                # 5. GET /api/music/rooms/{room_id}/history?telegram_id={id} - Get history
-            self.test_get_room_state,                  # 6. GET /api/music/rooms/{room_id}/state - Get room state
-            self.test_get_user_rooms,                  # 7. GET /api/music/rooms/user/{telegram_id} - Get user's rooms
-            self.test_leave_room                       # 8. POST /api/music/rooms/{room_id}/leave?telegram_id={id} - Leave room (cleanup)
+        # Admin Online Users API Tests (from review request)
+        admin_tests = [
+            self.test_track_activity_user_1,              # 1. POST /api/admin/track-activity (user 1, section=schedule)
+            self.test_get_online_users_after_first_activity,  # 2. GET /api/admin/online-users (check user appears)
+            self.test_track_activity_user_2,              # 3. POST /api/admin/track-activity (user 2, section=tasks)
+            self.test_track_activity_user_3,              # 4. POST /api/admin/track-activity (user 3, section=music)
+            self.test_get_online_users_increased_count,   # 5. GET /api/admin/online-users (check increased count and activity_text)
+            self.test_get_online_users_with_minutes_param # 6. GET /api/admin/online-users?minutes=1 (check minutes parameter)
         ]
         
-        all_tests = listening_room_tests
+        all_tests = admin_tests
         
         passed = 0
         total = len(all_tests)
@@ -584,7 +582,7 @@ class BackendTester:
         print(f"📊 Test Results: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All Listening Rooms API tests PASSED!")
+            print("🎉 All Admin Online Users API tests PASSED!")
             return True
         else:
             print(f"⚠️  {total - passed} tests FAILED")
