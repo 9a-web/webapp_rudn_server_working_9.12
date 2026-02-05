@@ -454,6 +454,8 @@ class TaskCreate(BaseModel):
     subtasks: List[str] = []  # Названия подзадач при создании
     # Массив видео (поддержка нескольких ссылок YouTube и VK)
     videos: List[VideoData] = []
+    # Связь с исходной задачей из списка дел
+    source_task_id: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
