@@ -803,12 +803,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   };
 
   // Обновление порядка задач после перетаскивания в карточке "Сегодня"
-  // С подтверждением через модальное окно
+  // Автоматическое сохранение порядка без подтверждения
   const handleReorderTasks = async (newOrder) => {
-    console.log('🔄 Reorder triggered!', {
-      oldOrder: todayTasks.map(t => ({ id: t.id, text: t.text, order: t.order })),
-      newOrder: newOrder.map(t => ({ id: t.id, text: t.text }))
-    });
+    console.log('🔄 Reorder triggered!');
     
     // Находим перемещённую задачу
     const oldIds = todayTasks.map(t => t.id);
@@ -816,25 +813,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     
     // Проверяем изменился ли порядок
     let hasChanged = false;
-    let movedTask = null;
-    let oldIndex = -1;
-    let newIndex = -1;
-    
     for (let i = 0; i < newIds.length; i++) {
       if (oldIds[i] !== newIds[i]) {
         hasChanged = true;
-        // Нашли различие - ищем какая задача переместилась
-        const taskId = newIds[i];
-        oldIndex = oldIds.indexOf(taskId);
-        newIndex = i;
-        movedTask = newOrder[i];
         break;
       }
     }
     
     if (!hasChanged) return;
     
-    // Немедленно обновляем UI для плавности (важно для Reorder.Group!)
+    // Немедленно обновляем UI для плавности
     const reorderedTaskIds = newOrder.map(t => t.id);
     const updatedTasks = [
       ...newOrder.map((task, index) => ({ ...task, order: index })),
@@ -842,27 +830,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     ];
     setTasks(updatedTasks);
     
-    // Показываем модальное окно подтверждения
-    if (movedTask && oldIndex !== newIndex) {
-      setReorderData({
-        task: movedTask,
-        oldIndex,
-        newIndex,
-        newOrder,
-        previousTasks: tasks // Сохраняем предыдущее состояние для отмены
-      });
-      setIsReorderConfirmOpen(true);
-      hapticFeedback && hapticFeedback('impact', 'medium');
-    }
-  };
-  
-  // Подтверждение перетаскивания - сохраняем на сервер
-  const confirmReorder = async () => {
-    if (!reorderData) return;
+    // Haptic feedback
+    hapticFeedback && hapticFeedback('impact', 'light');
     
-    const { newOrder } = reorderData;
-    
-    // Сохраняем порядок на сервер
+    // Сохраняем порядок на сервер в фоне
     try {
       const taskOrders = newOrder.map((task, index) => ({
         id: task.id,
@@ -872,26 +843,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       console.log('💾 Saving order to server:', taskOrders);
       await tasksAPI.reorderTasks(taskOrders);
       console.log('✅ Tasks reordered and saved to server');
-      hapticFeedback && hapticFeedback('notification', 'success');
     } catch (error) {
       console.error('❌ Error saving task order:', error);
-      // В случае ошибки восстанавливаем предыдущее состояние
-      if (reorderData.previousTasks) {
-        setTasks(reorderData.previousTasks);
-      }
     }
-    
-    setIsReorderConfirmOpen(false);
-    setReorderData(null);
-  };
-  
-  // Отмена перетаскивания - восстанавливаем предыдущее состояние
-  const cancelReorder = () => {
-    if (reorderData?.previousTasks) {
-      setTasks(reorderData.previousTasks);
-    }
-    setIsReorderConfirmOpen(false);
-    setReorderData(null);
   };
   
   // Синхронизация задачи с планировщиком
