@@ -1812,6 +1812,12 @@ const Home = () => {
           onExpand={() => setIsFullscreenPlayerOpen(true)}
           isHidden={isAnyModalOpen}
           onArtistClick={handleArtistClick}
+          onOpenListeningRoom={() => {
+            setActiveTab('music');
+            setTimeout(() => {
+              openListeningRoomRef.current?.();
+            }, 100);
+          }}
         />
       )}
 
