@@ -17,9 +17,17 @@ API_BASE = f"{BACKEND_URL}/api"
 class BackendTester:
     def __init__(self):
         self.test_results = []
-        self.owner_telegram_id = 765963392  # Owner telegram_id for testing
-        self.student_telegram_id = 123456789  # Student telegram_id for testing
-        self.test_journal_id = None  # Will store created journal ID
+        # Test user data as specified in review request
+        self.telegram_id = 765963392
+        self.first_name = "Test"
+        self.last_name = "User"
+        self.username = "testuser"
+        self.photo_url = None
+        
+        # Test room data
+        self.test_room_id = None
+        self.test_invite_code = None
+        self.test_invite_link = None
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
