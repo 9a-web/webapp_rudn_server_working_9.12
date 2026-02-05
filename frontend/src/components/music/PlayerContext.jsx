@@ -397,6 +397,16 @@ export const PlayerProvider = ({ children }) => {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
     
+    // При совместном прослушивании используем очередь комнаты
+    if (listeningRoomMode && listeningRoomQueue.length > 0) {
+      const nextTrack = listeningRoomQueue[0];
+      // Уведомляем listening room о воспроизведении следующего из очереди
+      if (listeningRoomCallbackRef.current?.playNextFromQueue) {
+        listeningRoomCallbackRef.current.playNextFromQueue();
+      }
+      return;
+    }
+    
     if (queue.length === 0) return;
     
     // Ищем следующий незаблокированный трек
@@ -409,8 +419,18 @@ export const PlayerProvider = ({ children }) => {
       const nextTrack = queue[nextIndex];
       setQueueIndex(nextIndex);
       await play(nextTrack, queue);
+    } else if (repeatMode === 'queue' && queue.length > 0) {
+      // При режиме повтора очереди - начинаем сначала
+      let firstIndex = 0;
+      while (firstIndex < queue.length && isTrackBlocked(queue[firstIndex])) {
+        firstIndex++;
+      }
+      if (firstIndex < queue.length) {
+        setQueueIndex(firstIndex);
+        await play(queue[firstIndex], queue);
+      }
     }
-  }, [queue, queueIndex, play, isTrackBlocked]);
+  }, [queue, queueIndex, play, isTrackBlocked, listeningRoomMode, listeningRoomQueue, repeatMode]);
 
   // Предыдущий трек (пропускает заблокированные)
   const prev = useCallback(async () => {
@@ -418,7 +438,19 @@ export const PlayerProvider = ({ children }) => {
       window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
     }
     
+    // При совместном прослушивании - перемотка в начало
+    if (listeningRoomMode) {
+      seek(0);
+      return;
+    }
+    
     if (queue.length === 0) return;
+    
+    // Если прошло больше 3 секунд - перемотка в начало
+    if (progress > 3) {
+      seek(0);
+      return;
+    }
     
     // Ищем предыдущий незаблокированный трек
     let prevIndex = queueIndex - 1;
@@ -430,8 +462,18 @@ export const PlayerProvider = ({ children }) => {
       const prevTrack = queue[prevIndex];
       setQueueIndex(prevIndex);
       await play(prevTrack, queue);
+    } else if (repeatMode === 'queue' && queue.length > 0) {
+      // При режиме повтора очереди - идём в конец
+      let lastIndex = queue.length - 1;
+      while (lastIndex >= 0 && isTrackBlocked(queue[lastIndex])) {
+        lastIndex--;
+      }
+      if (lastIndex >= 0) {
+        setQueueIndex(lastIndex);
+        await play(queue[lastIndex], queue);
+      }
     }
-  }, [queue, queueIndex, play, isTrackBlocked]);
+  }, [queue, queueIndex, play, isTrackBlocked, listeningRoomMode, seek, progress, repeatMode]);
 
   // Перемотка
   const seek = useCallback((time) => {
