@@ -179,6 +179,12 @@ const AdminPanel = ({ isOpen, onClose }) => {
               {/* Navigation Tabs */}
               <div className="flex p-1 bg-black/20 rounded-xl overflow-x-auto scrollbar-hide">
                 <TabButton 
+                  active={activeTab === 'online'} 
+                  onClick={() => setActiveTab('online')} 
+                  icon={<Wifi className="w-4 h-4" />}
+                  label="Онлайн" 
+                />
+                <TabButton 
                   active={activeTab === 'stats'} 
                   onClick={() => setActiveTab('stats')} 
                   icon={<BarChart3 className="w-4 h-4" />}
