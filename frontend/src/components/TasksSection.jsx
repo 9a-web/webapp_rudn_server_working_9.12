@@ -2934,7 +2934,7 @@ const TaskGroup = ({
           axis="y" 
           values={localTasks} 
           onReorder={handleReorder}
-          className="px-4 pb-4 space-y-2"
+          className="px-4 pb-4 space-y-2 overflow-hidden"
         >
           {localTasks.map((task) => {
             return (
