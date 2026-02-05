@@ -2600,9 +2600,9 @@ async def get_planner_day_events(telegram_id: int, date: str):
                 "$gte": target_date,
                 "$lt": target_date + timedelta(days=1)
             },
-            # Только события с установленным временем
-            "time_start": {"$ne": None, "$exists": True},
-            "time_end": {"$ne": None, "$exists": True}
+            # Только события с установленным временем (не null и не пустая строка)
+            "time_start": {"$ne": None, "$exists": True, "$nin": ["", None]},
+            "time_end": {"$ne": None, "$exists": True, "$nin": ["", None]}
         })
         
         tasks = await tasks_cursor.to_list(length=None)
