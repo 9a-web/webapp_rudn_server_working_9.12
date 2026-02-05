@@ -167,6 +167,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       }
       if (queueFromServer) {
         setQueue(queueFromServer);
+        updateListeningRoomQueue(queueFromServer);
       }
       if (historyFromServer) {
         setHistory(historyFromServer);
@@ -178,21 +179,32 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         setInitiatedByName(state.initiated_by_name || '');
       }
       
-      // Синхронизируем состояние плеера
+      // Синхронизируем состояние плеера (ТИХАЯ синхронизация - не отправляем события)
       if (state && state.current_track) {
         console.log('📥 Initial sync:', state.current_track.title, 'playing:', state.is_playing, 'position:', state.position);
-        ignoreUntilRef.current = Date.now() + 1000; // Увеличено до 1 секунды
+        // Устанавливаем ignore на 3 секунды для полной синхронизации без отправки событий
+        ignoreUntilRef.current = Date.now() + 3000;
         lastSeekTimeRef.current = Date.now();
+        lastRemoteEventRef.current = Date.now();
+        
         play(state.current_track, [state.current_track]);
+        
+        // Seek к актуальной позиции после небольшой задержки
         if (state.position > 0) {
           setTimeout(() => {
-            if (isMountedRef.current) seek(state.position);
-          }, 150);
+            if (isMountedRef.current) {
+              seek(state.position);
+            }
+          }, 200);
         }
+        
+        // Если на паузе - ставим на паузу
         if (!state.is_playing) {
           setTimeout(() => {
-            if (isMountedRef.current) pause();
-          }, 200);
+            if (isMountedRef.current) {
+              pause();
+            }
+          }, 300);
         }
       }
     },
