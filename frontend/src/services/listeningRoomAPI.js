@@ -1,15 +1,39 @@
 /**
  * API для совместного прослушивания музыки (Listening Rooms)
+ * 
+ * Улучшения v2:
+ * - Поддержка queue (очередь треков)
+ * - Поддержка history (история прослушивания)
+ * - initiated_by (кто включил трек)
+ * - Retry логика для HTTP запросов
+ * - Улучшенный polling с адаптивным интервалом
  */
 
 import { getBackendURL } from './api';
+
+// Retry wrapper для HTTP запросов
+const fetchWithRetry = async (url, options = {}, retries = 3, delay = 1000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok && response.status >= 500 && i < retries - 1) {
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise(r => setTimeout(r, delay * (i + 1)));
+    }
+  }
+};
 
 /**
  * Создать комнату совместного прослушивания
  */
 export const createListeningRoom = async (userData, roomName = 'Совместное прослушивание', controlMode = 'everyone') => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms`, {
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -36,7 +60,7 @@ export const createListeningRoom = async (userData, roomName = 'Совместн
  */
 export const getListeningRoom = async (roomId, telegramId) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}?telegram_id=${telegramId}`);
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}?telegram_id=${telegramId}`);
   
   if (!response.ok) {
     const error = await response.json();
@@ -51,7 +75,7 @@ export const getListeningRoom = async (roomId, telegramId) => {
  */
 export const joinListeningRoom = async (inviteCode, userData) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/join/${inviteCode}`, {
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/join/${inviteCode}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -76,7 +100,7 @@ export const joinListeningRoom = async (inviteCode, userData) => {
  */
 export const leaveListeningRoom = async (roomId, telegramId) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}/leave?telegram_id=${telegramId}`, {
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/leave?telegram_id=${telegramId}`, {
     method: 'POST'
   });
   
@@ -93,7 +117,7 @@ export const leaveListeningRoom = async (roomId, telegramId) => {
  */
 export const deleteListeningRoom = async (roomId, telegramId) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}?telegram_id=${telegramId}`, {
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}?telegram_id=${telegramId}`, {
     method: 'DELETE'
   });
   
@@ -110,7 +134,7 @@ export const deleteListeningRoom = async (roomId, telegramId) => {
  */
 export const updateListeningRoomSettings = async (roomId, telegramId, settings) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}/settings?telegram_id=${telegramId}`, {
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/settings?telegram_id=${telegramId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings)
@@ -129,7 +153,7 @@ export const updateListeningRoomSettings = async (roomId, telegramId, settings) 
  */
 export const getUserListeningRooms = async (telegramId) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/user/${telegramId}`);
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/user/${telegramId}`);
   
   if (!response.ok) {
     const error = await response.json();
@@ -144,11 +168,60 @@ export const getUserListeningRooms = async (telegramId) => {
  */
 export const getListeningRoomState = async (roomId) => {
   const backendUrl = getBackendURL();
-  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}/state`);
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/state`);
   
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to get room state');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Получить очередь треков комнаты
+ */
+export const getListeningRoomQueue = async (roomId, telegramId) => {
+  const backendUrl = getBackendURL();
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/queue?telegram_id=${telegramId}`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get queue');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Получить историю прослушивания комнаты
+ */
+export const getListeningRoomHistory = async (roomId, telegramId, limit = 20) => {
+  const backendUrl = getBackendURL();
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/history?telegram_id=${telegramId}&limit=${limit}`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get history');
+  }
+  
+  return response.json();
+};
+
+/**
+ * Добавить трек в очередь (HTTP)
+ */
+export const addToListeningRoomQueue = async (roomId, telegramId, track) => {
+  const backendUrl = getBackendURL();
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/queue/add?telegram_id=${telegramId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(track)
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to add to queue');
   }
   
   return response.json();
@@ -165,11 +238,11 @@ export const syncListeningRoomState = async (roomId, telegramId, event, track = 
     position: position.toString()
   });
   
-  const response = await fetch(`${backendUrl}/api/music/rooms/${roomId}/sync?${params}`, {
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/${roomId}/sync?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: track ? JSON.stringify(track) : '{}'
-  });
+  }, 2, 500); // Меньше retry для sync
   
   if (!response.ok) {
     const error = await response.json();
@@ -181,11 +254,16 @@ export const syncListeningRoomState = async (roomId, telegramId, event, track = 
 
 /**
  * Создать HTTP polling соединение для комнаты (fallback для WebSocket)
+ * Улучшено: адаптивный интервал polling, лучшая обработка ошибок
  */
 export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
   let pollInterval = null;
   let lastState = null;
   let isStopped = false;
+  let consecutiveErrors = 0;
+  let currentInterval = 1000; // Начинаем с 1 секунды
+  const maxInterval = 5000; // Максимум 5 секунд
+  const minInterval = 500; // Минимум 500мс при активном воспроизведении
   
   console.log('🔄 Starting HTTP polling for listening room:', roomId);
   
@@ -194,27 +272,30 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
     
     try {
       const state = await getListeningRoomState(roomId);
+      consecutiveErrors = 0; // Сбрасываем счётчик ошибок
+      
+      // Адаптивный интервал: быстрее при воспроизведении
+      currentInterval = state.is_playing ? minInterval : 2000;
       
       // Сравниваем с предыдущим состоянием
       if (lastState) {
         // Проверяем смену трека
         if (state.current_track?.id !== lastState.current_track?.id) {
-          handlers.onTrackChange?.(state.current_track, null);
+          handlers.onTrackChange?.(state.current_track, state.initiated_by, state.initiated_by_name);
         }
         // Проверяем изменения play/pause
         else if (state.is_playing !== lastState.is_playing) {
           if (state.is_playing) {
-            handlers.onPlay?.(state.current_track, state.position, null);
+            handlers.onPlay?.(state.current_track, state.position, state.initiated_by, state.initiated_by_name);
           } else {
-            handlers.onPause?.(state.position, null);
+            handlers.onPause?.(state.position, state.initiated_by);
           }
         }
         // Проверяем рассинхронизацию позиции (если разница > 5 секунд)
-        // FIX #10: Увеличили threshold с 3 до 5 секунд для уменьшения ложных срабатываний
         else if (state.is_playing && state.current_track?.id === lastState.current_track?.id) {
-          const positionDiff = Math.abs(state.position - lastState.position);
-          // Ожидаемое изменение за 500мс polling = ~0.5 сек, учитываем возможную задержку сети
-          // 5 секунд достаточно для определения реальной перемотки
+          const expectedPosition = lastState.position + (currentInterval / 1000);
+          const positionDiff = Math.abs(state.position - expectedPosition);
+          // Учитываем drift + сетевую задержку
           if (positionDiff > 5) {
             console.log('🔄 Position drift detected:', positionDiff.toFixed(1), 'sec, syncing...');
             handlers.onSeek?.(state.position, null);
@@ -226,12 +307,31 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
       }
       
       lastState = state;
+      
+      // Перезапускаем с новым интервалом
+      if (!isStopped) {
+        pollInterval = setTimeout(poll, currentInterval);
+      }
     } catch (error) {
       console.error('Polling error:', error);
-      if (error.message.includes('не найдена')) {
+      consecutiveErrors++;
+      
+      if (error.message.includes('не найдена') || error.message.includes('404')) {
         handlers.onRoomClosed?.('Комната закрыта');
         isStopped = true;
-        if (pollInterval) clearInterval(pollInterval);
+        return;
+      }
+      
+      // Экспоненциальный backoff при ошибках
+      if (consecutiveErrors > 5) {
+        handlers.onError?.('Ошибка соединения с сервером');
+        isStopped = true;
+        return;
+      }
+      
+      const backoffDelay = Math.min(1000 * Math.pow(2, consecutiveErrors), maxInterval);
+      if (!isStopped) {
+        pollInterval = setTimeout(poll, backoffDelay);
       }
     }
   };
@@ -239,9 +339,6 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
   // Первый запрос сразу
   poll();
   handlers.onConnected?.();
-  
-  // Polling каждые 500мс для быстрой синхронизации
-  pollInterval = setInterval(poll, 500);
   
   return {
     sendPlay: async (track, position = 0) => {
@@ -276,12 +373,20 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
       }
     },
     
+    sendQueueAdd: async (track) => {
+      try {
+        await addToListeningRoomQueue(roomId, telegramId, track);
+      } catch (e) {
+        console.error('Failed to add to queue:', e);
+      }
+    },
+    
     requestSync: poll,
     
     close: () => {
       isStopped = true;
       if (pollInterval) {
-        clearInterval(pollInterval);
+        clearTimeout(pollInterval);
         pollInterval = null;
       }
     },
@@ -294,6 +399,7 @@ export const createListeningRoomPolling = (roomId, telegramId, handlers) => {
 
 /**
  * Создать WebSocket соединение для комнаты
+ * Улучшено: поддержка queue, history, initiated_by, triggered_by_name
  */
 export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
   const backendUrl = getBackendURL();
@@ -317,11 +423,12 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
     console.log('✅ Listening room WebSocket connected');
     handlers.onConnected?.();
     
+    // Heartbeat каждые 25 секунд (меньше чем timeout сервера)
     pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ event: 'ping' }));
       }
-    }, 30000);
+    }, 25000);
   };
   
   ws.onmessage = (event) => {
@@ -331,36 +438,37 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
       
       switch (data.event) {
         case 'connected':
-          // Передаём online_count из события connected
-          handlers.onStateSync?.(data.state, data.can_control, data.online_count);
+          // Передаём все данные: state, can_control, online_count, queue, history
+          handlers.onStateSync?.(data.state, data.can_control, data.online_count, data.queue, data.history);
           break;
         case 'play':
-          handlers.onPlay?.(data.track, data.position, data.triggered_by);
+          handlers.onPlay?.(data.track, data.position, data.triggered_by, data.triggered_by_name);
           break;
         case 'pause':
-          handlers.onPause?.(data.position, data.triggered_by);
+          handlers.onPause?.(data.position, data.triggered_by, data.triggered_by_name);
           break;
         case 'seek':
           handlers.onSeek?.(data.position, data.triggered_by);
           break;
         case 'track_change':
-          handlers.onTrackChange?.(data.track, data.triggered_by);
+          handlers.onTrackChange?.(data.track, data.triggered_by, data.triggered_by_name, data.from_queue);
           break;
         case 'sync_state':
-          handlers.onStateSync?.(data.state);
+          handlers.onStateSync?.(data.state, undefined, undefined, data.queue, data.history);
+          break;
+        case 'queue_updated':
+          handlers.onQueueUpdated?.(data.queue, data.action, data.track, data.triggered_by, data.triggered_by_name);
           break;
         case 'user_joined':
-          handlers.onUserJoined?.(data.user, data.participants_count);
+          handlers.onUserJoined?.(data.user, data.participants_count, data.online_count);
           break;
         case 'user_connected':
-          // Новое событие - пользователь подключился к sync (не присоединился к комнате)
+          // Пользователь подключился к sync
           handlers.onOnlineCount?.(data.online_count);
           break;
         case 'user_left':
         case 'user_disconnected':
-          // Передаём online_count с сервера (FIX #4)
           handlers.onUserLeft?.(data.telegram_id, data.online_count);
-          // Также вызываем onOnlineCount если есть
           if (data.online_count !== undefined) {
             handlers.onOnlineCount?.(data.online_count);
           }
@@ -375,6 +483,7 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
           handlers.onError?.(data.message);
           break;
         case 'pong':
+          // Heartbeat response - ничего не делаем
           break;
         default:
           console.log('Unknown listening room event:', data.event);
@@ -390,7 +499,7 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
   };
   
   ws.onclose = (event) => {
-    console.log('🔌 Listening room WebSocket closed:', event.code);
+    console.log('🔌 Listening room WebSocket closed:', event.code, event.reason);
     if (pingInterval) {
       clearInterval(pingInterval);
     }
@@ -424,6 +533,30 @@ export const createListeningRoomWebSocket = (roomId, telegramId, handlers) => {
       }
     },
     
+    sendQueueAdd: (track) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'queue_add', track }));
+      }
+    },
+    
+    sendQueueRemove: (index) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'queue_remove', index }));
+      }
+    },
+    
+    sendQueueClear: () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'queue_clear' }));
+      }
+    },
+    
+    sendQueuePlayNext: () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'queue_play_next' }));
+      }
+    },
+    
     requestSync: () => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ event: 'sync_request' }));
@@ -451,18 +584,23 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
   let wsConnection = null;
   let pollingConnection = null;
   let usePolling = false;
+  let fallbackTimeout = null;
   
   const wrappedHandlers = {
     ...handlers,
     onConnected: () => {
       console.log('✅ Connection established (WebSocket)');
+      if (fallbackTimeout) {
+        clearTimeout(fallbackTimeout);
+        fallbackTimeout = null;
+      }
       handlers.onConnected?.();
     },
     onError: (message) => {
-      console.warn('⚠️ WebSocket error, falling back to HTTP polling');
+      console.warn('⚠️ WebSocket error, may fall back to HTTP polling');
       if (!usePolling && wsConnection) {
         usePolling = true;
-        try { wsConnection.close(); } catch (e) { /* ignore close errors */ }
+        try { wsConnection.close(); } catch (e) { /* ignore */ }
         
         pollingConnection = createListeningRoomPolling(roomId, telegramId, {
           ...handlers,
@@ -479,12 +617,12 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
   
   wsConnection = createListeningRoomWebSocket(roomId, telegramId, wrappedHandlers);
   
-  // Таймаут для переключения на polling
-  const fallbackTimeout = setTimeout(() => {
+  // Таймаут для переключения на polling (5 секунд)
+  fallbackTimeout = setTimeout(() => {
     if (!usePolling && wsConnection.readyState !== WebSocket.OPEN) {
       console.warn('⚠️ WebSocket timeout, falling back to HTTP polling');
       usePolling = true;
-      try { wsConnection.close(); } catch (e) { /* ignore close errors */ }
+      try { wsConnection.close(); } catch (e) { /* ignore */ }
       
       pollingConnection = createListeningRoomPolling(roomId, telegramId, {
         ...handlers,
@@ -525,6 +663,28 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
         wsConnection.sendTrackChange(track);
       }
     },
+    sendQueueAdd: (track) => {
+      if (usePolling && pollingConnection) {
+        pollingConnection.sendQueueAdd?.(track);
+      } else {
+        wsConnection.sendQueueAdd(track);
+      }
+    },
+    sendQueueRemove: (index) => {
+      if (!usePolling) {
+        wsConnection.sendQueueRemove(index);
+      }
+    },
+    sendQueueClear: () => {
+      if (!usePolling) {
+        wsConnection.sendQueueClear();
+      }
+    },
+    sendQueuePlayNext: () => {
+      if (!usePolling) {
+        wsConnection.sendQueuePlayNext();
+      }
+    },
     requestSync: () => {
       if (usePolling && pollingConnection) {
         pollingConnection.requestSync();
@@ -533,7 +693,7 @@ export const createListeningRoomConnection = (roomId, telegramId, handlers) => {
       }
     },
     close: () => {
-      clearTimeout(fallbackTimeout);
+      if (fallbackTimeout) clearTimeout(fallbackTimeout);
       if (pollingConnection) pollingConnection.close();
       if (wsConnection) wsConnection.close();
     },
@@ -555,6 +715,9 @@ export default {
   updateListeningRoomSettings,
   getUserListeningRooms,
   getListeningRoomState,
+  getListeningRoomQueue,
+  getListeningRoomHistory,
+  addToListeningRoomQueue,
   syncListeningRoomState,
   createListeningRoomPolling,
   createListeningRoomWebSocket,
