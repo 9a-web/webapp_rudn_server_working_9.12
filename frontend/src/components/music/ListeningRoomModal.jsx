@@ -35,7 +35,10 @@ import {
 
 const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange }) => {
   const { hapticFeedback, user } = useTelegram();
-  const { currentTrack, isPlaying, progress, play, pause, seek } = usePlayer();
+  const { 
+    currentTrack, isPlaying, progress, play, pause, seek,
+    enterListeningRoomMode, exitListeningRoomMode, updateListeningRoomQueue
+  } = usePlayer();
   
   const [view, setView] = useState('main'); // main, create, join, room
   const [subView, setSubView] = useState('info'); // info, queue, history (внутри room)
