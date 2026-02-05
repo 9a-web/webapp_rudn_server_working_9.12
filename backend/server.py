@@ -10719,13 +10719,17 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
             event = data.get("event")
             
             # Проверяем права на управление для событий воспроизведения
-            control_events = ["play", "pause", "seek", "track_change"]
+            control_events = ["play", "pause", "seek", "track_change", "queue_add", "queue_remove", "queue_clear"]
             if event in control_events and not can_control:
                 await websocket.send_json({
                     "event": "error",
                     "message": "У вас нет прав на управление воспроизведением"
                 })
                 continue
+            
+            # Получаем имя пользователя для initiated_by
+            participant = next((p for p in room["participants"] if p["telegram_id"] == telegram_id), None)
+            user_name = f"{participant.get('first_name', '')} {participant.get('last_name', '')}".strip() if participant else ""
             
             if event == "play":
                 # Воспроизведение
@@ -10735,7 +10739,9 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                 state_update = {
                     "state.is_playing": True,
                     "state.position": position,
-                    "state.updated_at": datetime.utcnow()
+                    "state.updated_at": datetime.utcnow(),
+                    "state.initiated_by": telegram_id,
+                    "state.initiated_by_name": user_name
                 }
                 if track_data:
                     state_update["state.current_track"] = track_data
@@ -10751,6 +10757,7 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                     "track": track_data,
                     "position": position,
                     "triggered_by": telegram_id,
+                    "triggered_by_name": user_name,
                     "timestamp": datetime.utcnow().isoformat()
                 }, exclude_user=telegram_id)
                 
@@ -10771,6 +10778,7 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                     "event": "pause",
                     "position": position,
                     "triggered_by": telegram_id,
+                    "triggered_by_name": user_name,
                     "timestamp": datetime.utcnow().isoformat()
                 }, exclude_user=telegram_id)
                 
@@ -10794,9 +10802,18 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                 }, exclude_user=telegram_id)
                 
             elif event == "track_change":
-                # Смена трека
+                # Смена трека - добавляем в историю
                 track_data = data.get("track")
                 
+                # Создаём запись для истории
+                history_item = {
+                    "track": track_data,
+                    "played_by": telegram_id,
+                    "played_by_name": user_name,
+                    "played_at": datetime.utcnow()
+                }
+                
+                # Обновляем состояние и добавляем в историю (максимум 20 записей)
                 await db.listening_rooms.update_one(
                     {"id": room_id},
                     {"$set": {
