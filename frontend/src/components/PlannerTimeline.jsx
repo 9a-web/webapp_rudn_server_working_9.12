@@ -1026,10 +1026,10 @@ export const FullscreenPlannerTimeline = ({
         </div>
       </div>
       
-      {/* Пустое состояние */}
+      {/* Пустое состояние - фиксированное по центру экрана */}
       {events.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-          <div className="text-center py-8">
+        <div className="fixed inset-0 flex items-center justify-center bg-white/80 pointer-events-none z-10" style={{ top: '64px' }}>
+          <div className="text-center py-8 pointer-events-auto">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Clock className="w-10 h-10 text-gray-400" />
             </div>
