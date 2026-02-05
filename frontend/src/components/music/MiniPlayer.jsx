@@ -15,7 +15,13 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick, onOpenLi
 
   // Показываем промо-карточку рандомно при смене трека
   useEffect(() => {
-    if (!currentTrack || !isPlaying) return;
+    if (!currentTrack || !isPlaying) {
+      // Скрываем промо при остановке
+      if (showPromo) {
+        setShowPromo(false);
+      }
+      return;
+    }
     
     // Не показываем для того же трека
     if (lastPromoTrackRef.current === currentTrack.id) return;
@@ -47,14 +53,7 @@ export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick, onOpenLi
         clearTimeout(promoTimerRef.current);
       }
     };
-  }, [currentTrack?.id, isPlaying]);
-
-  // Скрываем промо при остановке
-  useEffect(() => {
-    if (!isPlaying) {
-      setShowPromo(false);
-    }
-  }, [isPlaying]);
+  }, [currentTrack?.id, isPlaying, showPromo]);
 
   // Не рендерим если нет трека
   if (!currentTrack) return null;
