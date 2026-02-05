@@ -31,23 +31,6 @@ export default defineConfig(({ mode }) => {
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
-          manualChunks(id) {
-            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
-              return 'react-vendor';
-            }
-            if (id.includes('node_modules/react-router-dom') || id.includes('node_modules/react-router')) {
-              return 'router';
-            }
-            if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next')) {
-              return 'i18n';
-            }
-            if (id.includes('node_modules/framer-motion')) {
-              return 'motion';
-            }
-            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
-              return 'charts';
-            }
-          },
         },
       },
       chunkSizeWarningLimit: 1000,
