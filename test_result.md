@@ -1,4 +1,28 @@
 backend:
+  - task: "Test Admin Online Users API - Track Activity"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/admin/track-activity endpoint working correctly. Successfully tracks user activity with telegram_id and section parameters. Updates last_activity and current_section fields in database."
+
+  - task: "Test Admin Online Users API - Get Online Users"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/admin/online-users endpoint working correctly. Returns online_now, online_last_hour, online_last_day stats plus array of online users with activity_text (только что, X мин назад), current_section tracking."
+
   - task: "Test Web Sessions API - Create Session"
     implemented: true
     working: true
