@@ -191,6 +191,30 @@ backend:
         agent: "testing"
         comment: "✅ POST /api/music/rooms/{room_id}/leave?telegram_id={id} endpoint working correctly. Successfully handles room leaving/closing. When host leaves, room is properly closed and returns success=true."
 
+  - task: "Test Admin Online Users API - Track Activity"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/admin/track-activity endpoint working correctly. Successfully tracks user activity with telegram_id and section parameters. Updates last_activity and current_section in user_settings. Tested with multiple users and sections (schedule, tasks, music)."
+
+  - task: "Test Admin Online Users API - Get Online Users"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/admin/online-users endpoint working correctly. Returns proper response with online_now, online_last_hour, online_last_day, users array, threshold_minutes, and timestamp. Users array contains all required fields (telegram_id, first_name, last_name, username, photo_url, faculty, course, last_activity, activity_text, current_section). Activity_text shows 'только что' for recent activity. Minutes parameter works correctly for filtering users by activity threshold."
+
 frontend:
   # No frontend testing required for this review request
 
