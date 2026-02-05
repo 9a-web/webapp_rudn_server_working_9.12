@@ -538,6 +538,9 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         wsRef.current = null;
       }
       
+      // Отключаем режим listening room в плеере
+      exitListeningRoomMode();
+      
       setCurrentRoom(null);
       setIsConnected(false);
       setConnectionStatus('disconnected');
