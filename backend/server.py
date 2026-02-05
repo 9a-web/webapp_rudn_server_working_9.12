@@ -10159,7 +10159,8 @@ async def get_listening_room(room_id: str, telegram_id: int):
         return ListeningRoomResponse(
             room=room_model,
             is_host=is_host,
-            can_control=can_control
+            can_control=can_control,
+            online_count=online_count
         )
         
     except HTTPException:
