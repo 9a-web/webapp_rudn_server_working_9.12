@@ -1,11 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, X, Repeat } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, X, Repeat, Users, Sparkles } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
-export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick }) => {
+export const MiniPlayer = ({ onExpand, isHidden = false, onArtistClick, onOpenListeningRoom }) => {
   const { currentTrack, isPlaying, isLoading, progress, duration, toggle, next, prev, stop, error, repeatMode, toggleRepeat } = usePlayer();
+  
+  // Состояние для промо-карточки
+  const [showPromo, setShowPromo] = useState(false);
+  const promoTimerRef = useRef(null);
+  const lastPromoTrackRef = useRef(null);
+  const promoShownCountRef = useRef(0);
+
+  // Показываем промо-карточку рандомно при смене трека
+  useEffect(() => {
+    if (!currentTrack || !isPlaying) return;
+    
+    // Не показываем для того же трека
+    if (lastPromoTrackRef.current === currentTrack.id) return;
+    
+    // Не показываем слишком часто (максимум 3 раза за сессию)
+    if (promoShownCountRef.current >= 3) return;
+    
+    // Рандомный шанс показа (20%)
+    const shouldShow = Math.random() < 0.2;
+    
+    if (shouldShow) {
+      // Рандомная задержка от 2 до 8 секунд после начала трека
+      const delay = 2000 + Math.random() * 6000;
+      
+      promoTimerRef.current = setTimeout(() => {
+        setShowPromo(true);
+        lastPromoTrackRef.current = currentTrack.id;
+        promoShownCountRef.current += 1;
+        
+        // Автоматически скрываем через 10 секунд
+        setTimeout(() => {
+          setShowPromo(false);
+        }, 10000);
+      }, delay);
+    }
+    
+    return () => {
+      if (promoTimerRef.current) {
+        clearTimeout(promoTimerRef.current);
+      }
+    };
+  }, [currentTrack?.id, isPlaying]);
+
+  // Скрываем промо при остановке
+  useEffect(() => {
+    if (!isPlaying) {
+      setShowPromo(false);
+    }
+  }, [isPlaying]);
 
   // Не рендерим если нет трека
   if (!currentTrack) return null;
