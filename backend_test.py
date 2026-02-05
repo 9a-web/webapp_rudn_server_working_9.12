@@ -56,6 +56,65 @@ class BackendTester:
         print()
     
     
+    # ============ Setup Methods ============
+    
+    def setup_test_users(self) -> bool:
+        """Create test user settings for all test users"""
+        try:
+            print("🔧 Setting up test users...")
+            
+            test_users = [
+                {
+                    "telegram_id": self.telegram_id,
+                    "first_name": self.first_name,
+                    "last_name": self.last_name,
+                    "username": self.username,
+                    "photo_url": self.photo_url,
+                    "faculty": "Факультет физико-математических и естественных наук",
+                    "course": 3,
+                    "group_id": "test_group_1",
+                    "notifications_enabled": False
+                },
+                {
+                    "telegram_id": self.telegram_id_2,
+                    "first_name": self.first_name_2,
+                    "last_name": self.last_name_2,
+                    "username": self.username_2,
+                    "photo_url": None,
+                    "faculty": "Инженерная академия",
+                    "course": 2,
+                    "group_id": "test_group_2",
+                    "notifications_enabled": False
+                },
+                {
+                    "telegram_id": self.telegram_id_3,
+                    "first_name": self.first_name_3,
+                    "last_name": self.last_name_3,
+                    "username": self.username_3,
+                    "photo_url": None,
+                    "faculty": "Экономический факультет",
+                    "course": 1,
+                    "group_id": "test_group_3",
+                    "notifications_enabled": False
+                }
+            ]
+            
+            for user_data in test_users:
+                response = requests.post(f"{API_BASE}/user-settings", json=user_data, timeout=10)
+                
+                if response.status_code != 200:
+                    print(f"⚠️ Failed to create user {user_data['telegram_id']}: {response.status_code}")
+                    # Continue anyway, user might already exist
+                else:
+                    print(f"✅ Created/updated user {user_data['telegram_id']}")
+            
+            print("🔧 Test users setup completed")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error setting up test users: {e}")
+            return False
+    
     # ============ Admin Online Users API Tests ============
     
     def test_track_activity_user_1(self) -> bool:
