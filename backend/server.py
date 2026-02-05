@@ -2594,11 +2594,12 @@ async def get_planner_day_events(telegram_id: int, date: str):
             raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
         
         # Получаем только события с установленным временем на эту дату
+        # Расширяем диапазон на +/- 1 день для учёта часовых поясов
         tasks_cursor = db.tasks.find({
             "telegram_id": telegram_id,
             "target_date": {
-                "$gte": target_date,
-                "$lt": target_date + timedelta(days=1)
+                "$gte": target_date - timedelta(hours=12),
+                "$lt": target_date + timedelta(days=1, hours=12)
             },
             # Только события с установленным временем (не null и не пустая строка)
             "time_start": {"$ne": None, "$exists": True, "$nin": ["", None]},
