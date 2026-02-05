@@ -636,33 +636,22 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
           {/* Inner gradient overlay */}
           <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-white/10" />
           
-          {/* Icon with subtle animation */}
-          <motion.div
-            animate={activeListeningRoom ? { 
-              rotate: [0, 5, -5, 0]
-            } : {}}
-            transition={{ 
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
-            <Users className="relative w-6 h-6 text-white drop-shadow-lg" />
-          </motion.div>
+          {/* Icon - static, no animation */}
+          <Users className="relative w-6 h-6 text-white drop-shadow-lg" />
           
           {/* Active room indicator */}
           {activeListeningRoom && (
             <>
-              {/* Pulsing dot */}
-              <motion.span 
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 1, repeat: Infinity }}
-                className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-gradient-to-br from-green-300 to-emerald-400 rounded-full shadow-lg shadow-green-400/50"
-              />
+              {/* Pulsing dot - smooth animation */}
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-gradient-to-br from-green-300 to-emerald-400 rounded-full shadow-lg shadow-green-400/50 animate-pulse" />
               {/* Sound waves effect */}
               <motion.span
                 animate={{ scale: [1, 2], opacity: [0.6, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
+                transition={{ 
+                  duration: 1.5, 
+                  repeat: Infinity,
+                  ease: "easeOut"
+                }}
                 className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 rounded-full"
               />
             </>
