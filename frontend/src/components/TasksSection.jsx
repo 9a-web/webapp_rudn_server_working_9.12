@@ -2276,16 +2276,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       <AnimatePresence>
         {isFullscreenPlannerOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.3 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.3 }}
             transition={{ 
               type: "spring", 
-              stiffness: 300, 
-              damping: 30,
-              duration: 0.3
+              stiffness: 260, 
+              damping: 25,
+              duration: 0.4
             }}
-            className="fixed inset-0 z-[9998] bg-white"
+            className="fixed inset-0 z-[9998] bg-white origin-center"
           >
             {/* Шапка */}
             <motion.div 
