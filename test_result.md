@@ -95,6 +95,102 @@ backend:
         agent: "testing"
         comment: "✅ DELETE /api/journals/{journal_id}?telegram_id=XXX endpoint working correctly. Successfully deletes journal when called by owner, returns proper success response with status 'success'."
 
+  - task: "Test Listening Rooms API - Create Room"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/music/rooms endpoint working correctly. Successfully creates listening room with success=true, room_id, invite_code, and invite_link. All required fields present and properly formatted."
+
+  - task: "Test Listening Rooms API - Get Room Info"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/music/rooms/{room_id}?telegram_id={id} endpoint working correctly. Returns room object with all new fields: queue, history, state with initiated_by and initiated_by_name fields. Response structure matches requirements."
+
+  - task: "Test Listening Rooms API - Join Room by Invite Code"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/music/rooms/join/{invite_code} endpoint working correctly. Successfully joins room using invite code, returns success=true and room object. Handles existing participants properly."
+
+  - task: "Test Listening Rooms API - Get Queue"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/music/rooms/{room_id}/queue?telegram_id={id} endpoint working correctly. Returns queue array and count. Validates participant access properly."
+
+  - task: "Test Listening Rooms API - Get History"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/music/rooms/{room_id}/history?telegram_id={id} endpoint working correctly. Returns history array and count. Validates participant access properly."
+
+  - task: "Test Listening Rooms API - Get Room State"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/music/rooms/{room_id}/state endpoint working correctly. Returns is_playing, current_track, position with proper data types. State information accessible without authentication."
+
+  - task: "Test Listening Rooms API - Get User Rooms"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ GET /api/music/rooms/user/{telegram_id} endpoint working correctly. Returns rooms array for user. Successfully finds created test room in user's room list."
+
+  - task: "Test Listening Rooms API - Leave Room"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ POST /api/music/rooms/{room_id}/leave?telegram_id={id} endpoint working correctly. Successfully handles room leaving/closing. When host leaves, room is properly closed and returns success=true."
+
 frontend:
   # No frontend testing required for this review request
 
