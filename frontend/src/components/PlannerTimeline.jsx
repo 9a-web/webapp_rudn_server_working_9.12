@@ -973,7 +973,7 @@ export const FullscreenPlannerTimeline = ({
               }
             }}
           >
-            <div className="w-16 flex-shrink-0 pl-3 pr-3 flex items-center justify-center h-full">
+            <div className="w-16 flex-shrink-0 pl-3 pr-3 -translate-y-1/2">
               <span className="text-sm text-gray-400 font-medium">
                 {formatHour(hour)}
               </span>
