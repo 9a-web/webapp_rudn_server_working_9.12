@@ -528,10 +528,12 @@ export const ProfileModal = ({
                     />
                   ) : (
                     <div 
-                      className="w-full h-full flex items-center justify-center text-4xl font-bold"
+                      className="w-full h-full flex items-center justify-center text-4xl font-bold aspect-square"
                       style={{
                         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: '#FFFFFF',
+                        minWidth: '88px',
+                        minHeight: '88px',
                       }}
                     >
                       {user.first_name?.[0]?.toUpperCase() || '👤'}
@@ -539,9 +541,11 @@ export const ProfileModal = ({
                   )
                 ) : (
                   <div 
-                    className="w-full h-full flex items-center justify-center text-4xl"
+                    className="w-full h-full flex items-center justify-center text-4xl aspect-square"
                     style={{
                       color: '#FFFFFF',
+                      minWidth: '88px',
+                      minHeight: '88px',
                     }}
                   >
                     🔒
