@@ -2356,7 +2356,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.15, duration: 0.25 }}
+              transition={{ duration: 0.2 }}
               className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50"
             >
               <FullscreenPlannerTimeline
