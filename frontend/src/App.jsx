@@ -1731,6 +1731,7 @@ const Home = () => {
             <MusicSection 
               telegramId={user?.id}
               onListeningRoomOpenChange={setIsListeningRoomOpen}
+              openListeningRoomRef={openListeningRoomRef}
             />
           </div>
         )}
