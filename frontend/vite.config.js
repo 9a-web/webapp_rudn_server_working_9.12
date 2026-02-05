@@ -65,10 +65,15 @@ export default defineConfig(({ mode }) => {
       host: true,
     },
     
+    // Поддержка обоих префиксов (VITE_ и REACT_APP_) для import.meta.env
+    envPrefix: ['VITE_', 'REACT_APP_'],
+    
     define: {
       // Передаём только нужные переменные, не весь process.env
       'process.env.VITE_BACKEND_URL': JSON.stringify(env.VITE_BACKEND_URL || ''),
+      'process.env.REACT_APP_BACKEND_URL': JSON.stringify(env.VITE_BACKEND_URL || env.REACT_APP_BACKEND_URL || ''),
       'process.env.VITE_ENABLE_VISUAL_EDITS': JSON.stringify(env.VITE_ENABLE_VISUAL_EDITS || 'false'),
+      'process.env.REACT_APP_ENABLE_VISUAL_EDITS': JSON.stringify(env.VITE_ENABLE_VISUAL_EDITS || env.REACT_APP_ENABLE_VISUAL_EDITS || 'false'),
       'process.env.NODE_ENV': JSON.stringify(mode),
     },
   };
