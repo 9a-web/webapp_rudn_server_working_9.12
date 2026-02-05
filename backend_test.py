@@ -55,214 +55,26 @@ class BackendTester:
             print(f"   Response: {response_data}")
         print()
     
-    # ============ Listening Rooms API Tests ============
     
-    def test_create_listening_room(self) -> bool:
-        """Test POST /api/music/rooms - Create listening room"""
+    # ============ Admin Online Users API Tests ============
+    
+    def test_track_activity_user_1(self) -> bool:
+        """Test POST /api/admin/track-activity - Track activity for user 1 with section=schedule"""
         try:
-            print("🧪 Testing: Create Listening Room")
-            
-            room_data = {
-                "telegram_id": self.telegram_id,
-                "first_name": self.first_name,
-                "last_name": self.last_name,
-                "username": self.username,
-                "photo_url": self.photo_url,
-                "name": "Test Room",
-                "control_mode": "everyone"
-            }
-            
-            response = requests.post(f"{API_BASE}/music/rooms", json=room_data, timeout=10)
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Create Listening Room", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate required fields
-            required_fields = ["success", "room_id", "invite_code", "invite_link"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Create Listening Room", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            # Validate success is true
-            if not data.get("success"):
-                self.log_test(
-                    "Create Listening Room", 
-                    False, 
-                    f"Success field is false: {data}",
-                    data
-                )
-                return False
-            
-            # Store room data for subsequent tests
-            self.test_room_id = data["room_id"]
-            self.test_invite_code = data["invite_code"]
-            self.test_invite_link = data["invite_link"]
-            
-            self.log_test(
-                "Create Listening Room", 
-                True, 
-                f"Room created successfully. Room ID: {self.test_room_id}, Invite Code: {self.test_invite_code}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Create Listening Room", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Create Listening Room", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_get_room_info(self) -> bool:
-        """Test GET /api/music/rooms/{room_id}?telegram_id={id} - Get room info"""
-        if not self.test_room_id:
-            self.log_test(
-                "Get Room Info", 
-                False, 
-                "No test room available"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Get Room Info")
-            
-            response = requests.get(
-                f"{API_BASE}/music/rooms/{self.test_room_id}",
-                params={"telegram_id": self.telegram_id},
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get Room Info", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate required fields
-            required_fields = ["room"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get Room Info", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            room = data["room"]
-            
-            # Check for new fields: queue, history, state with initiated_by fields
-            room_required_fields = ["queue", "history", "state"]
-            room_missing_fields = [field for field in room_required_fields if field not in room]
-            
-            if room_missing_fields:
-                self.log_test(
-                    "Get Room Info", 
-                    False, 
-                    f"Missing room fields: {room_missing_fields}",
-                    room
-                )
-                return False
-            
-            # Check state has initiated_by fields
-            state = room["state"]
-            state_required_fields = ["initiated_by", "initiated_by_name"]
-            state_missing_fields = [field for field in state_required_fields if field not in state]
-            
-            if state_missing_fields:
-                self.log_test(
-                    "Get Room Info", 
-                    False, 
-                    f"Missing state fields: {state_missing_fields}",
-                    state
-                )
-                return False
-            
-            self.log_test(
-                "Get Room Info", 
-                True, 
-                f"Room info retrieved successfully with all required fields",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get Room Info", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get Room Info", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_join_room_by_invite_code(self) -> bool:
-        """Test POST /api/music/rooms/join/{invite_code} - Join room by invite code"""
-        if not self.test_invite_code:
-            self.log_test(
-                "Join Room by Invite Code", 
-                False, 
-                "No test invite code available"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Join Room by Invite Code")
-            
-            join_data = {
-                "telegram_id": self.telegram_id,
-                "first_name": self.first_name,
-                "last_name": self.last_name,
-                "username": self.username,
-                "photo_url": self.photo_url
-            }
+            print("🧪 Testing: Track Activity User 1 (schedule)")
             
             response = requests.post(
-                f"{API_BASE}/music/rooms/join/{self.test_invite_code}",
-                json=join_data,
+                f"{API_BASE}/admin/track-activity",
+                params={
+                    "telegram_id": self.telegram_id,
+                    "section": "schedule"
+                },
                 timeout=10
             )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Join Room by Invite Code", 
+                    "Track Activity User 1", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -272,14 +84,11 @@ class BackendTester:
             data = response.json()
             
             # Validate required fields
-            required_fields = ["success", "room"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
+            if "success" not in data:
                 self.log_test(
-                    "Join Room by Invite Code", 
+                    "Track Activity User 1", 
                     False, 
-                    f"Missing required fields: {missing_fields}",
+                    f"Missing success field in response",
                     data
                 )
                 return False
@@ -287,7 +96,7 @@ class BackendTester:
             # Validate success is true
             if not data.get("success"):
                 self.log_test(
-                    "Join Room by Invite Code", 
+                    "Track Activity User 1", 
                     False, 
                     f"Success field is false: {data}",
                     data
@@ -295,51 +104,43 @@ class BackendTester:
                 return False
             
             self.log_test(
-                "Join Room by Invite Code", 
+                "Track Activity User 1", 
                 True, 
-                f"Successfully joined room by invite code",
+                f"Activity tracked successfully for user {self.telegram_id} in section 'schedule'",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Join Room by Invite Code", 
+                "Track Activity User 1", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Join Room by Invite Code", 
+                "Track Activity User 1", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
             return False
     
     
-    def test_get_room_queue(self) -> bool:
-        """Test GET /api/music/rooms/{room_id}/queue?telegram_id={id} - Get queue"""
-        if not self.test_room_id:
-            self.log_test(
-                "Get Room Queue", 
-                False, 
-                "No test room available"
-            )
-            return False
-        
+    def test_get_online_users_after_first_activity(self) -> bool:
+        """Test GET /api/admin/online-users - Check user appears in online list"""
         try:
-            print("🧪 Testing: Get Room Queue")
+            print("🧪 Testing: Get Online Users After First Activity")
             
             response = requests.get(
-                f"{API_BASE}/music/rooms/{self.test_room_id}/queue",
-                params={"telegram_id": self.telegram_id},
+                f"{API_BASE}/admin/online-users",
+                params={"minutes": 5},
                 timeout=10
             )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Get Room Queue", 
+                    "Get Online Users After First Activity", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -349,330 +150,100 @@ class BackendTester:
             data = response.json()
             
             # Validate required fields
-            required_fields = ["queue", "count"]
+            required_fields = ["online_now", "online_last_hour", "online_last_day", "users", "threshold_minutes", "timestamp"]
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
                 self.log_test(
-                    "Get Room Queue", 
+                    "Get Online Users After First Activity", 
                     False, 
                     f"Missing required fields: {missing_fields}",
                     data
                 )
                 return False
             
-            # Validate queue is array and count is number
-            if not isinstance(data["queue"], list):
+            # Check if our test user is in the list
+            user_found = False
+            user_data = None
+            for user in data["users"]:
+                if user.get("telegram_id") == self.telegram_id:
+                    user_found = True
+                    user_data = user
+                    break
+            
+            if not user_found:
                 self.log_test(
-                    "Get Room Queue", 
+                    "Get Online Users After First Activity", 
                     False, 
-                    f"Queue should be array, got: {type(data['queue'])}",
+                    f"Test user {self.telegram_id} not found in online users list",
                     data
                 )
                 return False
             
-            if not isinstance(data["count"], int):
+            # Validate user has required fields
+            user_required_fields = ["telegram_id", "first_name", "last_name", "username", "photo_url", "faculty", "course", "last_activity", "activity_text", "current_section"]
+            user_missing_fields = [field for field in user_required_fields if field not in user_data]
+            
+            if user_missing_fields:
                 self.log_test(
-                    "Get Room Queue", 
+                    "Get Online Users After First Activity", 
                     False, 
-                    f"Count should be integer, got: {type(data['count'])}",
-                    data
+                    f"User data missing fields: {user_missing_fields}",
+                    user_data
+                )
+                return False
+            
+            # Check current_section is 'schedule'
+            if user_data.get("current_section") != "schedule":
+                self.log_test(
+                    "Get Online Users After First Activity", 
+                    False, 
+                    f"Expected current_section='schedule', got: {user_data.get('current_section')}",
+                    user_data
                 )
                 return False
             
             self.log_test(
-                "Get Room Queue", 
+                "Get Online Users After First Activity", 
                 True, 
-                f"Queue retrieved successfully. Count: {data['count']}",
+                f"User {self.telegram_id} found in online list with section 'schedule'. Online now: {data['online_now']}, Activity: {user_data.get('activity_text')}",
                 data
             )
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Get Room Queue", 
+                "Get Online Users After First Activity", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Get Room Queue", 
+                "Get Online Users After First Activity", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
             return False
     
     
-    def test_get_room_history(self) -> bool:
-        """Test GET /api/music/rooms/{room_id}/history?telegram_id={id} - Get history"""
-        if not self.test_room_id:
-            self.log_test(
-                "Get Room History", 
-                False, 
-                "No test room available"
-            )
-            return False
-        
+    def test_track_activity_user_2(self) -> bool:
+        """Test POST /api/admin/track-activity - Track activity for user 2 with section=tasks"""
         try:
-            print("🧪 Testing: Get Room History")
-            
-            response = requests.get(
-                f"{API_BASE}/music/rooms/{self.test_room_id}/history",
-                params={"telegram_id": self.telegram_id},
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get Room History", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate required fields
-            required_fields = ["history", "count"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get Room History", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            # Validate history is array and count is number
-            if not isinstance(data["history"], list):
-                self.log_test(
-                    "Get Room History", 
-                    False, 
-                    f"History should be array, got: {type(data['history'])}",
-                    data
-                )
-                return False
-            
-            if not isinstance(data["count"], int):
-                self.log_test(
-                    "Get Room History", 
-                    False, 
-                    f"Count should be integer, got: {type(data['count'])}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Get Room History", 
-                True, 
-                f"History retrieved successfully. Count: {data['count']}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get Room History", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get Room History", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_get_room_state(self) -> bool:
-        """Test GET /api/music/rooms/{room_id}/state - Get room state"""
-        if not self.test_room_id:
-            self.log_test(
-                "Get Room State", 
-                False, 
-                "No test room available"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Get Room State")
-            
-            response = requests.get(
-                f"{API_BASE}/music/rooms/{self.test_room_id}/state",
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get Room State", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate required fields including new ones
-            required_fields = ["is_playing", "current_track", "position"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get Room State", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            # Validate field types
-            if not isinstance(data["is_playing"], bool):
-                self.log_test(
-                    "Get Room State", 
-                    False, 
-                    f"is_playing should be boolean, got: {type(data['is_playing'])}",
-                    data
-                )
-                return False
-            
-            if not isinstance(data["position"], (int, float)):
-                self.log_test(
-                    "Get Room State", 
-                    False, 
-                    f"position should be number, got: {type(data['position'])}",
-                    data
-                )
-                return False
-            
-            self.log_test(
-                "Get Room State", 
-                True, 
-                f"Room state retrieved successfully. Playing: {data['is_playing']}, Position: {data['position']}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get Room State", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get Room State", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_get_user_rooms(self) -> bool:
-        """Test GET /api/music/rooms/user/{telegram_id} - Get user's rooms"""
-        try:
-            print("🧪 Testing: Get User Rooms")
-            
-            response = requests.get(
-                f"{API_BASE}/music/rooms/user/{self.telegram_id}",
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"HTTP {response.status_code}: {response.text}",
-                    response.text
-                )
-                return False
-            
-            data = response.json()
-            
-            # Validate required fields
-            required_fields = ["rooms"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"Missing required fields: {missing_fields}",
-                    data
-                )
-                return False
-            
-            # Validate rooms is array
-            if not isinstance(data["rooms"], list):
-                self.log_test(
-                    "Get User Rooms", 
-                    False, 
-                    f"Rooms should be array, got: {type(data['rooms'])}",
-                    data
-                )
-                return False
-            
-            # Check if our test room is in the list
-            room_found = False
-            if self.test_room_id:
-                for room in data["rooms"]:
-                    if room.get("id") == self.test_room_id:
-                        room_found = True
-                        break
-            
-            self.log_test(
-                "Get User Rooms", 
-                True, 
-                f"User rooms retrieved successfully. Count: {len(data['rooms'])}, Test room found: {room_found}",
-                data
-            )
-            return True
-            
-        except requests.exceptions.RequestException as e:
-            self.log_test(
-                "Get User Rooms", 
-                False, 
-                f"Network error: {str(e)}"
-            )
-            return False
-        except Exception as e:
-            self.log_test(
-                "Get User Rooms", 
-                False, 
-                f"Unexpected error: {str(e)}"
-            )
-            return False
-    
-    
-    def test_leave_room(self) -> bool:
-        """Test POST /api/music/rooms/{room_id}/leave?telegram_id={id} - Leave room (cleanup)"""
-        if not self.test_room_id:
-            self.log_test(
-                "Leave Room", 
-                False, 
-                "No test room available"
-            )
-            return False
-        
-        try:
-            print("🧪 Testing: Leave Room")
+            print("🧪 Testing: Track Activity User 2 (tasks)")
             
             response = requests.post(
-                f"{API_BASE}/music/rooms/{self.test_room_id}/leave",
-                params={"telegram_id": self.telegram_id},
+                f"{API_BASE}/admin/track-activity",
+                params={
+                    "telegram_id": self.telegram_id_2,
+                    "section": "tasks"
+                },
                 timeout=10
             )
             
             if response.status_code != 200:
                 self.log_test(
-                    "Leave Room", 
+                    "Track Activity User 2", 
                     False, 
                     f"HTTP {response.status_code}: {response.text}",
                     response.text
@@ -682,14 +253,11 @@ class BackendTester:
             data = response.json()
             
             # Validate required fields
-            required_fields = ["success"]
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if missing_fields:
+            if "success" not in data:
                 self.log_test(
-                    "Leave Room", 
+                    "Track Activity User 2", 
                     False, 
-                    f"Missing required fields: {missing_fields}",
+                    f"Missing success field in response",
                     data
                 )
                 return False
@@ -697,7 +265,7 @@ class BackendTester:
             # Validate success is true
             if not data.get("success"):
                 self.log_test(
-                    "Leave Room", 
+                    "Track Activity User 2", 
                     False, 
                     f"Success field is false: {data}",
                     data
@@ -705,29 +273,277 @@ class BackendTester:
                 return False
             
             self.log_test(
-                "Leave Room", 
+                "Track Activity User 2", 
                 True, 
-                f"Successfully left room (room closed as host)",
+                f"Activity tracked successfully for user {self.telegram_id_2} in section 'tasks'",
                 data
             )
-            
-            # Clear room data since we left/closed it
-            self.test_room_id = None
-            self.test_invite_code = None
-            self.test_invite_link = None
-            
             return True
             
         except requests.exceptions.RequestException as e:
             self.log_test(
-                "Leave Room", 
+                "Track Activity User 2", 
                 False, 
                 f"Network error: {str(e)}"
             )
             return False
         except Exception as e:
             self.log_test(
-                "Leave Room", 
+                "Track Activity User 2", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    
+    def test_track_activity_user_3(self) -> bool:
+        """Test POST /api/admin/track-activity - Track activity for user 3 with section=music"""
+        try:
+            print("🧪 Testing: Track Activity User 3 (music)")
+            
+            response = requests.post(
+                f"{API_BASE}/admin/track-activity",
+                params={
+                    "telegram_id": self.telegram_id_3,
+                    "section": "music"
+                },
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Track Activity User 3", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate required fields
+            if "success" not in data:
+                self.log_test(
+                    "Track Activity User 3", 
+                    False, 
+                    f"Missing success field in response",
+                    data
+                )
+                return False
+            
+            # Validate success is true
+            if not data.get("success"):
+                self.log_test(
+                    "Track Activity User 3", 
+                    False, 
+                    f"Success field is false: {data}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Track Activity User 3", 
+                True, 
+                f"Activity tracked successfully for user {self.telegram_id_3} in section 'music'",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Track Activity User 3", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Track Activity User 3", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    
+    def test_get_online_users_increased_count(self) -> bool:
+        """Test GET /api/admin/online-users - Check that online_now increased"""
+        try:
+            print("🧪 Testing: Get Online Users - Check Increased Count")
+            
+            response = requests.get(
+                f"{API_BASE}/admin/online-users",
+                params={"minutes": 5},
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Get Online Users - Check Increased Count", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate required fields
+            required_fields = ["online_now", "online_last_hour", "online_last_day", "users", "threshold_minutes", "timestamp"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test(
+                    "Get Online Users - Check Increased Count", 
+                    False, 
+                    f"Missing required fields: {missing_fields}",
+                    data
+                )
+                return False
+            
+            # Check that we have at least our test users online
+            online_count = data["online_now"]
+            if online_count < 1:
+                self.log_test(
+                    "Get Online Users - Check Increased Count", 
+                    False, 
+                    f"Expected at least 1 user online, got: {online_count}",
+                    data
+                )
+                return False
+            
+            # Check that activity_text shows "только что" for recent activity
+            recent_activity_found = False
+            for user in data["users"]:
+                if user.get("activity_text") == "только что":
+                    recent_activity_found = True
+                    break
+            
+            if not recent_activity_found:
+                self.log_test(
+                    "Get Online Users - Check Increased Count", 
+                    False, 
+                    f"No user with activity_text='только что' found",
+                    data
+                )
+                return False
+            
+            # Check that our test users are in different sections
+            user_sections = {}
+            for user in data["users"]:
+                telegram_id = user.get("telegram_id")
+                if telegram_id in [self.telegram_id, self.telegram_id_2, self.telegram_id_3]:
+                    user_sections[telegram_id] = user.get("current_section")
+            
+            expected_sections = {
+                self.telegram_id: "schedule",
+                self.telegram_id_2: "tasks", 
+                self.telegram_id_3: "music"
+            }
+            
+            sections_match = True
+            for tid, expected_section in expected_sections.items():
+                if tid in user_sections and user_sections[tid] != expected_section:
+                    sections_match = False
+                    break
+            
+            self.log_test(
+                "Get Online Users - Check Increased Count", 
+                True, 
+                f"Online users count: {online_count}, Recent activity found: {recent_activity_found}, Sections match: {sections_match}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Get Online Users - Check Increased Count", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Get Online Users - Check Increased Count", 
+                False, 
+                f"Unexpected error: {str(e)}"
+            )
+            return False
+    
+    
+    def test_get_online_users_with_minutes_param(self) -> bool:
+        """Test GET /api/admin/online-users?minutes=1 - Check minutes parameter works"""
+        try:
+            print("🧪 Testing: Get Online Users with minutes=1 parameter")
+            
+            response = requests.get(
+                f"{API_BASE}/admin/online-users",
+                params={"minutes": 1},
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                self.log_test(
+                    "Get Online Users with minutes=1", 
+                    False, 
+                    f"HTTP {response.status_code}: {response.text}",
+                    response.text
+                )
+                return False
+            
+            data = response.json()
+            
+            # Validate required fields
+            required_fields = ["online_now", "online_last_hour", "online_last_day", "users", "threshold_minutes", "timestamp"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test(
+                    "Get Online Users with minutes=1", 
+                    False, 
+                    f"Missing required fields: {missing_fields}",
+                    data
+                )
+                return False
+            
+            # Check that threshold_minutes is 1
+            if data["threshold_minutes"] != 1:
+                self.log_test(
+                    "Get Online Users with minutes=1", 
+                    False, 
+                    f"Expected threshold_minutes=1, got: {data['threshold_minutes']}",
+                    data
+                )
+                return False
+            
+            # Since we just sent activity, users should still be online within 1 minute
+            online_count = data["online_now"]
+            if online_count < 1:
+                self.log_test(
+                    "Get Online Users with minutes=1", 
+                    False, 
+                    f"Expected at least 1 user online within 1 minute, got: {online_count}",
+                    data
+                )
+                return False
+            
+            self.log_test(
+                "Get Online Users with minutes=1", 
+                True, 
+                f"Minutes parameter working correctly. Online within 1 minute: {online_count}, Threshold: {data['threshold_minutes']}",
+                data
+            )
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            self.log_test(
+                "Get Online Users with minutes=1", 
+                False, 
+                f"Network error: {str(e)}"
+            )
+            return False
+        except Exception as e:
+            self.log_test(
+                "Get Online Users with minutes=1", 
                 False, 
                 f"Unexpected error: {str(e)}"
             )
