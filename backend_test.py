@@ -10,8 +10,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
-# Backend URL from environment - using production URL for testing
-BACKEND_URL = "https://rudn-schedule.ru"
+# Backend URL from environment - using internal URL for testing from container
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
 class BackendTester:
