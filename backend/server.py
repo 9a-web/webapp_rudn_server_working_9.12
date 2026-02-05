@@ -10687,6 +10687,12 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
         listening_room_connections[room_id] = {}
     listening_room_connections[room_id][telegram_id] = websocket
     
+    # Обновляем is_online статус в БД
+    await db.listening_rooms.update_one(
+        {"id": room_id, "participants.telegram_id": telegram_id},
+        {"$set": {"participants.$.is_online": True}}
+    )
+    
     # Получаем актуальное количество онлайн
     online_count = len(listening_room_connections[room_id])
     
@@ -10701,6 +10707,8 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
         "room_id": room_id,
         "can_control": can_control,
         "state": serialize_for_json(state_with_actual_position),
+        "queue": room.get("queue", []),
+        "history": serialize_for_json(room.get("history", [])[:10]),  # Последние 10 треков
         "online_count": online_count
     })
     
