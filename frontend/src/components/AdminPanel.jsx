@@ -676,6 +676,180 @@ const FeatureStatCard = ({ icon, label, value, color }) => (
   </div>
 );
 
+// --- Online Tab ---
+const OnlineTab = ({ onlineData, loading, onRefresh }) => {
+  return (
+    <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6 space-y-6">
+      {/* Header с кнопкой обновления */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 w-3 h-3 bg-green-500 rounded-full animate-ping opacity-75"></div>
+          </div>
+          <h3 className="text-lg font-semibold text-white">Онлайн в реальном времени</h3>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm text-gray-300"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Обновить</span>
+        </button>
+      </div>
+
+      {loading && !onlineData ? (
+        <LoadingSpinner />
+      ) : onlineData ? (
+        <>
+          {/* Статистика онлайн */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-4 border border-green-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Circle className="w-4 h-4 text-green-400 fill-green-400" />
+                <span className="text-xs text-green-400 font-medium">Сейчас</span>
+              </div>
+              <div className="text-3xl font-bold text-white">{onlineData.online_now || 0}</div>
+              <div className="text-xs text-gray-400 mt-1">за {onlineData.threshold_minutes || 5} мин</div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl p-4 border border-blue-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-blue-400" />
+                <span className="text-xs text-blue-400 font-medium">За час</span>
+              </div>
+              <div className="text-3xl font-bold text-white">{onlineData.online_last_hour || 0}</div>
+              <div className="text-xs text-gray-400 mt-1">уникальных</div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-4 border border-purple-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="w-4 h-4 text-purple-400" />
+                <span className="text-xs text-purple-400 font-medium">За 24ч</span>
+              </div>
+              <div className="text-3xl font-bold text-white">{onlineData.online_last_day || 0}</div>
+              <div className="text-xs text-gray-400 mt-1">уникальных</div>
+            </div>
+          </div>
+
+          {/* Список пользователей онлайн */}
+          <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+              <h4 className="text-white font-medium flex items-center gap-2">
+                <Users className="w-4 h-4 text-green-400" />
+                Пользователи онлайн
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">
+                  {onlineData.users?.length || 0}
+                </span>
+              </h4>
+              <span className="text-xs text-gray-500">
+                Обновлено: {new Date(onlineData.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
+            
+            <div className="max-h-[400px] overflow-y-auto divide-y divide-white/5">
+              {onlineData.users && onlineData.users.length > 0 ? (
+                onlineData.users.map((user, index) => (
+                  <motion.div
+                    key={user.telegram_id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors"
+                  >
+                    {/* Аватар */}
+                    <div className="relative flex-shrink-0">
+                      {user.photo_url ? (
+                        <img 
+                          src={user.photo_url} 
+                          alt={user.first_name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
+                          {(user.first_name?.[0] || '?').toUpperCase()}
+                        </div>
+                      )}
+                      {/* Индикатор онлайн */}
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#2B2B3A]">
+                        <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-50"></div>
+                      </div>
+                    </div>
+                    
+                    {/* Инфо */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-white truncate">
+                          {user.first_name} {user.last_name}
+                        </span>
+                        {user.username && (
+                          <span className="text-xs text-gray-500 truncate">@{user.username}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        {user.current_section && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded">
+                            {user.current_section === 'schedule' && '📅 Расписание'}
+                            {user.current_section === 'tasks' && '✅ Задачи'}
+                            {user.current_section === 'journal' && '📓 Журнал'}
+                            {user.current_section === 'music' && '🎵 Музыка'}
+                            {user.current_section === 'friends' && '👥 Друзья'}
+                            {!['schedule', 'tasks', 'journal', 'music', 'friends'].includes(user.current_section) && user.current_section}
+                          </span>
+                        )}
+                        {user.faculty && (
+                          <span className="truncate">{user.faculty}</span>
+                        )}
+                        {user.course && (
+                          <span>{user.course} курс</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Время активности */}
+                    <div className="flex-shrink-0 text-right">
+                      <div className="text-xs text-green-400 font-medium">
+                        {user.activity_text}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        ID: {user.telegram_id}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <Wifi className="w-12 h-12 mb-3 opacity-30" />
+                  <p className="text-sm">Нет активных пользователей</p>
+                  <p className="text-xs text-gray-600 mt-1">за последние {onlineData.threshold_minutes || 5} минут</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Подсказка */}
+          <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-blue-300">
+            <Info className="w-5 h-5 flex-shrink-0" />
+            <span>Данные обновляются автоматически каждые 5 секунд. Пользователь считается онлайн, если был активен в течение последних {onlineData.threshold_minutes || 5} минут.</span>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+          <Wifi className="w-16 h-16 mb-4 opacity-30" />
+          <p>Не удалось загрузить данные</p>
+          <button
+            onClick={onRefresh}
+            className="mt-4 px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm transition-colors"
+          >
+            Попробовать снова
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Notifications Tab ---
 const NotificationsTab = () => {
   const [users, setUsers] = useState([]);
