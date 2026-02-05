@@ -112,7 +112,11 @@ const TimelineEventCard = ({
   const handlePointerUp = (e) => {
     // Освобождаем pointer capture
     try {
-      e.target.releasePointerCapture(e.pointerId);
+      if (cardRef.current) {
+        cardRef.current.releasePointerCapture(e.pointerId);
+      } else {
+        e.target.releasePointerCapture(e.pointerId);
+      }
     } catch (err) {
       // Ignore - pointer may not be captured
     }
@@ -171,7 +175,11 @@ const TimelineEventCard = ({
   
   const handlePointerCancel = (e) => {
     try {
-      e.target.releasePointerCapture(e.pointerId);
+      if (cardRef.current) {
+        cardRef.current.releasePointerCapture(e.pointerId);
+      } else {
+        e.target.releasePointerCapture(e.pointerId);
+      }
     } catch (err) {
       // Ignore - pointer may not be captured
     }
