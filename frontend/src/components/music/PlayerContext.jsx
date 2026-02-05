@@ -783,6 +783,12 @@ export const PlayerProvider = ({ children }) => {
     toggleShuffle,
     setQueue,
     clearError: () => setError(null),
+    // Listening Room functions
+    listeningRoomMode,
+    listeningRoomQueue,
+    enterListeningRoomMode,
+    exitListeningRoomMode,
+    updateListeningRoomQueue,
   };
 
   return (
