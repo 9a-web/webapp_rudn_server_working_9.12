@@ -1475,10 +1475,12 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
               
               <div className="bg-white rounded-2xl p-4 mb-4">
                 <QRCodeSVG
-                  value={`tg://resolve?domain=rudn_pro_bot&appname=app&startapp=listen_${currentRoom.invite_code}`}
+                  value={`https://t.me/rudn_pro_bot/app?startapp=listen_${currentRoom.invite_code}`}
                   size={250}
-                  level="M"
+                  level="H"
                   includeMargin={false}
+                  bgColor="#ffffff"
+                  fgColor="#1a1a1a"
                   className="w-full h-auto"
                 />
               </div>
@@ -1486,7 +1488,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
               <div className="text-center mb-4">
                 <p className="text-white font-medium mb-1">{currentRoom.name}</p>
                 <p className="text-gray-400 text-sm">
-                  Отсканируйте через камеру Telegram
+                  Отсканируйте камерой Telegram
                 </p>
                 <p className="text-purple-400 font-mono text-lg mt-2 tracking-wider">
                   {currentRoom.invite_code}
