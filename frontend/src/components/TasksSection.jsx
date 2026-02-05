@@ -141,12 +141,13 @@ const TaskTextWithBadge = ({ task, completed, onDoubleClick, hapticFeedback }) =
     <span 
       onDoubleClick={onDoubleClick}
       className={`
-        block text-xs leading-relaxed transition-all duration-200 cursor-pointer
+        block text-xs leading-relaxed transition-all duration-200 cursor-pointer break-words
         ${completed 
           ? 'text-[#999999] line-through' 
           : 'text-[#1C1C1E] hover:bg-yellow-50 rounded px-1 -mx-1'
         }
       `}
+      style={{ wordBreak: 'break-word' }}
       title={!completed ? "Двойной клик для быстрого редактирования текста" : ""}
     >
       {segments.length > 0 ? (
