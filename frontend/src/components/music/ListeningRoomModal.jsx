@@ -402,7 +402,10 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
     }
     setIsConnected(false);
     setConnectionStatus('disconnected');
-  }, []);
+    
+    // Отключаем режим listening room в плеере
+    exitListeningRoomMode();
+  }, [exitListeningRoomMode]);
   
   // Создание комнаты (ИСПРАВЛЕН race condition)
   const handleCreateRoom = async () => {
