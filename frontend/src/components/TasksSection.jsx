@@ -1769,7 +1769,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                 axis="y" 
                 values={todayTasks} 
                 onReorder={handleReorderTasks}
-                className="min-h-[100px] list-none"
+                className="min-h-[100px] list-none overflow-hidden"
                 style={{ padding: 0, margin: 0 }}
                 layoutScroll
               >
