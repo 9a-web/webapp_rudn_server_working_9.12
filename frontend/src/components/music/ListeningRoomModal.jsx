@@ -157,19 +157,21 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
         );
         if (response.ok) {
           const data = await response.json();
-          if (data.room && isMountedRef.current) {
-            // Обновляем только online_count и participants_count
-            const wsOnlineCount = Object.keys(data.room.participants || []).filter(p => p.is_online).length;
-            setOnlineCount(data.room.online_count || wsOnlineCount || 0);
-            setCurrentRoom(prev => prev ? {
-              ...prev,
-              participants: data.room.participants || prev.participants,
-              participants_count: data.room.participants?.length || prev.participants_count,
-              queue: data.room.queue || prev.queue,
-              state: data.room.state || prev.state
-            } : prev);
-            if (data.room.queue) {
-              setQueue(data.room.queue);
+          if (isMountedRef.current) {
+            // online_count теперь приходит напрямую из response
+            setOnlineCount(data.online_count || 0);
+            
+            if (data.room) {
+              setCurrentRoom(prev => prev ? {
+                ...prev,
+                participants: data.room.participants || prev.participants,
+                participants_count: data.room.participants?.length || prev.participants_count,
+                queue: data.room.queue || prev.queue,
+                state: data.room.state || prev.state
+              } : prev);
+              if (data.room.queue) {
+                setQueue(data.room.queue);
+              }
             }
           }
         }
