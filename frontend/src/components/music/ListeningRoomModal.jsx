@@ -150,7 +150,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       
       // Активируем режим listening room в плеере
       enterListeningRoomMode(queue, {
-        playNextFromQueue: handlePlayNextFromQueue
+        playNextFromQueue: () => playNextCallbackRef.current?.()
       });
     },
     onStateSync: (state, canCtrl, onlineCountFromServer, queueFromServer, historyFromServer) => {
