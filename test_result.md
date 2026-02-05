@@ -197,7 +197,7 @@ frontend:
 metadata:
   created_by: "testing_agent"
   version: "1.0"
-  test_sequence: 3
+  test_sequence: 4
   run_ui: false
 
 test_plan:
@@ -210,6 +210,14 @@ test_plan:
     - "Test Privacy Settings API - Verify Settings Persistence"
     - "Test Journal API - Leave Journal as Owner (Should Fail)"
     - "Test Journal API - Delete Journal as Owner"
+    - "Test Listening Rooms API - Create Room"
+    - "Test Listening Rooms API - Get Room Info"
+    - "Test Listening Rooms API - Join Room by Invite Code"
+    - "Test Listening Rooms API - Get Queue"
+    - "Test Listening Rooms API - Get History"
+    - "Test Listening Rooms API - Get Room State"
+    - "Test Listening Rooms API - Get User Rooms"
+    - "Test Listening Rooms API - Leave Room"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
