@@ -430,6 +430,9 @@ class Task(BaseModel):
     is_fixed: bool = False            # Жесткое событие (нельзя двигать)
     origin: str = "user"              # 'user', 'schedule'
     
+    # Связь с исходной задачей из списка дел
+    source_task_id: Optional[str] = None
+    
     order: int = 0  # Порядок задачи для drag & drop (меньше = выше в списке)
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
