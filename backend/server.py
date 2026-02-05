@@ -10041,6 +10041,7 @@ def get_state_with_actual_position(state: dict) -> dict:
 async def create_listening_room(request: CreateListeningRoomRequest):
     """
     Создать комнату совместного прослушивания музыки.
+    Улучшено: добавлены queue, history, initiated_by, max_participants
     """
     try:
         room_id = str(uuid.uuid4())
@@ -10054,7 +10055,8 @@ async def create_listening_room(request: CreateListeningRoomRequest):
             "username": request.username,
             "photo_url": request.photo_url,
             "joined_at": datetime.utcnow(),
-            "can_control": True
+            "can_control": True,
+            "is_online": False  # Станет True при подключении к WebSocket
         }
         
         room_data = {
@@ -10069,10 +10071,15 @@ async def create_listening_room(request: CreateListeningRoomRequest):
                 "is_playing": False,
                 "current_track": None,
                 "position": 0,
-                "updated_at": datetime.utcnow()
+                "updated_at": datetime.utcnow(),
+                "initiated_by": None,
+                "initiated_by_name": ""
             },
+            "queue": [],  # Очередь треков
+            "history": [],  # История последних 20 треков
             "created_at": datetime.utcnow(),
-            "is_active": True
+            "is_active": True,
+            "max_participants": 50
         }
         
         await db.listening_rooms.insert_one(room_data)
