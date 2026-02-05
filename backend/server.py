@@ -10816,29 +10816,160 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
                 # Обновляем состояние и добавляем в историю (максимум 20 записей)
                 await db.listening_rooms.update_one(
                     {"id": room_id},
-                    {"$set": {
-                        "state.current_track": track_data,
-                        "state.position": 0,
-                        "state.is_playing": True,
-                        "state.updated_at": datetime.utcnow()
-                    }}
+                    {
+                        "$set": {
+                            "state.current_track": track_data,
+                            "state.position": 0,
+                            "state.is_playing": True,
+                            "state.updated_at": datetime.utcnow(),
+                            "state.initiated_by": telegram_id,
+                            "state.initiated_by_name": user_name
+                        },
+                        "$push": {
+                            "history": {
+                                "$each": [history_item],
+                                "$position": 0,
+                                "$slice": 20  # Храним только последние 20 треков
+                            }
+                        }
+                    }
                 )
                 
                 await broadcast_to_listening_room(room_id, {
                     "event": "track_change",
                     "track": track_data,
                     "triggered_by": telegram_id,
+                    "triggered_by_name": user_name,
                     "timestamp": datetime.utcnow().isoformat()
                 }, exclude_user=telegram_id)
+            
+            elif event == "queue_add":
+                # Добавить трек в очередь
+                track_data = data.get("track")
+                if track_data:
+                    await db.listening_rooms.update_one(
+                        {"id": room_id},
+                        {"$push": {"queue": track_data}}
+                    )
+                    
+                    # Получаем обновлённую очередь
+                    room = await db.listening_rooms.find_one({"id": room_id})
+                    queue = room.get("queue", [])
+                    
+                    await broadcast_to_listening_room(room_id, {
+                        "event": "queue_updated",
+                        "queue": queue,
+                        "action": "add",
+                        "track": track_data,
+                        "triggered_by": telegram_id,
+                        "triggered_by_name": user_name
+                    })
+            
+            elif event == "queue_remove":
+                # Удалить трек из очереди по индексу
+                track_index = data.get("index", -1)
+                if track_index >= 0:
+                    room = await db.listening_rooms.find_one({"id": room_id})
+                    queue = room.get("queue", [])
+                    if 0 <= track_index < len(queue):
+                        removed_track = queue.pop(track_index)
+                        await db.listening_rooms.update_one(
+                            {"id": room_id},
+                            {"$set": {"queue": queue}}
+                        )
+                        
+                        await broadcast_to_listening_room(room_id, {
+                            "event": "queue_updated",
+                            "queue": queue,
+                            "action": "remove",
+                            "track": removed_track,
+                            "triggered_by": telegram_id
+                        })
+            
+            elif event == "queue_clear":
+                # Очистить очередь
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {"queue": []}}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "queue_updated",
+                    "queue": [],
+                    "action": "clear",
+                    "triggered_by": telegram_id
+                })
+            
+            elif event == "queue_play_next":
+                # Воспроизвести следующий трек из очереди
+                room = await db.listening_rooms.find_one({"id": room_id})
+                queue = room.get("queue", [])
+                if queue:
+                    next_track = queue.pop(0)
+                    
+                    # Добавляем в историю
+                    history_item = {
+                        "track": next_track,
+                        "played_by": telegram_id,
+                        "played_by_name": user_name,
+                        "played_at": datetime.utcnow()
+                    }
+                    
+                    await db.listening_rooms.update_one(
+                        {"id": room_id},
+                        {
+                            "$set": {
+                                "queue": queue,
+                                "state.current_track": next_track,
+                                "state.position": 0,
+                                "state.is_playing": True,
+                                "state.updated_at": datetime.utcnow(),
+                                "state.initiated_by": telegram_id,
+                                "state.initiated_by_name": user_name
+                            },
+                            "$push": {
+                                "history": {
+                                    "$each": [history_item],
+                                    "$position": 0,
+                                    "$slice": 20
+                                }
+                            }
+                        }
+                    )
+                    
+                    await broadcast_to_listening_room(room_id, {
+                        "event": "track_change",
+                        "track": next_track,
+                        "triggered_by": telegram_id,
+                        "triggered_by_name": user_name,
+                        "from_queue": True,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    
+                    await broadcast_to_listening_room(room_id, {
+                        "event": "queue_updated",
+                        "queue": queue,
+                        "action": "play_next"
+                    })
                 
             elif event == "sync_request":
-                # Запрос синхронизации состояния
+                # Запрос синхронизации состояния - проверяем что пользователь участник
                 room = await db.listening_rooms.find_one({"id": room_id})
                 if room:
+                    is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+                    if not is_participant:
+                        await websocket.send_json({
+                            "event": "error",
+                            "message": "Вы не являетесь участником комнаты"
+                        })
+                        continue
+                    
                     state_with_actual_position = get_state_with_actual_position(room.get("state", {}))
                     await websocket.send_json({
                         "event": "sync_state",
-                        "state": serialize_for_json(state_with_actual_position)
+                        "state": serialize_for_json(state_with_actual_position),
+                        "queue": room.get("queue", []),
+                        "history": serialize_for_json(room.get("history", [])[:10])  # Последние 10
                     })
                     
             elif event == "ping":
@@ -10849,20 +10980,130 @@ async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_
     except Exception as e:
         logger.error(f"Listening room WebSocket error: {e}")
     finally:
-        # Удаляем соединение
+        # Удаляем соединение и обновляем статус участника
         if room_id in listening_room_connections and telegram_id in listening_room_connections[room_id]:
             del listening_room_connections[room_id][telegram_id]
+            
+            # Обновляем is_online статус в БД
+            try:
+                await db.listening_rooms.update_one(
+                    {"id": room_id, "participants.telegram_id": telegram_id},
+                    {"$set": {"participants.$.is_online": False}}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update participant online status: {e}")
             
             # Получаем актуальное количество онлайн
             online_count = len(listening_room_connections.get(room_id, {}))
             
             # Уведомляем остальных об отключении и актуальном online_count
-            await broadcast_to_listening_room(room_id, {
-                "event": "user_disconnected",
-                "telegram_id": telegram_id,
-                "online_count": online_count
-            })
+            try:
+                await broadcast_to_listening_room(room_id, {
+                    "event": "user_disconnected",
+                    "telegram_id": telegram_id,
+                    "online_count": online_count
+                })
+            except Exception as e:
+                logger.warning(f"Failed to broadcast disconnect: {e}")
 
+
+# ============ API для очереди и истории Listening Room ============
+
+@api_router.get("/music/rooms/{room_id}/queue")
+async def get_listening_room_queue(room_id: str, telegram_id: int):
+    """Получить очередь треков комнаты"""
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем что пользователь участник
+        is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        return {
+            "queue": room.get("queue", []),
+            "count": len(room.get("queue", []))
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get queue error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/{room_id}/history")
+async def get_listening_room_history(room_id: str, telegram_id: int, limit: int = 20):
+    """Получить историю прослушивания комнаты"""
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем что пользователь участник
+        is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        history = room.get("history", [])[:limit]
+        
+        return {
+            "history": serialize_for_json(history),
+            "count": len(history)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/{room_id}/queue/add")
+async def add_to_listening_room_queue(room_id: str, telegram_id: int, track: dict):
+    """Добавить трек в очередь комнаты (HTTP fallback)"""
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем права
+        can_control = False
+        if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+            can_control = True
+        elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+            can_control = room["host_id"] == telegram_id
+        elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+            can_control = room["host_id"] == telegram_id or telegram_id in room.get("allowed_controllers", [])
+        
+        if not can_control:
+            raise HTTPException(status_code=403, detail="У вас нет прав на управление")
+        
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$push": {"queue": track}}
+        )
+        
+        # Уведомляем участников
+        participant = next((p for p in room["participants"] if p["telegram_id"] == telegram_id), None)
+        user_name = f"{participant.get('first_name', '')} {participant.get('last_name', '')}".strip() if participant else ""
+        
+        room = await db.listening_rooms.find_one({"id": room_id})
+        await broadcast_to_listening_room(room_id, {
+            "event": "queue_updated",
+            "queue": room.get("queue", []),
+            "action": "add",
+            "track": track,
+            "triggered_by": telegram_id,
+            "triggered_by_name": user_name
+        })
+        
+        return {"success": True, "queue_length": len(room.get("queue", []))}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Add to queue error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============ API для системы друзей (Friends) ============
