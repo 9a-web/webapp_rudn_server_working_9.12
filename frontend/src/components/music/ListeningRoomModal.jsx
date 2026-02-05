@@ -266,6 +266,9 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
       console.log('📋 Queue updated:', action, newQueue?.length, 'tracks');
       setQueue(newQueue || []);
       
+      // Синхронизируем очередь с плеером
+      updateListeningRoomQueue(newQueue || []);
+      
       if (action === 'add' && triggeredBy !== telegramId) {
         hapticFeedback?.('notification', 'success');
       }
