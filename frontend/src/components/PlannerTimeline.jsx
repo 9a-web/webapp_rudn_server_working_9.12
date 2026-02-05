@@ -754,7 +754,7 @@ export const PlannerTimeline = ({
         className="relative overflow-y-auto scrollbar-hide bg-gray-50/50 overscroll-contain"
         style={{ height: '400px', WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
+        <div className="relative pt-2" style={{ height: `${24 * HOUR_HEIGHT + 8}px` }}>
           {/* Часовые линии - кликабельные для быстрого создания */}
           {HOURS.map((hour) => (
             <div
