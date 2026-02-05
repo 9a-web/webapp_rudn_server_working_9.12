@@ -1475,7 +1475,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
               
               <div className="bg-white rounded-2xl p-4 mb-4">
                 <QRCodeSVG
-                  value={`https://t.me/rudn_pro_bot/app?startapp=listen_${currentRoom.invite_code}`}
+                  value={`tg://resolve?domain=rudn_pro_bot&appname=app&startapp=listen_${currentRoom.invite_code}`}
                   size={250}
                   level="M"
                   includeMargin={false}
@@ -1486,7 +1486,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
               <div className="text-center mb-4">
                 <p className="text-white font-medium mb-1">{currentRoom.name}</p>
                 <p className="text-gray-400 text-sm">
-                  Отсканируйте QR-код для вступления в комнату
+                  Отсканируйте через камеру Telegram
                 </p>
                 <p className="text-purple-400 font-mono text-lg mt-2 tracking-wider">
                   {currentRoom.invite_code}
