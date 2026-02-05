@@ -2583,7 +2583,8 @@ async def create_planner_event(task_data: TaskCreate):
 async def get_planner_day_events(telegram_id: int, date: str):
     """
     Получить все события (пары + пользовательские задачи) на конкретную дату.
-    Возвращает отсортированный по времени список.
+    Возвращает ТОЛЬКО события с установленным временем (time_start и time_end).
+    Задачи без времени не показываются в планировщике.
     """
     try:
         # Парсим дату
@@ -2592,22 +2593,16 @@ async def get_planner_day_events(telegram_id: int, date: str):
         except ValueError:
             raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
         
-        # Получаем все задачи/события на эту дату
-        # Условия:
-        # 1. target_date совпадает с датой
-        # 2. ИЛИ задача без target_date, но не завершена (задачи из общего списка)
-        
+        # Получаем только события с установленным временем на эту дату
         tasks_cursor = db.tasks.find({
             "telegram_id": telegram_id,
-            "$or": [
-                # События и задачи с target_date на эту дату
-                {
-                    "target_date": {
-                        "$gte": target_date,
-                        "$lt": target_date + timedelta(days=1)
-                    }
-                }
-            ]
+            "target_date": {
+                "$gte": target_date,
+                "$lt": target_date + timedelta(days=1)
+            },
+            # Только события с установленным временем
+            "time_start": {"$ne": None, "$exists": True},
+            "time_end": {"$ne": None, "$exists": True}
         })
         
         tasks = await tasks_cursor.to_list(length=None)
