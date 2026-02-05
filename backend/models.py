@@ -515,6 +515,8 @@ class TaskResponse(BaseModel):
     lessonType: Optional[str] = None
     # Массив видео (YouTube и VK)
     videos: List[VideoData] = []
+    # Связь с исходной задачей из списка дел
+    source_task_id: Optional[str] = None
 
 
 class YouTubeInfoResponse(BaseModel):
