@@ -614,6 +614,10 @@ class BackendTester:
         print("🚀 Starting Admin Online Users API Testing")
         print("=" * 50)
         
+        # Setup test users first
+        if not self.setup_test_users():
+            print("❌ Failed to setup test users, continuing anyway...")
+        
         # Admin Online Users API Tests (from review request)
         admin_tests = [
             self.test_track_activity_user_1,              # 1. POST /api/admin/track-activity (user 1, section=schedule)
