@@ -2023,60 +2023,6 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
 
       {/* Модальное окно подтверждения перетаскивания */}
       <AnimatePresence>
-        {isReorderConfirmOpen && reorderData && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-            onClick={cancelReorder}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                    <GripVertical className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Изменить порядок?</h3>
-                    <p className="text-sm text-gray-500">Подтвердите перемещение задачи</p>
-                  </div>
-                </div>
-                
-                <div className="bg-gray-50 rounded-xl p-3 mb-4">
-                  <p className="text-sm text-gray-700 font-medium truncate">
-                    {reorderData.task?.text}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Позиция: {reorderData.oldIndex + 1} → {reorderData.newIndex + 1}
-                  </p>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={cancelReorder}
-                    className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    onClick={confirmReorder}
-                    className="flex-1 py-2.5 bg-yellow-500 text-white rounded-xl font-medium text-sm"
-                  >
-                    Подтвердить
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
       </AnimatePresence>
 
       {/* Модальное окно синхронизации задачи с планировщиком */}
