@@ -577,24 +577,98 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange }) => {
         onActiveRoomChange={setActiveListeningRoom}
       />
       
-      {/* Floating Button for Listening Room */}
-      <motion.button
+      {/* Floating Button for Listening Room - Premium Style */}
+      <motion.div
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.3, type: 'spring' }}
-        onClick={() => setListeningRoomModalOpen(true)}
-        className={`fixed bottom-36 right-6 z-50 p-4 rounded-full shadow-lg transition-shadow ${
-          activeListeningRoom 
-            ? 'bg-gradient-to-br from-green-500 to-emerald-500 shadow-green-500/30 hover:shadow-green-500/50' 
-            : 'bg-gradient-to-br from-purple-500 to-pink-500 shadow-purple-500/30 hover:shadow-purple-500/50'
-        }`}
-        title={activeListeningRoom ? `В комнате: ${activeListeningRoom.name}` : 'Совместное прослушивание'}
+        transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+        className="fixed bottom-36 right-6 z-50"
       >
-        <Users className="w-6 h-6 text-white" />
-        {activeListeningRoom && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-        )}
-      </motion.button>
+        {/* Outer glow ring animation */}
+        <motion.div
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.5, 0.2, 0.5]
+          }}
+          transition={{ 
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className={`absolute inset-0 rounded-full blur-xl ${
+            activeListeningRoom 
+              ? 'bg-gradient-to-r from-green-400 to-emerald-400' 
+              : 'bg-gradient-to-r from-purple-500 to-pink-500'
+          }`}
+        />
+        
+        {/* Secondary pulse ring */}
+        <motion.div
+          animate={{ 
+            scale: [1, 1.4, 1],
+            opacity: [0.3, 0, 0.3]
+          }}
+          transition={{ 
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeOut",
+            delay: 0.5
+          }}
+          className={`absolute inset-0 rounded-full ${
+            activeListeningRoom 
+              ? 'bg-green-400/30' 
+              : 'bg-purple-400/30'
+          }`}
+        />
+        
+        {/* Main button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setListeningRoomModalOpen(true)}
+          className={`relative p-4 rounded-full backdrop-blur-sm border transition-all duration-300 ${
+            activeListeningRoom 
+              ? 'bg-gradient-to-br from-green-500/90 via-emerald-500/90 to-teal-500/90 border-green-400/50 shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:shadow-[0_0_40px_rgba(34,197,94,0.7)]' 
+              : 'bg-gradient-to-br from-violet-500/90 via-purple-500/90 to-fuchsia-500/90 border-purple-400/50 shadow-[0_0_30px_rgba(168,85,247,0.5)] hover:shadow-[0_0_40px_rgba(168,85,247,0.7)]'
+          }`}
+          title={activeListeningRoom ? `В комнате: ${activeListeningRoom.name}` : 'Совместное прослушивание'}
+        >
+          {/* Inner gradient overlay */}
+          <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-white/10" />
+          
+          {/* Icon with subtle animation */}
+          <motion.div
+            animate={activeListeningRoom ? { 
+              rotate: [0, 5, -5, 0]
+            } : {}}
+            transition={{ 
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <Users className="relative w-6 h-6 text-white drop-shadow-lg" />
+          </motion.div>
+          
+          {/* Active room indicator */}
+          {activeListeningRoom && (
+            <>
+              {/* Pulsing dot */}
+              <motion.span 
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-gradient-to-br from-green-300 to-emerald-400 rounded-full shadow-lg shadow-green-400/50"
+              />
+              {/* Sound waves effect */}
+              <motion.span
+                animate={{ scale: [1, 2], opacity: [0.6, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 rounded-full"
+              />
+            </>
+          )}
+        </motion.button>
+      </motion.div>
     </div>
   );
 };
