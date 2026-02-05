@@ -602,8 +602,8 @@ class BackendTester:
 
 
 def main():
-    """Main test execution for Listening Rooms API"""
-    print("🎵 Listening Rooms API Testing")
+    """Main test execution for Admin Online Users API"""
+    print("👥 Admin Online Users API Testing")
     print(f"Backend URL: {BACKEND_URL}")
     print()
     
