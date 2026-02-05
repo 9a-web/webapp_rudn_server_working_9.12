@@ -2728,12 +2728,15 @@ const TaskGroupItem = ({
       value={task}
       dragListener={false}
       dragControls={dragControls}
-      className="relative"
+      className="relative overflow-hidden"
+      layout
+      layoutId={task.id}
+      transition={{ type: "spring", stiffness: 400, damping: 35 }}
     >
       {/* Контент задачи */}
       <motion.div
         whileTap={{ scale: 0.98 }}
-        className="relative bg-white rounded-lg p-3 group shadow-sm"
+        className="relative bg-white rounded-lg p-3 group shadow-sm overflow-hidden"
       >
         {isEditing ? (
           <div className="flex items-center gap-2">
