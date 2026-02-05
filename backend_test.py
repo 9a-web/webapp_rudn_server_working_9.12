@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Testing Suite for Listening Rooms API
-Tests the listening rooms endpoints as specified in the review request
+Backend Testing Suite for Admin Online Users API
+Tests the admin online users tracking endpoints as specified in the review request
 """
 
 import requests
