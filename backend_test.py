@@ -19,15 +19,22 @@ class BackendTester:
         self.test_results = []
         # Test user data as specified in review request
         self.telegram_id = 765963392
-        self.first_name = "Test"
-        self.last_name = "User"
-        self.username = "testuser"
+        self.first_name = "Админ"
+        self.last_name = "Тестовый"
+        self.username = "admin_test"
         self.photo_url = None
         
-        # Test room data
-        self.test_room_id = None
-        self.test_invite_code = None
-        self.test_invite_link = None
+        # Additional test user
+        self.telegram_id_2 = 111222333
+        self.first_name_2 = "Пользователь"
+        self.last_name_2 = "Второй"
+        self.username_2 = "user_test_2"
+        
+        # Third test user
+        self.telegram_id_3 = 444555666
+        self.first_name_3 = "Пользователь"
+        self.last_name_3 = "Третий"
+        self.username_3 = "user_test_3"
         
     def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
         """Log test result"""
