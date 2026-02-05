@@ -2381,19 +2381,21 @@ const TodayTaskItem = ({
       dragListener={false}
       dragControls={dragControls}
       className={`mb-2 touch-none ${isDragEnabled ? 'z-50' : ''}`}
-      style={{ listStyle: 'none', touchAction: 'none' }}
+      style={{ listStyle: 'none', touchAction: 'none', position: 'relative' }}
       whileDrag={{ 
-        scale: 1.05, 
-        boxShadow: "0 8px 25px rgba(0,0,0,0.2)",
+        scale: 1.02, 
+        boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
         zIndex: 100,
         cursor: 'grabbing'
       }}
+      layout
+      layoutId={task.id}
       onDragEnd={() => setIsDragEnabled(false)}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      transition={{ type: "spring", stiffness: 400, damping: 35 }}
     >
       {/* Контент задачи */}
       <div 
-        className={`relative bg-white rounded-lg p-2 group shadow-sm transition-all ${isDragEnabled ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}`}
+        className={`relative bg-white rounded-lg p-2 group shadow-sm transition-all overflow-hidden ${isDragEnabled ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerCancel}
