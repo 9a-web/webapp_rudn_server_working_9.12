@@ -12797,8 +12797,13 @@ async def notify_achievement(to_telegram_id: int, achievement: dict):
 
 async def notify_journal_attendance(to_telegram_id: int, journal: dict, status: str, date: str):
     """Уведомление об отметке посещаемости"""
-    status_text = "присутствие" if status == "present" else "отсутствие" if status == "absent" else "опоздание"
-    status_emoji = "✅" if status == "present" else "❌" if status == "absent" else "⏰"
+    status_map = {
+        "present":  ("✅", "присутствие"),
+        "absent":   ("❌", "отсутствие"),
+        "late":     ("⏰", "опоздание"),
+    }
+    status_emoji, status_text = status_map.get(status, ("📋", status))
+    journal_name = journal.get('name', '')
     
     await create_notification(
         telegram_id=to_telegram_id,
@@ -12806,8 +12811,8 @@ async def notify_journal_attendance(to_telegram_id: int, journal: dict, status: 
         category=NotificationCategory.JOURNAL,
         priority=NotificationPriority.LOW,
         title="Отметка в журнале",
-        message=f"Вам отмечено {status_text} за {date} в журнале «{journal.get('name', '')}»",
-        emoji=status_emoji,
+        message=f"{status_emoji} {status_text.capitalize()} — {date}\n📚 {journal_name}",
+        emoji="📓",
         data={
             "journal_id": journal.get("id"),
             "status": status,
