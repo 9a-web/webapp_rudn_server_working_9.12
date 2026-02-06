@@ -185,6 +185,25 @@ class CoverService:
         except Exception as e:
             logger.error(f"Cache write error: {e}")
 
+    async def _save_to_cache_short(self, cache_key: str, artist: str, title: str):
+        """Кэшируем пустой результат на 2 часа (не 30 дней), чтобы повторить позже."""
+        try:
+            await self.collection.update_one(
+                {"cache_key": cache_key},
+                {"$set": {
+                    "cache_key": cache_key,
+                    "artist": artist,
+                    "title": title,
+                    "covers": {},
+                    "source": "none",
+                    "expires_at": datetime.utcnow() + timedelta(hours=2),
+                    "updated_at": datetime.utcnow()
+                }},
+                upsert=True
+            )
+        except Exception as e:
+            logger.error(f"Cache short write error: {e}")
+
     # ------------------------------------------------------------------
     #  PUBLIC API
     # ------------------------------------------------------------------
