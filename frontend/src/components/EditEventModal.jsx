@@ -176,7 +176,7 @@ export const EditEventModal = ({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center sm:justify-center"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-end sm:items-center sm:justify-center"
         variants={backdropVariants}
         initial="hidden"
         animate="visible"
