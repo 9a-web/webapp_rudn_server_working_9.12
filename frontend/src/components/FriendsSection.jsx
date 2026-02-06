@@ -345,6 +345,30 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     }
   };
 
+  const handleToggleFavorite = async (friendId, isFavorite) => {
+    try {
+      hapticFeedback('impact', 'light');
+      await friendsAPI.toggleFavorite(user.id, friendId, isFavorite);
+      await loadFriends();
+    } catch (error) {
+      showToast(error.message || 'Ошибка', 'error');
+    }
+  };
+
+  const handleRemoveFriend = async (friendId) => {
+    try {
+      hapticFeedback('impact', 'medium');
+      await friendsAPI.removeFriend(user.id, friendId);
+      hapticFeedback('notification', 'success');
+      showToast('Удалён из друзей');
+      await loadFriends();
+      handleCloseProfile();
+    } catch (error) {
+      hapticFeedback('notification', 'error');
+      showToast(error.message || 'Ошибка', 'error');
+    }
+  };
+
   // QR загрузка
   const handleOpenQR = async () => {
     hapticFeedback('impact', 'light');
