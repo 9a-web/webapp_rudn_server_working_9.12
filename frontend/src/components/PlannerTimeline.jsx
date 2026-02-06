@@ -576,36 +576,39 @@ const DayProgressBar = ({ events }) => {
       <div className="relative h-2 rounded-full overflow-hidden"
            style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.06) 100%)' }}>
         <div className="absolute inset-0 rounded-full border border-black/[0.04]" />
-        {/* Completed (green/purple) */}
-        <motion.div
-          className="absolute top-0 left-0 h-full rounded-full relative overflow-hidden"
-          initial={{ width: 0 }}
-          animate={{ width: `${percent}%` }}
-          transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.2 }}
-          style={{
-            background: allDone
-              ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
-              : 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
-          }}
-        >
-          <div className="absolute inset-0 opacity-40"
-               style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
-        </motion.div>
-        {/* Skipped (red) */}
-        {skippedPercent > 0 && (
+        {/* Combined bar: completed + skipped side by side */}
+        <div className="absolute inset-0 flex">
           <motion.div
-            className="absolute top-0 h-full rounded-full overflow-hidden"
-            initial={{ width: 0 }}
-            animate={{ width: `${skippedPercent}%`, left: `${percent}%` }}
-            transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.35 }}
+            className="h-full relative overflow-hidden"
             style={{
-              background: 'linear-gradient(90deg, #ef4444 0%, #f87171 100%)',
+              borderRadius: skippedPercent > 0 ? '9999px 0 0 9999px' : '9999px',
+              background: allDone
+                ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
+                : 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
             }}
+            initial={{ width: 0 }}
+            animate={{ width: `${percent}%` }}
+            transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.2 }}
           >
             <div className="absolute inset-0 opacity-40"
                  style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
           </motion.div>
-        )}
+          {skippedPercent > 0 && (
+            <motion.div
+              className="h-full relative overflow-hidden"
+              style={{
+                borderRadius: percent > 0 ? '0 9999px 9999px 0' : '9999px',
+                background: 'linear-gradient(90deg, #ef4444 0%, #f87171 100%)',
+              }}
+              initial={{ width: 0 }}
+              animate={{ width: `${skippedPercent}%` }}
+              transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.35 }}
+            >
+              <div className="absolute inset-0 opacity-40"
+                   style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
+            </motion.div>
+          )}
+        </div>
       </div>
     </div>
   );
