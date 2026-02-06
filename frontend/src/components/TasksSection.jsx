@@ -1874,6 +1874,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
             </div>
           ) : (
             <PlannerTimeline
+              ref={plannerTimelineRef}
               events={plannerEvents}
               currentDate={formatDateToYYYYMMDD(tasksSelectedDate)}
               onToggleComplete={handleTogglePlannerEvent}
