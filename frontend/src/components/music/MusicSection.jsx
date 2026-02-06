@@ -186,9 +186,20 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
           break;
         }
         case 'playlists': {
-          // Используем персональный токен пользователя
-          const pl = await musicAPI.getPlaylistsVK(telegramId);
-          setPlaylists(pl.playlists || []);
+          // Пробуем персональный токен, fallback на общий
+          try {
+            const pl = await musicAPI.getPlaylistsVK(telegramId);
+            setPlaylists(pl.playlists || []);
+          } catch (vkErr) {
+            console.warn('getPlaylistsVK failed, falling back:', vkErr.message);
+            try {
+              const pl = await musicAPI.getPlaylists();
+              setPlaylists(pl.playlists || []);
+            } catch (fallbackErr) {
+              console.error('getPlaylists fallback also failed:', fallbackErr);
+              setPlaylists([]);
+            }
+          }
           setHasMore(false);
           break;
         }
