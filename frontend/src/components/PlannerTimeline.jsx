@@ -584,7 +584,9 @@ export const PlannerTimeline = ({
   // Проверка, является ли сегодняшний день выбранным
   const isToday = useMemo(() => {
     if (!currentDate) return false;
-    const today = new Date().toISOString().split('T')[0];
+    // FIX: Используем локальную дату вместо UTC (toISOString даёт UTC)
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return currentDate === today;
   }, [currentDate]);
   
@@ -912,7 +914,9 @@ export const FullscreenPlannerTimeline = ({
   // Проверка, является ли сегодняшний день выбранным
   const isToday = useMemo(() => {
     if (!currentDate) return false;
-    const today = new Date().toISOString().split('T')[0];
+    // FIX: Используем локальную дату вместо UTC (toISOString даёт UTC)
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return currentDate === today;
   }, [currentDate]);
   
