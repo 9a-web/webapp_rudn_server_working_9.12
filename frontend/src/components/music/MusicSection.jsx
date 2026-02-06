@@ -218,6 +218,17 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
           setHasMore(false);
           break;
         }
+        case 'history': {
+          try {
+            const result = await musicAPI.getHistory(telegramId, 50);
+            setTracks(result.tracks || []);
+          } catch (histError) {
+            console.error('Load history error:', histError);
+            setTracks([]);
+          }
+          setHasMore(false);
+          break;
+        }
         default:
           break;
       }
