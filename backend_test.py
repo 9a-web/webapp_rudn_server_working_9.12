@@ -1,213 +1,589 @@
 #!/usr/bin/env python3
 """
-Backend Performance Testing for RUDN Schedule API
-Tests the performance-critical endpoints as specified in the review request.
+RUDN Schedule Web Session Backend API Tests
+
+Tests all web session synchronization endpoints according to the test plan.
 """
 
-import time
 import requests
 import json
-from datetime import datetime, timedelta
+import time
 import sys
+from datetime import datetime
+from typing import Optional, Dict, Any
 
-# Backend URL from frontend env
-BACKEND_URL = "https://d8cc5781-41cf-497a-8d0d-1a5844d54640.preview.emergentagent.com/api"
+# Backend URL from environment
+BACKEND_URL = "https://d8cc5781-41cf-497a-8d0d-1a5844d54640.preview.emergentagent.com"
+API_BASE = f"{BACKEND_URL}/api"
 
-# Test data
-TEST_TELEGRAM_ID = 123456
-
-def measure_time(func):
-    """Decorator to measure function execution time"""
-    def wrapper(*args, **kwargs):
+class WebSessionTester:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session_tokens = []
+        self.test_results = []
+        
+    def log_test(self, test_name: str, success: bool, response_time: float, details: str = ""):
+        """Log test result with timing information"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name} ({response_time:.3f}s)")
+        if details:
+            print(f"   Details: {details}")
+        
+        self.test_results.append({
+            "test": test_name,
+            "success": success,
+            "response_time": response_time,
+            "details": details
+        })
+        
+    def make_request(self, method: str, url: str, **kwargs) -> tuple[requests.Response, float]:
+        """Make HTTP request and measure response time"""
         start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        duration = end_time - start_time
-        return result, duration
-    return wrapper
-
-@measure_time
-def test_get_tasks(telegram_id):
-    """Test GET /api/tasks/{telegram_id}"""
-    url = f"{BACKEND_URL}/tasks/{telegram_id}"
-    response = requests.get(url)
-    return response
-
-@measure_time
-def test_create_task(telegram_id, text):
-    """Test POST /api/tasks"""
-    url = f"{BACKEND_URL}/tasks"
-    data = {
-        "telegram_id": telegram_id,
-        "text": text
-    }
-    response = requests.post(url, json=data)
-    return response
-
-@measure_time
-def test_create_planner_event(telegram_id, text, time_start, time_end, target_date):
-    """Test POST /api/planner/events"""
-    url = f"{BACKEND_URL}/planner/events"
-    data = {
-        "telegram_id": telegram_id,
-        "text": text,
-        "time_start": time_start,
-        "time_end": time_end,
-        "target_date": target_date
-    }
-    response = requests.post(url, json=data)
-    return response
-
-@measure_time
-def test_get_planner_day(telegram_id, date):
-    """Test GET /api/planner/{telegram_id}/{date}"""
-    url = f"{BACKEND_URL}/planner/{telegram_id}/{date}"
-    response = requests.get(url)
-    return response
-
-@measure_time
-def test_update_task(task_id, completed):
-    """Test PUT /api/tasks/{task_id}"""
-    url = f"{BACKEND_URL}/tasks/{task_id}"
-    data = {"completed": completed}
-    response = requests.put(url, json=data)
-    return response
-
-def print_test_result(test_name, response, duration):
-    """Print formatted test result"""
-    status_icon = "✅" if response.status_code == 200 else "❌"
-    print(f"{status_icon} {test_name}")
-    print(f"   Status: {response.status_code}")
-    print(f"   Time: {duration:.3f}s {'(SLOW!)' if duration > 2.0 else ''}")
-    
-    if response.status_code != 200:
-        print(f"   Error: {response.text}")
-    elif response.headers.get('content-type', '').startswith('application/json'):
-        try:
-            json_data = response.json()
-            if isinstance(json_data, list):
-                print(f"   Response: {len(json_data)} items")
-            elif isinstance(json_data, dict):
-                print(f"   Response: {list(json_data.keys())}")
+        response = self.session.request(method, url, **kwargs)
+        response_time = time.time() - start_time
+        return response, response_time
+        
+    def test_1_create_web_session(self) -> Optional[str]:
+        """Test 1: Create Web Session (POST /api/web-sessions)"""
+        print("\n=== Test 1: Create Web Session ===")
+        
+        url = f"{API_BASE}/web-sessions"
+        response, response_time = self.make_request("POST", url, json={})
+        
+        if response.status_code == 200:
+            data = response.json()
+            required_fields = ["session_token", "status", "qr_url", "expires_at"]
+            
+            if all(field in data for field in required_fields):
+                if data["status"] == "pending":
+                    session_token = data["session_token"]
+                    self.session_tokens.append(session_token)
+                    
+                    self.log_test(
+                        "Create Web Session", 
+                        True, 
+                        response_time,
+                        f"Token: {session_token[:8]}..., Status: {data['status']}"
+                    )
+                    return session_token
+                else:
+                    self.log_test("Create Web Session", False, response_time, f"Status not pending: {data['status']}")
             else:
-                print(f"   Response: {type(json_data).__name__}")
-        except:
-            print(f"   Response: {len(response.text)} chars")
-    print()
-    
-    return response.status_code == 200 and duration <= 2.0
-
-def main():
-    """Run all performance tests"""
-    print("🚀 Starting RUDN Schedule Backend Performance Tests")
-    print(f"Backend URL: {BACKEND_URL}")
-    print(f"Test Telegram ID: {TEST_TELEGRAM_ID}")
-    print("=" * 60)
-    
-    results = {}
-    total_time = 0
-    
-    # 1. Test initial task list loading
-    print("1️⃣ Testing Task List Loading (GET /api/tasks/{telegram_id})")
-    response, duration = test_get_tasks(TEST_TELEGRAM_ID)
-    results['get_tasks_initial'] = print_test_result("Initial Task List", response, duration)
-    total_time += duration
-    
-    # 2. Test task creation
-    print("2️⃣ Testing Task Creation (POST /api/tasks)")
-    response, duration = test_create_task(TEST_TELEGRAM_ID, "Test task for performance check")
-    task_creation_success = print_test_result("Task Creation", response, duration)
-    results['create_task'] = task_creation_success
-    total_time += duration
-    
-    # Get created task ID for later use
-    created_task_id = None
-    if task_creation_success and response.status_code == 200:
-        try:
-            task_data = response.json()
-            created_task_id = task_data.get('id')
-            print(f"   Created Task ID: {created_task_id}")
-        except:
-            pass
-    
-    # 3. Test task list after creation
-    print("3️⃣ Testing Task List After Creation")
-    response, duration = test_get_tasks(TEST_TELEGRAM_ID)
-    results['get_tasks_after_create'] = print_test_result("Task List After Creation", response, duration)
-    total_time += duration
-    
-    # 4. Test planner event creation
-    print("4️⃣ Testing Planner Event Creation (POST /api/planner/events)")
-    target_date = "2026-02-07T00:00:00"
-    response, duration = test_create_planner_event(
-        TEST_TELEGRAM_ID, 
-        "Test planner event", 
-        "10:00", 
-        "11:30", 
-        target_date
-    )
-    results['create_planner_event'] = print_test_result("Planner Event Creation", response, duration)
-    total_time += duration
-    
-    # 5. Test planner day events
-    print("5️⃣ Testing Planner Day Events (GET /api/planner/{telegram_id}/{date})")
-    response, duration = test_get_planner_day(TEST_TELEGRAM_ID, "2026-02-07")
-    results['get_planner_day'] = print_test_result("Planner Day Events", response, duration)
-    total_time += duration
-    
-    # 6. Test task update (if we have a task ID)
-    if created_task_id:
-        print("6️⃣ Testing Task Update (PUT /api/tasks/{task_id})")
-        response, duration = test_update_task(created_task_id, True)
-        results['update_task'] = print_test_result("Task Update", response, duration)
-        total_time += duration
-    else:
-        print("6️⃣ Skipping Task Update (no task ID available)")
-        results['update_task'] = False
-    
-    # 7. Test multiple rapid task creation
-    print("7️⃣ Testing Multiple Rapid Task Creation")
-    rapid_creation_start = time.time()
-    rapid_results = []
-    
-    for i in range(3):
-        text = f"Rapid test task {i+1}"
-        response, duration = test_create_task(TEST_TELEGRAM_ID, text)
-        success = response.status_code == 200 and duration <= 2.0
-        rapid_results.append(success)
-        print(f"   Task {i+1}: {'✅' if success else '❌'} ({duration:.3f}s)")
-    
-    rapid_creation_end = time.time()
-    rapid_total_time = rapid_creation_end - rapid_creation_start
-    
-    results['rapid_creation'] = all(rapid_results) and rapid_total_time <= 5.0
-    print(f"   Total time for 3 tasks: {rapid_total_time:.3f}s {'✅' if rapid_total_time <= 5.0 else '❌ SLOW!'}")
-    total_time += rapid_total_time
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print("📊 PERFORMANCE TEST SUMMARY")
-    print("=" * 60)
-    
-    passed_tests = sum(results.values())
-    total_tests = len(results)
-    
-    for test_name, passed in results.items():
-        status = "✅ PASS" if passed else "❌ FAIL"
-        print(f"{test_name.replace('_', ' ').title()}: {status}")
-    
-    print(f"\nTotal Tests: {total_tests}")
-    print(f"Passed: {passed_tests}")
-    print(f"Failed: {total_tests - passed_tests}")
-    print(f"Total Time: {total_time:.3f}s")
-    
-    if passed_tests == total_tests:
-        print("\n🎉 All performance tests PASSED! Backend is performing well.")
-        return True
-    else:
-        print(f"\n⚠️  {total_tests - passed_tests} test(s) FAILED. Performance issues detected.")
+                missing = [f for f in required_fields if f not in data]
+                self.log_test("Create Web Session", False, response_time, f"Missing fields: {missing}")
+        else:
+            self.log_test("Create Web Session", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return None
+        
+    def test_2_get_session_status(self, session_token: str) -> bool:
+        """Test 2: Get Session Status (GET /api/web-sessions/{token}/status)"""
+        print("\n=== Test 2: Get Session Status ===")
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/status"
+        response, response_time = self.make_request("GET", url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == "pending" and "qr_url" in data:
+                self.log_test(
+                    "Get Session Status (Pending)", 
+                    True, 
+                    response_time,
+                    f"Status: {data['status']}, Has QR URL: {'qr_url' in data}"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Get Session Status (Pending)", 
+                    False, 
+                    response_time, 
+                    f"Status: {data.get('status')}, Has QR URL: {'qr_url' in data}"
+                )
+        else:
+            self.log_test("Get Session Status (Pending)", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
         return False
+        
+    def test_3_notify_session_scanned(self, session_token: str) -> bool:
+        """Test 3: Notify Session Scanned (POST /api/web-sessions/{token}/scanned)"""
+        print("\n=== Test 3: Notify Session Scanned ===")
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/scanned"
+        payload = {
+            "telegram_id": 999888,
+            "first_name": "TestUser",
+            "photo_url": None
+        }
+        
+        response, response_time = self.make_request("POST", url, json=payload)
+        
+        if response.status_code == 200:
+            self.log_test(
+                "Notify Session Scanned", 
+                True, 
+                response_time,
+                f"Scanned by telegram_id: {payload['telegram_id']}"
+            )
+            return True
+        else:
+            self.log_test("Notify Session Scanned", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_4_verify_scanned_data(self, session_token: str) -> bool:
+        """Test 4: Verify scanned data in status (GET /api/web-sessions/{token}/status)"""
+        print("\n=== Test 4: Verify Scanned Data in Status ===")
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/status"
+        response, response_time = self.make_request("GET", url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if (data.get("telegram_id") == 999888 and 
+                data.get("first_name") == "TestUser" and
+                data.get("status") == "pending"):
+                self.log_test(
+                    "Verify Scanned Data", 
+                    True, 
+                    response_time,
+                    f"telegram_id: {data.get('telegram_id')}, first_name: {data.get('first_name')}"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Verify Scanned Data", 
+                    False, 
+                    response_time,
+                    f"telegram_id: {data.get('telegram_id')}, first_name: {data.get('first_name')}, status: {data.get('status')}"
+                )
+        else:
+            self.log_test("Verify Scanned Data", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_5_link_session(self, session_token: str) -> bool:
+        """Test 5: Link Session (POST /api/web-sessions/{token}/link)"""
+        print("\n=== Test 5: Link Session ===")
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/link"
+        payload = {
+            "telegram_id": 999888,
+            "first_name": "TestUser",
+            "last_name": "Bot",
+            "username": "testbot",
+            "photo_url": None
+        }
+        
+        response, response_time = self.make_request("POST", url, json=payload)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True:
+                self.log_test(
+                    "Link Session", 
+                    True, 
+                    response_time,
+                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Link Session", 
+                    False, 
+                    response_time,
+                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
+                )
+        else:
+            self.log_test("Link Session", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_6_verify_linked_status(self, session_token: str) -> bool:
+        """Test 6: Verify Linked Status (GET /api/web-sessions/{token}/status)"""
+        print("\n=== Test 6: Verify Linked Status ===")
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/status"
+        response, response_time = self.make_request("GET", url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            expected_fields = {
+                "status": "linked",
+                "telegram_id": 999888,
+                "first_name": "TestUser",
+                "last_name": "Bot",
+                "username": "testbot"
+            }
+            
+            success = all(data.get(key) == value for key, value in expected_fields.items())
+            
+            if success:
+                self.log_test(
+                    "Verify Linked Status", 
+                    True, 
+                    response_time,
+                    f"Status: {data.get('status')}, User: {data.get('first_name')} {data.get('last_name')}"
+                )
+                return True
+            else:
+                mismatches = {k: f"expected {v}, got {data.get(k)}" for k, v in expected_fields.items() if data.get(k) != v}
+                self.log_test(
+                    "Verify Linked Status", 
+                    False, 
+                    response_time,
+                    f"Mismatches: {mismatches}"
+                )
+        else:
+            self.log_test("Verify Linked Status", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_7_heartbeat(self, session_token: str) -> bool:
+        """Test 7: Heartbeat (POST /api/web-sessions/{token}/heartbeat)"""
+        print("\n=== Test 7: Heartbeat ===")
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/heartbeat"
+        response, response_time = self.make_request("POST", url, json={})
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True:
+                self.log_test(
+                    "Heartbeat", 
+                    True, 
+                    response_time,
+                    f"Success: {data.get('success')}"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Heartbeat", 
+                    False, 
+                    response_time,
+                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
+                )
+        else:
+            self.log_test("Heartbeat", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_8_get_user_devices(self) -> bool:
+        """Test 8: Get User Devices (GET /api/web-sessions/user/999888/devices)"""
+        print("\n=== Test 8: Get User Devices ===")
+        
+        url = f"{API_BASE}/web-sessions/user/999888/devices"
+        response, response_time = self.make_request("GET", url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            devices = data.get("devices", [])
+            
+            # Check if our linked session appears in devices list
+            session_found = any(
+                device.get("session_token") in self.session_tokens 
+                for device in devices
+            )
+            
+            if session_found and len(devices) > 0:
+                self.log_test(
+                    "Get User Devices", 
+                    True, 
+                    response_time,
+                    f"Found {len(devices)} devices, linked session present"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Get User Devices", 
+                    False, 
+                    response_time,
+                    f"Found {len(devices)} devices, linked session present: {session_found}"
+                )
+        else:
+            self.log_test("Get User Devices", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_9_race_condition(self) -> bool:
+        """Test 9: Race Condition Test - Try linking ALREADY linked session"""
+        print("\n=== Test 9: Race Condition Test ===")
+        
+        # Create a NEW session
+        print("Creating new session for race condition test...")
+        new_token = self.test_1_create_web_session()
+        if not new_token:
+            return False
+            
+        # Link the new session
+        print("Linking new session...")
+        if not self.test_5_link_session(new_token):
+            return False
+            
+        # Try to link the FIRST session again (should fail)
+        print("Attempting to link old session (should fail)...")
+        if len(self.session_tokens) >= 2:
+            old_token = self.session_tokens[0]  # First session token
+            
+            url = f"{API_BASE}/web-sessions/{old_token}/link"
+            payload = {
+                "telegram_id": 999888,
+                "first_name": "TestUser",
+                "last_name": "Bot",
+                "username": "testbot",
+                "photo_url": None
+            }
+            
+            response, response_time = self.make_request("POST", url, json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success") is False:
+                    self.log_test(
+                        "Race Condition Test", 
+                        True, 
+                        response_time,
+                        f"Correctly prevented double linking: {data.get('message', '')}"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "Race Condition Test", 
+                        False, 
+                        response_time,
+                        "Should have failed but returned success=true"
+                    )
+            else:
+                self.log_test("Race Condition Test", False, response_time, f"HTTP {response.status_code}: {response.text}")
+        else:
+            self.log_test("Race Condition Test", False, 0, "Not enough session tokens for race condition test")
+            
+        return False
+        
+    def test_10_reject_session(self) -> bool:
+        """Test 10: Reject Test"""
+        print("\n=== Test 10: Reject Session Test ===")
+        
+        # Create another session
+        reject_token = self.test_1_create_web_session()
+        if not reject_token:
+            return False
+            
+        # Reject the session
+        url = f"{API_BASE}/web-sessions/{reject_token}/rejected"
+        response, response_time = self.make_request("POST", url, json={})
+        
+        if response.status_code == 200:
+            # Check if status becomes "expired"
+            time.sleep(0.1)  # Small delay to ensure update is processed
+            
+            status_url = f"{API_BASE}/web-sessions/{reject_token}/status"
+            status_response, status_time = self.make_request("GET", status_url)
+            
+            if status_response.status_code == 200:
+                status_data = status_response.json()
+                if status_data.get("status") == "expired":
+                    self.log_test(
+                        "Reject Session", 
+                        True, 
+                        response_time + status_time,
+                        f"Session correctly marked as expired after rejection"
+                    )
+                    return True
+                else:
+                    self.log_test(
+                        "Reject Session", 
+                        False, 
+                        response_time + status_time,
+                        f"Status after rejection: {status_data.get('status')}, expected 'expired'"
+                    )
+            else:
+                self.log_test("Reject Session", False, response_time, "Failed to check status after rejection")
+        else:
+            self.log_test("Reject Session", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_11_revoke_single_device(self) -> bool:
+        """Test 11: Revoke Single Device (DELETE /api/web-sessions/{token}?telegram_id=999888)"""
+        print("\n=== Test 11: Revoke Single Device ===")
+        
+        if not self.session_tokens:
+            self.log_test("Revoke Single Device", False, 0, "No session tokens available")
+            return False
+            
+        # Use one of the linked session tokens
+        session_token = self.session_tokens[0]
+        
+        url = f"{API_BASE}/web-sessions/{session_token}"
+        params = {"telegram_id": 999888}
+        response, response_time = self.make_request("DELETE", url, params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True:
+                self.log_test(
+                    "Revoke Single Device", 
+                    True, 
+                    response_time,
+                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Revoke Single Device", 
+                    False, 
+                    response_time,
+                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
+                )
+        else:
+            self.log_test("Revoke Single Device", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_12_revoke_all_devices(self) -> bool:
+        """Test 12: Revoke All Devices (DELETE /api/web-sessions/user/999888/all)"""
+        print("\n=== Test 12: Revoke All Devices ===")
+        
+        url = f"{API_BASE}/web-sessions/user/999888/all"
+        response, response_time = self.make_request("DELETE", url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True and "deleted_count" in data:
+                self.log_test(
+                    "Revoke All Devices", 
+                    True, 
+                    response_time,
+                    f"Success: {data.get('success')}, Deleted: {data.get('deleted_count')} devices"
+                )
+                return True
+            else:
+                self.log_test(
+                    "Revoke All Devices", 
+                    False, 
+                    response_time,
+                    f"Success: {data.get('success')}, Deleted: {data.get('deleted_count', 'N/A')}"
+                )
+        else:
+            self.log_test("Revoke All Devices", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            
+        return False
+        
+    def test_13_heartbeat_on_deleted_session(self) -> bool:
+        """Test 13: Heartbeat on deleted session (should return 404)"""
+        print("\n=== Test 13: Heartbeat on Deleted Session ===")
+        
+        if not self.session_tokens:
+            self.log_test("Heartbeat on Deleted Session", False, 0, "No session tokens available")
+            return False
+            
+        # Use a revoked session token
+        session_token = self.session_tokens[0]
+        
+        url = f"{API_BASE}/web-sessions/{session_token}/heartbeat"
+        response, response_time = self.make_request("POST", url, json={})
+        
+        if response.status_code == 404:
+            self.log_test(
+                "Heartbeat on Deleted Session", 
+                True, 
+                response_time,
+                f"Correctly returned 404 for deleted session"
+            )
+            return True
+        else:
+            self.log_test(
+                "Heartbeat on Deleted Session", 
+                False, 
+                response_time,
+                f"Expected 404, got HTTP {response.status_code}: {response.text}"
+            )
+            
+        return False
+        
+    def run_all_tests(self):
+        """Run complete web session lifecycle test suite"""
+        print(f"🚀 Starting RUDN Schedule Web Session API Tests")
+        print(f"Backend URL: {BACKEND_URL}")
+        print(f"API Base: {API_BASE}")
+        print("="*70)
+        
+        # Test 1: Create Web Session
+        session_token = self.test_1_create_web_session()
+        if not session_token:
+            print("❌ Failed to create web session. Aborting test suite.")
+            return False
+            
+        # Test 2: Get Session Status (pending)
+        self.test_2_get_session_status(session_token)
+        
+        # Test 3: Notify Session Scanned
+        self.test_3_notify_session_scanned(session_token)
+        
+        # Test 4: Verify scanned data in status
+        self.test_4_verify_scanned_data(session_token)
+        
+        # Test 5: Link Session
+        self.test_5_link_session(session_token)
+        
+        # Test 6: Verify Linked Status
+        self.test_6_verify_linked_status(session_token)
+        
+        # Test 7: Heartbeat
+        self.test_7_heartbeat(session_token)
+        
+        # Test 8: Get User Devices
+        self.test_8_get_user_devices()
+        
+        # Test 9: Race Condition Test
+        self.test_9_race_condition()
+        
+        # Test 10: Reject Test
+        self.test_10_reject_session()
+        
+        # Test 11: Revoke Single Device
+        self.test_11_revoke_single_device()
+        
+        # Test 12: Revoke All Devices
+        self.test_12_revoke_all_devices()
+        
+        # Test 13: Heartbeat on deleted session
+        self.test_13_heartbeat_on_deleted_session()
+        
+        # Print summary
+        self.print_summary()
+        
+        return all(result["success"] for result in self.test_results)
+        
+    def print_summary(self):
+        """Print test results summary"""
+        print("\n" + "="*70)
+        print("🏁 TEST RESULTS SUMMARY")
+        print("="*70)
+        
+        passed = sum(1 for result in self.test_results if result["success"])
+        failed = len(self.test_results) - passed
+        total_time = sum(result["response_time"] for result in self.test_results)
+        
+        print(f"Total Tests: {len(self.test_results)}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {failed}")
+        print(f"Total Response Time: {total_time:.3f}s")
+        print(f"Average Response Time: {total_time/len(self.test_results):.3f}s")
+        
+        if failed > 0:
+            print("\n❌ FAILED TESTS:")
+            for result in self.test_results:
+                if not result["success"]:
+                    print(f"   • {result['test']}: {result['details']}")
+        
+        print(f"\n🎯 Overall Result: {'✅ ALL TESTS PASSED' if failed == 0 else f'❌ {failed} TESTS FAILED'}")
+
 
 if __name__ == "__main__":
-    success = main()
+    tester = WebSessionTester()
+    success = tester.run_all_tests()
+    
+    # Exit with appropriate code for CI/automation
     sys.exit(0 if success else 1)
