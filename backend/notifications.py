@@ -106,7 +106,7 @@ class TelegramNotificationService:
         
         # Собираем красивое сообщение
         lines = []
-        lines.append(f"⏰  <b>Напоминание о паре</b>")
+        lines.append("⏰  <b>Напоминание о паре</b>")
         lines.append("")
         lines.append(urgency)
         lines.append("")
