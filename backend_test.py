@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import sys
 
 # Configuration
-BASE_URL = "https://rudn-admin-redesign.preview.emergentagent.com/api"
+BASE_URL = "http://localhost:8001/api"
 TEST_TELEGRAM_ID = 12345
 
 def print_test_result(test_name, success, details=None):
