@@ -8,6 +8,22 @@ import { X, Search, Users, Building2, UserPlus, Check, Clock, Loader2, Sparkles 
 import { friendsAPI } from '../services/friendsAPI';
 import { scheduleAPI } from '../services/api';
 
+// URL backend из env
+const getBackendURL = () => {
+  let url = '';
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      url = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
+    }
+    if (!url && typeof process !== 'undefined' && process.env) {
+      url = process.env.REACT_APP_BACKEND_URL || '';
+    }
+  } catch (e) { /* env not available */ }
+  if (url && url.trim() !== '') return url;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
+  return window.location.origin;
+};
+
 const getAvatarGradient = (id) => {
   const gradients = [
     'from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500',
@@ -15,6 +31,27 @@ const getAvatarGradient = (id) => {
     'from-amber-500 to-orange-500', 'from-indigo-500 to-blue-600',
   ];
   return gradients[Math.abs(id || 0) % gradients.length];
+};
+
+// Компонент аватарки с фото
+const UserAvatar = ({ telegramId, firstName, username, size = 48, className = '' }) => {
+  const [imgError, setImgError] = useState(false);
+  const avatarUrl = `${getBackendURL()}/api/user-profile-photo-proxy/${telegramId}`;
+  const initials = (firstName?.[0] || username?.[0] || '?').toUpperCase();
+  const gradient = getAvatarGradient(telegramId);
+
+  return (
+    <div 
+      className={`bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold overflow-hidden shadow-lg ${className}`}
+      style={{ width: size, height: size }}
+    >
+      {!imgError ? (
+        <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={() => setImgError(true)} loading="lazy" />
+      ) : (
+        <span className="drop-shadow-sm" style={{ fontSize: size * 0.38 }}>{initials}</span>
+      )}
+    </div>
+  );
 };
 
 const pluralize = (n, one, few, many) => {
