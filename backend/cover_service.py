@@ -103,6 +103,35 @@ def _artist_match(query_artist: str, result_artist: str) -> bool:
     return False
 
 
+def _title_match(query_title: str, result_title: str) -> bool:
+    """
+    Проверяет совпадение названия трека.
+    Убирает скобки (remix/edit/feat) перед сравнением.
+    """
+    qt = _normalize(re.sub(r'\(.*?\)|\[.*?\]', '', query_title))
+    rt = _normalize(re.sub(r'\(.*?\)|\[.*?\]', '', result_title))
+
+    if not qt or not rt:
+        return False
+
+    # Точное совпадение
+    if qt == rt:
+        return True
+
+    # Один содержит другого (≥ 4 символа у меньшего)
+    if min(len(qt), len(rt)) >= 4 and (qt in rt or rt in qt):
+        return True
+
+    # Первые 2 слова совпадают
+    qt_words = qt.split()
+    rt_words = rt.split()
+    if len(qt_words) >= 2 and len(rt_words) >= 2:
+        if qt_words[0] == rt_words[0] and qt_words[1] == rt_words[1]:
+            return True
+
+    return False
+
+
 class CoverService:
     """Сервис получения обложек: iTunes → Deezer → None"""
 
