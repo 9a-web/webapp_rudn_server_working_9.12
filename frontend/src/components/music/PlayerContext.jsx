@@ -636,7 +636,25 @@ export const PlayerProvider = ({ children }) => {
       if (queue.length > 0 && queueIndex < queue.length - 1) {
         next();
       } else {
+        // Очередь закончилась — пробуем загрузить похожие треки
+        console.log('🎵 Queue ended, loading similar tracks...');
         setIsPlaying(false);
+        
+        if (currentTrackRef.current?.id) {
+          import('../../services/musicAPI.js').then(mod => {
+            mod.default.getSimilar(currentTrackRef.current.id, 15).then(data => {
+              const similar = data?.tracks || [];
+              if (similar.length > 0) {
+                console.log(`✨ Autoplay: loaded ${similar.length} similar tracks`);
+                setQueue(prev => [...prev, ...similar]);
+                // Запускаем первый похожий трек
+                setTimeout(() => {
+                  play(similar[0], [...queue, ...similar], queue.length);
+                }, 500);
+              }
+            }).catch(err => console.warn('Similar tracks load failed:', err));
+          });
+        }
       }
     };
     const onError = (e) => {
