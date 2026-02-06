@@ -91,6 +91,9 @@ export const PlayerProvider = ({ children }) => {
   
   // Кэш для сгенерированных обложек
   const coverCacheRef = useRef({});
+  const currentTrackRef = useRef(null);
+  const queueRef = useRef([]);
+  const queueIndexRef = useRef(0);
 
   // Инициализация Audio элемента и установка громкости
   useEffect(() => {
