@@ -13,17 +13,19 @@ from typing import Dict, Any, List
 
 # Get backend URL from frontend .env
 import os
-try:
-    with open('/app/frontend/.env', 'r') as f:
-        for line in f:
-            if line.startswith('REACT_APP_BACKEND_URL='):
-                BASE_URL = line.split('=', 1)[1].strip() + '/api'
-                break
-    else:
+
+def get_backend_url():
+    try:
+        with open('/app/frontend/.env', 'r') as f:
+            for line in f:
+                if line.startswith('REACT_APP_BACKEND_URL='):
+                    return line.split('=', 1)[1].strip() + '/api'
         raise ValueError("REACT_APP_BACKEND_URL not found in frontend/.env")
-except Exception as e:
-    print(f"Error reading frontend .env: {e}")
-    BASE_URL = "http://localhost:8001/api"  # fallback
+    except Exception as e:
+        print(f"Error reading frontend .env: {e}")
+        return "http://localhost:8001/api"  # fallback
+
+BASE_URL = get_backend_url()
 
 print(f"Using backend URL: {BASE_URL}")
 
