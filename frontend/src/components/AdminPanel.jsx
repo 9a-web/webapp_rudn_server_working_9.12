@@ -5,7 +5,8 @@ import {
   BarChart3, Clock, Activity, Star,
   BookOpen, Bell, Share2, CheckSquare, RefreshCw,
   Search, User, GraduationCap, FileText, Send, MessageSquare, Check,
-  Megaphone, AlertCircle, Info, Gift, Sparkles, Zap, Home, Wifi, Circle
+  Megaphone, AlertCircle, Info, Gift, Sparkles, Zap, Home, Wifi, Circle,
+  Globe, Smartphone, Monitor
 } from 'lucide-react';
 import axios from 'axios';
 import {
