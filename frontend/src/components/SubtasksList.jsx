@@ -107,7 +107,7 @@ const SubtasksList = ({
                     touch-manipulation active:scale-95
                     ${subtask.completed
                       ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500'
-                      : 'bg-transparent border-gray-600 hover:border-gray-500'
+                      : 'bg-transparent border-gray-300 hover:border-gray-400'
                     }
                     ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}
                   `}
