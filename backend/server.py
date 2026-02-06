@@ -13358,6 +13358,54 @@ async def revoke_all_devices(telegram_id: int):
         logger.error(f"Revoke all devices error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ============ Очистка устаревших сессий ============
+
+async def cleanup_expired_sessions():
+    """Удаляет expired и старые pending сессии (старше 30 минут) из БД"""
+    try:
+        cutoff_time = datetime.utcnow() - timedelta(minutes=30)
+        
+        # Удаляем expired сессии
+        result_expired = await db.web_sessions.delete_many({
+            "status": WebSessionStatus.EXPIRED.value
+        })
+        
+        # Удаляем зависшие pending сессии (старше 30 минут)
+        result_pending = await db.web_sessions.delete_many({
+            "status": WebSessionStatus.PENDING.value,
+            "created_at": {"$lt": cutoff_time}
+        })
+        
+        total = result_expired.deleted_count + result_pending.deleted_count
+        if total > 0:
+            logger.info(f"🧹 Cleaned up {total} stale sessions (expired: {result_expired.deleted_count}, old pending: {result_pending.deleted_count})")
+        
+        # Очищаем stale WebSocket connections
+        stale_tokens = []
+        for token, ws in web_session_connections.items():
+            try:
+                # Проверяем существует ли сессия в БД
+                session = await db.web_sessions.find_one({"session_token": token})
+                if not session:
+                    stale_tokens.append(token)
+            except Exception:
+                stale_tokens.append(token)
+        
+        for token in stale_tokens:
+            try:
+                ws = web_session_connections.pop(token, None)
+                if ws:
+                    await ws.close()
+            except Exception:
+                pass
+        
+        if stale_tokens:
+            logger.info(f"🧹 Cleaned up {len(stale_tokens)} stale WebSocket connections")
+            
+    except Exception as e:
+        logger.warning(f"Session cleanup error: {e}")
+
 # Include the router in the main app
 app.include_router(api_router)
 
