@@ -12650,16 +12650,16 @@ async def notify_friend_request(to_telegram_id: int, from_user: dict, request_id
         notification_type=NotificationType.FRIEND_REQUEST,
         category=NotificationCategory.SOCIAL,
         priority=NotificationPriority.HIGH,
-        title="Новая заявка в друзья",
-        message=f"{from_name} хочет добавить вас в друзья",
-        emoji="👥",
+        title="Заявка в друзья",
+        message=f"👤 {from_name} хочет добавить вас в друзья",
+        emoji="💌",
         data={
             "request_id": request_id,
             "from_telegram_id": from_user.get("telegram_id"),
             "from_name": from_name
         },
         actions=[
-            {"id": "accept", "label": "Принять", "type": "primary"},
+            {"id": "accept", "label": "✅ Принять", "type": "primary"},
             {"id": "reject", "label": "Отклонить", "type": "secondary"}
         ]
     )
