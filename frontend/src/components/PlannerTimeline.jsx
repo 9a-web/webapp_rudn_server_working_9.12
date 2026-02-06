@@ -1199,9 +1199,19 @@ export const FullscreenPlannerTimeline = React.forwardRef(({
   onTimeChange,
   hapticFeedback,
   currentDate 
-}) => {
+}, ref) => {
   const timelineRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Expose scrollToTime method to parent
+  React.useImperativeHandle(ref, () => ({
+    scrollToTime: (timeStr) => {
+      if (!timelineRef.current || !timeStr) return;
+      const minutes = parseTime(timeStr);
+      const scrollTarget = Math.max(0, (minutes / 60 - 1)) * HOUR_HEIGHT;
+      timelineRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    }
+  }));
   
   // Обновление текущего времени каждую минуту
   useEffect(() => {
