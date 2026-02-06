@@ -335,21 +335,11 @@ class CoverService:
                         'cover_xl': album.get('cover_xl')
                     }
                     if any(covers.values()):
-                        logger.info(f"Deezer cover ✓ «{artist} — {title}»")
+                        logger.info(f"Deezer cover ✓ «{artist} — {title}» (matched: {item_artist})")
                         return covers
 
-            # Fallback — первый результат
-            album = items[0].get('album', {})
-            covers = {
-                'cover_small': album.get('cover_small'),
-                'cover_medium': album.get('cover_medium'),
-                'cover_big': album.get('cover_big'),
-                'cover_xl': album.get('cover_xl')
-            }
-            if any(covers.values()):
-                logger.info(f"Deezer cover (fuzzy) «{artist} — {title}»")
-                return covers
-
+            # Артист не совпал — НЕ берём чужую обложку
+            logger.debug(f"Deezer: artist mismatch for «{artist}», results: {[i.get('artist',{}).get('name','') for i in items[:3]]}")
             return None
 
         except asyncio.TimeoutError:
