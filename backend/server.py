@@ -9434,8 +9434,7 @@ async def music_playlist_tracks_vk(telegram_id: int, owner_id: int, playlist_id:
         token = token_doc.get("vk_token")
         user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
         
-        # Запрос треков плейлиста к VK API
-        import requests
+        # Запрос треков плейлиста к VK API (async)
         params = {
             "access_token": token,
             "owner_id": owner_id,
@@ -9446,13 +9445,14 @@ async def music_playlist_tracks_vk(telegram_id: int, owner_id: int, playlist_id:
         if access_key:
             params["access_key"] = access_key
             
-        response = requests.get(
-            "https://api.vk.com/method/audio.get",
-            params=params,
-            headers={"User-Agent": user_agent},
-            timeout=15
-        )
-        data = response.json()
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.vk.com/method/audio.get",
+                params=params,
+                headers={"User-Agent": user_agent},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                data = await response.json()
         
         if "error" in data:
             error = data["error"]
