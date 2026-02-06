@@ -298,15 +298,25 @@ const UsersTab = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const searchTimerRef = useRef(null);
+
+  // Debounce поиск
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
 
   const fetchUsers = useCallback(async (reset = false) => {
     setLoading(true);
     try {
-      const skip = reset ? 0 : page * 50;
+      const currentPage = reset ? 0 : page;
+      const skip = currentPage * 50;
       const res = await axios.get(`${BACKEND_URL}/api/admin/users`, {
-        params: { limit: 50, skip, search }
+        params: { limit: 50, skip, search: debouncedSearch || undefined }
       });
       
       if (reset) {
@@ -322,11 +332,11 @@ const UsersTab = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     fetchUsers(true);
-  }, [search]); // Re-fetch on search change
+  }, [debouncedSearch]); // Re-fetch on debounced search change
 
   return (
     <div className="flex flex-col h-full">
