@@ -193,8 +193,16 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
           break;
         }
         case 'favorites': {
-          await loadFavorites();
-          setTracks(favorites);
+          // FIX: Получаем свежие данные и используем их напрямую
+          try {
+            const result = await musicAPI.getFavorites(telegramId);
+            const freshFavorites = result.tracks || [];
+            setFavorites(freshFavorites);
+            setTracks(freshFavorites);
+          } catch (favError) {
+            console.error('Load favorites error:', favError);
+            setTracks(favorites);
+          }
           setHasMore(false);
           break;
         }
