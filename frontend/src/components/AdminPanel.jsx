@@ -528,18 +528,21 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={usersActivity}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
-              <XAxis dataKey="date" stroke="#888" />
-              <YAxis stroke="#888" />
+              <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#888" allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#2B2B3A',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '12px'
                 }}
+                formatter={(value) => [value, 'Регистраций']}
+                labelFormatter={(label) => `Дата: ${label}`}
               />
               <Line
                 type="monotone"
                 dataKey="count"
+                name="Регистраций"
                 stroke="#8B5CF6"
                 strokeWidth={3}
                 dot={{ fill: '#8B5CF6', r: 4 }}
@@ -559,16 +562,18 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={hourlyActivity}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
-              <XAxis dataKey="hour" stroke="#888" />
-              <YAxis stroke="#888" />
+              <XAxis dataKey="hour" stroke="#888" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#888" allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#2B2B3A',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '12px'
                 }}
+                formatter={(value) => [value, 'Пользователей']}
+                labelFormatter={(label) => `${label}:00`}
               />
-              <Bar dataKey="count" fill="#EC4899" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="count" name="Пользователей" fill="#EC4899" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -577,16 +582,17 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={weeklyActivity}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff20" />
-              <XAxis dataKey="day" stroke="#888" />
-              <YAxis stroke="#888" />
+              <XAxis dataKey="day" stroke="#888" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#888" allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#2B2B3A',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '12px'
                 }}
+                formatter={(value) => [value, 'Пользователей']}
               />
-              <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="count" name="Пользователей" fill="#10B981" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
