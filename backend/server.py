@@ -13072,12 +13072,28 @@ async def notify_session_scanned(session_token: str, telegram_id: int = Body(...
     """
     Уведомить веб-клиент о том, что QR-код отсканирован и ожидается подтверждение.
     Вызывается мобильным клиентом при показе модального окна подтверждения.
+    Сохраняет данные сканирования в БД для polling-клиентов.
     """
     try:
         # Проверяем существование сессии
         session = await db.web_sessions.find_one({"session_token": session_token})
         if not session:
             raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        # Проверяем что сессия ещё pending (не linked/expired)
+        if session.get("status") != WebSessionStatus.PENDING.value:
+            raise HTTPException(status_code=400, detail="Сессия уже не ожидает связки")
+        
+        # Сохраняем данные сканирования в БД — для polling-клиентов
+        await db.web_sessions.update_one(
+            {"session_token": session_token},
+            {"$set": {
+                "scanned_by": telegram_id,
+                "scanned_first_name": first_name,
+                "scanned_photo_url": photo_url,
+                "scanned_at": datetime.utcnow()
+            }}
+        )
         
         # Отправляем через WebSocket
         if session_token in web_session_connections:
