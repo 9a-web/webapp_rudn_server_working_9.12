@@ -5597,8 +5597,8 @@ async def get_admin_stats(days: Optional[int] = None):
     def date_filter(field_name="created_at"):
         return {field_name: {"$gte": start_date}} if start_date else {}
 
-    # 1. Total Users
-    total_users = await db.user_settings.count_documents(date_filter("created_at"))
+    # 1. Total Users — ВСЕГДА считаем ВСЕХ пользователей (не зависит от фильтра)
+    total_users = await db.user_settings.count_documents({})
     
     # 2. Active Users Today
     today_start = datetime(now.year, now.month, now.day)
