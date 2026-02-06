@@ -212,6 +212,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const tasksRef = React.useRef(tasks);
   React.useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   
+  // Refs для скролла таймлайна к созданному событию
+  const plannerTimelineRef = React.useRef(null);
+  const fullscreenTimelineRef = React.useRef(null);
+  
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
