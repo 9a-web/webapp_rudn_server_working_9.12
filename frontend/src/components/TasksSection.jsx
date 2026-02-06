@@ -889,6 +889,17 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const confirmSyncTaskToPlanner = async () => {
     if (!taskToSync || !user?.id) return;
     
+    // FIX: Валидация — время начала должно быть раньше времени окончания
+    const [startH, startM] = syncTaskTime.start.split(':').map(Number);
+    const [endH, endM] = syncTaskTime.end.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    
+    if (startMinutes >= endMinutes) {
+      hapticFeedback && hapticFeedback('notification', 'error');
+      return; // Не отправляем — время начала >= время конца
+    }
+    
     setSyncingTask(true);
     
     try {
