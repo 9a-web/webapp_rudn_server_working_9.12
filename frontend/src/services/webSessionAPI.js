@@ -166,6 +166,14 @@ export const createSessionWebSocket = (sessionToken, { onLinked, onError, onExpi
           console.log('⏰ Session expired (polling)');
           onExpired?.();
           clearInterval(pollingInterval);
+        } else if (data.status === 'pending' && data.telegram_id) {
+          // Сессия pending но уже отсканирована — показываем "waiting"
+          console.log('📱 Session scanned (polling), waiting for confirmation...');
+          onScanned?.({
+            telegram_id: data.telegram_id,
+            first_name: data.first_name,
+            photo_url: data.photo_url
+          });
         }
       } catch (err) {
         console.warn('📡 Polling error:', err.message);
