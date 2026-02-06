@@ -22,7 +22,7 @@ const getBackendURL = () => {
     if (!envBackendUrl && typeof process !== 'undefined' && process.env) {
       envBackendUrl = process.env.REACT_APP_BACKEND_URL || '';
     }
-  } catch (e) {}
+  } catch (e) { /* env not available */ }
   if (envBackendUrl && envBackendUrl.trim() !== '') return envBackendUrl;
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
   return window.location.origin;
