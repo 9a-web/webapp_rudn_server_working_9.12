@@ -26,7 +26,7 @@ def test_create_task():
     """Test 1: Create a task"""
     print("🔄 Testing: Create Task...")
     
-    url = f"{BASE_URL}/tasks/{TEST_TELEGRAM_ID}"
+    url = f"{BASE_URL}/tasks"
     payload = {
         "telegram_id": TEST_TELEGRAM_ID,
         "text": "Test Task",
