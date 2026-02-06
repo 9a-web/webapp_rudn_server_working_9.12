@@ -6004,10 +6004,16 @@ async def get_online_users(minutes: int = 5):
             "last_activity": {"$gte": day_threshold}
         })
         
+        # Подсчёт по платформам
+        web_online = len([u for u in result if u.get("platform") == "web"])
+        tg_online = len([u for u in result if u.get("platform") == "telegram"])
+        
         return {
             "online_now": total_online,
             "online_last_hour": online_last_hour,
             "online_last_day": online_last_day,
+            "web_online": web_online,
+            "telegram_online": tg_online,
             "users": result,
             "threshold_minutes": minutes,
             "timestamp": datetime.utcnow().isoformat()
