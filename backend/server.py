@@ -13103,6 +13103,14 @@ async def notify_session_rejected(session_token: str):
     Вызывается мобильным клиентом при нажатии "Отмена".
     """
     try:
+        # Обновляем статус в БД на EXPIRED, чтобы polling-клиенты тоже узнали
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        if session and session.get("status") == WebSessionStatus.PENDING.value:
+            await db.web_sessions.update_one(
+                {"session_token": session_token},
+                {"$set": {"status": WebSessionStatus.EXPIRED.value}}
+            )
+        
         # Отправляем через WebSocket
         if session_token in web_session_connections:
             try:
