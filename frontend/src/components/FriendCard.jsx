@@ -2,7 +2,7 @@
  * FriendCard - Карточка друга с красивым дизайном и анимациями
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star, ChevronRight, Wifi } from 'lucide-react';
 
