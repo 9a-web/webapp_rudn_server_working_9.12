@@ -259,10 +259,24 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
   const copyAuthUrl = async () => {
     if (!authUrl) return;
     try {
-      await navigator.clipboard.writeText(authUrl);
+      // Telegram WebApp clipboard
       if (window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
       }
+      
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(authUrl);
+        return;
+      }
+      
+      // Fallback: textarea + execCommand
+      const ta = document.createElement('textarea');
+      ta.value = authUrl;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
     } catch (err) {
       console.error('Copy error:', err);
     }
