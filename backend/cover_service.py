@@ -330,7 +330,7 @@ class CoverService:
     # ------------------------------------------------------------------
 
     async def _fetch_from_deezer(self, artist: str, title: str) -> Optional[dict]:
-        """Запрос обложки из Deezer API (fallback)."""
+        """Запрос обложки из Deezer API (fallback). Проверяет артист + название."""
         try:
             session = await self._get_session()
 
@@ -339,7 +339,7 @@ class CoverService:
 
             async with session.get(
                 'https://api.deezer.com/search',
-                params={'q': query, 'limit': 3}
+                params={'q': query, 'limit': 5}
             ) as resp:
                 if resp.status != 200:
                     return None
@@ -349,11 +349,12 @@ class CoverService:
             if not items:
                 return None
 
-            # Ищем совпадение по артисту
+            # Ищем совпадение артиста И названия
             for item in items:
                 item_artist = item.get('artist', {}).get('name', '')
+                item_title = item.get('title', '')
                 album = item.get('album', {})
-                if _artist_match(artist, item_artist) and album.get('cover_big'):
+                if _artist_match(artist, item_artist) and _title_match(title, item_title) and album.get('cover_big'):
                     covers = {
                         'cover_small': album.get('cover_small'),
                         'cover_medium': album.get('cover_medium'),
@@ -361,11 +362,11 @@ class CoverService:
                         'cover_xl': album.get('cover_xl')
                     }
                     if any(covers.values()):
-                        logger.info(f"Deezer cover ✓ «{artist} — {title}» (matched: {item_artist})")
+                        logger.info(f"Deezer cover ✓ exact «{artist} — {title}» → «{item_artist} — {item_title}»")
                         return covers
 
-            # Артист не совпал — НЕ берём чужую обложку
-            logger.debug(f"Deezer: artist mismatch for «{artist}», results: {[i.get('artist',{}).get('name','') for i in items[:3]]}")
+            # Название не совпало — НЕ берём чужую обложку
+            logger.debug(f"Deezer: title mismatch for «{artist} — {title}», results: {[(i.get('artist',{}).get('name',''), i.get('title','')) for i in items[:3]]}")
             return None
 
         except asyncio.TimeoutError:
