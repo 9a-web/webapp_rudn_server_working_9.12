@@ -727,12 +727,12 @@ export const PlayerProvider = ({ children }) => {
     
     // Проверяем, есть ли предыдущий незаблокированный трек
     const hasPrevTrack = queue.length > 0 && queueIndex > 0 && queue.slice(0, queueIndex).some(
-      t => t.is_blocked !== true && t.content_restricted !== true && t.is_licensed !== false
+      t => !isTrackBlocked(t)
     );
     
     // Проверяем, есть ли следующий незаблокированный трек
     const hasNextTrack = queue.length > 0 && queueIndex < queue.length - 1 && queue.slice(queueIndex + 1).some(
-      t => t.is_blocked !== true && t.content_restricted !== true && t.is_licensed !== false
+      t => !isTrackBlocked(t)
     );
 
     // Обработчик Previous Track (кнопка ⏮)
