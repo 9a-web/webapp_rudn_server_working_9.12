@@ -1015,6 +1015,11 @@ class AdminStatsResponse(BaseModel):
     journal_joins_today: int = 0  # Присоединений к журналам сегодня
     journal_joins_week: int = 0  # Присоединений к журналам за неделю
     total_journals: int = 0  # Всего журналов
+    # Статистика веб-версии
+    web_sessions_total: int = 0  # Всего веб-сессий (linked)
+    web_sessions_active: int = 0  # Активных веб-сессий сейчас (linked + last_active < 10min)
+    web_unique_users: int = 0  # Уникальных пользователей веб-версии
+    web_users_today: int = 0  # Веб-пользователей сегодня
 
 
 class UserActivityPoint(BaseModel):
