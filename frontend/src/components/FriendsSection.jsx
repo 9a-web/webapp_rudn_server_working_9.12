@@ -520,6 +520,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     const isFriend = result.friendship_status === 'friend';
     const isPendingOut = result.friendship_status === 'pending_outgoing';
     const isPendingIn = result.friendship_status === 'pending_incoming';
+    const isSending = sendingRequest === result.telegram_id;
     
     return (
       <motion.div
@@ -534,9 +535,13 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
         
         <div className="relative p-4">
           <div className="flex items-center gap-3.5">
-            <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${getAvatarGradient(result.telegram_id)} flex items-center justify-center text-white font-bold text-base shadow-lg`}>
-              {(result.first_name?.[0] || result.username?.[0] || '?').toUpperCase()}
-            </div>
+            <UserAvatar
+              telegramId={result.telegram_id}
+              firstName={result.first_name}
+              username={result.username}
+              size={48}
+              className="rounded-2xl flex-shrink-0"
+            />
             
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-[15px] text-white truncate leading-tight">
@@ -560,9 +565,13 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                 <UserCheck className="w-3.5 h-3.5" /> Друзья
               </span>
             ) : isPendingOut ? (
-              <span className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/15 text-amber-400 rounded-full text-[12px] font-medium">
+              <motion.span
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/15 text-amber-400 rounded-full text-[12px] font-medium"
+              >
                 <Clock className="w-3.5 h-3.5" /> Отправлено
-              </span>
+              </motion.span>
             ) : isPendingIn ? (
               <motion.button
                 whileTap={{ scale: 0.85 }}
@@ -575,9 +584,18 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
               <motion.button
                 whileTap={{ scale: 0.85 }}
                 onClick={() => handleSendRequest(result.telegram_id)}
-                className="p-2.5 bg-purple-500/15 text-purple-400 rounded-xl hover:bg-purple-500/25 transition-all"
+                disabled={isSending}
+                className={`p-2.5 rounded-xl transition-all ${
+                  isSending
+                    ? 'bg-purple-500/10 text-purple-300'
+                    : 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25'
+                }`}
               >
-                <UserPlus className="w-[18px] h-[18px]" />
+                {isSending ? (
+                  <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                ) : (
+                  <UserPlus className="w-[18px] h-[18px]" />
+                )}
               </motion.button>
             )}
           </div>
