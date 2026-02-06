@@ -1,589 +1,341 @@
 #!/usr/bin/env python3
 """
-RUDN Schedule Web Session Backend API Tests
+Admin Panel Backend Test Suite
+Tests the admin panel endpoints according to the review request.
 
-Tests all web session synchronization endpoints according to the test plan.
+CRITICAL: Testing the bug fix that total_users should be SAME regardless of days param.
 """
 
 import requests
 import json
-import time
-import sys
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any, List
 
-# Backend URL from environment
-BACKEND_URL = "https://d8cc5781-41cf-497a-8d0d-1a5844d54640.preview.emergentagent.com"
-API_BASE = f"{BACKEND_URL}/api"
+# Get backend URL from frontend .env
+import os
+try:
+    with open('/app/frontend/.env', 'r') as f:
+        for line in f:
+            if line.startswith('REACT_APP_BACKEND_URL='):
+                BASE_URL = line.split('=', 1)[1].strip() + '/api'
+                break
+    else:
+        raise ValueError("REACT_APP_BACKEND_URL not found in frontend/.env")
+except Exception as e:
+    print(f"Error reading frontend .env: {e}")
+    BASE_URL = "http://localhost:8001/api"  # fallback
 
-class WebSessionTester:
+print(f"Using backend URL: {BASE_URL}")
+
+class AdminPanelTestSuite:
     def __init__(self):
         self.session = requests.Session()
-        self.session_tokens = []
-        self.test_results = []
+        self.session.timeout = 30
         
-    def log_test(self, test_name: str, success: bool, response_time: float, details: str = ""):
-        """Log test result with timing information"""
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} {test_name} ({response_time:.3f}s)")
-        if details:
-            print(f"   Details: {details}")
+    def log(self, message: str, level: str = "INFO"):
+        """Log test messages"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}] {level}: {message}")
         
-        self.test_results.append({
-            "test": test_name,
-            "success": success,
-            "response_time": response_time,
-            "details": details
-        })
-        
-    def make_request(self, method: str, url: str, **kwargs) -> tuple[requests.Response, float]:
-        """Make HTTP request and measure response time"""
-        start_time = time.time()
-        response = self.session.request(method, url, **kwargs)
-        response_time = time.time() - start_time
-        return response, response_time
-        
-    def test_1_create_web_session(self) -> Optional[str]:
-        """Test 1: Create Web Session (POST /api/web-sessions)"""
-        print("\n=== Test 1: Create Web Session ===")
-        
-        url = f"{API_BASE}/web-sessions"
-        response, response_time = self.make_request("POST", url, json={})
-        
-        if response.status_code == 200:
-            data = response.json()
-            required_fields = ["session_token", "status", "qr_url", "expires_at"]
+    def make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """Make HTTP request with error handling"""
+        url = f"{BASE_URL}{endpoint}"
+        try:
+            response = self.session.request(method, url, **kwargs)
+            self.log(f"{method} {endpoint} -> {response.status_code}")
+            return response
+        except Exception as e:
+            self.log(f"Request failed: {e}", "ERROR")
+            raise
             
-            if all(field in data for field in required_fields):
-                if data["status"] == "pending":
-                    session_token = data["session_token"]
-                    self.session_tokens.append(session_token)
+    def test_admin_stats_basic(self):
+        """Test GET /api/admin/stats without params"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/stats (basic)")
+        self.log("=" * 60)
+        
+        try:
+            response = self.make_request("GET", "/admin/stats")
+            if response.status_code != 200:
+                raise Exception(f"Failed: {response.status_code} - {response.text}")
+                
+            stats = response.json()
+            self.log(f"✅ Basic admin stats retrieved")
+            
+            # Check required fields
+            required_fields = [
+                'total_users', 'active_users_today', 'new_users_week', 'total_tasks',
+                'total_completed_tasks', 'total_achievements_earned', 'total_rooms'
+            ]
+            
+            for field in required_fields:
+                if field not in stats:
+                    raise Exception(f"❌ Missing field: {field}")
+                if not isinstance(stats[field], int):
+                    raise Exception(f"❌ {field} should be int, got {type(stats[field])}")
+                if stats[field] < 0:
+                    raise Exception(f"❌ {field} should be >= 0, got {stats[field]}")
                     
-                    self.log_test(
-                        "Create Web Session", 
-                        True, 
-                        response_time,
-                        f"Token: {session_token[:8]}..., Status: {data['status']}"
-                    )
-                    return session_token
-                else:
-                    self.log_test("Create Web Session", False, response_time, f"Status not pending: {data['status']}")
-            else:
-                missing = [f for f in required_fields if f not in data]
-                self.log_test("Create Web Session", False, response_time, f"Missing fields: {missing}")
-        else:
-            self.log_test("Create Web Session", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            self.log(f"📊 Basic Stats Summary:")
+            self.log(f"   Total Users: {stats['total_users']}")
+            self.log(f"   Active Users Today: {stats['active_users_today']}")
+            self.log(f"   New Users Week: {stats['new_users_week']}")
+            self.log(f"   Total Tasks: {stats['total_tasks']}")
             
-        return None
-        
-    def test_2_get_session_status(self, session_token: str) -> bool:
-        """Test 2: Get Session Status (GET /api/web-sessions/{token}/status)"""
-        print("\n=== Test 2: Get Session Status ===")
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/status"
-        response, response_time = self.make_request("GET", url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("status") == "pending" and "qr_url" in data:
-                self.log_test(
-                    "Get Session Status (Pending)", 
-                    True, 
-                    response_time,
-                    f"Status: {data['status']}, Has QR URL: {'qr_url' in data}"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Get Session Status (Pending)", 
-                    False, 
-                    response_time, 
-                    f"Status: {data.get('status')}, Has QR URL: {'qr_url' in data}"
-                )
-        else:
-            self.log_test("Get Session Status (Pending)", False, response_time, f"HTTP {response.status_code}: {response.text}")
+            return stats
             
-        return False
+        except Exception as e:
+            self.log(f"❌ BASIC STATS TEST FAILED: {e}", "ERROR")
+            return None
+            
+    def test_admin_stats_with_days_param(self):
+        """Test GET /api/admin/stats with days parameter - CRITICAL BUG FIX TEST"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/stats with days parameter")
+        self.log("CRITICAL: total_users should be SAME regardless of days param")
+        self.log("=" * 60)
         
-    def test_3_notify_session_scanned(self, session_token: str) -> bool:
-        """Test 3: Notify Session Scanned (POST /api/web-sessions/{token}/scanned)"""
-        print("\n=== Test 3: Notify Session Scanned ===")
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/scanned"
-        payload = {
-            "telegram_id": 999888,
-            "first_name": "TestUser",
-            "photo_url": None
-        }
-        
-        response, response_time = self.make_request("POST", url, json=payload)
-        
-        if response.status_code == 200:
-            self.log_test(
-                "Notify Session Scanned", 
-                True, 
-                response_time,
-                f"Scanned by telegram_id: {payload['telegram_id']}"
-            )
+        try:
+            # Get basic stats first (no days param)
+            basic_response = self.make_request("GET", "/admin/stats")
+            if basic_response.status_code != 200:
+                raise Exception(f"Basic stats failed: {basic_response.status_code}")
+            basic_stats = basic_response.json()
+            basic_total_users = basic_stats['total_users']
+            
+            # Test with days=7
+            response_7 = self.make_request("GET", "/admin/stats?days=7")
+            if response_7.status_code != 200:
+                raise Exception(f"Stats with days=7 failed: {response_7.status_code} - {response_7.text}")
+            stats_7 = response_7.json()
+            
+            # Test with days=30
+            response_30 = self.make_request("GET", "/admin/stats?days=30")
+            if response_30.status_code != 200:
+                raise Exception(f"Stats with days=30 failed: {response_30.status_code} - {response_30.text}")
+            stats_30 = response_30.json()
+            
+            self.log(f"✅ Retrieved stats with all days parameters")
+            
+            # CRITICAL CHECK: total_users should be SAME in all cases
+            self.log(f"🔍 CRITICAL BUG FIX VERIFICATION:")
+            self.log(f"   total_users (no days): {basic_total_users}")
+            self.log(f"   total_users (days=7):  {stats_7['total_users']}")
+            self.log(f"   total_users (days=30): {stats_30['total_users']}")
+            
+            if basic_total_users != stats_7['total_users']:
+                raise Exception(f"❌ BUG: total_users differs with days=7: {basic_total_users} vs {stats_7['total_users']}")
+                
+            if basic_total_users != stats_30['total_users']:
+                raise Exception(f"❌ BUG: total_users differs with days=30: {basic_total_users} vs {stats_30['total_users']}")
+                
+            self.log(f"✅ CRITICAL BUG FIX VERIFIED: total_users is consistent across all calls")
+            
             return True
-        else:
-            self.log_test("Notify Session Scanned", False, response_time, f"HTTP {response.status_code}: {response.text}")
             
-        return False
-        
-    def test_4_verify_scanned_data(self, session_token: str) -> bool:
-        """Test 4: Verify scanned data in status (GET /api/web-sessions/{token}/status)"""
-        print("\n=== Test 4: Verify Scanned Data in Status ===")
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/status"
-        response, response_time = self.make_request("GET", url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if (data.get("telegram_id") == 999888 and 
-                data.get("first_name") == "TestUser" and
-                data.get("status") == "pending"):
-                self.log_test(
-                    "Verify Scanned Data", 
-                    True, 
-                    response_time,
-                    f"telegram_id: {data.get('telegram_id')}, first_name: {data.get('first_name')}"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Verify Scanned Data", 
-                    False, 
-                    response_time,
-                    f"telegram_id: {data.get('telegram_id')}, first_name: {data.get('first_name')}, status: {data.get('status')}"
-                )
-        else:
-            self.log_test("Verify Scanned Data", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_5_link_session(self, session_token: str) -> bool:
-        """Test 5: Link Session (POST /api/web-sessions/{token}/link)"""
-        print("\n=== Test 5: Link Session ===")
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/link"
-        payload = {
-            "telegram_id": 999888,
-            "first_name": "TestUser",
-            "last_name": "Bot",
-            "username": "testbot",
-            "photo_url": None
-        }
-        
-        response, response_time = self.make_request("POST", url, json=payload)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") is True:
-                self.log_test(
-                    "Link Session", 
-                    True, 
-                    response_time,
-                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Link Session", 
-                    False, 
-                    response_time,
-                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
-                )
-        else:
-            self.log_test("Link Session", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_6_verify_linked_status(self, session_token: str) -> bool:
-        """Test 6: Verify Linked Status (GET /api/web-sessions/{token}/status)"""
-        print("\n=== Test 6: Verify Linked Status ===")
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/status"
-        response, response_time = self.make_request("GET", url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            expected_fields = {
-                "status": "linked",
-                "telegram_id": 999888,
-                "first_name": "TestUser",
-                "last_name": "Bot",
-                "username": "testbot"
-            }
-            
-            success = all(data.get(key) == value for key, value in expected_fields.items())
-            
-            if success:
-                self.log_test(
-                    "Verify Linked Status", 
-                    True, 
-                    response_time,
-                    f"Status: {data.get('status')}, User: {data.get('first_name')} {data.get('last_name')}"
-                )
-                return True
-            else:
-                mismatches = {k: f"expected {v}, got {data.get(k)}" for k, v in expected_fields.items() if data.get(k) != v}
-                self.log_test(
-                    "Verify Linked Status", 
-                    False, 
-                    response_time,
-                    f"Mismatches: {mismatches}"
-                )
-        else:
-            self.log_test("Verify Linked Status", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_7_heartbeat(self, session_token: str) -> bool:
-        """Test 7: Heartbeat (POST /api/web-sessions/{token}/heartbeat)"""
-        print("\n=== Test 7: Heartbeat ===")
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/heartbeat"
-        response, response_time = self.make_request("POST", url, json={})
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") is True:
-                self.log_test(
-                    "Heartbeat", 
-                    True, 
-                    response_time,
-                    f"Success: {data.get('success')}"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Heartbeat", 
-                    False, 
-                    response_time,
-                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
-                )
-        else:
-            self.log_test("Heartbeat", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_8_get_user_devices(self) -> bool:
-        """Test 8: Get User Devices (GET /api/web-sessions/user/999888/devices)"""
-        print("\n=== Test 8: Get User Devices ===")
-        
-        url = f"{API_BASE}/web-sessions/user/999888/devices"
-        response, response_time = self.make_request("GET", url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            devices = data.get("devices", [])
-            
-            # Check if our linked session appears in devices list
-            session_found = any(
-                device.get("session_token") in self.session_tokens 
-                for device in devices
-            )
-            
-            if session_found and len(devices) > 0:
-                self.log_test(
-                    "Get User Devices", 
-                    True, 
-                    response_time,
-                    f"Found {len(devices)} devices, linked session present"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Get User Devices", 
-                    False, 
-                    response_time,
-                    f"Found {len(devices)} devices, linked session present: {session_found}"
-                )
-        else:
-            self.log_test("Get User Devices", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_9_race_condition(self) -> bool:
-        """Test 9: Race Condition Test - Try linking ALREADY linked session"""
-        print("\n=== Test 9: Race Condition Test ===")
-        
-        # Create a NEW session
-        print("Creating new session for race condition test...")
-        new_token = self.test_1_create_web_session()
-        if not new_token:
+        except Exception as e:
+            self.log(f"❌ DAYS PARAMETER TEST FAILED: {e}", "ERROR")
             return False
             
-        # Link the new session
-        print("Linking new session...")
-        if not self.test_5_link_session(new_token):
-            return False
+    def test_faculty_stats(self):
+        """Test GET /api/admin/faculty-stats"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/faculty-stats")
+        self.log("=" * 60)
+        
+        try:
+            # Test basic endpoint
+            response = self.make_request("GET", "/admin/faculty-stats")
+            if response.status_code != 200:
+                raise Exception(f"Faculty stats failed: {response.status_code} - {response.text}")
+                
+            faculty_stats = response.json()
+            self.log(f"✅ Faculty stats retrieved")
             
-        # Try to link the FIRST session again (should fail)
-        print("Attempting to link old session (should fail)...")
-        if len(self.session_tokens) >= 2:
-            old_token = self.session_tokens[0]  # First session token
+            # Should return a list
+            if not isinstance(faculty_stats, list):
+                raise Exception(f"❌ Faculty stats should be list, got {type(faculty_stats)}")
+                
+            self.log(f"📊 Faculty Stats: {len(faculty_stats)} faculties")
             
-            url = f"{API_BASE}/web-sessions/{old_token}/link"
-            payload = {
-                "telegram_id": 999888,
-                "first_name": "TestUser",
-                "last_name": "Bot",
-                "username": "testbot",
-                "photo_url": None
-            }
+            # Test with days parameter
+            response_days = self.make_request("GET", "/admin/faculty-stats?days=7")
+            if response_days.status_code != 200:
+                raise Exception(f"Faculty stats with days=7 failed: {response_days.status_code} - {response_days.text}")
+                
+            self.log(f"✅ Faculty stats with days=7 retrieved")
             
-            response, response_time = self.make_request("POST", url, json=payload)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("success") is False:
-                    self.log_test(
-                        "Race Condition Test", 
-                        True, 
-                        response_time,
-                        f"Correctly prevented double linking: {data.get('message', '')}"
-                    )
-                    return True
-                else:
-                    self.log_test(
-                        "Race Condition Test", 
-                        False, 
-                        response_time,
-                        "Should have failed but returned success=true"
-                    )
-            else:
-                self.log_test("Race Condition Test", False, response_time, f"HTTP {response.status_code}: {response.text}")
-        else:
-            self.log_test("Race Condition Test", False, 0, "Not enough session tokens for race condition test")
-            
-        return False
-        
-    def test_10_reject_session(self) -> bool:
-        """Test 10: Reject Test"""
-        print("\n=== Test 10: Reject Session Test ===")
-        
-        # Create another session
-        reject_token = self.test_1_create_web_session()
-        if not reject_token:
-            return False
-            
-        # Reject the session
-        url = f"{API_BASE}/web-sessions/{reject_token}/rejected"
-        response, response_time = self.make_request("POST", url, json={})
-        
-        if response.status_code == 200:
-            # Check if status becomes "expired"
-            time.sleep(0.1)  # Small delay to ensure update is processed
-            
-            status_url = f"{API_BASE}/web-sessions/{reject_token}/status"
-            status_response, status_time = self.make_request("GET", status_url)
-            
-            if status_response.status_code == 200:
-                status_data = status_response.json()
-                if status_data.get("status") == "expired":
-                    self.log_test(
-                        "Reject Session", 
-                        True, 
-                        response_time + status_time,
-                        f"Session correctly marked as expired after rejection"
-                    )
-                    return True
-                else:
-                    self.log_test(
-                        "Reject Session", 
-                        False, 
-                        response_time + status_time,
-                        f"Status after rejection: {status_data.get('status')}, expected 'expired'"
-                    )
-            else:
-                self.log_test("Reject Session", False, response_time, "Failed to check status after rejection")
-        else:
-            self.log_test("Reject Session", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_11_revoke_single_device(self) -> bool:
-        """Test 11: Revoke Single Device (DELETE /api/web-sessions/{token}?telegram_id=999888)"""
-        print("\n=== Test 11: Revoke Single Device ===")
-        
-        if not self.session_tokens:
-            self.log_test("Revoke Single Device", False, 0, "No session tokens available")
-            return False
-            
-        # Use one of the linked session tokens
-        session_token = self.session_tokens[0]
-        
-        url = f"{API_BASE}/web-sessions/{session_token}"
-        params = {"telegram_id": 999888}
-        response, response_time = self.make_request("DELETE", url, params=params)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") is True:
-                self.log_test(
-                    "Revoke Single Device", 
-                    True, 
-                    response_time,
-                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Revoke Single Device", 
-                    False, 
-                    response_time,
-                    f"Success: {data.get('success')}, Message: {data.get('message', '')}"
-                )
-        else:
-            self.log_test("Revoke Single Device", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_12_revoke_all_devices(self) -> bool:
-        """Test 12: Revoke All Devices (DELETE /api/web-sessions/user/999888/all)"""
-        print("\n=== Test 12: Revoke All Devices ===")
-        
-        url = f"{API_BASE}/web-sessions/user/999888/all"
-        response, response_time = self.make_request("DELETE", url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") is True and "deleted_count" in data:
-                self.log_test(
-                    "Revoke All Devices", 
-                    True, 
-                    response_time,
-                    f"Success: {data.get('success')}, Deleted: {data.get('deleted_count')} devices"
-                )
-                return True
-            else:
-                self.log_test(
-                    "Revoke All Devices", 
-                    False, 
-                    response_time,
-                    f"Success: {data.get('success')}, Deleted: {data.get('deleted_count', 'N/A')}"
-                )
-        else:
-            self.log_test("Revoke All Devices", False, response_time, f"HTTP {response.status_code}: {response.text}")
-            
-        return False
-        
-    def test_13_heartbeat_on_deleted_session(self) -> bool:
-        """Test 13: Heartbeat on deleted session (should return 404)"""
-        print("\n=== Test 13: Heartbeat on Deleted Session ===")
-        
-        if not self.session_tokens:
-            self.log_test("Heartbeat on Deleted Session", False, 0, "No session tokens available")
-            return False
-            
-        # Use a revoked session token
-        session_token = self.session_tokens[0]
-        
-        url = f"{API_BASE}/web-sessions/{session_token}/heartbeat"
-        response, response_time = self.make_request("POST", url, json={})
-        
-        if response.status_code == 404:
-            self.log_test(
-                "Heartbeat on Deleted Session", 
-                True, 
-                response_time,
-                f"Correctly returned 404 for deleted session"
-            )
             return True
-        else:
-            self.log_test(
-                "Heartbeat on Deleted Session", 
-                False, 
-                response_time,
-                f"Expected 404, got HTTP {response.status_code}: {response.text}"
-            )
             
-        return False
-        
-    def run_all_tests(self):
-        """Run complete web session lifecycle test suite"""
-        print(f"🚀 Starting RUDN Schedule Web Session API Tests")
-        print(f"Backend URL: {BACKEND_URL}")
-        print(f"API Base: {API_BASE}")
-        print("="*70)
-        
-        # Test 1: Create Web Session
-        session_token = self.test_1_create_web_session()
-        if not session_token:
-            print("❌ Failed to create web session. Aborting test suite.")
+        except Exception as e:
+            self.log(f"❌ FACULTY STATS TEST FAILED: {e}", "ERROR")
             return False
             
-        # Test 2: Get Session Status (pending)
-        self.test_2_get_session_status(session_token)
+    def test_course_stats(self):
+        """Test GET /api/admin/course-stats"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/course-stats")
+        self.log("=" * 60)
         
-        # Test 3: Notify Session Scanned
-        self.test_3_notify_session_scanned(session_token)
+        try:
+            # Test basic endpoint
+            response = self.make_request("GET", "/admin/course-stats")
+            if response.status_code != 200:
+                raise Exception(f"Course stats failed: {response.status_code} - {response.text}")
+                
+            course_stats = response.json()
+            self.log(f"✅ Course stats retrieved")
+            
+            # Should return a list
+            if not isinstance(course_stats, list):
+                raise Exception(f"❌ Course stats should be list, got {type(course_stats)}")
+                
+            self.log(f"📊 Course Stats: {len(course_stats)} courses")
+            
+            # Test with days parameter
+            response_days = self.make_request("GET", "/admin/course-stats?days=30")
+            if response_days.status_code != 200:
+                raise Exception(f"Course stats with days=30 failed: {response_days.status_code} - {response_days.text}")
+                
+            self.log(f"✅ Course stats with days=30 retrieved")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ COURSE STATS TEST FAILED: {e}", "ERROR")
+            return False
+            
+    def test_hourly_activity(self):
+        """Test GET /api/admin/hourly-activity"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/hourly-activity")
+        self.log("=" * 60)
         
-        # Test 4: Verify scanned data in status
-        self.test_4_verify_scanned_data(session_token)
+        try:
+            response = self.make_request("GET", "/admin/hourly-activity")
+            if response.status_code != 200:
+                raise Exception(f"Hourly activity failed: {response.status_code} - {response.text}")
+                
+            hourly_activity = response.json()
+            self.log(f"✅ Hourly activity retrieved")
+            
+            # Should return a list
+            if not isinstance(hourly_activity, list):
+                raise Exception(f"❌ Hourly activity should be list, got {type(hourly_activity)}")
+                
+            self.log(f"📊 Hourly Activity: {len(hourly_activity)} data points")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ HOURLY ACTIVITY TEST FAILED: {e}", "ERROR")
+            return False
+            
+    def test_weekly_activity(self):
+        """Test GET /api/admin/weekly-activity"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/weekly-activity")
+        self.log("=" * 60)
         
-        # Test 5: Link Session
-        self.test_5_link_session(session_token)
+        try:
+            response = self.make_request("GET", "/admin/weekly-activity")
+            if response.status_code != 200:
+                raise Exception(f"Weekly activity failed: {response.status_code} - {response.text}")
+                
+            weekly_activity = response.json()
+            self.log(f"✅ Weekly activity retrieved")
+            
+            # Should return a list
+            if not isinstance(weekly_activity, list):
+                raise Exception(f"❌ Weekly activity should be list, got {type(weekly_activity)}")
+                
+            self.log(f"📊 Weekly Activity: {len(weekly_activity)} data points")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ WEEKLY ACTIVITY TEST FAILED: {e}", "ERROR")
+            return False
+            
+    def test_admin_users(self):
+        """Test GET /api/admin/users"""
+        self.log("=" * 60)
+        self.log("TESTING GET /api/admin/users")
+        self.log("=" * 60)
         
-        # Test 6: Verify Linked Status
-        self.test_6_verify_linked_status(session_token)
-        
-        # Test 7: Heartbeat
-        self.test_7_heartbeat(session_token)
-        
-        # Test 8: Get User Devices
-        self.test_8_get_user_devices()
-        
-        # Test 9: Race Condition Test
-        self.test_9_race_condition()
-        
-        # Test 10: Reject Test
-        self.test_10_reject_session()
-        
-        # Test 11: Revoke Single Device
-        self.test_11_revoke_single_device()
-        
-        # Test 12: Revoke All Devices
-        self.test_12_revoke_all_devices()
-        
-        # Test 13: Heartbeat on deleted session
-        self.test_13_heartbeat_on_deleted_session()
-        
-        # Print summary
-        self.print_summary()
-        
-        return all(result["success"] for result in self.test_results)
-        
-    def print_summary(self):
-        """Print test results summary"""
-        print("\n" + "="*70)
-        print("🏁 TEST RESULTS SUMMARY")
-        print("="*70)
-        
-        passed = sum(1 for result in self.test_results if result["success"])
-        failed = len(self.test_results) - passed
-        total_time = sum(result["response_time"] for result in self.test_results)
-        
-        print(f"Total Tests: {len(self.test_results)}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {failed}")
-        print(f"Total Response Time: {total_time:.3f}s")
-        print(f"Average Response Time: {total_time/len(self.test_results):.3f}s")
-        
-        if failed > 0:
-            print("\n❌ FAILED TESTS:")
-            for result in self.test_results:
-                if not result["success"]:
-                    print(f"   • {result['test']}: {result['details']}")
-        
-        print(f"\n🎯 Overall Result: {'✅ ALL TESTS PASSED' if failed == 0 else f'❌ {failed} TESTS FAILED'}")
+        try:
+            # Test basic endpoint
+            response = self.make_request("GET", "/admin/users")
+            if response.status_code != 200:
+                raise Exception(f"Admin users failed: {response.status_code} - {response.text}")
+                
+            users = response.json()
+            self.log(f"✅ Admin users retrieved")
+            
+            # Should return a list
+            if not isinstance(users, list):
+                raise Exception(f"❌ Admin users should be list, got {type(users)}")
+                
+            self.log(f"📊 Admin Users: {len(users)} users")
+            
+            # Test with limit parameter
+            response_limit = self.make_request("GET", "/admin/users?limit=10")
+            if response_limit.status_code != 200:
+                raise Exception(f"Admin users with limit failed: {response_limit.status_code} - {response_limit.text}")
+                
+            limited_users = response_limit.json()
+            if len(limited_users) > 10:
+                raise Exception(f"❌ Limit=10 but got {len(limited_users)} users")
+                
+            self.log(f"✅ Admin users with limit=10 retrieved ({len(limited_users)} users)")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ ADMIN USERS TEST FAILED: {e}", "ERROR")
+            return False
 
+def main():
+    """Run the complete admin panel test suite"""
+    print("🧪 Admin Panel Backend Test Suite")
+    print("=" * 60)
+    
+    test_suite = AdminPanelTestSuite()
+    
+    # Run all tests as specified in the review request
+    results = {}
+    
+    results['basic_stats'] = test_suite.test_admin_stats_basic()
+    results['stats_days_param'] = test_suite.test_admin_stats_with_days_param()  # CRITICAL BUG FIX
+    results['faculty_stats'] = test_suite.test_faculty_stats()
+    results['course_stats'] = test_suite.test_course_stats()
+    results['hourly_activity'] = test_suite.test_hourly_activity()
+    results['weekly_activity'] = test_suite.test_weekly_activity()
+    results['admin_users'] = test_suite.test_admin_users()
+    
+    # Summary
+    print("\n" + "=" * 60)
+    print("📊 ADMIN PANEL BACKEND TEST SUMMARY")
+    print("=" * 60)
+    
+    passed_count = sum(1 for result in results.values() if result)
+    total_count = len(results)
+    
+    for test_name, passed in results.items():
+        status = "✅ PASSED" if passed else "❌ FAILED"
+        print(f"{test_name}: {status}")
+    
+    print(f"\nOverall: {passed_count}/{total_count} tests passed")
+    
+    if all(results.values()):
+        print("\n🎉 ALL ADMIN PANEL TESTS PASSED!")
+        print("✅ All admin endpoints are working correctly")
+        print("✅ CRITICAL BUG FIX VERIFIED: total_users consistent across all calls")
+        return 0
+    else:
+        print("\n💥 SOME ADMIN PANEL TESTS FAILED!")
+        print("Please check the implementation and error messages above.")
+        return 1
 
 if __name__ == "__main__":
-    tester = WebSessionTester()
-    success = tester.run_all_tests()
-    
-    # Exit with appropriate code for CI/automation
-    sys.exit(0 if success else 1)
+    exit(main())
