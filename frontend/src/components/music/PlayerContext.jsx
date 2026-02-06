@@ -622,27 +622,53 @@ export const PlayerProvider = ({ children }) => {
         message: audio.error?.message,
         src: audio.src?.substring(0, 80)
       });
+      
+      const errorCode = audio.error?.code;
+      
+      // MEDIA_ERR_NETWORK (2) — сетевая ошибка, пробуем retry с новым URL
+      if (errorCode === MediaError.MEDIA_ERR_NETWORK && currentTrackRef.current && !audio._networkRetried) {
+        console.log('🔄 Network error — retrying with fresh URL...');
+        audio._networkRetried = true;
+        getTrackUrl(currentTrackRef.current, true).then(freshUrl => {
+          if (freshUrl) {
+            audio.src = freshUrl;
+            audio.load();
+            audio.play().catch(() => {});
+          } else {
+            setError('Ошибка сети');
+            setIsPlaying(false);
+            setIsLoading(false);
+          }
+        }).catch(() => {
+          setError('Ошибка сети');
+          setIsPlaying(false);
+          setIsLoading(false);
+        });
+        return;
+      }
+      
       setIsPlaying(false);
       setIsLoading(false);
       
-      // Более детальная обработка ошибок
-      if (audio.error) {
-        switch (audio.error.code) {
-          case MediaError.MEDIA_ERR_ABORTED:
-            setError('Загрузка прервана');
-            break;
-          case MediaError.MEDIA_ERR_NETWORK:
-            setError('Ошибка сети');
-            break;
-          case MediaError.MEDIA_ERR_DECODE:
-            setError('Ошибка декодирования');
-            break;
-          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            setError('Трек недоступен');
-            break;
-          default:
-            setError('Ошибка воспроизведения');
-        }
+      // MEDIA_ERR_SRC_NOT_SUPPORTED (4) или MEDIA_ERR_DECODE (3) — авто-пропуск
+      if (errorCode === MediaError.MEDIA_ERR_DECODE || errorCode === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+        setError('Трек недоступен — пропускаем...');
+        setTimeout(() => {
+          const idx = queueIndexRef.current;
+          const q = queueRef.current;
+          if (q.length > 0 && idx < q.length - 1) {
+            next();
+          } else {
+            setError(null);
+          }
+        }, 1200);
+        return;
+      }
+      
+      if (errorCode === MediaError.MEDIA_ERR_ABORTED) {
+        setError('Загрузка прервана');
+      } else {
+        setError('Ошибка воспроизведения');
       }
     };
     
