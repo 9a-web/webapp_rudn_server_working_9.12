@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
@@ -10,6 +10,13 @@ export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick }) => {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const searchTimeout = useRef(null);
+
+  // FIX: очистка таймера при unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, []);
 
   const handleSearch = useCallback(async (searchQuery) => {
     if (!searchQuery.trim()) {
