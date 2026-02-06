@@ -410,6 +410,82 @@ class CoverService:
         if self._session and not self._session.closed:
             await self._session.close()
 
+    # ------------------------------------------------------------------
+    #  ALBUM SEARCH (fallback: если конкретный трек не найден)
+    # ------------------------------------------------------------------
+
+    async def _fetch_from_itunes_album(self, artist: str, album: str) -> Optional[dict]:
+        """Поиск обложки по названию альбома через iTunes."""
+        try:
+            session = await self._get_session()
+            clean_artist = _normalize(re.sub(r'\s*feat\.?.*', '', artist, flags=re.IGNORECASE))
+            query = f"{clean_artist} {album.strip()}"
+
+            async with session.get(
+                'https://itunes.apple.com/search',
+                params={'term': query, 'media': 'music', 'entity': 'album', 'limit': 5}
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+
+            results = data.get('results', [])
+            for item in results:
+                item_artist = item.get('artistName', '')
+                item_album = item.get('collectionName', '')
+                artwork_url = item.get('artworkUrl100', '')
+
+                if not artwork_url:
+                    continue
+
+                if _artist_match(artist, item_artist) and _title_match(album, item_album):
+                    covers = {}
+                    for key, size_str in ITUNES_SIZE_MAP.items():
+                        covers[key] = re.sub(r'\d+x\d+bb', size_str, artwork_url)
+                    logger.info(f"iTunes album cover ✓ «{artist}» album «{album}» → «{item_album}»")
+                    return covers
+
+            return None
+        except Exception as e:
+            logger.error(f"iTunes album search error: {e}")
+            return None
+
+    async def _fetch_from_deezer_album(self, artist: str, album: str) -> Optional[dict]:
+        """Поиск обложки по названию альбома через Deezer."""
+        try:
+            session = await self._get_session()
+            clean_artist = _normalize(re.sub(r'\s*feat\.?.*', '', artist, flags=re.IGNORECASE))
+            query = f"{clean_artist} {album.strip()}"
+
+            async with session.get(
+                'https://api.deezer.com/search/album',
+                params={'q': query, 'limit': 5}
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+
+            items = data.get('data', [])
+            for item in items:
+                item_artist = item.get('artist', {}).get('name', '')
+                item_album = item.get('title', '')
+
+                if _artist_match(artist, item_artist) and _title_match(album, item_album):
+                    covers = {
+                        'cover_small': item.get('cover_small'),
+                        'cover_medium': item.get('cover_medium'),
+                        'cover_big': item.get('cover_big'),
+                        'cover_xl': item.get('cover_xl')
+                    }
+                    if any(covers.values()):
+                        logger.info(f"Deezer album cover ✓ «{artist}» album «{album}» → «{item_album}»")
+                        return covers
+
+            return None
+        except Exception as e:
+            logger.error(f"Deezer album search error: {e}")
+            return None
+
 
 # Singleton
 cover_service: Optional[CoverService] = None
