@@ -208,6 +208,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const { user, hapticFeedback } = useTelegram();
   
   const [tasks, setTasks] = useState([]);
+  // FIX: Ref для актуальных задач (для колбэков без stale closure)
+  const tasksRef = React.useRef(tasks);
+  React.useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
