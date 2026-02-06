@@ -290,30 +290,21 @@ class VKAuthService:
             return {"valid": False, "error": str(e)}
     
     async def test_audio_access(self, token: str) -> Dict[str, Any]:
-        """
-        Проверка доступа токена к аудио API.
-        
-        Returns:
-            Dict с результатом проверки
-        """
+        """Проверка доступа токена к аудио API (async)."""
         try:
-            response = requests.get(
-                "https://api.vk.com/method/audio.get",
-                params={
-                    "access_token": token,
-                    "count": 1,
-                    "v": "5.131"
-                },
-                headers={"User-Agent": KATE_USER_AGENT},
-                timeout=10
-            )
-            data = response.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://api.vk.com/method/audio.get",
+                    params={"access_token": token, "count": 1, "v": "5.131"},
+                    headers={"User-Agent": KATE_USER_AGENT},
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    data = await resp.json()
             
             if "error" in data:
                 error = data["error"]
                 error_code = error.get("error_code", 0)
                 
-                # Error 15 = Access denied (нет доступа к аудио)
                 if error_code == 15:
                     return {
                         "has_access": False,
