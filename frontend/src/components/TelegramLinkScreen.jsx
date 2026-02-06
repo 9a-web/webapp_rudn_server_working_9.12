@@ -158,9 +158,6 @@ const TelegramLinkScreen = ({ onLinked }) => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
