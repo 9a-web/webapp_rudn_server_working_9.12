@@ -262,7 +262,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
     setLoading(true);
     
     try {
-      // Используем персональный токен пользователя
+      // Пробуем персональный токен пользователя
       const result = await musicAPI.getPlaylistTracksVK(
         telegramId,
         playlist.owner_id, 
@@ -270,9 +270,20 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
         playlist.access_key || ''
       );
       setTracks(result.tracks || []);
-    } catch (error) {
-      console.error('Load playlist tracks error:', error);
-      setTracks([]);
+    } catch (vkError) {
+      console.warn('getPlaylistTracksVK failed, falling back:', vkError.message);
+      // Fallback на общий эндпоинт (серверный токен)
+      try {
+        const result = await musicAPI.getPlaylistTracks(
+          playlist.owner_id,
+          playlist.id,
+          playlist.access_key || ''
+        );
+        setTracks(result.tracks || []);
+      } catch (fallbackError) {
+        console.error('getPlaylistTracks fallback also failed:', fallbackError);
+        setTracks([]);
+      }
     } finally {
       setLoading(false);
     }
