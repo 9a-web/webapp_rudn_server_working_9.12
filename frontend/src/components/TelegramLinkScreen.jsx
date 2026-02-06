@@ -70,12 +70,14 @@ const TelegramLinkScreen = ({ onLinked }) => {
     }, 2000); // Проверяем каждые 2 секунды
   }, [onLinked]);
 
-  // Подключение к WebSocket
+  // Подключение к WebSocket (уже включает polling fallback)
   const connectWebSocket = useCallback((sessionToken) => {
     // Закрываем предыдущее соединение
     if (wsRef.current) {
       wsRef.current.close();
     }
+    // Предотвращаем двойной вызов onLinked
+    let linkedHandled = false;
     
     wsRef.current = createSessionWebSocket(sessionToken, {
       onConnected: () => {
@@ -87,6 +89,9 @@ const TelegramLinkScreen = ({ onLinked }) => {
         setScannedUser(userData);
       },
       onLinked: (userData) => {
+        if (linkedHandled) return; // Предотвращаем повторный вызов
+        linkedHandled = true;
+        
         console.log('🎉 Session linked!', userData);
         setStatus('linked');
         setScannedUser(userData);
@@ -128,9 +133,9 @@ const TelegramLinkScreen = ({ onLinked }) => {
       }
     });
 
-    // Запускаем polling как backup для WebSocket
-    startStatusPolling(sessionToken);
-  }, [onLinked, startStatusPolling]);
+    // НЕ запускаем дополнительный polling — createSessionWebSocket уже включает
+    // собственный polling fallback с автопереключением
+  }, [onLinked]);
 
   // Создание новой сессии
   const createSession = useCallback(async () => {
