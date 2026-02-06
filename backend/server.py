@@ -12775,18 +12775,22 @@ async def notify_task_completed(to_telegram_id: int, room: dict, task: dict, com
 
 async def notify_achievement(to_telegram_id: int, achievement: dict):
     """Уведомление о получении достижения"""
+    ach_name = achievement.get('name', '')
+    ach_emoji = achievement.get('emoji', '🏆')
+    ach_points = achievement.get('points', 0)
+    
     await create_notification(
         telegram_id=to_telegram_id,
         notification_type=NotificationType.ACHIEVEMENT_EARNED,
         category=NotificationCategory.ACHIEVEMENTS,
         priority=NotificationPriority.NORMAL,
         title="Новое достижение!",
-        message=f"Получено достижение «{achievement.get('name', '')}» +{achievement.get('points', 0)} очков",
-        emoji=achievement.get('emoji', '🏆'),
+        message=f"{ach_emoji} «{ach_name}»\n⭐ +{ach_points} очков",
+        emoji="🏆",
         data={
             "achievement_id": achievement.get("id"),
-            "achievement_name": achievement.get("name"),
-            "points": achievement.get("points")
+            "achievement_name": ach_name,
+            "points": ach_points
         }
     )
 
