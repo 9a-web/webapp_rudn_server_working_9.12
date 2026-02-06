@@ -675,7 +675,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const handleCopyInvite = async () => {
     if (!currentRoom?.invite_code) return;
     
-    const inviteLink = `https://t.me/rudn_pro_bot/app?startapp=listen_${currentRoom.invite_code}`;
+    const inviteLink = `https://t.me/${botUsername}/app?startapp=listen_${currentRoom.invite_code}`;
     
     try {
       await navigator.clipboard.writeText(inviteLink);
@@ -691,7 +691,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const handleShare = () => {
     if (!currentRoom?.invite_code) return;
     
-    const inviteLink = `https://t.me/rudn_pro_bot/app?startapp=listen_${currentRoom.invite_code}`;
+    const inviteLink = `https://t.me/${botUsername}/app?startapp=listen_${currentRoom.invite_code}`;
     const text = `🎵 Присоединяйся к совместному прослушиванию "${currentRoom.name}"!`;
     
     if (window.Telegram?.WebApp?.openTelegramLink) {
