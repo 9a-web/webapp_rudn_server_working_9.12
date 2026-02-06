@@ -1,47 +1,50 @@
 # Test Results
 
 ## Testing Protocol
-- Test backend first with deep_testing_backend_v2
-- Ask user before testing frontend
-- Do not re-test what has already passed
-
-## Changes Made - Music Module Deep Fix
-### Backend (music_service.py):
-- FIX: All sync VK calls wrapped in `asyncio.to_thread()` — no more event loop blocking
-- FIX: `_track_to_dict()` reads `track.id` instead of `track.track_id` — correct track IDs
-- FIX: Reusable `aiohttp.ClientSession` instead of new session per search
-- FIX: `enrich_tracks_with_covers()` creates new dicts instead of mutating originals
-- IMPROVED: Better `is_blocked` detection with `content_restricted` check
-
-### Backend (vk_auth_service.py):
-- FIX: `_get_user_id()`, `verify_token()`, `test_audio_access()` — all replaced `requests.get()` with async `aiohttp`
-
-### Backend (server.py music endpoints):
-- FIX: `music_my_audio` — removed double VK API call for `has_more` check
-- FIX: `music_popular`, `music_playlists`, `music_playlist_tracks` — now use async methods
-- FIX: `playlists-vk`, `playlist-vk`, `my-vk` — replaced blocking `requests.get()` with `aiohttp`
-- FIX: `add_music_favorite` — copies dict before insert to prevent _id leaking
-
-### Frontend (PlayerContext.jsx):
-- FIX: Removed `track.url = url` mutation of React state
-- FIX: Added URL expiration retry in play() — if MediaError, re-fetches URL from API
-- FIX: `onEnded` uses `isTrackBlocked()` instead of duplicated logic
-- FIX: Added `isTrackBlocked` to onEnded dependencies
-
-### Frontend (MusicSection.jsx):
-- FIX: Favorites stale closure — loads data inline and uses fresh result directly
-
-## Backend Test Instructions
-Test the following music endpoints:
-1. GET /api/music/search?q=rock&count=3 — should return tracks array (may be empty if VK token expired)
-2. GET /api/music/popular?count=3 — should return tracks array
-3. GET /api/music/my?count=3 — should return tracks array
-4. GET /api/music/playlists — should return playlists array
-5. GET /api/bot-info — should return bot info
-6. All endpoints should handle errors gracefully (200 with empty data, not 500)
-
-Note: VK Music token may be expired in test env — this is expected. Key test is that endpoints don't crash (no 500 errors).
+- Test backend APIs using curl commands with the backend testing agent
+- Test frontend using the frontend testing agent
+- When testing backend, focus on API endpoints and data integrity
+- When testing frontend, focus on user interactions and visual consistency
+- Use ENV=test mode (MONGO DB: test_database)
+- IMPORTANT: Backend runs on port 8001 internally
+- IMPORTANT: All API routes must use /api prefix
 
 ## Incorporate User Feedback
-- Follow user instructions exactly
+- Testing agent's output must be carefully reviewed for feedback
+- Any reported issues should be fixed immediately
+- Follow testing agent's instructions exactly
 - Do not make additional changes without asking
+
+## User Problem Statement
+Анализ и исправление модулей "Список дел" и "Планировщик" в RUDN Schedule Telegram Web App.
+
+## Current Task
+Исправлены 17 багов в модулях Tasks и Planner (backend + frontend). Нужно протестировать.
+
+## Backend Fixes Applied
+1. update_task - добавлена обработка полей `notes` и `origin` (ранее игнорировались)
+2. create_planner_event - исправлен .dict() → .model_dump(), конвертация subtasks из List[str] в List[TaskSubtask]
+3. get_planner_day_events - упрощён MongoDB-запрос, добавлен расчёт прогресса подзадач и videos
+4. sync_schedule_to_planner - добавлены пропущенные поля (subtasks, videos, notes, skipped)
+5. sync_selected_schedule_events - аналогичное исправление
+6. productivity-stats - оптимизация O(N) вместо O(7×N), удалена неиспользуемая переменная
+
+## Frontend Fixes Applied
+7. PlannerTimeline - исправлено переключение просроченных событий (инкремент currentOverdueIndex)
+8. TasksSection - onKeyPress → onKeyDown (Escape теперь работает)
+9. TasksSection - синхронизация tasksSelectedDate с пропом selectedDate
+10. TasksSection - валидация time_start < time_end при синхронизации с планировщиком
+11. TasksSection - исправлен stale closure в handleReorderTasks через ref
+12. TasksSection - устранена двойная сортировка, интегрирован пользовательский sortBy
+13. SubtasksList - исправлена тёмная тема на светлую
+14. PlannerTimeline - isToday проверка с локальной таймзоной вместо UTC
+15. PlannerTimeline - алгоритм пересечений через Union-Find (исправлена некорректная группировка)
+
+## Tests to Run
+### Backend API Tests:
+1. POST /api/tasks/{telegram_id} - создание задачи
+2. PUT /api/tasks/{task_id} - обновление задачи с notes и origin
+3. GET /api/tasks/{telegram_id} - получение задач
+4. POST /api/planner/events - создание события в планировщике
+5. GET /api/planner/{telegram_id}/{date} - получение событий на дату
+6. GET /api/tasks/{telegram_id}/productivity-stats - статистика
