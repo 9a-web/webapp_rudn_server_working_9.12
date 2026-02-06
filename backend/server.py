@@ -9405,7 +9405,7 @@ async def music_playlists_vk(telegram_id: int):
 async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str = "", count: int = 100):
     """Треки конкретного плейлиста с обложками из Deezer (DEPRECATED - используйте /music/playlist-vk/{telegram_id}/{owner_id}/{playlist_id})"""
     try:
-        tracks = music_service.get_playlist_tracks(owner_id, playlist_id, access_key, count)
+        tracks = await music_service.get_playlist_tracks(owner_id, playlist_id, access_key, count)
         
         # Обогащаем треки обложками из Deezer API
         tracks = await music_service.enrich_tracks_with_covers(tracks)
