@@ -544,9 +544,9 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         }
       );
       
-      // Перезагружаем события
+      // ОПТИМИЗАЦИЯ: Перезагружаем только события планировщика
+      // loadTasks() убран — события планировщика не показываются в списке задач
       await loadPlannerEvents(tasksSelectedDate);
-      await loadTasks();
       
       hapticFeedback && hapticFeedback('notification', 'success');
     } catch (error) {
@@ -564,9 +564,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     try {
       await plannerAPI.updateEvent(eventId, updateData);
       
-      // Перезагружаем события
+      // ОПТИМИЗАЦИЯ: Перезагружаем только события планировщика
       await loadPlannerEvents(tasksSelectedDate);
-      await loadTasks();
       
       hapticFeedback && hapticFeedback('notification', 'success');
     } catch (error) {
@@ -584,9 +583,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     try {
       await plannerAPI.deleteEvent(eventId);
       
-      // Перезагружаем события
+      // ОПТИМИЗАЦИЯ: Перезагружаем только события планировщика
       await loadPlannerEvents(tasksSelectedDate);
-      await loadTasks();
       
       hapticFeedback && hapticFeedback('notification', 'success');
     } catch (error) {
