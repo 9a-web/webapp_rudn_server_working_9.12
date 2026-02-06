@@ -333,7 +333,9 @@ export const achievementsAPI = {
       });
       return response.data;
     } catch (error) {
-      handleError(error);
+      // FIX: Тихо игнорируем ошибки трекинга (аналитика не критична)
+      console.debug('Action tracking error:', error.message);
+      return null;
     }
   },
 
