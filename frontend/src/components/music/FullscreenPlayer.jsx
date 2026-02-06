@@ -193,16 +193,20 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
               <p className="text-xs text-white/40 uppercase tracking-wider">Сейчас играет</p>
             </div>
             
-            <button
-              onClick={() => setShowVolume(!showVolume)}
-              className="p-2 text-white/60 hover:text-white active:scale-95 transition-all rounded-full hover:bg-white/10"
-            >
-              {volume === 0 ? (
-                <VolumeX className="w-6 h-6" />
-              ) : (
-                <Volume2 className="w-6 h-6" />
-              )}
-            </button>
+            {/* Volume button — скрыт на мобильных (iOS не поддерживает JS volume) */}
+            {!isMobile && (
+              <button
+                onClick={() => setShowVolume(!showVolume)}
+                className="p-2 text-white/60 hover:text-white active:scale-95 transition-all rounded-full hover:bg-white/10"
+              >
+                {volume === 0 ? (
+                  <VolumeX className="w-6 h-6" />
+                ) : (
+                  <Volume2 className="w-6 h-6" />
+                )}
+              </button>
+            )}
+            {isMobile && <div className="w-10" />}
           </div>
 
           {/* Volume slider (if shown) */}
