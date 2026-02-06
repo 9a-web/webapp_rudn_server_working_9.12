@@ -1314,11 +1314,12 @@ export const FullscreenPlannerTimeline = ({
               Нет событий на этот день
             </p>
             <p className="text-gray-400 text-sm mt-1">
-              Нажмите на время или + чтобы добавить
+              Удерживайте палец на времени для создания
             </p>
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };
