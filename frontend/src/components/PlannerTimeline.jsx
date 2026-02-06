@@ -1382,6 +1382,6 @@ export const FullscreenPlannerTimeline = React.forwardRef(({
     </div>
     </div>
   );
-};
+});
 
 export default PlannerTimeline;
