@@ -74,6 +74,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
     { id: 'popular', icon: TrendingUp, label: 'Топ' },
     { id: 'playlists', icon: ListMusic, label: 'Плейлисты' },
     { id: 'favorites', icon: Heart, label: 'Избранное' },
+    { id: 'history', icon: Clock, label: 'Недавние' },
   ];
 
   // Загрузка избранного при монтировании
