@@ -12687,6 +12687,7 @@ async def notify_friend_accepted(to_telegram_id: int, friend_user: dict):
 async def notify_room_invite(to_telegram_id: int, room: dict, inviter: dict):
     """Уведомление о приглашении в комнату"""
     inviter_name = f"{inviter.get('first_name', '')} {inviter.get('last_name', '')}".strip() or inviter.get('username', 'Пользователь')
+    room_name = room.get('name', 'Комната')
     
     await create_notification(
         telegram_id=to_telegram_id,
@@ -12694,15 +12695,15 @@ async def notify_room_invite(to_telegram_id: int, room: dict, inviter: dict):
         category=NotificationCategory.ROOMS,
         priority=NotificationPriority.HIGH,
         title="Приглашение в комнату",
-        message=f"{inviter_name} приглашает вас в комнату «{room.get('name', 'Комната')}»",
+        message=f"👤 {inviter_name} зовёт вас в «{room_name}»",
         emoji="🏠",
         data={
             "room_id": room.get("id"),
-            "room_name": room.get("name"),
+            "room_name": room_name,
             "inviter_telegram_id": inviter.get("telegram_id")
         },
         actions=[
-            {"id": "join", "label": "Присоединиться", "type": "primary"},
+            {"id": "join", "label": "✅ Вступить", "type": "primary"},
             {"id": "decline", "label": "Отклонить", "type": "secondary"}
         ]
     )
