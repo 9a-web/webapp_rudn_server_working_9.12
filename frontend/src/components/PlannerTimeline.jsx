@@ -928,44 +928,49 @@ export const FullscreenPlannerTimeline = ({
     return currentDate === today;
   }, [currentDate]);
   
-  // Обработка наложения событий
+  // Обработка наложения событий (FIX: Union-Find алгоритм для корректных групп)
   const processedEvents = useMemo(() => {
     const sorted = [...events].sort((a, b) => parseTime(a.time_start) - parseTime(b.time_start));
-    const result = [];
     
-    sorted.forEach(event => {
-      const startMinutes = parseTime(event.time_start);
-      const endMinutes = parseTime(event.time_end) || startMinutes + 60;
-      
-      const overlapping = result.filter(e => {
-        const eStart = parseTime(e.time_start);
-        const eEnd = parseTime(e.time_end) || eStart + 60;
-        return startMinutes < eEnd && endMinutes > eStart;
-      });
-      
-      const overlapGroup = overlapping.length > 0 ? overlapping[0].overlapGroup : result.length;
-      const overlapIndex = overlapping.length;
-      
-      result.push({
-        ...event,
-        overlapGroup,
-        overlapIndex,
-        startMinutes,
-        endMinutes,
-      });
-    });
+    const items = sorted.map((event, idx) => ({
+      ...event,
+      startMinutes: parseTime(event.time_start),
+      endMinutes: parseTime(event.time_end) || parseTime(event.time_start) + 60,
+      idx,
+    }));
+    
+    const parent = items.map((_, i) => i);
+    const find = (x) => {
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    };
+    const union = (a, b) => { parent[find(a)] = find(b); };
+    
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (items[j].startMinutes >= items[i].endMinutes) break;
+        union(i, j);
+      }
+    }
     
     const groups = {};
-    result.forEach(e => {
-      if (!groups[e.overlapGroup]) groups[e.overlapGroup] = [];
-      groups[e.overlapGroup].push(e);
+    items.forEach((item, i) => {
+      const root = find(i);
+      if (!groups[root]) groups[root] = [];
+      groups[root].push(i);
     });
     
-    return result.map(e => ({
-      ...e,
-      totalOverlaps: groups[e.overlapGroup].length,
-      isOverlapping: groups[e.overlapGroup].length > 1,
-    }));
+    return items.map((item, i) => {
+      const root = find(i);
+      const group = groups[root];
+      return {
+        ...item,
+        overlapGroup: root,
+        overlapIndex: group.indexOf(i),
+        totalOverlaps: group.length,
+        isOverlapping: group.length > 1,
+      };
+    });
   }, [events]);
 
   return (
