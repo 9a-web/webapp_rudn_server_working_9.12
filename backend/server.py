@@ -2342,7 +2342,6 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
             # FIX: Формируем ответ через TaskResponse(**dict) — проще и надёжнее
             progress_info = calculate_subtasks_progress(new_task.get("subtasks", []))
             task_response = TaskResponse(**new_task, **progress_info)
-            )
             synced_tasks.append(task_response)
         
         return PlannerSyncResponse(
