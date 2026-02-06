@@ -1866,6 +1866,14 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         if task_update.order is not None:
             update_data["order"] = task_update.order
         
+        # FIX: Обновление заметок (ранее пропущено)
+        if task_update.notes is not None:
+            update_data["notes"] = task_update.notes
+        
+        # FIX: Обновление origin (ранее пропущено)
+        if task_update.origin is not None:
+            update_data["origin"] = task_update.origin
+        
         # Обновление времени (для событий планировщика)
         if task_update.time_start is not None:
             update_data["time_start"] = task_update.time_start
