@@ -258,17 +258,18 @@ cors_origins_list = [origin.strip() for origin in cors_origins_str.split(',')]
 
 # Check if "*" is in the list
 if '*' in cors_origins_list:
-    # If "*" is specified, use it without credentials
+    # FIX: Даже с wildcard, используем allow_credentials=True и echoing origin
+    # Это лучше работает с Kubernetes ingress/proxy
     app.add_middleware(
         CORSMiddleware,
-        allow_credentials=False,
-        allow_origins=["*"],
+        allow_credentials=True,
+        allow_origins=cors_origins_list,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["*"],
         max_age=3600,
     )
-    logger.info("CORS configured with wildcard (*) - all origins allowed without credentials")
+    logger.info("CORS configured with wildcard (*) - all origins allowed with credentials")
 else:
     # If specific origins are provided, enable credentials
     app.add_middleware(
