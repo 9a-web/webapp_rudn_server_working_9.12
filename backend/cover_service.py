@@ -289,17 +289,8 @@ class CoverService:
                     logger.info(f"iTunes cover ✓ «{artist} — {title}» (matched: {item_artist})")
                     return covers
 
-            # Если строгое сравнение не сработало — берём первый результат
-            # (лучше хоть какая-то обложка, чем никакой)
-            first = results[0]
-            artwork_url = first.get('artworkUrl100', '')
-            if artwork_url:
-                covers = {}
-                for key, size_str in ITUNES_SIZE_MAP.items():
-                    covers[key] = re.sub(r'\d+x\d+bb', size_str, artwork_url)
-                logger.info(f"iTunes cover (fuzzy) «{artist} — {title}» → {first.get('artistName','?')}")
-                return covers
-
+            # Артист не совпал ни в одном результате — НЕ берём чужую обложку
+            logger.debug(f"iTunes: artist mismatch for «{artist}», results: {[r.get('artistName','') for r in results[:3]]}")
             return None
 
         except asyncio.TimeoutError:
