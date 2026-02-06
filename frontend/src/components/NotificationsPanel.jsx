@@ -86,7 +86,27 @@ const NotificationsPanel = ({
     setIsLoading(true);
     try {
       const data = await notificationsAPI.getNotifications(telegramId, 50);
-      setNotifications(data.notifications || []);
+      // Проверяем localStorage для уже обработанных запросов из FriendsSection
+      let processedRequests = {};
+      try {
+        const saved = localStorage.getItem('processed_friend_requests');
+        if (saved) processedRequests = JSON.parse(saved);
+      } catch (e) { /* ignore */ }
+      
+      const updatedNotifs = (data.notifications || []).map(n => {
+        if (n.type === 'friend_request' && n.data?.request_id) {
+          const processed = processedRequests[n.data.request_id];
+          if (processed) {
+            const actionTaken = processed.status === 'accepted' ? 'accept' : processed.status === 'rejected' ? 'reject' : null;
+            if (actionTaken && !n.action_taken) {
+              return { ...n, action_taken: actionTaken, read: true };
+            }
+          }
+        }
+        return n;
+      });
+      
+      setNotifications(updatedNotifs);
       setUnreadCount(data.unread_count || 0);
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -100,6 +120,23 @@ const NotificationsPanel = ({
       loadNotifications();
     }
   }, [isOpen, loadNotifications]);
+
+  // Слушаем события из FriendsSection
+  useEffect(() => {
+    const handleFriendAction = (e) => {
+      const { requestId, action } = e.detail || {};
+      if (!requestId || !action) return;
+      // Обновляем соответствующее уведомление
+      setNotifications(prev => prev.map(n => {
+        if (n.type === 'friend_request' && n.data?.request_id === requestId) {
+          return { ...n, action_taken: action, read: true };
+        }
+        return n;
+      }));
+    };
+    window.addEventListener('friend-request-action-from-friends', handleFriendAction);
+    return () => window.removeEventListener('friend-request-action-from-friends', handleFriendAction);
+  }, []);
 
   // Отметить как прочитанное
   const handleMarkAsRead = async (notificationId) => {
