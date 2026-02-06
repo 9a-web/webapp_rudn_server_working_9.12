@@ -371,6 +371,14 @@ async def create_indexes():
         # In-App Notifications
         await safe_create_index(db.in_app_notifications, [("telegram_id", 1), ("created_at", -1)])
         
+        # Friends system indexes
+        await safe_create_index(db.friends, [("user_telegram_id", 1), ("friend_telegram_id", 1)], unique=True)
+        await safe_create_index(db.friends, "user_telegram_id")
+        await safe_create_index(db.friends, "friend_telegram_id")
+        await safe_create_index(db.friend_requests, [("from_telegram_id", 1), ("to_telegram_id", 1), ("status", 1)])
+        await safe_create_index(db.friend_requests, [("to_telegram_id", 1), ("status", 1)])
+        await safe_create_index(db.user_blocks, [("blocker_telegram_id", 1), ("blocked_telegram_id", 1)], unique=True)
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
