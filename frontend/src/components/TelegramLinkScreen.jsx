@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Smartphone, RefreshCw, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
-import { createWebSession, createSessionWebSocket, getWebSessionStatus } from '../services/webSessionAPI';
+import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
 
 const TelegramLinkScreen = ({ onLinked }) => {
   const [session, setSession] = useState(null);
