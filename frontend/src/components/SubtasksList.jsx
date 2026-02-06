@@ -87,8 +87,8 @@ const SubtasksList = ({
                 key={subtask.subtask_id}
                 value={subtask}
                 className="flex items-center gap-2 p-2.5 
-                         bg-gray-800/50 border border-gray-700 rounded-lg
-                         hover:border-gray-600 transition-colors group"
+                         bg-gray-50 border border-gray-200 rounded-lg
+                         hover:border-gray-300 transition-colors group"
               >
                 {/* Drag Handle */}
                 {!isReadOnly && (
