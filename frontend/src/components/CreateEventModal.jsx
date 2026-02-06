@@ -1,16 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Clock, Calendar, Tag, BookOpen } from 'lucide-react';
+import { X, Clock, Calendar, Sparkles, FileText, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { modalVariants, backdropVariants } from '../utils/animations';
+
+const glassBackdrop = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.3, ease: 'easeOut' } },
+};
+
+const glassModal = {
+  hidden: { opacity: 0, y: 60, scale: 0.97 },
+  visible: { 
+    opacity: 1, y: 0, scale: 1, 
+    transition: { type: 'spring', damping: 28, stiffness: 320, mass: 0.8 } 
+  },
+};
 
 export const CreateEventModal = ({ 
   isOpen, 
   onClose, 
   onCreateEvent, 
   hapticFeedback,
-  selectedDate, // Выбранная дата
-  defaultTimeStart, // Предустановленное время начала (для быстрого создания)
-  defaultTimeEnd, // Предустановленное время окончания
+  selectedDate,
+  defaultTimeStart,
+  defaultTimeEnd,
 }) => {
   const [eventText, setEventText] = useState('');
   const [timeStart, setTimeStart] = useState('');
@@ -20,22 +32,21 @@ export const CreateEventModal = ({
   const [saving, setSaving] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [timeError, setTimeError] = useState('');
+  const [focusedField, setFocusedField] = useState(null);
   
   const modalRef = useRef(null);
+  const inputRef = useRef(null);
   
-  // Блокируем скролл страницы при открытии модального окна
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      setTimeout(() => inputRef.current?.focus(), 350);
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
   
-  // Сбрасываем поля при открытии и применяем предустановленное время
   useEffect(() => {
     if (isOpen) {
       setEventText('');
@@ -44,109 +55,65 @@ export const CreateEventModal = ({
       setCategory('personal');
       setNotes('');
       setTimeError('');
+      setFocusedField(null);
     }
   }, [isOpen, defaultTimeStart, defaultTimeEnd]);
   
-  // Категории событий
   const categories = [
-    { id: 'study', label: 'Учеба', emoji: '📚', color: 'from-blue-400 to-blue-500' },
-    { id: 'personal', label: 'Личное', emoji: '🏠', color: 'from-green-400 to-green-500' },
-    { id: 'sport', label: 'Спорт', emoji: '🏃', color: 'from-red-400 to-red-500' },
-    { id: 'work', label: 'Работа', emoji: '💼', color: 'from-purple-400 to-purple-500' },
-    { id: 'meeting', label: 'Встреча', emoji: '👥', color: 'from-orange-400 to-orange-500' },
+    { id: 'study',    label: 'Учёба',   emoji: '📚', gradient: 'from-blue-500/80 to-cyan-400/80',    ring: 'ring-blue-400/50',   bg: 'bg-blue-500/10' },
+    { id: 'personal', label: 'Личное',   emoji: '🏠', gradient: 'from-emerald-500/80 to-teal-400/80', ring: 'ring-emerald-400/50', bg: 'bg-emerald-500/10' },
+    { id: 'sport',    label: 'Спорт',    emoji: '🏃', gradient: 'from-rose-500/80 to-orange-400/80',  ring: 'ring-rose-400/50',    bg: 'bg-rose-500/10' },
+    { id: 'work',     label: 'Работа',   emoji: '💼', gradient: 'from-violet-500/80 to-purple-400/80', ring: 'ring-violet-400/50', bg: 'bg-violet-500/10' },
+    { id: 'meeting',  label: 'Встреча',  emoji: '👥', gradient: 'from-amber-500/80 to-yellow-400/80', ring: 'ring-amber-400/50',   bg: 'bg-amber-500/10' },
   ];
   
-  // Валидация времени
   const validateTime = (start, end) => {
-    if (!start || !end) return true; // Если не заполнены - пока не валидируем
-    
-    const [startHour, startMin] = start.split(':').map(Number);
-    const [endHour, endMin] = end.split(':').map(Number);
-    
-    const startMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-    
-    if (endMinutes <= startMinutes) {
-      setTimeError('Время окончания должно быть позже времени начала');
+    if (!start || !end) return true;
+    const [sH, sM] = start.split(':').map(Number);
+    const [eH, eM] = end.split(':').map(Number);
+    if (eH * 60 + eM <= sH * 60 + sM) {
+      setTimeError('Время окончания должно быть позже начала');
       return false;
     }
-    
     setTimeError('');
     return true;
   };
   
-  // Обработка изменения времени начала
-  const handleTimeStartChange = (value) => {
-    setTimeStart(value);
-    if (timeEnd) {
-      validateTime(value, timeEnd);
-    }
-  };
-  
-  // Обработка изменения времени окончания
-  const handleTimeEndChange = (value) => {
-    setTimeEnd(value);
-    if (timeStart) {
-      validateTime(timeStart, value);
-    }
-  };
+  const handleTimeStartChange = (v) => { setTimeStart(v); timeEnd && validateTime(v, timeEnd); };
+  const handleTimeEndChange = (v) => { setTimeEnd(v); timeStart && validateTime(timeStart, v); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!eventText.trim()) {
-      alert('Введите название события');
-      return;
-    }
-    
-    if (!timeStart || !timeEnd) {
-      alert('Укажите время начала и окончания');
-      return;
-    }
-    
-    if (!validateTime(timeStart, timeEnd)) {
-      return;
-    }
+    if (!eventText.trim()) return;
+    if (!timeStart || !timeEnd) return;
+    if (!validateTime(timeStart, timeEnd)) return;
     
     try {
       setSaving(true);
       hapticFeedback && hapticFeedback('impact', 'medium');
       
-      // Форматируем дату
       let targetDateISO = null;
       if (selectedDate) {
-        const targetDate = new Date(selectedDate);
-        const year = targetDate.getFullYear();
-        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-        const day = String(targetDate.getDate()).padStart(2, '0');
-        targetDateISO = `${year}-${month}-${day}T00:00:00`;
+        const d = new Date(selectedDate);
+        targetDateISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T00:00:00`;
       }
       
-      const eventData = {
+      await onCreateEvent({
         text: eventText.trim(),
         time_start: timeStart,
         time_end: timeEnd,
-        category: category,
+        category,
         target_date: targetDateISO,
         notes: notes || null,
         origin: 'user',
-        is_fixed: false, // Пользовательские события не жесткие
-      };
+        is_fixed: false,
+      });
       
-      await onCreateEvent(eventData);
-      
-      // Очищаем и закрываем
-      setEventText('');
-      setTimeStart('');
-      setTimeEnd('');
-      setCategory('personal');
-      setNotes('');
-      setTimeError('');
+      setEventText(''); setTimeStart(''); setTimeEnd('');
+      setCategory('personal'); setNotes(''); setTimeError('');
       onClose();
     } catch (error) {
       console.error('Error creating event:', error);
-      const errorMessage = error?.message || error?.toString() || 'Неизвестная ошибка при создании события';
-      alert(`Ошибка при создании события: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -155,41 +122,52 @@ export const CreateEventModal = ({
   const handleClose = () => {
     if (saving) return;
     hapticFeedback && hapticFeedback('impact', 'light');
-    setEventText('');
-    setTimeStart('');
-    setTimeEnd('');
-    setCategory('personal');
-    setNotes('');
-    setTimeError('');
-    setDragY(0);
-    onClose();
+    setEventText(''); setTimeStart(''); setTimeEnd('');
+    setCategory('personal'); setNotes(''); setTimeError('');
+    setDragY(0); onClose();
   };
   
-  // Обработка свайпа вниз для закрытия
-  const handleDragEnd = (event, info) => {
-    if (info.offset.y > 100) {
-      handleClose();
-    } else {
-      setDragY(0);
-    }
+  const handleDragEnd = (_, info) => {
+    if (info.offset.y > 100) handleClose();
+    else setDragY(0);
   };
 
   if (!isOpen) return null;
 
+  const activeCat = categories.find(c => c.id === category);
+  const isValid = eventText.trim() && timeStart && timeEnd && !timeError;
+
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-end sm:items-center sm:justify-center"
-        variants={backdropVariants}
+        className="fixed inset-0 z-[10000] flex items-end sm:items-center sm:justify-center"
+        variants={glassBackdrop}
         initial="hidden"
         animate="visible"
         exit="hidden"
         onClick={handleClose}
       >
+        {/* Animated background */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-md" />
+        
+        {/* Decorative orbs */}
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl animate-pulse pointer-events-none" />
+        <div className="absolute bottom-1/3 right-1/4 w-48 h-48 bg-blue-500/15 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '1s' }} />
+
+        {/* Modal */}
         <motion.div
           ref={modalRef}
-          className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-t-[2rem] sm:rounded-[2rem] w-full sm:w-[500px] sm:max-h-[90vh] overflow-hidden shadow-2xl border border-slate-700/50"
-          variants={modalVariants}
+          className="relative w-full sm:w-[480px] sm:max-h-[88vh] overflow-hidden
+                     rounded-t-[28px] sm:rounded-[24px]
+                     border border-white/[0.12]
+                     shadow-[0_8px_64px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)]"
+          style={{
+            background: 'linear-gradient(135deg, rgba(30,30,50,0.85) 0%, rgba(20,20,40,0.92) 50%, rgba(30,25,50,0.88) 100%)',
+            backdropFilter: 'blur(40px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+            y: dragY > 0 ? dragY : 0,
+          }}
+          variants={glassModal}
           initial="hidden"
           animate="visible"
           exit="hidden"
@@ -198,156 +176,239 @@ export const CreateEventModal = ({
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={{ top: 0, bottom: 0.5 }}
           onDragEnd={handleDragEnd}
-          onDrag={(e, info) => setDragY(info.offset.y)}
-          style={{ y: dragY > 0 ? dragY : 0 }}
+          onDrag={(_, info) => setDragY(info.offset.y)}
         >
-          {/* Drag Handle */}
-          <div className="flex justify-center pt-3 pb-2">
-            <div className="w-12 h-1.5 bg-slate-600/50 rounded-full" />
+          {/* Top glass shine line */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-10 h-1 rounded-full bg-white/20" />
           </div>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-6 pb-4 border-b border-slate-700/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
+          <div className="px-6 pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="relative">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-[rgba(30,30,50,0.9)]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white/95 tracking-tight">Новое событие</h2>
+                  <p className="text-xs text-white/40 mt-0.5">Добавьте в планировщик</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Новое событие</h2>
-                <p className="text-sm text-slate-400">Создайте событие с временем</p>
-              </div>
+              <button
+                onClick={handleClose}
+                disabled={saving}
+                className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.06] 
+                           transition-all duration-200 active:scale-90"
+              >
+                <X className="w-5 h-5 text-white/50" />
+              </button>
             </div>
-            <button
-              onClick={handleClose}
-              className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors"
-              disabled={saving}
-            >
-              <X className="w-6 h-6 text-slate-400" />
-            </button>
           </div>
 
-          {/* Content */}
-          <form onSubmit={handleSubmit} className="p-6 max-h-[70vh] overflow-y-auto">
-            {/* Название события */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Название события *
+          {/* Separator */}
+          <div className="mx-6 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6 max-h-[65vh] overflow-y-auto space-y-5
+                                                    scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+            
+            {/* Event name */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-white/50 uppercase tracking-wider mb-2.5">
+                <Calendar className="w-3.5 h-3.5" /> Название
               </label>
-              <input
-                type="text"
-                value={eventText}
-                onChange={(e) => setEventText(e.target.value)}
-                placeholder="Встреча, тренировка, занятие..."
-                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                autoFocus
-                disabled={saving}
-              />
+              <div className={`relative rounded-2xl transition-all duration-300
+                    ${focusedField === 'name' 
+                      ? 'ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.15)]' 
+                      : ''}`}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={eventText}
+                  onChange={(e) => setEventText(e.target.value)}
+                  onFocus={() => setFocusedField('name')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="Встреча, тренировка, занятие..."
+                  disabled={saving}
+                  className="w-full px-4 py-3.5 
+                             bg-white/[0.05] border border-white/[0.08] rounded-2xl
+                             text-white/90 text-[15px] placeholder-white/25
+                             focus:outline-none focus:bg-white/[0.07] focus:border-white/[0.15]
+                             transition-all duration-300 disabled:opacity-40"
+                />
+              </div>
             </div>
 
-            {/* Время */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Время *
+            {/* Time */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-white/50 uppercase tracking-wider mb-2.5">
+                <Clock className="w-3.5 h-3.5" /> Время
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Начало</label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      type="time"
-                      value={timeStart}
-                      onChange={(e) => handleTimeStartChange(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={saving}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Окончание</label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      type="time"
-                      value={timeEnd}
-                      onChange={(e) => handleTimeEndChange(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      disabled={saving}
-                    />
-                  </div>
-                </div>
-              </div>
-              {timeError && (
-                <p className="text-red-400 text-sm mt-2">{timeError}</p>
-              )}
-            </div>
-
-            {/* Категория */}
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-300 mb-3">
-                Категория
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => {
-                      setCategory(cat.id);
-                      hapticFeedback && hapticFeedback('impact', 'light');
-                    }}
-                    className={`p-3 rounded-xl border-2 transition-all ${
-                      category === cat.id
-                        ? `bg-gradient-to-r ${cat.color} border-white/50 shadow-lg scale-105`
-                        : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                    }`}
-                    disabled={saving}
-                  >
-                    <div className="text-2xl mb-1">{cat.emoji}</div>
-                    <div className={`text-xs font-medium ${
-                      category === cat.id ? 'text-white' : 'text-slate-400'
-                    }`}>
-                      {cat.label}
+                {[
+                  { label: 'Начало', value: timeStart, onChange: handleTimeStartChange, field: 'start' },
+                  { label: 'Конец', value: timeEnd, onChange: handleTimeEndChange, field: 'end' },
+                ].map(({ label, value, onChange, field }) => (
+                  <div key={field}>
+                    <div className="text-[11px] text-white/30 mb-1.5 ml-1">{label}</div>
+                    <div className={`relative rounded-2xl transition-all duration-300
+                          ${focusedField === field 
+                            ? 'ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.15)]' 
+                            : ''}`}>
+                      <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 pointer-events-none" />
+                      <input
+                        type="time"
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        onFocus={() => setFocusedField(field)}
+                        onBlur={() => setFocusedField(null)}
+                        disabled={saving}
+                        className="w-full pl-10 pr-3 py-3.5 
+                                   bg-white/[0.05] border border-white/[0.08] rounded-2xl
+                                   text-white/90 text-[15px]
+                                   focus:outline-none focus:bg-white/[0.07] focus:border-white/[0.15]
+                                   transition-all duration-300 disabled:opacity-40
+                                   [color-scheme:dark]"
+                      />
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
+              <AnimatePresence>
+                {timeError && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -4, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -4, height: 0 }}
+                    className="text-rose-400/90 text-xs mt-2 ml-1 flex items-center gap-1"
+                  >
+                    <span className="inline-block w-1 h-1 rounded-full bg-rose-400" />
+                    {timeError}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Заметки */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Заметки (опционально)
+            {/* Category */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
+                <FileText className="w-3.5 h-3.5" /> Категория
               </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Дополнительная информация..."
-                rows={3}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                disabled={saving}
-              />
+              <div className="flex flex-wrap gap-2">
+                {categories.map((cat) => {
+                  const isActive = category === cat.id;
+                  return (
+                    <motion.button
+                      key={cat.id}
+                      type="button"
+                      whileTap={{ scale: 0.93 }}
+                      onClick={() => {
+                        setCategory(cat.id);
+                        hapticFeedback && hapticFeedback('impact', 'light');
+                      }}
+                      disabled={saving}
+                      className={`relative flex items-center gap-2 px-4 py-2.5 rounded-2xl 
+                                  border transition-all duration-300 overflow-hidden
+                                  ${isActive 
+                                    ? `border-white/20 shadow-lg ring-1 ${cat.ring}` 
+                                    : 'border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.03]'
+                                  }`}
+                    >
+                      {/* Glass active background */}
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeCategoryGlass"
+                          className={`absolute inset-0 bg-gradient-to-r ${cat.gradient} opacity-20`}
+                          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        />
+                      )}
+                      <span className="relative text-lg">{cat.emoji}</span>
+                      <span className={`relative text-xs font-medium transition-colors duration-200
+                                        ${isActive ? 'text-white/90' : 'text-white/40'}`}>
+                        {cat.label}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Кнопка создания */}
-            <button
+            {/* Notes */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-white/50 uppercase tracking-wider mb-2.5">
+                <FileText className="w-3.5 h-3.5" /> Заметки
+                <span className="text-white/20 font-normal normal-case tracking-normal ml-1">— опционально</span>
+              </label>
+              <div className={`relative rounded-2xl transition-all duration-300
+                    ${focusedField === 'notes' 
+                      ? 'ring-2 ring-purple-500/40 shadow-[0_0_20px_rgba(139,92,246,0.15)]' 
+                      : ''}`}>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onFocus={() => setFocusedField('notes')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="Дополнительная информация..."
+                  rows={2}
+                  disabled={saving}
+                  className="w-full px-4 py-3.5 
+                             bg-white/[0.05] border border-white/[0.08] rounded-2xl
+                             text-white/90 text-[15px] placeholder-white/25
+                             focus:outline-none focus:bg-white/[0.07] focus:border-white/[0.15]
+                             transition-all duration-300 resize-none disabled:opacity-40"
+                />
+              </div>
+            </div>
+
+            {/* Submit button */}
+            <motion.button
               type="submit"
-              disabled={saving || !eventText.trim() || !timeStart || !timeEnd || !!timeError}
-              className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={saving || !isValid}
+              whileTap={{ scale: 0.97 }}
+              className={`relative w-full py-4 rounded-2xl font-semibold text-[15px]
+                          overflow-hidden transition-all duration-300
+                          flex items-center justify-center gap-2.5
+                          ${isValid && !saving
+                            ? 'text-white shadow-[0_4px_24px_rgba(139,92,246,0.3)] hover:shadow-[0_8px_32px_rgba(139,92,246,0.4)]' 
+                            : 'text-white/30 cursor-not-allowed'
+                          }`}
+              style={{
+                background: isValid && !saving
+                  ? 'linear-gradient(135deg, rgba(139,92,246,0.9) 0%, rgba(219,39,119,0.8) 100%)'
+                  : 'rgba(255,255,255,0.04)',
+                border: '1px solid',
+                borderColor: isValid && !saving ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)',
+              }}
             >
+              {/* Button shine */}
+              {isValid && !saving && (
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+              )}
+              
               {saving ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Создание...
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  <span>Создание...</span>
                 </>
               ) : (
                 <>
-                  <Calendar className="w-5 h-5" />
-                  Создать событие
+                  <Sparkles className="w-4.5 h-4.5" />
+                  <span>Создать событие</span>
+                  <ChevronRight className="w-4 h-4 opacity-50" />
                 </>
               )}
-            </button>
+            </motion.button>
           </form>
+
+          {/* Bottom glass shine */}
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
         </motion.div>
       </motion.div>
     </AnimatePresence>
