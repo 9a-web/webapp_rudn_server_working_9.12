@@ -12734,6 +12734,8 @@ async def notify_room_task(to_telegram_id: int, room: dict, task: dict, creator:
 async def notify_task_assigned(to_telegram_id: int, room: dict, task: dict, assigner: dict):
     """Уведомление о назначении задачи"""
     assigner_name = f"{assigner.get('first_name', '')} {assigner.get('last_name', '')}".strip() or "Участник"
+    task_text = task.get('text', '')[:50]
+    room_name = room.get('name', '')
     
     await create_notification(
         telegram_id=to_telegram_id,
@@ -12741,12 +12743,12 @@ async def notify_task_assigned(to_telegram_id: int, room: dict, task: dict, assi
         category=NotificationCategory.ROOMS,
         priority=NotificationPriority.HIGH,
         title="Вам назначена задача",
-        message=f"{assigner_name} назначил вам задачу «{task.get('text', '')[:50]}»",
-        emoji="📌",
+        message=f"📌 «{task_text}»\n👤 От: {assigner_name}\n🏠 {room_name}",
+        emoji="🎯",
         data={
             "room_id": room.get("id"),
             "task_id": task.get("id"),
-            "room_name": room.get("name")
+            "room_name": room_name
         }
     )
 
