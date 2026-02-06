@@ -121,8 +121,8 @@ const SubtasksList = ({
                 <span className={`
                   flex-1 text-sm
                   ${subtask.completed 
-                    ? 'line-through text-gray-500' 
-                    : 'text-gray-300'
+                    ? 'line-through text-gray-400' 
+                    : 'text-gray-700'
                   }
                 `}>
                   {subtask.title}
