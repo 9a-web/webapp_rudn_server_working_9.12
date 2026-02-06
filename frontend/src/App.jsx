@@ -937,24 +937,51 @@ const Home = () => {
       setLoading(true);
       setError(null);
       
-      const scheduleData = await scheduleAPI.getSchedule({
-        facultet_id: userSettings.facultet_id,
-        level_id: userSettings.level_id,
-        kurs: userSettings.kurs,
-        form_code: userSettings.form_code,
-        group_id: userSettings.group_id,
-        week_number: weekNumber,
-      });
+      // 1) Пробуем загрузить из кэша СНАЧАЛА (мгновенно), чтобы показать данные пока грузим свежие
+      let cachedEvents = null;
+      try {
+        const cached = await scheduleAPI.getCachedSchedule(userSettings.group_id, weekNumber);
+        if (cached && cached.events && cached.events.length > 0) {
+          cachedEvents = cached.events;
+        }
+      } catch (cacheErr) {
+        // Кэш не критичен — игнорируем
+      }
       
-      setSchedule(scheduleData.events || []);
-      hapticFeedback('notification', 'success');
+      // 2) Пробуем получить актуальное расписание с RUDN
+      try {
+        const scheduleData = await scheduleAPI.getSchedule({
+          facultet_id: userSettings.facultet_id,
+          level_id: userSettings.level_id,
+          kurs: userSettings.kurs,
+          form_code: userSettings.form_code,
+          group_id: userSettings.group_id,
+          week_number: weekNumber,
+        });
+        
+        setSchedule(scheduleData.events || []);
+        hapticFeedback('notification', 'success');
+        return; // Успех — выходим
+      } catch (fetchErr) {
+        console.warn('Не удалось загрузить актуальное расписание:', fetchErr.message);
+        
+        // 3) Если свежие данные не доступны — используем кэш
+        if (cachedEvents) {
+          console.log('Используем кэшированное расписание');
+          setSchedule(cachedEvents);
+          hapticFeedback('notification', 'success');
+          return; // Кэш спас — выходим без ошибки
+        }
+        
+        // 4) Нет ни свежих данных, ни кэша — выбрасываем ошибку
+        throw fetchErr;
+      }
     } catch (err) {
       console.error('Error loading schedule:', err);
       
       // Формируем читаемое сообщение об ошибке
       let errorMessage = err.message || 'Неизвестная ошибка';
       
-      // Если err.message является объектом или массивом, пытаемся его распарсить
       if (typeof errorMessage === 'object') {
         if (Array.isArray(errorMessage)) {
           errorMessage = errorMessage.map(e => e.msg || JSON.stringify(e)).join(', ');
