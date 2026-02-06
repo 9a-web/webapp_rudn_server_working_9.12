@@ -306,11 +306,26 @@ export const PlayerProvider = ({ children }) => {
             setIsPlaying(true);
             setIsLoading(false);
             setError(null);
+            audioRef.current._networkRetried = false; // reset retry flag
             
-            // ВАЖНО: Сразу устанавливаем playbackState для системного плеера
+            // Записываем в историю прослушивания
+            try {
+              const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+              const telegramId = tgUser?.id || window._webSessionTelegramId;
+              if (telegramId && track) {
+                import('../../services/musicAPI.js').then(mod => {
+                  mod.default.addToHistory(telegramId, {
+                    id: track.id, artist: track.artist, title: track.title,
+                    duration: track.duration, cover: track.cover, album: track.album,
+                    stream_url: track.stream_url
+                  }).catch(() => {});
+                });
+              }
+            } catch (_) {}
+            
+            // Устанавливаем playbackState для системного плеера
             if ('mediaSession' in navigator) {
               navigator.mediaSession.playbackState = 'playing';
-              console.log('🎵 Media Session playbackState set to playing');
             }
           })
           .catch(async (err) => {
