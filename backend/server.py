@@ -308,8 +308,19 @@ async def create_indexes():
         await db.user_settings.create_index("telegram_id", unique=True)
         await db.user_settings.create_index("group_id")
         
-        # Tasks (Compound index for filtering by user and completion status)
+        # Tasks - основной индекс для списка задач
         await db.tasks.create_index([("telegram_id", 1), ("completed", 1)])
+        # Tasks - индекс для telegram_id отдельно (для сортировки по order)
+        await db.tasks.create_index("telegram_id")
+        # Tasks - составной индекс для планировщика (target_date запросы)
+        await db.tasks.create_index([("telegram_id", 1), ("target_date", 1)])
+        
+        # User Stats - индекс для быстрого поиска статистики достижений
+        await db.user_stats.create_index("telegram_id", unique=True)
+        
+        # User Achievements - индекс для быстрой проверки достижений
+        await db.user_achievements.create_index("telegram_id")
+        await db.user_achievements.create_index([("telegram_id", 1), ("achievement_id", 1)], unique=True)
         
         # Rooms
         await db.rooms.create_index("owner_id")
@@ -346,6 +357,9 @@ async def create_indexes():
         # Cover Cache (Deezer обложки)
         await db.cover_cache.create_index("cache_key", unique=True)
         await db.cover_cache.create_index("expires_at", expireAfterSeconds=0)  # TTL индекс
+        
+        # In-App Notifications
+        await db.in_app_notifications.create_index([("telegram_id", 1), ("created_at", -1)])
         
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
