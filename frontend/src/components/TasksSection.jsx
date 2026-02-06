@@ -673,9 +673,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       const newStatus = !event.completed;
       await plannerAPI.updateEvent(eventId, { completed: newStatus });
       
-      // Перезагрузить события
+      // ОПТИМИЗАЦИЯ: Перезагружаем только события планировщика
       await loadPlannerEvents(tasksSelectedDate);
-      await loadTasks();
       
       // Вибрация при успешном выполнении
       if (newStatus) {
@@ -706,9 +705,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       const newSkipped = !event.skipped;
       await plannerAPI.updateEvent(eventId, { skipped: newSkipped });
       
-      // Перезагрузить события
+      // ОПТИМИЗАЦИЯ: Перезагружаем только события планировщика
       await loadPlannerEvents(tasksSelectedDate);
-      await loadTasks();
     } catch (error) {
       console.error('Error toggling skipped status:', error);
     }
