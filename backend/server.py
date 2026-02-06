@@ -10137,21 +10137,21 @@ async def get_my_vk_audio(telegram_id: int, count: int = 50, offset: int = 0):
         vk_user_id = token_doc.get("vk_user_id")
         user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
         
-        # Запрос к VK API
-        import requests
-        response = requests.get(
-            "https://api.vk.com/method/audio.get",
-            params={
-                "access_token": token,
-                "owner_id": vk_user_id,
-                "count": count,
-                "offset": offset,
-                "v": "5.131"
-            },
-            headers={"User-Agent": user_agent},
-            timeout=15
-        )
-        data = response.json()
+        # Запрос к VK API (async)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.vk.com/method/audio.get",
+                params={
+                    "access_token": token,
+                    "owner_id": vk_user_id,
+                    "count": count,
+                    "offset": offset,
+                    "v": "5.131"
+                },
+                headers={"User-Agent": user_agent},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                data = await response.json()
         
         if "error" in data:
             error = data["error"]
