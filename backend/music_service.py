@@ -229,6 +229,7 @@ class VKMusicService:
                 "duration": item.get('duration', 0),
                 "url": direct_url if not is_blocked else None,
                 "cover": cover_url,
+                "album": album_name,
                 "stream_url": f"/api/music/stream/{track_id}",
                 "is_blocked": is_blocked
             }
