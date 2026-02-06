@@ -20,7 +20,7 @@ import logging
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime
 from vkaudiotoken import get_kate_token, get_vk_official_token, TwoFAHelper, TokenException
-import requests
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
