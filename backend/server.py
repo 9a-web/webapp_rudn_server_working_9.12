@@ -11954,17 +11954,36 @@ async def get_friends_list(telegram_id: int, favorites_only: bool = False, searc
 
 @api_router.get("/friends/{telegram_id}/requests", response_model=FriendRequestsResponse)
 async def get_friend_requests(telegram_id: int):
-    """Получить входящие и исходящие запросы на дружбу"""
+    """Получить входящие и исходящие запросы на дружбу (оптимизировано)"""
     try:
-        # Входящие запросы
-        incoming_data = await db.friend_requests.find({
-            "to_telegram_id": telegram_id,
-            "status": "pending"
-        }).to_list(100)
+        # Загружаем все запросы одним батчем
+        all_requests = await db.friend_requests.find({
+            "$or": [
+                {"to_telegram_id": telegram_id, "status": "pending"},
+                {"from_telegram_id": telegram_id, "status": "pending"}
+            ]
+        }).to_list(200)
+        
+        incoming_data = [r for r in all_requests if r["to_telegram_id"] == telegram_id]
+        outgoing_data = [r for r in all_requests if r["from_telegram_id"] == telegram_id]
+        
+        # Собираем все нужные user IDs
+        user_ids = set()
+        for req in incoming_data:
+            user_ids.add(req["from_telegram_id"])
+        for req in outgoing_data:
+            user_ids.add(req["to_telegram_id"])
+        
+        # Batch-загрузка пользователей
+        users_list = await db.user_settings.find({"telegram_id": {"$in": list(user_ids)}}).to_list(200)
+        users_map = {u["telegram_id"]: u for u in users_list}
+        
+        # Batch-подсчёт общих друзей
+        mutual_counts = await get_mutual_friends_count_batch(telegram_id, list(user_ids))
         
         incoming = []
         for req in incoming_data:
-            user = await db.user_settings.find_one({"telegram_id": req["from_telegram_id"]})
+            user = users_map.get(req["from_telegram_id"])
             if user:
                 incoming.append(FriendRequestCard(
                     request_id=req["id"],
@@ -11975,19 +11994,13 @@ async def get_friend_requests(telegram_id: int):
                     group_name=user.get("group_name"),
                     facultet_name=user.get("facultet_name"),
                     message=req.get("message"),
-                    mutual_friends_count=await get_mutual_friends_count(telegram_id, req["from_telegram_id"]),
+                    mutual_friends_count=mutual_counts.get(req["from_telegram_id"], 0),
                     created_at=req.get("created_at", datetime.utcnow())
                 ))
         
-        # Исходящие запросы
-        outgoing_data = await db.friend_requests.find({
-            "from_telegram_id": telegram_id,
-            "status": "pending"
-        }).to_list(100)
-        
         outgoing = []
         for req in outgoing_data:
-            user = await db.user_settings.find_one({"telegram_id": req["to_telegram_id"]})
+            user = users_map.get(req["to_telegram_id"])
             if user:
                 outgoing.append(FriendRequestCard(
                     request_id=req["id"],
@@ -11998,7 +12011,7 @@ async def get_friend_requests(telegram_id: int):
                     group_name=user.get("group_name"),
                     facultet_name=user.get("facultet_name"),
                     message=req.get("message"),
-                    mutual_friends_count=await get_mutual_friends_count(telegram_id, req["to_telegram_id"]),
+                    mutual_friends_count=mutual_counts.get(req["to_telegram_id"], 0),
                     created_at=req.get("created_at", datetime.utcnow())
                 ))
         
