@@ -11881,33 +11881,66 @@ async def search_users(
 
 @api_router.get("/friends/{telegram_id}", response_model=FriendsListResponse)
 async def get_friends_list(telegram_id: int, favorites_only: bool = False, search: str = None):
-    """Получить список друзей"""
+    """Получить список друзей (оптимизировано: batch-запросы)"""
     try:
         query = {"user_telegram_id": telegram_id}
         if favorites_only:
             query["is_favorite"] = True
         
         friends_data = await db.friends.find(query).to_list(1000)
+        if not friends_data:
+            return FriendsListResponse(friends=[], total=0)
+        
+        # Batch-загрузка всех user_settings за один запрос
+        friend_ids = [f["friend_telegram_id"] for f in friends_data]
+        friend_users_list = await db.user_settings.find({"telegram_id": {"$in": friend_ids}}).to_list(1000)
+        friend_users_map = {u["telegram_id"]: u for u in friend_users_list}
+        
+        # Batch-подсчёт общих друзей
+        mutual_counts = await get_mutual_friends_count_batch(telegram_id, friend_ids)
+        
+        # Маппинг is_favorite и created_at
+        friend_meta = {f["friend_telegram_id"]: f for f in friends_data}
         
         friends = []
-        for f in friends_data:
-            friend_user = await db.user_settings.find_one({"telegram_id": f["friend_telegram_id"]})
-            if friend_user:
-                # Фильтрация по поиску
-                if search:
-                    search_lower = search.lower()
-                    name = f"{friend_user.get('first_name', '')} {friend_user.get('last_name', '')}".lower()
-                    username = (friend_user.get("username") or "").lower()
-                    if search_lower not in name and search_lower not in username:
-                        continue
-                
-                friend_card = await build_friend_card(
-                    friend_user, 
-                    telegram_id, 
-                    f.get("created_at"),
-                    f.get("is_favorite", False)
-                )
-                friends.append(friend_card)
+        for fid in friend_ids:
+            user_data = friend_users_map.get(fid)
+            if not user_data:
+                continue
+            
+            # Фильтрация по поиску
+            if search:
+                search_lower = search.lower()
+                name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".lower()
+                username = (user_data.get("username") or "").lower()
+                if search_lower not in name and search_lower not in username:
+                    continue
+            
+            meta = friend_meta.get(fid, {})
+            privacy = await get_user_privacy_settings(fid)
+            
+            # Проверяем онлайн-статус
+            is_online = False
+            last_activity = user_data.get("last_activity")
+            if last_activity and privacy.show_online_status:
+                if isinstance(last_activity, str):
+                    last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                is_online = (datetime.utcnow() - last_activity).total_seconds() < 300
+            
+            friend_card = FriendCard(
+                telegram_id=fid,
+                username=user_data.get("username"),
+                first_name=user_data.get("first_name"),
+                last_name=user_data.get("last_name"),
+                group_name=user_data.get("group_name"),
+                facultet_name=user_data.get("facultet_name"),
+                is_online=is_online if privacy.show_online_status else False,
+                last_activity=last_activity if privacy.show_online_status else None,
+                is_favorite=meta.get("is_favorite", False),
+                mutual_friends_count=mutual_counts.get(fid, 0),
+                friendship_date=meta.get("created_at")
+            )
+            friends.append(friend_card)
         
         # Сортируем: избранные первые, потом по алфавиту
         friends.sort(key=lambda x: (not x.is_favorite, x.first_name or "", x.last_name or ""))
