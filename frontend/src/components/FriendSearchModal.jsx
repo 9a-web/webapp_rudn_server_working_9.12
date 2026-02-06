@@ -1,31 +1,41 @@
 /**
- * FriendSearchModal - Расширенный поиск пользователей
+ * FriendSearchModal - Расширенный поиск пользователей (обновлённый дизайн)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Search, Users, Building2, UserPlus, Check, Clock, Loader2 } from 'lucide-react';
+import { X, Search, Users, Building2, UserPlus, Check, Clock, Loader2, Sparkles } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 import { scheduleAPI } from '../services/api';
 
-const FriendSearchModal = ({ 
-  isOpen, 
-  onClose, 
-  userSettings, 
-  currentUserId, 
-  onSendRequest 
-}) => {
+const getAvatarGradient = (id) => {
+  const gradients = [
+    'from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500',
+    'from-emerald-500 to-teal-500', 'from-rose-500 to-pink-500',
+    'from-amber-500 to-orange-500', 'from-indigo-500 to-blue-600',
+  ];
+  return gradients[Math.abs(id || 0) % gradients.length];
+};
+
+const pluralize = (n, one, few, many) => {
+  const abs = Math.abs(n) % 100;
+  const n1 = abs % 10;
+  if (abs > 10 && abs < 20) return `${n} ${many}`;
+  if (n1 > 1 && n1 < 5) return `${n} ${few}`;
+  if (n1 === 1) return `${n} ${one}`;
+  return `${n} ${many}`;
+};
+
+const FriendSearchModal = ({ isOpen, onClose, userSettings, currentUserId, onSendRequest }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [faculties, setFaculties] = useState([]);
-  const [groups, setGroups] = useState([]);
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingFaculties, setLoadingFaculties] = useState(false);
-  const [sendingRequest, setSendingRequest] = useState(null); // ID пользователя, которому отправляется запрос
+  const [sendingRequest, setSendingRequest] = useState(null);
 
-  // Загрузка факультетов
   useEffect(() => {
     const loadFaculties = async () => {
       if (!isOpen) return;
@@ -39,33 +49,21 @@ const FriendSearchModal = ({
         setLoadingFaculties(false);
       }
     };
-
     loadFaculties();
   }, [isOpen]);
 
-  // Сброс при закрытии
   useEffect(() => {
     if (!isOpen) {
-      setSearchQuery('');
-      setSelectedFaculty(null);
-      setSelectedGroup(null);
-      setResults([]);
+      setSearchQuery(''); setSelectedFaculty(null);
+      setSelectedGroup(null); setResults([]);
     }
   }, [isOpen]);
 
-  // Поиск
   const handleSearch = useCallback(async () => {
     if (!currentUserId) return;
-    
     setIsLoading(true);
     try {
-      const data = await friendsAPI.searchUsers(
-        currentUserId,
-        searchQuery,
-        selectedGroup,
-        selectedFaculty,
-        100
-      );
+      const data = await friendsAPI.searchUsers(currentUserId, searchQuery, selectedGroup, selectedFaculty, 100);
       setResults(data.results || []);
     } catch (error) {
       console.error('Error searching:', error);
@@ -74,10 +72,9 @@ const FriendSearchModal = ({
     }
   }, [currentUserId, searchQuery, selectedFaculty, selectedGroup]);
 
-  // Автопоиск при изменении фильтров
   useEffect(() => {
     if (isOpen && (selectedFaculty || selectedGroup || searchQuery)) {
-      const timer = setTimeout(handleSearch, 300);
+      const timer = setTimeout(handleSearch, 350);
       return () => clearTimeout(timer);
     }
   }, [isOpen, selectedFaculty, selectedGroup, searchQuery, handleSearch]);
@@ -86,11 +83,8 @@ const FriendSearchModal = ({
     setSendingRequest(targetId);
     try {
       await onSendRequest(targetId);
-      // Обновляем статус в результатах
-      setResults(prev => prev.map(r => 
-        r.telegram_id === targetId 
-          ? { ...r, friendship_status: 'pending_outgoing' }
-          : r
+      setResults(prev => prev.map(r =>
+        r.telegram_id === targetId ? { ...r, friendship_status: 'pending_outgoing' } : r
       ));
     } catch (error) {
       console.error('Error sending request:', error);
@@ -105,46 +99,25 @@ const FriendSearchModal = ({
     
     if (status === 'friend') {
       return (
-        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-full text-sm">
-          <Check className="w-4 h-4" />
-          Друзья
+        <span className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/15 text-emerald-400 rounded-full text-[12px] font-medium">
+          <Check className="w-3.5 h-3.5" /> Друзья
         </span>
       );
     }
-    
     if (status?.includes('pending')) {
       return (
-        <motion.span 
-          initial={{ scale: 0.8 }}
-          animate={{ scale: 1 }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-full text-sm"
-        >
-          <Clock className="w-4 h-4" />
-          Отправлено
+        <motion.span initial={{ scale: 0.8 }} animate={{ scale: 1 }}
+          className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/15 text-amber-400 rounded-full text-[12px] font-medium">
+          <Clock className="w-3.5 h-3.5" /> Отправлено
         </motion.span>
       );
     }
-    
-    if (status === 'blocked' || status === 'blocked_by') {
-      return null;
-    }
+    if (status === 'blocked' || status === 'blocked_by') return null;
     
     return (
-      <motion.button
-        onClick={() => handleSendRequest(result.telegram_id)}
-        disabled={isSending}
-        whileTap={{ scale: 0.9 }}
-        className={`p-2 rounded-xl transition-colors ${
-          isSending 
-            ? 'bg-purple-500/10 text-purple-300' 
-            : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
-        }`}
-      >
-        {isSending ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <UserPlus className="w-5 h-5" />
-        )}
+      <motion.button onClick={() => handleSendRequest(result.telegram_id)} disabled={isSending} whileTap={{ scale: 0.85 }}
+        className={`p-2.5 rounded-xl transition-all ${isSending ? 'bg-purple-500/10 text-purple-300' : 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25'}`}>
+        {isSending ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <UserPlus className="w-[18px] h-[18px]" />}
       </motion.button>
     );
   };
@@ -153,176 +126,137 @@ const FriendSearchModal = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
-            onClick={onClose}
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60]" onClick={onClose} />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, y: '100%' }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-[60] bg-gray-900 rounded-t-3xl max-h-[90vh] overflow-hidden flex flex-col"
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            className="fixed inset-x-0 bottom-0 z-[60] rounded-t-[28px] max-h-[92vh] overflow-hidden flex flex-col"
+            style={{ backgroundColor: 'rgba(18, 18, 24, 0.98)', backdropFilter: 'blur(40px)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1.5 bg-gray-700 rounded-full" />
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-white/10 rounded-full" />
             </div>
 
-            {/* Header */}
-            <div className="px-4 pb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Расширенный поиск</h2>
-              <button
-                onClick={onClose}
-                className="p-2 bg-white/10 rounded-xl text-gray-400 hover:bg-white/20"
-              >
+            <div className="px-5 pb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                <h2 className="text-[18px] font-bold text-white">Расширенный поиск</h2>
+              </div>
+              <motion.button whileTap={{ scale: 0.85 }} onClick={onClose}
+                className="p-2 bg-white/[0.06] rounded-xl text-gray-400 hover:bg-white/10">
                 <X className="w-5 h-5" />
-              </button>
+              </motion.button>
             </div>
 
-            {/* Search input */}
-            <div className="px-4 pb-4">
+            {/* Search */}
+            <div className="px-5 pb-4">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500" />
+                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Имя или @username"
-                  className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+                  className="w-full pl-11 pr-4 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-2xl text-white text-[14px] placeholder-gray-600 focus:outline-none focus:border-purple-500/40 transition-all"
                 />
               </div>
             </div>
 
             {/* Filters */}
-            <div className="px-4 pb-4 space-y-3">
-              {/* Faculty filter */}
+            <div className="px-5 pb-4 space-y-3">
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">Факультет</label>
-                <select
-                  value={selectedFaculty || ''}
-                  onChange={(e) => setSelectedFaculty(e.target.value || null)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-purple-500/50 appearance-none"
-                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'white\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5rem' }}
-                >
+                <label className="text-[12px] text-gray-500 mb-1.5 block font-medium uppercase tracking-wider">Факультет</label>
+                <select value={selectedFaculty || ''} onChange={(e) => setSelectedFaculty(e.target.value || null)}
+                  className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.08] rounded-2xl text-white text-[14px] focus:outline-none focus:border-purple-500/40 appearance-none"
+                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%239ca3af\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2rem' }}>
                   <option value="">Все факультеты</option>
-                  {faculties.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
+                  {faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
 
-              {/* Quick filters */}
               <div className="flex gap-2 flex-wrap">
                 {userSettings?.group_id && (
-                  <button
-                    onClick={() => {
-                      setSelectedGroup(userSettings.group_id);
-                      setSelectedFaculty(null);
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors ${
-                      selectedGroup === userSettings.group_id
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/5 text-gray-300'
-                    }`}
-                  >
-                    <Users className="w-4 h-4" />
-                    Моя группа
-                  </button>
+                  <motion.button whileTap={{ scale: 0.95 }}
+                    onClick={() => { setSelectedGroup(userSettings.group_id); setSelectedFaculty(null); }}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${
+                      selectedGroup === userSettings.group_id ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'bg-white/[0.04] text-gray-400 border border-white/[0.06]'
+                    }`}>
+                    <Users className="w-3.5 h-3.5" /> Моя группа
+                  </motion.button>
                 )}
                 {userSettings?.facultet_id && (
-                  <button
-                    onClick={() => {
-                      setSelectedFaculty(userSettings.facultet_id);
-                      setSelectedGroup(null);
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-colors ${
-                      selectedFaculty === userSettings.facultet_id
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/5 text-gray-300'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4" />
-                    Мой факультет
-                  </button>
+                  <motion.button whileTap={{ scale: 0.95 }}
+                    onClick={() => { setSelectedFaculty(userSettings.facultet_id); setSelectedGroup(null); }}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${
+                      selectedFaculty === userSettings.facultet_id ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'bg-white/[0.04] text-gray-400 border border-white/[0.06]'
+                    }`}>
+                    <Building2 className="w-3.5 h-3.5" /> Мой факультет
+                  </motion.button>
                 )}
-                <button
-                  onClick={() => {
-                    setSelectedFaculty(null);
-                    setSelectedGroup(null);
-                    setSearchQuery('');
-                    setResults([]);
-                  }}
-                  className="px-4 py-2 bg-white/5 text-gray-400 rounded-xl"
-                >
+                <motion.button whileTap={{ scale: 0.95 }}
+                  onClick={() => { setSelectedFaculty(null); setSelectedGroup(null); setSearchQuery(''); setResults([]); }}
+                  className="px-4 py-2 bg-white/[0.04] text-gray-500 rounded-xl text-[13px] font-medium border border-white/[0.06]">
                   Сбросить
-                </button>
+                </motion.button>
               </div>
             </div>
 
             {/* Results */}
-            <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <div className="flex-1 overflow-y-auto px-5 pb-6">
               {isLoading ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-10">
                   <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : results.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-400 mb-3">
+                  <p className="text-[12px] text-gray-500 font-medium mb-2">
                     Найдено: {results.length}
                   </p>
-                  {results.map((result) => (
-                    <motion.div
-                      key={result.telegram_id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white/5 rounded-2xl p-4 border border-white/10"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-medium">
-                          {(result.first_name?.[0] || result.username?.[0] || '?').toUpperCase()}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-white truncate">
-                            {result.first_name} {result.last_name}
-                          </h4>
-                          <p className="text-sm text-gray-400 truncate">
-                            {result.group_name || (result.username ? `@${result.username}` : '')}
-                          </p>
-                          {result.facultet_name && (
-                            <p className="text-xs text-gray-500 truncate">
-                              {result.facultet_name}
+                  {results.map((result, idx) => (
+                    <motion.div key={result.telegram_id}
+                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.03 }}
+                      className="relative overflow-hidden rounded-2xl">
+                      <div className="absolute inset-0 bg-white/[0.03]" />
+                      <div className="absolute inset-0 border border-white/[0.06] rounded-2xl" />
+                      <div className="relative p-4">
+                        <div className="flex items-center gap-3.5">
+                          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${getAvatarGradient(result.telegram_id)} flex items-center justify-center text-white font-bold text-base shadow-lg`}>
+                            {(result.first_name?.[0] || result.username?.[0] || '?').toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-[14px] text-white truncate">{result.first_name} {result.last_name}</h4>
+                            <p className="text-[12px] text-gray-400 truncate mt-0.5">
+                              {result.group_name || (result.username ? `@${result.username}` : '')}
                             </p>
-                          )}
-                          {result.mutual_friends_count > 0 && (
-                            <p className="text-xs text-purple-400 mt-0.5">
-                              {result.mutual_friends_count} общих друзей
-                            </p>
-                          )}
+                            {result.facultet_name && <p className="text-[11px] text-gray-500 truncate">{result.facultet_name}</p>}
+                            {result.mutual_friends_count > 0 && (
+                              <p className="text-[11px] text-purple-400/70 mt-0.5">
+                                {pluralize(result.mutual_friends_count, 'общий друг', 'общих друга', 'общих друзей')}
+                              </p>
+                            )}
+                          </div>
+                          {getStatusButton(result)}
                         </div>
-
-                        {getStatusButton(result)}
                       </div>
                     </motion.div>
                   ))}
                 </div>
               ) : (searchQuery || selectedFaculty || selectedGroup) ? (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                  <p className="text-gray-400">Никого не найдено</p>
+                <div className="text-center py-10">
+                  <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-3">
+                    <Search className="w-7 h-7 text-gray-600" />
+                  </div>
+                  <p className="text-gray-400 text-[14px]">Никого не найдено</p>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                  <p className="text-gray-400">Выберите фильтр или введите имя</p>
+                <div className="text-center py-10">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-3">
+                    <Users className="w-7 h-7 text-purple-400/40" />
+                  </div>
+                  <p className="text-gray-400 text-[14px]">Выберите фильтр или введите имя</p>
                 </div>
               )}
             </div>
