@@ -205,18 +205,16 @@ class VKAuthService:
             raise VKAuthError(f"Ошибка авторизации: {str(e)}", "unknown_error")
     
     async def _get_user_id(self, token: str) -> int:
-        """Получение user_id через VK API"""
+        """Получение user_id через VK API (async)"""
         try:
-            response = requests.get(
-                "https://api.vk.com/method/users.get",
-                params={
-                    "access_token": token,
-                    "v": "5.131"
-                },
-                headers={"User-Agent": KATE_USER_AGENT},
-                timeout=10
-            )
-            data = response.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://api.vk.com/method/users.get",
+                    params={"access_token": token, "v": "5.131"},
+                    headers={"User-Agent": KATE_USER_AGENT},
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    data = await resp.json()
             
             if "response" in data and len(data["response"]) > 0:
                 return data["response"][0]["id"]
