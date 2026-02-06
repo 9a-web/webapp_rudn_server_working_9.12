@@ -12905,6 +12905,7 @@ async def get_web_session_status(session_token: str):
     Получить статус веб-сессии.
     Используется для polling или проверки после WebSocket disconnect.
     Обновляет last_active для связанных сессий.
+    Возвращает данные сканирования если QR-код был отсканирован.
     """
     try:
         session = await db.web_sessions.find_one({"session_token": session_token})
@@ -12931,18 +12932,29 @@ async def get_web_session_status(session_token: str):
         bot_username = get_telegram_bot_username()
         qr_url = f"https://t.me/{bot_username}/app?startapp=link_{session_token}"
         
-        return WebSessionResponse(
-            session_token=session_token,
-            status=WebSessionStatus(session["status"]),
-            qr_url=qr_url,
-            expires_at=session.get("expires_at"),
-            telegram_id=session.get("telegram_id"),
-            first_name=session.get("first_name"),
-            last_name=session.get("last_name"),
-            username=session.get("username"),
-            photo_url=session.get("photo_url"),
-            user_settings=session.get("user_settings")
-        )
+        # Для PENDING сессий с данными сканирования — передаём scanned_by
+        # (polling-клиенты узнают что QR отсканирован)
+        response_data = {
+            "session_token": session_token,
+            "status": WebSessionStatus(session["status"]),
+            "qr_url": qr_url,
+            "expires_at": session.get("expires_at"),
+            "telegram_id": session.get("telegram_id"),
+            "first_name": session.get("first_name"),
+            "last_name": session.get("last_name"),
+            "username": session.get("username"),
+            "photo_url": session.get("photo_url"),
+            "user_settings": session.get("user_settings")
+        }
+        
+        # Если сессия PENDING но уже отсканирована — передаём данные в first_name/photo_url/telegram_id
+        # чтобы polling-клиент мог показать "waiting" состояние
+        if session["status"] == WebSessionStatus.PENDING.value and session.get("scanned_by"):
+            response_data["telegram_id"] = session.get("scanned_by")
+            response_data["first_name"] = session.get("scanned_first_name")
+            response_data["photo_url"] = session.get("scanned_photo_url")
+        
+        return WebSessionResponse(**response_data)
         
     except HTTPException:
         raise
