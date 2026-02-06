@@ -882,7 +882,6 @@ export const PlannerTimeline = React.forwardRef(({
       timelineRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
     }
   }));
-  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Обновление текущего времени каждую минуту
   useEffect(() => {
