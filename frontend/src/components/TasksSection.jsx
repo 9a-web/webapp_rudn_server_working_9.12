@@ -1341,23 +1341,44 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       }
     });
     
-    // Сортируем задачи: сначала по order (drag & drop), затем по приоритету
+    // FIX: Единая сортировка с учётом пользовательского sortBy
     const priorityOrder = { high: 3, medium: 2, low: 1 };
     allTasks.sort((a, b) => {
       // 1. СНАЧАЛА ПО СТАТУСУ ВЫПОЛНЕНИЯ (невыполненные сверху)
       if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1; // false (невыполненные) идут первыми
+        return a.completed ? 1 : -1;
       }
       
-      // 2. Потом по order (если установлен) - только для задач с одинаковым статусом
+      // 2. По order (drag & drop)
       const orderA = a.order !== undefined ? a.order : 999999;
       const orderB = b.order !== undefined ? b.order : 999999;
-      
       if (orderA !== orderB) {
         return orderA - orderB;
       }
       
-      // 3. Потом по приоритету
+      // 3. Пользовательский sortBy (приоритет / дедлайн / дата создания)
+      if (sortBy === 'priority') {
+        const pA = priorityOrder[a.priority] || 2;
+        const pB = priorityOrder[b.priority] || 2;
+        if (pA !== pB) return pB - pA;
+      } else if (sortBy === 'deadline') {
+        if (a.deadline && b.deadline) {
+          const diff = new Date(a.deadline) - new Date(b.deadline);
+          if (diff !== 0) return diff;
+        } else if (a.deadline) {
+          return -1;
+        } else if (b.deadline) {
+          return 1;
+        }
+      } else {
+        // По дате создания (новые сверху)
+        const dateA = new Date(a.created_at || 0);
+        const dateB = new Date(b.created_at || 0);
+        const diff = dateB - dateA;
+        if (diff !== 0) return diff;
+      }
+      
+      // 4. Fallback по приоритету
       const priorityA = priorityOrder[a.priority] || 2;
       const priorityB = priorityOrder[b.priority] || 2;
       return priorityB - priorityA;
