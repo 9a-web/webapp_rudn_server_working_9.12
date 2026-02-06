@@ -202,12 +202,13 @@ export const PlayerProvider = ({ children }) => {
 
   /**
    * Получение прямой ссылки на трек
-   * Если url уже есть (например, из избранного) - используем его
+   * Если url уже есть и свежий — используем его
    * Иначе запрашиваем через API
+   * FIX: Добавлен retry при ошибке (URL мог истечь)
    */
-  const getTrackUrl = useCallback(async (track) => {
-    // Если URL уже есть и он валидный - используем его
-    if (track.url && track.url.startsWith('http')) {
+  const getTrackUrl = useCallback(async (track, forceRefresh = false) => {
+    // Если URL уже есть и он валидный — используем его (если не форсируем обновление)
+    if (!forceRefresh && track.url && track.url.startsWith('http')) {
       console.log('🔗 Using existing URL:', track.url.substring(0, 60) + '...');
       return track.url;
     }
