@@ -37,6 +37,9 @@ export const FullscreenPlayer = ({ isOpen, onClose, onArtistClick }) => {
   const progressBarRef = useRef(null);
   const constraintsRef = useRef(null);
   
+  // Определяем мобильное устройство (volume slider бесполезен на iOS)
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
   // Motion value для отслеживания позиции свайпа
   const dragY = useMotionValue(0);
   
