@@ -1,11 +1,26 @@
 /**
  * API Service для работы с системой друзей
+ * Использует REACT_APP_BACKEND_URL из .env
  */
 
 import axios from 'axios';
 
-// Определяем URL backend
+// Определяем URL backend из env
 const getBackendURL = () => {
+  let envBackendUrl = '';
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
+    }
+    if (!envBackendUrl && typeof process !== 'undefined' && process.env) {
+      envBackendUrl = process.env.REACT_APP_BACKEND_URL || '';
+    }
+  } catch (error) {
+    console.warn('Could not access environment variables:', error);
+  }
+  if (envBackendUrl && envBackendUrl.trim() !== '') {
+    return envBackendUrl;
+  }
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:8001';
   }
@@ -42,9 +57,6 @@ const handleError = (error) => {
 export const friendsAPI = {
   // ========== Поиск и список ==========
   
-  /**
-   * Поиск пользователей
-   */
   searchUsers: async (telegramId, query = '', groupId = null, facultetId = null, limit = 50) => {
     try {
       const params = new URLSearchParams({ telegram_id: telegramId, limit });
@@ -59,9 +71,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Получить список друзей
-   */
   getFriends: async (telegramId, favoritesOnly = false, search = '') => {
     try {
       const params = new URLSearchParams();
@@ -76,9 +85,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Получить запросы на дружбу
-   */
   getFriendRequests: async (telegramId) => {
     try {
       const response = await api.get(`/friends/${telegramId}/requests`);
@@ -88,9 +94,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Получить общих друзей
-   */
   getMutualFriends: async (telegramId, otherTelegramId) => {
     try {
       const response = await api.get(`/friends/mutual/${telegramId}/${otherTelegramId}`);
@@ -100,9 +103,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Получить заблокированных пользователей
-   */
   getBlockedUsers: async (telegramId) => {
     try {
       const response = await api.get(`/friends/${telegramId}/blocked`);
@@ -114,9 +114,6 @@ export const friendsAPI = {
 
   // ========== Действия с друзьями ==========
 
-  /**
-   * Отправить запрос на дружбу
-   */
   sendFriendRequest: async (telegramId, targetTelegramId) => {
     try {
       const response = await api.post(`/friends/request/${targetTelegramId}`, {
@@ -128,9 +125,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Принять запрос на дружбу
-   */
   acceptFriendRequest: async (requestId, telegramId) => {
     try {
       const response = await api.post(`/friends/accept/${requestId}`, {
@@ -142,9 +136,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Отклонить запрос на дружбу
-   */
   rejectFriendRequest: async (requestId, telegramId) => {
     try {
       const response = await api.post(`/friends/reject/${requestId}`, {
@@ -156,9 +147,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Отменить отправленный запрос
-   */
   cancelFriendRequest: async (requestId, telegramId) => {
     try {
       const response = await api.post(`/friends/cancel/${requestId}`, {
@@ -170,9 +158,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Удалить из друзей
-   */
   removeFriend: async (telegramId, friendTelegramId) => {
     try {
       const response = await api.delete(`/friends/${friendTelegramId}`, {
@@ -184,9 +169,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Добавить/убрать из избранного
-   */
   toggleFavorite: async (telegramId, friendTelegramId, isFavorite) => {
     try {
       const response = await api.post(`/friends/${friendTelegramId}/favorite`, {
@@ -199,9 +181,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Заблокировать пользователя
-   */
   blockUser: async (telegramId, targetTelegramId) => {
     try {
       const response = await api.post(`/friends/block/${targetTelegramId}`, {
@@ -213,9 +192,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Разблокировать пользователя
-   */
   unblockUser: async (telegramId, targetTelegramId) => {
     try {
       const response = await api.delete(`/friends/block/${targetTelegramId}`, {
@@ -229,9 +205,6 @@ export const friendsAPI = {
 
   // ========== Профиль ==========
 
-  /**
-   * Получить публичный профиль пользователя
-   */
   getUserProfile: async (telegramId, viewerTelegramId = null) => {
     try {
       const params = viewerTelegramId ? `?viewer_telegram_id=${viewerTelegramId}` : '';
@@ -242,9 +215,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Получить расписание друга
-   */
   getFriendSchedule: async (friendTelegramId, viewerTelegramId, date = null) => {
     try {
       const params = new URLSearchParams({ viewer_telegram_id: viewerTelegramId });
@@ -257,9 +227,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Получить данные для QR-кода профиля
-   */
   getProfileQR: async (telegramId) => {
     try {
       const response = await api.get(`/profile/${telegramId}/qr`);
@@ -271,9 +238,6 @@ export const friendsAPI = {
 
   // ========== Настройки приватности ==========
 
-  /**
-   * Получить настройки приватности
-   */
   getPrivacySettings: async (telegramId) => {
     try {
       const response = await api.get(`/profile/${telegramId}/privacy`);
@@ -283,9 +247,6 @@ export const friendsAPI = {
     }
   },
 
-  /**
-   * Обновить настройки приватности
-   */
   updatePrivacySettings: async (telegramId, settings) => {
     try {
       const response = await api.put(`/profile/${telegramId}/privacy`, settings);
@@ -297,9 +258,6 @@ export const friendsAPI = {
 
   // ========== Онбординг ==========
 
-  /**
-   * Обработать приглашение от друга
-   */
   processFriendInvite: async (telegramId, inviterTelegramId, useInviterGroup = false) => {
     try {
       const response = await api.post('/friends/process-invite', {
