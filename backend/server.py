@@ -12674,9 +12674,9 @@ async def notify_friend_accepted(to_telegram_id: int, friend_user: dict):
         notification_type=NotificationType.FRIEND_ACCEPTED,
         category=NotificationCategory.SOCIAL,
         priority=NotificationPriority.NORMAL,
-        title="Заявка принята",
-        message=f"{friend_name} принял вашу заявку в друзья",
-        emoji="✅",
+        title="Вы теперь друзья!",
+        message=f"🤝 {friend_name} принял вашу заявку",
+        emoji="🎉",
         data={
             "friend_telegram_id": friend_user.get("telegram_id"),
             "friend_name": friend_name
