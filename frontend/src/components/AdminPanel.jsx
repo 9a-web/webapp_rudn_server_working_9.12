@@ -638,7 +638,10 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
-                  label={(entry) => `${entry.faculty_name.substring(0, 15)}...`}
+                  label={(entry) => {
+                    const name = entry.faculty_name || 'Без факультета';
+                    return name.length > 15 ? `${name.substring(0, 15)}…` : name;
+                  }}
                 >
                   {facultyStats.slice(0, 6).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
