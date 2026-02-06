@@ -18,57 +18,6 @@ const TelegramLinkScreen = ({ onLinked }) => {
   const wsRef = useRef(null);
   const timerRef = useRef(null);
 
-  // Polling статуса сессии (backup для WebSocket)
-  const startStatusPolling = useCallback((sessionToken) => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const sessionStatus = await getWebSessionStatus(sessionToken);
-        console.log('📊 Polling status:', sessionStatus.status);
-        
-        if (sessionStatus.status === 'linked') {
-          setStatus('linked');
-          if (sessionStatus.telegram_id) {
-            setScannedUser({
-              telegram_id: sessionStatus.telegram_id,
-              first_name: sessionStatus.first_name,
-              last_name: sessionStatus.last_name,
-              username: sessionStatus.username,
-              photo_url: sessionStatus.photo_url
-            });
-            
-            // Сохраняем данные
-            localStorage.setItem('telegram_user', JSON.stringify({
-              id: sessionStatus.telegram_id,
-              first_name: sessionStatus.first_name,
-              last_name: sessionStatus.last_name,
-              username: sessionStatus.username,
-              photo_url: sessionStatus.photo_url
-            }));
-            localStorage.setItem('session_token', sessionToken);
-            
-            if (sessionStatus.user_settings) {
-              localStorage.setItem('user_settings', JSON.stringify(sessionStatus.user_settings));
-            }
-            
-            setTimeout(() => {
-              onLinked?.(sessionStatus);
-            }, 1500);
-          }
-          clearInterval(pollingRef.current);
-        } else if (sessionStatus.status === 'expired') {
-          setStatus('expired');
-          clearInterval(pollingRef.current);
-        }
-      } catch (err) {
-        console.log('Polling error:', err);
-      }
-    }, 2000); // Проверяем каждые 2 секунды
-  }, [onLinked]);
-
   // Подключение к WebSocket (уже включает polling fallback)
   const connectWebSocket = useCallback((sessionToken) => {
     // Закрываем предыдущее соединение
