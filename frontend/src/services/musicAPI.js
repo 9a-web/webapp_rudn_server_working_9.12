@@ -190,7 +190,24 @@ export const musicAPI = {
   getMyVKAudio: async (telegramId, count = 50, offset = 0) => {
     const response = await api.get(`/music/my-vk/${telegramId}?count=${count}&offset=${offset}`);
     return response.data;
-  }
+  },
+
+  // ---- History ----
+  addToHistory: async (telegramId, track) => {
+    const response = await api.post(`/music/history/${telegramId}`, track);
+    return response.data;
+  },
+
+  getHistory: async (telegramId, limit = 50) => {
+    const response = await api.get(`/music/history/${telegramId}?limit=${limit}`);
+    return response.data;
+  },
+
+  // ---- Similar ----
+  getSimilar: async (trackId, count = 20) => {
+    const response = await api.get(`/music/similar/${trackId}?count=${count}`);
+    return response.data;
+  },
 };
 
 export default musicAPI;
