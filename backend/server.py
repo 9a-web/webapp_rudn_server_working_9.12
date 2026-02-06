@@ -12598,9 +12598,13 @@ async def create_notification(
             try:
                 from notifications import get_notification_service
                 notification_service = get_notification_service()
+                
+                # Красиво форматируем push-сообщение
+                push_text = f"{emoji}  <b>{title}</b>\n\n{message}"
+                
                 await notification_service.send_message(
                     telegram_id,
-                    f"{emoji} {title}\n\n{message}"
+                    push_text
                 )
             except Exception as e:
                 logger.warning(f"Failed to send push notification: {e}")
