@@ -542,9 +542,25 @@ const DayProgressBar = ({ events }) => {
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
   const skippedPercent = total > 0 ? Math.round((skipped / total) * 100) : 0;
   
-  if (total === 0) return null;
+  const allDone = total > 0 && completed === total;
+  const prevAllDoneRef = useRef(false);
+  const hasLoadedRef = useRef(false);
   
-  const allDone = completed === total;
+  useEffect(() => {
+    // Пропускаем первый рендер (загрузка) — конфетти только при действии пользователя
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      prevAllDoneRef.current = allDone;
+      return;
+    }
+    // Конфетти при переходе: не все → все выполнены
+    if (allDone && !prevAllDoneRef.current) {
+      confettiExplosion();
+    }
+    prevAllDoneRef.current = allDone;
+  }, [allDone]);
+  
+  if (total === 0) return null;
   
   return (
     <div className="px-4 py-2.5 border-b border-gray-200/60">
