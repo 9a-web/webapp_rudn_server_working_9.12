@@ -41,6 +41,10 @@ export default defineConfig(({ mode }) => {
       host: true,
       strictPort: true,
       allowedHosts: true,
+      // Allow admin-test.html
+      fs: {
+        allow: ['.'],
+      },
     },
     
     preview: {
