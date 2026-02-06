@@ -13415,8 +13415,9 @@ app.include_router(api_router)
 @app.websocket("/api/ws/session/{session_token}")
 async def websocket_session(websocket: WebSocket, session_token: str):
     """
-    WebSocket для real-time уведомления о связке сессии.
-    Веб-клиент подключается и ждёт событие 'linked'.
+    WebSocket для real-time уведомления о связке/мониторинге сессии.
+    - Для PENDING сессий: ждёт событие 'linked'/'scanned'/'rejected'
+    - Для LINKED сессий: мониторит событие 'revoked' (вместо закрытия)
     """
     await websocket.accept()
     
@@ -13427,29 +13428,25 @@ async def websocket_session(websocket: WebSocket, session_token: str):
         await websocket.close()
         return
     
-    # Если сессия уже связана - сразу отправляем данные
-    if session["status"] == WebSessionStatus.LINKED.value:
-        await websocket.send_json({
-            "event": "linked",
-            "data": {
-                "telegram_id": session.get("telegram_id"),
-                "first_name": session.get("first_name"),
-                "last_name": session.get("last_name"),
-                "username": session.get("username"),
-                "photo_url": session.get("photo_url"),
-                "user_settings": session.get("user_settings")
-            }
-        })
-        await websocket.close()
-        return
+    # Для LINKED сессий — режим мониторинга (ждём revoked)
+    # НЕ закрываем сразу, а держим соединение для получения revoked событий
+    is_monitor_mode = session["status"] == WebSessionStatus.LINKED.value
     
     # Сохраняем соединение
     web_session_connections[session_token] = websocket
-    logger.info(f"🔌 WebSocket connected for session {session_token[:8]}...")
+    logger.info(f"🔌 WebSocket connected for session {session_token[:8]}... (monitor={is_monitor_mode})")
     
     try:
-        # Отправляем подтверждение подключения
-        await websocket.send_json({"event": "connected", "session_token": session_token})
+        # Отправляем подтверждение подключения с текущим статусом
+        if is_monitor_mode:
+            await websocket.send_json({
+                "event": "connected",
+                "session_token": session_token,
+                "mode": "monitor",
+                "status": "linked"
+            })
+        else:
+            await websocket.send_json({"event": "connected", "session_token": session_token})
         
         # Ждём сообщений или отключения
         while True:
@@ -13462,7 +13459,13 @@ async def websocket_session(websocket: WebSocket, session_token: str):
                 elif data == "check":
                     # Проверяем статус сессии
                     session = await db.web_sessions.find_one({"session_token": session_token})
-                    if session and session["status"] == WebSessionStatus.LINKED.value:
+                    if not session:
+                        # Сессия удалена (revoked)
+                        await websocket.send_json({"event": "revoked", "message": "Сессия удалена"})
+                        break
+                    
+                    if session["status"] == WebSessionStatus.LINKED.value and not is_monitor_mode:
+                        # Сессия связана — отправляем данные
                         await websocket.send_json({
                             "event": "linked",
                             "data": {
@@ -13474,30 +13477,42 @@ async def websocket_session(websocket: WebSocket, session_token: str):
                                 "user_settings": session.get("user_settings")
                             }
                         })
+                        break
+                    elif session["status"] == WebSessionStatus.EXPIRED.value:
+                        await websocket.send_json({"event": "expired"})
                         break
                         
             except asyncio.TimeoutError:
                 # Проверяем статус сессии при timeout
                 session = await db.web_sessions.find_one({"session_token": session_token})
-                if session:
-                    if session["status"] == WebSessionStatus.LINKED.value:
-                        await websocket.send_json({
-                            "event": "linked",
-                            "data": {
-                                "telegram_id": session.get("telegram_id"),
-                                "first_name": session.get("first_name"),
-                                "last_name": session.get("last_name"),
-                                "username": session.get("username"),
-                                "photo_url": session.get("photo_url"),
-                                "user_settings": session.get("user_settings")
-                            }
-                        })
-                        break
-                    elif session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+                if not session:
+                    # Сессия удалена (revoked)
+                    await websocket.send_json({"event": "revoked", "message": "Сессия удалена"})
+                    break
+                
+                if session["status"] == WebSessionStatus.LINKED.value and not is_monitor_mode:
+                    await websocket.send_json({
+                        "event": "linked",
+                        "data": {
+                            "telegram_id": session.get("telegram_id"),
+                            "first_name": session.get("first_name"),
+                            "last_name": session.get("last_name"),
+                            "username": session.get("username"),
+                            "photo_url": session.get("photo_url"),
+                            "user_settings": session.get("user_settings")
+                        }
+                    })
+                    break
+                elif session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+                    if not is_monitor_mode:
                         await websocket.send_json({"event": "expired"})
                         break
+                
                 # Отправляем ping для поддержания соединения
-                await websocket.send_text("ping")
+                try:
+                    await websocket.send_text("ping")
+                except Exception:
+                    break
                 
     except WebSocketDisconnect:
         logger.info(f"🔌 WebSocket disconnected for session {session_token[:8]}...")
