@@ -537,7 +537,9 @@ const TimelineEventCard = ({
 // ============================================================
 const DayProgressBar = ({ events }) => {
   const total = events.length;
-  const completed = events.filter(e => e.completed || e.skipped).length;
+  const completed = events.filter(e => e.completed).length;
+  const skipped = events.filter(e => e.skipped && !e.completed).length;
+  const remaining = total - completed - skipped;
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
   
   if (total === 0) return null;
