@@ -416,16 +416,17 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
         
         <div className="relative p-4">
           <div className="flex items-center gap-3.5">
-            {/* Аватар */}
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-base overflow-hidden shadow-lg bg-gradient-to-br ${
-              processedStatus === 'accepted' 
-                ? 'from-emerald-500 to-teal-500' 
-                : processedStatus === 'rejected' || processedStatus === 'cancelled'
-                ? 'from-gray-500 to-gray-600'
-                : getAvatarGradient(request.telegram_id)
-            }`}>
-              {(request.first_name?.[0] || request.username?.[0] || '?').toUpperCase()}
-            </div>
+            {/* Аватар с фото */}
+            <UserAvatar
+              telegramId={request.telegram_id}
+              firstName={request.first_name}
+              username={request.username}
+              size={48}
+              className={`rounded-2xl flex-shrink-0 ${
+                processedStatus === 'accepted' ? 'ring-2 ring-emerald-500/30' :
+                processedStatus === 'rejected' || processedStatus === 'cancelled' ? 'opacity-50 grayscale' : ''
+              }`}
+            />
             
             {/* Информация */}
             <div className="flex-1 min-w-0">
