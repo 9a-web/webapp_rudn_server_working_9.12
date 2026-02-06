@@ -669,6 +669,13 @@ export const PlannerTimeline = ({
       // Отмечаем как пропущенное
       onMarkSkipped && onMarkSkipped(currentOverdueEvent.id);
     }
+    
+    // FIX: Переключаем на следующее просроченное событие
+    setCurrentOverdueIndex(prev => {
+      const nextIndex = prev + 1;
+      // Если индекс выходит за пределы — сбрасываем (все обработаны)
+      return nextIndex >= overdueEventsLength ? 0 : nextIndex;
+    });
   };
 
   return (
