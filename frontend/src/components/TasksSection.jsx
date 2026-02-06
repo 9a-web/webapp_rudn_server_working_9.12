@@ -2316,6 +2316,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
               className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50"
             >
               <FullscreenPlannerTimeline
+                ref={fullscreenTimelineRef}
                 events={plannerEvents}
                 currentDate={formatDateToYYYYMMDD(tasksSelectedDate)}
                 onToggleComplete={handleTogglePlannerEvent}
