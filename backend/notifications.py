@@ -67,13 +67,6 @@ class TelegramNotificationService:
     def _format_class_notification(self, class_info: dict, minutes_before: int) -> str:
         """
         Форматировать текст уведомления о паре
-        
-        Args:
-            class_info: Информация о паре
-            minutes_before: За сколько минут уведомление
-            
-        Returns:
-            Отформатированный текст сообщения
         """
         discipline = class_info.get('discipline', 'Пара')
         time = class_info.get('time', '')
@@ -86,35 +79,61 @@ class TelegramNotificationService:
         from datetime import timezone
         import pytz
         moscow_tz = pytz.timezone('Europe/Moscow')
-        current_time = datetime.now(moscow_tz).strftime('%H:%M:%S')
+        current_time = datetime.now(moscow_tz).strftime('%H:%M')
         
-        # Формируем сообщение в новом формате
-        message = "🔔 <b>Уведомление!</b>\n"
+        # Иконка типа занятия
+        type_icons = {
+            'лекция': '🎓', 'лек': '🎓',
+            'практика': '✏️', 'практ': '✏️', 'пр': '✏️',
+            'семинар': '💬', 'сем': '💬',
+            'лабораторная': '🔬', 'лаб': '🔬',
+            'экзамен': '📋', 'зачет': '📋', 'зачёт': '📋',
+        }
+        type_icon = '📖'
+        if lesson_type:
+            for key, icon in type_icons.items():
+                if key in lesson_type.lower():
+                    type_icon = icon
+                    break
+
+        # Выбираем фразу по времени до начала
+        if minutes_before <= 5:
+            urgency = "🔴  <b>Бегом! Пара вот-вот начнётся!</b>"
+        elif minutes_before <= 15:
+            urgency = "🟡  <b>Скоро начало — пора выходить!</b>"
+        else:
+            urgency = f"🟢  <b>Через {minutes_before} мин — есть время собраться</b>"
         
-        if group_name:
-            message += f"👥 Группа: {group_name}\n"
-        
-        message += f"\n⏰ Через {minutes_before} минут начинается:\n\n"
+        # Собираем красивое сообщение
+        lines = []
+        lines.append(f"⏰  <b>Напоминание о паре</b>")
+        lines.append("")
+        lines.append(urgency)
+        lines.append("")
+        lines.append("┌─────────────────────")
         
         if time:
-            message += f"🕒 {time}\n"
+            lines.append(f"│  🕐  <b>{time}</b>")
         
-        # Формируем строку с дисциплиной и типом занятия
+        lines.append(f"│  {type_icon}  <b>{discipline}</b>")
+        
         if lesson_type:
-            message += f"📚 {discipline} ({lesson_type})\n"
-        else:
-            message += f"📚 {discipline}\n"
+            lines.append(f"│        <i>({lesson_type})</i>")
         
         if teacher:
-            message += f"👨‍🏫 {teacher}\n"
+            lines.append(f"│  👨‍🏫  {teacher}")
         
         if auditory:
-            message += f"🏫 {auditory}\n"
+            lines.append(f"│  📍  <b>{auditory}</b>")
         
-        message += f"\n🕐 Текущее время: {current_time}\n"
-        message += "💡 Не опоздай!"
+        if group_name:
+            lines.append(f"│  👥  {group_name}")
         
-        return message
+        lines.append("└─────────────────────")
+        lines.append("")
+        lines.append(f"🕐 Сейчас: <b>{current_time}</b> МСК")
+        
+        return "\n".join(lines)
     
     async def send_test_notification(self, telegram_id: int) -> bool:
         """
