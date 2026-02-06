@@ -1186,10 +1186,10 @@ export const PlannerTimeline = React.forwardRef(({
       )}
     </div>
   );
-};
+});
 
 // Полноэкранная версия Timeline планировщика
-export const FullscreenPlannerTimeline = ({ 
+export const FullscreenPlannerTimeline = React.forwardRef(({ 
   events = [], 
   onToggleComplete, 
   onDelete,
