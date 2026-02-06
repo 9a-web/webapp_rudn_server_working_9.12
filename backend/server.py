@@ -2165,21 +2165,21 @@ async def get_productivity_stats(telegram_id: int):
             best_streak = max(best_streak, temp_streak, current_streak)
         
         # Статистика по последним 7 дням
+        # FIX: Оптимизация O(N) вместо O(7*N) — предварительно группируем задачи по дням
+        day_counts = {}
+        for task in completed_tasks:
+            completed_at = task.get("completed_at")
+            if completed_at:
+                if isinstance(completed_at, str):
+                    completed_at = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                task_day = completed_at.date()
+                day_counts[task_day] = day_counts.get(task_day, 0) + 1
+        
         daily_stats = []
         for i in range(6, -1, -1):
             day = (today_start - timedelta(days=i)).date()
             day_name = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][day.weekday()]
-            count = 1 if day in completion_dates else 0
-            
-            # Подсчитываем количество выполненных задач за этот день
-            day_count = 0
-            for task in completed_tasks:
-                completed_at = task.get("completed_at")
-                if completed_at:
-                    if isinstance(completed_at, str):
-                        completed_at = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
-                    if completed_at.date() == day:
-                        day_count += 1
+            day_count = day_counts.get(day, 0)
             
             daily_stats.append({
                 "date": day.isoformat(),
