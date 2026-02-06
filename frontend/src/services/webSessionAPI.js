@@ -383,11 +383,9 @@ export const sendHeartbeat = async (sessionToken) => {
     
     return { valid: true };
   } catch (e) {
-    // При сетевой ошибке "Response body is already used" от rrweb - 
-    // проверяем есть ли сессия в localStorage
+    // При сетевой ошибке "Response body is already used" от rrweb
     if (e.message?.includes('Response body is already used')) {
       console.warn('Heartbeat: Response already used, checking localStorage...');
-      const sessionExists = localStorage.getItem('session_token') === sessionToken;
       // Делаем дополнительную проверку через простой HEAD запрос
       try {
         const checkResp = await fetch(`${backendUrl}/api/web-sessions/${sessionToken}/status`, {
@@ -397,12 +395,17 @@ export const sendHeartbeat = async (sessionToken) => {
           console.log('🔌 Session confirmed deleted via HEAD check');
           return { valid: false, reason: 'not_found' };
         }
+        // HEAD успешен — сессия существует
+        return { valid: true };
       } catch {
         // Игнорируем ошибки вторичной проверки
       }
     }
+    
     console.warn('Heartbeat failed:', e.message);
-    return { valid: true }; // При других сетевых ошибках считаем сессию валидной
+    // При сетевых ошибках (сервер недоступен) — считаем сессию невалидной
+    // после 3 последовательных ошибок (логика на уровне вызывающего кода)
+    return { valid: true, networkError: true };
   }
 };
 
