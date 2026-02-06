@@ -270,13 +270,11 @@ class CoverService:
     async def _fetch_from_itunes(self, artist: str, title: str) -> Optional[dict]:
         """
         Поиск обложки через iTunes Search API.
-        Бесплатно, без ключа, высокая точность.
-        Проверяем совпадение артиста с результатом.
+        Приоритет: артист+название совпадают → только артист (но тот же альбом).
         """
         try:
             session = await self._get_session()
 
-            # Чистим название для поиска
             clean_title = re.sub(r'\(.*?\)|\[.*?\]', '', title).strip()
             clean_artist = artist.strip()
             query = f"{clean_artist} {clean_title}"
@@ -287,7 +285,7 @@ class CoverService:
                     'term': query,
                     'media': 'music',
                     'entity': 'song',
-                    'limit': 5
+                    'limit': 10
                 }
             ) as resp:
                 if resp.status != 200:
@@ -301,25 +299,24 @@ class CoverService:
                 logger.debug(f"iTunes: no results for «{query}»")
                 return None
 
-            # Ищем первый результат с совпадающим артистом
+            # ПРИОРИТЕТ 1: Артист И название совпадают → точная обложка
             for item in results:
                 item_artist = item.get('artistName', '')
+                item_title = item.get('trackName', '')
                 artwork_url = item.get('artworkUrl100', '')
 
                 if not artwork_url:
                     continue
 
-                if _artist_match(clean_artist, item_artist):
-                    # Генерируем все размеры из базового URL
+                if _artist_match(clean_artist, item_artist) and _title_match(clean_title, item_title):
                     covers = {}
                     for key, size_str in ITUNES_SIZE_MAP.items():
                         covers[key] = re.sub(r'\d+x\d+bb', size_str, artwork_url)
-
-                    logger.info(f"iTunes cover ✓ «{artist} — {title}» (matched: {item_artist})")
+                    logger.info(f"iTunes cover ✓ exact «{artist} — {title}» → «{item_artist} — {item_title}»")
                     return covers
 
-            # Артист не совпал ни в одном результате — НЕ берём чужую обложку
-            logger.debug(f"iTunes: artist mismatch for «{artist}», results: {[r.get('artistName','') for r in results[:3]]}")
+            # ПРИОРИТЕТ 2: Только артист совпадает — НЕ берём (это другая песня = другая обложка)
+            logger.debug(f"iTunes: artist ok but title mismatch for «{artist} — {title}», results: {[(r.get('artistName',''), r.get('trackName','')) for r in results[:3]]}")
             return None
 
         except asyncio.TimeoutError:
