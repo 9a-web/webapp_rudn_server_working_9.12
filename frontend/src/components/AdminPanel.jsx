@@ -407,12 +407,21 @@ const ClassesTab = () => {
   const [journals, setJournals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimerRef = useRef(null);
   
+  // Debounce поиск
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
+
   const fetchJournals = useCallback(async () => {
     setLoading(true);
     try {
       const res = await axios.get(`${BACKEND_URL}/api/admin/journals`, {
-        params: { limit: 100, search }
+        params: { limit: 100, search: debouncedSearch || undefined }
       });
       setJournals(res.data);
     } catch (error) {
@@ -420,11 +429,11 @@ const ClassesTab = () => {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     fetchJournals();
-  }, [search]);
+  }, [debouncedSearch]);
 
   return (
     <div className="flex flex-col h-full">
