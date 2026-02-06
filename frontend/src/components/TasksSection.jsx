@@ -344,6 +344,19 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     }
   }, [user, userSettings, weekNumber]);
 
+  // FIX: Синхронизация tasksSelectedDate с внешним пропом selectedDate
+  useEffect(() => {
+    if (selectedDate) {
+      const newDate = new Date(selectedDate);
+      newDate.setHours(0, 0, 0, 0);
+      const currentDate = new Date(tasksSelectedDate);
+      currentDate.setHours(0, 0, 0, 0);
+      if (newDate.getTime() !== currentDate.getTime()) {
+        setTasksSelectedDate(newDate);
+      }
+    }
+  }, [selectedDate]);
+
   // Уведомляем родительский компонент об изменении состояния модальных окон
   useEffect(() => {
     if (onModalStateChange) {
