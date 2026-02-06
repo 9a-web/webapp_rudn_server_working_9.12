@@ -217,6 +217,24 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     loadData();
   }, [loadData]);
 
+  // === Синхронизация с NotificationsPanel через CustomEvent ===
+  useEffect(() => {
+    const handleNotifAction = (e) => {
+      const { requestId, action } = e.detail || {};
+      if (!requestId || !action) return;
+      // Помечаем в processedRequests
+      setProcessedRequests(prev => {
+        const next = { ...prev, [requestId]: { status: action === 'accept' ? 'accepted' : 'rejected', time: Date.now() } };
+        localStorage.setItem('processed_friend_requests', JSON.stringify(next));
+        return next;
+      });
+      // Перезагружаем список друзей если принят
+      if (action === 'accept') loadFriends();
+    };
+    window.addEventListener('friend-request-action', handleNotifAction);
+    return () => window.removeEventListener('friend-request-action', handleNotifAction);
+  }, [loadFriends]);
+
   // Debounced search effect
   useEffect(() => {
     const doSearch = async () => {
@@ -246,13 +264,25 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     setRefreshing(false);
   };
 
+  // Функция для отправки события синхронизации
+  const dispatchFriendAction = (requestId, action) => {
+    window.dispatchEvent(new CustomEvent('friend-request-action-from-friends', {
+      detail: { requestId, action }
+    }));
+  };
+
   // Действия
   const handleAcceptRequest = async (requestId) => {
     try {
       hapticFeedback('impact', 'medium');
       await friendsAPI.acceptFriendRequest(requestId, user.id);
       hapticFeedback('notification', 'success');
-      setProcessedRequests(prev => ({ ...prev, [requestId]: { status: 'accepted', time: Date.now() } }));
+      setProcessedRequests(prev => {
+        const next = { ...prev, [requestId]: { status: 'accepted', time: Date.now() } };
+        localStorage.setItem('processed_friend_requests', JSON.stringify(next));
+        return next;
+      });
+      dispatchFriendAction(requestId, 'accept');
       showToast('Запрос принят! Теперь вы друзья');
       await loadFriends();
     } catch (error) {
@@ -265,7 +295,12 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     try {
       hapticFeedback('impact', 'light');
       await friendsAPI.rejectFriendRequest(requestId, user.id);
-      setProcessedRequests(prev => ({ ...prev, [requestId]: { status: 'rejected', time: Date.now() } }));
+      setProcessedRequests(prev => {
+        const next = { ...prev, [requestId]: { status: 'rejected', time: Date.now() } };
+        localStorage.setItem('processed_friend_requests', JSON.stringify(next));
+        return next;
+      });
+      dispatchFriendAction(requestId, 'reject');
       showToast('Запрос отклонён');
     } catch (error) {
       showToast(error.message || 'Ошибка', 'error');
@@ -276,47 +311,37 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     try {
       hapticFeedback('impact', 'light');
       await friendsAPI.cancelFriendRequest(requestId, user.id);
-      setProcessedRequests(prev => ({ ...prev, [requestId]: { status: 'cancelled', time: Date.now() } }));
+      setProcessedRequests(prev => {
+        const next = { ...prev, [requestId]: { status: 'cancelled', time: Date.now() } };
+        localStorage.setItem('processed_friend_requests', JSON.stringify(next));
+        return next;
+      });
       showToast('Запрос отменён');
     } catch (error) {
       showToast(error.message || 'Ошибка', 'error');
     }
   };
 
-  const handleToggleFavorite = async (friendId, isFavorite) => {
-    try {
-      hapticFeedback('impact', 'light');
-      await friendsAPI.toggleFavorite(user.id, friendId, isFavorite);
-      await loadFriends();
-    } catch (error) {
-      showToast(error.message || 'Ошибка', 'error');
-    }
-  };
-
-  const handleRemoveFriend = async (friendId) => {
-    try {
-      hapticFeedback('impact', 'medium');
-      await friendsAPI.removeFriend(user.id, friendId);
-      hapticFeedback('notification', 'success');
-      showToast('Удалён из друзей');
-      await loadFriends();
-      handleCloseProfile();
-    } catch (error) {
-      hapticFeedback('notification', 'error');
-      showToast(error.message || 'Ошибка', 'error');
-    }
-  };
+  const [sendingRequest, setSendingRequest] = useState(null);
 
   const handleSendRequest = async (targetId) => {
     try {
+      setSendingRequest(targetId);
       hapticFeedback('impact', 'medium');
       const result = await friendsAPI.sendFriendRequest(user.id, targetId);
       hapticFeedback('notification', 'success');
       showToast(result?.message || 'Запрос отправлен!');
-      await loadData();
+      // Оптимистично обновляем статус в результатах поиска
+      setSearchResults(prev => prev.map(r =>
+        r.telegram_id === targetId ? { ...r, friendship_status: 'pending_outgoing' } : r
+      ));
+      // Перезагружаем запросы
+      loadRequests();
     } catch (error) {
       hapticFeedback('notification', 'error');
       showToast(error.message || 'Ошибка', 'error');
+    } finally {
+      setSendingRequest(null);
     }
   };
 
