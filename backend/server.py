@@ -2643,20 +2643,37 @@ async def create_planner_event(task_data: TaskCreate):
                 detail="События должны иметь дату (target_date)"
             )
         
-        # Создаем событие (не задачу)
-        # order не важен для событий, они сортируются по времени
-        # origin уже есть в task_data (по умолчанию "user")
+        # FIX: Конвертируем subtasks из List[str] в List[TaskSubtask]
+        subtasks = []
+        for i, subtask_title in enumerate(task_data.subtasks):
+            subtasks.append(TaskSubtask(
+                title=subtask_title,
+                order=i
+            ).model_dump())
+        
+        # FIX: Используем model_dump() вместо deprecated .dict()
+        task_dict_data = task_data.model_dump()
+        task_dict_data.pop('subtasks', None)  # Удаляем строковые названия
+        
         task = Task(
-            **task_data.dict(),
-            order=0  # События не участвуют в drag&drop
+            **task_dict_data,
+            order=0,  # События не участвуют в drag&drop
+            subtasks=subtasks
         )
-        task_dict = task.dict()
+        task_dict = task.model_dump()
+        
+        # FIX: Гарантируем наличие videos
+        if 'videos' not in task_dict:
+            task_dict['videos'] = []
         
         await db.tasks.insert_one(task_dict)
         
         logger.info(f"Создано событие для пользователя {task_data.telegram_id}: {task_data.text}")
         
-        return TaskResponse(**task_dict)
+        # FIX: Добавляем прогресс подзадач
+        progress_info = calculate_subtasks_progress(task_dict.get("subtasks", []))
+        
+        return TaskResponse(**task_dict, **progress_info)
     except HTTPException:
         raise
     except Exception as e:
