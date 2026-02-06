@@ -108,19 +108,61 @@ export const VKAuthModal = ({ isOpen, onClose, telegramId }) => {
   };
   
   const handlePasteFromClipboard = async () => {
+    setError(null);
+    
+    // 1. Telegram WebApp API (работает в мини-приложении)
     try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        setTokenUrl(text);
-        
-        if (window.Telegram?.WebApp?.HapticFeedback) {
-          window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+      if (window.Telegram?.WebApp?.readTextFromClipboard) {
+        window.Telegram.WebApp.readTextFromClipboard((text) => {
+          if (text) {
+            setTokenUrl(text);
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+              window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+            }
+          } else {
+            setError('Буфер обмена пуст. Скопируйте ссылку и попробуйте снова.');
+          }
+        });
+        return;
+      }
+    } catch (tgErr) {
+      console.warn('Telegram clipboard API failed:', tgErr);
+    }
+    
+    // 2. Standard Clipboard API (работает в HTTPS + focus)
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          setTokenUrl(text);
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+          }
+          return;
         }
       }
-    } catch (err) {
-      console.error('Clipboard read error:', err);
-      setError('Не удалось прочитать буфер обмена. Вставьте ссылку вручную.');
+    } catch (clipErr) {
+      console.warn('Standard clipboard API failed:', clipErr);
     }
+    
+    // 3. Fallback — фокусируем textarea и просим пользователя вставить вручную
+    try {
+      const textarea = document.querySelector('textarea[placeholder*="blank.html"], textarea[placeholder*="access_token"]');
+      if (textarea) {
+        textarea.focus();
+        // Пробуем execCommand paste (работает в некоторых мобильных браузерах)
+        const pasted = document.execCommand('paste');
+        if (pasted && textarea.value) {
+          setTokenUrl(textarea.value);
+          return;
+        }
+      }
+    } catch (execErr) {
+      console.warn('execCommand paste failed:', execErr);
+    }
+    
+    // Все способы не сработали — показываем подсказку
+    setError('Зажмите поле ввода выше и выберите «Вставить» из меню.');
   };
   
   const handleSubmitToken = async () => {
