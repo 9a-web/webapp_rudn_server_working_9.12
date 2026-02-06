@@ -1632,11 +1632,14 @@ async def get_user_tasks(telegram_id: int):
         # Сортируем по order (порядок drag & drop), затем по created_at
         tasks = await db.tasks.find(query).sort([("order", 1), ("created_at", -1)]).to_list(1000)
         
-        # Добавляем статистику подзадач и YouTube информацию для каждой задачи
+        # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video() для каждой задачи
+        # Это убирает медленные сетевые запросы к YouTube/VK через yt_dlp
+        # Видео информация возвращается только если уже сохранена в документе
         result = []
         for task in tasks:
-            # Обогащаем задачу видео информацией (YouTube и VK)
-            task = await enrich_task_with_video(task)
+            # Используем уже сохранённые videos, без сетевых запросов
+            if 'videos' not in task:
+                task['videos'] = []
             progress_info = calculate_subtasks_progress(task.get("subtasks", []))
             result.append(TaskResponse(**task, **progress_info))
         
