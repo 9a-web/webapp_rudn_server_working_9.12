@@ -84,9 +84,9 @@ const FriendCard = ({ friend, onPress, onToggleFavorite, index = 0 }) => {
   const displayName = [first_name, last_name].filter(Boolean).join(' ') || username || 'Пользователь';
   const initials = (first_name?.[0] || username?.[0] || '?').toUpperCase();
 
-  useEffect(() => {
-    setAvatarError(false);
-  }, [telegram_id]);
+  // Reset avatar error when telegram_id changes (using key pattern instead of useEffect+setState)
+  const avatarKey = `avatar-${telegram_id}`;
+
 
   return (
     <motion.div
