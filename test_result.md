@@ -1,21 +1,25 @@
 # Test Result
 
 ## Problem Statement
-На продакшн сервере список дел долго загружается. Задачи в списке дел и планировщике долго создаются.
+Полный аудит и оптимизация функции "Синхронизация с веб-версией" (Web Sessions)
 
-## Root Causes Found
-1. `GET /api/tasks/{id}` - For each task, called `enrich_task_with_video()` using yt_dlp (2-10sec per video URL)
-2. `POST /api/tasks` - Blocking achievement tracking (4-7 DB queries) + video enrichment
-3. Frontend duplicated achievement tracking after task creation
-4. Frontend called slow `loadTasks()` after every planner CRUD operation
-5. Missing MongoDB indexes for tasks, user_stats, user_achievements
+## Bugs Found & Fixed
 
-## Fixes Applied
-1. Removed blocking yt_dlp video enrichment from task listing, creation, and update
-2. Made achievement tracking fire-and-forget (`asyncio.create_task`)
-3. Removed duplicate achievement tracking from frontend
-4. Removed unnecessary `loadTasks()` from planner event CRUD on frontend
-5. Added missing MongoDB indexes with safe_create_index helper
+### Backend Bugs:
+1. **Race condition в link_web_session** - Два параллельных запроса могли связать одну сессию. FIX: atomic find_one_and_update
+2. **notify_session_rejected не обновлял статус в БД** - Polling-клиенты не узнавали об отклонении. FIX: обновляет статус на EXPIRED
+3. **notify_session_scanned не сохранял данные в БД** - Polling-клиенты не видели "scanned". FIX: сохраняет scanned_by данные
+4. **get_web_session_status не возвращал scanned данные** - FIX: передаёт telegram_id/first_name при scanned
+5. **WebSocket для LINKED сессий закрывался сразу** - Мониторинг revoked не работал. FIX: режим monitor для LINKED сессий
+6. **Memory leak web_session_connections** - Stale connections не чистились. FIX: cleanup_expired_sessions()
+7. **Нет очистки expired/pending сессий** - Мусор в БД. FIX: cleanup при старте + background cleanup
+
+### Frontend Bugs:
+8. **TelegramLinkScreen двойной polling** - onLinked вызывался дважды. FIX: убран дублирующий polling
+9. **TelegramLinkConfirmModal хардкод VITE_BACKEND_URL** - FIX: заменён на getBackendURL()
+10. **sendHeartbeat возвращал valid:true при сетевых ошибках** - FIX: добавлен networkError флаг
+11. **Polling не обрабатывал scanned состояние** - FIX: проверяет pending + telegram_id
+12. **Telegram notification при link блокировал ответ** - FIX: fire-and-forget через asyncio.create_task
 
 ## Testing Protocol
 - Backend testing: Use `deep_testing_backend_v2`
