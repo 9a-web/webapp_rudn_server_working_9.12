@@ -17,7 +17,6 @@ const TelegramLinkScreen = ({ onLinked }) => {
   const [scannedUser, setScannedUser] = useState(null); // Данные пользователя при сканировании
   const wsRef = useRef(null);
   const timerRef = useRef(null);
-  const pollingRef = useRef(null);
 
   // Polling статуса сессии (backup для WebSocket)
   const startStatusPolling = useCallback((sessionToken) => {
