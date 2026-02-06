@@ -504,28 +504,28 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
             icon={<Users className="w-6 h-6" />}
             title="Всего пользователей"
             value={generalStats.total_users}
-            subtitle={`Сегодня: ${generalStats.active_users_today}`}
+            subtitle={`Активных сегодня: ${formatNumber(generalStats.active_users_today)}`}
             color="from-purple-500 to-purple-600"
           />
           <StatCard
             icon={<TrendingUp className="w-6 h-6" />}
-            title="Новые пользователи"
+            title="Новые за неделю"
             value={generalStats.new_users_week}
-            subtitle={`За неделю`}
+            subtitle={`За месяц: ${formatNumber(generalStats.new_users_month || 0)}`}
             color="from-pink-500 to-pink-600"
           />
           <StatCard
             icon={<CheckSquare className="w-6 h-6" />}
             title="Всего задач"
             value={generalStats.total_tasks}
-            subtitle={`Выполнено: ${generalStats.total_completed_tasks}`}
+            subtitle={`Выполнено: ${formatNumber(generalStats.total_completed_tasks)}`}
             color="from-yellow-500 to-orange-500"
           />
           <StatCard
             icon={<Award className="w-6 h-6" />}
-            title="Достижений"
+            title="Достижений выдано"
             value={generalStats.total_achievements_earned}
-            subtitle={`Комнат: ${generalStats.total_rooms}`}
+            subtitle={`Комнат: ${formatNumber(generalStats.total_rooms)}`}
             color="from-cyan-500 to-blue-500"
           />
         </div>
