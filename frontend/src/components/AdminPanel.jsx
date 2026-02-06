@@ -866,6 +866,16 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
+                        {/* Platform badge */}
+                        {user.platform === 'web' ? (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-teal-500/20 text-teal-300 rounded" title={user.browser ? `${user.browser} • ${user.os}` : 'Веб'}>
+                            <Globe className="w-3 h-3" /> Веб
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded">
+                            <Smartphone className="w-3 h-3" /> TG
+                          </span>
+                        )}
                         {user.current_section && (
                           <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded">
                             {user.current_section === 'schedule' && '📅 Расписание'}
@@ -873,14 +883,12 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
                             {user.current_section === 'journal' && '📓 Журнал'}
                             {user.current_section === 'music' && '🎵 Музыка'}
                             {user.current_section === 'friends' && '👥 Друзья'}
-                            {!['schedule', 'tasks', 'journal', 'music', 'friends'].includes(user.current_section) && user.current_section}
+                            {user.current_section === 'home' && '🏠 Главная'}
+                            {!['schedule', 'tasks', 'journal', 'music', 'friends', 'home'].includes(user.current_section) && user.current_section}
                           </span>
                         )}
-                        {user.faculty && (
-                          <span className="truncate">{user.faculty}</span>
-                        )}
-                        {user.course && (
-                          <span>{user.course} курс</span>
+                        {user.platform === 'web' && user.browser && (
+                          <span className="text-[10px] text-gray-600 truncate hidden sm:inline">{user.browser}</span>
                         )}
                       </div>
                     </div>
