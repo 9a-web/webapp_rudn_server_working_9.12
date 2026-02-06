@@ -41,31 +41,34 @@ CACHE_TTL_DAYS = 30
 
 
 def _normalize(text: str) -> str:
-    """
-    Нормализация строки для нечёткого сравнения:
-    - lowercase
-    - убираем диакритику (é → e)
-    - убираем всё кроме букв, цифр, пробелов
-    - схлопываем пробелы
-    """
+    """Нормализация: lowercase, без диакритики, только буквы/цифры/пробелы."""
     if not text:
         return ''
     text = text.lower().strip()
-    # Убираем диакритику
     text = unicodedata.normalize('NFD', text)
     text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
-    # Оставляем только буквы, цифры, пробелы
     text = re.sub(r'[^a-zа-яё0-9\s]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
+_FEAT_SPLIT = re.compile(r'\s*(?:feat\.?|ft\.?|&|,|\band\b|\bx\b)\s*', re.IGNORECASE)
+
+
+def _split_artists(name: str) -> set:
+    """Разбивает 'Miyagi & Эндшпиль feat. Brick Bazuka' → {'miyagi', 'эндшпиль', 'brick bazuka'}"""
+    parts = _FEAT_SPLIT.split(_normalize(name))
+    return {p.strip() for p in parts if p.strip()}
+
+
 def _artist_match(query_artist: str, result_artist: str) -> bool:
     """
-    Проверяет, совпадает ли артист из результата поиска с запрашиваемым.
-    Учитывает:
-      - feat./ft./& — "Miyagi & Эндшпиль" vs "Miyagi"
-      - Подстроки — "The Weeknd" vs "Weeknd"
+    Строгая проверка совпадения артиста.
+    Правила:
+      1. Точное совпадение нормализованных строк
+      2. Хотя бы один «основной» артист (до feat) совпадает целиком
+      3. Один целиком содержит другого, НО только если короткий ≥ 5 символов
+         (чтобы "Ли" не матчил "Алиса", но "Weeknd" матчил "The Weeknd")
     """
     qa = _normalize(query_artist)
     ra = _normalize(result_artist)
@@ -73,27 +76,28 @@ def _artist_match(query_artist: str, result_artist: str) -> bool:
     if not qa or not ra:
         return False
 
-    # Точное совпадение
+    # 1. Точное совпадение
     if qa == ra:
         return True
 
-    # Один содержит другого
-    if qa in ra or ra in qa:
+    # 2. Разбиваем по feat/ft/&/x/,  и ищем совпадение частей
+    qa_parts = _split_artists(query_artist)
+    ra_parts = _split_artists(result_artist)
+
+    # Точное совпадение хотя бы одной части
+    common = qa_parts & ra_parts
+    if common:
         return True
 
-    # Разбиваем по feat/ft/&/,/and
-    splitters = re.compile(r'\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*', re.IGNORECASE)
-    qa_parts = set(splitters.split(qa))
-    ra_parts = set(splitters.split(ra))
-
-    # Хотя бы одна общая часть
-    if qa_parts & ra_parts:
+    # 3. Один целиком содержит другого (только если ≥ 5 символов у меньшего)
+    min_len = min(len(qa), len(ra))
+    if min_len >= 5 and (qa in ra or ra in qa):
         return True
 
-    # Любая часть query содержится в любой части result (или наоборот)
+    # 4. Проверяем части: одна часть целиком совпадает с частью другого (≥ 5 символов)
     for qp in qa_parts:
         for rp in ra_parts:
-            if len(qp) >= 3 and len(rp) >= 3 and (qp in rp or rp in qp):
+            if len(qp) >= 5 and len(rp) >= 5 and (qp == rp):
                 return True
 
     return False
