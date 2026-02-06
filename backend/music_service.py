@@ -239,21 +239,21 @@ class VKMusicService:
     
     def _track_to_dict(self, track) -> dict:
         """Преобразование объекта трека vkpymusic в словарь"""
-        # FIX: vkpymusic Song object uses 'id' not 'track_id'
         song_id = getattr(track, 'id', None) or getattr(track, 'track_id', 0)
         owner_id = getattr(track, 'owner_id', 0)
         full_id = f"{owner_id}_{song_id}"
         
-        # Получаем обложку
+        # Получаем обложку и название альбома
         cover = None
+        album_name = ''
         if hasattr(track, 'album') and track.album:
             album = track.album
             if isinstance(album, dict):
+                album_name = album.get('title', '')
                 thumb = album.get('thumb', {})
                 if thumb and isinstance(thumb, dict):
                     cover = thumb.get('photo_300') or thumb.get('photo_600')
         
-        # Проверяем, заблокирован ли трек
         track_url = getattr(track, 'url', None)
         is_blocked = (
             not track_url or 
@@ -269,6 +269,7 @@ class VKMusicService:
             "duration": getattr(track, 'duration', 0),
             "url": track_url if not is_blocked else None,
             "cover": cover,
+            "album": album_name,
             "stream_url": f"/api/music/stream/{full_id}",
             "is_blocked": is_blocked
         }
