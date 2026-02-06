@@ -221,8 +221,9 @@ class CoverService:
             await self._save_to_cache(cache_key, artist, title, covers, source='deezer')
             return covers.get(size_key)
 
-        # Ничего не нашли — кэшируем пустой результат
-        await self._save_to_cache(cache_key, artist, title, {}, source='none')
+        # Ничего не нашли — кэшируем пустой результат, но КОРОТКО (2 часа),
+        # чтобы при rate-limit не залочить трек навсегда
+        await self._save_to_cache_short(cache_key, artist, title)
         return None
 
     async def get_covers_batch(
