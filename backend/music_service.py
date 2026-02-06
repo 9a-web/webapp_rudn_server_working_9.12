@@ -202,10 +202,12 @@ class VKMusicService:
                 
             track_id = f"{owner_id}_{song_id}"
             
-            # Извлекаем обложку альбома
+            # Извлекаем обложку и название альбома
             cover_url = None
+            album_name = ''
             album = item.get('album')
             if album and isinstance(album, dict):
+                album_name = album.get('title', '')
                 thumb = album.get('thumb')
                 if thumb and isinstance(thumb, dict):
                     cover_url = thumb.get('photo_600') or thumb.get('photo_300') or thumb.get('photo_68')
