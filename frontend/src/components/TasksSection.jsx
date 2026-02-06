@@ -570,6 +570,14 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       await loadPlannerEvents(tasksSelectedDate);
       
       hapticFeedback && hapticFeedback('notification', 'success');
+      
+      // Скроллим таймлайн к времени нового события
+      if (eventData.time_start) {
+        setTimeout(() => {
+          plannerTimelineRef.current?.scrollToTime?.(eventData.time_start);
+          fullscreenTimelineRef.current?.scrollToTime?.(eventData.time_start);
+        }, 300);
+      }
     } catch (error) {
       console.error('Error creating event:', error);
       throw error;
