@@ -9556,10 +9556,12 @@ async def add_music_favorite(telegram_id: int, track: dict):
         if existing:
             return {"success": False, "message": "Track already in favorites"}
         
-        track["telegram_id"] = telegram_id
-        track["added_at"] = datetime.utcnow()
+        # FIX: Копируем dict чтобы не мутировать оригинал и не пробрасывать _id
+        favorite_doc = {**track}
+        favorite_doc["telegram_id"] = telegram_id
+        favorite_doc["added_at"] = datetime.utcnow()
         
-        await db.music_favorites.insert_one(track)
+        await db.music_favorites.insert_one(favorite_doc)
         return {"success": True}
     except Exception as e:
         logger.error(f"Add music favorite error: {e}")
