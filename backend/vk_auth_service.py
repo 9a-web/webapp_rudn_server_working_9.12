@@ -254,24 +254,16 @@ class VKAuthService:
         return captcha_data if captcha_data else None
     
     async def verify_token(self, token: str) -> Dict[str, Any]:
-        """
-        Проверка валидности токена VK.
-        
-        Returns:
-            Dict с информацией о пользователе или ошибкой
-        """
+        """Проверка валидности токена VK (async)."""
         try:
-            response = requests.get(
-                "https://api.vk.com/method/users.get",
-                params={
-                    "access_token": token,
-                    "fields": "photo_100,first_name,last_name",
-                    "v": "5.131"
-                },
-                headers={"User-Agent": KATE_USER_AGENT},
-                timeout=10
-            )
-            data = response.json()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://api.vk.com/method/users.get",
+                    params={"access_token": token, "fields": "photo_100,first_name,last_name", "v": "5.131"},
+                    headers={"User-Agent": KATE_USER_AGENT},
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as resp:
+                    data = await resp.json()
             
             if "error" in data:
                 error = data["error"]
