@@ -2313,17 +2313,21 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
                 "text": event.get("discipline", ""),
                 "completed": False,
                 "completed_at": None,
+                "skipped": False,
                 "category": "study",
                 "priority": "medium",
                 "deadline": None,
                 "target_date": target_date,
                 "subject": event.get("discipline"),
                 "discipline_id": None,
+                "notes": None,
                 "time_start": time_start,
                 "time_end": time_end,
                 "is_fixed": True,  # Пары - жесткие события
                 "origin": "schedule",
                 "order": 0,
+                "subtasks": [],
+                "videos": [],
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
                 # Дополнительные поля для отображения
@@ -2335,29 +2339,9 @@ async def sync_schedule_to_planner(request: PlannerSyncRequest):
             await db.tasks.insert_one(new_task)
             synced_count += 1
             
-            # Формируем ответ
-            task_response = TaskResponse(
-                id=new_task["id"],
-                telegram_id=new_task["telegram_id"],
-                text=new_task["text"],
-                completed=new_task["completed"],
-                completed_at=new_task.get("completed_at"),
-                category=new_task.get("category"),
-                priority=new_task.get("priority"),
-                deadline=new_task.get("deadline"),
-                target_date=new_task.get("target_date"),
-                subject=new_task.get("subject"),
-                discipline_id=new_task.get("discipline_id"),
-                time_start=new_task.get("time_start"),
-                time_end=new_task.get("time_end"),
-                is_fixed=new_task.get("is_fixed", False),
-                origin=new_task.get("origin", "user"),
-                order=new_task.get("order", 0),
-                created_at=new_task["created_at"],
-                updated_at=new_task["updated_at"],
-                teacher=new_task.get("teacher"),
-                auditory=new_task.get("auditory"),
-                lessonType=new_task.get("lessonType")
+            # FIX: Формируем ответ через TaskResponse(**dict) — проще и надёжнее
+            progress_info = calculate_subtasks_progress(new_task.get("subtasks", []))
+            task_response = TaskResponse(**new_task, **progress_info)
             )
             synced_tasks.append(task_response)
         
