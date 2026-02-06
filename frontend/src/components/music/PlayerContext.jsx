@@ -321,7 +321,7 @@ export const PlayerProvider = ({ children }) => {
                   }).catch(() => {});
                 });
               }
-            } catch (_) {}
+            } catch (_histErr) { /* история не критична */ }
             
             // Устанавливаем playbackState для системного плеера
             if ('mediaSession' in navigator) {
