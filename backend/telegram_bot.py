@@ -739,7 +739,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                         referrer_name = f"{first_name} {last_name}".strip()
                         await bot.send_message(
                             chat_id=referrer_id,
-                            text=f"🎉 Отличные новости!\n\n<b>{referrer_name}</b> присоединился по вашей реферальной ссылке!\n\n💰 Вы получили <b>{bonus_points} баллов</b>",
+                            text=(
+                                f"🎉  <b>Новый реферал!</b>\n"
+                                f"\n"
+                                f"<b>{referrer_name}</b> присоединился\n"
+                                f"по вашей пригласительной ссылке.\n"
+                                f"\n"
+                                f"💰 Начислено: <b>+{bonus_points} баллов</b>\n"
+                                f"\n"
+                                f"<i>Приглашайте друзей — получайте бонусы!</i>"
+                            ),
                             parse_mode='HTML'
                         )
                     except Exception as e:
