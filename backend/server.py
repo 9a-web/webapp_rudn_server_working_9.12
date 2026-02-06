@@ -301,65 +301,75 @@ async def add_cors_headers(request, call_next):
 
 
 # ============ Database Indexes Optimization ============
+async def safe_create_index(collection, keys, **kwargs):
+    """Безопасное создание индекса — игнорирует конфликты с существующими индексами"""
+    try:
+        await collection.create_index(keys, **kwargs)
+    except Exception as e:
+        if "IndexOptionsConflict" in str(e) or "already exists" in str(e):
+            logger.debug(f"Index already exists for {collection.name}: {keys}")
+        else:
+            logger.warning(f"Index creation warning for {collection.name}: {e}")
+
 async def create_indexes():
     """Create indexes for all collections to ensure scalability"""
     try:
         # User Settings
-        await db.user_settings.create_index("telegram_id", unique=True)
-        await db.user_settings.create_index("group_id")
+        await safe_create_index(db.user_settings, "telegram_id", unique=True)
+        await safe_create_index(db.user_settings, "group_id")
         
         # Tasks - основной индекс для списка задач
-        await db.tasks.create_index([("telegram_id", 1), ("completed", 1)])
+        await safe_create_index(db.tasks, [("telegram_id", 1), ("completed", 1)])
         # Tasks - индекс для telegram_id отдельно (для сортировки по order)
-        await db.tasks.create_index("telegram_id")
+        await safe_create_index(db.tasks, "telegram_id")
         # Tasks - составной индекс для планировщика (target_date запросы)
-        await db.tasks.create_index([("telegram_id", 1), ("target_date", 1)])
+        await safe_create_index(db.tasks, [("telegram_id", 1), ("target_date", 1)])
         
         # User Stats - индекс для быстрого поиска статистики достижений
-        await db.user_stats.create_index("telegram_id", unique=True)
+        await safe_create_index(db.user_stats, "telegram_id", unique=True)
         
         # User Achievements - индекс для быстрой проверки достижений
-        await db.user_achievements.create_index("telegram_id")
-        await db.user_achievements.create_index([("telegram_id", 1), ("achievement_id", 1)], unique=True)
+        await safe_create_index(db.user_achievements, "telegram_id")
+        await safe_create_index(db.user_achievements, [("telegram_id", 1), ("achievement_id", 1)], unique=True)
         
         # Rooms
-        await db.rooms.create_index("owner_id")
-        await db.rooms.create_index("participants.telegram_id")
-        await db.rooms.create_index("invite_token", unique=True)
+        await safe_create_index(db.rooms, "owner_id")
+        await safe_create_index(db.rooms, "participants.telegram_id")
+        await safe_create_index(db.rooms, "invite_token", unique=True)
         
         # Group Tasks
-        await db.group_tasks.create_index("room_id")
-        await db.group_tasks.create_index([("participants.telegram_id", 1), ("completed", 1)])
+        await safe_create_index(db.group_tasks, "room_id")
+        await safe_create_index(db.group_tasks, [("participants.telegram_id", 1), ("completed", 1)])
         
         # Journals & Attendance
-        await db.journals.create_index("owner_id")
-        await db.journals.create_index("invite_token", unique=True)
+        await safe_create_index(db.journals, "owner_id")
+        await safe_create_index(db.journals, "invite_token", unique=True)
         
-        await db.journal_students.create_index("journal_id")
-        await db.journal_students.create_index("telegram_id")
-        await db.journal_students.create_index("invite_code", unique=True)
+        await safe_create_index(db.journal_students, "journal_id")
+        await safe_create_index(db.journal_students, "telegram_id")
+        await safe_create_index(db.journal_students, "invite_code", unique=True)
         
         # Compound index for fast attendance lookups
-        await db.attendance_records.create_index([("journal_id", 1), ("session_id", 1)])
-        await db.attendance_records.create_index([("journal_id", 1), ("student_id", 1)])
+        await safe_create_index(db.attendance_records, [("journal_id", 1), ("session_id", 1)])
+        await safe_create_index(db.attendance_records, [("journal_id", 1), ("student_id", 1)])
         
         # Scheduled Notifications
-        await db.scheduled_notifications.create_index("notification_key", unique=True)
-        await db.scheduled_notifications.create_index([("date", 1), ("status", 1)])
+        await safe_create_index(db.scheduled_notifications, "notification_key", unique=True)
+        await safe_create_index(db.scheduled_notifications, [("date", 1), ("status", 1)])
         
         # Referral System
-        await db.referral_events.create_index("telegram_id")
-        await db.referral_events.create_index("referrer_id")
+        await safe_create_index(db.referral_events, "telegram_id")
+        await safe_create_index(db.referral_events, "referrer_id")
         
         # Notification History
-        await db.notification_history.create_index([("telegram_id", 1), ("sent_at", -1)])
+        await safe_create_index(db.notification_history, [("telegram_id", 1), ("sent_at", -1)])
         
         # Cover Cache (Deezer обложки)
-        await db.cover_cache.create_index("cache_key", unique=True)
-        await db.cover_cache.create_index("expires_at", expireAfterSeconds=0)  # TTL индекс
+        await safe_create_index(db.cover_cache, "cache_key", unique=True)
+        await safe_create_index(db.cover_cache, "expires_at", expireAfterSeconds=0)
         
         # In-App Notifications
-        await db.in_app_notifications.create_index([("telegram_id", 1), ("created_at", -1)])
+        await safe_create_index(db.in_app_notifications, [("telegram_id", 1), ("created_at", -1)])
         
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
