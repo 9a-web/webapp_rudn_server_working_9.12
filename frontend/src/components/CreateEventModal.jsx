@@ -305,36 +305,35 @@ export const CreateEventModal = ({
                 {categories.map((cat) => {
                   const isActive = category === cat.id;
                   return (
-                    <motion.button
+                    <button
                       key={cat.id}
                       type="button"
-                      whileTap={{ scale: 0.93 }}
                       onClick={() => {
                         setCategory(cat.id);
                         hapticFeedback && hapticFeedback('impact', 'light');
                       }}
                       disabled={saving}
                       className={`relative flex items-center gap-2 px-4 py-2.5 rounded-2xl 
-                                  border transition-all duration-300 overflow-hidden
+                                  border overflow-hidden
+                                  transition-[background,border-color,box-shadow,transform] duration-200 ease-out
+                                  active:scale-[0.95]
                                   ${isActive 
-                                    ? `border-white/20 shadow-lg ring-1 ${cat.ring}` 
-                                    : 'border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.03]'
+                                    ? `border-white/20 shadow-[0_0_16px_rgba(139,92,246,0.2)] ring-1 ${cat.ring}` 
+                                    : 'border-white/[0.06] hover:border-white/[0.12]'
                                   }`}
+                      style={{
+                        background: isActive
+                          ? `linear-gradient(135deg, ${cat.id === 'study' ? 'rgba(59,130,246,0.18)' : cat.id === 'personal' ? 'rgba(16,185,129,0.18)' : cat.id === 'sport' ? 'rgba(244,63,94,0.18)' : cat.id === 'work' ? 'rgba(139,92,246,0.18)' : 'rgba(245,158,11,0.18)'} 0%, rgba(255,255,255,0.04) 100%)`
+                          : 'rgba(255,255,255,0.02)',
+                      }}
                     >
-                      {/* Glass active background */}
-                      {isActive && (
-                        <motion.div
-                          layoutId="activeCategoryGlass"
-                          className={`absolute inset-0 bg-gradient-to-r ${cat.gradient} opacity-20`}
-                          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        />
-                      )}
-                      <span className="relative text-lg">{cat.emoji}</span>
-                      <span className={`relative text-xs font-medium transition-colors duration-200
+                      <span className="relative text-lg leading-none">{cat.emoji}</span>
+                      <span className={`relative text-xs font-medium
+                                        transition-colors duration-200
                                         ${isActive ? 'text-white/90' : 'text-white/40'}`}>
                         {cat.label}
                       </span>
-                    </motion.button>
+                    </button>
                   );
                 })}
               </div>
