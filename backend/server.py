@@ -12756,15 +12756,16 @@ async def notify_task_assigned(to_telegram_id: int, room: dict, task: dict, assi
 async def notify_task_completed(to_telegram_id: int, room: dict, task: dict, completer: dict):
     """Уведомление о выполнении задачи"""
     completer_name = f"{completer.get('first_name', '')} {completer.get('last_name', '')}".strip() or "Участник"
+    task_text = task.get('text', '')[:50]
     
     await create_notification(
         telegram_id=to_telegram_id,
         notification_type=NotificationType.ROOM_TASK_COMPLETED,
         category=NotificationCategory.ROOMS,
         priority=NotificationPriority.LOW,
-        title="Задача выполнена",
-        message=f"{completer_name} выполнил задачу «{task.get('text', '')[:50]}»",
-        emoji="✅",
+        title="Задача выполнена ✓",
+        message=f"✅ «{task_text}»\n👤 {completer_name}",
+        emoji="🎉",
         data={
             "room_id": room.get("id"),
             "task_id": task.get("id")
