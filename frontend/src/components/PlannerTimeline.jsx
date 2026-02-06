@@ -581,7 +581,7 @@ const DayProgressBar = ({ events }) => {
           <motion.div
             className="h-full relative overflow-hidden"
             style={{
-              borderRadius: skippedPercent > 0 ? '9999px 0 0 9999px' : '9999px',
+              borderRadius: skippedPercent > 0 ? '9999px 4px 4px 9999px' : '9999px',
               background: allDone
                 ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
                 : 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
