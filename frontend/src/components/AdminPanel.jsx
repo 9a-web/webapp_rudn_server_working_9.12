@@ -663,13 +663,19 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
   );
 };
 
+// Форматирование числа (1234 → "1 234")
+const formatNumber = (num) => {
+  if (num === undefined || num === null) return '0';
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+};
+
 const StatCard = ({ icon, title, value, subtitle, color }) => (
   <div className="relative overflow-hidden bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
     <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${color} opacity-10 rounded-full -mr-8 -mt-8`} />
     <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${color} mb-4 text-white shadow-lg`}>
       {icon}
     </div>
-    <div className="text-3xl font-bold text-white mb-1">{value}</div>
+    <div className="text-3xl font-bold text-white mb-1">{formatNumber(value)}</div>
     <div className="text-sm text-gray-400 mb-1">{title}</div>
     <div className="text-xs text-gray-500">{subtitle}</div>
   </div>
