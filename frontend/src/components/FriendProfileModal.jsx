@@ -1,34 +1,44 @@
 /**
- * FriendProfileModal - Модальное окно профиля друга
- * Показывает: информацию о друге, расписание, общих друзей
+ * FriendProfileModal - Профиль друга с красивым дизайном
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Star, UserMinus, Calendar, Users, 
-  Clock, MapPin, ChevronRight, AlertTriangle,
-  Eye, EyeOff, Shield, Ban, ChevronLeft, ChevronDown
+  MapPin, ChevronRight, AlertTriangle,
+  EyeOff, ChevronLeft, ChevronDown, Wifi, Trophy
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 import { groupScheduleItems } from '../utils/scheduleUtils';
 
-// Получение URL для фото профиля
+// URL backend из env
 const getBackendURL = () => {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
-  }
+  let envBackendUrl = '';
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
+    }
+    if (!envBackendUrl && typeof process !== 'undefined' && process.env) {
+      envBackendUrl = process.env.REACT_APP_BACKEND_URL || '';
+    }
+  } catch (e) {}
+  if (envBackendUrl && envBackendUrl.trim() !== '') return envBackendUrl;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
   return window.location.origin;
 };
 
+const getAvatarGradient = (id) => {
+  const gradients = [
+    'from-violet-500 to-purple-600', 'from-blue-500 to-cyan-500',
+    'from-emerald-500 to-teal-500', 'from-rose-500 to-pink-500',
+    'from-amber-500 to-orange-500', 'from-indigo-500 to-blue-600',
+  ];
+  return gradients[Math.abs(id || 0) % gradients.length];
+};
+
 const FriendProfileModal = ({ 
-  isOpen, 
-  onClose, 
-  friend, 
-  currentUserId,
-  userSettings,
-  onRemoveFriend,
-  onToggleFavorite
+  isOpen, onClose, friend, currentUserId, userSettings, onRemoveFriend, onToggleFavorite
 }) => {
   const [profile, setProfile] = useState(null);
   const [schedule, setSchedule] = useState(null);
@@ -43,20 +53,15 @@ const FriendProfileModal = ({
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState(null);
 
-  // Группировка расписания по дисциплине и времени
   const groupedSchedule = useMemo(() => {
     if (!schedule?.schedule?.length) return [];
     return groupScheduleItems(schedule.schedule);
   }, [schedule]);
 
-  // Синхронизация is_favorite при открытии
   useEffect(() => {
-    if (friend) {
-      setIsFavorite(friend.is_favorite || false);
-    }
+    if (friend) setIsFavorite(friend.is_favorite || false);
   }, [friend]);
 
-  // Загрузка аватарки
   useEffect(() => {
     if (isOpen && friend?.telegram_id) {
       setAvatarError(false);
@@ -64,18 +69,15 @@ const FriendProfileModal = ({
     }
   }, [isOpen, friend?.telegram_id]);
 
-  // Загрузка данных профиля
   useEffect(() => {
     const loadProfile = async () => {
       if (!isOpen || !friend?.telegram_id || !currentUserId) return;
-      
       setIsLoading(true);
       try {
         const [profileData, mutualData] = await Promise.all([
           friendsAPI.getUserProfile(friend.telegram_id, currentUserId),
           friendsAPI.getMutualFriends(currentUserId, friend.telegram_id)
         ]);
-        
         setProfile(profileData);
         setMutualFriends(mutualData.mutual_friends || []);
       } catch (error) {
@@ -84,89 +86,62 @@ const FriendProfileModal = ({
         setIsLoading(false);
       }
     };
-
     loadProfile();
   }, [isOpen, friend?.telegram_id, currentUserId]);
 
-  // Загрузка расписания с учётом выбранной даты
   const loadSchedule = useCallback(async (date) => {
     if (!friend?.telegram_id || !currentUserId) return;
-    
     setScheduleLoading(true);
     try {
       const dateStr = date.toISOString().split('T')[0];
-      console.log('Loading friend schedule for date:', dateStr);
       const scheduleData = await friendsAPI.getFriendSchedule(friend.telegram_id, currentUserId, dateStr);
-      console.log('Friend schedule loaded:', scheduleData);
       setSchedule(scheduleData);
     } catch (error) {
-      console.error('Error loading schedule:', error);
-      setSchedule({ error: true, message: error.message || 'Ошибка загрузки расписания' });
+      setSchedule({ error: true, message: error.message || 'Ошибка загрузки' });
     } finally {
       setScheduleLoading(false);
     }
   }, [friend?.telegram_id, currentUserId]);
 
-  // Загружаем расписание при переключении на таб или смене даты
   useEffect(() => {
     if (activeTab === 'schedule' && friend?.telegram_id && currentUserId) {
       loadSchedule(selectedDate);
     }
   }, [activeTab, selectedDate, friend?.telegram_id, currentUserId, loadSchedule]);
 
-  // Навигация по дням
   const changeDate = (days) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     setSelectedDate(newDate);
   };
 
-  // Форматирование даты
   const formatDate = (date) => {
     const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = date.toDateString();
     if (dateStr === today.toDateString()) return 'Сегодня';
     if (dateStr === tomorrow.toDateString()) return 'Завтра';
     if (dateStr === yesterday.toDateString()) return 'Вчера';
-    
-    return date.toLocaleDateString('ru-RU', { 
-      weekday: 'short', 
-      day: 'numeric', 
-      month: 'short' 
-    });
+    return date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
-  // Сброс при закрытии
   useEffect(() => {
     if (!isOpen) {
-      setProfile(null);
-      setSchedule(null);
-      setMutualFriends([]);
-      setActiveTab('info');
-      setShowRemoveConfirm(false);
-      setAvatarUrl(null);
-      setAvatarError(false);
-      setSelectedDate(new Date());
-      setScheduleLoading(false);
-      setExpandedIndex(null);
+      setProfile(null); setSchedule(null); setMutualFriends([]);
+      setActiveTab('info'); setShowRemoveConfirm(false);
+      setAvatarUrl(null); setAvatarError(false);
+      setSelectedDate(new Date()); setScheduleLoading(false); setExpandedIndex(null);
     }
   }, [isOpen]);
 
-  // Обработка переключения избранного
   const handleToggleFavorite = async () => {
     const newValue = !isFavorite;
-    setIsFavorite(newValue); // Оптимистичное обновление UI
-    
+    setIsFavorite(newValue);
     try {
       await onToggleFavorite?.(friend.telegram_id, newValue);
     } catch (error) {
-      setIsFavorite(!newValue); // Откат при ошибке
-      console.error('Error toggling favorite:', error);
+      setIsFavorite(!newValue);
     }
   };
 
@@ -184,373 +159,343 @@ const FriendProfileModal = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50"
             onClick={onClose}
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, y: '100%' }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-50 bg-gray-900 rounded-t-3xl max-h-[90vh] overflow-hidden"
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] max-h-[92vh] overflow-hidden"
+            style={{ backgroundColor: 'rgba(18, 18, 24, 0.98)', backdropFilter: 'blur(40px)' }}
           >
             {/* Handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1.5 bg-gray-700 rounded-full" />
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-white/10 rounded-full" />
             </div>
 
-            {/* Header */}
-            <div className="px-4 pb-4">
-              <div className="flex items-start gap-4">
-                {/* Аватар */}
+            {/* Header with gradient background */}
+            <div className="relative px-5 pb-5">
+              {/* Subtle gradient glow */}
+              <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-gradient-to-br ${getAvatarGradient(friend.telegram_id)} opacity-[0.06] rounded-full blur-3xl`} />
+              
+              <div className="relative flex items-start gap-4">
                 <div className="relative flex-shrink-0">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-2xl overflow-hidden">
+                  <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, type: 'spring' }}
+                    className={`w-[72px] h-[72px] rounded-[22px] bg-gradient-to-br ${getAvatarGradient(friend.telegram_id)} flex items-center justify-center text-white font-bold text-2xl overflow-hidden shadow-xl`}
+                  >
                     {avatarUrl && !avatarError ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt={displayName}
-                        className="w-full h-full object-cover"
-                        onError={() => setAvatarError(true)}
-                      />
-                    ) : (
-                      initials
-                    )}
-                  </div>
+                      <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" onError={() => setAvatarError(true)} />
+                    ) : initials}
+                  </motion.div>
                   {profile?.is_online && (
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-3 border-gray-900" />
-                  )}
-                </div>
-
-                {/* Информация */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-white truncate">{displayName}</h2>
-                    {isFavorite && (
-                      <Star className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="currentColor" />
-                    )}
-                  </div>
-                  {friend.username && (
-                    <p className="text-gray-400">@{friend.username}</p>
-                  )}
-                  <p className="text-sm text-purple-400 mt-1">
-                    {friend.group_name || profile?.group_name || 'Группа не указана'}
-                  </p>
-                  {(friend.facultet_name || profile?.facultet_name) && (
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {friend.facultet_name || profile?.facultet_name}
-                    </p>
-                  )}
-                </div>
-
-                {/* Кнопка закрытия */}
-                <button
-                  onClick={onClose}
-                  className="p-2 bg-white/10 rounded-xl text-gray-400 hover:bg-white/20 flex-shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Статистика */}
-              {profile && (
-                <div className="flex gap-4 mt-4">
-                  <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-white">{profile.friends_count || 0}</p>
-                    <p className="text-xs text-gray-400">Друзей</p>
-                  </div>
-                  <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-white">{mutualFriends.length}</p>
-                    <p className="text-xs text-gray-400">Общих</p>
-                  </div>
-                  {profile.privacy?.show_achievements !== false && (
-                    <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold text-white">{profile.achievements_count || 0}</p>
-                      <p className="text-xs text-gray-400">Достижений</p>
+                    <div className="absolute -bottom-1 -right-1">
+                      <div className="w-5 h-5 bg-emerald-500 rounded-full border-[3px] relative" style={{ borderColor: 'rgba(18, 18, 24, 0.98)' }}>
+                        <div className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-30" />
+                      </div>
                     </div>
                   )}
                 </div>
+
+                <div className="flex-1 min-w-0 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-[20px] font-bold text-white truncate">{displayName}</h2>
+                    {isFavorite && <Star className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="currentColor" />}
+                  </div>
+                  {friend.username && <p className="text-[13px] text-gray-400 mt-0.5">@{friend.username}</p>}
+                  <p className="text-[13px] text-purple-400 mt-1 font-medium">
+                    {friend.group_name || profile?.group_name || 'Группа не указана'}
+                  </p>
+                  {(friend.facultet_name || profile?.facultet_name) && (
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                      {friend.facultet_name || profile?.facultet_name}
+                    </p>
+                  )}
+                  {profile?.is_online && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-1">
+                      <Wifi className="w-3 h-3" /> в сети
+                    </span>
+                  )}
+                </div>
+
+                <motion.button
+                  whileTap={{ scale: 0.85 }}
+                  onClick={onClose}
+                  className="p-2 bg-white/[0.06] rounded-xl text-gray-500 hover:bg-white/10 flex-shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
+              </div>
+
+              {/* Stats */}
+              {profile && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="flex gap-3 mt-5"
+                >
+                  <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
+                    <p className="text-xl font-bold text-white">{profile.friends_count || 0}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Друзей</p>
+                  </div>
+                  <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
+                    <p className="text-xl font-bold text-white">{mutualFriends.length}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Общих</p>
+                  </div>
+                  {profile.privacy?.show_achievements !== false && (
+                    <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
+                      <p className="text-xl font-bold text-white">{profile.achievements_count || 0}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Достижений</p>
+                    </div>
+                  )}
+                </motion.div>
               )}
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 px-4 pb-3">
+            <div className="relative flex gap-1 px-5 pb-3">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
                 return (
-                  <button
+                  <motion.button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/5 text-gray-400'
+                    className={`flex-1 relative flex items-center justify-center gap-1.5 py-2.5 rounded-xl transition-all z-10 ${
+                      isActive ? 'text-white' : 'text-gray-500 bg-white/[0.03]'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm font-medium">{tab.name}</span>
-                  </button>
+                    {isActive && (
+                      <motion.div
+                        layoutId="profileTabBg"
+                        className="absolute inset-0 bg-purple-500/90 rounded-xl shadow-md shadow-purple-500/15"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-1.5">
+                      <Icon className="w-4 h-4" />
+                      <span className="text-[13px] font-semibold">{tab.name}</span>
+                    </span>
+                  </motion.button>
                 );
               })}
             </div>
 
             {/* Content */}
-            <div className="px-4 pb-4 overflow-y-auto max-h-[45vh]">
-              {/* Info Tab */}
-              {activeTab === 'info' && (
-                <div className="space-y-4">
-                  {/* Общие друзья */}
-                  {mutualFriends.length > 0 && (
-                    <div className="bg-white/5 rounded-2xl p-4">
-                      <h3 className="text-sm font-medium text-gray-400 mb-3">
-                        Общие друзья ({mutualFriends.length})
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {mutualFriends.slice(0, 5).map((mf) => (
-                          <div
-                            key={mf.telegram_id}
-                            className="flex items-center gap-2 bg-white/5 rounded-full px-3 py-1.5"
-                          >
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xs font-medium">
-                              {(mf.first_name?.[0] || '?').toUpperCase()}
+            <div className="px-5 pb-6 overflow-y-auto max-h-[45vh]">
+              <AnimatePresence mode="wait">
+                {activeTab === 'info' && (
+                  <motion.div
+                    key="info"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="space-y-4"
+                  >
+                    {/* Mutual Friends */}
+                    {mutualFriends.length > 0 && (
+                      <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.06]">
+                        <h3 className="text-[12px] font-semibold text-gray-400 mb-3 uppercase tracking-wider">
+                          Общие друзья · {mutualFriends.length}
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {mutualFriends.slice(0, 6).map((mf) => (
+                            <div key={mf.telegram_id} className="flex items-center gap-2 bg-white/[0.04] rounded-full px-3 py-1.5 border border-white/[0.05]">
+                              <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${getAvatarGradient(mf.telegram_id)} flex items-center justify-center text-white text-[10px] font-bold`}>
+                                {(mf.first_name?.[0] || '?').toUpperCase()}
+                              </div>
+                              <span className="text-[12px] text-gray-300 font-medium">{mf.first_name}</span>
                             </div>
-                            <span className="text-sm text-gray-300">{mf.first_name}</span>
-                          </div>
-                        ))}
-                        {mutualFriends.length > 5 && (
-                          <div className="flex items-center px-3 py-1.5 text-sm text-gray-400">
-                            +{mutualFriends.length - 5}
-                          </div>
-                        )}
+                          ))}
+                          {mutualFriends.length > 6 && (
+                            <div className="flex items-center px-3 py-1.5 text-[12px] text-gray-500 font-medium">
+                              +{mutualFriends.length - 6}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Действия */}
-                  <div className="space-y-2">
-                    <button
-                      onClick={handleToggleFavorite}
-                      className="w-full flex items-center gap-3 p-4 bg-white/5 rounded-2xl text-left hover:bg-white/10 transition-colors"
-                    >
-                      <div className={`p-2 rounded-xl ${isFavorite ? 'bg-yellow-500/20' : 'bg-white/10'}`}>
-                        <Star className={`w-5 h-5 ${isFavorite ? 'text-yellow-400' : 'text-gray-400'}`} fill={isFavorite ? 'currentColor' : 'none'} />
+                    {/* Actions */}
+                    <div className="space-y-2">
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleToggleFavorite}
+                        className="w-full flex items-center gap-3.5 p-4 bg-white/[0.03] rounded-2xl text-left hover:bg-white/[0.06] transition-all border border-white/[0.06]"
+                      >
+                        <div className={`p-2.5 rounded-xl ${isFavorite ? 'bg-yellow-500/15' : 'bg-white/[0.06]'}`}>
+                          <Star className={`w-5 h-5 ${isFavorite ? 'text-yellow-400' : 'text-gray-500'}`} fill={isFavorite ? 'currentColor' : 'none'} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[14px] text-white">
+                            {isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                          </p>
+                          <p className="text-[12px] text-gray-500 mt-0.5">
+                            {isFavorite ? 'Уберёт из начала списка' : 'Будет в начале списка'}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                      </motion.button>
+
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowRemoveConfirm(true)}
+                        className="w-full flex items-center gap-3.5 p-4 bg-red-500/[0.06] rounded-2xl text-left hover:bg-red-500/[0.1] transition-all border border-red-500/10"
+                      >
+                        <div className="p-2.5 rounded-xl bg-red-500/15">
+                          <UserMinus className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[14px] text-red-400">Удалить из друзей</p>
+                          <p className="text-[12px] text-gray-500 mt-0.5">Можно добавить снова</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === 'schedule' && (
+                  <motion.div
+                    key="schedule"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="space-y-3"
+                  >
+                    {/* Date navigation */}
+                    <div className="flex items-center justify-between bg-white/[0.03] rounded-2xl p-2.5 border border-white/[0.06]">
+                      <motion.button whileTap={{ scale: 0.85 }} onClick={() => changeDate(-1)} className="p-2 hover:bg-white/[0.06] rounded-xl transition-colors">
+                        <ChevronLeft className="w-5 h-5 text-gray-400" />
+                      </motion.button>
+                      <div className="text-center">
+                        <p className="font-semibold text-[14px] text-white">{formatDate(selectedDate)}</p>
+                        <p className="text-[11px] text-gray-500">{selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-white">
-                          {isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                      <motion.button whileTap={{ scale: 0.85 }} onClick={() => changeDate(1)} className="p-2 hover:bg-white/[0.06] rounded-xl transition-colors">
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      </motion.button>
+                    </div>
+
+                    {/* Quick buttons */}
+                    <div className="flex gap-2">
+                      {[
+                        { label: 'Сегодня', date: new Date() },
+                        { label: 'Завтра', date: new Date(Date.now() + 86400000) }
+                      ].map(btn => (
+                        <motion.button
+                          key={btn.label}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedDate(btn.date)}
+                          className={`flex-1 py-2 rounded-xl text-[13px] font-medium transition-all ${
+                            selectedDate.toDateString() === btn.date.toDateString()
+                              ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
+                              : 'bg-white/[0.04] text-gray-400 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {btn.label}
+                        </motion.button>
+                      ))}
+                    </div>
+
+                    {/* Schedule content */}
+                    {scheduleLoading ? (
+                      <div className="flex justify-center py-10">
+                        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : schedule?.error ? (
+                      <div className="text-center py-10">
+                        <EyeOff className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+                        <p className="text-gray-400 text-[14px]">Расписание недоступно</p>
+                        <p className="text-[12px] text-gray-600 mt-1">{schedule.message}</p>
+                      </div>
+                    ) : groupedSchedule.length > 0 ? (
+                      <>
+                        <p className="text-[12px] text-gray-500 mb-1">
+                          {schedule.friend_name} • {schedule.group_name}
                         </p>
-                        <p className="text-sm text-gray-400">
-                          {isFavorite ? 'Уберет из начала списка' : 'Будет в начале списка'}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-gray-500" />
-                    </button>
-
-                    <button
-                      onClick={() => setShowRemoveConfirm(true)}
-                      className="w-full flex items-center gap-3 p-4 bg-red-500/10 rounded-2xl text-left hover:bg-red-500/20 transition-colors"
-                    >
-                      <div className="p-2 rounded-xl bg-red-500/20">
-                        <UserMinus className="w-5 h-5 text-red-400" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-red-400">Удалить из друзей</p>
-                        <p className="text-sm text-gray-500">Можно добавить снова</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Schedule Tab */}
-              {activeTab === 'schedule' && (
-                <div className="space-y-3">
-                  {/* Навигация по дням */}
-                  <div className="flex items-center justify-between bg-white/5 rounded-2xl p-2">
-                    <button
-                      onClick={() => changeDate(-1)}
-                      className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-                    >
-                      <ChevronLeft className="w-5 h-5 text-gray-400" />
-                    </button>
-                    
-                    <div className="text-center">
-                      <p className="font-medium text-white">{formatDate(selectedDate)}</p>
-                      <p className="text-xs text-gray-500">
-                        {selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={() => changeDate(1)}
-                      className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-                    >
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
-                    </button>
-                  </div>
-
-                  {/* Быстрые кнопки */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setSelectedDate(new Date())}
-                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        selectedDate.toDateString() === new Date().toDateString()
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                      }`}
-                    >
-                      Сегодня
-                    </button>
-                    <button
-                      onClick={() => {
-                        const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        setSelectedDate(tomorrow);
-                      }}
-                      className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        selectedDate.toDateString() === new Date(Date.now() + 86400000).toDateString()
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                      }`}
-                    >
-                      Завтра
-                    </button>
-                  </div>
-
-                  {/* Контент расписания */}
-                  {scheduleLoading || (!schedule && activeTab === 'schedule') ? (
-                    <div className="flex justify-center py-8">
-                      <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  ) : schedule?.error ? (
-                    <div className="text-center py-8">
-                      <EyeOff className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                      <p className="text-gray-400">Расписание недоступно</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {schedule.message || 'Пользователь скрыл расписание или группа не настроена'}
-                      </p>
-                    </div>
-                  ) : groupedSchedule.length > 0 ? (
-                    <>
-                      <p className="text-sm text-gray-400 mb-2">
-                        {schedule.friend_name} • {schedule.group_name}
-                      </p>
-                      {groupedSchedule.map((event, index) => {
-                        // Парсим время из формата "09:00 - 10:20"
-                        const timeParts = event.time?.split(' - ') || [];
-                        const startTime = timeParts[0] || event.time_start?.slice(0, 5) || '';
-                        const endTime = timeParts[1] || event.time_end?.slice(0, 5) || '';
-                        const isExpanded = expandedIndex === index;
-                        const hasMultipleSubItems = event.subItems && event.subItems.length > 1;
-                        
-                        return (
-                          <motion.div
-                            key={index}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className={`bg-white/5 rounded-2xl p-4 border border-white/10 ${hasMultipleSubItems ? 'cursor-pointer' : ''}`}
-                            onClick={() => hasMultipleSubItems && setExpandedIndex(isExpanded ? null : index)}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="bg-purple-500/20 rounded-xl px-3 py-2 text-center min-w-[60px]">
-                                <p className="text-lg font-bold text-purple-400">
-                                  {startTime}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {endTime}
-                                </p>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-white truncate">
-                                  {event.discipline || event.title || event.subject}
-                                </h4>
-                                {event.lessonType && (
-                                  <p className="text-xs text-purple-400 mb-1">{event.lessonType}</p>
-                                )}
-                                
-                                {/* Если несколько преподавателей/аудиторий - показываем с разворачиванием */}
-                                {hasMultipleSubItems ? (
-                                  <>
-                                    <p className="text-sm text-gray-400">
-                                      {event.subItems.length} варианта
-                                    </p>
-                                    
-                                    {/* Развёрнутые детали */}
-                                    <AnimatePresence>
-                                      {isExpanded && (
-                                        <motion.div
-                                          initial={{ opacity: 0, height: 0 }}
-                                          animate={{ opacity: 1, height: 'auto' }}
-                                          exit={{ opacity: 0, height: 0 }}
-                                          className="mt-3 space-y-2 overflow-hidden"
-                                        >
-                                          {event.subItems.map((subItem, subIndex) => (
-                                            <div 
-                                              key={subIndex} 
-                                              className={`${subIndex > 0 ? 'pt-2 border-t border-white/10' : ''}`}
-                                            >
-                                              {subItem.teacher && (
-                                                <p className="text-sm text-gray-300">{subItem.teacher}</p>
-                                              )}
-                                              {subItem.auditory && (
-                                                <p className="text-xs text-gray-500 flex items-center gap-1">
-                                                  <MapPin className="w-3 h-3" />
-                                                  {subItem.auditory}
-                                                </p>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </motion.div>
-                                      )}
-                                    </AnimatePresence>
-                                  </>
-                                ) : (
-                                  <>
-                                    {/* Один вариант - показываем сразу */}
-                                    {event.subItems?.[0]?.teacher && (
-                                      <p className="text-sm text-gray-400 truncate">{event.subItems[0].teacher}</p>
-                                    )}
-                                    {event.subItems?.[0]?.auditory && (
-                                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                        <MapPin className="w-3 h-3" />
-                                        {event.subItems[0].auditory}
-                                      </p>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                              
-                              {/* Иконка раскрытия */}
-                              {hasMultipleSubItems && (
-                                <div className="flex-shrink-0">
-                                  {isExpanded ? (
-                                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                        {groupedSchedule.map((event, index) => {
+                          const timeParts = event.time?.split(' - ') || [];
+                          const startTime = timeParts[0] || event.time_start?.slice(0, 5) || '';
+                          const endTime = timeParts[1] || event.time_end?.slice(0, 5) || '';
+                          const isExpanded = expandedIndex === index;
+                          const hasMultiple = event.subItems && event.subItems.length > 1;
+                          
+                          return (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, y: 12 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className={`bg-white/[0.03] rounded-2xl p-4 border border-white/[0.06] ${hasMultiple ? 'cursor-pointer' : ''}`}
+                              onClick={() => hasMultiple && setExpandedIndex(isExpanded ? null : index)}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="bg-purple-500/12 rounded-xl px-3 py-2 text-center min-w-[60px] border border-purple-500/10">
+                                  <p className="text-base font-bold text-purple-400">{startTime}</p>
+                                  <p className="text-[10px] text-gray-500">{endTime}</p>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold text-[14px] text-white truncate">
+                                    {event.discipline || event.title || event.subject}
+                                  </h4>
+                                  {event.lessonType && <p className="text-[11px] text-purple-400 mb-1">{event.lessonType}</p>}
+                                  {hasMultiple ? (
+                                    <>
+                                      <p className="text-[12px] text-gray-500">{event.subItems.length} варианта</p>
+                                      <AnimatePresence>
+                                        {isExpanded && (
+                                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 space-y-2 overflow-hidden">
+                                            {event.subItems.map((sub, si) => (
+                                              <div key={si} className={si > 0 ? 'pt-2 border-t border-white/[0.06]' : ''}>
+                                                {sub.teacher && <p className="text-[13px] text-gray-300">{sub.teacher}</p>}
+                                                {sub.auditory && (
+                                                  <p className="text-[11px] text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3" />{sub.auditory}</p>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    </>
                                   ) : (
-                                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                                    <>
+                                      {event.subItems?.[0]?.teacher && <p className="text-[13px] text-gray-400 truncate">{event.subItems[0].teacher}</p>}
+                                      {event.subItems?.[0]?.auditory && (
+                                        <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3" />{event.subItems[0].auditory}</p>
+                                      )}
+                                    </>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Calendar className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                      <p className="text-gray-400">Нет пар на {formatDate(selectedDate).toLowerCase()}</p>
-                    </div>
-                  )}
-                </div>
-              )}
+                                {hasMultiple && (
+                                  <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} className="flex-shrink-0">
+                                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                                  </motion.div>
+                                )}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="text-center py-10">
+                        <Calendar className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+                        <p className="text-gray-400 text-[14px]">Нет пар на {formatDate(selectedDate).toLowerCase()}</p>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Remove Confirmation */}
@@ -560,40 +505,43 @@ const FriendProfileModal = ({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-end justify-center z-10"
+                  className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-end justify-center z-10"
                 >
                   <motion.div
-                    initial={{ y: 100 }}
-                    animate={{ y: 0 }}
-                    exit={{ y: 100 }}
-                    className="bg-gray-800 rounded-t-3xl p-6 w-full"
+                    initial={{ y: 100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 100, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    className="rounded-t-[28px] p-6 w-full"
+                    style={{ backgroundColor: 'rgba(28, 28, 36, 0.98)' }}
                   >
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-3 bg-red-500/20 rounded-2xl">
+                    <div className="flex items-center gap-3.5 mb-5">
+                      <div className="p-3 bg-red-500/15 rounded-2xl">
                         <AlertTriangle className="w-6 h-6 text-red-400" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-white">Удалить из друзей?</h3>
-                        <p className="text-sm text-gray-400">Это действие можно отменить</p>
+                        <h3 className="text-[17px] font-bold text-white">Удалить из друзей?</h3>
+                        <p className="text-[13px] text-gray-500 mt-0.5">Это действие можно отменить позже</p>
                       </div>
                     </div>
-                    
                     <div className="flex gap-3">
-                      <button
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setShowRemoveConfirm(false)}
-                        className="flex-1 py-3 bg-white/10 text-white rounded-xl font-medium"
+                        className="flex-1 py-3.5 bg-white/[0.06] text-white rounded-2xl font-semibold text-[14px]"
                       >
                         Отмена
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => {
                           onRemoveFriend?.(friend.telegram_id);
                           setShowRemoveConfirm(false);
                         }}
-                        className="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium"
+                        className="flex-1 py-3.5 bg-red-500 text-white rounded-2xl font-semibold text-[14px] shadow-lg shadow-red-500/20"
                       >
                         Удалить
-                      </button>
+                      </motion.button>
                     </div>
                   </motion.div>
                 </motion.div>
