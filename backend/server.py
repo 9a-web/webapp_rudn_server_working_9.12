@@ -12956,26 +12956,19 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
     """
     Связать веб-сессию с Telegram профилем.
     Вызывается из Telegram Web App после подтверждения пользователем.
+    Использует атомарную операцию find_one_and_update для предотвращения race condition.
     """
     try:
-        # Находим сессию
-        session = await db.web_sessions.find_one({"session_token": session_token})
+        # Проверяем срок действия (предварительная проверка)
+        session_check = await db.web_sessions.find_one({"session_token": session_token})
         
-        if not session:
+        if not session_check:
             return WebSessionLinkResponse(
                 success=False,
                 message="Сессия не найдена"
             )
         
-        # Проверяем статус
-        if session["status"] != WebSessionStatus.PENDING.value:
-            return WebSessionLinkResponse(
-                success=False,
-                message="Сессия уже использована или истекла"
-            )
-        
-        # Проверяем срок действия
-        if session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+        if session_check.get("expires_at") and datetime.utcnow() > session_check["expires_at"]:
             await db.web_sessions.update_one(
                 {"session_token": session_token},
                 {"$set": {"status": WebSessionStatus.EXPIRED.value}}
@@ -12996,7 +12989,8 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
                 if isinstance(value, datetime):
                     user_settings_dict[key] = value.isoformat()
         
-        # Обновляем сессию
+        # АТОМАРНАЯ ОПЕРАЦИЯ: find_one_and_update с условием status=PENDING
+        # Предотвращает race condition - только один запрос сможет связать сессию
         update_data = {
             "status": WebSessionStatus.LINKED.value,
             "telegram_id": request.telegram_id,
@@ -13005,29 +12999,43 @@ async def link_web_session(session_token: str, request: WebSessionLinkRequest):
             "username": request.username,
             "photo_url": request.photo_url,
             "user_settings": user_settings_dict,
-            "linked_at": datetime.utcnow()
+            "linked_at": datetime.utcnow(),
+            "last_active": datetime.utcnow()
         }
         
-        await db.web_sessions.update_one(
-            {"session_token": session_token},
-            {"$set": update_data}
+        result = await db.web_sessions.find_one_and_update(
+            {
+                "session_token": session_token,
+                "status": WebSessionStatus.PENDING.value
+            },
+            {"$set": update_data},
+            return_document=True  # pymongo.ReturnDocument.AFTER
         )
+        
+        if not result:
+            return WebSessionLinkResponse(
+                success=False,
+                message="Сессия уже использована или истекла"
+            )
         
         logger.info(f"✅ Web session linked: {session_token[:8]}... -> {request.telegram_id}")
         
-        # Отправляем уведомление в Telegram о новом устройстве
-        try:
-            from telegram_bot import send_device_linked_notification
-            device_name = session.get("device_name", "Неизвестное устройство")
-            await send_device_linked_notification(
-                telegram_id=request.telegram_id,
-                device_name=device_name,
-                session_token=session_token,
-                photo_url=request.photo_url,
-                first_name=request.first_name
-            )
-        except Exception as notify_err:
-            logger.warning(f"⚠️ Не удалось отправить Telegram уведомление: {notify_err}")
+        # Отправляем уведомление в Telegram о новом устройстве (fire-and-forget)
+        async def _send_telegram_notification():
+            try:
+                from telegram_bot import send_device_linked_notification
+                device_name = result.get("device_name", "Неизвестное устройство")
+                await send_device_linked_notification(
+                    telegram_id=request.telegram_id,
+                    device_name=device_name,
+                    session_token=session_token,
+                    photo_url=request.photo_url,
+                    first_name=request.first_name
+                )
+            except Exception as notify_err:
+                logger.warning(f"⚠️ Не удалось отправить Telegram уведомление: {notify_err}")
+        
+        asyncio.create_task(_send_telegram_notification())
         
         # Отправляем уведомление через WebSocket если есть активное соединение
         if session_token in web_session_connections:
