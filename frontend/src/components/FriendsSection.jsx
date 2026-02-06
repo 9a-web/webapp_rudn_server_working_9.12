@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Search, UserPlus, Bell, Star, 
   RefreshCw, UserCheck, UserX, Clock, Send, 
-  QrCode, ScanLine, X, Sparkles, Heart
+  QrCode, ScanLine, X, Sparkles, Heart, Loader2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
@@ -16,6 +16,22 @@ import { friendsAPI } from '../services/friendsAPI';
 import FriendCard from './FriendCard';
 import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
+
+// URL backend из env
+const getBackendURL = () => {
+  let url = '';
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      url = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
+    }
+    if (!url && typeof process !== 'undefined' && process.env) {
+      url = process.env.REACT_APP_BACKEND_URL || '';
+    }
+  } catch (e) { /* env not available */ }
+  if (url && url.trim() !== '') return url;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
+  return window.location.origin;
+};
 
 // Русское склонение
 const pluralize = (n, one, few, many) => {
@@ -35,6 +51,30 @@ const useDebounce = (value, delay) => {
     return () => clearTimeout(handler);
   }, [value, delay]);
   return debouncedValue;
+};
+
+// Компонент аватарки с фото + fallback на инициалы
+const UserAvatar = ({ telegramId, firstName, username, size = 48, className = '' }) => {
+  const [imgError, setImgError] = useState(false);
+  const avatarUrl = `${getBackendURL()}/api/user-profile-photo-proxy/${telegramId}`;
+  const initials = (firstName?.[0] || username?.[0] || '?').toUpperCase();
+  const gradient = getAvatarGradient(telegramId);
+
+  return (
+    <div 
+      className={`bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold overflow-hidden shadow-lg ${className}`}
+      style={{ width: size, height: size }}
+    >
+      {!imgError ? (
+        <img 
+          src={avatarUrl} alt="" className="w-full h-full object-cover"
+          onError={() => setImgError(true)} loading="lazy"
+        />
+      ) : (
+        <span className="drop-shadow-sm" style={{ fontSize: size * 0.38 }}>{initials}</span>
+      )}
+    </div>
+  );
 };
 
 const TABS = [
