@@ -1061,39 +1061,15 @@ export const PlannerTimeline = ({
         style={{ height: '400px', WebkitOverflowScrolling: 'touch' }}
       >
         <div className="relative pt-2" style={{ height: `${24 * HOUR_HEIGHT + 8}px` }}>
-          {/* Часовые линии - кликабельные для быстрого создания */}
+          {/* Часовые линии — long-press для быстрого создания */}
           {HOURS.map((hour) => (
-            <div
+            <LongPressSlot
               key={hour}
-              className="absolute left-0 right-0 flex group"
-              style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
-              onClick={(e) => {
-                // Вычисляем точное время по клику
-                if (onQuickCreate) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const clickY = e.clientY - rect.top;
-                  const minutesOffset = Math.floor((clickY / HOUR_HEIGHT) * 60);
-                  const totalMinutes = hour * 60 + minutesOffset;
-                  
-                  // Округляем до 15 минут
-                  const roundedMinutes = Math.round(totalMinutes / 15) * 15;
-                  const endMinutes = roundedMinutes + 60;
-                  
-                  hapticFeedback && hapticFeedback('impact', 'light');
-                  onQuickCreate(formatMinutesToTime(roundedMinutes), formatMinutesToTime(endMinutes));
-                }
-              }}
-            >
-              {/* Время слева */}
-              <div className="w-14 flex-shrink-0 pl-2 pr-2 -translate-y-[25%]">
-                <span className="text-xs text-gray-400 font-medium">
-                  {formatHour(hour)}
-                </span>
-              </div>
-              
-              {/* Разделительная линия с подсветкой при наведении */}
-              <div className={`flex-1 border-t border-gray-200/70 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
-            </div>
+              hour={hour}
+              onQuickCreate={onQuickCreate}
+              hapticFeedback={hapticFeedback}
+              events={events}
+            />
           ))}
           
           {/* Индикатор текущего времени (только для сегодня и если есть события) */}
