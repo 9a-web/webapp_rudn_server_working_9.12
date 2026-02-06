@@ -494,8 +494,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         setSyncPreviewData(null);
         
         // Перезагружаем события после синхронизации
+        // ОПТИМИЗАЦИЯ: Перезагружаем только события планировщика
         await loadPlannerEvents(tasksSelectedDate);
-        await loadTasks();
         
         const message = response.synced_count > 0 
           ? `Добавлено ${response.synced_count} ${response.synced_count === 1 ? 'пара' : response.synced_count < 5 ? 'пары' : 'пар'}`
