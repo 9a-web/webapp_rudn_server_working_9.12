@@ -208,9 +208,10 @@ class CoverService:
     #  PUBLIC API
     # ------------------------------------------------------------------
 
-    async def get_cover(self, artist: str, title: str, size: str = 'big') -> Optional[str]:
+    async def get_cover(self, artist: str, title: str, size: str = 'big', album: str = '') -> Optional[str]:
         """
         Получение обложки трека (кэш → iTunes → Deezer).
+        Если album передан и трек не найден — ищет по альбому.
         """
         if not artist or not title:
             return None
@@ -224,24 +225,34 @@ class CoverService:
             url = cached.get(size_key)
             if url:
                 return url
-            # Кэш есть, но пустой — значит ранее не нашли, не делаем повторный запрос
             if cached == {}:
                 return None
 
-        # 2. iTunes
+        # 2. iTunes по артисту + названию трека
         covers = await self._fetch_from_itunes(artist, title)
         if covers:
             await self._save_to_cache(cache_key, artist, title, covers, source='itunes')
             return covers.get(size_key)
 
-        # 3. Deezer fallback
+        # 3. Deezer по артисту + названию трека
         covers = await self._fetch_from_deezer(artist, title)
         if covers:
             await self._save_to_cache(cache_key, artist, title, covers, source='deezer')
             return covers.get(size_key)
 
-        # Ничего не нашли — кэшируем пустой результат, но КОРОТКО (2 часа),
-        # чтобы при rate-limit не залочить трек навсегда
+        # 4. Fallback: поиск по альбому (если передан)
+        if album and album.strip():
+            covers = await self._fetch_from_itunes_album(artist, album)
+            if covers:
+                await self._save_to_cache(cache_key, artist, title, covers, source='itunes_album')
+                return covers.get(size_key)
+
+            covers = await self._fetch_from_deezer_album(artist, album)
+            if covers:
+                await self._save_to_cache(cache_key, artist, title, covers, source='deezer_album')
+                return covers.get(size_key)
+
+        # Ничего не нашли — кэшируем коротко
         await self._save_to_cache_short(cache_key, artist, title)
         return None
 
