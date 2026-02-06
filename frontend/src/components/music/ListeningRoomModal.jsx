@@ -48,6 +48,24 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [botUsername, setBotUsername] = useState('rudn_mosbot');
+
+  // Получаем username бота из API (зависит от ENV)
+  useEffect(() => {
+    const fetchBotUsername = async () => {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL || '';
+        const res = await fetch(`${backendUrl}/api/bot-info`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.username) setBotUsername(data.username);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch bot username, using default');
+      }
+    };
+    fetchBotUsername();
+  }, []);
   
   // Состояние комнат
   const [myRooms, setMyRooms] = useState([]);
