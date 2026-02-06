@@ -2695,8 +2695,8 @@ async def get_planner_day_events(telegram_id: int, date: str):
         except ValueError:
             raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
         
+        # FIX: Упрощённый MongoDB-запрос (убраны избыточные $ne + $nin)
         # Получаем только события с установленным временем на эту дату
-        # Расширяем диапазон на +/- 1 день для учёта часовых поясов
         tasks_cursor = db.tasks.find({
             "telegram_id": telegram_id,
             "target_date": {
@@ -2704,40 +2704,21 @@ async def get_planner_day_events(telegram_id: int, date: str):
                 "$lt": target_date + timedelta(days=1, hours=12)
             },
             # Только события с установленным временем (не null и не пустая строка)
-            "time_start": {"$ne": None, "$exists": True, "$nin": ["", None]},
-            "time_end": {"$ne": None, "$exists": True, "$nin": ["", None]}
+            "time_start": {"$exists": True, "$nin": [None, ""]},
+            "time_end": {"$exists": True, "$nin": [None, ""]}
         })
         
         tasks = await tasks_cursor.to_list(length=None)
         
-        # Формируем ответ
+        # FIX: Формируем ответ с прогрессом подзадач и videos
         events = []
         for task in tasks:
-            task_response = TaskResponse(
-                id=task["id"],
-                telegram_id=task["telegram_id"],
-                text=task["text"],
-                completed=task.get("completed", False),
-                completed_at=task.get("completed_at"),
-                skipped=task.get("skipped", False),
-                category=task.get("category"),
-                priority=task.get("priority", "medium"),
-                deadline=task.get("deadline"),
-                target_date=task.get("target_date"),
-                subject=task.get("subject"),
-                discipline_id=task.get("discipline_id"),
-                time_start=task.get("time_start"),
-                time_end=task.get("time_end"),
-                is_fixed=task.get("is_fixed", False),
-                origin=task.get("origin", "user"),
-                order=task.get("order", 0),
-                created_at=task["created_at"],
-                updated_at=task["updated_at"],
-                notes=task.get("notes"),
-                teacher=task.get("teacher"),
-                auditory=task.get("auditory"),
-                lessonType=task.get("lessonType")
-            )
+            # Гарантируем наличие videos
+            if 'videos' not in task:
+                task['videos'] = []
+            # Вычисляем прогресс подзадач
+            progress_info = calculate_subtasks_progress(task.get("subtasks", []))
+            task_response = TaskResponse(**task, **progress_info)
             events.append(task_response)
         
         # Сортируем события по времени начала
