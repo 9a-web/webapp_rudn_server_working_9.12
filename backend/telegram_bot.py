@@ -166,12 +166,17 @@ async def send_device_linked_notification(
         formatted_time = now.strftime("%d.%m.%Y в %H:%M")
         
         # Формируем сообщение
-        message_text = f"""🔗 <b>Новое устройство подключено</b>
-
-📱 <b>{device_name}</b>
-🕐 Подключено: {formatted_time} UTC
-
-<i>Если это были не вы, немедленно удалите этот сеанс.</i>"""
+        message_text = (
+            f"🔗  <b>Новое устройство подключено</b>\n"
+            f"\n"
+            f"┌─────────────────────\n"
+            f"│  📱  <b>{device_name}</b>\n"
+            f"│  🕐  {formatted_time} UTC\n"
+            f"└─────────────────────\n"
+            f"\n"
+            f"⚠️ <i>Если это были не вы — немедленно\n"
+            f"удалите этот сеанс кнопкой ниже.</i>"
+        )
 
         # Создаём inline-кнопку для удаления сеанса
         keyboard = [
