@@ -1050,6 +1050,9 @@ export const PlannerTimeline = ({
           </div>
         </div>
       </div>
+
+      {/* Прогресс-бар дня */}
+      <DayProgressBar events={events} />
       
       {/* Timeline контейнер */}
       <div 
