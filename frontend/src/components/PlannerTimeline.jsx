@@ -532,7 +532,291 @@ const TimelineEventCard = ({
   );
 };
 
-// Главный компонент Timeline
+// ============================================================
+// Прогресс-бар дня (стекломорфизм)
+// ============================================================
+const DayProgressBar = ({ events }) => {
+  const total = events.length;
+  const completed = events.filter(e => e.completed || e.skipped).length;
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+  
+  if (total === 0) return null;
+  
+  const allDone = completed === total;
+  
+  return (
+    <div className="px-4 py-2.5 border-b border-gray-200/60">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          Прогресс дня
+        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-xs font-bold tabular-nums ${allDone ? 'text-emerald-600' : 'text-gray-700'}`}>
+            {completed}/{total}
+          </span>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md
+            ${allDone 
+              ? 'bg-emerald-100 text-emerald-700' 
+              : percent > 50 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'bg-gray-100 text-gray-600'
+            }`}>
+            {percent}%
+          </span>
+        </div>
+      </div>
+      {/* Glass progress bar */}
+      <div className="relative h-2 rounded-full overflow-hidden"
+           style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.06) 100%)' }}>
+        <div className="absolute inset-0 rounded-full border border-black/[0.04]" />
+        <motion.div
+          className="h-full rounded-full relative overflow-hidden"
+          initial={{ width: 0 }}
+          animate={{ width: `${percent}%` }}
+          transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.2 }}
+          style={{
+            background: allDone
+              ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
+              : 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+          }}
+        >
+          {/* Shine effect */}
+          <div className="absolute inset-0 opacity-40"
+               style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// Long-press ghost preview + haptic
+// ============================================================
+const LongPressSlot = ({ hour, onQuickCreate, hapticFeedback, events }) => {
+  const timerRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const [ghostTime, setGhostTime] = useState(null);
+  const [pressing, setPressing] = useState(false);
+  const LONG_PRESS_MS = 400;
+
+  // Check if this hour is occupied by an event
+  const isOccupied = useMemo(() => {
+    const slotStart = hour * 60;
+    const slotEnd = slotStart + 60;
+    return events.some(e => {
+      const eStart = parseTime(e.time_start);
+      const eEnd = parseTime(e.time_end) || eStart + 60;
+      return eStart < slotEnd && eEnd > slotStart;
+    });
+  }, [hour, events]);
+
+  const calcTime = (clientY, rect) => {
+    const y = clientY - rect.top;
+    const minutesOffset = Math.floor((y / HOUR_HEIGHT) * 60);
+    const total = hour * 60 + minutesOffset;
+    const rounded = Math.round(total / 15) * 15;
+    return { start: rounded, end: rounded + 60 };
+  };
+
+  const startPress = (clientY, rect) => {
+    if (!onQuickCreate || isOccupied) return;
+    const time = calcTime(clientY, rect);
+    touchStartRef.current = { clientY };
+    setGhostTime(time);
+    setPressing(true);
+    timerRef.current = setTimeout(() => {
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      onQuickCreate(formatMinutesToTime(time.start), formatMinutesToTime(time.end));
+      setGhostTime(null);
+      setPressing(false);
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelPress = () => {
+    clearTimeout(timerRef.current);
+    setGhostTime(null);
+    setPressing(false);
+    touchStartRef.current = null;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return;
+    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.clientY);
+    if (dy > 10) cancelPress(); // Cancel if scrolling
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div
+      className="absolute left-0 right-0 flex group"
+      style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+      onTouchStart={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        startPress(e.touches[0].clientY, rect);
+      }}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
+      onTouchMove={handleTouchMove}
+      onMouseDown={(e) => {
+        if (e.button !== 0) return;
+        startPress(e.clientY, e.currentTarget.getBoundingClientRect());
+      }}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+    >
+      {/* Time label */}
+      <div className="w-14 flex-shrink-0 pl-2 pr-2 -translate-y-[25%]">
+        <span className="text-xs text-gray-400 font-medium">{formatHour(hour)}</span>
+      </div>
+      {/* Slot area */}
+      <div className={`flex-1 border-t border-gray-200/70 relative
+        ${onQuickCreate && !isOccupied ? 'cursor-pointer' : ''}
+        ${pressing ? 'bg-indigo-50/60' : onQuickCreate && !isOccupied ? 'hover:bg-blue-50/40' : ''}
+        transition-colors duration-150`}
+      >
+        {/* Ghost preview during long-press */}
+        <AnimatePresence>
+          {ghostTime && pressing && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0.8 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-x-1 rounded-lg border-2 border-dashed border-indigo-400/50 bg-indigo-100/40 flex items-center justify-center gap-1.5 pointer-events-none"
+              style={{
+                top: `${((ghostTime.start % 60) / 60) * 100}%`,
+                height: `${HOUR_HEIGHT}px`,
+              }}
+            >
+              <Plus className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-[11px] font-medium text-indigo-600">
+                {formatMinutesToTime(ghostTime.start)} — {formatMinutesToTime(ghostTime.end)}
+              </span>
+              {/* Pulsing ring */}
+              <motion.div
+                className="absolute inset-0 rounded-lg border-2 border-indigo-400/30"
+                animate={{ scale: [1, 1.02, 1], opacity: [0.5, 0.2, 0.5] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// Long-press slot for fullscreen (wider labels)
+const LongPressSlotFullscreen = ({ hour, onQuickCreate, hapticFeedback, events }) => {
+  const timerRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const [ghostTime, setGhostTime] = useState(null);
+  const [pressing, setPressing] = useState(false);
+  const LONG_PRESS_MS = 400;
+
+  const isOccupied = useMemo(() => {
+    const slotStart = hour * 60;
+    const slotEnd = slotStart + 60;
+    return events.some(e => {
+      const eStart = parseTime(e.time_start);
+      const eEnd = parseTime(e.time_end) || eStart + 60;
+      return eStart < slotEnd && eEnd > slotStart;
+    });
+  }, [hour, events]);
+
+  const calcTime = (clientY, rect) => {
+    const y = clientY - rect.top;
+    const minutesOffset = Math.floor((y / HOUR_HEIGHT) * 60);
+    const total = hour * 60 + minutesOffset;
+    const rounded = Math.round(total / 15) * 15;
+    return { start: rounded, end: rounded + 60 };
+  };
+
+  const startPress = (clientY, rect) => {
+    if (!onQuickCreate || isOccupied) return;
+    const time = calcTime(clientY, rect);
+    touchStartRef.current = { clientY };
+    setGhostTime(time);
+    setPressing(true);
+    timerRef.current = setTimeout(() => {
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      onQuickCreate(formatMinutesToTime(time.start), formatMinutesToTime(time.end));
+      setGhostTime(null);
+      setPressing(false);
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelPress = () => {
+    clearTimeout(timerRef.current);
+    setGhostTime(null);
+    setPressing(false);
+    touchStartRef.current = null;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return;
+    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.clientY);
+    if (dy > 10) cancelPress();
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div
+      className="absolute left-0 right-0 flex group"
+      style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+      onTouchStart={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        startPress(e.touches[0].clientY, rect);
+      }}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
+      onTouchMove={handleTouchMove}
+      onMouseDown={(e) => {
+        if (e.button !== 0) return;
+        startPress(e.clientY, e.currentTarget.getBoundingClientRect());
+      }}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+    >
+      <div className="w-16 flex-shrink-0 pl-3 pr-3 -translate-y-[25%]">
+        <span className="text-sm text-gray-400 font-medium">{formatHour(hour)}</span>
+      </div>
+      <div className={`flex-1 border-t border-gray-200/70 relative
+        ${onQuickCreate && !isOccupied ? 'cursor-pointer' : ''}
+        ${pressing ? 'bg-indigo-50/60' : onQuickCreate && !isOccupied ? 'hover:bg-blue-50/40' : ''}
+        transition-colors duration-150`}
+      >
+        <AnimatePresence>
+          {ghostTime && pressing && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0.8 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-x-1 rounded-lg border-2 border-dashed border-indigo-400/50 bg-indigo-100/40 flex items-center justify-center gap-1.5 pointer-events-none"
+              style={{
+                top: `${((ghostTime.start % 60) / 60) * 100}%`,
+                height: `${HOUR_HEIGHT}px`,
+              }}
+            >
+              <Plus className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-[11px] font-medium text-indigo-600">
+                {formatMinutesToTime(ghostTime.start)} — {formatMinutesToTime(ghostTime.end)}
+              </span>
+              <motion.div
+                className="absolute inset-0 rounded-lg border-2 border-indigo-400/30"
+                animate={{ scale: [1, 1.02, 1], opacity: [0.5, 0.2, 0.5] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
 export const PlannerTimeline = ({ 
   events = [], 
   onToggleComplete, 
