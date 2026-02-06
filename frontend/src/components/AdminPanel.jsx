@@ -532,6 +532,33 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
         </div>
       )}
 
+      {/* Web-version stats */}
+      {generalStats && (generalStats.web_sessions_total > 0 || generalStats.web_unique_users > 0) && (
+        <div className="bg-gradient-to-r from-teal-500/10 to-blue-500/10 rounded-2xl p-4 border border-teal-500/15">
+          <h3 className="text-sm font-semibold text-teal-400 mb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4" /> Веб-версия
+          </h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white/5 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-white">{formatNumber(generalStats.web_sessions_total)}</div>
+              <div className="text-xs text-gray-400 mt-1">Веб-сессий</div>
+            </div>
+            <div className="bg-white/5 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-emerald-400">{formatNumber(generalStats.web_sessions_active)}</div>
+              <div className="text-xs text-gray-400 mt-1">Сейчас онлайн</div>
+            </div>
+            <div className="bg-white/5 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-white">{formatNumber(generalStats.web_unique_users)}</div>
+              <div className="text-xs text-gray-400 mt-1">Уникальных</div>
+            </div>
+            <div className="bg-white/5 rounded-xl p-3 text-center">
+              <div className="text-2xl font-bold text-white">{formatNumber(generalStats.web_users_today)}</div>
+              <div className="text-xs text-gray-400 mt-1">Сегодня</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* User Registration Chart */}
       <ChartCard title="Регистрации пользователей" icon={<Users />}>
         {usersActivity.length > 0 ? (
