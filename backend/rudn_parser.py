@@ -134,46 +134,58 @@ async def get_schedule(
     group_id: str,
     week_number: int = 1
 ) -> List[Dict]:
-    """Получает расписание для конкретной группы"""
-    try:
-        params = {
-            "facultet": facultet_id,
-            "level": level_id,
-            "kurs": kurs,
-            "form": form_code,
-            "group": group_id
-        }
-        
-        logger.info(f"Запрос расписания для группы {group_id}, неделя {week_number}")
-        
-        timeout = aiohttp.ClientTimeout(total=TIMEOUT)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(
-                BASE_URL,
-                params=params,
-                headers=HEADERS
-            ) as response:
-                if response.status != 200:
-                    logger.error(f"Ошибка HTTP {response.status} при получении расписания")
-                    return []
-                
-                html = await response.text()
-                
-                if not html.strip():
-                    logger.warning("Получен пустой ответ от сервера")
-                    return []
-                
-                # Выполняем CPU-емкий парсинг в отдельном потоке, чтобы не блокировать event loop
-                loop = asyncio.get_running_loop()
-                return await loop.run_in_executor(None, parse_html_schedule, html, week_number)
-    except aiohttp.ClientError as e:
-        logger.error(f"Ошибка подключения при получении расписания: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"Неожиданная ошибка при получении расписания: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return []
+    """Получает расписание для конкретной группы (с retry)"""
+    max_retries = 2
+    
+    for attempt in range(max_retries + 1):
+        try:
+            params = {
+                "facultet": facultet_id,
+                "level": level_id,
+                "kurs": kurs,
+                "form": form_code,
+                "group": group_id
+            }
+            
+            logger.info(f"Запрос расписания для группы {group_id}, неделя {week_number} (попытка {attempt + 1})")
+            
+            timeout = aiohttp.ClientTimeout(total=TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    BASE_URL,
+                    params=params,
+                    headers=HEADERS
+                ) as response:
+                    if response.status != 200:
+                        logger.error(f"Ошибка HTTP {response.status} при получении расписания")
+                        if attempt < max_retries:
+                            await asyncio.sleep(1)
+                            continue
+                        return []
+                    
+                    html = await response.text()
+                    
+                    if not html.strip():
+                        logger.warning("Получен пустой ответ от сервера")
+                        return []
+                    
+                    # Выполняем CPU-емкий парсинг в отдельном потоке, чтобы не блокировать event loop
+                    loop = asyncio.get_running_loop()
+                    return await loop.run_in_executor(None, parse_html_schedule, html, week_number)
+                    
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            logger.error(f"Ошибка подключения при получении расписания (попытка {attempt + 1}): {e}")
+            if attempt < max_retries:
+                await asyncio.sleep(1)
+                continue
+            return []
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка при получении расписания: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+    
+    return []
 
 
 def parse_html_schedule(html_content: str, week_number: int = 1) -> List[Dict]:
