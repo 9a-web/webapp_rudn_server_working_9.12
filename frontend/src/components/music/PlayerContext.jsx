@@ -95,6 +95,11 @@ export const PlayerProvider = ({ children }) => {
   const queueRef = useRef([]);
   const queueIndexRef = useRef(0);
 
+  // Синхронизация рефов с состоянием (для использования внутри event handlers)
+  useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
+
   // Инициализация Audio элемента и установка громкости
   useEffect(() => {
     if (!audioRef.current && typeof Audio !== 'undefined') {
