@@ -11281,17 +11281,53 @@ async def get_user_friends_count(telegram_id: int) -> int:
 
 
 async def get_mutual_friends_count(user1_id: int, user2_id: int) -> int:
-    """Получить количество общих друзей двух пользователей"""
-    # Получаем друзей первого пользователя
-    friends1 = await db.friends.find({"user_telegram_id": user1_id}).to_list(1000)
-    friends1_ids = set(f["friend_telegram_id"] for f in friends1)
+    """Получить количество общих друзей двух пользователей (оптимизировано через aggregation)"""
+    try:
+        pipeline = [
+            {"$match": {"user_telegram_id": user1_id}},
+            {"$lookup": {
+                "from": "friends",
+                "let": {"friend_id": "$friend_telegram_id"},
+                "pipeline": [
+                    {"$match": {
+                        "$expr": {
+                            "$and": [
+                                {"$eq": ["$user_telegram_id", user2_id]},
+                                {"$eq": ["$friend_telegram_id", "$$friend_id"]}
+                            ]
+                        }
+                    }}
+                ],
+                "as": "mutual"
+            }},
+            {"$match": {"mutual": {"$ne": []}}},
+            {"$count": "total"}
+        ]
+        result = await db.friends.aggregate(pipeline).to_list(1)
+        return result[0]["total"] if result else 0
+    except Exception:
+        # Fallback к простому методу
+        friends1 = await db.friends.find({"user_telegram_id": user1_id}).to_list(1000)
+        friends1_ids = set(f["friend_telegram_id"] for f in friends1)
+        friends2 = await db.friends.find({"user_telegram_id": user2_id}).to_list(1000)
+        friends2_ids = set(f["friend_telegram_id"] for f in friends2)
+        return len(friends1_ids & friends2_ids)
+
+
+async def get_mutual_friends_count_batch(user_id: int, target_ids: list) -> dict:
+    """Batch-подсчёт общих друзей для списка пользователей"""
+    if not target_ids:
+        return {}
     
-    # Получаем друзей второго пользователя
-    friends2 = await db.friends.find({"user_telegram_id": user2_id}).to_list(1000)
-    friends2_ids = set(f["friend_telegram_id"] for f in friends2)
+    my_friends = await db.friends.find({"user_telegram_id": user_id}).to_list(1000)
+    my_friend_ids = set(f["friend_telegram_id"] for f in my_friends)
     
-    # Находим пересечение
-    return len(friends1_ids & friends2_ids)
+    result = {}
+    for tid in target_ids:
+        their_friends = await db.friends.find({"user_telegram_id": tid}).to_list(1000)
+        their_ids = set(f["friend_telegram_id"] for f in their_friends)
+        result[tid] = len(my_friend_ids & their_ids)
+    return result
 
 
 async def is_blocked(blocker_id: int, blocked_id: int) -> bool:
