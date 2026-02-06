@@ -5934,6 +5934,25 @@ async def get_online_users(minutes: int = 5):
         
         # Форматируем данные
         result = []
+        
+        # Получаем все активные web-сессии для определения платформы
+        web_threshold_online = datetime.utcnow() - timedelta(minutes=minutes)
+        active_web_sessions = await db.web_sessions.find({
+            "status": "linked",
+            "last_active": {"$gte": web_threshold_online}
+        }).to_list(1000)
+        web_user_ids = set()
+        web_session_info = {}
+        for ws in active_web_sessions:
+            tid = ws.get("telegram_id")
+            if tid:
+                web_user_ids.add(tid)
+                web_session_info[tid] = {
+                    "browser": ws.get("browser", ""),
+                    "os": ws.get("os", ""),
+                    "device_name": ws.get("device_name", "")
+                }
+        
         for user in online_users:
             last_activity = user.get("last_activity")
             if last_activity:
@@ -5947,8 +5966,12 @@ async def get_online_users(minutes: int = 5):
             else:
                 activity_text = "неизвестно"
             
+            tid = user.get("telegram_id")
+            is_web = tid in web_user_ids
+            ws_info = web_session_info.get(tid, {})
+            
             result.append({
-                "telegram_id": user.get("telegram_id"),
+                "telegram_id": tid,
                 "first_name": user.get("first_name", ""),
                 "last_name": user.get("last_name", ""),
                 "username": user.get("username", ""),
@@ -5957,7 +5980,11 @@ async def get_online_users(minutes: int = 5):
                 "course": user.get("course"),
                 "last_activity": last_activity.isoformat() if last_activity else None,
                 "activity_text": activity_text,
-                "current_section": user.get("current_section", "")
+                "current_section": user.get("current_section", ""),
+                "platform": "web" if is_web else "telegram",
+                "browser": ws_info.get("browser", "") if is_web else "",
+                "os": ws_info.get("os", "") if is_web else "",
+                "device_name": ws_info.get("device_name", "") if is_web else ""
             })
         
         # Также получаем общую статистику
