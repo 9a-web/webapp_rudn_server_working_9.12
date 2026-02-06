@@ -260,9 +260,13 @@ const FriendSearchModal = ({ isOpen, onClose, userSettings, currentUserId, onSen
                       <div className="absolute inset-0 border border-white/[0.06] rounded-2xl" />
                       <div className="relative p-4">
                         <div className="flex items-center gap-3.5">
-                          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${getAvatarGradient(result.telegram_id)} flex items-center justify-center text-white font-bold text-base shadow-lg`}>
-                            {(result.first_name?.[0] || result.username?.[0] || '?').toUpperCase()}
-                          </div>
+                          <UserAvatar
+                            telegramId={result.telegram_id}
+                            firstName={result.first_name}
+                            username={result.username}
+                            size={48}
+                            className="rounded-2xl flex-shrink-0"
+                          />
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-[14px] text-white truncate">{result.first_name} {result.last_name}</h4>
                             <p className="text-[12px] text-gray-400 truncate mt-0.5">
