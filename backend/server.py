@@ -9309,7 +9309,7 @@ async def music_popular(count: int = 30, offset: int = 0):
 async def music_playlists():
     """Плейлисты пользователя VK (DEPRECATED - используйте /music/playlists-vk/{telegram_id})"""
     try:
-        playlists = music_service.get_playlists()
+        playlists = await music_service.get_playlists()
         return {"playlists": playlists}
     except Exception as e:
         logger.error(f"Music playlists error: {e}")
