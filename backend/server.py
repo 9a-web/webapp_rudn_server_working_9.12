@@ -5404,18 +5404,24 @@ async def get_top_users(
 
 
 @api_router.get("/admin/faculty-stats")
-async def get_faculty_stats():
+async def get_faculty_stats(days: Optional[int] = None):
     """
-    Получить статистику по факультетам
+    Получить статистику по факультетам (с опциональным фильтром по периоду регистрации)
     """
     try:
+        # Базовый фильтр
+        match_filter = {
+            "facultet_name": {"$ne": None, "$exists": True}
+        }
+        
+        # Фильтр по периоду
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+            match_filter["created_at"] = {"$gte": start_date}
+        
         # Агрегация по факультетам
         pipeline = [
-            {
-                "$match": {
-                    "facultet_name": {"$ne": None, "$exists": True}
-                }
-            },
+            {"$match": match_filter},
             {
                 "$group": {
                     "_id": "$facultet_name",
@@ -5423,9 +5429,7 @@ async def get_faculty_stats():
                     "users_count": {"$sum": 1}
                 }
             },
-            {
-                "$sort": {"users_count": -1}
-            }
+            {"$sort": {"users_count": -1}}
         ]
         
         results = await db.user_settings.aggregate(pipeline).to_list(length=None)
