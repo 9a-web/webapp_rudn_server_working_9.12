@@ -46,9 +46,8 @@ const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) 
     // Получаем фото через API
     const loadPhoto = async () => {
       try {
-        // Определяем базовый URL для API
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 
-          (window.location.hostname === 'localhost' ? 'http://localhost:8001' : '');
+        // Определяем базовый URL для API через единый getBackendURL()
+        const backendUrl = getBackendURL();
         const apiUrl = `${backendUrl}/api/user-profile-photo-proxy/${user.id}`;
         
         console.log('Loading profile photo from:', apiUrl);
