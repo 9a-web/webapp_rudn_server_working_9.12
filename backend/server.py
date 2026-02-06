@@ -9293,7 +9293,7 @@ async def music_my_audio(count: int = 50, offset: int = 0):
 async def music_popular(count: int = 30, offset: int = 0):
     """Популярные треки с пагинацией и обложками из Deezer"""
     try:
-        tracks = music_service.get_popular(count, offset)
+        tracks = await music_service.get_popular(count, offset)
         
         # Обогащаем треки обложками из Deezer API
         tracks = await music_service.enrich_tracks_with_covers(tracks)
