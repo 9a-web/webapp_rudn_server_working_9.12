@@ -323,9 +323,7 @@ class VKMusicService:
 
 
     async def enrich_tracks_with_covers(self, tracks: list) -> list:
-        """
-        Добавляет обложки к трекам из Deezer API (для треков без обложек).
-        """
+        """Добавляет обложки к трекам (для треков без обложек), используя album как fallback."""
         if not tracks:
             return tracks
         
@@ -336,15 +334,40 @@ class VKMusicService:
             if not cover_svc:
                 return tracks
             
-            # Получаем обложки пакетно для треков без обложек
-            covers = await cover_svc.get_covers_batch(tracks, size='big')
+            tracks_need = [t for t in tracks if not t.get('cover')]
+            if not tracks_need:
+                return tracks
             
-            # Обогащаем треки (создаём новые dict, не мутируем оригиналы)
+            semaphore = asyncio.Semaphore(5)
+            
+            async def _get_one(track):
+                async with semaphore:
+                    cover = await cover_svc.get_cover(
+                        track.get('artist', ''),
+                        track.get('title', ''),
+                        'big',
+                        album=track.get('album', '')
+                    )
+                    return track.get('id'), cover
+            
+            results = await asyncio.gather(
+                *[_get_one(t) for t in tracks_need],
+                return_exceptions=True
+            )
+            
+            covers_map = {}
+            for r in results:
+                if isinstance(r, Exception):
+                    continue
+                track_id, url = r
+                if url:
+                    covers_map[track_id] = url
+            
             enriched = []
             for track in tracks:
                 track_id = track.get('id')
-                if not track.get('cover') and track_id in covers and covers[track_id]:
-                    enriched.append({**track, 'cover': covers[track_id]})
+                if not track.get('cover') and track_id in covers_map:
+                    enriched.append({**track, 'cover': covers_map[track_id]})
                 else:
                     enriched.append(track)
             
