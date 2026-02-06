@@ -820,8 +820,15 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const handleReorderTasks = async (newOrder) => {
     console.log('🔄 Reorder triggered!');
     
-    // Находим перемещённую задачу
-    const oldIds = todayTasks.map(t => t.id);
+    // FIX: Используем ref для актуальных задач, а не stale closure
+    const currentTasks = tasksRef.current;
+    const currentFiltered = currentTasks.filter(t => {
+      const taskDate = t.target_date ? new Date(t.target_date) : null;
+      if (!taskDate) return false;
+      const selDate = new Date(tasksSelectedDate);
+      return taskDate.toDateString() === selDate.toDateString();
+    });
+    const oldIds = currentFiltered.map(t => t.id);
     const newIds = newOrder.map(t => t.id);
     
     // Проверяем изменился ли порядок
