@@ -1831,8 +1831,8 @@ async def update_task(task_id: str, task_update: TaskUpdate):
                     deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
                 on_time = datetime.utcnow() <= deadline
             
-            # Отслеживаем выполнение задачи
-            await track_user_action(
+            # ОПТИМИЗАЦИЯ: Трекинг достижений fire-and-forget (не блокируем ответ)
+            asyncio.create_task(track_user_action(
                 db,
                 existing_task["telegram_id"],
                 "complete_task",
@@ -1840,10 +1840,11 @@ async def update_task(task_id: str, task_update: TaskUpdate):
                     "hour": current_hour,
                     "on_time": on_time
                 }
-            )
+            ))
         
-        # Обогащаем задачу видео информацией (YouTube и VK)
-        updated_task = await enrich_task_with_video(updated_task)
+        # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video — убираем медленные yt_dlp запросы
+        if 'videos' not in updated_task:
+            updated_task['videos'] = []
         
         # Добавляем статистику подзадач
         progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
