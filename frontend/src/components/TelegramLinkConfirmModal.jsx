@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link2, User, Shield, CheckCircle, X, Loader2, AlertCircle } from 'lucide-react';
 import { linkWebSession, notifySessionScanned, notifySessionRejected } from '../services/webSessionAPI';
+import { getBackendURL } from '../services/api';
 import { useTelegram } from '../contexts/TelegramContext';
 
 const TelegramLinkConfirmModal = ({ isOpen, onClose, sessionToken, onSuccess }) => {
