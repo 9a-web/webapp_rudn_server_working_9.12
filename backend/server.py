@@ -486,7 +486,7 @@ async def get_filter_data_endpoint(request: FilterDataRequest):
 
 @api_router.post("/schedule", response_model=ScheduleResponse)
 async def get_schedule_endpoint(request: ScheduleRequest):
-    """Получить расписание для группы"""
+    """Получить расписание для группы (с fallback на кэш)"""
     try:
         events = await get_schedule(
             facultet_id=request.facultet_id,
@@ -497,48 +497,86 @@ async def get_schedule_endpoint(request: ScheduleRequest):
             week_number=request.week_number
         )
         
-        # Кэшируем расписание
-        cache_data = {
-            "id": str(uuid.uuid4()),
-            "group_id": request.group_id,
-            "week_number": request.week_number,
-            "events": [event for event in events],
-            "cached_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(hours=1)
-        }
-        
-        await db.schedule_cache.update_one(
-            {"group_id": request.group_id, "week_number": request.week_number},
-            {"$set": cache_data},
-            upsert=True
-        )
-        
-        # Попытка запланировать уведомления для пользователей этой группы, у которых включены уведомления
-        # (В реальном production лучше делать это фоновой задачей, но для MVP можно и так)
-        try:
-            # Запускаем в фоне, чтобы не тормозить ответ
-            async def schedule_for_group():
-                users = await db.user_settings.find({
-                    "group_id": request.group_id,
-                    "notifications_enabled": True
-                }).to_list(None)
-                
-                if users:
-                    scheduler = get_scheduler_v2(db)
-                    for user in users:
-                        await scheduler.schedule_user_notifications(user['telegram_id'])
+        if events:
+            # Кэшируем расписание
+            cache_data = {
+                "id": str(uuid.uuid4()),
+                "group_id": request.group_id,
+                "week_number": request.week_number,
+                "events": [event for event in events],
+                "cached_at": datetime.utcnow(),
+                "expires_at": datetime.utcnow() + timedelta(hours=6)
+            }
             
-            asyncio.create_task(schedule_for_group())
-        except Exception as e:
-            logger.error(f"Failed to trigger group scheduling: {e}")
-        
-        return ScheduleResponse(
-            events=[ScheduleEvent(**event) for event in events],
-            group_id=request.group_id,
-            week_number=request.week_number
-        )
+            await db.schedule_cache.update_one(
+                {"group_id": request.group_id, "week_number": request.week_number},
+                {"$set": cache_data},
+                upsert=True
+            )
+            
+            # Планируем уведомления в фоне
+            try:
+                async def schedule_for_group():
+                    users = await db.user_settings.find({
+                        "group_id": request.group_id,
+                        "notifications_enabled": True
+                    }).to_list(None)
+                    
+                    if users:
+                        scheduler = get_scheduler_v2(db)
+                        for user in users:
+                            await scheduler.schedule_user_notifications(user['telegram_id'])
+                
+                asyncio.create_task(schedule_for_group())
+            except Exception as e:
+                logger.error(f"Failed to trigger group scheduling: {e}")
+            
+            return ScheduleResponse(
+                events=[ScheduleEvent(**event) for event in events],
+                group_id=request.group_id,
+                week_number=request.week_number
+            )
+        else:
+            # Пустой результат от RUDN API — пробуем кэш
+            cached = await db.schedule_cache.find_one({
+                "group_id": request.group_id,
+                "week_number": request.week_number
+            })
+            
+            if cached and cached.get("events"):
+                logger.info(f"RUDN API вернул пустой ответ, используем кэш для группы {request.group_id}")
+                return ScheduleResponse(
+                    events=[ScheduleEvent(**event) for event in cached["events"]],
+                    group_id=request.group_id,
+                    week_number=request.week_number
+                )
+            
+            # Нет ни данных, ни кэша — возвращаем пустое расписание
+            return ScheduleResponse(
+                events=[],
+                group_id=request.group_id,
+                week_number=request.week_number
+            )
+            
     except Exception as e:
         logger.error(f"Ошибка при получении расписания: {e}")
+        
+        # При ошибке — пробуем отдать кэш
+        try:
+            cached = await db.schedule_cache.find_one({
+                "group_id": request.group_id,
+                "week_number": request.week_number
+            })
+            if cached and cached.get("events"):
+                logger.info(f"Ошибка RUDN API, отдаём кэш для группы {request.group_id}")
+                return ScheduleResponse(
+                    events=[ScheduleEvent(**event) for event in cached["events"]],
+                    group_id=request.group_id,
+                    week_number=request.week_number
+                )
+        except Exception:
+            pass
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 
