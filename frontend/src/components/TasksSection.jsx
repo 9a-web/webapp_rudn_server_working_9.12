@@ -1287,21 +1287,8 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       filtered = filtered.filter(t => t.priority === selectedPriority);
     }
     
-    // Сортировка
-    filtered.sort((a, b) => {
-      if (sortBy === 'priority') {
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        return (priorityOrder[b.priority] || 2) - (priorityOrder[a.priority] || 2);
-      } else if (sortBy === 'deadline') {
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline) - new Date(b.deadline);
-      } else {
-        // По умолчанию - по дате создания (новые сверху)
-        return new Date(b.created_at) - new Date(a.created_at);
-      }
-    });
+    // FIX: Убрана сортировка здесь — она делается в getTasksForSelectedDate()
+    // чтобы не было двойной сортировки (вторая перезаписывала первую)
     
     return filtered;
   };
