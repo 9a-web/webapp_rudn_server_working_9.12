@@ -1237,38 +1237,26 @@ export const FullscreenPlannerTimeline = ({
   }, [events]);
 
   return (
-    <div 
-      ref={timelineRef}
-      className="relative overflow-y-auto h-full overscroll-contain"
-      style={{ WebkitOverflowScrolling: 'touch' }}
-    >
+    <div className="relative h-full flex flex-col">
+      {/* Прогресс-бар дня (fullscreen) */}
+      <DayProgressBar events={events} />
+      
+      <div 
+        ref={timelineRef}
+        className="relative overflow-y-auto flex-1 overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
       <div className="relative pt-2" style={{ height: `${24 * HOUR_HEIGHT + 8}px` }}>
-        {/* Часовые линии */}
+        {/* Часовые линии — long-press для быстрого создания */}
         {HOURS.map((hour) => (
-          <div
+          <LongPressSlotFullscreen
             key={hour}
-            className="absolute left-0 right-0 flex group"
-            style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
-            onClick={(e) => {
-              if (onQuickCreate) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const clickY = e.clientY - rect.top;
-                const minutesOffset = Math.floor((clickY / HOUR_HEIGHT) * 60);
-                const totalMinutes = hour * 60 + minutesOffset;
-                const roundedMinutes = Math.round(totalMinutes / 15) * 15;
-                const endMinutes = roundedMinutes + 60;
-                
-                hapticFeedback && hapticFeedback('impact', 'light');
-                onQuickCreate(formatMinutesToTime(roundedMinutes), formatMinutesToTime(endMinutes));
-              }
-            }}
-          >
-            <div className="w-16 flex-shrink-0 pl-3 pr-3 -translate-y-[25%]">
-              <span className="text-sm text-gray-400 font-medium">
-                {formatHour(hour)}
-              </span>
-            </div>
-            <div className={`flex-1 border-t border-gray-200/70 ${onQuickCreate ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`} />
+            hour={hour}
+            onQuickCreate={onQuickCreate}
+            hapticFeedback={hapticFeedback}
+            events={events}
+          />
+        ))}
           </div>
         ))}
         
