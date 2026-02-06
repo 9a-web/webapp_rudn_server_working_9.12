@@ -9335,20 +9335,20 @@ async def music_playlists_vk(telegram_id: int):
         vk_user_id = token_doc.get("vk_user_id")
         user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
         
-        # Запрос плейлистов к VK API
-        import requests
-        response = requests.get(
-            "https://api.vk.com/method/audio.getPlaylists",
-            params={
-                "access_token": token,
-                "owner_id": vk_user_id,
-                "count": 50,
-                "v": "5.131"
-            },
-            headers={"User-Agent": user_agent},
-            timeout=15
-        )
-        data = response.json()
+        # Запрос плейлистов к VK API (async)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.vk.com/method/audio.getPlaylists",
+                params={
+                    "access_token": token,
+                    "owner_id": vk_user_id,
+                    "count": 50,
+                    "v": "5.131"
+                },
+                headers={"User-Agent": user_agent},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                data = await response.json()
         
         if "error" in data:
             error = data["error"]
