@@ -662,7 +662,14 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#2B2B3A',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px'
+                  }}
+                  formatter={(value, name) => [formatNumber(value), 'Студентов']}
+                />
               </PieChart>
             </ResponsiveContainer>
           ) : <div className="text-center text-gray-500 py-10">Нет данных</div>}
