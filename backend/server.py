@@ -12712,19 +12712,21 @@ async def notify_room_invite(to_telegram_id: int, room: dict, inviter: dict):
 async def notify_room_task(to_telegram_id: int, room: dict, task: dict, creator: dict):
     """Уведомление о новой задаче в комнате"""
     creator_name = f"{creator.get('first_name', '')} {creator.get('last_name', '')}".strip() or "Участник"
+    task_text = task.get('text', '')[:50]
+    room_name = room.get('name', '')
     
     await create_notification(
         telegram_id=to_telegram_id,
         notification_type=NotificationType.ROOM_TASK_NEW,
         category=NotificationCategory.ROOMS,
         priority=NotificationPriority.NORMAL,
-        title="Новая задача",
-        message=f"{creator_name} добавил задачу «{task.get('text', '')[:50]}» в комнату «{room.get('name', '')}»",
-        emoji="📝",
+        title="Новая задача в комнате",
+        message=f"📝 {creator_name} → «{task_text}»\n🏠 {room_name}",
+        emoji="📋",
         data={
             "room_id": room.get("id"),
             "task_id": task.get("id"),
-            "room_name": room.get("name")
+            "room_name": room_name
         }
     )
 
