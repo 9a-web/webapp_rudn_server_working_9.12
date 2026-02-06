@@ -68,8 +68,8 @@ const AdminPanel = ({ isOpen, onClose }) => {
         axios.get(`${BACKEND_URL}/api/admin/weekly-activity${daysParam}`),
         axios.get(`${BACKEND_URL}/api/admin/feature-usage${daysParam}`),
         axios.get(`${BACKEND_URL}/api/admin/top-users?metric=points&limit=10`),
-        axios.get(`${BACKEND_URL}/api/admin/faculty-stats`),
-        axios.get(`${BACKEND_URL}/api/admin/course-stats`)
+        axios.get(`${BACKEND_URL}/api/admin/faculty-stats${daysParam}`),
+        axios.get(`${BACKEND_URL}/api/admin/course-stats${daysParam}`)
       ]);
 
       setGeneralStats(generalRes.data);
