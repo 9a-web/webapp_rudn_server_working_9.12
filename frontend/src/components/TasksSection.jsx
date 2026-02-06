@@ -2339,7 +2339,7 @@ const TodayTaskItem = ({
               type="text"
               value={editingText}
               onChange={(e) => setEditingText(e.target.value)}
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   onSaveEdit(task.id);
                 } else if (e.key === 'Escape') {
@@ -2674,7 +2674,7 @@ const TaskGroupItem = ({
               type="text"
               value={editingText}
               onChange={(e) => setEditingText(e.target.value)}
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   onSaveEdit(task.id);
                 } else if (e.key === 'Escape') {
