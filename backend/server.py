@@ -11812,18 +11812,18 @@ async def search_users(
     facultet_id: str = None,
     limit: int = 50
 ):
-    """Поиск пользователей для добавления в друзья"""
+    """Поиск пользователей для добавления в друзья (оптимизировано)"""
     try:
-        # Базовый фильтр - не показываем себя
-        filter_query = {"telegram_id": {"$ne": telegram_id}}
-        
         # Получаем заблокированных пользователей
         blocked_by_me = await db.user_blocks.find({"blocker_telegram_id": telegram_id}).to_list(100)
         blocked_me = await db.user_blocks.find({"blocked_telegram_id": telegram_id}).to_list(100)
         blocked_ids = [b["blocked_telegram_id"] for b in blocked_by_me] + [b["blocker_telegram_id"] for b in blocked_me]
         
-        if blocked_ids:
-            filter_query["telegram_id"]["$nin"] = blocked_ids
+        # Исключаем себя и заблокированных
+        exclude_ids = [telegram_id] + blocked_ids
+        
+        # Базовый фильтр
+        filter_query = {"telegram_id": {"$nin": exclude_ids}}
         
         # Поиск по группе
         if group_id:
@@ -11835,8 +11835,6 @@ async def search_users(
         
         # Текстовый поиск
         if query:
-            query_lower = query.lower()
-            # Используем регулярное выражение для поиска
             filter_query["$or"] = [
                 {"username": {"$regex": query, "$options": "i"}},
                 {"first_name": {"$regex": query, "$options": "i"}},
@@ -11845,26 +11843,64 @@ async def search_users(
         
         users = await db.user_settings.find(filter_query).limit(limit).to_list(limit)
         
-        # Фильтруем пользователей, которые скрыли себя из поиска
+        if not users:
+            return FriendSearchResponse(results=[], total=0, query=query)
+        
+        # Batch-загрузка privacy settings (проверяем поле в уже загруженных user_settings)
+        # Batch-подсчёт статусов дружбы
+        user_ids = [u["telegram_id"] for u in users]
+        
+        # Получаем все дружбы текущего пользователя
+        my_friends = await db.friends.find({"user_telegram_id": telegram_id}).to_list(1000)
+        my_friend_ids = set(f["friend_telegram_id"] for f in my_friends)
+        
+        # Получаем все pending запросы текущего пользователя
+        my_outgoing = await db.friend_requests.find({
+            "from_telegram_id": telegram_id,
+            "to_telegram_id": {"$in": user_ids},
+            "status": "pending"
+        }).to_list(100)
+        outgoing_map = {r["to_telegram_id"] for r in my_outgoing}
+        
+        my_incoming = await db.friend_requests.find({
+            "to_telegram_id": telegram_id,
+            "from_telegram_id": {"$in": user_ids},
+            "status": "pending"
+        }).to_list(100)
+        incoming_map = {r["from_telegram_id"] for r in my_incoming}
+        
+        # Batch mutual friends
+        mutual_counts = await get_mutual_friends_count_batch(telegram_id, user_ids)
+        
         results = []
         for user in users:
-            privacy = await get_user_privacy_settings(user["telegram_id"])
+            uid = user["telegram_id"]
             
-            # Если пользователь скрыл себя из поиска - не показываем его
-            if not privacy.show_in_search:
+            # Проверяем privacy
+            privacy_data = user.get("privacy_settings", {})
+            show_in_search = privacy_data.get("show_in_search", True) if privacy_data else True
+            if not show_in_search:
                 continue
             
-            friendship_status = await get_friendship_status(telegram_id, user["telegram_id"])
+            # Определяем статус дружбы
+            if uid in my_friend_ids:
+                friendship_status = "friend"
+            elif uid in incoming_map:
+                friendship_status = "pending_incoming"
+            elif uid in outgoing_map:
+                friendship_status = "pending_outgoing"
+            else:
+                friendship_status = None
             
             results.append(FriendSearchResult(
-                telegram_id=user["telegram_id"],
+                telegram_id=uid,
                 username=user.get("username"),
                 first_name=user.get("first_name"),
                 last_name=user.get("last_name"),
                 group_name=user.get("group_name"),
                 facultet_name=user.get("facultet_name"),
                 kurs=user.get("kurs"),
-                mutual_friends_count=await get_mutual_friends_count(telegram_id, user["telegram_id"]),
+                mutual_friends_count=mutual_counts.get(uid, 0),
                 friendship_status=friendship_status
             ))
         
