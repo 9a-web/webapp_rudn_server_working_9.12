@@ -150,10 +150,10 @@ const SubtasksList = ({
       {!isReadOnly && (
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center gap-2 px-3 py-2
-                       bg-gray-800 border border-gray-700 rounded-lg
+                       bg-white border border-gray-200 rounded-lg
                        focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/20
                        transition-all">
-            <Plus className="w-4 h-4 text-gray-500 flex-shrink-0" />
+            <Plus className="w-4 h-4 text-gray-400 flex-shrink-0" />
             <input
               type="text"
               value={newSubtaskTitle}
@@ -162,8 +162,8 @@ const SubtasksList = ({
               placeholder="Добавить подзадачу..."
               maxLength={100}
               disabled={isAdding}
-              className="flex-1 bg-transparent text-white text-sm
-                       placeholder-gray-500 focus:outline-none
+              className="flex-1 bg-transparent text-gray-800 text-sm
+                       placeholder-gray-400 focus:outline-none
                        disabled:opacity-50"
             />
           </div>
