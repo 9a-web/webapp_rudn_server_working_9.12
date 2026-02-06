@@ -1695,16 +1695,18 @@ async def create_task(task_data: TaskCreate):
         
         await db.tasks.insert_one(task_dict)
         
-        # Отслеживаем создание задачи для достижений
-        await track_user_action(
+        # ОПТИМИЗАЦИЯ: Трекинг достижений fire-and-forget (не блокируем ответ)
+        asyncio.create_task(track_user_action(
             db, 
             task_data.telegram_id, 
             "create_task",
             metadata={}
-        )
+        ))
         
-        # Обогащаем задачу видео информацией (YouTube и VK)
-        task_dict = await enrich_task_with_video(task_dict)
+        # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video — убираем медленные yt_dlp запросы
+        # Видео обогащение происходит лениво при обновлении задачи
+        if 'videos' not in task_dict:
+            task_dict['videos'] = []
         
         # Добавляем статистику подзадач
         progress_info = calculate_subtasks_progress(task_dict.get("subtasks", []))
