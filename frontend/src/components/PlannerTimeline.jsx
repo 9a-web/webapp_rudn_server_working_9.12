@@ -858,7 +858,7 @@ const LongPressSlotFullscreen = ({ hour, onQuickCreate, hapticFeedback, events }
     </div>
   );
 };
-export const PlannerTimeline = ({ 
+export const PlannerTimeline = React.forwardRef(({ 
   events = [], 
   onToggleComplete, 
   onDelete,
@@ -869,8 +869,19 @@ export const PlannerTimeline = ({
   onExpand,
   hapticFeedback,
   currentDate 
-}) => {
+}, ref) => {
   const timelineRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Expose scrollToTime method to parent
+  React.useImperativeHandle(ref, () => ({
+    scrollToTime: (timeStr) => {
+      if (!timelineRef.current || !timeStr) return;
+      const minutes = parseTime(timeStr);
+      const scrollTarget = Math.max(0, (minutes / 60 - 1)) * HOUR_HEIGHT;
+      timelineRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    }
+  }));
   const [currentTime, setCurrentTime] = useState(new Date());
   
   // Обновление текущего времени каждую минуту
