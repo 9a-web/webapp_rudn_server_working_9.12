@@ -1,270 +1,383 @@
 """
-Cover Service - получение обложек треков через Deezer API
-Автор: AI Assistant
-Дата: 2025-07-08
+Cover Service - получение обложек треков через несколько источников.
+
+Порядок приоритета:
+  1. Кэш MongoDB (моментально)
+  2. iTunes Search API — бесплатный, без ключа, высокая точность (сравнение артиста)
+  3. Deezer API — fallback
+
+iTunes возвращает artworkUrl100, который масштабируется до любого размера
+заменой "100x100bb" → "600x600bb" и т.д.
 """
 import aiohttp
 import asyncio
 import hashlib
 import logging
+import re
+import unicodedata
 from typing import Optional, Dict, List, Any
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 
-# Размеры обложек Deezer
+# Размеры обложек (унифицированные ключи)
 COVER_SIZES = {
-    'small': 'cover_small',    # 56x56
-    'medium': 'cover_medium',  # 250x250
-    'big': 'cover_big',        # 500x500
-    'xl': 'cover_xl'           # 1000x1000
+    'small': 'cover_small',    # ~56-100px
+    'medium': 'cover_medium',  # ~250px
+    'big': 'cover_big',        # ~500px
+    'xl': 'cover_xl'           # ~1000px
 }
 
-# TTL кеша - 30 дней
+# Соответствие размеров для iTunes (замена в URL artworkUrl100)
+ITUNES_SIZE_MAP = {
+    'cover_small': '100x100bb',
+    'cover_medium': '250x250bb',
+    'cover_big': '600x600bb',
+    'cover_xl': '1200x1200bb'
+}
+
 CACHE_TTL_DAYS = 30
 
 
+def _normalize(text: str) -> str:
+    """
+    Нормализация строки для нечёткого сравнения:
+    - lowercase
+    - убираем диакритику (é → e)
+    - убираем всё кроме букв, цифр, пробелов
+    - схлопываем пробелы
+    """
+    if not text:
+        return ''
+    text = text.lower().strip()
+    # Убираем диакритику
+    text = unicodedata.normalize('NFD', text)
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    # Оставляем только буквы, цифры, пробелы
+    text = re.sub(r'[^a-zа-яё0-9\s]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def _artist_match(query_artist: str, result_artist: str) -> bool:
+    """
+    Проверяет, совпадает ли артист из результата поиска с запрашиваемым.
+    Учитывает:
+      - feat./ft./& — "Miyagi & Эндшпиль" vs "Miyagi"
+      - Подстроки — "The Weeknd" vs "Weeknd"
+    """
+    qa = _normalize(query_artist)
+    ra = _normalize(result_artist)
+
+    if not qa or not ra:
+        return False
+
+    # Точное совпадение
+    if qa == ra:
+        return True
+
+    # Один содержит другого
+    if qa in ra or ra in qa:
+        return True
+
+    # Разбиваем по feat/ft/&/,/and
+    splitters = re.compile(r'\s*(?:feat\.?|ft\.?|&|,|\band\b)\s*', re.IGNORECASE)
+    qa_parts = set(splitters.split(qa))
+    ra_parts = set(splitters.split(ra))
+
+    # Хотя бы одна общая часть
+    if qa_parts & ra_parts:
+        return True
+
+    # Любая часть query содержится в любой части result (или наоборот)
+    for qp in qa_parts:
+        for rp in ra_parts:
+            if len(qp) >= 3 and len(rp) >= 3 and (qp in rp or rp in qp):
+                return True
+
+    return False
+
+
 class CoverService:
-    """Сервис получения обложек треков через Deezer API"""
-    
+    """Сервис получения обложек: iTunes → Deezer → None"""
+
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
         self.collection = db.cover_cache
         self._session: Optional[aiohttp.ClientSession] = None
-    
+
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Ленивая инициализация HTTP сессии"""
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=5)
+                timeout=aiohttp.ClientTimeout(total=6)
             )
         return self._session
-    
+
+    # ------------------------------------------------------------------
+    #  CACHE
+    # ------------------------------------------------------------------
+
     def _make_cache_key(self, artist: str, title: str) -> str:
-        """Создание ключа кеша"""
-        # Нормализуем строки для лучшего совпадения
         normalized = f"{artist.lower().strip()}|{title.lower().strip()}"
         return hashlib.md5(normalized.encode()).hexdigest()
-    
-    async def get_cover(
-        self, 
-        artist: str, 
-        title: str, 
-        size: str = 'big'
-    ) -> Optional[str]:
-        """
-        Получение обложки трека
-        
-        Args:
-            artist: Имя исполнителя
-            title: Название трека
-            size: Размер обложки (small/medium/big/xl)
-        
-        Returns:
-            URL обложки или None
-        """
-        if not artist or not title:
-            return None
-        
-        cache_key = self._make_cache_key(artist, title)
-        
-        # 1. Проверяем кеш
-        cached = await self._get_from_cache(cache_key)
-        if cached:
-            return cached.get(COVER_SIZES.get(size, 'cover_big'))
-        
-        # 2. Запрос к Deezer API
-        covers = await self._fetch_from_deezer(artist, title)
-        
-        if covers:
-            # 3. Сохраняем в кеш
-            await self._save_to_cache(cache_key, artist, title, covers)
-            return covers.get(COVER_SIZES.get(size, 'cover_big'))
-        
-        # 4. Сохраняем "пустой" результат в кеш, чтобы не делать повторных запросов
-        await self._save_to_cache(cache_key, artist, title, {})
-        return None
-    
-    async def get_covers_batch(
-        self, 
-        tracks: List[Dict[str, Any]], 
-        size: str = 'big'
-    ) -> Dict[str, Optional[str]]:
-        """
-        Пакетное получение обложек для списка треков
-        
-        Args:
-            tracks: Список треков [{"artist": ..., "title": ..., "id": ...}, ...]
-            size: Размер обложки
-        
-        Returns:
-            Словарь {track_id: cover_url}
-        """
-        if not tracks:
-            return {}
-        
-        # Фильтруем треки без обложек (у которых cover = None)
-        tracks_without_covers = [
-            t for t in tracks 
-            if not t.get('cover')
-        ]
-        
-        if not tracks_without_covers:
-            # Все треки уже имеют обложки
-            return {t.get('id', ''): t.get('cover') for t in tracks}
-        
-        # Создаём задачи для получения обложек
-        tasks = []
-        track_ids = []
-        
-        for track in tracks_without_covers:
-            artist = track.get('artist', '')
-            title = track.get('title', '')
-            track_id = track.get('id', f"{artist}_{title}")
-            
-            track_ids.append(track_id)
-            tasks.append(self.get_cover(artist, title, size))
-        
-        # Параллельное выполнение с семафором для rate limiting
-        semaphore = asyncio.Semaphore(10)  # Максимум 10 параллельных запросов
-        
-        async def limited_get_cover(task):
-            async with semaphore:
-                return await task
-        
-        results = await asyncio.gather(
-            *[limited_get_cover(task) for task in tasks],
-            return_exceptions=True
-        )
-        
-        covers = {}
-        for track_id, result in zip(track_ids, results):
-            if isinstance(result, Exception):
-                logger.error(f"Error getting cover for {track_id}: {result}")
-                covers[track_id] = None
-            else:
-                covers[track_id] = result
-        
-        return covers
-    
+
     async def _get_from_cache(self, cache_key: str) -> Optional[dict]:
-        """Получение из кеша"""
         try:
             cached = await self.collection.find_one({
                 "cache_key": cache_key,
                 "expires_at": {"$gt": datetime.utcnow()}
             })
-            if cached:
-                logger.debug(f"Cache hit for {cache_key}")
-                return cached.get('covers')
+            if cached and cached.get('covers'):
+                return cached['covers']
         except Exception as e:
             logger.error(f"Cache read error: {e}")
         return None
-    
-    async def _save_to_cache(
-        self, 
-        cache_key: str, 
-        artist: str, 
-        title: str, 
-        covers: dict
-    ):
-        """Сохранение в кеш"""
+
+    async def _save_to_cache(self, cache_key: str, artist: str, title: str, covers: dict, source: str = ''):
         try:
             await self.collection.update_one(
                 {"cache_key": cache_key},
-                {
-                    "$set": {
-                        "cache_key": cache_key,
-                        "artist": artist,
-                        "title": title,
-                        "covers": covers,
-                        "expires_at": datetime.utcnow() + timedelta(days=CACHE_TTL_DAYS),
-                        "updated_at": datetime.utcnow()
-                    }
-                },
+                {"$set": {
+                    "cache_key": cache_key,
+                    "artist": artist,
+                    "title": title,
+                    "covers": covers,
+                    "source": source,
+                    "expires_at": datetime.utcnow() + timedelta(days=CACHE_TTL_DAYS),
+                    "updated_at": datetime.utcnow()
+                }},
                 upsert=True
             )
-            logger.debug(f"Cached cover for {artist} - {title}")
         except Exception as e:
             logger.error(f"Cache write error: {e}")
-    
-    async def _fetch_from_deezer(
-        self, 
-        artist: str, 
-        title: str
-    ) -> Optional[dict]:
-        """Запрос обложки из Deezer API"""
+
+    # ------------------------------------------------------------------
+    #  PUBLIC API
+    # ------------------------------------------------------------------
+
+    async def get_cover(self, artist: str, title: str, size: str = 'big') -> Optional[str]:
+        """
+        Получение обложки трека (кэш → iTunes → Deezer).
+        """
+        if not artist or not title:
+            return None
+
+        cache_key = self._make_cache_key(artist, title)
+        size_key = COVER_SIZES.get(size, 'cover_big')
+
+        # 1. Кэш
+        cached = await self._get_from_cache(cache_key)
+        if cached is not None:
+            url = cached.get(size_key)
+            if url:
+                return url
+            # Кэш есть, но пустой — значит ранее не нашли, не делаем повторный запрос
+            if cached == {}:
+                return None
+
+        # 2. iTunes
+        covers = await self._fetch_from_itunes(artist, title)
+        if covers:
+            await self._save_to_cache(cache_key, artist, title, covers, source='itunes')
+            return covers.get(size_key)
+
+        # 3. Deezer fallback
+        covers = await self._fetch_from_deezer(artist, title)
+        if covers:
+            await self._save_to_cache(cache_key, artist, title, covers, source='deezer')
+            return covers.get(size_key)
+
+        # Ничего не нашли — кэшируем пустой результат
+        await self._save_to_cache(cache_key, artist, title, {}, source='none')
+        return None
+
+    async def get_covers_batch(
+        self,
+        tracks: List[Dict[str, Any]],
+        size: str = 'big'
+    ) -> Dict[str, Optional[str]]:
+        """Пакетное получение обложек для треков без cover."""
+        if not tracks:
+            return {}
+
+        tracks_need = [t for t in tracks if not t.get('cover')]
+        if not tracks_need:
+            return {t.get('id', ''): t.get('cover') for t in tracks}
+
+        semaphore = asyncio.Semaphore(8)
+
+        async def _limited(track):
+            async with semaphore:
+                return track.get('id', ''), await self.get_cover(
+                    track.get('artist', ''),
+                    track.get('title', ''),
+                    size
+                )
+
+        results = await asyncio.gather(
+            *[_limited(t) for t in tracks_need],
+            return_exceptions=True
+        )
+
+        covers = {}
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error(f"Batch cover error: {r}")
+                continue
+            track_id, url = r
+            covers[track_id] = url
+
+        return covers
+
+    # ------------------------------------------------------------------
+    #  iTunes Search API
+    # ------------------------------------------------------------------
+
+    async def _fetch_from_itunes(self, artist: str, title: str) -> Optional[dict]:
+        """
+        Поиск обложки через iTunes Search API.
+        Бесплатно, без ключа, высокая точность.
+        Проверяем совпадение артиста с результатом.
+        """
         try:
             session = await self._get_session()
-            
-            # Формируем поисковый запрос - очищаем от лишних символов
+
+            # Чистим название для поиска
+            clean_title = re.sub(r'\(.*?\)|\[.*?\]', '', title).strip()
             clean_artist = artist.strip()
-            clean_title = title.strip()
-            # Удаляем части в скобках/кавычках которые могут мешать поиску
-            for char in ['(', ')', '[', ']', '"', "'"]:
-                clean_title = clean_title.replace(char, '')
-            
             query = f"{clean_artist} {clean_title}"
-            url = "https://api.deezer.com/search"
-            params = {
-                "q": query,
-                "limit": 1
-            }
-            
-            async with session.get(url, params=params) as resp:
-                if resp.status != 200:
-                    logger.warning(f"Deezer API returned {resp.status}")
-                    return None
-                
-                data = await resp.json()
-                
-                if not data.get('data'):
-                    logger.debug(f"No results from Deezer for: {query}")
-                    return None
-                
-                track = data['data'][0]
-                album = track.get('album', {})
-                
-                covers = {
-                    'cover_small': album.get('cover_small'),
-                    'cover_medium': album.get('cover_medium'),
-                    'cover_big': album.get('cover_big'),
-                    'cover_xl': album.get('cover_xl')
+
+            async with session.get(
+                'https://itunes.apple.com/search',
+                params={
+                    'term': query,
+                    'media': 'music',
+                    'entity': 'song',
+                    'limit': 5
                 }
-                
-                # Проверяем, что хотя бы одна обложка есть
-                if any(covers.values()):
-                    logger.info(f"Found cover for: {artist} - {title}")
-                    return covers
-                
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning(f"iTunes API status {resp.status}")
+                    return None
+
+                data = await resp.json(content_type=None)
+
+            results = data.get('results', [])
+            if not results:
+                logger.debug(f"iTunes: no results for «{query}»")
                 return None
-                
+
+            # Ищем первый результат с совпадающим артистом
+            for item in results:
+                item_artist = item.get('artistName', '')
+                artwork_url = item.get('artworkUrl100', '')
+
+                if not artwork_url:
+                    continue
+
+                if _artist_match(clean_artist, item_artist):
+                    # Генерируем все размеры из базового URL
+                    covers = {}
+                    for key, size_str in ITUNES_SIZE_MAP.items():
+                        covers[key] = re.sub(r'\d+x\d+bb', size_str, artwork_url)
+
+                    logger.info(f"iTunes cover ✓ «{artist} — {title}» (matched: {item_artist})")
+                    return covers
+
+            # Если строгое сравнение не сработало — берём первый результат
+            # (лучше хоть какая-то обложка, чем никакой)
+            first = results[0]
+            artwork_url = first.get('artworkUrl100', '')
+            if artwork_url:
+                covers = {}
+                for key, size_str in ITUNES_SIZE_MAP.items():
+                    covers[key] = re.sub(r'\d+x\d+bb', size_str, artwork_url)
+                logger.info(f"iTunes cover (fuzzy) «{artist} — {title}» → {first.get('artistName','?')}")
+                return covers
+
+            return None
+
         except asyncio.TimeoutError:
-            logger.warning(f"Deezer API timeout for: {artist} - {title}")
+            logger.warning(f"iTunes timeout: «{artist} — {title}»")
         except Exception as e:
-            logger.error(f"Deezer API error: {e}")
-        
+            logger.error(f"iTunes error: {e}")
         return None
-    
+
+    # ------------------------------------------------------------------
+    #  Deezer API (fallback)
+    # ------------------------------------------------------------------
+
+    async def _fetch_from_deezer(self, artist: str, title: str) -> Optional[dict]:
+        """Запрос обложки из Deezer API (fallback)."""
+        try:
+            session = await self._get_session()
+
+            clean_title = re.sub(r'[(\[\]"\')]', '', title).strip()
+            query = f"{artist.strip()} {clean_title}"
+
+            async with session.get(
+                'https://api.deezer.com/search',
+                params={'q': query, 'limit': 3}
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+
+            items = data.get('data', [])
+            if not items:
+                return None
+
+            # Ищем совпадение по артисту
+            for item in items:
+                item_artist = item.get('artist', {}).get('name', '')
+                album = item.get('album', {})
+                if _artist_match(artist, item_artist) and album.get('cover_big'):
+                    covers = {
+                        'cover_small': album.get('cover_small'),
+                        'cover_medium': album.get('cover_medium'),
+                        'cover_big': album.get('cover_big'),
+                        'cover_xl': album.get('cover_xl')
+                    }
+                    if any(covers.values()):
+                        logger.info(f"Deezer cover ✓ «{artist} — {title}»")
+                        return covers
+
+            # Fallback — первый результат
+            album = items[0].get('album', {})
+            covers = {
+                'cover_small': album.get('cover_small'),
+                'cover_medium': album.get('cover_medium'),
+                'cover_big': album.get('cover_big'),
+                'cover_xl': album.get('cover_xl')
+            }
+            if any(covers.values()):
+                logger.info(f"Deezer cover (fuzzy) «{artist} — {title}»")
+                return covers
+
+            return None
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Deezer timeout: «{artist} — {title}»")
+        except Exception as e:
+            logger.error(f"Deezer error: {e}")
+        return None
+
     async def close(self):
-        """Закрытие HTTP сессии"""
         if self._session and not self._session.closed:
             await self._session.close()
 
 
-# Singleton будет создан в server.py после инициализации db
+# Singleton
 cover_service: Optional[CoverService] = None
 
 
 def init_cover_service(db: AsyncIOMotorDatabase) -> CoverService:
-    """Инициализация сервиса обложек"""
     global cover_service
     cover_service = CoverService(db)
-    logger.info("✅ Cover service initialized")
+    logger.info("✅ Cover service initialized (iTunes → Deezer)")
     return cover_service
 
 
 def get_cover_service() -> Optional[CoverService]:
-    """Получение экземпляра сервиса"""
     return cover_service
