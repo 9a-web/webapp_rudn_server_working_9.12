@@ -5668,6 +5668,35 @@ async def get_admin_stats(days: Optional[int] = None):
     # 9. Total journals
     total_journals = await db.attendance_journals.count_documents(date_filter("created_at"))
 
+    # 10. Web-version statistics
+    # Всего linked веб-сессий
+    web_sessions_total = await db.web_sessions.count_documents({"status": "linked"})
+    
+    # Активные веб-сессии (linked + last_active < 10 мин назад)
+    web_threshold = now - timedelta(minutes=10)
+    web_sessions_active = await db.web_sessions.count_documents({
+        "status": "linked",
+        "last_active": {"$gte": web_threshold}
+    })
+    
+    # Уникальные пользователи веб-версии (все время)
+    web_unique_pipeline = [
+        {"$match": {"status": "linked", "telegram_id": {"$ne": None}}},
+        {"$group": {"_id": "$telegram_id"}},
+        {"$count": "total"}
+    ]
+    web_unique_result = await db.web_sessions.aggregate(web_unique_pipeline).to_list(1)
+    web_unique_users = web_unique_result[0]["total"] if web_unique_result else 0
+    
+    # Веб-пользователи сегодня (уникальные, с активностью сегодня)
+    web_today_pipeline = [
+        {"$match": {"status": "linked", "telegram_id": {"$ne": None}, "last_active": {"$gte": today_start}}},
+        {"$group": {"_id": "$telegram_id"}},
+        {"$count": "total"}
+    ]
+    web_today_result = await db.web_sessions.aggregate(web_today_pipeline).to_list(1)
+    web_users_today = web_today_result[0]["total"] if web_today_result else 0
+
     return AdminStatsResponse(
         total_users=total_users,
         active_users_today=active_users_today,
@@ -5688,7 +5717,12 @@ async def get_admin_stats(days: Optional[int] = None):
         total_journal_joins=total_journal_joins,
         journal_joins_today=journal_joins_today,
         journal_joins_week=journal_joins_week,
-        total_journals=total_journals
+        total_journals=total_journals,
+        # Web-version statistics
+        web_sessions_total=web_sessions_total,
+        web_sessions_active=web_sessions_active,
+        web_unique_users=web_unique_users,
+        web_users_today=web_users_today
     )
 
 
