@@ -1493,7 +1493,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange })
               
               <div className="bg-white rounded-2xl p-4 mb-4">
                 <QRCodeSVG
-                  value={`https://t.me/rudn_pro_bot/app?startapp=listen_${currentRoom.invite_code}`}
+                  value={`https://t.me/${botUsername}/app?startapp=listen_${currentRoom.invite_code}`}
                   size={250}
                   level="H"
                   includeMargin={false}
