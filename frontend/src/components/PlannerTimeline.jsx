@@ -1257,8 +1257,6 @@ export const FullscreenPlannerTimeline = ({
             events={events}
           />
         ))}
-          </div>
-        ))}
         
         {/* Индикатор текущего времени */}
         {isToday && events.length > 0 && (
