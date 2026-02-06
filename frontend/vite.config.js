@@ -41,7 +41,14 @@ export default defineConfig(({ mode }) => {
       host: true,
       strictPort: true,
       allowedHosts: true,
-      // Allow admin-test.html
+      // Проксируем /api/* запросы к бэкенду на порту 8001
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8001',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
       fs: {
         allow: ['.'],
       },
