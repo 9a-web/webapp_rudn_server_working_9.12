@@ -696,7 +696,7 @@ const ChartCard = ({ title, icon, children }) => (
 const FeatureStatCard = ({ icon, label, value, color }) => (
   <div className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
     <div className={color}>{icon}</div>
-    <div className="text-2xl font-bold text-white">{value}</div>
+    <div className="text-2xl font-bold text-white">{formatNumber(value)}</div>
     <div className="text-xs text-gray-400 text-center">{label}</div>
   </div>
 );
