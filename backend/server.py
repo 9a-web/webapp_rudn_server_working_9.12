@@ -9620,6 +9620,80 @@ async def remove_music_favorite(telegram_id: int, track_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ MUSIC HISTORY & SIMILAR ============
+
+@api_router.post("/music/history/{telegram_id}")
+async def add_to_history(telegram_id: int, track: dict):
+    """Добавить трек в историю прослушивания"""
+    try:
+        history_doc = {**track}
+        history_doc["telegram_id"] = telegram_id
+        history_doc["played_at"] = datetime.utcnow()
+        # Удаляем старую запись этого трека (если есть) чтобы поднять наверх
+        await db.music_history.delete_many({
+            "telegram_id": telegram_id,
+            "id": track.get("id")
+        })
+        await db.music_history.insert_one(history_doc)
+        # Ограничиваем историю 200 записями
+        count = await db.music_history.count_documents({"telegram_id": telegram_id})
+        if count > 200:
+            oldest = await db.music_history.find(
+                {"telegram_id": telegram_id}
+            ).sort("played_at", 1).limit(count - 200).to_list(None)
+            if oldest:
+                ids = [d["_id"] for d in oldest]
+                await db.music_history.delete_many({"_id": {"$in": ids}})
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Add to history error: {e}")
+        return {"success": False}
+
+@api_router.get("/music/history/{telegram_id}")
+async def get_history(telegram_id: int, limit: int = 50):
+    """Получить историю прослушивания"""
+    try:
+        history = await db.music_history.find(
+            {"telegram_id": telegram_id},
+            {"_id": 0, "telegram_id": 0}
+        ).sort("played_at", -1).limit(limit).to_list(None)
+        return {"tracks": history, "count": len(history)}
+    except Exception as e:
+        logger.error(f"Get history error: {e}")
+        return {"tracks": [], "count": 0}
+
+@api_router.get("/music/similar/{track_id}")
+async def get_similar_tracks(track_id: str, count: int = 20):
+    """Получить похожие треки (на основе артиста текущего трека)"""
+    try:
+        # Извлекаем информацию о текущем треке из поиска
+        artist = None
+        # Ищем трек в избранном или истории
+        for coll in [db.music_favorites, db.music_history]:
+            doc = await coll.find_one({"id": track_id})
+            if doc:
+                artist = doc.get("artist")
+                break
+        
+        if not artist:
+            # Пробуем получить через VK API
+            url = await music_service.get_track_url(track_id)
+            # Используем поиск по ID для получения метаданных
+            return {"tracks": [], "count": 0, "source": "unknown_track"}
+        
+        # Ищем треки того же артиста
+        results = await music_service.search(artist, count=count)
+        # Фильтруем текущий трек
+        similar = [t for t in results if t.get("id") != track_id]
+        # Обогащаем обложками
+        similar = await music_service.enrich_tracks_with_covers(similar)
+        
+        return {"tracks": similar[:count], "count": len(similar[:count]), "source": "artist"}
+    except Exception as e:
+        logger.error(f"Get similar tracks error: {e}")
+        return {"tracks": [], "count": 0}
+
+
 # ============ VK AUTH API ============
 
 from vk_auth_service import vk_auth_service, VKAuthError
