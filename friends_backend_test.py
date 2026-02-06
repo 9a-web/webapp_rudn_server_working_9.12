@@ -16,8 +16,8 @@ import sys
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-# Backend URL from environment
-BACKEND_URL = "https://d8cc5781-41cf-497a-8d0d-1a5844d54640.preview.emergentagent.com"
+# Backend URL from environment - use localhost for testing
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
 class FriendsTester:
