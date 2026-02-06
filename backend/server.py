@@ -13609,6 +13609,12 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
     
+    # Очистка устаревших веб-сессий при старте
+    try:
+        await cleanup_expired_sessions()
+    except Exception as e:
+        logger.warning(f"Initial session cleanup failed: {e}")
+    
     # Запускаем НОВЫЙ планировщик уведомлений V2
     try:
         scheduler_v2 = get_scheduler_v2(db)
