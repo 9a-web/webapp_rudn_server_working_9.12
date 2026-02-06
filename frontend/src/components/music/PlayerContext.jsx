@@ -665,7 +665,7 @@ export const PlayerProvider = ({ children }) => {
       audio.removeEventListener('loadstart', onLoadStart);
       audio.removeEventListener('canplay', onCanPlay);
     };
-  }, [next, queue, queueIndex, repeatMode, play]);
+  }, [next, queue, queueIndex, repeatMode, play, isTrackBlocked]);
 
   // Media Session обработчики (кнопки на Lock Screen)
   useEffect(() => {
