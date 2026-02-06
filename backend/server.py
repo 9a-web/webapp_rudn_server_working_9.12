@@ -5454,32 +5454,31 @@ async def get_faculty_stats(days: Optional[int] = None):
 
 
 @api_router.get("/admin/course-stats", response_model=List[CourseStats])
-async def get_course_stats():
+async def get_course_stats(days: Optional[int] = None):
     """
-    Получить статистику по курсам
+    Получить статистику по курсам (с опциональным фильтром по периоду)
     """
     try:
-        # Агрегация по курсам
+        match_filter = {
+            "kurs": {"$ne": None, "$exists": True}
+        }
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+            match_filter["created_at"] = {"$gte": start_date}
+        
         pipeline = [
-            {
-                "$match": {
-                    "kurs": {"$ne": None, "$exists": True}
-                }
-            },
+            {"$match": match_filter},
             {
                 "$group": {
                     "_id": "$kurs",
                     "users_count": {"$sum": 1}
                 }
             },
-            {
-                "$sort": {"_id": 1}
-            }
+            {"$sort": {"_id": 1}}
         ]
         
         results = await db.user_settings.aggregate(pipeline).to_list(length=None)
         
-        # Преобразуем результат
         course_stats = [
             CourseStats(
                 course=result["_id"],
