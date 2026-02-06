@@ -193,9 +193,28 @@ const NotificationsPanel = ({
         } else if (actionId === 'reject' && requestId) {
           await friendsAPI.rejectFriendRequest(requestId, telegramId);
         }
+        
+        // Синхронизируем с FriendsSection
+        if (requestId) {
+          // Сохраняем в localStorage для FriendsSection
+          try {
+            const saved = localStorage.getItem('processed_friend_requests');
+            const processed = saved ? JSON.parse(saved) : {};
+            processed[requestId] = {
+              status: actionId === 'accept' ? 'accepted' : 'rejected',
+              time: Date.now()
+            };
+            localStorage.setItem('processed_friend_requests', JSON.stringify(processed));
+          } catch (e) { /* ignore */ }
+          
+          // Отправляем событие для FriendsSection
+          window.dispatchEvent(new CustomEvent('friend-request-action', {
+            detail: { requestId, action: actionId }
+          }));
+        }
       }
       
-      // Обновляем UI
+      // Обновляем UI — НЕ удаляем, а помечаем как обработанное
       setNotifications(prev => prev.map(n => 
         n.id === notification.id ? { ...n, action_taken: actionId, read: true } : n
       ));
