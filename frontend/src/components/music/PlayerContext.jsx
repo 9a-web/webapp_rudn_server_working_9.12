@@ -595,7 +595,7 @@ export const PlayerProvider = ({ children }) => {
           // Последний трек - ищем первый незаблокированный
           console.log('🔁 Repeating queue from start');
           let firstIndex = 0;
-          while (firstIndex < queue.length && (queue[firstIndex].is_blocked === true || queue[firstIndex].content_restricted === true || queue[firstIndex].is_licensed === false)) {
+          while (firstIndex < queue.length && isTrackBlocked(queue[firstIndex])) {
             firstIndex++;
           }
           if (firstIndex < queue.length) {
