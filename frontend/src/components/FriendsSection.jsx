@@ -1,14 +1,14 @@
 /**
  * FriendsSection - Главный компонент раздела "Друзья"
- * Вкладки: Друзья | Запросы | Поиск
+ * Полный редизайн: glass morphism, стaggered анимации, skeleton loading, debounce поиск
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Search, UserPlus, Bell, Star, 
-  ChevronRight, RefreshCw, Filter,
-  UserCheck, UserX, Clock, Send, QrCode, ScanLine, X
+  RefreshCw, UserCheck, UserX, Clock, Send, 
+  QrCode, ScanLine, X, Sparkles, Heart
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
@@ -17,11 +17,66 @@ import FriendCard from './FriendCard';
 import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
 
+// Русское склонение
+const pluralize = (n, one, few, many) => {
+  const abs = Math.abs(n) % 100;
+  const n1 = abs % 10;
+  if (abs > 10 && abs < 20) return `${n} ${many}`;
+  if (n1 > 1 && n1 < 5) return `${n} ${few}`;
+  if (n1 === 1) return `${n} ${one}`;
+  return `${n} ${many}`;
+};
+
+// Debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+};
+
 const TABS = [
   { id: 'friends', name: 'Друзья', icon: Users },
   { id: 'requests', name: 'Запросы', icon: Bell },
   { id: 'search', name: 'Поиск', icon: Search }
 ];
+
+// Skeleton Component
+const SkeletonCard = ({ delay = 0 }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ delay }}
+    className="rounded-2xl p-4 border border-white/[0.06] bg-white/[0.03]"
+  >
+    <div className="flex items-center gap-3.5">
+      <div className="w-[52px] h-[52px] rounded-[18px] bg-white/[0.06] animate-pulse" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 bg-white/[0.06] rounded-lg w-32 animate-pulse" />
+        <div className="h-3 bg-white/[0.04] rounded-lg w-24 animate-pulse" />
+        <div className="h-2.5 bg-white/[0.03] rounded-lg w-20 animate-pulse" />
+      </div>
+      <div className="w-9 h-9 rounded-xl bg-white/[0.04] animate-pulse" />
+    </div>
+  </motion.div>
+);
+
+// Avatar gradient generator
+const getAvatarGradient = (id) => {
+  const gradients = [
+    'from-violet-500 to-purple-600',
+    'from-blue-500 to-cyan-500', 
+    'from-emerald-500 to-teal-500',
+    'from-rose-500 to-pink-500',
+    'from-amber-500 to-orange-500',
+    'from-indigo-500 to-blue-600',
+    'from-fuchsia-500 to-pink-600',
+    'from-cyan-500 to-blue-500',
+  ];
+  return gradients[Math.abs(id || 0) % gradients.length];
+};
 
 const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const { user, webApp } = useTelegram();
@@ -29,31 +84,54 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
   const [searchResults, setSearchResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [qrData, setQrData] = useState(null);
+  const [toast, setToast] = useState(null);
+  const searchInputRef = useRef(null);
   
-  // Состояние для обработанных запросов (request_id -> 'accepted' | 'rejected' | 'cancelled')
-  // Загружаем из localStorage при инициализации
+  // Debounced search
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
+  
+  // Processed requests с ограничением и очисткой
   const [processedRequests, setProcessedRequests] = useState(() => {
     try {
       const saved = localStorage.getItem('processed_friend_requests');
-      return saved ? JSON.parse(saved) : {};
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      // Очищаем записи старше 24 часов
+      const now = Date.now();
+      const cleaned = {};
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'object' && v.time && (now - v.time) < 86400000) {
+          cleaned[k] = v;
+        } else if (typeof v === 'string') {
+          // Старый формат — конвертируем
+          cleaned[k] = { status: v, time: now };
+        }
+      });
+      return cleaned;
     } catch {
       return {};
     }
   });
   
-  // Сохраняем обработанные запросы в localStorage при изменении
   useEffect(() => {
     if (Object.keys(processedRequests).length > 0) {
       localStorage.setItem('processed_friend_requests', JSON.stringify(processedRequests));
     }
   }, [processedRequests]);
+
+  // Показ toast-уведомления
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const hapticFeedback = useCallback((type = 'impact', style = 'light') => {
     if (webApp?.HapticFeedback) {
@@ -99,7 +177,28 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     loadData();
   }, [loadData]);
 
-  // Обновить данные
+  // Debounced search effect
+  useEffect(() => {
+    const doSearch = async () => {
+      if (!user?.id || !debouncedSearchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      try {
+        const data = await friendsAPI.searchUsers(user.id, debouncedSearchQuery);
+        setSearchResults(data.results || []);
+      } catch (error) {
+        console.error('Error searching users:', error);
+      }
+    };
+    doSearch();
+  }, [debouncedSearchQuery, user?.id]);
+
+  // Подсчёт непрочитанных входящих (без обработанных)
+  const unprocessedIncomingCount = useMemo(() => {
+    return (requests.incoming || []).filter(r => !processedRequests[r.request_id]).length;
+  }, [requests.incoming, processedRequests]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     hapticFeedback('impact', 'medium');
@@ -107,19 +206,18 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     setRefreshing(false);
   };
 
-  // Действия с друзьями
+  // Действия
   const handleAcceptRequest = async (requestId) => {
     try {
       hapticFeedback('impact', 'medium');
       await friendsAPI.acceptFriendRequest(requestId, user.id);
       hapticFeedback('notification', 'success');
-      // Помечаем запрос как принятый вместо удаления
-      setProcessedRequests(prev => ({ ...prev, [requestId]: 'accepted' }));
-      // Обновляем список друзей
+      setProcessedRequests(prev => ({ ...prev, [requestId]: { status: 'accepted', time: Date.now() } }));
+      showToast('Запрос принят! Теперь вы друзья');
       await loadFriends();
     } catch (error) {
       hapticFeedback('notification', 'error');
-      console.error('Error accepting request:', error);
+      showToast(error.message || 'Ошибка', 'error');
     }
   };
 
@@ -127,10 +225,10 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     try {
       hapticFeedback('impact', 'light');
       await friendsAPI.rejectFriendRequest(requestId, user.id);
-      // Помечаем запрос как отклонённый вместо удаления
-      setProcessedRequests(prev => ({ ...prev, [requestId]: 'rejected' }));
+      setProcessedRequests(prev => ({ ...prev, [requestId]: { status: 'rejected', time: Date.now() } }));
+      showToast('Запрос отклонён');
     } catch (error) {
-      console.error('Error rejecting request:', error);
+      showToast(error.message || 'Ошибка', 'error');
     }
   };
 
@@ -138,10 +236,10 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     try {
       hapticFeedback('impact', 'light');
       await friendsAPI.cancelFriendRequest(requestId, user.id);
-      // Помечаем запрос как отменённый вместо удаления
-      setProcessedRequests(prev => ({ ...prev, [requestId]: 'cancelled' }));
+      setProcessedRequests(prev => ({ ...prev, [requestId]: { status: 'cancelled', time: Date.now() } }));
+      showToast('Запрос отменён');
     } catch (error) {
-      console.error('Error canceling request:', error);
+      showToast(error.message || 'Ошибка', 'error');
     }
   };
 
@@ -151,7 +249,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
       await friendsAPI.toggleFavorite(user.id, friendId, isFavorite);
       await loadFriends();
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      showToast(error.message || 'Ошибка', 'error');
     }
   };
 
@@ -160,173 +258,167 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
       hapticFeedback('impact', 'medium');
       await friendsAPI.removeFriend(user.id, friendId);
       hapticFeedback('notification', 'success');
+      showToast('Удалён из друзей');
       await loadFriends();
       handleCloseProfile();
     } catch (error) {
       hapticFeedback('notification', 'error');
-      console.error('Error removing friend:', error);
+      showToast(error.message || 'Ошибка', 'error');
     }
   };
 
   const handleSendRequest = async (targetId) => {
     try {
       hapticFeedback('impact', 'medium');
-      await friendsAPI.sendFriendRequest(user.id, targetId);
+      const result = await friendsAPI.sendFriendRequest(user.id, targetId);
       hapticFeedback('notification', 'success');
+      showToast(result?.message || 'Запрос отправлен!');
       await loadData();
     } catch (error) {
       hapticFeedback('notification', 'error');
-      console.error('Error sending request:', error);
+      showToast(error.message || 'Ошибка', 'error');
     }
   };
 
-  // Поиск пользователей
-  const handleSearch = async (query) => {
-    if (!user?.id) return;
-    setSearchQuery(query);
-    
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
+  // QR загрузка
+  const handleOpenQR = async () => {
+    hapticFeedback('impact', 'light');
+    setShowQRModal(true);
     try {
-      const data = await friendsAPI.searchUsers(user.id, query);
-      setSearchResults(data.results || []);
+      const data = await friendsAPI.getProfileQR(user.id);
+      setQrData(data);
     } catch (error) {
-      console.error('Error searching users:', error);
+      setQrData({ qr_data: `friend_${user?.id}`, display_name: 'Мой профиль' });
     }
   };
 
-  // Открыть профиль
   const handleOpenProfile = (friend) => {
     hapticFeedback('impact', 'light');
     setSelectedProfile(friend);
     onFriendProfileOpen?.(true);
   };
 
-  // Закрыть профиль
   const handleCloseProfile = () => {
     setSelectedProfile(null);
     onFriendProfileOpen?.(false);
   };
 
   // Рендер карточки запроса
-  const renderRequestCard = (request, isIncoming) => {
-    const processedStatus = processedRequests[request.request_id];
+  const renderRequestCard = (request, isIncoming, idx) => {
+    const processedObj = processedRequests[request.request_id];
+    const processedStatus = processedObj?.status || (typeof processedObj === 'string' ? processedObj : null);
     const isProcessed = !!processedStatus;
     
     return (
       <motion.div
         key={request.request_id}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: isProcessed ? 0.7 : 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        className={`bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10 transition-opacity ${isProcessed ? 'opacity-70' : ''}`}
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: isProcessed ? 0.55 : 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, x: isIncoming ? -80 : 80, scale: 0.9 }}
+        transition={{ duration: 0.35, delay: idx * 0.04 }}
+        className="relative group overflow-hidden rounded-2xl"
       >
-        <div className="flex items-center gap-3">
-          {/* Аватар */}
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-medium ${
-            processedStatus === 'accepted' 
-              ? 'bg-gradient-to-br from-green-500 to-emerald-500' 
-              : processedStatus === 'rejected' || processedStatus === 'cancelled'
-              ? 'bg-gradient-to-br from-gray-500 to-gray-600'
-              : 'bg-gradient-to-br from-purple-500 to-pink-500'
-          }`}>
-            {(request.first_name?.[0] || request.username?.[0] || '?').toUpperCase()}
-          </div>
-          
-          {/* Информация */}
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-white truncate">
-              {request.first_name} {request.last_name}
-            </h4>
-            <p className="text-sm text-gray-400 truncate">
-              {request.group_name || request.username ? `@${request.username}` : 'Группа не указана'}
-            </p>
-            {request.mutual_friends_count > 0 && !isProcessed && (
-              <p className="text-xs text-purple-400 mt-0.5">
-                {request.mutual_friends_count} общих друзей
+        <div className="absolute inset-0 bg-gradient-to-r from-white/[0.05] to-white/[0.02] backdrop-blur-xl" />
+        <div className={`absolute inset-0 border rounded-2xl transition-all duration-300 ${
+          processedStatus === 'accepted' ? 'border-emerald-500/20' :
+          processedStatus === 'rejected' ? 'border-red-500/10' :
+          'border-white/[0.08]'
+        }`} />
+        
+        <div className="relative p-4">
+          <div className="flex items-center gap-3.5">
+            {/* Аватар */}
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-base overflow-hidden shadow-lg bg-gradient-to-br ${
+              processedStatus === 'accepted' 
+                ? 'from-emerald-500 to-teal-500' 
+                : processedStatus === 'rejected' || processedStatus === 'cancelled'
+                ? 'from-gray-500 to-gray-600'
+                : getAvatarGradient(request.telegram_id)
+            }`}>
+              {(request.first_name?.[0] || request.username?.[0] || '?').toUpperCase()}
+            </div>
+            
+            {/* Информация */}
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-[15px] text-white truncate leading-tight">
+                {request.first_name} {request.last_name}
+              </h4>
+              <p className="text-[13px] text-gray-400 truncate mt-0.5">
+                {request.group_name || (request.username ? `@${request.username}` : 'Нет группы')}
               </p>
-            )}
-            {/* Статус обработки */}
-            {processedStatus === 'accepted' && (
-              <p className="text-xs text-green-400 mt-0.5 font-medium">
-                ✓ Запрос принят
-              </p>
-            )}
-            {processedStatus === 'rejected' && (
-              <p className="text-xs text-red-400 mt-0.5 font-medium">
-                ✗ Запрос отклонён
-              </p>
-            )}
-            {processedStatus === 'cancelled' && (
-              <p className="text-xs text-gray-400 mt-0.5 font-medium">
-                Запрос отменён
-              </p>
-            )}
-          </div>
-
-          {/* Действия */}
-          <div className="flex gap-2">
-            {isIncoming ? (
-              isProcessed ? (
-                // Показываем выбранное действие неактивным
-                <div className="flex gap-2">
-                  <div
-                    className={`p-2 rounded-xl transition-colors ${
-                      processedStatus === 'accepted' 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-green-500/10 text-green-400/40'
-                    }`}
-                  >
-                    <UserCheck className="w-5 h-5" />
-                  </div>
-                  <div
-                    className={`p-2 rounded-xl transition-colors ${
-                      processedStatus === 'rejected' 
-                        ? 'bg-red-500 text-white' 
-                        : 'bg-red-500/10 text-red-400/40'
-                    }`}
-                  >
-                    <UserX className="w-5 h-5" />
-                  </div>
-                </div>
-              ) : (
-                // Активные кнопки
-                <>
-                  <button
-                    onClick={() => handleAcceptRequest(request.request_id)}
-                    className="p-2 bg-green-500/20 text-green-400 rounded-xl hover:bg-green-500/30 transition-colors"
-                  >
-                    <UserCheck className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handleRejectRequest(request.request_id)}
-                    className="p-2 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors"
-                  >
-                    <UserX className="w-5 h-5" />
-                  </button>
-                </>
-              )
-            ) : (
-              isProcessed ? (
-                <div className={`p-2 rounded-xl ${
-                  processedStatus === 'cancelled' 
-                    ? 'bg-gray-500 text-white' 
-                    : 'bg-gray-500/10 text-gray-400/40'
-                }`}>
-                  <Clock className="w-5 h-5" />
-                </div>
-              ) : (
-                <button
-                  onClick={() => handleCancelRequest(request.request_id)}
-                  className="p-2 bg-gray-500/20 text-gray-400 rounded-xl hover:bg-gray-500/30 transition-colors"
+              
+              {/* Статус */}
+              {processedStatus === 'accepted' && (
+                <motion.p 
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-[11px] text-emerald-400 mt-1 font-medium flex items-center gap-1"
                 >
-                  <Clock className="w-5 h-5" />
-                </button>
-              )
-            )}
+                  <UserCheck className="w-3 h-3" /> Теперь друзья
+                </motion.p>
+              )}
+              {processedStatus === 'rejected' && (
+                <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} 
+                  className="text-[11px] text-red-400/70 mt-1 font-medium">✗ Отклонён</motion.p>
+              )}
+              {processedStatus === 'cancelled' && (
+                <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} 
+                  className="text-[11px] text-gray-500 mt-1">Отменён</motion.p>
+              )}
+              {!isProcessed && request.mutual_friends_count > 0 && (
+                <p className="text-[11px] text-purple-400/70 mt-1">
+                  {pluralize(request.mutual_friends_count, 'общий друг', 'общих друга', 'общих друзей')}
+                </p>
+              )}
+            </div>
+
+            {/* Кнопки действий */}
+            <div className="flex gap-2">
+              {isIncoming ? (
+                isProcessed ? (
+                  <div className="flex gap-2 opacity-50">
+                    <div className={`p-2.5 rounded-xl ${processedStatus === 'accepted' ? 'bg-emerald-500 text-white' : 'bg-white/[0.04] text-gray-600'}`}>
+                      <UserCheck className="w-[18px] h-[18px]" />
+                    </div>
+                    <div className={`p-2.5 rounded-xl ${processedStatus === 'rejected' ? 'bg-red-500 text-white' : 'bg-white/[0.04] text-gray-600'}`}>
+                      <UserX className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() => handleAcceptRequest(request.request_id)}
+                      className="p-2.5 bg-emerald-500/15 text-emerald-400 rounded-xl hover:bg-emerald-500/25 transition-all active:bg-emerald-500/30"
+                    >
+                      <UserCheck className="w-[18px] h-[18px]" />
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() => handleRejectRequest(request.request_id)}
+                      className="p-2.5 bg-red-500/10 text-red-400/80 rounded-xl hover:bg-red-500/20 transition-all"
+                    >
+                      <UserX className="w-[18px] h-[18px]" />
+                    </motion.button>
+                  </>
+                )
+              ) : (
+                isProcessed ? (
+                  <div className="p-2.5 rounded-xl bg-white/[0.04] text-gray-600 opacity-50">
+                    <Clock className="w-[18px] h-[18px]" />
+                  </div>
+                ) : (
+                  <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => handleCancelRequest(request.request_id)}
+                    className="p-2.5 bg-white/[0.06] text-gray-400 rounded-xl hover:bg-red-500/10 hover:text-red-400 transition-all"
+                    title="Отменить запрос"
+                  >
+                    <X className="w-[18px] h-[18px]" />
+                  </motion.button>
+                )
+              )}
+            </div>
           </div>
         </div>
       </motion.div>
@@ -334,105 +426,171 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   };
 
   // Рендер результата поиска
-  const renderSearchResult = (result) => {
+  const renderSearchResult = (result, idx) => {
     const isFriend = result.friendship_status === 'friend';
-    const isPending = result.friendship_status?.includes('pending');
+    const isPendingOut = result.friendship_status === 'pending_outgoing';
+    const isPendingIn = result.friendship_status === 'pending_incoming';
     
     return (
       <motion.div
         key={result.telegram_id}
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10"
+        transition={{ duration: 0.35, delay: idx * 0.04 }}
+        className="relative overflow-hidden rounded-2xl"
       >
-        <div className="flex items-center gap-3">
-          {/* Аватар */}
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-medium">
-            {(result.first_name?.[0] || result.username?.[0] || '?').toUpperCase()}
-          </div>
-          
-          {/* Информация */}
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-white truncate">
-              {result.first_name} {result.last_name}
-            </h4>
-            <p className="text-sm text-gray-400 truncate">
-              {result.group_name || (result.username ? `@${result.username}` : '')}
-            </p>
-            {result.facultet_name && (
-              <p className="text-xs text-gray-500 truncate">
-                {result.facultet_name}
+        <div className="absolute inset-0 bg-gradient-to-r from-white/[0.05] to-white/[0.02]" />
+        <div className="absolute inset-0 border border-white/[0.08] rounded-2xl" />
+        
+        <div className="relative p-4">
+          <div className="flex items-center gap-3.5">
+            <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${getAvatarGradient(result.telegram_id)} flex items-center justify-center text-white font-bold text-base shadow-lg`}>
+              {(result.first_name?.[0] || result.username?.[0] || '?').toUpperCase()}
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-[15px] text-white truncate leading-tight">
+                {result.first_name} {result.last_name}
+              </h4>
+              <p className="text-[13px] text-gray-400 truncate mt-0.5">
+                {result.group_name || (result.username ? `@${result.username}` : '')}
               </p>
+              {result.facultet_name && (
+                <p className="text-[11px] text-gray-500 truncate mt-0.5">{result.facultet_name}</p>
+              )}
+              {result.mutual_friends_count > 0 && (
+                <p className="text-[11px] text-purple-400/70 mt-0.5">
+                  {pluralize(result.mutual_friends_count, 'общий друг', 'общих друга', 'общих друзей')}
+                </p>
+              )}
+            </div>
+
+            {isFriend ? (
+              <span className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/15 text-emerald-400 rounded-full text-[12px] font-medium">
+                <UserCheck className="w-3.5 h-3.5" /> Друзья
+              </span>
+            ) : isPendingOut ? (
+              <span className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/15 text-amber-400 rounded-full text-[12px] font-medium">
+                <Clock className="w-3.5 h-3.5" /> Отправлено
+              </span>
+            ) : isPendingIn ? (
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                onClick={() => handleAcceptRequest(result.telegram_id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/15 text-emerald-400 rounded-full text-[12px] font-medium"
+              >
+                <UserCheck className="w-3.5 h-3.5" /> Принять
+              </motion.button>
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                onClick={() => handleSendRequest(result.telegram_id)}
+                className="p-2.5 bg-purple-500/15 text-purple-400 rounded-xl hover:bg-purple-500/25 transition-all"
+              >
+                <UserPlus className="w-[18px] h-[18px]" />
+              </motion.button>
             )}
           </div>
-
-          {/* Действия */}
-          {isFriend ? (
-            <span className="px-3 py-1.5 bg-green-500/20 text-green-400 rounded-full text-sm">
-              Друзья
-            </span>
-          ) : isPending ? (
-            <span className="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-full text-sm">
-              Ожидание
-            </span>
-          ) : (
-            <button
-              onClick={() => handleSendRequest(result.telegram_id)}
-              className="p-2 bg-purple-500/20 text-purple-400 rounded-xl hover:bg-purple-500/30 transition-colors"
-            >
-              <UserPlus className="w-5 h-5" />
-            </button>
-          )}
         </div>
       </motion.div>
     );
   };
 
-  const totalRequests = requests.incoming?.length || 0;
-
   return (
     <div className="min-h-screen pb-24">
+      {/* Toast уведомление */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-4 left-4 right-4 z-[9999]"
+          >
+            <div className={`px-4 py-3 rounded-2xl backdrop-blur-xl border shadow-xl text-sm font-medium text-center ${
+              toast.type === 'error' 
+                ? 'bg-red-500/20 border-red-500/20 text-red-300' 
+                : 'bg-emerald-500/20 border-emerald-500/20 text-emerald-300'
+            }`}>
+              {toast.message}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Заголовок */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-white">Друзья</h1>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="p-2 bg-white/10 rounded-xl text-white/70 hover:bg-white/20 transition-colors"
-          >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[22px] font-bold text-white tracking-tight">Друзья</h1>
+            {friends.length > 0 && (
+              <motion.span 
+                initial={{ scale: 0 }} 
+                animate={{ scale: 1 }}
+                className="px-2.5 py-0.5 bg-purple-500/15 text-purple-400 rounded-full text-[12px] font-semibold"
+              >
+                {friends.length}
+              </motion.span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileTap={{ scale: 0.85 }}
+              onClick={handleOpenQR}
+              className="p-2.5 bg-white/[0.06] rounded-xl text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+            >
+              <QrCode className="w-[18px] h-[18px]" />
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.85 }}
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="p-2.5 bg-white/[0.06] rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <RefreshCw className={`w-[18px] h-[18px] ${refreshing ? 'animate-spin' : ''}`} />
+            </motion.button>
+          </div>
         </div>
 
         {/* Табы */}
-        <div className="flex gap-2 bg-white/5 p-1 rounded-2xl">
+        <div className="relative flex gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/[0.06]">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-            const showBadge = tab.id === 'requests' && totalRequests > 0;
+            const showBadge = tab.id === 'requests' && unprocessedIncomingCount > 0;
             
             return (
-              <button
+              <motion.button
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id);
                   hapticFeedback('impact', 'light');
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all relative ${
-                  isActive
-                    ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-gray-400 hover:text-white'
+                className={`flex-1 relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all duration-200 z-10 ${
+                  isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span className="text-sm font-medium">{tab.name}</span>
-                {showBadge && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {totalRequests}
-                  </span>
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTabBg"
+                    className="absolute inset-0 bg-purple-500/90 rounded-xl shadow-lg shadow-purple-500/20"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
                 )}
-              </button>
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <Icon className="w-4 h-4" />
+                  <span className="text-[13px] font-semibold">{tab.name}</span>
+                </span>
+                {showBadge && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center z-20 px-1"
+                  >
+                    {unprocessedIncomingCount}
+                  </motion.span>
+                )}
+              </motion.button>
             );
           })}
         </div>
@@ -441,193 +599,238 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
       {/* Контент */}
       <div className="px-4 pt-4">
         <AnimatePresence mode="wait">
-          {/* Вкладка: Друзья */}
+          {/* ===== Вкладка: Друзья ===== */}
           {activeTab === 'friends' && (
             <motion.div
               key="friends"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-3"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-2.5"
             >
               {/* Фильтр избранных */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-400 text-sm">
-                  {friends.length} {friends.length === 1 ? 'друг' : 'друзей'}
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-gray-500 text-[13px]">
+                  {pluralize(friends.length, 'друг', 'друга', 'друзей')}
                 </span>
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
                   onClick={() => {
                     setShowFavoritesOnly(!showFavoritesOnly);
                     hapticFeedback('impact', 'light');
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 ${
                     showFavoritesOnly
-                      ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'bg-white/5 text-gray-400'
+                      ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20'
+                      : 'bg-white/[0.04] text-gray-500 border border-transparent hover:text-yellow-400'
                   }`}
                 >
-                  <Star className="w-4 h-4" fill={showFavoritesOnly ? 'currentColor' : 'none'} />
-                  <span className="text-sm">Избранные</span>
-                </button>
+                  <Star className="w-3.5 h-3.5" fill={showFavoritesOnly ? 'currentColor' : 'none'} />
+                  <span className="text-[12px] font-medium">Избранные</span>
+                </motion.button>
               </div>
 
               {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                <div className="space-y-2.5">
+                  {[0, 1, 2, 3].map(i => <SkeletonCard key={i} delay={i * 0.08} />)}
                 </div>
               ) : friends.length > 0 ? (
-                friends.map((friend) => (
+                friends.map((friend, idx) => (
                   <FriendCard
                     key={friend.telegram_id}
                     friend={friend}
+                    index={idx}
                     onPress={() => handleOpenProfile(friend)}
                     onToggleFavorite={() => handleToggleFavorite(friend.telegram_id, !friend.is_favorite)}
                   />
                 ))
               ) : (
-                <div className="text-center py-12">
-                  <Users className="w-16 h-16 mx-auto text-gray-600 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-400 mb-2">
-                    {showFavoritesOnly ? 'Нет избранных друзей' : 'Пока нет друзей'}
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-16"
+                >
+                  <div className="relative inline-block mb-6">
+                    <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mx-auto">
+                      {showFavoritesOnly ? (
+                        <Heart className="w-10 h-10 text-purple-400/60" />
+                      ) : (
+                        <Users className="w-10 h-10 text-purple-400/60" />
+                      )}
+                    </div>
+                    <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-purple-400/40" />
+                  </div>
+                  <h3 className="text-[17px] font-semibold text-gray-300 mb-2">
+                    {showFavoritesOnly ? 'Нет избранных' : 'Пока нет друзей'}
                   </h3>
-                  <p className="text-gray-500 text-sm mb-4">
+                  <p className="text-[13px] text-gray-500 mb-6 max-w-[240px] mx-auto leading-relaxed">
                     {showFavoritesOnly 
-                      ? 'Отметьте друзей звёздочкой' 
-                      : 'Найдите одногруппников и добавьте их в друзья'}
+                      ? 'Нажмите ★ на карточке друга, чтобы добавить в избранное' 
+                      : 'Найдите одногруппников через поиск или поделитесь QR-кодом'}
                   </p>
                   {!showFavoritesOnly && (
-                    <div className="flex flex-col gap-3">
-                      <button
+                    <div className="flex flex-col gap-2.5 max-w-[200px] mx-auto">
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setActiveTab('search')}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-500 text-white rounded-xl"
+                        className="flex items-center justify-center gap-2 px-5 py-3 bg-purple-500 text-white rounded-2xl font-medium text-[14px] shadow-lg shadow-purple-500/20"
                       >
                         <Search className="w-4 h-4" />
                         Найти друзей
-                      </button>
-                      <button
-                        onClick={() => {
-                          hapticFeedback('impact', 'light');
-                          setShowQRModal(true);
-                        }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 text-white rounded-xl border border-white/10"
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleOpenQR}
+                        className="flex items-center justify-center gap-2 px-5 py-3 bg-white/[0.06] text-gray-300 rounded-2xl font-medium text-[14px] border border-white/[0.08]"
                       >
                         <QrCode className="w-4 h-4" />
-                        QR-код
-                      </button>
+                        Показать QR
+                      </motion.button>
                     </div>
                   )}
-                </div>
+                </motion.div>
               )}
             </motion.div>
           )}
 
-          {/* Вкладка: Запросы */}
+          {/* ===== Вкладка: Запросы ===== */}
           {activeTab === 'requests' && (
             <motion.div
               key="requests"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-5"
             >
-              {/* Входящие запросы */}
+              {/* Входящие */}
               {requests.incoming?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                    <UserPlus className="w-4 h-4" />
-                    Входящие ({requests.incoming.length})
+                  <h3 className="text-[13px] font-semibold text-gray-400 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Входящие · {requests.incoming.length}
                   </h3>
                   <div className="space-y-2">
-                    {requests.incoming.map((req) => renderRequestCard(req, true))}
+                    {requests.incoming.map((req, idx) => renderRequestCard(req, true, idx))}
                   </div>
                 </div>
               )}
 
-              {/* Исходящие запросы */}
+              {/* Исходящие */}
               {requests.outgoing?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                    <Send className="w-4 h-4" />
-                    Отправленные ({requests.outgoing.length})
+                  <h3 className="text-[13px] font-semibold text-gray-400 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                    <Send className="w-3.5 h-3.5" />
+                    Отправленные · {requests.outgoing.length}
                   </h3>
                   <div className="space-y-2">
-                    {requests.outgoing.map((req) => renderRequestCard(req, false))}
+                    {requests.outgoing.map((req, idx) => renderRequestCard(req, false, idx))}
                   </div>
                 </div>
               )}
 
               {/* Пусто */}
               {(!requests.incoming?.length && !requests.outgoing?.length) && (
-                <div className="text-center py-12">
-                  <Bell className="w-16 h-16 mx-auto text-gray-600 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-400 mb-2">Нет запросов</h3>
-                  <p className="text-gray-500 text-sm">
-                    Здесь будут появляться запросы на дружбу
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-16"
+                >
+                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500/15 to-cyan-500/15 flex items-center justify-center mx-auto mb-6">
+                    <Bell className="w-10 h-10 text-blue-400/50" />
+                  </div>
+                  <h3 className="text-[17px] font-semibold text-gray-300 mb-2">Нет запросов</h3>
+                  <p className="text-[13px] text-gray-500 max-w-[220px] mx-auto leading-relaxed">
+                    Здесь появятся входящие и исходящие запросы в друзья
                   </p>
-                </div>
+                </motion.div>
               )}
             </motion.div>
           )}
 
-          {/* Вкладка: Поиск */}
+          {/* ===== Вкладка: Поиск ===== */}
           {activeTab === 'search' && (
             <motion.div
               key="search"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
               className="space-y-4"
             >
               {/* Поле поиска */}
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск по имени или @username"
-                  className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50"
+                  className="w-full pl-11 pr-10 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-2xl text-white text-[14px] placeholder-gray-600 focus:outline-none focus:border-purple-500/40 focus:bg-white/[0.06] transition-all"
                 />
+                {searchQuery && (
+                  <motion.button
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-white/10 rounded-full text-gray-400"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </motion.button>
+                )}
               </div>
 
               {/* Быстрые фильтры */}
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                <button
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowSearchModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-xl whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-purple-500/12 text-purple-400 rounded-xl whitespace-nowrap text-[13px] font-medium border border-purple-500/15"
                 >
-                  <Filter className="w-4 h-4" />
-                  Расширенный поиск
-                </button>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Расширенный
+                </motion.button>
                 {userSettings?.group_id && (
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
                     onClick={async () => {
                       const data = await friendsAPI.searchUsers(user.id, '', userSettings.group_id);
                       setSearchResults(data.results || []);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/5 text-gray-300 rounded-xl whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white/[0.04] text-gray-400 rounded-xl whitespace-nowrap text-[13px] font-medium border border-white/[0.06]"
                   >
-                    <Users className="w-4 h-4" />
+                    <Users className="w-3.5 h-3.5" />
                     Моя группа
-                  </button>
+                  </motion.button>
                 )}
               </div>
 
-              {/* Результаты поиска */}
+              {/* Результаты */}
               {searchResults.length > 0 ? (
                 <div className="space-y-2">
-                  {searchResults.map(renderSearchResult)}
+                  <p className="text-[12px] text-gray-500 font-medium">
+                    Найдено: {searchResults.length}
+                  </p>
+                  {searchResults.map((r, idx) => renderSearchResult(r, idx))}
                 </div>
               ) : searchQuery ? (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                  <p className="text-gray-400">Никого не найдено</p>
-                </div>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                  <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-8 h-8 text-gray-600" />
+                  </div>
+                  <p className="text-gray-400 text-[14px]">Никого не найдено</p>
+                  <p className="text-gray-600 text-[12px] mt-1">Попробуйте другой запрос</p>
+                </motion.div>
               ) : (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                  <p className="text-gray-400">Введите имя или @username</p>
-                </div>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-8 h-8 text-purple-400/40" />
+                  </div>
+                  <p className="text-gray-400 text-[14px]">Введите имя или @username</p>
+                  <p className="text-gray-600 text-[12px] mt-1">Или используйте фильтры выше</p>
+                </motion.div>
               )}
             </motion.div>
           )}
@@ -653,7 +856,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
         onSendRequest={handleSendRequest}
       />
 
-      {/* Модальное окно QR-кода */}
+      {/* QR Modal */}
       <AnimatePresence>
         {showQRModal && (
           <motion.div
@@ -661,66 +864,71 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
             onClick={() => setShowQRModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-sm rounded-3xl overflow-hidden"
-              style={{
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }}
+              initial={{ scale: 0.85, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              className="w-full max-w-sm rounded-3xl overflow-hidden border border-white/[0.08]"
+              style={{ backgroundColor: 'rgba(22, 22, 28, 0.97)', backdropFilter: 'blur(40px)' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-white/10">
-                <h3 className="text-lg font-semibold text-white">Мой QR-код</h3>
-                <button
+              <div className="flex items-center justify-between p-5 pb-2">
+                <div>
+                  <h3 className="text-[18px] font-bold text-white">Мой QR-код</h3>
+                  <p className="text-[12px] text-gray-500 mt-0.5">
+                    {qrData?.display_name || 'Загрузка...'}
+                  </p>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.85 }}
                   onClick={() => setShowQRModal(false)}
-                  className="p-2 bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
+                  className="p-2 bg-white/[0.06] rounded-xl text-gray-400 hover:text-white transition-colors"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </motion.button>
               </div>
 
               {/* QR Code */}
-              <div className="p-6">
-                <div className="bg-white rounded-2xl p-4 mx-auto w-fit">
+              <div className="px-5 pb-5 pt-3">
+                <motion.div 
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+                  className="bg-white rounded-3xl p-5 mx-auto w-fit shadow-2xl"
+                >
                   <QRCodeSVG
-                    value={`friend_${user?.id}`}
+                    value={qrData?.qr_data || `friend_${user?.id}`}
                     size={200}
                     level="M"
                     includeMargin={false}
+                    fgColor="#1a1a2e"
                   />
-                </div>
+                </motion.div>
                 
-                <p className="text-center text-gray-400 text-sm mt-4">
+                <p className="text-center text-gray-500 text-[13px] mt-5 leading-relaxed max-w-[240px] mx-auto">
                   Покажите этот QR-код другу, чтобы он мог добавить вас
                 </p>
 
-                {/* Кнопка сканирования - только в Telegram */}
+                {/* Кнопка сканирования */}
                 {webApp?.showScanQrPopup && (
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => {
                       hapticFeedback('impact', 'medium');
                       setShowQRModal(false);
-                      
                       webApp.showScanQrPopup(
                         { text: 'Наведите камеру на QR-код друга' },
                         (scannedText) => {
                           if (!scannedText) return;
-                          
-                          // Проверяем формат friend_XXXXX
                           const friendId = scannedText.match(/friend[_\/](\d+)/)?.[1];
                           if (friendId) {
                             hapticFeedback('notification', 'success');
                             webApp.closeScanQrPopup();
-                            
-                            // Отправляем запрос в друзья
                             if (parseInt(friendId) !== user?.id) {
                               handleSendRequest(parseInt(friendId));
                             }
@@ -730,11 +938,11 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                         }
                       );
                     }}
-                    className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-purple-500 text-white rounded-xl font-medium"
+                    className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-3.5 bg-purple-500 text-white rounded-2xl font-semibold text-[14px] shadow-lg shadow-purple-500/25"
                   >
                     <ScanLine className="w-5 h-5" />
                     Сканировать QR друга
-                  </button>
+                  </motion.button>
                 )}
               </div>
             </motion.div>
