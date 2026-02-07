@@ -798,36 +798,33 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
                     initial={{ opacity: 0, x: -15 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.03 }}
-                    className="flex items-center gap-3 p-3.5 hover:bg-white/[0.03] transition-colors"
+                    className="flex items-center gap-3 p-3 hover:bg-white/[0.03] transition-colors cursor-pointer active:bg-white/[0.05]"
                   >
                     <div className="relative flex-shrink-0">
                       {user.photo_url ? (
-                        <img src={user.photo_url} alt={user.first_name} className="w-10 h-10 rounded-full object-cover ring-1 ring-white/10" />
+                        <img src={user.photo_url} alt={user.first_name} className="w-9 h-9 rounded-full object-cover ring-1 ring-white/10" />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/80 to-pink-500/80 flex items-center justify-center text-white font-bold text-sm">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500/80 to-pink-500/80 flex items-center justify-center text-white font-bold text-xs">
                           {(user.first_name?.[0] || '?').toUpperCase()}
                         </div>
                       )}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0c0c18]" />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#0c0c18]" />
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-white text-sm truncate">{user.first_name} {user.last_name}</span>
-                        {user.username && <span className="text-[11px] text-gray-600 truncate">@{user.username}</span>}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="font-medium text-white text-sm truncate">{user.first_name} {user.last_name}</div>
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                         {user.platform === 'web' ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-teal-500/10 text-teal-400 rounded text-[10px] font-medium">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-teal-500/10 text-teal-400 rounded text-[10px] font-medium">
                             <Globe className="w-2.5 h-2.5" /> Веб
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[10px] font-medium">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[10px] font-medium">
                             <Smartphone className="w-2.5 h-2.5" /> TG
                           </span>
                         )}
                         {user.current_section && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/10 text-purple-300 rounded text-[10px] font-medium">
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-purple-500/10 text-purple-300 rounded text-[10px] font-medium truncate max-w-[100px]">
                             {user.current_section === 'schedule' && '📅 Расписание'}
                             {user.current_section === 'tasks' && '✅ Задачи'}
                             {user.current_section === 'journal' && '📓 Журнал'}
@@ -840,29 +837,25 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
                       </div>
                     </div>
                     
-                    <div className="flex-shrink-0 text-right flex items-center gap-2">
-                      {/* Открыть в Telegram */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           const url = user.username 
                             ? `https://t.me/${user.username}` 
                             : `tg://user?id=${user.telegram_id}`;
-                          try {
-                            window.Telegram?.WebApp?.openTelegramLink?.(url) 
-                              || window.open(url, '_blank');
-                          } catch { window.open(url, '_blank'); }
+                          try { window.Telegram?.WebApp?.openTelegramLink?.(url) || window.open(url, '_blank'); }
+                          catch { window.open(url, '_blank'); }
                         }}
                         className="p-1.5 rounded-lg bg-[#2AABEE]/10 hover:bg-[#2AABEE]/20 transition-colors"
                         title="Открыть в Telegram"
                       >
-                        <svg className="w-4 h-4 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                        <svg className="w-3.5 h-3.5 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
                         </svg>
                       </button>
-                      <div>
-                        <div className="text-[11px] text-green-400 font-semibold">{user.activity_text}</div>
-                        <div className="text-[10px] text-gray-600">ID: {user.telegram_id}</div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-green-400 font-semibold leading-tight">{user.activity_text}</div>
                       </div>
                     </div>
                   </motion.div>
