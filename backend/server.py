@@ -4150,7 +4150,7 @@ async def get_room_tasks(room_id: str):
 
 
 @api_router.put("/group-tasks/{task_id}/update", response_model=GroupTaskResponse)
-async def update_group_task(task_id: str, update_data: GroupTaskUpdate, telegram_id: int = Body(..., embed=False)):
+async def update_group_task(task_id: str, update_data: GroupTaskUpdate):
     """Обновить групповую задачу (название, описание, дедлайн, категорию, приоритет, теги, участников)"""
     try:
         task_doc = await db.group_tasks.find_one({"task_id": task_id})
@@ -4158,22 +4158,24 @@ async def update_group_task(task_id: str, update_data: GroupTaskUpdate, telegram
         if not task_doc:
             raise HTTPException(status_code=404, detail="Задача не найдена")
         
-        # Проверяем, что пользователь является участником задачи
-        is_participant = any(p.get("telegram_id") == telegram_id for p in task_doc.get("participants", []))
-        is_owner = task_doc.get("owner_id") == telegram_id
-        
-        # Проверяем также по комнате (владелец/админ комнаты может редактировать)
-        is_room_admin = False
-        room_id = task_doc.get("room_id")
-        if room_id:
-            room_doc_check = await db.rooms.find_one({"room_id": room_id})
-            if room_doc_check:
-                room_participant = next((p for p in room_doc_check.get("participants", []) if p.get("telegram_id") == telegram_id), None)
-                if room_participant and room_participant.get("role") in ["owner", "admin"]:
-                    is_room_admin = True
-        
-        if not is_participant and not is_owner and not is_room_admin:
-            raise HTTPException(status_code=403, detail="Недостаточно прав для редактирования задачи")
+        # Проверяем права (если telegram_id передан)
+        telegram_id = update_data.telegram_id
+        if telegram_id:
+            is_participant = any(p.get("telegram_id") == telegram_id for p in task_doc.get("participants", []))
+            is_owner = task_doc.get("owner_id") == telegram_id
+            
+            # Проверяем также по комнате (владелец/админ комнаты может редактировать)
+            is_room_admin = False
+            room_id = task_doc.get("room_id")
+            if room_id:
+                room_doc_check = await db.rooms.find_one({"room_id": room_id})
+                if room_doc_check:
+                    room_participant = next((p for p in room_doc_check.get("participants", []) if p.get("telegram_id") == telegram_id), None)
+                    if room_participant and room_participant.get("role") in ["owner", "admin"]:
+                        is_room_admin = True
+            
+            if not is_participant and not is_owner and not is_room_admin:
+                raise HTTPException(status_code=403, detail="Недостаточно прав для редактирования задачи")
         
         # Подготавливаем данные для обновления
         update_fields = {}
