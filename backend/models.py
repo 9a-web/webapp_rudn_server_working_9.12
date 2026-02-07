@@ -918,6 +918,7 @@ class GroupTaskUpdate(BaseModel):
     status: Optional[str] = None
     tags: Optional[List[str]] = None
     assigned_to: Optional[List[int]] = None  # Список telegram_id участников (None = не менять, [] = все участники)
+    telegram_id: Optional[int] = None  # ID пользователя, который делает обновление (для проверки прав)
 
 
 class RoomActivity(BaseModel):
