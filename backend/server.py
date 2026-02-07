@@ -4564,55 +4564,6 @@ async def get_room_stats(room_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_router.put("/rooms/{room_id}/participant-role", response_model=SuccessResponse)
-async def update_participant_role(role_update: ParticipantRoleUpdate):
-    """Изменить роль участника комнаты"""
-    try:
-        room_doc = await db.rooms.find_one({"room_id": role_update.room_id})
-        
-        if not room_doc:
-            raise HTTPException(status_code=404, detail="Комната не найдена")
-        
-        # Проверяем права (только owner и admin могут менять роли)
-        changer = next((p for p in room_doc.get("participants", []) if p.get("telegram_id") == role_update.changed_by), None)
-        
-        if not changer or changer.get("role") not in ["owner", "admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-        
-        # Нельзя изменить роль owner
-        target = next((p for p in room_doc.get("participants", []) if p.get("telegram_id") == role_update.telegram_id), None)
-        
-        if target and target.get("role") == "owner":
-            raise HTTPException(status_code=403, detail="Нельзя изменить роль владельца")
-        
-        # Обновляем роль
-        await db.rooms.update_one(
-            {"room_id": role_update.room_id, "participants.telegram_id": role_update.telegram_id},
-            {"$set": {"participants.$.role": role_update.new_role}}
-        )
-        
-        # Логируем активность
-        activity = RoomActivity(
-            room_id=role_update.room_id,
-            user_id=role_update.changed_by,
-            username="",
-            first_name="User",
-            action_type="role_changed",
-            action_details={
-                "target_user": role_update.telegram_id,
-                "new_role": role_update.new_role
-            }
-        )
-        await db.room_activities.insert_one(activity.model_dump())
-        
-        return SuccessResponse(success=True, message="Роль успешно обновлена")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Ошибка при изменении роли: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @api_router.put("/rooms/{room_id}/tasks-reorder", response_model=SuccessResponse)
 async def reorder_room_tasks(room_id: str, reorder_request: RoomTaskReorderRequest):
     """Изменить порядок задач в комнате (drag & drop)"""
