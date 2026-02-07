@@ -715,12 +715,23 @@ const TasksTab = ({
   handleDeleteTask,
   handleViewTaskDetails,
   handleReorderTasks,
+  handlePinTask,
   getPriorityColor,
   getStatusColor,
   getTaskProgress,
+  getDeadlineInfo,
   userSettings,
   isOwner,
-  colorScheme
+  colorScheme,
+  filterStatus,
+  setFilterStatus,
+  filterPriority,
+  setFilterPriority,
+  sortBy,
+  setSortBy,
+  showFilters,
+  setShowFilters,
+  totalCount
 }) => {
   if (isLoading) {
     return (
@@ -730,50 +741,175 @@ const TasksTab = ({
     );
   }
 
+  const hasActiveFilters = filterStatus !== 'all' || filterPriority !== 'all' || sortBy !== 'default';
+
   return (
-    <div className="space-y-4">
-      {/* Кнопка добавления задачи */}
-      <button
-        onClick={onOpenAddModal}
-        type="button"
-        className={`w-full px-4 py-3 rounded-xl border-2 border-dashed 
-                 ${colorScheme.borderColor} hover:bg-gray-800
-                 text-gray-400 hover:text-gray-300
-                 transition-all touch-manipulation active:scale-95
-                 flex items-center justify-center gap-2 cursor-pointer`}
-      >
-        <Plus className="w-5 h-5" />
-        <span className="font-medium">Добавить задачу</span>
-      </button>
+    <div className="space-y-3">
+      {/* Кнопка добавления + фильтры */}
+      <div className="flex gap-2">
+        <button
+          onClick={onOpenAddModal}
+          type="button"
+          className={`flex-1 px-4 py-2.5 rounded-xl border-2 border-dashed 
+                   ${colorScheme.borderColor} hover:bg-gray-800
+                   text-gray-400 hover:text-gray-300
+                   transition-all touch-manipulation active:scale-95
+                   flex items-center justify-center gap-2 cursor-pointer`}
+        >
+          <Plus className="w-5 h-5" />
+          <span className="font-medium text-sm">Добавить задачу</span>
+        </button>
+        
+        {totalCount > 0 && (
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 py-2.5 rounded-xl border transition-all touch-manipulation active:scale-95
+                     ${hasActiveFilters 
+                       ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' 
+                       : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:text-gray-300'}`}
+          >
+            <Filter className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Панель фильтров */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 bg-gray-800/70 border border-gray-700 rounded-xl space-y-2.5">
+              {/* Статус */}
+              <div>
+                <span className="text-xs text-gray-500 mb-1 block">Статус</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { value: 'all', label: 'Все' },
+                    { value: 'created', label: 'Новые' },
+                    { value: 'in_progress', label: 'В работе' },
+                    { value: 'completed', label: 'Готово' },
+                    { value: 'overdue', label: 'Просрочено' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setFilterStatus(opt.value)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all
+                               ${filterStatus === opt.value 
+                                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                                 : 'bg-gray-700/50 text-gray-400 border border-transparent hover:bg-gray-700'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Приоритет */}
+              <div>
+                <span className="text-xs text-gray-500 mb-1 block">Приоритет</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { value: 'all', label: 'Все' },
+                    { value: 'high', label: 'Высокий', color: 'text-red-400' },
+                    { value: 'medium', label: 'Средний', color: 'text-yellow-400' },
+                    { value: 'low', label: 'Низкий', color: 'text-green-400' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setFilterPriority(opt.value)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all
+                               ${filterPriority === opt.value 
+                                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                                 : `bg-gray-700/50 ${opt.color || 'text-gray-400'} border border-transparent hover:bg-gray-700`}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Сортировка */}
+              <div>
+                <span className="text-xs text-gray-500 mb-1 block">Сортировка</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { value: 'default', label: 'По умолчанию' },
+                    { value: 'deadline', label: 'По дедлайну' },
+                    { value: 'priority', label: 'По приоритету' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setSortBy(opt.value)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all
+                               ${sortBy === opt.value 
+                                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                                 : 'bg-gray-700/50 text-gray-400 border border-transparent hover:bg-gray-700'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Сброс фильтров */}
+              {hasActiveFilters && (
+                <button
+                  onClick={() => { setFilterStatus('all'); setFilterPriority('all'); setSortBy('default'); }}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Счётчик */}
+      {hasActiveFilters && (
+        <p className="text-xs text-gray-500 px-1">
+          Показано {tasks.length} из {totalCount} задач
+        </p>
+      )}
 
       {/* Список задач */}
       {tasks.length === 0 ? (
         <div className="py-12 text-center">
           <CheckCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400">
-            Нет задач в этой комнате
+            {hasActiveFilters ? 'Нет задач по выбранным фильтрам' : 'Нет задач в этой комнате'}
           </p>
-          <p className="text-sm text-gray-500 mt-1">
-            Добавьте первую задачу выше
-          </p>
+          {!hasActiveFilters && (
+            <p className="text-sm text-gray-500 mt-1">Добавьте первую задачу выше</p>
+          )}
         </div>
       ) : (
         <div className="py-1">
-          <Reorder.Group axis="y" values={tasks} onReorder={handleReorderTasks} className="space-y-3">
+          <Reorder.Group axis="y" values={tasks} onReorder={handleReorderTasks} className="space-y-2.5">
           {tasks.map((task) => {
             const currentUserParticipant = task.participants.find(
               p => p.telegram_id === userSettings?.telegram_id
             );
             const progress = getTaskProgress(task);
+            const deadlineInfo = getDeadlineInfo(task.deadline);
+            const subtasks = task.subtasks || [];
+            const subtasksDone = subtasks.filter(s => s.completed).length;
+            const hasSubtasks = subtasks.length > 0;
 
             return (
               <Reorder.Item key={task.task_id} value={task}>
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-gray-800/50 border border-gray-700 rounded-xl
-                           hover:border-gray-600 hover:shadow-lg hover:shadow-indigo-500/10
-                           transition-all group"
+                  className={`p-3.5 rounded-xl transition-all group
+                           ${task.pinned 
+                             ? 'bg-yellow-500/5 border border-yellow-500/20 hover:border-yellow-500/40' 
+                             : 'bg-gray-800/50 border border-gray-700 hover:border-gray-600'}
+                           hover:shadow-lg hover:shadow-indigo-500/5`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Checkbox */}
@@ -799,64 +935,104 @@ const TasksTab = ({
                       className="flex-1 min-w-0 cursor-pointer"
                       onClick={() => handleViewTaskDetails(task)}
                     >
-                      <h4 className={`
-                        text-sm font-medium mb-1
-                        ${currentUserParticipant?.completed 
-                          ? 'line-through text-gray-500' 
-                          : 'text-white'
-                        }
-                      `}>
-                        {task.title}
-                      </h4>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {task.pinned && (
+                          <Pin className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                        )}
+                        <h4 className={`
+                          text-sm font-medium truncate
+                          ${currentUserParticipant?.completed 
+                            ? 'line-through text-gray-500' 
+                            : 'text-white'
+                          }
+                        `}>
+                          {task.title}
+                        </h4>
+                      </div>
                       
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
                         {/* Приоритет */}
-                        <span className={`flex items-center gap-1 ${getPriorityColor(task.priority)}`}>
+                        <span className={`flex items-center gap-0.5 ${getPriorityColor(task.priority)}`}>
                           <Flag className="w-3 h-3" />
-                          {task.priority}
+                          {task.priority === 'high' ? 'Выс' : task.priority === 'medium' ? 'Сред' : 'Низ'}
                         </span>
 
-                        {/* Дедлайн */}
-                        {task.deadline && (
-                          <span className="flex items-center gap-1 text-gray-400">
+                        {/* Дедлайн с индикацией */}
+                        {deadlineInfo && (
+                          <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-medium ${deadlineInfo.color}`}>
+                            {deadlineInfo.urgent && <AlertTriangle className="w-3 h-3" />}
                             <Calendar className="w-3 h-3" />
-                            {new Date(task.deadline).toLocaleDateString('ru-RU')}
+                            {deadlineInfo.label}
                           </span>
                         )}
 
-                        {/* Прогресс */}
+                        {/* Прогресс подзадач */}
+                        {hasSubtasks && (
+                          <span className={`flex items-center gap-0.5 ${subtasksDone === subtasks.length ? 'text-green-400' : 'text-gray-400'}`}>
+                            <ListChecks className="w-3 h-3" />
+                            {subtasksDone}/{subtasks.length}
+                          </span>
+                        )}
+
+                        {/* Комментарии */}
+                        {task.comments_count > 0 && (
+                          <span className="flex items-center gap-0.5 text-gray-400">
+                            <MessageSquare className="w-3 h-3" />
+                            {task.comments_count}
+                          </span>
+                        )}
+
+                        {/* Прогресс участников */}
                         <span className="text-gray-500">
                           {progress}% • {task.participants?.filter(p => p.completed).length}/{task.participants?.length}
                         </span>
                       </div>
 
-                      {/* Progress Bar */}
+                      {/* Progress Bar участников */}
                       {progress > 0 && (
-                        <div className="mt-2 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                        <div className="mt-2 h-1 bg-gray-700 rounded-full overflow-hidden">
                           <div 
                             className={`h-full bg-gradient-to-r ${colorScheme.buttonGradient} transition-all`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
                       )}
+
+                      {/* Прогресс подзадач — мини-бар */}
+                      {hasSubtasks && (
+                        <div className="mt-1.5 h-1 bg-gray-700/50 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
+                            style={{ width: `${(subtasksDone / subtasks.length) * 100}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    {/* Actions - видны владельцу комнаты ИЛИ создателю задачи, всегда видны на мобильных */}
+                    {/* Actions */}
                     {(isOwner || task.owner_id === userSettings?.telegram_id) && (
-                      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handlePinTask(task); }}
+                          className={`p-1.5 rounded-lg transition-colors touch-manipulation active:scale-95
+                                   ${task.pinned ? 'text-yellow-400 hover:bg-yellow-500/10' : 'text-gray-500 hover:bg-gray-700'}`}
+                          title={task.pinned ? 'Открепить' : 'Закрепить'}
+                        >
+                          {task.pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                        </button>
                         <button
                           onClick={() => handleEditTask(task)}
                           className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-500/10
                                    transition-colors touch-manipulation active:scale-95"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteTask(task.task_id)}
                           className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10
                                    transition-colors touch-manipulation active:scale-95"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     )}
