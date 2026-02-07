@@ -19,6 +19,35 @@ TIMEOUT = 30
 TEST_TELEGRAM_ID = 12345
 SECOND_USER_ID = 99999
 
+def test_create_user_settings():
+    """Test 0: Create user settings (prerequisite for group task creation)"""
+    print("🔄 Testing: Create User Settings...")
+    
+    url = f"{BACKEND_URL}/user-settings"
+    payload = {
+        "telegram_id": TEST_TELEGRAM_ID,
+        "username": "testuser",
+        "first_name": "Test User",
+        "group_id": "test-group",
+        "notifications_enabled": True,
+        "notification_time": 10
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=TIMEOUT)
+        
+        if response.status_code == 200:
+            data = response.json()
+            print_test_result("Create User Settings", True, f"User settings created for ID: {data['telegram_id']}")
+            return True
+        else:
+            print_test_result("Create User Settings", False, f"HTTP {response.status_code}: {response.text}")
+            return False
+            
+    except Exception as e:
+        print_test_result("Create User Settings", False, f"Exception: {str(e)}")
+        return False
+
 def print_test_result(test_name, success, details=None):
     """Print formatted test result"""
     status = "✅ PASS" if success else "❌ FAIL"
