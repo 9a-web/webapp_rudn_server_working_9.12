@@ -161,6 +161,44 @@ const RoomParticipantsList = ({
     }
   };
 
+  // Исключить участника
+  const handleKickParticipant = async (participant) => {
+    const confirmKick = window.confirm(`Исключить ${participant.first_name} из комнаты?`);
+    if (!confirmKick) return;
+
+    try {
+      await kickParticipant(roomId, participant.telegram_id, currentUserId);
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.notificationOccurred('success');
+      }
+      if (onParticipantsUpdated) await onParticipantsUpdated();
+    } catch (error) {
+      console.error('Error kicking participant:', error);
+      const msg = error.response?.data?.detail || 'Ошибка при исключении';
+      alert(msg);
+    }
+  };
+
+  // Передать права владельца
+  const handleTransferOwnership = async (participant) => {
+    const confirmTransfer = window.confirm(
+      `Передать права владельца ${participant.first_name}?\nВы станете администратором.`
+    );
+    if (!confirmTransfer) return;
+
+    try {
+      await transferOwnership(roomId, currentUserId, participant.telegram_id);
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.notificationOccurred('success');
+      }
+      if (onParticipantsUpdated) await onParticipantsUpdated();
+    } catch (error) {
+      console.error('Error transferring ownership:', error);
+      const msg = error.response?.data?.detail || 'Ошибка при передаче прав';
+      alert(msg);
+    }
+  };
+
   // Сортировка: владелец первый, затем по ролям, затем по алфавиту
   const sortedParticipants = [...participants].sort((a, b) => {
     const roleOrder = { owner: 0, admin: 1, moderator: 2, member: 3, viewer: 4 };
