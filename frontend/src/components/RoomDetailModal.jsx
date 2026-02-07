@@ -280,7 +280,11 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
   const handleSaveTask = async (taskId, updateData) => {
     try {
       const { updateGroupTask } = await import('../services/roomsAPI');
-      await updateGroupTask(taskId, updateData);
+      // Добавляем telegram_id для проверки прав на бэкенде
+      await updateGroupTask(taskId, {
+        ...updateData,
+        telegram_id: userSettings?.telegram_id
+      });
       await loadRoomTasks();
       
       if (webApp?.HapticFeedback) {
