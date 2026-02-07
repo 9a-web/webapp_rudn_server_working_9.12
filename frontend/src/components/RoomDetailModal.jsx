@@ -467,10 +467,18 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
                     currentUserId={userSettings?.telegram_id}
                     roomId={room.room_id}
                     onRoleChanged={loadRoomTasks}
-                    onParticipantsUpdated={() => {
+                    onParticipantsUpdated={async () => {
                       // Обновить данные комнаты при добавлении участников
                       loadRoomTasks();
-                      if (onRoomUpdated) onRoomUpdated();
+                      if (onRoomUpdated) {
+                        try {
+                          const { getRoomDetail } = await import('../services/roomsAPI');
+                          const updatedRoom = await getRoomDetail(room.room_id);
+                          onRoomUpdated(updatedRoom);
+                        } catch (err) {
+                          console.error('Error refreshing room:', err);
+                        }
+                      }
                     }}
                   />
                 )}
