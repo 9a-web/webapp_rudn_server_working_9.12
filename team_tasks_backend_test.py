@@ -364,7 +364,7 @@ def test_reorder_room_tasks(room_id, task_id):
     url = f"{BACKEND_URL}/rooms/{room_id}/tasks-reorder"
     payload = {
         "room_id": room_id,
-        "tasks": [{"task_id": task_id, "order": 0}]
+        "tasks": [{"id": task_id, "order": 0}]
     }
     
     try:
