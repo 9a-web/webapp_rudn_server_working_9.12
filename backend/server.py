@@ -3154,6 +3154,18 @@ async def complete_group_task(task_id: str, complete_data: GroupTaskCompleteRequ
                 {"$set": {"status": "in_progress"}}
             )
             updated_task.status = "in_progress"
+        else:
+            # Все сняли галочку - возвращаем в "created"
+            # Но проверяем дедлайн — если просрочен, ставим overdue
+            if updated_task.deadline and updated_task.deadline < datetime.utcnow():
+                new_status = "overdue"
+            else:
+                new_status = "created"
+            await db.group_tasks.update_one(
+                {"task_id": task_id},
+                {"$set": {"status": new_status}}
+            )
+            updated_task.status = new_status
         
         completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
         
