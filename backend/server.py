@@ -2745,6 +2745,7 @@ async def create_group_task(task_data: GroupTaskCreate):
             category=task_data.category,
             priority=task_data.priority,
             owner_id=task_data.telegram_id,
+            room_id=task_data.room_id,
             participants=[owner_participant],
             status='created'
         )
