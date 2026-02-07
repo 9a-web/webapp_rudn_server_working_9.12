@@ -981,6 +981,30 @@ class RoomTaskReorderRequest(BaseModel):
     tasks: List[dict]  # [{"task_id": "...", "order": 0}, ...]
 
 
+class KickParticipantRequest(BaseModel):
+    """Запрос на исключение участника из комнаты"""
+    kicked_by: int  # telegram_id того, кто исключает
+    reason: Optional[str] = None  # Причина исключения
+
+
+class TransferOwnershipRequest(BaseModel):
+    """Запрос на передачу прав владельца"""
+    current_owner: int  # telegram_id текущего владельца
+    new_owner: int  # telegram_id нового владельца
+
+
+class GroupTaskCommentUpdate(BaseModel):
+    """Запрос обновления комментария"""
+    telegram_id: int  # кто редактирует
+    text: str  # новый текст
+
+
+class GroupTaskPinRequest(BaseModel):
+    """Запрос на закрепление/открепление задачи"""
+    telegram_id: int
+    pinned: bool
+
+
 class RoomFriendToAdd(BaseModel):
     """Друг для добавления в комнату"""
     telegram_id: int
