@@ -327,6 +327,65 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
     }
   };
 
+  // Закрепить/открепить задачу
+  const handlePinTask = async (task) => {
+    try {
+      await togglePinTask(task.task_id, userSettings?.telegram_id, !task.pinned);
+      await loadRoomTasks();
+      if (webApp?.HapticFeedback) {
+        webApp.HapticFeedback.impactOccurred('medium');
+      }
+    } catch (error) {
+      console.error('Error pinning task:', error);
+    }
+  };
+
+  // Хелпер: дедлайн
+  const getDeadlineInfo = (deadline) => {
+    if (!deadline) return null;
+    const now = new Date();
+    const dl = new Date(deadline);
+    const diffMs = dl - now;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    
+    if (diffMs < 0) return { label: 'Просрочено', color: 'text-red-400 bg-red-500/15', urgent: true };
+    if (diffHours < 24) return { label: `${Math.ceil(diffHours)}ч`, color: 'text-orange-400 bg-orange-500/15', urgent: true };
+    if (diffDays < 3) return { label: `${Math.ceil(diffDays)}д`, color: 'text-yellow-400 bg-yellow-500/15', urgent: false };
+    return { label: dl.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }), color: 'text-gray-400 bg-white/5', urgent: false };
+  };
+
+  // Фильтрация и сортировка задач
+  const filteredTasks = useMemo(() => {
+    let result = [...tasks];
+    
+    // Фильтр по статусу
+    if (filterStatus !== 'all') {
+      result = result.filter(t => t.status === filterStatus);
+    }
+    // Фильтр по приоритету
+    if (filterPriority !== 'all') {
+      result = result.filter(t => t.priority === filterPriority);
+    }
+    
+    // Сортировка
+    if (sortBy === 'deadline') {
+      result.sort((a, b) => {
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+    } else if (sortBy === 'priority') {
+      result.sort((a, b) => (PRIORITY_MAP[b.priority] || 0) - (PRIORITY_MAP[a.priority] || 0));
+    }
+    
+    // Закреплённые всегда вверху
+    result.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+    
+    return result;
+  }, [tasks, filterStatus, filterPriority, sortBy]);
+
   const handleClose = () => {
     if (webApp?.HapticFeedback) {
       webApp.HapticFeedback.impactOccurred('light');
