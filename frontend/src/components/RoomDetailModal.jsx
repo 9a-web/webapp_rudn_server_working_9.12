@@ -3,12 +3,13 @@
  * Табы: Задачи | Участники | Активность | Настройки
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
   X, Users, Share2, Trash2, Plus, Check, Settings,
   Clock, Flag, Calendar, ChevronRight, LogOut,
-  CheckCircle, Edit2, Filter, SortAsc, Activity
+  CheckCircle, Edit2, Filter, SortAsc, Activity,
+  Pin, PinOff, MessageSquare, AlertTriangle, ListChecks
 } from 'lucide-react';
 import { useTelegram } from '../contexts/TelegramContext';
 import { 
@@ -20,7 +21,8 @@ import {
   toggleTaskComplete,
   deleteGroupTask,
   reorderRoomTasks,
-  updateRoom
+  updateRoom,
+  togglePinTask
 } from '../services/roomsAPI';
 import { getRoomColor } from '../constants/roomColors';
 import EditRoomTaskModal from './EditRoomTaskModal';
@@ -37,6 +39,8 @@ const TABS = [
   { id: 'stats', name: 'Статистика', icon: Filter }
 ];
 
+const PRIORITY_MAP = { high: 3, medium: 2, low: 1 };
+
 const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, onRoomUpdated }) => {
   const [activeTab, setActiveTab] = useState('tasks');
   const [tasks, setTasks] = useState([]);
@@ -47,6 +51,11 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
   const [editingTask, setEditingTask] = useState(null);
   const [taskDetailView, setTaskDetailView] = useState(null);
   const { webApp } = useTelegram();
+  // Фильтры и сортировка
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [sortBy, setSortBy] = useState('default');
+  const [showFilters, setShowFilters] = useState(false);
 
   const isOwner = room && userSettings && room.owner_id === userSettings.telegram_id;
   const colorScheme = room ? getRoomColor(room.color || 'blue') : getRoomColor('blue');
