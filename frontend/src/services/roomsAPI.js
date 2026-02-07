@@ -315,3 +315,73 @@ export const addFriendsToRoom = async (roomId, telegramId, friends) => {
     throw error;
   }
 };
+
+// Исключить участника из комнаты
+export const kickParticipant = async (roomId, targetId, kickedBy, reason = '') => {
+  try {
+    const response = await axios.delete(
+      `${API_BASE_URL}/api/rooms/${roomId}/participants/${targetId}`,
+      { data: { kicked_by: kickedBy, reason } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error kicking participant:', error);
+    throw error;
+  }
+};
+
+// Передать права владельца
+export const transferOwnership = async (roomId, currentOwner, newOwner) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/api/rooms/${roomId}/transfer-ownership`,
+      { current_owner: currentOwner, new_owner: newOwner }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error transferring ownership:', error);
+    throw error;
+  }
+};
+
+// Закрепить/открепить задачу
+export const togglePinTask = async (taskId, telegramId, pinned) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/api/group-tasks/${taskId}/pin`,
+      { telegram_id: telegramId, pinned }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error toggling pin:', error);
+    throw error;
+  }
+};
+
+// Редактировать комментарий
+export const editComment = async (taskId, commentId, telegramId, text) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/api/group-tasks/${taskId}/comments/${commentId}`,
+      { telegram_id: telegramId, text }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error editing comment:', error);
+    throw error;
+  }
+};
+
+// Удалить комментарий
+export const deleteComment = async (taskId, commentId, telegramId) => {
+  try {
+    const response = await axios.delete(
+      `${API_BASE_URL}/api/group-tasks/${taskId}/comments/${commentId}`,
+      { data: { telegram_id: telegramId } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    throw error;
+  }
+};
