@@ -4,10 +4,13 @@
 
 import axios from 'axios';
 
-// Определяем URL backend
+// Определяем URL backend через env-переменную (как в api.js)
 const getBackendURL = () => {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
+  try {
+    const envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
+    if (envBackendUrl) return envBackendUrl;
+  } catch (e) {
+    // fallback
   }
   return window.location.origin;
 };
