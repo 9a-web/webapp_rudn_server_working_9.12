@@ -1033,6 +1033,136 @@ const UsersTab = () => {
           </motion.button>
         )}
       </div>
+
+      {/* User Detail Modal */}
+      <AnimatePresence>
+        {detailUser && (
+          <motion.div
+            className="fixed inset-0 z-[9999] flex items-end sm:items-center sm:justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setDetailUser(null)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              className="relative w-full sm:w-[440px] max-h-[85vh] overflow-y-auto
+                         rounded-t-[24px] sm:rounded-[20px] border border-white/[0.1]
+                         shadow-[0_8px_48px_rgba(0,0,0,0.5)]"
+              style={{ background: 'linear-gradient(135deg, rgba(20,20,35,0.95) 0%, rgba(15,15,30,0.98) 100%)', backdropFilter: 'blur(40px)' }}
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full bg-white/20" /></div>
+              
+              {/* Header */}
+              <div className="px-5 pt-4 pb-5 text-center relative">
+                <button onClick={() => setDetailUser(null)} className="absolute right-4 top-4 p-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] transition-colors">
+                  <X className="w-4 h-4 text-white/50" />
+                </button>
+                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-purple-500/40 to-blue-500/40 flex items-center justify-center text-2xl font-bold text-white border-2 border-white/10 shadow-lg shadow-purple-500/10">
+                  {detailUser.first_name?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <h3 className="text-lg font-bold text-white mt-3">
+                  {detailUser.first_name} {detailUser.last_name}
+                </h3>
+                {detailUser.username && (
+                  <p className="text-sm text-gray-500 mt-0.5">@{detailUser.username}</p>
+                )}
+                {/* Online status */}
+                {detailProfile?.is_online && (
+                  <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 text-[11px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    Онлайн
+                  </span>
+                )}
+              </div>
+
+              <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+              {detailLoading ? (
+                <div className="py-12 text-center"><GlassLoader /></div>
+              ) : (
+                <div className="px-5 py-4 space-y-3">
+                  {/* Info grid */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {[
+                      { label: 'Telegram ID', value: detailUser.telegram_id, icon: '🆔' },
+                      { label: 'Группа', value: detailUser.group_name || '—', icon: '👥' },
+                      { label: 'Факультет', value: detailProfile?.facultet_name || detailUser.facultet_name || '—', icon: '🏛️' },
+                      { label: 'Курс', value: detailProfile?.kurs || detailUser.kurs || '—', icon: '📚' },
+                      { label: 'Регистрация', value: detailUser.created_at ? new Date(detailUser.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—', icon: '📅' },
+                      { label: 'Последняя активность', value: detailProfile?.last_activity ? (() => { const d = new Date(detailProfile.last_activity); const diff = Math.floor((Date.now() - d.getTime()) / 60000); return diff < 5 ? 'Только что' : diff < 60 ? `${diff} мин назад` : diff < 1440 ? `${Math.floor(diff/60)} ч назад` : d.toLocaleDateString('ru-RU'); })() : detailUser.last_activity ? new Date(detailUser.last_activity).toLocaleDateString('ru-RU') : '—', icon: '⏱️' },
+                    ].map((item) => (
+                      <div key={item.label} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">{item.icon} {item.label}</div>
+                        <div className="text-[13px] text-white/80 font-medium truncate">{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Stats row */}
+                  {detailProfile && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Друзья', value: detailProfile.friends_count, gradient: 'from-blue-500 to-cyan-500' },
+                        { label: 'Достижения', value: detailProfile.achievements_count, gradient: 'from-amber-500 to-orange-500' },
+                        { label: 'Баллы', value: detailProfile.total_points, gradient: 'from-purple-500 to-pink-500' },
+                      ].map((s) => (
+                        <div key={s.label} className="text-center p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                          <div className={`text-xl font-bold bg-gradient-to-r ${s.gradient} bg-clip-text text-transparent`}>{s.value}</div>
+                          <div className="text-[10px] text-gray-600 mt-0.5">{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Notifications */}
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1.5">🔔 Уведомления</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] text-white/80">{detailUser.notifications_enabled ? 'Включены' : 'Отключены'}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${detailUser.notifications_enabled ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                        {detailUser.notifications_enabled ? `за ${detailUser.notification_time || 10} мин` : 'OFF'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        const url = detailUser.username 
+                          ? `https://t.me/${detailUser.username}` 
+                          : `tg://user?id=${detailUser.telegram_id}`;
+                        try { window.Telegram?.WebApp?.openTelegramLink?.(url) || window.open(url, '_blank'); }
+                        catch { window.open(url, '_blank'); }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2AABEE]/15 hover:bg-[#2AABEE]/25 transition-colors border border-[#2AABEE]/20"
+                    >
+                      <svg className="w-4 h-4 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
+                      </svg>
+                      <span className="text-[13px] font-semibold text-[#2AABEE]">Telegram</span>
+                    </button>
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText(String(detailUser.telegram_id)); }}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors border border-white/[0.06]"
+                    >
+                      <Copy className="w-4 h-4 text-gray-500" />
+                      <span className="text-[13px] text-gray-400">ID</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
