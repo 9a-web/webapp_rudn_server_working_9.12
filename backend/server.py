@@ -4669,6 +4669,241 @@ async def reorder_room_tasks(room_id: str, reorder_request: RoomTaskReorderReque
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Kick участника из комнаты ============
+
+@api_router.delete("/rooms/{room_id}/participants/{target_id}", response_model=SuccessResponse)
+async def kick_participant(room_id: str, target_id: int, request: KickParticipantRequest):
+    """Исключить участника из комнаты (только owner/admin)"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        participants = room_doc.get("participants", [])
+        kicker = next((p for p in participants if p.get("telegram_id") == request.kicked_by), None)
+        target = next((p for p in participants if p.get("telegram_id") == target_id), None)
+        
+        if not kicker:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        if not target:
+            raise HTTPException(status_code=404, detail="Участник не найден в комнате")
+        
+        # Проверяем права
+        if kicker.get("role") not in ["owner", "admin"]:
+            raise HTTPException(status_code=403, detail="Только владелец или админ может исключать участников")
+        
+        # Нельзя исключить владельца
+        if target.get("role") == "owner":
+            raise HTTPException(status_code=403, detail="Нельзя исключить владельца комнаты")
+        
+        # Admin не может кикнуть другого admin
+        if kicker.get("role") == "admin" and target.get("role") == "admin":
+            raise HTTPException(status_code=403, detail="Админ не может исключить другого админа")
+        
+        # Удаляем участника
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$pull": {"participants": {"telegram_id": target_id}}}
+        )
+        
+        # Убираем его из assigned задач комнаты
+        await db.group_tasks.update_many(
+            {"room_id": room_id, "participants.telegram_id": target_id},
+            {"$pull": {"participants": {"telegram_id": target_id}}}
+        )
+        
+        # Логируем активность
+        activity = RoomActivity(
+            room_id=room_id,
+            user_id=request.kicked_by,
+            username=kicker.get("username"),
+            first_name=kicker.get("first_name", "User"),
+            action_type="member_kicked",
+            action_details={
+                "target_user_id": target_id,
+                "target_user_name": target.get("first_name", ""),
+                "reason": request.reason or "Без причины"
+            }
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        return SuccessResponse(success=True, message=f"Участник {target.get('first_name', '')} исключён из комнаты")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при исключении участника: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Передача прав владельца ============
+
+@api_router.put("/rooms/{room_id}/transfer-ownership", response_model=SuccessResponse)
+async def transfer_ownership(room_id: str, request: TransferOwnershipRequest):
+    """Передать права владельца комнаты другому участнику"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        participants = room_doc.get("participants", [])
+        current = next((p for p in participants if p.get("telegram_id") == request.current_owner), None)
+        new_owner = next((p for p in participants if p.get("telegram_id") == request.new_owner), None)
+        
+        if not current:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        if current.get("role") != "owner":
+            raise HTTPException(status_code=403, detail="Только владелец может передать права")
+        if not new_owner:
+            raise HTTPException(status_code=404, detail="Новый владелец не найден среди участников")
+        if request.current_owner == request.new_owner:
+            raise HTTPException(status_code=400, detail="Нельзя передать права самому себе")
+        
+        # Меняем роли
+        await db.rooms.update_one(
+            {"room_id": room_id, "participants.telegram_id": request.current_owner},
+            {"$set": {"participants.$.role": "admin"}}  # бывший owner становится admin
+        )
+        await db.rooms.update_one(
+            {"room_id": room_id, "participants.telegram_id": request.new_owner},
+            {"$set": {"participants.$.role": "owner"}}
+        )
+        # Обновляем owner_id комнаты
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$set": {"owner_id": request.new_owner, "updated_at": datetime.utcnow()}}
+        )
+        
+        # Логируем
+        activity = RoomActivity(
+            room_id=room_id,
+            user_id=request.current_owner,
+            username=current.get("username"),
+            first_name=current.get("first_name", "User"),
+            action_type="ownership_transferred",
+            action_details={
+                "new_owner_id": request.new_owner,
+                "new_owner_name": new_owner.get("first_name", "")
+            }
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        return SuccessResponse(success=True, message=f"Права владельца переданы {new_owner.get('first_name', '')}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при передаче прав: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Редактирование/удаление комментариев ============
+
+@api_router.put("/group-tasks/{task_id}/comments/{comment_id}", response_model=GroupTaskCommentResponse)
+async def edit_comment(task_id: str, comment_id: str, update: GroupTaskCommentUpdate):
+    """Редактировать комментарий (только автор)"""
+    try:
+        comment_doc = await db.group_task_comments.find_one({"comment_id": comment_id, "task_id": task_id})
+        if not comment_doc:
+            raise HTTPException(status_code=404, detail="Комментарий не найден")
+        
+        if comment_doc.get("telegram_id") != update.telegram_id:
+            raise HTTPException(status_code=403, detail="Только автор может редактировать комментарий")
+        
+        if not update.text.strip():
+            raise HTTPException(status_code=400, detail="Текст комментария не может быть пустым")
+        
+        await db.group_task_comments.update_one(
+            {"comment_id": comment_id},
+            {"$set": {
+                "text": update.text.strip(),
+                "edited": True,
+                "edited_at": datetime.utcnow()
+            }}
+        )
+        
+        updated_doc = await db.group_task_comments.find_one({"comment_id": comment_id})
+        return GroupTaskCommentResponse(**updated_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при редактировании комментария: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/group-tasks/{task_id}/comments/{comment_id}", response_model=SuccessResponse)
+async def delete_comment(task_id: str, comment_id: str, telegram_id: int = Body(..., embed=True)):
+    """Удалить комментарий (автор или owner задачи)"""
+    try:
+        comment_doc = await db.group_task_comments.find_one({"comment_id": comment_id, "task_id": task_id})
+        if not comment_doc:
+            raise HTTPException(status_code=404, detail="Комментарий не найден")
+        
+        # Проверяем права: автор комментария или owner задачи
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        is_comment_author = comment_doc.get("telegram_id") == telegram_id
+        is_task_owner = task_doc and task_doc.get("owner_id") == telegram_id
+        
+        if not is_comment_author and not is_task_owner:
+            raise HTTPException(status_code=403, detail="Нет прав на удаление комментария")
+        
+        await db.group_task_comments.delete_one({"comment_id": comment_id})
+        return SuccessResponse(success=True, message="Комментарий удалён")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении комментария: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Закрепление задач ============
+
+@api_router.put("/group-tasks/{task_id}/pin", response_model=GroupTaskResponse)
+async def toggle_pin_task(task_id: str, pin_request: GroupTaskPinRequest):
+    """Закрепить/открепить задачу (owner задачи или owner/admin комнаты)"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Проверяем права
+        is_task_owner = task_doc.get("owner_id") == pin_request.telegram_id
+        is_room_admin = False
+        room_id = task_doc.get("room_id")
+        if room_id:
+            room_doc = await db.rooms.find_one({"room_id": room_id})
+            if room_doc:
+                room_participant = next((p for p in room_doc.get("participants", []) if p.get("telegram_id") == pin_request.telegram_id), None)
+                if room_participant and room_participant.get("role") in ["owner", "admin"]:
+                    is_room_admin = True
+        
+        if not is_task_owner and not is_room_admin:
+            raise HTTPException(status_code=403, detail="Недостаточно прав для закрепления задачи")
+        
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {"$set": {"pinned": pin_request.pinned, "updated_at": datetime.utcnow()}}
+        )
+        
+        updated_task = await db.group_tasks.find_one({"task_id": task_id})
+        participants = updated_task.get("participants", [])
+        total_participants = len(participants)
+        completed_participants = sum(1 for p in participants if p.get("completed", False))
+        completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        return GroupTaskResponse(
+            **updated_task,
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при закреплении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ Эндпоинты для реферальной системы ============
 
 def generate_referral_code(telegram_id: int) -> str:
