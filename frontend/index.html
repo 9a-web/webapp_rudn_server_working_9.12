@@ -92,7 +92,7 @@
         -->
         <script>
             // Only load visual edit scripts when inside an iframe and visual edits are enabled
-            if (window.self !== window.top && '%REACT_APP_ENABLE_VISUAL_EDITS%' === 'true') {
+            if (window.self !== window.top && '%VITE_ENABLE_VISUAL_EDITS%' === 'true') {
                 // Load debug monitor script
                 var debugScript = document.createElement('script');
                 debugScript.src = 'https://assets.emergent.sh/scripts/debug-monitor.js';
