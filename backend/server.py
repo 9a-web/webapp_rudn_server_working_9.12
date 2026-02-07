@@ -4150,11 +4150,15 @@ async def get_room_tasks(room_id: str):
             if total_participants > 0:
                 completion_percentage = int((completed_participants / total_participants) * 100)
             
+            # Подсчитываем количество комментариев
+            comments_count = await db.group_task_comments.count_documents({"task_id": task_doc.get("task_id")})
+            
             tasks.append(GroupTaskResponse(
                 **task_doc,
                 completion_percentage=completion_percentage,
                 total_participants=total_participants,
-                completed_participants=completed_participants
+                completed_participants=completed_participants,
+                comments_count=comments_count
             ))
         
         return tasks
