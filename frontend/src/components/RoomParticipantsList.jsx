@@ -416,6 +416,41 @@ const RoomParticipantsList = ({
                           </button>
                         );
                       })}
+
+                      {/* Разделитель */}
+                      <div className="border-t border-gray-700 my-1" />
+
+                      {/* Передать права (только для owner) */}
+                      {currentUser?.role === 'owner' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsRoleMenuOpen(false);
+                            setChangingRoleFor(null);
+                            handleTransferOwnership(participant);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg
+                                   text-sm text-yellow-400 hover:bg-yellow-500/10 transition-colors text-left"
+                        >
+                          <ArrowRightLeft className="w-4 h-4 flex-shrink-0" />
+                          <span className="flex-1">Передать права</span>
+                        </button>
+                      )}
+
+                      {/* Исключить */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsRoleMenuOpen(false);
+                          setChangingRoleFor(null);
+                          handleKickParticipant(participant);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg
+                                 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                      >
+                        <UserMinus className="w-4 h-4 flex-shrink-0" />
+                        <span className="flex-1">Исключить</span>
+                      </button>
                     </div>
                   </motion.div>
                 </>
