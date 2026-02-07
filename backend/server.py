@@ -4542,34 +4542,34 @@ async def get_room_stats(room_id: str):
         if total_tasks > 0:
             completion_percentage = int((completed_tasks / total_tasks) * 100)
         
-        # Статистика по участникам
+        # Статистика по участникам - оптимизировано: одна загрузка всех задач
         participants = room_doc.get("participants", [])
-        participants_stats = []
+        all_room_tasks = await db.group_tasks.find({"room_id": room_id}).to_list(length=None)
         
+        # Предварительно подсчитываем статистику по каждому участнику
+        participant_created = {}  # telegram_id -> count
+        participant_completed = {}  # telegram_id -> count
+        
+        for task in all_room_tasks:
+            owner = task.get("owner_id")
+            participant_created[owner] = participant_created.get(owner, 0) + 1
+            
+            for p in task.get("participants", []):
+                pid = p.get("telegram_id")
+                if p.get("completed", False):
+                    participant_completed[pid] = participant_completed.get(pid, 0) + 1
+        
+        participants_stats = []
         for participant in participants:
             telegram_id = participant.get("telegram_id")
-            
-            # Подсчитываем задачи участника
-            user_tasks = await db.group_tasks.count_documents({
-                "room_id": room_id,
-                "owner_id": telegram_id
-            })
-            
-            # Подсчитываем выполненные задачи
-            user_completed = 0
-            async for task in db.group_tasks.find({"room_id": room_id}):
-                for p in task.get("participants", []):
-                    if p.get("telegram_id") == telegram_id and p.get("completed", False):
-                        user_completed += 1
-                        break
             
             participants_stats.append({
                 "telegram_id": telegram_id,
                 "username": participant.get("username"),
                 "first_name": participant.get("first_name"),
                 "role": participant.get("role"),
-                "tasks_created": user_tasks,
-                "tasks_completed": user_completed,
+                "tasks_created": participant_created.get(telegram_id, 0),
+                "tasks_completed": participant_completed.get(telegram_id, 0),
                 "joined_at": participant.get("joined_at")
             })
         
