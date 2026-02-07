@@ -2822,11 +2822,15 @@ async def get_user_group_tasks(telegram_id: int):
             
             completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
             
+            # Подсчитываем количество комментариев
+            comments_count = await db.group_task_comments.count_documents({"task_id": task.task_id})
+            
             tasks.append(GroupTaskResponse(
                 **task.model_dump(),
                 completion_percentage=completion_percentage,
                 total_participants=total_participants,
-                completed_participants=completed_participants
+                completed_participants=completed_participants,
+                comments_count=comments_count
             ))
         
         return tasks
