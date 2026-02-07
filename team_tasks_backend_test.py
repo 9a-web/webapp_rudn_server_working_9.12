@@ -412,10 +412,11 @@ def test_delete_room_cleanup(room_id):
         print_test_result("Delete Room Cleanup", False, "No room_id provided")
         return False
     
-    url = f"{BACKEND_URL}/rooms/{room_id}?telegram_id={TEST_TELEGRAM_ID}"
+    url = f"{BACKEND_URL}/rooms/{room_id}"
+    payload = {"telegram_id": TEST_TELEGRAM_ID}
     
     try:
-        response = requests.delete(url, timeout=TIMEOUT)
+        response = requests.delete(url, json=payload, timeout=TIMEOUT)
         
         if response.status_code == 200:
             print_test_result("Delete Room Cleanup", True, "Room deleted successfully (cleanup order fixed)")
