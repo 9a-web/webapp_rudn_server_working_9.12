@@ -438,6 +438,9 @@ def main():
     
     results = {}
     
+    # Test 0: Create User Settings (prerequisite)
+    results['create_user_settings'] = test_create_user_settings()
+    
     # Test 1: Create Room (prerequisite)
     room_id = test_create_room()
     results['create_room'] = room_id is not None
