@@ -706,6 +706,7 @@ class GroupTask(BaseModel):
     tags: List[str] = []  # Теги/метки для задачи
     subtasks: List[Subtask] = []  # Подзадачи
     order: int = 0  # Порядок для drag & drop
+    pinned: bool = False  # Закреплена ли задача
 
 
 class GroupTaskCreate(BaseModel):
