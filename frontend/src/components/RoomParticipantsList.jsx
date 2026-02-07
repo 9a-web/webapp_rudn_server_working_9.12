@@ -4,8 +4,8 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Crown, Shield, Eye, User, ChevronDown, Check, UserPlus, Link2, Copy } from 'lucide-react';
-import { updateParticipantRole, addFriendsToRoom, generateInviteLink } from '../services/roomsAPI';
+import { Users, Crown, Shield, Eye, User, ChevronDown, Check, UserPlus, Link2, Copy, UserMinus, ArrowRightLeft } from 'lucide-react';
+import { updateParticipantRole, addFriendsToRoom, generateInviteLink, kickParticipant, transferOwnership } from '../services/roomsAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 import SelectFriendsModal from './SelectFriendsModal';
 
