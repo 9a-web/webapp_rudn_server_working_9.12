@@ -4115,8 +4115,8 @@ async def get_room_tasks(room_id: str):
         if not room_doc:
             raise HTTPException(status_code=404, detail="Комната не найдена")
         
-        # Получаем все задачи комнаты
-        tasks_cursor = db.group_tasks.find({"room_id": room_id}).sort("created_at", -1)
+        # Получаем все задачи комнаты (сортировка по order, затем по дате создания)
+        tasks_cursor = db.group_tasks.find({"room_id": room_id}).sort([("order", 1), ("created_at", -1)])
         
         tasks = []
         async for task_doc in tasks_cursor:
