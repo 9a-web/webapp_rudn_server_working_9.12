@@ -910,7 +910,22 @@ const UsersTab = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [detailUser, setDetailUser] = useState(null);
+  const [detailProfile, setDetailProfile] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const searchTimerRef = useRef(null);
+
+  // Загрузка детального профиля
+  useEffect(() => {
+    if (!detailUser) { setDetailProfile(null); return; }
+    let cancelled = false;
+    setDetailLoading(true);
+    axios.get(`${BACKEND_URL}/api/profile/${detailUser.telegram_id}`)
+      .then(res => { if (!cancelled) setDetailProfile(res.data); })
+      .catch(() => { if (!cancelled) setDetailProfile(null); })
+      .finally(() => { if (!cancelled) setDetailLoading(false); });
+    return () => { cancelled = true; };
+  }, [detailUser]);
 
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
