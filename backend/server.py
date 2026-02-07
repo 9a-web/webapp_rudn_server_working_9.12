@@ -4613,20 +4613,23 @@ async def update_participant_role(role_update: ParticipantRoleUpdate):
 
 
 @api_router.put("/rooms/{room_id}/tasks-reorder", response_model=SuccessResponse)
-async def reorder_room_tasks(reorder_request: TaskReorderRequest):
+async def reorder_room_tasks(room_id: str, reorder_request: RoomTaskReorderRequest):
     """Изменить порядок задач в комнате (drag & drop)"""
     try:
-        room_doc = await db.rooms.find_one({"room_id": reorder_request.room_id})
+        room_doc = await db.rooms.find_one({"room_id": room_id})
         
         if not room_doc:
             raise HTTPException(status_code=404, detail="Комната не найдена")
         
         # Обновляем порядок для каждой задачи
         for task_order in reorder_request.tasks:
-            await db.group_tasks.update_one(
-                {"task_id": task_order["task_id"]},
-                {"$set": {"order": task_order["order"]}}
-            )
+            task_id = task_order.get("task_id") if isinstance(task_order, dict) else getattr(task_order, "task_id", None)
+            order = task_order.get("order") if isinstance(task_order, dict) else getattr(task_order, "order", None)
+            if task_id is not None and order is not None:
+                await db.group_tasks.update_one(
+                    {"task_id": task_id},
+                    {"$set": {"order": order}}
+                )
         
         return SuccessResponse(success=True, message="Порядок задач обновлен")
     except HTTPException:
