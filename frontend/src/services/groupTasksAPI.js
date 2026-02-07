@@ -2,7 +2,7 @@
  * API для работы с групповыми задачами
  */
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '';
+const API_BASE_URL = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
 
 export const groupTasksAPI = {
   /**
