@@ -4375,6 +4375,10 @@ async def update_subtask(task_id: str, subtask_id: str, update_data: SubtaskUpda
             subtasks[subtask_index]["completed"] = update_data.completed
             if update_data.completed:
                 subtasks[subtask_index]["completed_at"] = datetime.utcnow()
+                subtasks[subtask_index]["completed_by"] = getattr(update_data, 'completed_by', None)
+            else:
+                subtasks[subtask_index]["completed_at"] = None
+                subtasks[subtask_index]["completed_by"] = None
         
         # Сохраняем изменения
         await db.group_tasks.update_one(
