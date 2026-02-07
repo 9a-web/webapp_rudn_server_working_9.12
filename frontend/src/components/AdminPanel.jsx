@@ -960,53 +960,41 @@ const UsersTab = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: Math.min(i * 0.02, 0.5) }}
-            className={`${GLASS.card} rounded-xl p-4 flex items-center justify-between transition-all duration-300 ${GLASS.cardHover}`}
+            onClick={() => setDetailUser(user)}
+            className={`${GLASS.card} rounded-xl p-3 transition-all duration-300 ${GLASS.cardHover} cursor-pointer active:scale-[0.98]`}
           >
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/30 to-blue-500/30 backdrop-blur-sm flex items-center justify-center text-purple-300 font-bold text-sm border border-white/[0.08]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500/30 to-blue-500/30 backdrop-blur-sm flex items-center justify-center text-purple-300 font-bold text-sm border border-white/[0.08]">
                 {user.first_name?.[0]?.toUpperCase() || 'U'}
               </div>
-              <div>
-                <div className="font-medium text-white text-sm">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-white text-sm truncate">
                   {user.first_name} {user.last_name}
-                  {user.username && <span className="text-gray-500 text-[12px] ml-2">@{user.username}</span>}
                 </div>
-                <div className="text-[11px] text-gray-600 flex items-center gap-2 mt-0.5">
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {user.group_name || 'Без группы'}
-                  </span>
-                  <span className="text-gray-700">•</span>
-                  <span>ID: {user.telegram_id}</span>
+                <div className="text-[11px] text-gray-600 flex items-center gap-1.5 mt-0.5 truncate">
+                  <span className="truncate">{user.group_name || 'Без группы'}</span>
+                  {user.username && <span className="text-gray-700 truncate">@{user.username}</span>}
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="text-right">
-                <div className="text-[10px] text-gray-600 uppercase tracking-wider font-medium">Регистрация</div>
-                <div className="text-[12px] text-gray-400 font-medium">
-                  {user.created_at ? new Date(user.created_at).toLocaleDateString('ru-RU') : '—'}
-                </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const url = user.username 
+                      ? `https://t.me/${user.username}` 
+                      : `tg://user?id=${user.telegram_id}`;
+                    try { window.Telegram?.WebApp?.openTelegramLink?.(url) || window.open(url, '_blank'); }
+                    catch { window.open(url, '_blank'); }
+                  }}
+                  className="p-1.5 rounded-lg bg-[#2AABEE]/10 hover:bg-[#2AABEE]/20 transition-colors"
+                  title="Открыть в Telegram"
+                >
+                  <svg className="w-3.5 h-3.5 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
+                  </svg>
+                </button>
+                <ChevronRight className="w-4 h-4 text-gray-600" />
               </div>
-              {/* Открыть в Telegram */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const url = user.username 
-                    ? `https://t.me/${user.username}` 
-                    : `tg://user?id=${user.telegram_id}`;
-                  try {
-                    window.Telegram?.WebApp?.openTelegramLink?.(url) 
-                      || window.open(url, '_blank');
-                  } catch { window.open(url, '_blank'); }
-                }}
-                className="p-2 rounded-xl bg-[#2AABEE]/10 hover:bg-[#2AABEE]/20 transition-colors flex-shrink-0"
-                title="Открыть в Telegram"
-              >
-                <svg className="w-4 h-4 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
-                </svg>
-              </button>
             </div>
           </motion.div>
         ))}
