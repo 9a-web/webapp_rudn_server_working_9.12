@@ -4114,17 +4114,43 @@ async def update_participant_role(role_update: ParticipantRoleUpdate):
 
 
 @api_router.get("/rooms/{room_id}/tasks", response_model=List[GroupTaskResponse])
-async def get_room_tasks(room_id: str):
-    """Получить все задачи комнаты"""
+async def get_room_tasks(
+    room_id: str,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    assigned_to: Optional[int] = None,
+    sort_by: Optional[str] = None  # 'deadline', 'priority', 'status', 'created'
+):
+    """Получить задачи комнаты с фильтрами и сортировкой"""
     try:
-        # Проверяем существование комнаты
         room_doc = await db.rooms.find_one({"room_id": room_id})
         
         if not room_doc:
             raise HTTPException(status_code=404, detail="Комната не найдена")
         
-        # Получаем все задачи комнаты (сортировка по order, затем по дате создания)
-        tasks_cursor = db.group_tasks.find({"room_id": room_id}).sort([("order", 1), ("created_at", -1)])
+        # Строим фильтр
+        query = {"room_id": room_id}
+        if status:
+            query["status"] = status
+        if priority:
+            query["priority"] = priority
+        if assigned_to:
+            query["participants.telegram_id"] = assigned_to
+        
+        # Определяем сортировку: закреплённые всегда вверху
+        sort_fields = [("pinned", -1)]  # pinned=True первыми
+        if sort_by == 'deadline':
+            sort_fields.append(("deadline", 1))
+        elif sort_by == 'priority':
+            sort_fields.append(("priority", -1))
+        elif sort_by == 'status':
+            sort_fields.append(("status", 1))
+        elif sort_by == 'created':
+            sort_fields.append(("created_at", -1))
+        else:
+            sort_fields.extend([("order", 1), ("created_at", -1)])
+        
+        tasks_cursor = db.group_tasks.find(query).sort(sort_fields)
         
         tasks = []
         async for task_doc in tasks_cursor:
