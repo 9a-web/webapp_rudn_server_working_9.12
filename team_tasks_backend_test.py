@@ -29,6 +29,12 @@ def test_create_user_settings():
         "username": "testuser",
         "first_name": "Test User",
         "group_id": "test-group",
+        "group_name": "Test Group Name", 
+        "facultet_id": "test-facultet",
+        "facultet_name": "Test Facultet",
+        "level_id": "test-level",
+        "kurs": "1",
+        "form_code": "test-form",
         "notifications_enabled": True,
         "notification_time": 10
     }
