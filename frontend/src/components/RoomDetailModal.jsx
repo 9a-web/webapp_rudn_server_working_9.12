@@ -750,9 +750,9 @@ const TasksTab = ({
                       )}
                     </div>
 
-                    {/* Actions */}
-                    {isOwner && (
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Actions - видны владельцу комнаты ИЛИ создателю задачи, всегда видны на мобильных */}
+                    {(isOwner || task.owner_id === userSettings?.telegram_id) && (
+                      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEditTask(task)}
                           className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-500/10
