@@ -100,7 +100,6 @@ from models import (
     RoomUpdate,
     RoomAddFriendsRequest,
     RoomFriendToAdd,
-    TaskReorderRequest,
     RoomTaskReorderRequest,
     ReferralUser,
     ReferralStats,
