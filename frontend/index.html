@@ -81,12 +81,20 @@
         </script>
         
         <title>RUDN Schedule</title>
-        <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
-        <!--
-        These two scripts have been added for the testing, please do not edit or remove them
-        -->
-        <script src="https://unpkg.com/rrweb@latest/dist/rrweb.min.js"></script>
-        <script src="https://d2adkz2s9zrlge.cloudfront.net/rrweb-recorder-20250919-1.js"></script>
+        <script>
+        // Emergent platform scripts - only load on Emergent domains (not on production)
+        if (window.location.hostname.includes('emergentagent.com') || window.location.hostname === 'localhost') {
+            var s1 = document.createElement('script');
+            s1.src = 'https://assets.emergent.sh/scripts/emergent-main.js';
+            document.head.appendChild(s1);
+            var s2 = document.createElement('script');
+            s2.src = 'https://unpkg.com/rrweb@latest/dist/rrweb.min.js';
+            document.head.appendChild(s2);
+            var s3 = document.createElement('script');
+            s3.src = 'https://d2adkz2s9zrlge.cloudfront.net/rrweb-recorder-20250919-1.js';
+            document.head.appendChild(s3);
+        }
+        </script>
         <!--
         These two scripts have been added for the Visual Edits, please do not edit or remove them
         -->
