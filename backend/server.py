@@ -4297,13 +4297,18 @@ async def update_group_task(task_id: str, update_data: GroupTaskUpdate):
 
 
 @api_router.post("/group-tasks/{task_id}/subtasks", response_model=GroupTaskResponse)
-async def add_subtask(task_id: str, subtask: SubtaskCreate):
+async def add_subtask(task_id: str, subtask: SubtaskCreate, telegram_id: int = Body(..., embed=True)):
     """Добавить подзадачу"""
     try:
         task_doc = await db.group_tasks.find_one({"task_id": task_id})
         
         if not task_doc:
             raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Проверяем, что пользователь является участником задачи
+        is_participant = any(p.get("telegram_id") == telegram_id for p in task_doc.get("participants", []))
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Только участники могут добавлять подзадачи")
         
         # Создаем подзадачу
         new_subtask = Subtask(
