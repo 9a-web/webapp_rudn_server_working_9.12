@@ -516,7 +516,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
               <div className="px-4 py-4 sm:px-6 sm:py-6">
                 {activeTab === 'tasks' && (
                   <TasksTab
-                    tasks={tasks}
+                    tasks={filteredTasks}
                     isLoading={isLoading}
                     onOpenAddModal={() => setIsAddTaskModalOpen(true)}
                     handleToggleTask={handleToggleTask}
@@ -524,12 +524,23 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
                     handleDeleteTask={handleDeleteTask}
                     handleViewTaskDetails={handleViewTaskDetails}
                     handleReorderTasks={handleReorderTasks}
+                    handlePinTask={handlePinTask}
                     getPriorityColor={getPriorityColor}
                     getStatusColor={getStatusColor}
                     getTaskProgress={getTaskProgress}
+                    getDeadlineInfo={getDeadlineInfo}
                     userSettings={userSettings}
                     isOwner={isOwner}
                     colorScheme={colorScheme}
+                    filterStatus={filterStatus}
+                    setFilterStatus={setFilterStatus}
+                    filterPriority={filterPriority}
+                    setFilterPriority={setFilterPriority}
+                    sortBy={sortBy}
+                    setSortBy={setSortBy}
+                    showFilters={showFilters}
+                    setShowFilters={setShowFilters}
+                    totalCount={tasks.length}
                   />
                 )}
 
