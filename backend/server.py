@@ -3701,16 +3701,20 @@ async def add_friends_to_room(room_id: str, data: RoomAddFriendsRequest):
         )
         
         # Записываем активность
+        # Получаем имя добавляющего
+        adder_info = next((p for p in room_doc.get("participants", []) if p["telegram_id"] == data.telegram_id), None)
         for friend in added_friends:
             activity = RoomActivity(
                 room_id=room_id,
                 user_id=data.telegram_id,
-                username=None,
-                first_name="",
-                event_type="member_added",
-                target_user_id=friend["telegram_id"],
-                target_user_name=friend["first_name"],
-                description=f"Добавлен участник {friend['first_name']}"
+                username=adder_info.get("username") if adder_info else None,
+                first_name=adder_info.get("first_name", "User") if adder_info else "User",
+                action_type="member_added",
+                action_details={
+                    "target_user_id": friend["telegram_id"],
+                    "target_user_name": friend["first_name"],
+                    "description": f"Добавлен участник {friend['first_name']}"
+                }
             )
             await db.room_activities.insert_one(activity.model_dump())
         
