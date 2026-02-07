@@ -328,6 +328,36 @@ const FriendProfileModal = ({
 
                     {/* Actions */}
                     <div className="space-y-2">
+                      {/* Открыть в Telegram */}
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          const url = friend.username 
+                            ? `https://t.me/${friend.username}` 
+                            : `tg://user?id=${friend.telegram_id}`;
+                          try {
+                            window.Telegram?.WebApp?.openTelegramLink?.(url) 
+                              || window.open(url, '_blank');
+                          } catch {
+                            window.open(url, '_blank');
+                          }
+                        }}
+                        className="w-full flex items-center gap-3.5 p-4 bg-[#2AABEE]/[0.08] rounded-2xl text-left hover:bg-[#2AABEE]/[0.14] transition-all border border-[#2AABEE]/15"
+                      >
+                        <div className="p-2.5 rounded-xl bg-[#2AABEE]/15">
+                          <svg className="w-5 h-5 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[14px] text-[#2AABEE]">Открыть в Telegram</p>
+                          <p className="text-[12px] text-gray-500 mt-0.5">
+                            {friend.username ? `@${friend.username}` : 'Перейти в профиль'}
+                          </p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-[#2AABEE]/50" />
+                      </motion.button>
+
                       <motion.button
                         whileTap={{ scale: 0.98 }}
                         onClick={handleToggleFavorite}
