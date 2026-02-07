@@ -242,7 +242,7 @@ def test_complete_group_task(task_id):
     
     # Complete the task
     url = f"{BACKEND_URL}/group-tasks/{task_id}/complete"
-    payload = {"telegram_id": TEST_TELEGRAM_ID, "completed": True}
+    payload = {"task_id": task_id, "telegram_id": TEST_TELEGRAM_ID, "completed": True}
     
     try:
         response = requests.put(url, json=payload, timeout=TIMEOUT)
@@ -251,7 +251,7 @@ def test_complete_group_task(task_id):
             data = response.json()
             
             # Now uncomplete the task (Bug 9 fix - should return to "created" not stuck at "in_progress")
-            uncomplete_payload = {"telegram_id": TEST_TELEGRAM_ID, "completed": False}
+            uncomplete_payload = {"task_id": task_id, "telegram_id": TEST_TELEGRAM_ID, "completed": False}
             uncomplete_response = requests.put(url, json=uncomplete_payload, timeout=TIMEOUT)
             
             if uncomplete_response.status_code == 200:
