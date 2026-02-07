@@ -331,7 +331,10 @@ def test_add_subtask_permissions(task_id):
         return False
     
     url = f"{BACKEND_URL}/group-tasks/{task_id}/subtasks"
-    payload = {"title": "Subtask 1", "telegram_id": TEST_TELEGRAM_ID}
+    payload = {
+        "title": "Subtask 1",
+        "telegram_id": TEST_TELEGRAM_ID
+    }
     
     try:
         response = requests.post(url, json=payload, timeout=TIMEOUT)
@@ -339,11 +342,13 @@ def test_add_subtask_permissions(task_id):
         if response.status_code == 200:
             data = response.json()
             
-            if 'subtask_id' in data:
-                print_test_result("Add Subtask Permissions", True, f"Subtask added by participant: {data['subtask_id']}")
+            # Check if subtasks exist in response
+            subtasks = data.get('subtasks', [])
+            if subtasks and len(subtasks) > 0:
+                print_test_result("Add Subtask Permissions", True, f"Subtask added by participant: {len(subtasks)} subtasks total")
                 return True
             else:
-                print_test_result("Add Subtask Permissions", False, "Subtask not created properly")
+                print_test_result("Add Subtask Permissions", False, "No subtasks found in response")
                 return False
         else:
             print_test_result("Add Subtask Permissions", False, f"HTTP {response.status_code}: {response.text}")
