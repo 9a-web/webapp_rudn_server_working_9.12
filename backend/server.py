@@ -3933,14 +3933,20 @@ async def delete_room(room_id: str, telegram_id: int = Body(..., embed=True)):
         if room_doc.get("owner_id") != telegram_id:
             raise HTTPException(status_code=403, detail="Только владелец может удалить комнату")
         
-        # Удаляем все задачи комнаты
-        await db.group_tasks.delete_many({"room_id": room_id})
-        
-        # Удаляем комментарии к задачам комнаты
+        # Сначала собираем ID задач ДЛЯ удаления комментариев
         tasks_to_delete = await db.group_tasks.find({"room_id": room_id}).to_list(length=None)
         task_ids = [task["task_id"] for task in tasks_to_delete]
+        
+        # Удаляем комментарии к задачам комнаты
         if task_ids:
             await db.group_task_comments.delete_many({"task_id": {"$in": task_ids}})
+            await db.group_task_invites.delete_many({"task_id": {"$in": task_ids}})
+        
+        # Теперь удаляем сами задачи
+        await db.group_tasks.delete_many({"room_id": room_id})
+        
+        # Удаляем активности комнаты
+        await db.room_activities.delete_many({"room_id": room_id})
         
         # Удаляем комнату
         await db.rooms.delete_one({"room_id": room_id})
