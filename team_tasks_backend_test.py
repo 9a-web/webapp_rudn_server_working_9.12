@@ -132,14 +132,16 @@ def test_create_group_task(room_id):
         
         if response.status_code == 200:
             data = response.json()
+            task_id = data.get('task_id')
             
-            # Verify room_id persists (Bug 4 fix)
+            # Check room_id preservation (Bug 4 fix)
             if data.get('room_id') == room_id:
-                print_test_result("Create Group Task", True, f"Task created with room_id: {data['task_id']}")
-                return data['task_id']
+                print_test_result("Create Group Task", True, f"Task created with room_id: {task_id}")
+                return task_id
             else:
-                print_test_result("Create Group Task", False, f"room_id not preserved. Expected: {room_id}, Got: {data.get('room_id')}")
-                return None
+                # Bug 4 not fully fixed, but task was created - continue testing
+                print_test_result("Create Group Task (Bug 4 Issue)", False, f"room_id not preserved. Expected: {room_id}, Got: {data.get('room_id')}. Task ID: {task_id}")
+                return task_id  # Return task_id so other tests can continue
         else:
             print_test_result("Create Group Task", False, f"HTTP {response.status_code}: {response.text}")
             return None
