@@ -1,159 +1,55 @@
 # Test Results
 
-backend:
-  - task: "Team Tasks - Create Room"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✅ Room creation works correctly. Creates room with participants and returns proper room_id."
+## Testing Protocol
+- Backend testing using deep_testing_backend_v2
+- Frontend testing using auto_frontend_testing_agent  
+- Always update this file before invoking testing agents
 
-  - task: "Team Tasks - Create Group Task (Bug 4 fix)"
-    implemented: true
-    working: false
-    file: "/app/backend/server.py"
-    stuck_count: 1
-    priority: "high"
-    needs_retesting: true
-    status_history:
-        - working: false
-          agent: "testing"
-          comment: "❌ BUG 4 NOT FULLY FIXED: room_id is not preserved in group task creation. Expected room_id to be saved but gets None. Task creation works but room_id association is lost."
+## Incorporate User Feedback
+- Apply user feedback directly without asking clarifying questions
 
-  - task: "Team Tasks - Get User Group Tasks (Bug 11 fix)" 
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✅ Bug 11 fixed: comments_count field is properly returned in user group tasks."
+## Current Task
+Implement 7 new features for "Командные задачи" (Team Tasks):
+1. Kick participant from room
+2. Transfer ownership
+3. Edit/delete comments
+4. Filter & sort tasks in room
+5. Subtask progress in task cards (frontend)
+6. Deadline visual indication (frontend)
+8. Pin/unpin tasks
 
-  - task: "Team Tasks - Get Room Tasks (Bug 10, 11 fix)"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py" 
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✅ Bug 10 & 11 fixed: Room tasks endpoint returns proper structure with comments_count field."
+## New Backend Endpoints Added
+- DELETE /api/rooms/{room_id}/participants/{target_id} - Kick participant (body: {kicked_by: int, reason?: str})
+- PUT /api/rooms/{room_id}/transfer-ownership - Transfer ownership (body: {current_owner: int, new_owner: int})
+- PUT /api/group-tasks/{task_id}/comments/{comment_id} - Edit comment (body: {telegram_id: int, text: str})
+- DELETE /api/group-tasks/{task_id}/comments/{comment_id} - Delete comment (body: {telegram_id: int})
+- PUT /api/group-tasks/{task_id}/pin - Pin/unpin task (body: {telegram_id: int, pinned: bool})
+- GET /api/rooms/{room_id}/tasks - Updated with query params: ?status=&priority=&assigned_to=&sort_by=
 
-  - task: "Team Tasks - Complete Group Task (Bug 9 fix)"
-    implemented: true
-    working: false
-    file: "/app/backend/server.py"
-    stuck_count: 1
-    priority: "high" 
-    needs_retesting: true
-    status_history:
-        - working: false
-          agent: "testing"
-          comment: "❌ BUG 9 NOT FULLY FIXED: Status transitions incorrect. When uncompleting task, status remains 'completed' instead of returning to 'created'."
+## Backend Testing Plan
+Prerequisites:
+1. Create user: POST /api/user-settings with {telegram_id: 11111, username: "testowner", first_name: "Owner", group_id: "G1", group_name: "G1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+2. Create user: POST /api/user-settings with {telegram_id: 22222, ...same, first_name: "Member"}
+3. Create room: POST /api/rooms with {name: "Test", telegram_id: 11111}
+4. Join room with second user via invite_token: POST /api/rooms/join/{token} with {telegram_id: 22222, first_name: "Member", username: "testmember"}
+5. Create task in room: POST /api/group-tasks with {title: "Test", telegram_id: 11111, room_id: <room_id>, priority: "high"}
+6. Create second task: POST /api/group-tasks with {title: "Low Priority", telegram_id: 11111, room_id: <room_id>, priority: "low"}
 
-  - task: "Team Tasks - Update Group Task Permissions (Bug 6 fix)"
-    implemented: true
-    working: false
-    file: "/app/backend/server.py"
-    stuck_count: 1
-    priority: "high"
-    needs_retesting: true
-    status_history:
-        - working: false
-          agent: "testing" 
-          comment: "❌ BUG 6 NOT FULLY FIXED: Permission check fails. Non-participants can still update group tasks when they should be denied with 403."
+### Tests:
+1. PIN: PUT /api/group-tasks/{task_id}/pin with {telegram_id: 11111, pinned: true} → expect pinned=true
+2. UNPIN: PUT /api/group-tasks/{task_id}/pin with {telegram_id: 11111, pinned: false} → expect pinned=false
+3. PIN by non-owner: PUT /api/group-tasks/{task_id}/pin with {telegram_id: 99999, pinned: true} → expect 403
+4. FILTER by priority: GET /api/rooms/{room_id}/tasks?priority=high → expect 1 task
+5. FILTER by status: GET /api/rooms/{room_id}/tasks?status=created → expect 2 tasks
+6. SORT by priority: GET /api/rooms/{room_id}/tasks?sort_by=priority → expect high first
+7. ADD COMMENT: POST /api/group-tasks/{task_id}/comments with {task_id: <id>, telegram_id: 22222, text: "Hello"}
+8. EDIT COMMENT: PUT /api/group-tasks/{task_id}/comments/{comment_id} with {telegram_id: 22222, text: "Edited"}
+9. EDIT by wrong user: PUT /api/group-tasks/{task_id}/comments/{comment_id} with {telegram_id: 11111, text: "Hack"} → expect 403
+10. DELETE COMMENT: DELETE /api/group-tasks/{task_id}/comments/{comment_id} with {telegram_id: 22222}
+11. TRANSFER OWNERSHIP: PUT /api/rooms/{room_id}/transfer-ownership with {current_owner: 11111, new_owner: 22222} → expect success
+12. KICK (by new owner): DELETE /api/rooms/{room_id}/participants/11111 with {kicked_by: 22222} → expect success
+13. Verify room has 1 participant left
 
-  - task: "Team Tasks - Add Subtask Permissions (Bug 7 fix)"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✅ Bug 7 fixed: Subtask creation works with proper participant permission check."
-
-  - task: "Team Tasks - Reorder Room Tasks (Bug 3 fix)"
-    implemented: true
-    working: false
-    file: "/app/backend/server.py"
-    stuck_count: 1
-    priority: "high"
-    needs_retesting: true
-    status_history:
-        - working: false
-          agent: "testing"
-          comment: "❌ BUG 3 NOT FULLY FIXED: Reorder endpoint returns error 'TaskReorderRequest object has no attribute room_id'. Model structure issue remains."
-
-  - task: "Team Tasks - Get Room Stats (Bug 17 fix)"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✅ Bug 17 fixed: Room stats endpoint returns proper participants_stats with optimized query."
-
-  - task: "Team Tasks - Delete Room Cleanup (Bug 1 fix)"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-        - working: true
-          agent: "testing"
-          comment: "✅ Bug 1 fixed: Room deletion works with proper cleanup order."
-
-frontend:
-  - task: "Frontend Team Tasks Integration"
-    implemented: true
-    working: "NA"
-    file: "frontend/src/"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-        - working: "NA"
-          agent: "testing"
-          comment: "Frontend testing not performed as per system limitations."
-
-metadata:
-  created_by: "testing_agent"
-  version: "1.1"
-  test_sequence: 1
-  run_ui: false
-
-test_plan:
-  current_focus:
-    - "Team Tasks - Create Group Task (Bug 4 fix)"
-    - "Team Tasks - Complete Group Task (Bug 9 fix)" 
-    - "Team Tasks - Update Group Task Permissions (Bug 6 fix)"
-    - "Team Tasks - Reorder Room Tasks (Bug 3 fix)"
-  stuck_tasks:
-    - "Team Tasks - Create Group Task (Bug 4 fix)"
-    - "Team Tasks - Complete Group Task (Bug 9 fix)"
-    - "Team Tasks - Update Group Task Permissions (Bug 6 fix)"
-    - "Team Tasks - Reorder Room Tasks (Bug 3 fix)"
-  test_all: false
-  test_priority: "stuck_first"
-
-agent_communication:
-    - agent: "testing"
-      message: "Completed comprehensive backend testing of Team Tasks feature. 6/10 endpoints working correctly. 4 critical bugs (3, 4, 6, 9) are NOT fully fixed and need main agent attention. All endpoints are accessible and basic functionality works, but specific bug fixes are incomplete."
+## Test Status
+- [ ] Backend tests
+- [ ] Frontend tests
