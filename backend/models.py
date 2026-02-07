@@ -743,6 +743,7 @@ class GroupTaskResponse(BaseModel):
     subtasks: List[Subtask] = []  # Подзадачи
     order: int = 0  # Порядок для drag & drop
     comments_count: int = 0  # Количество комментариев
+    pinned: bool = False  # Закреплена ли задача
 
 
 class GroupTaskComment(BaseModel):
