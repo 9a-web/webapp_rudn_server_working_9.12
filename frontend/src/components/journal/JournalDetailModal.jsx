@@ -39,6 +39,7 @@ import JournalApplicationsModal from './JournalApplicationsModal';
 import { ShareStudentLinkModal } from './ShareStudentLinkModal';
 
 import { EditStudentModal } from './EditStudentModal';
+import { EditJournalModal } from './EditJournalModal';
 import { JournalStatsTab } from './JournalStatsTab';
 import { MyAttendanceStats } from './MyAttendanceStats';
 import { fetchBotInfo } from '../../utils/botInfo';
