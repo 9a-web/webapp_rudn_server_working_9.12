@@ -471,7 +471,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             className="relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-2xl overflow-hidden"
-            style={{ aspectRatio: '1536 / 1024' }}
+            style={{ aspectRatio: 'auto', minHeight: '70vh' }}
           >
             {/* Фоновое изображение на весь блок */}
             <img 
@@ -481,6 +481,13 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             />
             {/* Затемнение для читаемости текста */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+
+            {/* Медиа-запрос: на md+ возвращаем aspect-ratio */}
+            <style>{`
+              @media (min-width: 768px) {
+                .music-welcome-card { min-height: auto !important; aspect-ratio: 1536 / 1024 !important; }
+              }
+            `}</style>
               
             <div className="relative h-full flex flex-col items-center justify-end text-center space-y-4 sm:space-y-5 p-6 sm:p-8 pb-8 sm:pb-10">
                 {/* Логотипы VK и РУДН с иконкой связи */}
