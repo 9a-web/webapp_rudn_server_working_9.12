@@ -980,6 +980,16 @@ export const JournalDetailModal = ({
           />
         )}
 
+        {showEditJournal && (
+          <EditJournalModal
+            isOpen={showEditJournal}
+            onClose={() => setShowEditJournal(false)}
+            journal={journal}
+            onSave={handleSaveJournal}
+            hapticFeedback={hapticFeedback}
+          />
+        )}
+
         <CreateSubjectModal
           isOpen={showCreateSubject}
           onClose={() => setShowCreateSubject(false)}
