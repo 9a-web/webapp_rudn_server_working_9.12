@@ -96,7 +96,7 @@ export const NotificationSettings = ({
         
         showAlert && showAlert(
           `✅ Уведомления включены! Напоминание за ${notificationTime} ${pluralizeMinutes(notificationTime)}\n\n` +
-          `Тестовое уведомление отправлено в бот @rudn_mosbot`
+          `Тестовое уведомление отправлено в бот @${botUsername}`
         );
       } else {
         showAlert && showAlert('🔕 Уведомления выключены');
