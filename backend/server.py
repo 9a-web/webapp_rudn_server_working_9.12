@@ -425,6 +425,10 @@ async def startup_event():
     # Start background tasks
     asyncio.create_task(create_indexes())
     asyncio.create_task(collect_server_metrics_loop())
+    
+    # Получаем username бота через getMe
+    from config import _fetch_bot_username
+    await _fetch_bot_username()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
