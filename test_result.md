@@ -18,8 +18,39 @@ Add server load statistics tab to admin panel.
 ### Frontend Changes  
 - New "Сервер" tab in AdminPanel with gauges, charts, MongoDB & process stats
 
-### Backend Test
-- `GET /api/admin/server-stats` — ✅ Returns correct JSON with all metrics
+### Backend Test Results - Server Stats Endpoint
+**Test Date:** 2026-02-09T13:37:18
+
+**Endpoint:** `GET /api/admin/server-stats`
+**Status:** ✅ FULLY TESTED - ALL TESTS PASSED
+
+**Comprehensive Test Results:**
+1. ✅ Basic HTTP GET request - Returns 200 OK
+2. ✅ JSON structure validation - All required fields present
+3. ✅ System object validation - platform, architecture, hostname, python_version
+4. ✅ CPU object validation - percent (0-100%), count_logical, per_core array, load_average
+5. ✅ Memory object validation - total_gb, used_gb, percent (0-100%)
+6. ✅ Disk object validation - total_gb, used_gb, percent 
+7. ✅ Network object validation - bytes_sent, bytes_recv
+8. ✅ Uptime object validation - seconds, days, hours, minutes
+9. ✅ Process object validation - pid, memory_rss_mb, threads
+10. ✅ MongoDB object validation - collections, connections_current (19 collections, 4 connections)
+11. ✅ Top processes array validation - 8 processes returned
+12. ✅ Consistency test - Two calls return different timestamps, consistent structure
+13. ✅ Data ranges validation - All numeric values within reasonable ranges
+
+**Sample Response Data:**
+- Platform: Linux aarch64, Python 3.11.14
+- CPU Usage: 6.1%, Memory Usage: 60.1% (9.4GB/15.6GB) 
+- Disk Usage: 18.8% (17.7GB/94.2GB), Uptime: 5+ hours
+- Process: PID 3378, 126MB RAM, 8 threads
+- MongoDB: 19 collections, 4 active connections
+
+**Testing Notes:**
+- Internal endpoint (localhost:8001) works perfectly
+- External URL routing may need configuration for production access
+- All psutil dependencies working correctly
+- MongoDB connection and stats retrieval successful
 
 ## New Backend Endpoints Added
 - DELETE /api/rooms/{room_id}/participants/{target_id} - Kick participant (body: {kicked_by: int, reason?: str})
