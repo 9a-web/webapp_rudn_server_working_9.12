@@ -471,7 +471,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             className="music-welcome-card relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-2xl overflow-hidden"
-            style={{ aspectRatio: 'auto', minHeight: '70vh' }}
+            style={{ aspectRatio: 'auto', minHeight: '70vh', marginTop: '15px' }}
           >
             {/* Фоновое изображение: мобильное и десктопное */}
             <img 
