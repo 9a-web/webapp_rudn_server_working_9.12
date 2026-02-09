@@ -473,11 +473,16 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             className="music-welcome-card relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-2xl overflow-hidden"
             style={{ aspectRatio: 'auto', minHeight: '70vh' }}
           >
-            {/* Фоновое изображение на весь блок */}
+            {/* Фоновое изображение: мобильное и десктопное */}
+            <img 
+              src="/music-welcome-owl-mobile.png" 
+              alt="" 
+              className="absolute inset-0 w-full h-full object-cover md:hidden"
+            />
             <img 
               src="/music-welcome-owl.png" 
               alt="" 
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover hidden md:block"
             />
             {/* Затемнение для читаемости текста */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
