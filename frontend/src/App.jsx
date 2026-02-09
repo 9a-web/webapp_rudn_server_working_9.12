@@ -49,6 +49,8 @@ import { getWebSessionStatus, sendHeartbeat, createSessionMonitorWebSocket } fro
 import TelegramLinkScreen from './components/TelegramLinkScreen';
 import TelegramLinkConfirmModal from './components/TelegramLinkConfirmModal';
 
+import ErrorBoundary from './components/ErrorBoundary';
+
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
   const { theme } = useTheme(); // Use Theme Context
