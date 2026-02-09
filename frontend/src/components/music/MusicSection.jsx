@@ -529,13 +529,13 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
                     repeat: Infinity,
                     ease: "easeInOut"
                   }}
-                  className="w-full sm:w-auto sm:min-w-[320px] py-4 px-6 sm:px-8 rounded-xl font-semibold text-white text-base sm:text-lg
+                  className="w-auto py-2.5 px-5 rounded-xl font-semibold text-white text-sm
                             bg-gradient-to-r from-blue-500 to-blue-600 
                             hover:from-blue-600 hover:to-blue-700
-                            transition-all duration-300 flex items-center justify-center gap-3
+                            transition-all duration-300 flex items-center justify-center gap-2
                             shadow-lg shadow-blue-500/30"
                 >
-                  <Key className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <Key className="w-4 h-4" />
                   <span>Получить токен</span>
                 </motion.button>
                 
