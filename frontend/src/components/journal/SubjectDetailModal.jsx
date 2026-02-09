@@ -4,9 +4,10 @@ import {
   X, ArrowLeft, Calendar, Plus, Trash2, Check,
   BookOpen, GraduationCap, FlaskConical, FileText, CalendarRange
 } from 'lucide-react';
-import { getSubjectDetail, createSession, deleteSession } from '../../services/journalAPI';
+import { getSubjectDetail, createSession, deleteSession, updateSubject, updateSession } from '../../services/journalAPI';
 import { AttendanceModal } from './AttendanceModal';
 import { CreateSessionModal } from './CreateSessionModal';
+import { EditSessionModal } from './EditSessionModal';
 
 const SESSION_ICONS = {
   lecture: BookOpen,
