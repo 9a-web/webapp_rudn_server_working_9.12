@@ -493,7 +493,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             <style>{`
               @media (min-width: 768px) {
                 .music-welcome-card { min-height: auto !important; aspect-ratio: 1536 / 1024 !important; }
-                .music-welcome-content { justify-content: flex-start !important; padding-top: 3rem !important; }
+                .music-welcome-content { justify-content: flex-start !important; padding-top: calc(3rem + 5px) !important; }
               }
             `}</style>
               
