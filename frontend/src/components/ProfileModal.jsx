@@ -10,6 +10,7 @@ import ProfileSettingsModal from './ProfileSettingsModal';
 import { friendsAPI } from '../services/friendsAPI';
 import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
 import { getBackendURL } from '../services/api';
+import { fetchBotInfo } from '../utils/botInfo';
 
 // Admin UIDs для доступа к специальным функциям
 const ADMIN_UIDS = ['765963392', '1311283832'];
