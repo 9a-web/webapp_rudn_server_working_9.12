@@ -3519,7 +3519,7 @@ async def generate_room_invite_link(room_id: str, telegram_id: int = Body(..., e
             raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
         
         # Получаем имя бота из конфига (зависит от ENV)
-        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        # ENV=test -> rudn_mosbot, ENV=production -> rudn_mosbot
         bot_username = get_telegram_bot_username()
         
         # Формируем ссылку с реферальным кодом (Web App формат для прямого открытия приложения)
@@ -4945,7 +4945,7 @@ async def get_referral_code(telegram_id: int):
             logger.info(f"✅ Создан реферальный код для пользователя {telegram_id}: {referral_code}")
         
         # Получаем имя бота из конфига (зависит от ENV)
-        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        # ENV=test -> rudn_mosbot, ENV=production -> rudn_mosbot
         bot_username = get_telegram_bot_username()
         
         # Формируем реферальные ссылки
@@ -5244,7 +5244,7 @@ async def get_referral_stats(telegram_id: int):
             )
         
         # Получаем имя бота из конфига (зависит от ENV)
-        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        # ENV=test -> rudn_mosbot, ENV=production -> rudn_mosbot
         bot_username = get_telegram_bot_username()
         referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
         
@@ -7050,7 +7050,7 @@ async def generate_journal_invite_link(journal_id: str):
             raise HTTPException(status_code=404, detail="Journal not found")
         
         # Получаем имя бота из конфига (зависит от ENV)
-        # ENV=test -> rudn_pro_bot, ENV=production -> rudn_mosbot
+        # ENV=test -> rudn_mosbot, ENV=production -> rudn_mosbot
         bot_username = get_telegram_bot_username()
         # Старый формат через /start
         invite_link = f"https://t.me/{bot_username}?start=journal_{journal['invite_token']}"
