@@ -23,7 +23,7 @@ def test_health_check():
     # Test both localhost and production URL to see which is working
     urls_to_test = [
         "http://localhost:8001/api",
-        "https://rudn-webapp.preview.emergentagent.com/api"
+        "https://rudn-test-build.preview.emergentagent.com/api"
     ]
     
     for base_url in urls_to_test:
