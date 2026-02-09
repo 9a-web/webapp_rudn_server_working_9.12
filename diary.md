@@ -86,11 +86,11 @@
    - Приоритет копирования `referral_link_webapp` вместо `referral_link`
 
 #### 📋 Формат реферальных ссылок:
-- **Старый формат (через /start):** `https://t.me/rudn_pro_bot?start=ref_CODE`
-- **Новый формат (через Web App):** `https://t.me/rudn_pro_bot/app?startapp=ref_CODE` ✅
+- **Старый формат (через /start):** `https://t.me/rudn_mosbot?start=ref_CODE`
+- **Новый формат (через Web App):** `https://t.me/rudn_mosbot/app?startapp=ref_CODE` ✅
 
 #### 🔗 Как работает:
-1. Пользователь открывает ссылку `t.me/rudn_pro_bot/app?startapp=ref_28DB4CDB84`
+1. Пользователь открывает ссылку `t.me/rudn_mosbot/app?startapp=ref_28DB4CDB84`
 2. Telegram открывает Web App и передаёт `start_param = "ref_28DB4CDB84"`
 3. Frontend получает `startParam` через TelegramContext
 4. App.jsx отправляет запрос на `/api/referral/process-webapp`

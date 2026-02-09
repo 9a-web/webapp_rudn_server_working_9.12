@@ -428,7 +428,7 @@ service.get_playlists(user_id) # Плейлисты
 ### 6.1 Первый запуск (новый пользователь)
 
 ```
-1. Пользователь → /start в @rudn_pro_bot
+1. Пользователь → /start в @rudn_mosbot
 2. Bot создает user_settings (без группы)
 3. Показывает кнопку "Открыть расписание"
 4. WebApp → WelcomeScreen → GroupSelector
