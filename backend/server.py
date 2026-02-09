@@ -448,6 +448,19 @@ class StatusCheckCreate(BaseModel):
 async def root():
     return {"message": "RUDN Schedule API is running"}
 
+
+@api_router.get("/bot-info")
+async def get_bot_info():
+    """Возвращает информацию о текущем Telegram боте (username, ENV)."""
+    from config import _bot_username_cache, ENV
+    username = _bot_username_cache.get("username", "bot")
+    return {
+        "username": username,
+        "first_name": _bot_username_cache.get("first_name", ""),
+        "bot_id": _bot_username_cache.get("id", 0),
+        "env": ENV,
+    }
+
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
     status_dict = input.dict()
