@@ -98,6 +98,7 @@ export const JournalDetailModal = ({
   const [showApplications, setShowApplications] = useState(false); // Модал заявок
   const [showShareStudentLink, setShowShareStudentLink] = useState(false); // Модал отправки ссылки студенту
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // Подтверждение удаления журнала
+  const [showEditJournal, setShowEditJournal] = useState(false); // Модал редактирования журнала
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // Подтверждение выхода из журнала
   const [botUsername, setBotUsername] = useState('bot');
   
