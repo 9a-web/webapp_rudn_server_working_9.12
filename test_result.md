@@ -9,21 +9,21 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Architecture optimization — improve fundamental app stability without breaking existing functionality.
+Add comprehensive journal editing functionality (Edit Journal, Edit Subject, Edit Session).
 
-### Backend Changes Made:
-1. **Merged duplicate startup events** (lines 407+14512) → one unified `startup_event()` with 8 ordered steps
-2. **CORS simplification** — removed duplicate if/else branches (identical code), optimized custom middleware to only echo origin when needed
-3. **Logging level = ENV-dependent** — DEBUG for test, INFO for production
-4. **MongoDB connection pool** — added maxPoolSize=50, minPoolSize=5, timeouts, retryWrites/Reads
-5. **Missing DB indexes** — added: schedule_cache(group_id+week_number), server_metrics_history(timestamp), web_sessions(session_token, telegram_id+status), scheduled_notifications(telegram_id+date, status+date, scheduled_time), sent_notifications(notification_key), in_app_notifications(telegram_id+read+dismissed)
-6. **Metrics cleanup optimization** — changed from every 60s to every ~1 hour (60 cycles)
+### Changes Made:
+**New files:**
+- `frontend/src/components/journal/EditJournalModal.jsx` — modal for editing journal name, group, description, color
+- `frontend/src/components/journal/EditSessionModal.jsx` — modal for editing session title, date, type, description
 
-### Frontend Changes Made:
-7. **Notification polling** — reduced from 5s to 30s (6x less network load)
-8. **Session heartbeat** — reduced from 10s to 30s (3x less network load)
-9. **ErrorBoundary** — added component wrapping App and lazy-loaded modals
-10. **Unified getBackendURL()** — replaced direct process.env access in App.jsx with getBackendURL()
+**Modified files:**
+- `frontend/src/components/journal/JournalDetailModal.jsx` — added Edit button (pencil icon) in header, wired EditJournalModal
+- `frontend/src/components/journal/SubjectDetailModal.jsx` — added inline subject editing (name, description, color) in header + Edit button on session cards + wired EditSessionModal
+
+**Backend APIs used (already existing):**
+- PUT /api/journals/{journal_id} — name, group_name, description, color
+- PUT /api/journals/subjects/{subject_id} — name, description, color
+- PUT /api/journals/sessions/{session_id} — title, date, type, description
 - `backend/models.py`: Updated comment to remove hardcoded bot name reference.
 - Backend endpoint `/api/bot-info` returns dynamic username based on ENV (test→devrudnbot, production→rudn_mosbot).
 
