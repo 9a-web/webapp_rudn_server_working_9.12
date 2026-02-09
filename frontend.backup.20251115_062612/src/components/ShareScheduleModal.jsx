@@ -18,7 +18,7 @@ export const ShareScheduleModal = ({
   telegramId
 }) => {
   const [copied, setCopied] = useState(false);
-  const [botUsername, setBotUsername] = useState('rudn_pro_bot');
+  const [botUsername, setBotUsername] = useState('rudn_mosbot');
   const [webAppUrl, setWebAppUrl] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const scheduleImageRef = useRef(null);
@@ -542,7 +542,7 @@ const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName,
         <p className="text-sm text-gray-700 font-medium">
           Создано в <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">RUDN Schedule</span>
         </p>
-        <p className="text-xs text-gray-500 mt-1">@rudn_pro_bot • Telegram WebApp</p>
+        <p className="text-xs text-gray-500 mt-1">@rudn_mosbot • Telegram WebApp</p>
       </div>
     </div>
   );
