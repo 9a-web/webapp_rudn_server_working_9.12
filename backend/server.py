@@ -239,12 +239,14 @@ from lk_parser import RUDNLKParser
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Configure logging early
+# Configure logging early (DEBUG для test, INFO для production)
+_log_level = logging.DEBUG if ENV != "production" else logging.INFO
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=_log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+logger.info(f"📋 Logging level: {logging.getLevelName(_log_level)} (ENV={ENV})")
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
