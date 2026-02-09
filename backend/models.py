@@ -384,7 +384,7 @@ class WeatherResponse(BaseModel):
 
 class BotInfo(BaseModel):
     """Информация о боте"""
-    username: str  # Username бота (например, @rudn_mosbot)
+    username: str  # Username бота (определяется динамически через getMe)
     first_name: str  # Имя бота
     id: int  # ID бота
     can_join_groups: bool = False
