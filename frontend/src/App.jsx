@@ -118,6 +118,9 @@ const Home = () => {
   const [isNotificationsPanelOpen, setIsNotificationsPanelOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [hasNewNotification, setHasNewNotification] = useState(false); // Флаг нового уведомления для анимации
+  
+  // Динамический favicon с бейджем уведомлений
+  useFaviconBadge(unreadNotificationsCount);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentClass, setCurrentClass] = useState(null);
