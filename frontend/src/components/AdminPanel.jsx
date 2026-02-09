@@ -1987,10 +1987,13 @@ const ServerTab = () => {
         </motion.div>
       )}
 
+      {/* ===== History Section ===== */}
+      <ServerHistorySection />
+
       {/* Auto-refresh info */}
       <div className="flex items-center gap-2 p-3.5 bg-cyan-500/[0.06] border border-cyan-500/10 rounded-xl text-[12px] text-cyan-300/80 backdrop-blur-sm">
         <Info className="w-4 h-4 flex-shrink-0 text-cyan-400/60" />
-        <span>Данные обновляются автоматически каждые 5 секунд. Отображается нагрузка текущего сервера.</span>
+        <span>Данные обновляются автоматически каждые 5 секунд. История записывается каждую минуту и хранится 7 дней.</span>
       </div>
     </div>
   );
