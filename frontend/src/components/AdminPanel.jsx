@@ -209,6 +209,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
   const tabs = [
     { id: 'online', icon: <Wifi className="w-4 h-4" />, label: 'Онлайн', glow: 'green' },
     { id: 'stats', icon: <BarChart3 className="w-4 h-4" />, label: 'Статистика', glow: 'purple' },
+    { id: 'server', icon: <Server className="w-4 h-4" />, label: 'Сервер', glow: 'cyan' },
     { id: 'users', icon: <Users className="w-4 h-4" />, label: 'Студенты', glow: 'blue' },
     { id: 'classes', icon: <BookOpen className="w-4 h-4" />, label: 'Занятия', glow: 'orange' },
     { id: 'notifications', icon: <Bell className="w-4 h-4" />, label: 'Уведомления', glow: 'pink' },
