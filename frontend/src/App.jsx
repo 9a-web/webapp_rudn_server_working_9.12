@@ -1433,7 +1433,6 @@ const Home = () => {
           // Загружаем данные о пользователе и аватарку
           try {
             const { friendsAPI } = await import('./services/friendsAPI');
-            const { getBackendURL } = await import('./services/api');
             const backendUrl = getBackendURL();
             
             // Загружаем профиль и аватарку параллельно
