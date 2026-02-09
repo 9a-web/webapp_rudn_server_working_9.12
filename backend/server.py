@@ -15,6 +15,8 @@ import httpx
 import aiohttp
 import asyncio
 import threading
+import psutil
+import platform
 
 # Импорт модулей парсера и моделей
 from rudn_parser import (
