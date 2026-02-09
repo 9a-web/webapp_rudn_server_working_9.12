@@ -15,24 +15,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadialBarChart, RadialBar
 } from 'recharts';
-
-// Backend URL
-const getBackendURL = () => {
-  let envBackendUrl = '';
-  try {
-    if (import.meta.env.VITE_BACKEND_URL) {
-      envBackendUrl = import.meta.env.VITE_BACKEND_URL;
-    } else if (import.meta.env.REACT_APP_BACKEND_URL) {
-      envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL;
-    }
-  } catch (error) {
-    console.warn('Could not access environment variables:', error);
-  }
-  
-  if (envBackendUrl && envBackendUrl.trim() !== '') return envBackendUrl;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 const BACKEND_URL = getBackendURL();
 
