@@ -41,6 +41,7 @@ import { ShareStudentLinkModal } from './ShareStudentLinkModal';
 import { EditStudentModal } from './EditStudentModal';
 import { JournalStatsTab } from './JournalStatsTab';
 import { MyAttendanceStats } from './MyAttendanceStats';
+import { fetchBotInfo } from '../../utils/botInfo';
 const COLORS = {
   purple: 'from-purple-400 to-pink-400',
   blue: 'from-blue-400 to-cyan-400',
