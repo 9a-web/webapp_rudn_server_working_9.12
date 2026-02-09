@@ -50,3 +50,4 @@ pyee
 greenlet
 vkaudiotoken
 yt-dlp
+psutil
