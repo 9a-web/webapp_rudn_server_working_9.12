@@ -9,8 +9,8 @@ import json
 from datetime import datetime
 import time
 
-# Backend URL from frontend .env
-BACKEND_URL = "https://schedule-app-32.preview.emergentagent.com"
+# Backend URL - using internal URL for testing since we're in the same container
+BACKEND_URL = "http://localhost:8001"
 SERVER_STATS_URL = f"{BACKEND_URL}/api/admin/server-stats"
 
 def test_server_stats_endpoint():
