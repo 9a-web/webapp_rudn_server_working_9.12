@@ -6534,6 +6534,9 @@ async def get_server_stats():
         logger.error(f"Error getting server stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ============ API для ЛК РУДН (lk.rudn.ru) ============
+
 @api_router.post("/lk/connect", response_model=LKConnectionResponse)
 async def connect_lk(data: LKCredentialsRequest):
     """
