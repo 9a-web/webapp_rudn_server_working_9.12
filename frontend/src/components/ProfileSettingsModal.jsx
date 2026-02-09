@@ -10,14 +10,7 @@ import {
   Palette, Snowflake, Settings, ChevronRight, Sparkles
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
-
-// Определяем URL backend в зависимости от окружения
-const getBackendURL = () => {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
-  }
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 const ProfileSettingsModal = ({ isOpen, onClose, telegramId, hapticFeedback, onThemeChange }) => {
   const [activeTab, setActiveTab] = useState('privacy'); // 'privacy' | 'design'
