@@ -353,11 +353,11 @@ const Home = () => {
     }
   }, [user?.id]);
 
-  // Периодическая загрузка счётчика - каждые 5 секунд для real-time обновления
+  // Периодическая загрузка счётчика — каждые 30 секунд (оптимизировано для снижения нагрузки)
   useEffect(() => {
     if (isReady && user?.id) {
       loadUnreadCount();
-      const interval = setInterval(loadUnreadCount, 5000); // Каждые 5 секунд для real-time
+      const interval = setInterval(loadUnreadCount, 30000); // Каждые 30 секунд
       return () => {
         clearInterval(interval);
         if (newNotificationTimerRef.current) {
