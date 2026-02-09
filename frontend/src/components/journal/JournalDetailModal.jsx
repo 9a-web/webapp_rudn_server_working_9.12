@@ -284,6 +284,18 @@ export const JournalDetailModal = ({
       console.error('Error updating student:', error);
     }
   };
+
+  const handleSaveJournal = async (data) => {
+    try {
+      const { updateJournal } = await import('../../services/journalAPI');
+      await updateJournal(journalId, data);
+      loadData();
+      onJournalUpdated?.();
+    } catch (error) {
+      console.error('Error updating journal:', error);
+      throw error;
+    }
+  };
   
   const handleUnlinkStudent = async (studentId) => {
       try {
