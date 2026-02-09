@@ -356,7 +356,7 @@ export const botAPI = {
       handleError(error);
       // Возвращаем fallback данные если API недоступен
       return {
-        username: 'rudn_mosbot',
+        username: 'bot',
         first_name: 'RUDN Schedule',
         id: 0
       };
