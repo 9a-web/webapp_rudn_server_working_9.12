@@ -4,7 +4,7 @@ import {
   X, ArrowLeft, Users, Calendar, BarChart3, Share2, Settings, 
   UserPlus, Plus, Check, Clock, Link2, Crown, Trash2,
   BookOpen, GraduationCap, FlaskConical, FileText, Copy, ExternalLink,
-  TrendingUp, Inbox, Send, LogOut, AlertTriangle
+  TrendingUp, Inbox, Send, LogOut, AlertTriangle, Edit3
 } from 'lucide-react';
 import {
   getJournalDetail,
