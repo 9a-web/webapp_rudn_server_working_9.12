@@ -6630,11 +6630,14 @@ async def get_server_stats():
 
 
 # --- Background task: сбор метрик сервера каждые 60 секунд ---
+_metrics_cleanup_counter = 0  # Счётчик циклов для периодической очистки
+
 async def collect_server_metrics_loop():
     """Фоновая задача для периодического сбора метрик сервера в MongoDB"""
+    global _metrics_cleanup_counter
     import time as _time
     await asyncio.sleep(5)  # ждём старт приложения
-    logger.info("📊 Server metrics collector started (interval: 60s)")
+    logger.info("📊 Server metrics collector started (interval: 60s, cleanup: every 60 cycles/~1h)")
     
     while True:
         try:
@@ -6681,9 +6684,14 @@ async def collect_server_metrics_loop():
 
             await db.server_metrics_history.insert_one(metric)
 
-            # Удаляем записи старше 7 дней
-            cutoff = datetime.utcnow() - timedelta(days=7)
-            await db.server_metrics_history.delete_many({"timestamp": {"$lt": cutoff}})
+            # Очистка старых записей раз в ~1 час (60 циклов × 60 сек), а не каждый цикл
+            _metrics_cleanup_counter += 1
+            if _metrics_cleanup_counter >= 60:
+                _metrics_cleanup_counter = 0
+                cutoff = datetime.utcnow() - timedelta(days=7)
+                deleted = await db.server_metrics_history.delete_many({"timestamp": {"$lt": cutoff}})
+                if deleted.deleted_count > 0:
+                    logger.info(f"🧹 Cleaned up {deleted.deleted_count} old server metrics")
 
         except Exception as e:
             logger.warning(f"⚠️ Error collecting server metrics: {e}")
