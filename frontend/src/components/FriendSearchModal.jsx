@@ -7,22 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Users, Building2, UserPlus, Check, Clock, Loader2, Sparkles } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 import { scheduleAPI } from '../services/api';
-
-// URL backend из env
-const getBackendURL = () => {
-  let url = '';
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      url = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
-    }
-    if (!url && typeof process !== 'undefined' && process.env) {
-      url = process.env.REACT_APP_BACKEND_URL || '';
-    }
-  } catch (e) { /* env not available */ }
-  if (url && url.trim() !== '') return url;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 const getAvatarGradient = (id) => {
   const gradients = [
