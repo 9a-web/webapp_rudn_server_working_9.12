@@ -193,9 +193,34 @@ export const SubjectDetailModal = ({
               >
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
+              {!isEditingSubject ? (
+                <button
+                  onClick={startEditingSubject}
+                  className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                  title="Редактировать предмет"
+                >
+                  <Edit3 className="w-5 h-5 text-white" />
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={cancelEditingSubject}
+                    className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                  >
+                    <X className="w-5 h-5 text-white" />
+                  </button>
+                  <button
+                    onClick={handleSaveSubject}
+                    disabled={!editName.trim() || isSavingSubject}
+                    className="p-2 rounded-full bg-white/20 backdrop-blur-sm disabled:opacity-40"
+                  >
+                    <Check className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+              )}
             </div>
             
-            {subject && (
+            {subject && !isEditingSubject && (
               <div>
                 <h1 className="text-2xl font-bold text-white">{subject.name}</h1>
                 {subject.description && (
@@ -204,6 +229,45 @@ export const SubjectDetailModal = ({
                 <div className="flex items-center gap-4 mt-2 text-white/60 text-sm">
                   <span>{subject.sessions?.length || 0} занятий</span>
                   <span>{subject.total_students || 0} студентов</span>
+                </div>
+              </div>
+            )}
+
+            {subject && isEditingSubject && (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Название предмета"
+                  className="w-full bg-white/15 border border-white/25 rounded-xl px-4 py-2.5 text-white text-lg font-bold placeholder-white/40 focus:outline-none focus:border-white/50 transition-colors"
+                  autoFocus
+                />
+                <input
+                  type="text"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Описание / преподаватель"
+                  className="w-full bg-white/15 border border-white/25 rounded-xl px-4 py-2 text-white/90 text-sm placeholder-white/40 focus:outline-none focus:border-white/50 transition-colors"
+                />
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs text-white/50 mb-2">
+                    <Palette className="w-3 h-3" />
+                    Цвет
+                  </label>
+                  <div className="flex gap-2">
+                    {Object.entries(SUBJECT_COLORS).map(([id, grad]) => (
+                      <button
+                        key={id}
+                        onClick={() => setEditColor(id)}
+                        className={`w-8 h-8 rounded-lg bg-gradient-to-br ${grad} transition-all ${
+                          editColor === id
+                            ? 'ring-2 ring-white ring-offset-1 ring-offset-transparent scale-110'
+                            : 'opacity-50 hover:opacity-100'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
