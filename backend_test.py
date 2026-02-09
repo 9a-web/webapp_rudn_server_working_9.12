@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Server Stats Endpoints
-Tests server-stats and server-stats-history endpoints according to review request
+Backend API Testing Script
+Tests bot-info endpoint according to review request
 """
 
 import requests
