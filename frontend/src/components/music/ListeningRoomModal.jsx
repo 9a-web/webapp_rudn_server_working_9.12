@@ -34,6 +34,7 @@ import {
   updateListeningRoomSettings,
   createListeningRoomConnection
 } from '../../services/listeningRoomAPI';
+import { fetchBotInfo } from '../../utils/botInfo';
 
 const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange }) => {
   const { hapticFeedback, user } = useTelegram();
