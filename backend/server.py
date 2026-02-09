@@ -414,7 +414,10 @@ async def create_indexes():
 
 @app.on_event("startup")
 async def startup_event():
-    # Setup Playwright browser symlinks for LK RUDN parser
+    """Единая точка инициализации при запуске приложения"""
+    logger.info("🚀 Starting RUDN Schedule API...")
+    
+    # 1. Setup Playwright browser symlinks for LK RUDN parser
     import subprocess
     try:
         setup_script = "/app/scripts/setup_playwright.sh"
@@ -424,19 +427,84 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ Failed to setup Playwright symlinks: {e}")
     
-    # Initialize cover service for Deezer album art
+    # 2. Initialize cover service for Deezer album art
     try:
         init_cover_service(db)
     except Exception as e:
         logger.warning(f"⚠️ Failed to init cover service: {e}")
     
-    # Start background tasks
+    # 3. Создаём индексы БД (в фоне, чтобы не блокировать старт)
     asyncio.create_task(create_indexes())
+    
+    # 4. Запускаем сбор метрик сервера (фоновый цикл)
     asyncio.create_task(collect_server_metrics_loop())
     
-    # Получаем username бота через getMe
+    # 5. Получаем username бота через getMe
     from config import _fetch_bot_username
     await _fetch_bot_username()
+    
+    # 6. Очистка устаревших веб-сессий
+    try:
+        await cleanup_expired_sessions()
+    except Exception as e:
+        logger.warning(f"⚠️ Initial session cleanup failed: {e}")
+    
+    # 7. Запускаем планировщик уведомлений V2
+    try:
+        scheduler_v2 = get_scheduler_v2(db)
+        scheduler_v2.start()
+        logger.info("✅ Notification Scheduler V2 started successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to start notification scheduler V2: {e}")
+        # Fallback на старую систему
+        try:
+            logger.info("Attempting fallback to old scheduler...")
+            scheduler = get_scheduler(db)
+            scheduler.start()
+            logger.info("⚠️ Fallback: Old notification scheduler started")
+        except Exception as fallback_error:
+            logger.error(f"❌ Fallback also failed: {fallback_error}")
+    
+    # 8. Запускаем Telegram бота как background task
+    try:
+        global bot_application
+        from telegram import Update
+        from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+        
+        import sys
+        sys.path.insert(0, '/app/backend')
+        from telegram_bot import start_command, users_command, clear_db_command, TELEGRAM_BOT_TOKEN
+        
+        active_token = get_telegram_bot_token()
+        
+        if active_token:
+            env_mode = "TEST" if is_test_environment() else "PRODUCTION"
+            logger.info(f"🤖 Запуск Telegram бота в режиме {env_mode}...")
+            
+            bot_application = Application.builder().token(active_token).build()
+            
+            bot_application.add_handler(CommandHandler("start", start_command))
+            bot_application.add_handler(CommandHandler("users", users_command))
+            bot_application.add_handler(CommandHandler("clear_db", clear_db_command))
+            
+            from telegram_bot import handle_revoke_device_callback
+            bot_application.add_handler(CallbackQueryHandler(handle_revoke_device_callback, pattern=r"^revoke_device_"))
+            
+            async def start_bot():
+                await bot_application.initialize()
+                await bot_application.start()
+                await bot_application.updater.start_polling(
+                    allowed_updates=Update.ALL_TYPES,
+                    drop_pending_updates=True
+                )
+                logger.info(f"✅ Telegram bot polling started successfully (ENV={ENV})")
+            
+            asyncio.create_task(start_bot())
+            logger.info(f"Telegram bot initialization started as background task (ENV={ENV})")
+        else:
+            logger.warning("Токен бота не найден, bot not started")
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}", exc_info=True)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
