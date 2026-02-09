@@ -538,10 +538,10 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
                     ease: "easeInOut"
                   }}
                   className="w-auto py-2.5 px-5 rounded-xl font-semibold text-white text-sm
-                            bg-gradient-to-r from-blue-500 to-blue-600 
-                            hover:from-blue-600 hover:to-blue-700
+                            bg-gradient-to-r from-pink-400 to-red-400 
+                            hover:from-pink-500 hover:to-red-500
                             transition-all duration-300 flex items-center justify-center gap-2
-                            shadow-lg shadow-blue-500/30"
+                            shadow-lg shadow-pink-500/30"
                 >
                   <Key className="w-4 h-4" />
                   <span>Получить токен</span>
