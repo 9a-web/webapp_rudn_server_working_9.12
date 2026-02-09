@@ -544,7 +544,7 @@ const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName,
         <p className="text-sm text-[#1C1C1E] font-semibold">
           RUDN Schedule
         </p>
-        <p className="text-xs text-gray-500 mt-1">@rudn_mosbot • Telegram WebApp</p>
+        <p className="text-xs text-gray-500 mt-1">@{botUsername} • Telegram WebApp</p>
       </div>
     </div>
   );
