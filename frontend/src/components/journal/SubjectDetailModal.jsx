@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, ArrowLeft, Calendar, Plus, Trash2, Check,
-  BookOpen, GraduationCap, FlaskConical, FileText, CalendarRange
+  BookOpen, GraduationCap, FlaskConical, FileText, CalendarRange,
+  Edit3, Palette
 } from 'lucide-react';
 import { getSubjectDetail, createSession, deleteSession, updateSubject, updateSession } from '../../services/journalAPI';
 import { AttendanceModal } from './AttendanceModal';
