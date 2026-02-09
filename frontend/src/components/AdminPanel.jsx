@@ -6,7 +6,8 @@ import {
   BookOpen, Bell, Share2, CheckSquare, RefreshCw,
   Search, User, GraduationCap, FileText, Send, MessageSquare, Check,
   Megaphone, AlertCircle, Info, Gift, Sparkles, Zap, Home, Wifi, Circle,
-  Globe, Smartphone, Monitor, ArrowUpRight, ArrowDownRight, Layers, Eye, Copy, ChevronRight
+  Globe, Smartphone, Monitor, ArrowUpRight, ArrowDownRight, Layers, Eye, Copy, ChevronRight,
+  Server, Cpu, HardDrive, Database, MemoryStick, Gauge
 } from 'lucide-react';
 import axios from 'axios';
 import {
