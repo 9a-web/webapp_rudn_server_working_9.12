@@ -689,5 +689,5 @@ export const activityAPI = {
   },
 };
 
-export { getBackendURL };
+export { getBackendURL } from '../utils/config';
 export default api;
