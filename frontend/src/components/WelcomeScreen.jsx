@@ -9,10 +9,16 @@ import { useTelegram } from '../contexts/TelegramContext';
 import { createWebSession, createSessionWebSocket, linkWebSession, notifySessionScanned } from '../services/webSessionAPI';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Smartphone, CheckCircle, Loader2 } from 'lucide-react';
+import { fetchBotInfo } from '../utils/botInfo';
 
 const WelcomeScreen = ({ onGetStarted, onSyncComplete, hideSyncButton = false }) => {
   const { hapticFeedback, webApp, user } = useTelegram();
   const [showQRModal, setShowQRModal] = useState(false);
+  const [botUsername, setBotUsername] = useState('bot');
+  
+  useEffect(() => {
+    fetchBotInfo().then(info => setBotUsername(info.username));
+  }, []);
   const [session, setSession] = useState(null);
   const [sessionStatus, setSessionStatus] = useState('loading'); // loading, ready, scanned, linked, expired, error
   const [scannedUser, setScannedUser] = useState(null);
