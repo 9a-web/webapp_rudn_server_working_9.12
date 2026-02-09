@@ -375,6 +375,15 @@ export const SubjectDetailModal = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              setShowEditSession(session);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-gray-500 hover:text-blue-400 transition-colors"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleDeleteSession(session.session_id);
                             }}
                             className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors"
