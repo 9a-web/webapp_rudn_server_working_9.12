@@ -74,7 +74,7 @@ def get_telegram_bot_username() -> str:
     """
     Возвращает username Telegram бота в зависимости от ENV.
     
-    - ENV=test -> rudn_pro_bot (тестовый бот)
+    - ENV=test -> rudn_mosbot (тестовый бот)
     - ENV=production -> rudn_mosbot (основной бот)
     
     Returns:
@@ -83,7 +83,7 @@ def get_telegram_bot_username() -> str:
     if ENV == "production":
         return "rudn_mosbot"
     else:
-        return "rudn_pro_bot"
+        return "rudn_mosbot"
 
 
 # Экспортируем активный токен для обратной совместимости
