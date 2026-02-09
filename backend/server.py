@@ -6721,7 +6721,8 @@ def _aggregate_bucket(items, bucket_time):
         "process_rss_mb": round(sum(m.get("process_rss_mb", 0) for m in items) / n, 2),
     }
 
-@api_router.post("/lk/connect", response_model=LKConnectionResponse)
+
+# ============ API для ЛК РУДН (lk.rudn.ru) ============
 async def connect_lk(data: LKCredentialsRequest):
     """
     Подключение личного кабинета РУДН к аккаунту пользователя
