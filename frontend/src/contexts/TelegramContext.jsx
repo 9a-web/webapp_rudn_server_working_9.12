@@ -289,17 +289,8 @@ export const TelegramProvider = ({ children }) => {
           // Если есть session_token - проверяем сессию на сервере
           if (savedSessionToken) {
             // Проверяем валидность сессии на сервере
-            // Используем ту же логику что в api.js
-            let backendUrl;
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-              backendUrl = 'http://localhost:8001';
-            } else if (import.meta.env.REACT_APP_BACKEND_URL) {
-              backendUrl = import.meta.env.REACT_APP_BACKEND_URL;
-            } else if (process.env.REACT_APP_BACKEND_URL) {
-              backendUrl = process.env.REACT_APP_BACKEND_URL;
-            } else {
-              backendUrl = window.location.origin;
-            }
+            // Используем единую функцию getBackendURL из config
+            const backendUrl = getBackendURL();
             
             console.log('🔗 Checking session at:', `${backendUrl}/api/web-sessions/${savedSessionToken}/status`);
             
