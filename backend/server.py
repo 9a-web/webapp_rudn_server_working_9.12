@@ -248,9 +248,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info(f"📋 Logging level: {logging.getLevelName(_log_level)} (ENV={ENV})")
 
-# MongoDB connection
+# MongoDB connection (с оптимизированными настройками пула)
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=50,
+    minPoolSize=5,
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=5000,
+    socketTimeoutMS=30000,
+    retryWrites=True,
+    retryReads=True,
+)
 db = client[os.environ['DB_NAME']]
 
 # Global bot application instance
