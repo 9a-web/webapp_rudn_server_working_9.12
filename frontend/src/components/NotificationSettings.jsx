@@ -5,6 +5,7 @@ import { userAPI, achievementsAPI } from '../services/api';
 import { useTranslation } from 'react-i18next';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { pluralizeMinutes } from '../utils/pluralize';
+import { fetchBotInfo } from '../utils/botInfo';
 
 import NotificationHistory from './NotificationHistory';
 export const NotificationSettings = ({ 
@@ -19,6 +20,12 @@ export const NotificationSettings = ({
   const [notificationTime, setNotificationTime] = useState(10);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [botUsername, setBotUsername] = useState('bot');
+
+  // Загрузка username бота
+  useEffect(() => {
+    fetchBotInfo().then(info => setBotUsername(info.username));
+  }, []);
 
   // Доступные варианты времени уведомления
   const timeOptions = [
