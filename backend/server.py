@@ -387,6 +387,27 @@ async def create_indexes():
         await safe_create_index(db.friend_requests, [("to_telegram_id", 1), ("status", 1)])
         await safe_create_index(db.user_blocks, [("blocker_telegram_id", 1), ("blocked_telegram_id", 1)], unique=True)
         
+        # Schedule Cache - составной индекс для быстрого поиска кэша расписания
+        await safe_create_index(db.schedule_cache, [("group_id", 1), ("week_number", 1)], unique=True)
+        
+        # Server Metrics History - индекс по времени для запросов истории и TTL-очистки
+        await safe_create_index(db.server_metrics_history, [("timestamp", 1)])
+        
+        # Scheduled Notifications - дополнительные индексы (из второго startup)
+        await safe_create_index(db.scheduled_notifications, [("telegram_id", 1), ("date", 1)])
+        await safe_create_index(db.scheduled_notifications, [("status", 1), ("date", 1)])
+        await safe_create_index(db.scheduled_notifications, [("scheduled_time", 1)])
+        
+        # Sent Notifications (старая система)
+        await safe_create_index(db.sent_notifications, "notification_key", unique=True)
+        
+        # In-App Notifications - индекс для непрочитанных
+        await safe_create_index(db.in_app_notifications, [("telegram_id", 1), ("read", 1), ("dismissed", 1)])
+        
+        # Web Sessions - индексы для QR-авторизации
+        await safe_create_index(db.web_sessions, "session_token", unique=True)
+        await safe_create_index(db.web_sessions, [("telegram_id", 1), ("status", 1)])
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
