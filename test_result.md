@@ -161,3 +161,46 @@ Prerequisites:
 - External access confirmed (not localhost:8001 as requested, but production URL)
 - Response times: <30 seconds for all requests
 - All endpoints accessible via external network
+
+### Backend Test Results - Bot Info Endpoint
+**Test Date:** 2026-02-09T14:45:12
+**Testing Agent:** deep_testing_backend_v2
+
+**Review Request Testing:** `/api/bot-info` endpoint validation
+**Endpoint Tested:** `GET /api/bot-info`
+
+**Test Results: ✅ ALL TESTS PASSED (1/1)**
+
+**Detailed Test Results:**
+
+**1. Bot Info Endpoint Validation**
+- ✅ HTTP 200 response with valid JSON structure
+- ✅ All expected fields present: `username`, `first_name`, `bot_id`, `env`
+- ✅ Username validation: `devrudnbot` (correctly NOT `rudn_mosbot`)
+- ✅ First name validation: `RUDN GO [dev]` (non-empty)
+- ✅ Bot ID validation: `8556911140` (valid > 0)
+- ✅ Env field validation: `test` (correct for test environment)
+- ✅ Dynamic bot username fetch working (via getMe API)
+- ✅ ENV-based token selection working (using TEST_TELEGRAM_BOT_TOKEN)
+
+**Response Sample:**
+```json
+{
+  "username": "devrudnbot",
+  "first_name": "RUDN GO [dev]",
+  "bot_id": 8556911140,
+  "env": "test"
+}
+```
+
+**Technical Implementation Status:**
+- ✅ ENV=test configuration active
+- ✅ TEST_TELEGRAM_BOT_TOKEN being used correctly
+- ✅ Bot username cache populated via getMe API
+- ✅ Dynamic username fetching working (not hardcoded "rudn_mosbot")
+- ✅ All expected fields returned in correct format
+- ✅ Environment-specific bot selection working as designed
+
+**Testing Environment:**
+- Backend URL: https://rudn-webapp.preview.emergentagent.com/api  
+- Bot info endpoint fully functional and meeting all review requirements
