@@ -47,6 +47,14 @@ export const SubjectDetailModal = ({
   const [isLoading, setIsLoading] = useState(true);
   const [showAddSession, setShowAddSession] = useState(false);
   const [showAttendance, setShowAttendance] = useState(null);
+  const [showEditSession, setShowEditSession] = useState(null); // session to edit
+  
+  // Inline editing state for subject
+  const [isEditingSubject, setIsEditingSubject] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editColor, setEditColor] = useState('blue');
+  const [isSavingSubject, setIsSavingSubject] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!subjectId) return;
