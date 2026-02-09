@@ -923,8 +923,8 @@ const Home = () => {
     // Отправляем heartbeat сразу при загрузке
     checkSession();
     
-    // Периодически отправляем heartbeat каждые 10 секунд для быстрой реакции
-    const heartbeatInterval = setInterval(checkSession, 10000);
+    // Периодически отправляем heartbeat каждые 30 секунд (оптимизировано)
+    const heartbeatInterval = setInterval(checkSession, 30000);
     
     return () => {
       clearInterval(heartbeatInterval);
