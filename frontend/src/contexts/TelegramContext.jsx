@@ -4,6 +4,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { getBackendURL } from '../utils/config';
 
 const TelegramContext = createContext(null);
 
