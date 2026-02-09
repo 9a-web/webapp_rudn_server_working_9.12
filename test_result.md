@@ -9,10 +9,21 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Replace all hardcoded "rudn_mosbot" links with dynamic bot username based on ENV.
+Architecture optimization — improve fundamental app stability without breaking existing functionality.
 
-### Changes Made:
-- `frontend/src/components/ProfileModal.jsx`: Added `fetchBotInfo` import, `botUsername` state, useEffect to load bot username. Replaced hardcoded `rudn_mosbot` → dynamic `botUsername`.
+### Backend Changes Made:
+1. **Merged duplicate startup events** (lines 407+14512) → one unified `startup_event()` with 8 ordered steps
+2. **CORS simplification** — removed duplicate if/else branches (identical code), optimized custom middleware to only echo origin when needed
+3. **Logging level = ENV-dependent** — DEBUG for test, INFO for production
+4. **MongoDB connection pool** — added maxPoolSize=50, minPoolSize=5, timeouts, retryWrites/Reads
+5. **Missing DB indexes** — added: schedule_cache(group_id+week_number), server_metrics_history(timestamp), web_sessions(session_token, telegram_id+status), scheduled_notifications(telegram_id+date, status+date, scheduled_time), sent_notifications(notification_key), in_app_notifications(telegram_id+read+dismissed)
+6. **Metrics cleanup optimization** — changed from every 60s to every ~1 hour (60 cycles)
+
+### Frontend Changes Made:
+7. **Notification polling** — reduced from 5s to 30s (6x less network load)
+8. **Session heartbeat** — reduced from 10s to 30s (3x less network load)
+9. **ErrorBoundary** — added component wrapping App and lazy-loaded modals
+10. **Unified getBackendURL()** — replaced direct process.env access in App.jsx with getBackendURL()
 - `backend/models.py`: Updated comment to remove hardcoded bot name reference.
 - Backend endpoint `/api/bot-info` returns dynamic username based on ENV (test→devrudnbot, production→rudn_mosbot).
 
