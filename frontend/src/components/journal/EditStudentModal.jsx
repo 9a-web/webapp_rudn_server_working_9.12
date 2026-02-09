@@ -11,7 +11,7 @@ export const EditStudentModal = ({
   onDelete, 
   onUnlink,
   hapticFeedback,
-  botUsername = "rudn_mosbot"
+  botUsername = "bot"
 }) => {
   const { t } = useTranslation();
   const [fullName, setFullName] = useState('');
