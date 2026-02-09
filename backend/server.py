@@ -283,12 +283,12 @@ app.add_middleware(
 )
 logger.info(f"CORS configured for origins: {cors_origins_list}")
 
-# Additional middleware to ensure CORS headers are always present
+# Additional middleware: echo origin для совместимости credentials + быстрый preflight
 @app.middleware("http")
 async def add_cors_headers(request, call_next):
     origin = request.headers.get("origin", "")
     
-    # FIX: Для OPTIONS preflight — быстрый ответ с CORS headers
+    # Быстрый ответ на OPTIONS preflight
     if request.method == "OPTIONS":
         response = Response(content="OK", status_code=200)
         response.headers["access-control-allow-origin"] = origin or "*"
@@ -300,17 +300,10 @@ async def add_cors_headers(request, call_next):
     
     response = await call_next(request)
     
-    # FIX: ВСЕГДА перезаписываем CORS headers (echo origin для совместимости с credentials)
-    # access-control-allow-origin: * + credentials: true запрещено спецификацией CORS
+    # Echo origin для совместимости с credentials (спецификация запрещает * + credentials)
     if origin:
         response.headers["access-control-allow-origin"] = origin
-    elif not response.headers.get("access-control-allow-origin"):
-        response.headers["access-control-allow-origin"] = "*"
-    
-    response.headers["access-control-allow-methods"] = "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT"
-    response.headers["access-control-allow-headers"] = "*"
-    response.headers["access-control-allow-credentials"] = "true"
-    response.headers["access-control-max-age"] = "3600"
+        response.headers["access-control-allow-credentials"] = "true"
         
     return response
 
