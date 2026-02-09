@@ -63,6 +63,12 @@ export const ProfileModal = ({
   const [qrData, setQrData] = useState(null);
   const [showDevicesModal, setShowDevicesModal] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [botUsername, setBotUsername] = useState('bot');
+
+  // Загрузка username бота
+  useEffect(() => {
+    fetchBotInfo().then(info => setBotUsername(info.username));
+  }, []);
 
   // Проверка на админа
   const isAdmin = useMemo(() => {
