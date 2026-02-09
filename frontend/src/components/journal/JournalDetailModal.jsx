@@ -736,13 +736,13 @@ export const JournalDetailModal = ({
                 {/* Subjects Tab (instead of Sessions) */}
                 {activeTab === 'sessions' && isOwner && (
                   <div>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                      <h3 className="text-lg font-semibold text-white">Предметы</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                      <h3 className="text-xl font-semibold text-white">Предметы</h3>
                       <button
                         onClick={() => setShowCreateSubject(true)}
-                        className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-gradient-to-r ${gradient} rounded-lg text-xs sm:text-sm text-white w-fit`}
+                        className={`flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
                       >
-                        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <Plus className="w-4 h-4" />
                         Добавить
                       </button>
                     </div>
