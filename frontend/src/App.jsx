@@ -1794,21 +1794,25 @@ const Home = () => {
         )}
         
         <Suspense fallback={null}>
-          <CalendarModal
-            isOpen={isCalendarOpen}
-            onClose={() => setIsCalendarOpen(false)}
-            onDateSelect={handleDateSelect}
-          />
+          <ErrorBoundary>
+            <CalendarModal
+              isOpen={isCalendarOpen}
+              onClose={() => setIsCalendarOpen(false)}
+              onDateSelect={handleDateSelect}
+            />
+          </ErrorBoundary>
         </Suspense>
 
         <Suspense fallback={null}>
-          <AnalyticsModal
-            isOpen={isAnalyticsOpen}
-            onClose={() => setIsAnalyticsOpen(false)}
-            schedule={schedule}
-            userStats={userStats}
-            hapticFeedback={hapticFeedback}
-          />
+          <ErrorBoundary>
+            <AnalyticsModal
+              isOpen={isAnalyticsOpen}
+              onClose={() => setIsAnalyticsOpen(false)}
+              schedule={schedule}
+              userStats={userStats}
+              hapticFeedback={hapticFeedback}
+            />
+          </ErrorBoundary>
         </Suspense>
 
         {effectiveUser && (
