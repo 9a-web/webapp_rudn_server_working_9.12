@@ -470,7 +470,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="relative w-full rounded-2xl overflow-hidden"
+            className="relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-2xl overflow-hidden"
             style={{ aspectRatio: '1536 / 1024' }}
           >
             {/* Фоновое изображение на весь блок */}
