@@ -9,14 +9,17 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Implement 7 new features for "Командные задачи" (Team Tasks):
-1. Kick participant from room
-2. Transfer ownership
-3. Edit/delete comments
-4. Filter & sort tasks in room
-5. Subtask progress in task cards (frontend)
-6. Deadline visual indication (frontend)
-8. Pin/unpin tasks
+Add server load statistics tab to admin panel.
+
+### Backend Changes
+- New endpoint: `GET /api/admin/server-stats` - returns CPU, RAM, Disk, uptime, MongoDB stats, process info, network, top processes
+- Added `psutil` dependency
+
+### Frontend Changes  
+- New "Сервер" tab in AdminPanel with gauges, charts, MongoDB & process stats
+
+### Backend Test
+- `GET /api/admin/server-stats` — ✅ Returns correct JSON with all metrics
 
 ## New Backend Endpoints Added
 - DELETE /api/rooms/{room_id}/participants/{target_id} - Kick participant (body: {kicked_by: int, reason?: str})
