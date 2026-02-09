@@ -6723,6 +6723,8 @@ def _aggregate_bucket(items, bucket_time):
 
 
 # ============ API для ЛК РУДН (lk.rudn.ru) ============
+
+@api_router.post("/lk/connect", response_model=LKConnectionResponse)
 async def connect_lk(data: LKCredentialsRequest):
     """
     Подключение личного кабинета РУДН к аккаунту пользователя
