@@ -4,28 +4,7 @@
  */
 
 import axios from 'axios';
-
-// Определяем URL backend из env
-const getBackendURL = () => {
-  let envBackendUrl = '';
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
-    }
-    if (!envBackendUrl && typeof process !== 'undefined' && process.env) {
-      envBackendUrl = process.env.REACT_APP_BACKEND_URL || '';
-    }
-  } catch (error) {
-    console.warn('Could not access environment variables:', error);
-  }
-  if (envBackendUrl && envBackendUrl.trim() !== '') {
-    return envBackendUrl;
-  }
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
-  }
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 const API_BASE = `${getBackendURL()}/api`;
 
