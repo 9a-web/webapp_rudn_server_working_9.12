@@ -269,36 +269,19 @@ bot_application = None
 app = FastAPI(title="RUDN Schedule API", version="1.0.0")
 
 # Configure CORS middleware BEFORE adding routes
-# When allow_credentials=True, we cannot use "*" for origins
 cors_origins_str = os.environ.get('CORS_ORIGINS', '*')
 cors_origins_list = [origin.strip() for origin in cors_origins_str.split(',')]
 
-# Check if "*" is in the list
-if '*' in cors_origins_list:
-    # FIX: Даже с wildcard, используем allow_credentials=True и echoing origin
-    # Это лучше работает с Kubernetes ingress/proxy
-    app.add_middleware(
-        CORSMiddleware,
-        allow_credentials=True,
-        allow_origins=cors_origins_list,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-        max_age=3600,
-    )
-    logger.info("CORS configured with wildcard (*) - all origins allowed with credentials")
-else:
-    # If specific origins are provided, enable credentials
-    app.add_middleware(
-        CORSMiddleware,
-        allow_credentials=True,
-        allow_origins=cors_origins_list,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-        max_age=3600,
-    )
-    logger.info(f"CORS configured for specific origins: {cors_origins_list}")
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=cors_origins_list,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+logger.info(f"CORS configured for origins: {cors_origins_list}")
 
 # Additional middleware to ensure CORS headers are always present
 @app.middleware("http")
