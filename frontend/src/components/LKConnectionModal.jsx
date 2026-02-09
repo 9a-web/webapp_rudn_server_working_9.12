@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Mail, CheckCircle, AlertCircle, Loader2, Link2, Unlink, RefreshCw, User, Phone, Calendar, Building2 } from 'lucide-react';
-
-// Определяем URL backend в зависимости от окружения (аналогично api.js)
-const getBackendURL = () => {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
-  }
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 // Функция для получения корректного ФИО
 // Если full_name содержит "Персональные данные" (ошибка парсинга), 
