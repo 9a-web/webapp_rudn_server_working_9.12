@@ -427,6 +427,17 @@ export const SubjectDetailModal = ({
               hapticFeedback={hapticFeedback}
             />
           )}
+
+          {/* Edit Session Modal */}
+          {showEditSession && (
+            <EditSessionModal
+              isOpen={!!showEditSession}
+              onClose={() => setShowEditSession(null)}
+              session={showEditSession}
+              onSave={handleSaveSession}
+              hapticFeedback={hapticFeedback}
+            />
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
