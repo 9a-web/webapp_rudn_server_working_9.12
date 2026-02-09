@@ -160,7 +160,7 @@ const DevicesModal = ({ isOpen, onClose, user }) => {
         }
         
         // Парсим QR-код - ожидаем формат с link_{session_token}
-        // Например: https://t.me/rudn_mosbot/app?startapp=link_abc123
+        // Например: https://t.me/{bot}/app?startapp=link_abc123
         let sessionToken = null;
         
         if (data.includes('startapp=link_')) {
