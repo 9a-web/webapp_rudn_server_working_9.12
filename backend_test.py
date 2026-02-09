@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for RUDN Schedule Tasks and Planner
-Tests all endpoints according to the review request specifications
+Backend API Testing Script for Server Stats Endpoints
+Tests server-stats and server-stats-history endpoints according to review request
 """
 
 import requests
@@ -10,8 +10,8 @@ import uuid
 from datetime import datetime, timedelta
 import sys
 
-# Configuration
-BASE_URL = "http://localhost:8001/api"
+# Configuration - using external URL as per environment setup
+BASE_URL = "https://rudn-webapp.preview.emergentagent.com/api"
 TEST_TELEGRAM_ID = 12345
 
 def print_test_result(test_name, success, details=None):
