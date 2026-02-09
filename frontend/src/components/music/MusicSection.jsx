@@ -472,9 +472,19 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             exit={{ opacity: 0 }}
             className="flex flex-col items-center justify-center px-4 py-8 min-h-[50vh]"
           >
-            <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20 
-                            border border-blue-500/30 backdrop-blur-sm">
-              <div className="flex flex-col items-center text-center space-y-5 sm:space-y-6">
+            <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm relative">
+              {/* Фоновое изображение */}
+              <div className="absolute inset-0">
+                <img 
+                  src="/music-welcome-owl.png" 
+                  alt="" 
+                  className="w-full h-full object-cover"
+                />
+                {/* Затемнение для читаемости текста */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/30" />
+              </div>
+              
+              <div className="relative flex flex-col items-center text-center space-y-5 sm:space-y-6 p-6 sm:p-8">
                 {/* Логотипы VK и РУДН с иконкой связи */}
                 <div className="flex items-center gap-3 sm:gap-4">
                   <Icon28LogoVkColor width={48} height={48} className="sm:w-14 sm:h-14" />
