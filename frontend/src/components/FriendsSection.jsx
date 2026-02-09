@@ -16,22 +16,7 @@ import { friendsAPI } from '../services/friendsAPI';
 import FriendCard from './FriendCard';
 import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
-
-// URL backend из env
-const getBackendURL = () => {
-  let url = '';
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      url = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
-    }
-    if (!url && typeof process !== 'undefined' && process.env) {
-      url = process.env.REACT_APP_BACKEND_URL || '';
-    }
-  } catch (e) { /* env not available */ }
-  if (url && url.trim() !== '') return url;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return 'http://localhost:8001';
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 // Русское склонение
 const pluralize = (n, one, few, many) => {
