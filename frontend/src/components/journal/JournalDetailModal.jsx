@@ -595,29 +595,41 @@ export const JournalDetailModal = ({
                           </button>
                         )}
                         <div className="relative">
-                          {/* Волны пульсации когда нет студентов */}
+                          {/* Волны пульсации когда нет студентов — цвет совпадает с кнопкой */}
                           {students.length === 0 && (
                             <>
                               <span 
-                                className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400"
+                                className={`absolute inset-0 rounded-lg bg-gradient-to-r ${gradient}`}
                                 style={{
-                                  animation: 'pulse-wave 2s ease-out infinite',
+                                  animation: 'btn-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                                  filter: 'blur(3px)',
                                 }}
                               />
                               <span 
-                                className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-400 to-pink-400"
+                                className={`absolute inset-0 rounded-lg bg-gradient-to-r ${gradient}`}
                                 style={{
-                                  animation: 'pulse-wave 2s ease-out infinite 0.5s',
+                                  animation: 'btn-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite 0.8s',
+                                  filter: 'blur(2px)',
+                                }}
+                              />
+                              <span 
+                                className={`absolute inset-0 rounded-lg bg-gradient-to-r ${gradient}`}
+                                style={{
+                                  animation: 'btn-pulse-ring 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite 1.6s',
+                                  filter: 'blur(1px)',
                                 }}
                               />
                               <style>{`
-                                @keyframes pulse-wave {
+                                @keyframes btn-pulse-ring {
                                   0% {
                                     transform: scale(1);
-                                    opacity: 0.4;
+                                    opacity: 0.45;
+                                  }
+                                  50% {
+                                    opacity: 0.2;
                                   }
                                   100% {
-                                    transform: scale(1.15);
+                                    transform: scale(1.35, 1.6);
                                     opacity: 0;
                                   }
                                 }
