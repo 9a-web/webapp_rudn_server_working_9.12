@@ -173,7 +173,7 @@ const WelcomeScreen = ({ onGetStarted, onSyncComplete, hideSyncButton = false })
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
         >
-          @rudn_mosbot
+          @{botUsername}
         </motion.p>
       </div>
 
