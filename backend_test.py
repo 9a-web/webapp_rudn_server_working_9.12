@@ -22,100 +22,178 @@ def print_test_result(test_name, success, details=None):
         print(f"   {details}")
     print()
 
-def test_create_task():
-    """Test 1: Create a task"""
-    print("🔄 Testing: Create Task...")
+def test_server_stats():
+    """Test 1: GET /api/admin/server-stats - should return 200 with JSON containing cpu, memory, disk, uptime, mongodb, top_processes"""
+    print("🔄 Testing: Server Stats...")
     
-    url = f"{BASE_URL}/tasks"
-    payload = {
-        "telegram_id": TEST_TELEGRAM_ID,
-        "text": "Test Task",
-        "category": "study",
-        "priority": "high",
-        "target_date": "2026-02-07T00:00:00Z",
-        "subtasks": ["Subtask 1", "Subtask 2"]
-    }
+    url = f"{BASE_URL}/admin/server-stats"
     
     try:
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.get(url, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Verify required top-level fields
+            required_fields = ['cpu', 'memory', 'disk', 'uptime', 'mongodb', 'top_processes']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print_test_result("Server Stats", False, f"Missing top-level fields: {missing_fields}")
+                return False
+            
+            # Verify CPU object structure
+            cpu_required = ['percent', 'count_logical', 'per_core', 'load_average']
+            cpu_missing = [field for field in cpu_required if field not in data['cpu']]
+            if cpu_missing:
+                print_test_result("Server Stats", False, f"Missing CPU fields: {cpu_missing}")
+                return False
+                
+            # Verify Memory object structure
+            memory_required = ['total_gb', 'used_gb', 'percent']
+            memory_missing = [field for field in memory_required if field not in data['memory']]
+            if memory_missing:
+                print_test_result("Server Stats", False, f"Missing memory fields: {memory_missing}")
+                return False
+                
+            # Verify Disk object structure
+            disk_required = ['total_gb', 'used_gb', 'percent']
+            disk_missing = [field for field in disk_required if field not in data['disk']]
+            if disk_missing:
+                print_test_result("Server Stats", False, f"Missing disk fields: {disk_missing}")
+                return False
+                
+            # Verify Uptime object structure
+            uptime_required = ['seconds', 'days', 'hours', 'minutes']
+            uptime_missing = [field for field in uptime_required if field not in data['uptime']]
+            if uptime_missing:
+                print_test_result("Server Stats", False, f"Missing uptime fields: {uptime_missing}")
+                return False
+                
+            # Verify Process object structure
+            process_required = ['pid', 'memory_rss_mb', 'threads']
+            process_missing = [field for field in process_required if field not in data.get('process', {})]
+            if process_missing:
+                print_test_result("Server Stats", False, f"Missing process fields: {process_missing}")
+                return False
+                
+            # Verify MongoDB object exists (can have error field if connection fails)
+            if 'mongodb' not in data:
+                print_test_result("Server Stats", False, "Missing mongodb field")
+                return False
+                
+            # Verify top_processes is array
+            if not isinstance(data['top_processes'], list):
+                print_test_result("Server Stats", False, f"top_processes should be array, got: {type(data['top_processes'])}")
+                return False
+            
+            # Verify data ranges are reasonable
+            cpu_percent = data['cpu']['percent']
+            if not (0 <= cpu_percent <= 100):
+                print_test_result("Server Stats", False, f"CPU percent out of range: {cpu_percent}")
+                return False
+                
+            memory_percent = data['memory']['percent'] 
+            if not (0 <= memory_percent <= 100):
+                print_test_result("Server Stats", False, f"Memory percent out of range: {memory_percent}")
+                return False
+            
+            print_test_result("Server Stats", True, f"All required fields present with valid data ranges")
+            return True
+        else:
+            print_test_result("Server Stats", False, f"HTTP {response.status_code}: {response.text}")
+            return False
+            
+    except Exception as e:
+        print_test_result("Server Stats", False, f"Exception: {str(e)}")
+        return False
+
+def test_server_stats_history_1h():
+    """Test 2: GET /api/admin/server-stats-history?hours=1 - should return proper structure"""
+    print("🔄 Testing: Server Stats History (1 hour)...")
+    
+    url = f"{BASE_URL}/admin/server-stats-history?hours=1"
+    
+    try:
+        response = requests.get(url, timeout=30)
         
         if response.status_code == 200:
             data = response.json()
             
             # Verify required fields
-            required_fields = ['id', 'subtasks']
+            required_fields = ['period_hours', 'total_points', 'interval_minutes', 'metrics', 'peaks', 'averages']
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
-                print_test_result("Create Task", False, f"Missing fields: {missing_fields}")
-                return None
-            
-            # Verify subtasks structure
-            if isinstance(data['subtasks'], list) and len(data['subtasks']) == 2:
-                # Check if subtasks have proper structure (subtask_id, title, completed)
-                subtask_valid = True
-                for subtask in data['subtasks']:
-                    if not all(key in subtask for key in ['subtask_id', 'title', 'completed']):
-                        subtask_valid = False
-                        break
-                
-                if subtask_valid:
-                    print_test_result("Create Task", True, f"Task created with ID: {data['id']}")
-                    return data['id']
-                else:
-                    print_test_result("Create Task", False, "Subtasks don't have required structure (subtask_id, title, completed)")
-                    return None
-            else:
-                print_test_result("Create Task", False, f"Expected 2 subtasks, got: {data.get('subtasks', [])}")
-                return None
-        else:
-            print_test_result("Create Task", False, f"HTTP {response.status_code}: {response.text}")
-            return None
-            
-    except Exception as e:
-        print_test_result("Create Task", False, f"Exception: {str(e)}")
-        return None
-
-def test_update_task(task_id):
-    """Test 2: Update task with notes and origin"""
-    print("🔄 Testing: Update Task (BUG FIX #1 and #2)...")
-    
-    if not task_id:
-        print_test_result("Update Task", False, "No task_id provided (previous test failed)")
-        return False
-    
-    url = f"{BASE_URL}/tasks/{task_id}"
-    payload = {
-        "notes": "Test notes updated",
-        "origin": "schedule"
-    }
-    
-    try:
-        response = requests.put(url, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Verify the updated fields
-            if data.get('notes') == "Test notes updated" and data.get('origin') == "schedule":
-                print_test_result("Update Task", True, "Task updated successfully with notes and origin")
-                return True
-            else:
-                print_test_result("Update Task", False, f"Fields not updated correctly. notes: {data.get('notes')}, origin: {data.get('origin')}")
+                print_test_result("Server Stats History (1h)", False, f"Missing fields: {missing_fields}")
                 return False
+            
+            # Verify period_hours is correct
+            if data['period_hours'] != 1:
+                print_test_result("Server Stats History (1h)", False, f"Expected period_hours=1, got: {data['period_hours']}")
+                return False
+                
+            # Verify total_points is number >= 0
+            if not isinstance(data['total_points'], int) or data['total_points'] < 0:
+                print_test_result("Server Stats History (1h)", False, f"Invalid total_points: {data['total_points']}")
+                return False
+                
+            # Verify interval_minutes is number
+            if not isinstance(data['interval_minutes'], int):
+                print_test_result("Server Stats History (1h)", False, f"Invalid interval_minutes: {data['interval_minutes']}")
+                return False
+                
+            # Verify metrics is array of objects
+            if not isinstance(data['metrics'], list):
+                print_test_result("Server Stats History (1h)", False, f"metrics should be array, got: {type(data['metrics'])}")
+                return False
+                
+            # If we have metrics, verify structure
+            if data['metrics']:
+                metric_required = ['cpu_percent', 'ram_percent', 'disk_percent', 'load_1', 'process_rss_mb', 'timestamp']
+                first_metric = data['metrics'][0]
+                metric_missing = [field for field in metric_required if field not in first_metric]
+                if metric_missing:
+                    print_test_result("Server Stats History (1h)", False, f"Missing metric fields: {metric_missing}")
+                    return False
+                    
+            # Verify peaks structure
+            if 'peaks' in data and data['peaks']:
+                peaks_required = ['cpu', 'ram', 'disk', 'load']
+                peaks_missing = [field for field in peaks_required if field not in data['peaks']]
+                if peaks_missing:
+                    print_test_result("Server Stats History (1h)", False, f"Missing peaks fields: {peaks_missing}")
+                    return False
+                    
+                # Each peak should have value and timestamp
+                for peak_name, peak_data in data['peaks'].items():
+                    if not isinstance(peak_data, dict) or 'value' not in peak_data or 'timestamp' not in peak_data:
+                        print_test_result("Server Stats History (1h)", False, f"Invalid peak structure for {peak_name}")
+                        return False
+                        
+            # Verify averages structure  
+            if 'averages' in data and data['averages']:
+                averages_required = ['cpu', 'ram', 'disk']
+                averages_missing = [field for field in averages_required if field not in data['averages']]
+                if averages_missing:
+                    print_test_result("Server Stats History (1h)", False, f"Missing averages fields: {averages_missing}")
+                    return False
+            
+            print_test_result("Server Stats History (1h)", True, f"Valid structure with {data['total_points']} data points")
+            return True
         else:
-            print_test_result("Update Task", False, f"HTTP {response.status_code}: {response.text}")
+            print_test_result("Server Stats History (1h)", False, f"HTTP {response.status_code}: {response.text}")
             return False
             
     except Exception as e:
-        print_test_result("Update Task", False, f"Exception: {str(e)}")
+        print_test_result("Server Stats History (1h)", False, f"Exception: {str(e)}")
         return False
 
-def test_get_tasks():
-    """Test 3: Get tasks"""
-    print("🔄 Testing: Get Tasks...")
+def test_server_stats_history_24h():
+    """Test 3: GET /api/admin/server-stats-history?hours=24 - verify period_hours=24"""
+    print("🔄 Testing: Server Stats History (24 hours)...")
     
-    url = f"{BASE_URL}/tasks/{TEST_TELEGRAM_ID}"
+    url = f"{BASE_URL}/admin/server-stats-history?hours=24"
     
     try:
         response = requests.get(url, timeout=30)
@@ -123,91 +201,34 @@ def test_get_tasks():
         if response.status_code == 200:
             data = response.json()
             
-            if isinstance(data, list):
-                # Check if our created task is in the list with updated notes
-                test_task_found = False
-                for task in data:
-                    if task.get('text') == 'Test Task' and task.get('notes') == 'Test notes updated':
-                        test_task_found = True
-                        break
-                
-                if test_task_found:
-                    print_test_result("Get Tasks", True, f"Found {len(data)} tasks including our test task with updated notes")
-                    return True
-                else:
-                    print_test_result("Get Tasks", False, "Test task with updated notes not found in the list")
-                    return False
-            else:
-                print_test_result("Get Tasks", False, f"Expected list, got: {type(data)}")
+            # Verify period_hours is correct
+            if data.get('period_hours') != 24:
+                print_test_result("Server Stats History (24h)", False, f"Expected period_hours=24, got: {data.get('period_hours')}")
                 return False
-        else:
-            print_test_result("Get Tasks", False, f"HTTP {response.status_code}: {response.text}")
-            return False
-            
-    except Exception as e:
-        print_test_result("Get Tasks", False, f"Exception: {str(e)}")
-        return False
-
-def test_create_planner_event():
-    """Test 4: Create planner event (BUG FIX #3)"""
-    print("🔄 Testing: Create Planner Event (BUG FIX #3)...")
-    
-    url = f"{BASE_URL}/planner/events"
-    payload = {
-        "telegram_id": TEST_TELEGRAM_ID,
-        "text": "Planner Event Test",
-        "time_start": "10:00",
-        "time_end": "11:30",
-        "target_date": "2026-02-07T00:00:00Z",
-        "category": "study",
-        "priority": "medium",
-        "subtasks": ["Step 1", "Step 2"]
-    }
-    
-    try:
-        response = requests.post(url, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Verify required fields for planner events
-            required_fields = ['id', 'subtasks', 'videos']
+                
+            # Same structure validation as 1h test
+            required_fields = ['period_hours', 'total_points', 'interval_minutes', 'metrics', 'peaks', 'averages']
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
-                print_test_result("Create Planner Event", False, f"Missing fields: {missing_fields}")
-                return None
+                print_test_result("Server Stats History (24h)", False, f"Missing fields: {missing_fields}")
+                return False
             
-            # Verify subtasks are TaskSubtask objects with proper structure
-            if isinstance(data['subtasks'], list) and len(data['subtasks']) == 2:
-                subtask_valid = True
-                for subtask in data['subtasks']:
-                    if not all(key in subtask for key in ['subtask_id', 'title', 'completed']):
-                        subtask_valid = False
-                        break
-                
-                if subtask_valid and 'videos' in data:
-                    print_test_result("Create Planner Event", True, f"Planner event created with ID: {data['id']}")
-                    return data['id']
-                else:
-                    print_test_result("Create Planner Event", False, "Subtasks conversion or videos field issue")
-                    return None
-            else:
-                print_test_result("Create Planner Event", False, f"Expected 2 subtasks, got: {data.get('subtasks', [])}")
-                return None
+            print_test_result("Server Stats History (24h)", True, f"Valid 24h structure with {data.get('total_points', 0)} data points")
+            return True
         else:
-            print_test_result("Create Planner Event", False, f"HTTP {response.status_code}: {response.text}")
-            return None
+            print_test_result("Server Stats History (24h)", False, f"HTTP {response.status_code}: {response.text}")
+            return False
             
     except Exception as e:
-        print_test_result("Create Planner Event", False, f"Exception: {str(e)}")
-        return None
+        print_test_result("Server Stats History (24h)", False, f"Exception: {str(e)}")
+        return False
 
-def test_get_planner_day_events():
-    """Test 5: Get planner day events (BUG FIX #4)"""
-    print("🔄 Testing: Get Planner Day Events (BUG FIX #4)...")
+def test_server_stats_history_168h():
+    """Test 4: GET /api/admin/server-stats-history?hours=168 - verify it caps at 168 hours"""
+    print("🔄 Testing: Server Stats History (168 hours - cap limit)...")
     
-    url = f"{BASE_URL}/planner/{TEST_TELEGRAM_ID}/2026-02-07"
+    url = f"{BASE_URL}/admin/server-stats-history?hours=168"
     
     try:
         response = requests.get(url, timeout=30)
@@ -215,46 +236,34 @@ def test_get_planner_day_events():
         if response.status_code == 200:
             data = response.json()
             
-            # Verify response structure (PlannerDayResponse)
-            required_fields = ['date', 'events', 'total_count']
+            # Verify period_hours is capped at 168
+            if data.get('period_hours') != 168:
+                print_test_result("Server Stats History (168h)", False, f"Expected period_hours=168 (capped), got: {data.get('period_hours')}")
+                return False
+                
+            # Same structure validation
+            required_fields = ['period_hours', 'total_points', 'interval_minutes', 'metrics', 'peaks', 'averages']
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
-                print_test_result("Get Planner Day Events", False, f"Missing fields: {missing_fields}")
+                print_test_result("Server Stats History (168h)", False, f"Missing fields: {missing_fields}")
                 return False
             
-            # Check if events array has proper structure with subtasks progress and videos
-            if isinstance(data['events'], list):
-                events_valid = True
-                for event in data['events']:
-                    # Check if event has subtasks progress fields and videos
-                    required_event_fields = ['subtasks', 'videos']
-                    if not all(field in event for field in required_event_fields):
-                        events_valid = False
-                        break
-                
-                if events_valid:
-                    print_test_result("Get Planner Day Events", True, f"Found {len(data['events'])} events with proper structure")
-                    return True
-                else:
-                    print_test_result("Get Planner Day Events", False, "Events missing subtasks or videos fields")
-                    return False
-            else:
-                print_test_result("Get Planner Day Events", False, f"Expected events array, got: {type(data.get('events'))}")
-                return False
+            print_test_result("Server Stats History (168h)", True, f"Valid 168h structure (properly capped) with {data.get('total_points', 0)} data points")
+            return True
         else:
-            print_test_result("Get Planner Day Events", False, f"HTTP {response.status_code}: {response.text}")
+            print_test_result("Server Stats History (168h)", False, f"HTTP {response.status_code}: {response.text}")
             return False
             
     except Exception as e:
-        print_test_result("Get Planner Day Events", False, f"Exception: {str(e)}")
+        print_test_result("Server Stats History (168h)", False, f"Exception: {str(e)}")
         return False
 
-def test_get_productivity_stats():
-    """Test 6: Get productivity stats (BUG FIX #6)"""
-    print("🔄 Testing: Get Productivity Stats (BUG FIX #6)...")
+def test_server_stats_history_over_limit():
+    """Test 5: GET /api/admin/server-stats-history?hours=200 - verify it caps at 168 hours even with higher input"""
+    print("🔄 Testing: Server Stats History (200 hours - over limit)...")
     
-    url = f"{BASE_URL}/tasks/{TEST_TELEGRAM_ID}/productivity-stats"
+    url = f"{BASE_URL}/admin/server-stats-history?hours=200"
     
     try:
         response = requests.get(url, timeout=30)
@@ -262,98 +271,48 @@ def test_get_productivity_stats():
         if response.status_code == 200:
             data = response.json()
             
-            # Verify daily_stats array contains 7 days
-            if 'daily_stats' in data and isinstance(data['daily_stats'], list):
-                if len(data['daily_stats']) == 7:
-                    print_test_result("Get Productivity Stats", True, f"Stats returned with 7 days of data")
-                    return True
-                else:
-                    print_test_result("Get Productivity Stats", False, f"Expected 7 days, got: {len(data['daily_stats'])}")
-                    return False
-            else:
-                print_test_result("Get Productivity Stats", False, "Missing or invalid daily_stats field")
+            # Should be capped at 168 even when requesting 200
+            if data.get('period_hours') != 168:
+                print_test_result("Server Stats History (over limit)", False, f"Expected period_hours=168 (capped from 200), got: {data.get('period_hours')}")
                 return False
+            
+            print_test_result("Server Stats History (over limit)", True, f"Properly capped at 168h when requesting 200h")
+            return True
         else:
-            print_test_result("Get Productivity Stats", False, f"HTTP {response.status_code}: {response.text}")
+            print_test_result("Server Stats History (over limit)", False, f"HTTP {response.status_code}: {response.text}")
             return False
             
     except Exception as e:
-        print_test_result("Get Productivity Stats", False, f"Exception: {str(e)}")
-        return False
-
-def cleanup_tasks():
-    """Test 7: Cleanup - delete created tasks"""
-    print("🔄 Testing: Cleanup Created Tasks...")
-    
-    # First get all tasks
-    url = f"{BASE_URL}/tasks/{TEST_TELEGRAM_ID}"
-    
-    try:
-        response = requests.get(url, timeout=30)
-        
-        if response.status_code != 200:
-            print_test_result("Cleanup Tasks", False, f"Failed to get tasks: HTTP {response.status_code}")
-            return False
-        
-        tasks = response.json()
-        deleted_count = 0
-        
-        # Delete tasks that match our test data
-        for task in tasks:
-            if task.get('text') in ['Test Task', 'Planner Event Test']:
-                delete_url = f"{BASE_URL}/tasks/{task['id']}"
-                try:
-                    delete_response = requests.delete(delete_url, timeout=30)
-                    if delete_response.status_code in [200, 204]:
-                        deleted_count += 1
-                    else:
-                        print(f"   Failed to delete task {task['id']}: HTTP {delete_response.status_code}")
-                except Exception as e:
-                    print(f"   Exception deleting task {task['id']}: {str(e)}")
-        
-        print_test_result("Cleanup Tasks", True, f"Deleted {deleted_count} test tasks")
-        return True
-        
-    except Exception as e:
-        print_test_result("Cleanup Tasks", False, f"Exception: {str(e)}")
+        print_test_result("Server Stats History (over limit)", False, f"Exception: {str(e)}")
         return False
 
 def main():
-    """Run all tests"""
-    print("🚀 Starting RUDN Schedule Backend API Tests")
+    """Run all server stats tests"""
+    print("🚀 Starting Server Stats Backend API Tests")
     print(f"Backend URL: {BASE_URL}")
-    print(f"Test Telegram ID: {TEST_TELEGRAM_ID}")
-    print("=" * 60)
+    print("=" * 70)
     
     results = {}
     
-    # Test 1: Create Task
-    task_id = test_create_task()
-    results['create_task'] = task_id is not None
+    # Test 1: Server Stats
+    results['server_stats'] = test_server_stats()
     
-    # Test 2: Update Task (depends on Test 1)
-    results['update_task'] = test_update_task(task_id)
+    # Test 2: Server Stats History (1 hour)
+    results['server_stats_history_1h'] = test_server_stats_history_1h()
     
-    # Test 3: Get Tasks
-    results['get_tasks'] = test_get_tasks()
+    # Test 3: Server Stats History (24 hours)
+    results['server_stats_history_24h'] = test_server_stats_history_24h()
     
-    # Test 4: Create Planner Event
-    planner_event_id = test_create_planner_event()
-    results['create_planner_event'] = planner_event_id is not None
+    # Test 4: Server Stats History (168 hours - limit)
+    results['server_stats_history_168h'] = test_server_stats_history_168h()
     
-    # Test 5: Get Planner Day Events
-    results['get_planner_day_events'] = test_get_planner_day_events()
-    
-    # Test 6: Get Productivity Stats
-    results['get_productivity_stats'] = test_get_productivity_stats()
-    
-    # Test 7: Cleanup
-    results['cleanup'] = cleanup_tasks()
+    # Test 5: Server Stats History (over limit)
+    results['server_stats_history_over_limit'] = test_server_stats_history_over_limit()
     
     # Summary
-    print("=" * 60)
+    print("=" * 70)
     print("📊 TEST SUMMARY")
-    print("=" * 60)
+    print("=" * 70)
     
     passed = sum(1 for result in results.values() if result)
     total = len(results)
@@ -366,7 +325,7 @@ def main():
     print(f"Overall: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
     
     if passed == total:
-        print("🎉 All tests passed!")
+        print("🎉 All server stats endpoint tests passed!")
         return 0
     else:
         print("⚠️  Some tests failed. Check the details above.")
