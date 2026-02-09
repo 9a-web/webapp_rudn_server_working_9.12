@@ -6372,7 +6372,167 @@ async def track_user_activity(telegram_id: int, section: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============ API для ЛК РУДН (lk.rudn.ru) ============
+# ============ Server Load Statistics ============
+
+@api_router.get("/admin/server-stats")
+async def get_server_stats():
+    """
+    Статистика нагрузки на сервер: CPU, RAM, Disk, uptime, MongoDB, процессы.
+    """
+    try:
+        import time
+
+        # CPU
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        cpu_count = psutil.cpu_count()
+        cpu_count_logical = psutil.cpu_count(logical=True)
+        cpu_freq = psutil.cpu_freq()
+        
+        # Per-core CPU
+        cpu_per_core = psutil.cpu_percent(interval=0, percpu=True)
+
+        # RAM
+        mem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+
+        # Disk
+        disk = psutil.disk_usage('/')
+        try:
+            disk_io = psutil.disk_io_counters()
+            disk_io_data = {
+                "read_bytes": disk_io.read_bytes,
+                "write_bytes": disk_io.write_bytes,
+                "read_count": disk_io.read_count,
+                "write_count": disk_io.write_count,
+            } if disk_io else None
+        except Exception:
+            disk_io_data = None
+
+        # Network
+        try:
+            net_io = psutil.net_io_counters()
+            network = {
+                "bytes_sent": net_io.bytes_sent,
+                "bytes_recv": net_io.bytes_recv,
+                "packets_sent": net_io.packets_sent,
+                "packets_recv": net_io.packets_recv,
+            }
+        except Exception:
+            network = None
+
+        # Uptime
+        boot_time = psutil.boot_time()
+        uptime_seconds = int(time.time() - boot_time)
+        uptime_days = uptime_seconds // 86400
+        uptime_hours = (uptime_seconds % 86400) // 3600
+        uptime_minutes = (uptime_seconds % 3600) // 60
+
+        # Current process (FastAPI)
+        proc = psutil.Process()
+        proc_mem = proc.memory_info()
+        proc_create_time = datetime.fromtimestamp(proc.create_time())
+
+        # MongoDB stats
+        mongo_stats = {}
+        try:
+            db_stats = await db.command("dbStats")
+            server_status = await db.command("serverStatus")
+            mongo_stats = {
+                "db_name": db_stats.get("db", ""),
+                "collections": db_stats.get("collections", 0),
+                "objects": db_stats.get("objects", 0),
+                "data_size_mb": round(db_stats.get("dataSize", 0) / (1024 * 1024), 2),
+                "storage_size_mb": round(db_stats.get("storageSize", 0) / (1024 * 1024), 2),
+                "indexes": db_stats.get("indexes", 0),
+                "index_size_mb": round(db_stats.get("indexSize", 0) / (1024 * 1024), 2),
+                "connections_current": server_status.get("connections", {}).get("current", 0),
+                "connections_available": server_status.get("connections", {}).get("available", 0),
+                "uptime_seconds": server_status.get("uptime", 0),
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get MongoDB stats: {e}")
+            mongo_stats = {"error": str(e)}
+
+        # Top processes by CPU
+        top_processes = []
+        try:
+            for p in sorted(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']),
+                            key=lambda x: x.info.get('cpu_percent', 0) or 0, reverse=True)[:8]:
+                top_processes.append({
+                    "pid": p.info['pid'],
+                    "name": p.info['name'],
+                    "cpu_percent": round(p.info.get('cpu_percent', 0) or 0, 1),
+                    "memory_percent": round(p.info.get('memory_percent', 0) or 0, 1),
+                })
+        except Exception:
+            pass
+
+        # Load average
+        try:
+            load_avg = os.getloadavg()
+            load_average = {
+                "1min": round(load_avg[0], 2),
+                "5min": round(load_avg[1], 2),
+                "15min": round(load_avg[2], 2),
+            }
+        except Exception:
+            load_average = None
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "system": {
+                "platform": platform.system(),
+                "platform_release": platform.release(),
+                "architecture": platform.machine(),
+                "hostname": platform.node(),
+                "python_version": platform.python_version(),
+            },
+            "cpu": {
+                "percent": cpu_percent,
+                "count_physical": cpu_count,
+                "count_logical": cpu_count_logical,
+                "frequency_mhz": round(cpu_freq.current, 0) if cpu_freq else None,
+                "per_core": cpu_per_core,
+                "load_average": load_average,
+            },
+            "memory": {
+                "total_gb": round(mem.total / (1024**3), 2),
+                "used_gb": round(mem.used / (1024**3), 2),
+                "available_gb": round(mem.available / (1024**3), 2),
+                "percent": mem.percent,
+                "swap_total_gb": round(swap.total / (1024**3), 2),
+                "swap_used_gb": round(swap.used / (1024**3), 2),
+                "swap_percent": swap.percent,
+            },
+            "disk": {
+                "total_gb": round(disk.total / (1024**3), 2),
+                "used_gb": round(disk.used / (1024**3), 2),
+                "free_gb": round(disk.free / (1024**3), 2),
+                "percent": round(disk.used / disk.total * 100, 1),
+                "io": disk_io_data,
+            },
+            "network": network,
+            "uptime": {
+                "seconds": uptime_seconds,
+                "days": uptime_days,
+                "hours": uptime_hours,
+                "minutes": uptime_minutes,
+                "boot_time": datetime.fromtimestamp(boot_time).isoformat(),
+            },
+            "process": {
+                "pid": proc.pid,
+                "memory_rss_mb": round(proc_mem.rss / (1024**2), 2),
+                "memory_vms_mb": round(proc_mem.vms / (1024**2), 2),
+                "cpu_percent": proc.cpu_percent(),
+                "threads": proc.num_threads(),
+                "started_at": proc_create_time.isoformat(),
+            },
+            "mongodb": mongo_stats,
+            "top_processes": top_processes,
+        }
+    except Exception as e:
+        logger.error(f"Error getting server stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/lk/connect", response_model=LKConnectionResponse)
 async def connect_lk(data: LKCredentialsRequest):
