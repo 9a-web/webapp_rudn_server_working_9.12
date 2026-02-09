@@ -9,7 +9,12 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Add server load statistics tab to admin panel.
+Replace all hardcoded "rudn_mosbot" links with dynamic bot username based on ENV.
+
+### Changes Made:
+- `frontend/src/components/ProfileModal.jsx`: Added `fetchBotInfo` import, `botUsername` state, useEffect to load bot username. Replaced hardcoded `rudn_mosbot` → dynamic `botUsername`.
+- `backend/models.py`: Updated comment to remove hardcoded bot name reference.
+- Backend endpoint `/api/bot-info` returns dynamic username based on ENV (test→devrudnbot, production→rudn_mosbot).
 
 ### Backend Changes
 - New endpoint: `GET /api/admin/server-stats` - returns CPU, RAM, Disk, uptime, MongoDB stats, process info, network, top processes
