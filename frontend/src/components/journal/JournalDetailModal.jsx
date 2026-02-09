@@ -477,6 +477,13 @@ export const JournalDetailModal = ({
                 {isOwner && (
                   <>
                     <button
+                      onClick={() => setShowEditJournal(true)}
+                      className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
+                      title="Редактировать журнал"
+                    >
+                      <Edit3 className="w-5 h-5 text-white" />
+                    </button>
+                    <button
                       onClick={handleGenerateInviteLink}
                       className="p-2 rounded-full bg-black/20 backdrop-blur-sm"
                     >
