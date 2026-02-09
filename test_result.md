@@ -168,7 +168,7 @@ Prerequisites:
 - ✅ psutil system monitoring operational
 
 **Testing Environment:**
-- Backend URL: https://rudn-webapp.preview.emergentagent.com/api
+- Backend URL: https://rudn-test-build.preview.emergentagent.com/api
 - External access confirmed (not localhost:8001 as requested, but production URL)
 - Response times: <30 seconds for all requests
 - All endpoints accessible via external network
