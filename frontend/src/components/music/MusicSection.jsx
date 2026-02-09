@@ -477,12 +477,14 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             <img 
               src="/music-welcome-owl-mobile.png" 
               alt="" 
-              className="absolute inset-0 w-full h-full object-cover object-center md:hidden"
+              className="absolute inset-0 w-full h-full object-cover md:hidden"
+              style={{ objectPosition: '55% center' }}
             />
             <img 
               src="/music-welcome-owl.png" 
               alt="" 
-              className="absolute inset-0 w-full h-full object-cover object-center hidden md:block"
+              className="absolute inset-0 w-full h-full object-cover hidden md:block"
+              style={{ objectPosition: '55% center' }}
             />
             {/* Затемнение для читаемости текста */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
