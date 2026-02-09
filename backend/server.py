@@ -6536,7 +6536,190 @@ async def get_server_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============ API для ЛК РУДН (lk.rudn.ru) ============
+# --- Background task: сбор метрик сервера каждые 60 секунд ---
+async def collect_server_metrics_loop():
+    """Фоновая задача для периодического сбора метрик сервера в MongoDB"""
+    import time as _time
+    await asyncio.sleep(5)  # ждём старт приложения
+    logger.info("📊 Server metrics collector started (interval: 60s)")
+    
+    while True:
+        try:
+            cpu_percent = psutil.cpu_percent(interval=1)
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            try:
+                net_io = psutil.net_io_counters()
+                net_bytes_sent = net_io.bytes_sent
+                net_bytes_recv = net_io.bytes_recv
+            except Exception:
+                net_bytes_sent = 0
+                net_bytes_recv = 0
+
+            try:
+                load_avg = os.getloadavg()
+                load_1 = round(load_avg[0], 2)
+                load_5 = round(load_avg[1], 2)
+                load_15 = round(load_avg[2], 2)
+            except Exception:
+                load_1 = load_5 = load_15 = 0
+
+            proc = psutil.Process()
+            proc_mem = proc.memory_info()
+
+            metric = {
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.utcnow(),
+                "cpu_percent": round(cpu_percent, 1),
+                "ram_percent": round(mem.percent, 1),
+                "ram_used_gb": round(mem.used / (1024**3), 2),
+                "ram_total_gb": round(mem.total / (1024**3), 2),
+                "disk_percent": round(disk.used / disk.total * 100, 1),
+                "disk_used_gb": round(disk.used / (1024**3), 2),
+                "net_bytes_sent": net_bytes_sent,
+                "net_bytes_recv": net_bytes_recv,
+                "load_1": load_1,
+                "load_5": load_5,
+                "load_15": load_15,
+                "process_rss_mb": round(proc_mem.rss / (1024**2), 2),
+                "process_threads": proc.num_threads(),
+            }
+
+            await db.server_metrics_history.insert_one(metric)
+
+            # Удаляем записи старше 7 дней
+            cutoff = datetime.utcnow() - timedelta(days=7)
+            await db.server_metrics_history.delete_many({"timestamp": {"$lt": cutoff}})
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error collecting server metrics: {e}")
+        
+        await asyncio.sleep(60)
+
+
+@api_router.get("/admin/server-stats-history")
+async def get_server_stats_history(hours: int = 24):
+    """
+    История нагрузки сервера за указанный период.
+    Возвращает метрики + пиковые значения.
+    
+    Query params:
+    - hours: период в часах (1, 6, 24, 72, 168). По умолчанию 24.
+    """
+    try:
+        hours = min(hours, 168)  # максимум 7 дней
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        
+        cursor = db.server_metrics_history.find(
+            {"timestamp": {"$gte": cutoff}},
+            {"_id": 0}
+        ).sort("timestamp", 1)
+        
+        all_metrics = await cursor.to_list(length=None)
+        
+        if not all_metrics:
+            return {
+                "period_hours": hours,
+                "total_points": 0,
+                "metrics": [],
+                "peaks": None,
+                "averages": None,
+            }
+        
+        # Агрегируем данные для больших периодов (чтобы не отдавать тысячи точек)
+        # Для 1ч — каждая минута, для 6ч — каждые 5 мин, для 24ч+ — каждые 15 мин
+        if hours <= 1:
+            interval_minutes = 1
+        elif hours <= 6:
+            interval_minutes = 5
+        elif hours <= 24:
+            interval_minutes = 15
+        else:
+            interval_minutes = 30
+        
+        # Группируем по интервалам
+        aggregated = []
+        bucket_start = None
+        bucket_items = []
+        
+        for m in all_metrics:
+            ts = m["timestamp"]
+            bucket_key = ts.replace(
+                minute=(ts.minute // interval_minutes) * interval_minutes,
+                second=0, microsecond=0
+            )
+            
+            if bucket_start is None or bucket_key != bucket_start:
+                if bucket_items:
+                    aggregated.append(_aggregate_bucket(bucket_items, bucket_start))
+                bucket_start = bucket_key
+                bucket_items = [m]
+            else:
+                bucket_items.append(m)
+        
+        if bucket_items:
+            aggregated.append(_aggregate_bucket(bucket_items, bucket_start))
+        
+        # Пиковые нагрузки
+        peaks = {
+            "cpu": {"value": 0, "timestamp": None},
+            "ram": {"value": 0, "timestamp": None},
+            "disk": {"value": 0, "timestamp": None},
+            "load": {"value": 0, "timestamp": None},
+        }
+        
+        for m in all_metrics:
+            if m.get("cpu_percent", 0) > peaks["cpu"]["value"]:
+                peaks["cpu"]["value"] = m["cpu_percent"]
+                peaks["cpu"]["timestamp"] = m["timestamp"].isoformat()
+            if m.get("ram_percent", 0) > peaks["ram"]["value"]:
+                peaks["ram"]["value"] = m["ram_percent"]
+                peaks["ram"]["timestamp"] = m["timestamp"].isoformat()
+            if m.get("disk_percent", 0) > peaks["disk"]["value"]:
+                peaks["disk"]["value"] = m["disk_percent"]
+                peaks["disk"]["timestamp"] = m["timestamp"].isoformat()
+            load_val = m.get("load_1", 0)
+            if load_val > peaks["load"]["value"]:
+                peaks["load"]["value"] = load_val
+                peaks["load"]["timestamp"] = m["timestamp"].isoformat()
+        
+        # Средние значения
+        n = len(all_metrics)
+        averages = {
+            "cpu": round(sum(m.get("cpu_percent", 0) for m in all_metrics) / n, 1),
+            "ram": round(sum(m.get("ram_percent", 0) for m in all_metrics) / n, 1),
+            "disk": round(sum(m.get("disk_percent", 0) for m in all_metrics) / n, 1),
+        }
+        
+        return {
+            "period_hours": hours,
+            "total_points": len(aggregated),
+            "interval_minutes": interval_minutes,
+            "metrics": aggregated,
+            "peaks": peaks,
+            "averages": averages,
+        }
+    except Exception as e:
+        logger.error(f"Error getting server stats history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _aggregate_bucket(items, bucket_time):
+    """Агрегирует массив метрик в одну точку (среднее)"""
+    n = len(items)
+    return {
+        "timestamp": bucket_time.isoformat(),
+        "cpu_percent": round(sum(m.get("cpu_percent", 0) for m in items) / n, 1),
+        "ram_percent": round(sum(m.get("ram_percent", 0) for m in items) / n, 1),
+        "ram_used_gb": round(sum(m.get("ram_used_gb", 0) for m in items) / n, 2),
+        "disk_percent": round(sum(m.get("disk_percent", 0) for m in items) / n, 1),
+        "net_bytes_sent": max(m.get("net_bytes_sent", 0) for m in items),
+        "net_bytes_recv": max(m.get("net_bytes_recv", 0) for m in items),
+        "load_1": round(sum(m.get("load_1", 0) for m in items) / n, 2),
+        "load_5": round(sum(m.get("load_5", 0) for m in items) / n, 2),
+        "process_rss_mb": round(sum(m.get("process_rss_mb", 0) for m in items) / n, 2),
+    }
 
 @api_router.post("/lk/connect", response_model=LKConnectionResponse)
 async def connect_lk(data: LKCredentialsRequest):
