@@ -3,13 +3,7 @@
  */
 
 import axios from 'axios';
-
-const getBackendURL = () => {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:8001';
-  }
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 const API_BASE = `${getBackendURL()}/api`;
 
