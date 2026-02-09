@@ -589,7 +589,7 @@ export const ProfileModal = ({
                   {fullName}
                 </p>
                 <a
-                  href="https://t.me/rudn_mosbot"
+                  href={`https://t.me/${botUsername}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[17px] font-bold inline-block"
@@ -607,7 +607,7 @@ export const ProfileModal = ({
                     if (hapticFeedback) hapticFeedback('impact', 'light');
                   }}
                 >
-                  @rudn_mosbot
+                  @{botUsername}
                 </a>
               </div>
             )}
