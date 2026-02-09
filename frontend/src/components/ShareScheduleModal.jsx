@@ -20,25 +20,16 @@ export const ShareScheduleModal = ({
   telegramId
 }) => {
   const [copied, setCopied] = useState(false);
-  const [botUsername, setBotUsername] = useState('rudn_mosbot');
+  const [botUsername, setBotUsername] = useState('bot');
   const [webAppUrl, setWebAppUrl] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const scheduleImageRef = useRef(null);
 
   // Получаем информацию о боте при монтировании
   useEffect(() => {
-    const fetchBotInfo = async () => {
-      try {
-        const botInfo = await botAPI.getBotInfo();
-        if (botInfo && botInfo.username) {
-          setBotUsername(botInfo.username);
-        }
-      } catch (error) {
-        console.error('Failed to fetch bot info:', error);
-      }
-    };
-
-    fetchBotInfo();
+    fetchBotInfoUtil().then(info => {
+      if (info.username) setBotUsername(info.username);
+    });
 
     // Определяем URL WebApp
     if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
