@@ -740,7 +740,7 @@ export const JournalDetailModal = ({
                       <h3 className="text-xl font-semibold text-white">Предметы</h3>
                       <button
                         onClick={() => setShowCreateSubject(true)}
-                        className={`flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white`}
+                        className={`flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r ${gradient} rounded-lg text-sm text-white w-fit`}
                       >
                         <Plus className="w-4 h-4" />
                         Добавить
