@@ -5,6 +5,7 @@ import { toPng } from 'html-to-image';
 import { botAPI } from '../services/api';
 import { achievementsAPI } from '../services/api';
 import { groupScheduleItems } from '../utils/scheduleUtils';
+import { fetchBotInfo as fetchBotInfoUtil } from '../utils/botInfo';
 
 /**
  * Компонент для шаринга расписания
