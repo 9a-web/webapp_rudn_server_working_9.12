@@ -15,9 +15,9 @@ import ListeningRoomModal from './ListeningRoomModal';
 const pulseAnimation = {
   scale: [1, 1.02, 1],
   boxShadow: [
-    '0 0 0 0 rgba(59, 130, 246, 0.4)',
-    '0 0 0 12px rgba(59, 130, 246, 0)',
-    '0 0 0 0 rgba(59, 130, 246, 0)'
+    '0 0 0 0 rgba(251, 146, 60, 0.4)',
+    '0 0 0 12px rgba(251, 146, 60, 0)',
+    '0 0 0 0 rgba(251, 146, 60, 0)'
   ]
 };
 
