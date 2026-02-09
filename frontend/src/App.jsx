@@ -2006,20 +2006,22 @@ const Home = () => {
 
 function App() {
   return (
-    <div className="App">
-      <ThemeProvider>
-        <TelegramProvider>
-          <PlayerProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/status-tester" element={<StatusTester />} />
-              </Routes>
-            </BrowserRouter>
-          </PlayerProvider>
-        </TelegramProvider>
-      </ThemeProvider>
-    </div>
+    <ErrorBoundary>
+      <div className="App">
+        <ThemeProvider>
+          <TelegramProvider>
+            <PlayerProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/status-tester" element={<StatusTester />} />
+                </Routes>
+              </BrowserRouter>
+            </PlayerProvider>
+          </TelegramProvider>
+        </ThemeProvider>
+      </div>
+    </ErrorBoundary>
   );
 }
 
