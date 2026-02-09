@@ -288,12 +288,12 @@ export const NotificationSettings = ({
               <ol className="text-xs sm:text-sm text-blue-900 list-decimal list-inside space-y-1">
                 <li>Начать диалог с ботом{' '}
                   <a 
-                    href="https://t.me/rudn_mosbot" 
+                    href={`https://t.me/${botUsername}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="font-semibold underline hover:text-blue-700"
                   >
-                    @rudn_mosbot
+                    @{botUsername}
                   </a>
                 </li>
                 <li>Отправить команду <code className="bg-blue-100 px-1 rounded">/start</code></li>
