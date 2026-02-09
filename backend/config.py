@@ -72,18 +72,38 @@ def is_production_environment() -> bool:
 
 def get_telegram_bot_username() -> str:
     """
-    Возвращает username Telegram бота в зависимости от ENV.
-    
-    - ENV=test -> rudn_mosbot (тестовый бот)
-    - ENV=production -> rudn_mosbot (основной бот)
-    
-    Returns:
-        str: Username бота для текущего окружения
+    Возвращает username Telegram бота.
+    Сначала проверяет кэш (заполняется при старте через getMe).
+    Если кэш пуст — возвращает fallback.
     """
-    if ENV == "production":
-        return "rudn_mosbot"
-    else:
-        return "rudn_mosbot"
+    return _bot_username_cache.get("username", "bot")
+
+
+# Кэш username бота (заполняется при старте)
+_bot_username_cache = {}
+
+
+async def _fetch_bot_username():
+    """Получает username бота через Telegram Bot API getMe и кэширует."""
+    import httpx
+    token = get_telegram_bot_token()
+    if not token:
+        logger.error("❌ Не удалось получить username бота: токен не задан")
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
+            data = resp.json()
+            if data.get("ok") and data.get("result", {}).get("username"):
+                username = data["result"]["username"]
+                _bot_username_cache["username"] = username
+                _bot_username_cache["first_name"] = data["result"].get("first_name", "")
+                _bot_username_cache["id"] = data["result"].get("id", 0)
+                logger.info(f"🤖 Bot username получен через getMe: @{username} (ENV={ENV})")
+            else:
+                logger.warning(f"⚠️ getMe вернул неожиданный ответ: {data}")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при вызове getMe: {e}")
 
 
 # Экспортируем активный токен для обратной совместимости
