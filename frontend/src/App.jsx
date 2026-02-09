@@ -781,7 +781,7 @@ const Home = () => {
         
         // Загружаем настройки темы
         try {
-          const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
+          const backendUrl = getBackendURL();
           const themeResponse = await fetch(`${backendUrl}/api/user-settings/${currentUser.id}/theme`);
           if (themeResponse.ok) {
             const themeData = await themeResponse.json();
