@@ -470,21 +470,19 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center px-4 py-8 min-h-[50vh]"
+            className="relative w-full rounded-2xl overflow-hidden"
+            style={{ aspectRatio: '1536 / 1024' }}
           >
-            <div className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm relative">
-              {/* Фоновое изображение */}
-              <div className="absolute inset-0">
-                <img 
-                  src="/music-welcome-owl.png" 
-                  alt="" 
-                  className="w-full h-full object-cover"
-                />
-                {/* Затемнение для читаемости текста */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/30" />
-              </div>
+            {/* Фоновое изображение на весь блок */}
+            <img 
+              src="/music-welcome-owl.png" 
+              alt="" 
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {/* Затемнение для читаемости текста */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
               
-              <div className="relative flex flex-col items-center text-center space-y-5 sm:space-y-6 p-6 sm:p-8">
+            <div className="relative h-full flex flex-col items-center justify-end text-center space-y-4 sm:space-y-5 p-6 sm:p-8 pb-8 sm:pb-10">
                 {/* Логотипы VK и РУДН с иконкой связи */}
                 <div className="flex items-center gap-3 sm:gap-4">
                   <Icon28LogoVkColor width={48} height={48} className="sm:w-14 sm:h-14" />
@@ -510,7 +508,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
                   <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                     Добро пожаловать в Музыку
                   </h2>
-                  <p className="text-sm sm:text-base text-white/60 leading-relaxed max-w-md mx-auto">
+                  <p className="text-sm sm:text-base text-white/70 leading-relaxed max-w-md mx-auto">
                     Для доступа к вашим аудиозаписям VK необходимо получить токен авторизации
                   </p>
                 </div>
@@ -535,11 +533,10 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
                 </motion.button>
                 
                 {/* Подсказка */}
-                <p className="text-xs sm:text-sm text-white/40">
+                <p className="text-xs sm:text-sm text-white/50">
                   Нажмите, чтобы авторизоваться через VK
                 </p>
               </div>
-            </div>
           </motion.div>
         ) : activeTab === 'playlists' && !selectedPlaylist ? (
           <motion.div
