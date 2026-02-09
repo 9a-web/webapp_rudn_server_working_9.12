@@ -119,6 +119,52 @@ export const SubjectDetailModal = ({
     }
   };
 
+  // --- Subject editing ---
+  const startEditingSubject = () => {
+    if (hapticFeedback?.impactOccurred) hapticFeedback.impactOccurred('light');
+    setEditName(subject?.name || '');
+    setEditDescription(subject?.description || '');
+    setEditColor(subject?.color || 'blue');
+    setIsEditingSubject(true);
+  };
+
+  const cancelEditingSubject = () => {
+    setIsEditingSubject(false);
+  };
+
+  const handleSaveSubject = async () => {
+    if (!editName.trim()) return;
+    if (hapticFeedback?.impactOccurred) hapticFeedback.impactOccurred('medium');
+    
+    setIsSavingSubject(true);
+    try {
+      await updateSubject(subjectId, {
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+        color: editColor,
+      });
+      setIsEditingSubject(false);
+      loadData();
+      if (onSubjectUpdated) onSubjectUpdated();
+    } catch (error) {
+      console.error('Error updating subject:', error);
+    } finally {
+      setIsSavingSubject(false);
+    }
+  };
+
+  // --- Session editing ---
+  const handleSaveSession = async (sessionId, data) => {
+    try {
+      await updateSession(sessionId, data);
+      loadData();
+      if (onSubjectUpdated) onSubjectUpdated();
+    } catch (error) {
+      console.error('Error updating session:', error);
+      throw error;
+    }
+  };
+
   if (!isOpen) return null;
 
   const gradient = subject ? SUBJECT_COLORS[subject.color] || SUBJECT_COLORS.blue : SUBJECT_COLORS.blue;
