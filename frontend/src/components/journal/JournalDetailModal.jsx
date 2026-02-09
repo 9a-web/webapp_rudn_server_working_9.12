@@ -98,6 +98,12 @@ export const JournalDetailModal = ({
   const [showShareStudentLink, setShowShareStudentLink] = useState(false); // Модал отправки ссылки студенту
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // Подтверждение удаления журнала
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // Подтверждение выхода из журнала
+  const [botUsername, setBotUsername] = useState('bot');
+  
+  // Загрузка username бота
+  useEffect(() => {
+    fetchBotInfo().then(info => setBotUsername(info.username));
+  }, []);
   const [actionLoading, setActionLoading] = useState(false); // Загрузка при действиях
   const [applicationsCount, setApplicationsCount] = useState(0); // Количество заявок
   const [inviteLink, setInviteLink] = useState('');
