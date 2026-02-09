@@ -3,17 +3,7 @@
  */
 
 import axios from 'axios';
-
-// Определяем URL backend через env-переменную (как в api.js)
-const getBackendURL = () => {
-  try {
-    const envBackendUrl = import.meta.env.REACT_APP_BACKEND_URL || import.meta.env.VITE_BACKEND_URL || '';
-    if (envBackendUrl) return envBackendUrl;
-  } catch (e) {
-    // fallback
-  }
-  return window.location.origin;
-};
+import { getBackendURL } from '../utils/config';
 
 const API_BASE_URL = getBackendURL();
 
