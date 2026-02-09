@@ -943,6 +943,7 @@ export const JournalDetailModal = ({
             onDelete={handleDeleteStudent}
             onUnlink={handleUnlinkStudent}
             hapticFeedback={hapticFeedback}
+            botUsername={botUsername}
           />
         )}
 
