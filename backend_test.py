@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Backend API Testing Script
-Tests bot-info endpoint according to review request
+Comprehensive validation after architectural refactoring on localhost:8001
+Validates all 7 key points from review request
 """
 
 import requests
@@ -10,9 +11,9 @@ import uuid
 from datetime import datetime, timedelta
 import sys
 
-# Configuration - using external URL as per environment setup
-BASE_URL = "https://rudn-webapp.preview.emergentagent.com/api"
-TEST_TELEGRAM_ID = 12345
+# Configuration - testing on localhost:8001 as per review request
+BASE_URL = "http://localhost:8001/api"
+TEST_TELEGRAM_ID = 99999
 
 def print_test_result(test_name, success, details=None):
     """Print formatted test result"""
