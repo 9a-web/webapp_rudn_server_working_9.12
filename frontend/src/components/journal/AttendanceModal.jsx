@@ -108,6 +108,23 @@ export const AttendanceModal = ({
     ));
   };
 
+  const openCustomGradeInput = (studentId, currentGrade) => {
+    setEditingGradeStudent(studentId);
+    setCustomGradeInput(prev => ({ ...prev, [studentId]: currentGrade != null ? String(currentGrade) : '' }));
+    setTimeout(() => customInputRef.current?.focus(), 50);
+  };
+
+  const confirmCustomGrade = (studentId) => {
+    const raw = customGradeInput[studentId]?.trim();
+    if (!raw || isNaN(Number(raw))) {
+      setEditingGradeStudent(null);
+      return;
+    }
+    const value = Number(raw);
+    handleGradeChange(studentId, value);
+    setEditingGradeStudent(null);
+  };
+
   const handleSave = async () => {
     const changedRecords = Object.entries(changes).map(([studentId, data]) => {
       const student = attendance.find(a => a.student_id === studentId);
