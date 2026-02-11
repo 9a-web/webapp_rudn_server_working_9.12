@@ -107,10 +107,20 @@ class MessageTester:
         if not result2:
             return False
             
+        # Check if they're already friends
+        friends_check = self.test_request("GET", f"/friends/{self.user1_id}", None, 200, "Check Friendship Status")
+        if friends_check and friends_check.get("friends"):
+            # Check if user2 is in friends list
+            is_friend = any(f["telegram_id"] == self.user2_id for f in friends_check["friends"])
+            if is_friend:
+                self.log("✅ Users are already friends - skipping friend request")
+                return True
+        
         # Send friend request
         friend_req_data = {"telegram_id": self.user1_id}
         result3 = self.test_request("POST", f"/friends/request/{self.user2_id}", friend_req_data, 200, "Send Friend Request")
         if not result3:
+            # Maybe they're already friends, check the error
             return False
             
         # Get friend requests to find request_id
