@@ -2315,3 +2315,67 @@ class ListeningRoomSyncEvent(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
+
+# ============ Модели для системы сообщений (Messages / Dialogs) ============
+
+class MessageCreate(BaseModel):
+    """Создание нового сообщения"""
+    sender_id: int
+    receiver_id: int
+    text: str = Field(..., min_length=1, max_length=4000)
+
+class MessageResponse(BaseModel):
+    """Ответ с данными сообщения"""
+    id: str
+    conversation_id: str
+    sender_id: int
+    text: str
+    created_at: datetime
+    read_at: Optional[datetime] = None
+    is_deleted: bool = False
+    edited_at: Optional[datetime] = None
+
+class ConversationCreate(BaseModel):
+    """Создание/получение диалога"""
+    user1_id: int
+    user2_id: int
+
+class ConversationParticipant(BaseModel):
+    """Участник диалога"""
+    telegram_id: int
+    first_name: str = ""
+    last_name: str = ""
+    username: str = ""
+    is_online: bool = False
+    last_activity: Optional[datetime] = None
+
+class ConversationResponse(BaseModel):
+    """Ответ с данными диалога"""
+    id: str
+    participants: List[ConversationParticipant] = []
+    last_message: Optional[MessageResponse] = None
+    unread_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+class ConversationsListResponse(BaseModel):
+    """Список диалогов пользователя"""
+    conversations: List[ConversationResponse] = []
+    total: int = 0
+
+class MessagesListResponse(BaseModel):
+    """Список сообщений в диалоге"""
+    messages: List[MessageResponse] = []
+    total: int = 0
+    has_more: bool = False
+
+class UnreadCountResponse(BaseModel):
+    """Количество непрочитанных сообщений"""
+    total_unread: int = 0
+    per_conversation: dict = {}
+
+class MessageActionResponse(BaseModel):
+    """Ответ на действие с сообщением"""
+    success: bool
+    message: str
+
