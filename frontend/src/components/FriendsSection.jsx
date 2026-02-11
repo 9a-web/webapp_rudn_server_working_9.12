@@ -803,7 +803,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
         </div>
 
         {/* Табы */}
-        <div className="relative flex gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/[0.06]">
+        <div className="relative flex gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -817,7 +817,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
                   setActiveTab(tab.id);
                   hapticFeedback('impact', 'light');
                 }}
-                className={`flex-1 relative flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl transition-all duration-200 z-10 ${
+                className={`flex-shrink-0 flex-1 min-w-0 relative flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl transition-all duration-200 z-10 ${
                   isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
