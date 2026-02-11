@@ -2318,11 +2318,81 @@ class ListeningRoomSyncEvent(BaseModel):
 
 # ============ Модели для системы сообщений (Messages / Dialogs) ============
 
+class MessageType(str, Enum):
+    """Типы сообщений"""
+    TEXT = "text"
+    SCHEDULE = "schedule"
+    MUSIC = "music"
+    TASK = "task"
+    FORWARD = "forward"
+
+class ReactionInfo(BaseModel):
+    """Информация о реакции"""
+    emoji: str
+    users: List[int] = []
+
+class ReplyInfo(BaseModel):
+    """Информация о reply"""
+    message_id: str
+    sender_id: int
+    sender_name: str = ""
+    text: str = ""
+
 class MessageCreate(BaseModel):
     """Создание нового сообщения"""
     sender_id: int
     receiver_id: int
     text: str = Field(..., min_length=1, max_length=4000)
+    message_type: str = "text"
+    reply_to_id: Optional[str] = None
+    metadata: Optional[dict] = None
+
+class MessageEdit(BaseModel):
+    """Редактирование сообщения"""
+    telegram_id: int
+    text: str = Field(..., min_length=1, max_length=4000)
+
+class MessageReaction(BaseModel):
+    """Добавление/удаление реакции"""
+    telegram_id: int
+    emoji: str = Field(..., min_length=1, max_length=10)
+
+class MessagePin(BaseModel):
+    """Закрепление сообщения"""
+    telegram_id: int
+    is_pinned: bool = True
+
+class MessageForward(BaseModel):
+    """Пересылка сообщения"""
+    sender_id: int
+    receiver_id: int
+    original_message_id: str
+
+class ScheduleShareMessage(BaseModel):
+    """Отправка расписания"""
+    sender_id: int
+    receiver_id: int
+    date: Optional[str] = None
+
+class MusicShareMessage(BaseModel):
+    """Отправка музыки"""
+    sender_id: int
+    receiver_id: int
+    track_title: str
+    track_artist: str
+    track_id: Optional[str] = None
+    track_duration: Optional[int] = None
+    cover_url: Optional[str] = None
+
+class TaskFromMessage(BaseModel):
+    """Создание задачи из сообщения"""
+    telegram_id: int
+    message_id: str
+    title: Optional[str] = None
+
+class TypingIndicator(BaseModel):
+    """Индикатор набора"""
+    telegram_id: int
 
 class MessageResponse(BaseModel):
     """Ответ с данными сообщения"""
@@ -2330,10 +2400,16 @@ class MessageResponse(BaseModel):
     conversation_id: str
     sender_id: int
     text: str
+    message_type: str = "text"
     created_at: datetime
     read_at: Optional[datetime] = None
     is_deleted: bool = False
     edited_at: Optional[datetime] = None
+    is_pinned: bool = False
+    reply_to: Optional[ReplyInfo] = None
+    reactions: List[ReactionInfo] = []
+    metadata: Optional[dict] = None
+    forwarded_from: Optional[dict] = None
 
 class ConversationCreate(BaseModel):
     """Создание/получение диалога"""
@@ -2355,6 +2431,7 @@ class ConversationResponse(BaseModel):
     participants: List[ConversationParticipant] = []
     last_message: Optional[MessageResponse] = None
     unread_count: int = 0
+    pinned_message: Optional[MessageResponse] = None
     created_at: datetime
     updated_at: datetime
 
