@@ -126,7 +126,7 @@ const getConversationTimeAgo = (dateStr) => {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 };
 
-const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
+const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinListeningRoom }) => {
   const { user, webApp } = useTelegram();
   const [activeTab, setActiveTab] = useState('friends');
   const [friends, setFriends] = useState([]);
