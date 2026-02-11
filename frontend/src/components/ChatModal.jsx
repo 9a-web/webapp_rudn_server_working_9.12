@@ -882,9 +882,11 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       case 'reply':
         setReplyTo(message);
         setEditingMessage(null);
+        if (preEditText) { setInputText(preEditText); setPreEditText(''); }
         inputRef.current?.focus();
         break;
       case 'edit':
+        setPreEditText(inputText); // Сохраняем текущий текст перед редактированием
         setEditingMessage(message);
         setInputText(message.text);
         setReplyTo(null);
