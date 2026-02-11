@@ -101,6 +101,13 @@ const FriendSearchModal = ({ isOpen, onClose, userSettings, currentUserId, onSen
     }
   }, [isOpen, selectedFaculty, selectedGroup, searchQuery, handleSearch]);
 
+  // При получении SSE события — перезагружаем результаты поиска
+  useEffect(() => {
+    if (isOpen && refreshTrigger && (selectedFaculty || selectedGroup || searchQuery)) {
+      handleSearch();
+    }
+  }, [refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSendRequest = async (targetId) => {
     setSendingRequest(targetId);
     try {
