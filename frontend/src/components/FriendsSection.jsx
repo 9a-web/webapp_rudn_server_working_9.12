@@ -233,6 +233,9 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
   const handleFriendEvent = useCallback((eventType, eventData) => {
     console.log('[FriendEvents] SSE event:', eventType, eventData);
     
+    // Обновляем trigger для FriendSearchModal
+    setFriendEventTrigger(prev => prev + 1);
+    
     switch (eventType) {
       case 'friend_request_received':
         // Кто-то отправил нам заявку — обновляем список заявок
