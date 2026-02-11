@@ -142,144 +142,137 @@ class ScheduleTester:
         self.log("✅ Users setup complete - 77777 and 88888 are now friends")
         return True
         
-    def run_messaging_tests(self) -> bool:
-        """Run all 16 messaging tests from the test plan"""
-        print("\n=== MESSAGING TESTS (16 Tests) ===")
+    def run_schedule_tests(self) -> bool:
+        """Run schedule sending fix tests from the review request"""
+        print("\n=== SCHEDULE SENDING FIX TESTS ===")
         
-        # Test 1: Blank text validation (text with only spaces should return 422)
-        blank_text_data = {
+        # Test 1: POST /api/messages/send-schedule with date: "2025-07-14"
+        schedule_test1_data = {
             "sender_id": self.user1_id,
-            "receiver_id": self.user2_id, 
-            "text": "   "  # Only spaces
+            "receiver_id": self.user2_id,
+            "date": "2025-07-14"
         }
-        result1 = self.test_request("POST", "/messages/send", blank_text_data, 422, "1. Blank Text Validation")
+        result1 = self.test_request("POST", "/messages/send-schedule", schedule_test1_data, 200, "1. Send Schedule (2025-07-14)")
         if not result1:
             return False
             
-        # Test 2: Send normal message
-        normal_msg_data = {
+        # Verify response has message_type = "schedule"
+        if result1.get("message_type") != "schedule":
+            self.log(f"  Expected message_type='schedule', got '{result1.get('message_type')}'", False)
+            return False
+        else:
+            self.log("  ✓ message_type = 'schedule'")
+            
+        # Verify metadata contains ALL required fields
+        metadata = result1.get("metadata", {})
+        required_fields = ["date", "group_name", "sender_name", "items", "week_number", "day_name"]
+        missing_fields = []
+        
+        for field in required_fields:
+            if field not in metadata:
+                missing_fields.append(field)
+                
+        if missing_fields:
+            self.log(f"  Missing metadata fields: {missing_fields}", False)
+            return False
+        else:
+            self.log(f"  ✓ All metadata fields present: {list(metadata.keys())}")
+            
+        # Log all metadata field values for verification
+        for field, value in metadata.items():
+            self.log(f"  metadata.{field} = {value}")
+            
+        # Verify items is an array
+        if not isinstance(metadata.get("items"), list):
+            self.log(f"  Expected items to be array, got {type(metadata.get('items'))}", False)
+            return False
+        else:
+            self.log(f"  ✓ items is array with {len(metadata['items'])} items")
+            
+        # Verify week_number is a number
+        if not isinstance(metadata.get("week_number"), (int, float)):
+            self.log(f"  Expected week_number to be number, got {type(metadata.get('week_number'))}", False)
+            return False
+        else:
+            self.log(f"  ✓ week_number is number: {metadata['week_number']}")
+            
+        # Verify day_name is a string
+        if not isinstance(metadata.get("day_name"), str):
+            self.log(f"  Expected day_name to be string, got {type(metadata.get('day_name'))}", False)
+            return False
+        else:
+            self.log(f"  ✓ day_name is string: '{metadata['day_name']}'")
+            
+        # Test 2: POST /api/messages/send-schedule with date: "2025-09-15" (Monday)
+        schedule_test2_data = {
             "sender_id": self.user1_id,
             "receiver_id": self.user2_id,
-            "text": "Test message"
+            "date": "2025-09-15"  # Sept 15 2025 is Monday
         }
-        result2 = self.test_request("POST", "/messages/send", normal_msg_data, 200, "2. Send Test Message")
+        result2 = self.test_request("POST", "/messages/send-schedule", schedule_test2_data, 200, "2. Send Schedule (2025-09-15 Monday)")
         if not result2:
             return False
-        self.message_ids.append(result2.get("id"))
-        
-        # Get conversation_id from first message
-        if not self.conversation_id and result2:
-            self.conversation_id = result2.get("conversation_id")
-            self.log(f"Got conversation_id: {self.conversation_id}")
             
-        # Test 3: Send reply message
-        reply_msg_data = {
-            "sender_id": self.user2_id,
-            "receiver_id": self.user1_id,
-            "text": "Reply test"
+        # Verify metadata.day_name = "Понедельник" (Sept 15 2025 is Monday)
+        metadata2 = result2.get("metadata", {})
+        expected_day_name = "Понедельник"
+        actual_day_name = metadata2.get("day_name", "")
+        
+        if actual_day_name != expected_day_name:
+            self.log(f"  Expected day_name='{expected_day_name}', got '{actual_day_name}'", False)
+            return False
+        else:
+            self.log(f"  ✓ day_name = '{actual_day_name}' (correct for Monday)")
+            
+        # Verify metadata.week_number = 2 (ISO week 38, even = 2)
+        expected_week_number = 2  # ISO week 38 is even, so should be 2
+        actual_week_number = metadata2.get("week_number")
+        
+        if actual_week_number != expected_week_number:
+            self.log(f"  Expected week_number={expected_week_number}, got {actual_week_number}", False)
+            return False
+        else:
+            self.log(f"  ✓ week_number = {actual_week_number} (correct for ISO week 38)")
+            
+        # Log all metadata for this test
+        for field, value in metadata2.items():
+            self.log(f"  metadata.{field} = {value}")
+            
+        # Test 3: POST /api/messages/send-schedule without date (defaults to today)
+        schedule_test3_data = {
+            "sender_id": self.user1_id,
+            "receiver_id": self.user2_id
         }
-        result3 = self.test_request("POST", "/messages/send", reply_msg_data, 200, "3. Send Reply Message")
+        result3 = self.test_request("POST", "/messages/send-schedule", schedule_test3_data, 200, "3. Send Schedule (no date - defaults to today)")
         if not result3:
             return False
-        self.message_ids.append(result3.get("id"))
-        
-        if not self.conversation_id:
-            self.log("No conversation_id available for subsequent tests", False)
-            return False
             
-        # Test 4: Get conversation messages
-        result4 = self.test_request("GET", f"/messages/{self.conversation_id}/messages?telegram_id={self.user1_id}&limit=50", 
-                                   None, 200, "4. Get Conversation Messages")
+        # Verify metadata.date is today's date
+        metadata3 = result3.get("metadata", {})
+        today_date = datetime.utcnow().strftime("%Y-%m-%d")
+        actual_date = metadata3.get("date", "")
+        
+        if actual_date != today_date:
+            self.log(f"  Expected date='{today_date}', got '{actual_date}'", False)
+            return False
+        else:
+            self.log(f"  ✓ date = '{actual_date}' (correct for today)")
+            
+        # Log all metadata for this test
+        for field, value in metadata3.items():
+            self.log(f"  metadata.{field} = {value}")
+            
+        # Test 4: POST /api/messages/send with basic text (sanity check)
+        basic_msg_data = {
+            "sender_id": self.user1_id,
+            "receiver_id": self.user2_id,
+            "text": "test for z-index"
+        }
+        result4 = self.test_request("POST", "/messages/send", basic_msg_data, 200, "4. Send Basic Message (Sanity Check)")
         if not result4:
             return False
             
-        # Test 5: Cursor pagination test  
-        if self.message_ids and len(self.message_ids) > 0:
-            first_msg_id = self.message_ids[0]
-            result5 = self.test_request("GET", f"/messages/{self.conversation_id}/messages?telegram_id={self.user1_id}&before={first_msg_id}&limit=10", 
-                                       None, 200, "5. Cursor Pagination Test")
-        else:
-            self.log("Test 5: No message ID for pagination test", False)
-            result5 = None
-            
-        # Test 6: Search messages (normal query)
-        result6 = self.test_request("GET", f"/messages/{self.conversation_id}/search?q=test&telegram_id={self.user1_id}",
-                                   None, 200, "6. Search Messages (Normal)")
-        if not result6:
-            return False
-            
-        # Test 7: Regex injection test (query with parentheses should NOT crash)
-        result7 = self.test_request("GET", f"/messages/{self.conversation_id}/search?q=(test)&telegram_id={self.user1_id}",
-                                   None, 200, "7. Regex Injection Test (Parentheses)")
-        if not result7:
-            return False
-            
-        # Test 8: Delete message (soft delete)
-        if self.message_ids and len(self.message_ids) > 0:
-            delete_msg_id = self.message_ids[0]
-            delete_data = {"telegram_id": self.user1_id}
-            result8 = self.test_request("DELETE", f"/messages/{delete_msg_id}", delete_data, 200, "8. Delete Message (Soft Delete)")
-            
-            # Test 9: Pin deleted message should return 400
-            pin_deleted_data = {"telegram_id": self.user1_id, "is_pinned": True}
-            result9 = self.test_request("PUT", f"/messages/{delete_msg_id}/pin", pin_deleted_data, 400, "9. Pin Deleted Message (Should Fail)")
-            
-        else:
-            self.log("Test 8 & 9: No message ID for delete/pin tests", False)
-            result8 = result9 = None
-            
-        # Test 10: Pin normal message
-        if self.message_ids and len(self.message_ids) > 1:
-            normal_msg_id = self.message_ids[1] 
-            pin_normal_data = {"telegram_id": self.user1_id, "is_pinned": True}
-            result10 = self.test_request("PUT", f"/messages/{normal_msg_id}/pin", pin_normal_data, 200, "10. Pin Normal Message")
-        else:
-            self.log("Test 10: No normal message ID for pin test", False) 
-            result10 = None
-            
-        # Test 11: create-task with non-participant should return 403
-        if self.message_ids and len(self.message_ids) > 0:
-            non_participant_data = {"telegram_id": 99999, "message_id": self.message_ids[0]}
-            result11 = self.test_request("POST", "/messages/create-task", non_participant_data, 403, "11. Create Task (Non-Participant)")
-        else:
-            self.log("Test 11: No message ID for create-task test", False)
-            result11 = None
-            
-        # Test 12: create-task with valid participant  
-        if self.message_ids and len(self.message_ids) > 0:
-            participant_data = {"telegram_id": self.user1_id, "message_id": self.message_ids[0]}
-            result12 = self.test_request("POST", "/messages/create-task", participant_data, 200, "12. Create Task (Valid Participant)")
-        else:
-            self.log("Test 12: No message ID for create-task test", False)
-            result12 = None
-            
-        # Test 13: Unread count via aggregation
-        result13 = self.test_request("GET", f"/messages/unread/{self.user1_id}", None, 200, "13. Unread Count (Aggregation)")
-        if not result13:
-            return False
-            
-        # Test 14: Forward message should create in_app_notification
-        if self.message_ids and len(self.message_ids) > 0:
-            forward_data = {
-                "sender_id": self.user1_id,
-                "receiver_id": self.user2_id, 
-                "original_message_id": self.message_ids[0]
-            }
-            result14 = self.test_request("POST", "/messages/forward", forward_data, 200, "14. Forward Message")
-            if result14:
-                # Check in_app_notifications collection (we'll just log that it should be checked)
-                self.log("  → Should check in_app_notifications collection for new notification")
-        else:
-            self.log("Test 14: No message ID for forward test", False)
-            result14 = None
-            
-        # Test 15: Set typing indicator
-        typing_data = {"telegram_id": self.user1_id}
-        result15 = self.test_request("POST", f"/messages/{self.conversation_id}/typing", typing_data, 200, "15. Set Typing Indicator")
-        
-        # Test 16: Get typing users
-        result16 = self.test_request("GET", f"/messages/{self.conversation_id}/typing?telegram_id={self.user2_id}", 
-                                    None, 200, "16. Get Typing Users")
+        self.log("  ✓ Basic messaging functionality working")
         
         return True
         
