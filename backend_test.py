@@ -1,428 +1,381 @@
 #!/usr/bin/env python3
 """
-Backend Test for SSE (Server-Sent Events) Friend Events System
-Testing the SSE friend events system on http://localhost:8001
+Backend Test Script for Schedule Sending in Messages
+Testing schedule sending endpoints on http://localhost:8001
 """
+
 import asyncio
+import aiohttp
 import json
-import requests
-import time
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any
-import urllib3
+from datetime import datetime, timedelta
+import sys
 
-# Disable SSL warnings for localhost
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Base URL from the review request
+BASE_URL = "http://localhost:8001/api"
 
-class SSEClient:
-    """SSE Client for testing Server-Sent Events"""
-    
-    def __init__(self, url: str):
-        self.url = url
-        self.events = []
-        self.running = False
-        self.thread = None
-        
-    def start_listening(self, timeout: int = 30):
-        """Start listening to SSE stream with timeout"""
-        self.running = True
-        self.thread = threading.Thread(target=self._listen, args=(timeout,))
-        self.thread.start()
-        # Give a moment for connection to establish
-        time.sleep(1)
-        
-    def _listen(self, timeout: int):
-        """Listen to SSE stream"""
-        try:
-            response = requests.get(
-                self.url,
-                stream=True,
-                timeout=timeout,
-                headers={'Accept': 'text/event-stream'}
-            )
-            
-            for line in response.iter_lines(decode_unicode=True):
-                if not self.running:
-                    break
-                    
-                if line and line.startswith('data: '):
-                    try:
-                        data = json.loads(line[6:])  # Remove 'data: ' prefix
-                        self.events.append(data)
-                        print(f"SSE Event received: {data}")
-                    except json.JSONDecodeError as e:
-                        print(f"Failed to parse SSE event: {line}, error: {e}")
-                        
-        except requests.RequestException as e:
-            if self.running:  # Only log if we're still supposed to be running
-                print(f"SSE Connection error: {e}")
-                
-    def stop_listening(self):
-        """Stop listening to SSE stream"""
-        self.running = False
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=2)
-            
-    def get_events(self) -> List[Dict[str, Any]]:
-        """Get all received events"""
-        return self.events.copy()
-    
-    def wait_for_event(self, event_type: str, timeout: int = 10) -> Dict[str, Any]:
-        """Wait for a specific event type"""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            for event in self.events:
-                if event.get('type') == event_type:
-                    return event
-            time.sleep(0.1)
-        return None
-
-class BackendTester:
-    """Backend tester for SSE friend events system"""
-    
+class ScheduleTestRunner:
     def __init__(self):
-        self.base_url = "http://localhost:8001/api"
+        self.session = None
         self.test_results = []
-        self.session = requests.Session()
+        self.conversation_id = None
         
-    def log_result(self, test_name: str, passed: bool, details: str = ""):
-        """Log test result"""
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        result = f"{status}: {test_name}"
-        if details:
-            result += f" - {details}"
-        print(result)
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+    
+    def log_test(self, test_name: str, success: bool, details: str = ""):
+        """Log test results"""
+        status = "✅ PASSED" if success else "❌ FAILED"
         self.test_results.append({
             "test": test_name,
-            "passed": passed,
+            "success": success,
             "details": details
         })
-        
-    def make_request(self, method: str, endpoint: str, data: Dict = None, timeout: int = 10) -> requests.Response:
-        """Make HTTP request to backend"""
-        url = f"{self.base_url}{endpoint}"
+        print(f"{status}: {test_name}")
+        if details:
+            print(f"  Details: {details}")
+    
+    async def make_request(self, method: str, endpoint: str, data: dict = None, params: dict = None):
+        """Make HTTP request and return response"""
+        url = f"{BASE_URL}{endpoint}"
         try:
             if method.upper() == "GET":
-                return self.session.get(url, timeout=timeout)
+                async with self.session.get(url, params=params) as resp:
+                    return resp.status, await resp.json()
             elif method.upper() == "POST":
-                return self.session.post(url, json=data, timeout=timeout)
+                async with self.session.post(url, json=data) as resp:
+                    return resp.status, await resp.json()
+            elif method.upper() == "PUT":
+                async with self.session.put(url, json=data) as resp:
+                    return resp.status, await resp.json()
             elif method.upper() == "DELETE":
-                return self.session.delete(url, json=data, timeout=timeout)
-            else:
-                raise ValueError(f"Unsupported method: {method}")
+                async with self.session.delete(url, json=data) as resp:
+                    return resp.status, await resp.json()
         except Exception as e:
-            print(f"Request error for {method} {url}: {e}")
-            raise
-            
-    def create_test_user(self, telegram_id: int, username: str, first_name: str) -> bool:
-        """Create a test user"""
-        try:
-            response = self.make_request("POST", "/user-settings", {
-                "telegram_id": telegram_id,
-                "username": username,
-                "first_name": first_name,
-                "group_id": "G1",
-                "group_name": "Группа1",
-                "facultet_id": "F1",
-                "level_id": "L1",
-                "kurs": "1",
-                "form_code": "ОФО"
-            })
-            
-            if response.status_code in [200, 201]:
-                print(f"✅ User {telegram_id} ({username}) created/updated successfully")
-                return True
-            else:
-                print(f"❌ Failed to create user {telegram_id}: {response.status_code} - {response.text}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error creating user {telegram_id}: {e}")
-            return False
-            
-    def test_sse_connection(self):
-        """Test 1: SSE Connection - should start with connected event"""
-        print("\n=== Test 1: SSE Connection ===")
+            return 500, {"error": str(e)}
+    
+    async def setup_test_users(self):
+        """Setup test users 77777 and 88888 with friendship"""
+        print("🔧 Setting up test users...")
         
-        try:
-            # Start SSE client
-            sse_client = SSEClient(f"{self.base_url}/friends/events/77777")
-            sse_client.start_listening(timeout=5)
-            
-            # Wait for connected event
-            time.sleep(2)
-            events = sse_client.get_events()
-            sse_client.stop_listening()
-            
-            # Check if we got the connected event
-            if events and len(events) > 0:
-                first_event = events[0]
-                if first_event.get('type') == 'connected':
-                    self.log_result("SSE Connection", True, "Connected event received successfully")
-                    return True
-                else:
-                    self.log_result("SSE Connection", False, f"Expected 'connected' event, got: {first_event}")
-                    return False
-            else:
-                self.log_result("SSE Connection", False, "No events received from SSE stream")
-                return False
-                
-        except Exception as e:
-            self.log_result("SSE Connection", False, f"Error: {e}")
-            return False
-            
-    def cleanup_test_users(self):
-        """Clean up test data before running tests"""
-        try:
-            # Remove any existing friendship
-            self.make_request("DELETE", "/friends/444444", {"telegram_id": 333333})
-            self.make_request("DELETE", "/friends/333333", {"telegram_id": 444444})
-            
-            # Cancel any pending friend requests
-            response = self.make_request("GET", "/friends/444444/requests")
-            if response.status_code == 200:
-                requests_data = response.json()
-                incoming_requests = requests_data.get('incoming', [])
-                for request in incoming_requests:
-                    if request.get('telegram_id') == 333333:
-                        # Try to cancel the request
-                        try:
-                            self.make_request("POST", f"/friends/cancel/{request['request_id']}", {"telegram_id": 333333})
-                        except:
-                            pass
-                            
-            print("✅ Test data cleanup completed")
-            return True
-        except Exception as e:
-            print(f"⚠️  Test cleanup warning: {e}")
-            return True  # Continue with tests even if cleanup fails
-            
-    def test_sse_friend_request_events(self):
-        """Test 2: SSE events on friend request"""
-        print("\n=== Test 2: SSE Friend Request Events ===")
+        # User data for 77777
+        user1_data = {
+            "telegram_id": 77777,
+            "username": "testuser1",
+            "first_name": "Test1", 
+            "last_name": "User1",
+            "group_id": "14966",
+            "group_name": "ИВБОп-ИВТ-11",
+            "facultet_id": "41",
+            "level_id": "1",
+            "kurs": "1",
+            "form_code": "ОФО"
+        }
         
-        try:
-            # Step 1: Create test users
-            user1_created = self.create_test_user(333333, "ssetest1", "SSETest1")
-            user2_created = self.create_test_user(444444, "ssetest2", "SSETest2")
-            
-            if not (user1_created and user2_created):
-                self.log_result("Friend Request Events Setup", False, "Failed to create test users")
-                return False
-                
-            # Step 2: Start SSE listening for user 444444 (receiver)
-            sse_client = SSEClient(f"{self.base_url}/friends/events/444444")
-            sse_client.start_listening(timeout=15)
-            
-            # Wait for connected event
-            time.sleep(1)
-            
-            # Step 3: Send friend request from 333333 to 444444
-            response = self.make_request("POST", "/friends/request/444444", {"telegram_id": 333333})
-            
-            if response.status_code not in [200, 201]:
-                sse_client.stop_listening()
-                self.log_result("Friend Request Send", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-            # Step 4: Wait for friend_request_received event
-            time.sleep(2)
-            friend_request_event = sse_client.wait_for_event("friend_request_received", timeout=5)
-            sse_client.stop_listening()
-            
-            if friend_request_event:
-                expected_data = friend_request_event.get('data', {})
-                if expected_data.get('from_telegram_id') == 333333:
-                    self.log_result("Friend Request Events", True, "friend_request_received event received correctly")
-                    return True
-                else:
-                    self.log_result("Friend Request Events", False, f"Event data incorrect: {expected_data}")
-                    return False
-            else:
-                all_events = sse_client.get_events()
-                self.log_result("Friend Request Events", False, f"friend_request_received event not received. All events: {all_events}")
-                return False
-                
-        except Exception as e:
-            self.log_result("Friend Request Events", False, f"Error: {e}")
-            return False
-            
-    def test_sse_accept_events(self):
-        """Test 3: SSE events on accept"""
-        print("\n=== Test 3: SSE Accept Events ===")
+        # User data for 88888
+        user2_data = {
+            "telegram_id": 88888,
+            "username": "testuser2", 
+            "first_name": "Test2",
+            "last_name": "User2",
+            "group_id": "14966",
+            "group_name": "ИВБОп-ИВТ-11",
+            "facultet_id": "41",
+            "level_id": "1",
+            "kurs": "1",
+            "form_code": "ОФО"
+        }
         
-        try:
-            # Step 1: Get friend requests for 444444
-            response = self.make_request("GET", "/friends/444444/requests")
-            
-            if response.status_code != 200:
-                self.log_result("Get Friend Requests", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-            requests_data = response.json()
-            incoming_requests = requests_data.get('incoming', [])
-            
-            if not incoming_requests:
-                self.log_result("Accept Events Setup", False, "No pending friend requests found")
-                return False
-                
-            request_id = incoming_requests[0]['request_id']
-            
-            # Step 2: Start SSE for user 333333 (the sender)
-            sse_client = SSEClient(f"{self.base_url}/friends/events/333333")
-            sse_client.start_listening(timeout=15)
-            
-            # Wait for connected event
-            time.sleep(1)
-            
-            # Step 3: Accept the request
-            response = self.make_request("POST", f"/friends/accept/{request_id}", {"telegram_id": 444444})
-            
-            if response.status_code not in [200, 201]:
-                sse_client.stop_listening()
-                self.log_result("Friend Request Accept", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-            # Step 4: Wait for friend_request_accepted event
-            time.sleep(2)
-            accept_event = sse_client.wait_for_event("friend_request_accepted", timeout=5)
-            sse_client.stop_listening()
-            
-            if accept_event:
-                expected_data = accept_event.get('data', {})
-                if expected_data.get('by_telegram_id') == 444444:
-                    self.log_result("Accept Events", True, "friend_request_accepted event received correctly")
-                    return True
-                else:
-                    self.log_result("Accept Events", False, f"Event data incorrect: {expected_data}")
-                    return False
-            else:
-                all_events = sse_client.get_events()
-                self.log_result("Accept Events", False, f"friend_request_accepted event not received. All events: {all_events}")
-                return False
-                
-        except Exception as e:
-            self.log_result("Accept Events", False, f"Error: {e}")
-            return False
-            
-    def test_sse_remove_friend_events(self):
-        """Test 4: SSE events on remove friend"""
-        print("\n=== Test 4: SSE Remove Friend Events ===")
+        # Create/update users
+        status1, resp1 = await self.make_request("POST", "/user-settings", user1_data)
+        status2, resp2 = await self.make_request("POST", "/user-settings", user2_data)
         
-        try:
-            # Step 1: Start SSE for user 444444
-            sse_client = SSEClient(f"{self.base_url}/friends/events/444444")
-            sse_client.start_listening(timeout=15)
-            
-            # Wait for connected event
-            time.sleep(1)
-            
-            # Step 2: Remove friend - DELETE /api/friends/444444 with {"telegram_id": 333333}
-            response = self.make_request("DELETE", "/friends/444444", {"telegram_id": 333333})
-            
-            if response.status_code not in [200, 201]:
-                sse_client.stop_listening()
-                self.log_result("Remove Friend", False, f"HTTP {response.status_code}: {response.text}")
-                return False
-                
-            # Step 3: Wait for friend_removed event
-            time.sleep(2)
-            remove_event = sse_client.wait_for_event("friend_removed", timeout=5)
-            sse_client.stop_listening()
-            
-            if remove_event:
-                expected_data = remove_event.get('data', {})
-                if expected_data.get('by_telegram_id') == 333333:
-                    self.log_result("Remove Friend Events", True, "friend_removed event received correctly")
-                    return True
-                else:
-                    self.log_result("Remove Friend Events", False, f"Event data incorrect: {expected_data}")
-                    return False
-            else:
-                all_events = sse_client.get_events()
-                self.log_result("Remove Friend Events", False, f"friend_removed event not received. All events: {all_events}")
-                return False
-                
-        except Exception as e:
-            self.log_result("Remove Friend Events", False, f"Error: {e}")
-            return False
-            
-    def run_all_tests(self):
-        """Run all SSE tests"""
-        print("🚀 Starting SSE Friend Events System Tests")
-        print(f"Backend URL: {self.base_url}")
-        
-        # Clean up any existing test data first
-        self.cleanup_test_users()
-        
-        tests = [
-            self.test_sse_connection,
-            self.test_sse_friend_request_events,
-            self.test_sse_accept_events,
-            self.test_sse_remove_friend_events
-        ]
-        
-        passed_tests = 0
-        
-        for test in tests:
-            try:
-                if test():
-                    passed_tests += 1
-                time.sleep(1)  # Brief pause between tests
-            except Exception as e:
-                print(f"❌ Test failed with exception: {e}")
-                
-        print(f"\n📊 Test Results: {passed_tests}/{len(tests)} tests passed")
-        
-        if passed_tests == len(tests):
-            print("🎉 ALL TESTS PASSED!")
-            return True
+        if status1 == 200 and status2 == 200:
+            self.log_test("Setup Users", True, "Users 77777 and 88888 created/updated")
         else:
-            print("❌ Some tests failed")
+            self.log_test("Setup Users", False, f"User creation failed: {status1}, {status2}")
             return False
+        
+        # Check if they are already friends
+        status, friends = await self.make_request("GET", "/friends/77777")
+        
+        friends_exist = False
+        if status == 200 and "friends" in friends:
+            for friend in friends["friends"]:
+                if friend.get("telegram_id") == 88888:
+                    friends_exist = True
+                    break
+        
+        if not friends_exist:
+            # Send friend request from 77777 to 88888
+            status, resp = await self.make_request("POST", "/friends/request/88888", {"telegram_id": 77777})
             
-    def print_summary(self):
-        """Print detailed test summary"""
-        print("\n" + "="*50)
-        print("📋 DETAILED TEST SUMMARY")
-        print("="*50)
+            if status != 200:
+                self.log_test("Friend Request", False, f"Friend request failed: {status}")
+                return False
+            
+            # Get friend requests for 88888
+            status, requests = await self.make_request("GET", "/friends/88888/requests")
+            
+            if status != 200 or not requests.get("requests"):
+                self.log_test("Get Friend Requests", False, f"Failed to get requests: {status}")
+                return False
+            
+            # Accept the request
+            request_id = requests["requests"][0]["id"]
+            status, resp = await self.make_request("POST", f"/friends/accept/{request_id}", {"telegram_id": 88888})
+            
+            if status == 200:
+                self.log_test("Establish Friendship", True, "Users are now friends")
+            else:
+                self.log_test("Establish Friendship", False, f"Accept request failed: {status}")
+                return False
+        else:
+            self.log_test("Establish Friendship", True, "Users were already friends")
+        
+        return True
+    
+    async def test_schedule_for_today(self):
+        """Test 1: Send schedule for today (date: null)"""
+        print("\n📅 Test 1: Send schedule for today")
+        
+        data = {
+            "sender_id": 77777,
+            "receiver_id": 88888,
+            "date": None  # Should default to today
+        }
+        
+        status, resp = await self.make_request("POST", "/messages/send-schedule", data)
+        
+        if status != 200:
+            self.log_test("Send Schedule Today", False, f"HTTP {status}: {resp}")
+            return False
+        
+        # Validate response structure
+        success = True
+        details = []
+        
+        # Check message_type
+        if resp.get("message_type") != "schedule":
+            success = False
+            details.append("message_type is not 'schedule'")
+        
+        # Check metadata
+        metadata = resp.get("metadata", {})
+        if not isinstance(metadata.get("items"), list):
+            success = False
+            details.append("metadata.items is not an array")
+        
+        # Check date is today
+        today = datetime.now().strftime("%Y-%m-%d")
+        if metadata.get("date") != today:
+            success = False
+            details.append(f"metadata.date is not today ({today})")
+        
+        # Check week_number is 1 (current week)
+        if metadata.get("week_number") != 1:
+            success = False
+            details.append(f"metadata.week_number is not 1 (got {metadata.get('week_number')})")
+        
+        self.log_test("Send Schedule Today", success, "; ".join(details) if details else "All validations passed")
+        
+        # Store conversation_id for later tests
+        if "conversation_id" in resp:
+            self.conversation_id = resp["conversation_id"]
+        
+        return success
+    
+    async def test_schedule_for_this_week(self):
+        """Test 2: Send schedule for a specific date (this week)"""
+        print("\n📅 Test 2: Send schedule for this week")
+        
+        # Calculate a date from this week (e.g., Monday)
+        today = datetime.now()
+        days_since_monday = today.weekday()  # Monday is 0
+        this_monday = today - timedelta(days=days_since_monday)
+        test_date = this_monday.strftime("%Y-%m-%d")
+        
+        data = {
+            "sender_id": 77777,
+            "receiver_id": 88888,
+            "date": test_date
+        }
+        
+        status, resp = await self.make_request("POST", "/messages/send-schedule", data)
+        
+        if status != 200:
+            self.log_test("Send Schedule This Week", False, f"HTTP {status}: {resp}")
+            return False
+        
+        # Validate response structure
+        success = True
+        details = []
+        
+        # Check message_type
+        if resp.get("message_type") != "schedule":
+            success = False
+            details.append("message_type is not 'schedule'")
+        
+        # Check metadata
+        metadata = resp.get("metadata", {})
+        if metadata.get("date") != test_date:
+            success = False
+            details.append(f"metadata.date is not {test_date}")
+        
+        # Check week_number is 1 (current week)
+        if metadata.get("week_number") != 1:
+            success = False
+            details.append(f"metadata.week_number is not 1 (got {metadata.get('week_number')})")
+        
+        self.log_test("Send Schedule This Week", success, "; ".join(details) if details else f"Schedule sent for {test_date}")
+        return success
+    
+    async def test_schedule_for_next_week(self):
+        """Test 3: Send schedule for next week"""
+        print("\n📅 Test 3: Send schedule for next week")
+        
+        # Calculate a date from next week
+        today = datetime.now()
+        next_week_date = today + timedelta(days=7)
+        test_date = next_week_date.strftime("%Y-%m-%d")
+        
+        data = {
+            "sender_id": 77777,
+            "receiver_id": 88888,
+            "date": test_date
+        }
+        
+        status, resp = await self.make_request("POST", "/messages/send-schedule", data)
+        
+        if status != 200:
+            self.log_test("Send Schedule Next Week", False, f"HTTP {status}: {resp}")
+            return False
+        
+        # Validate response structure
+        success = True
+        details = []
+        
+        # Check message_type
+        if resp.get("message_type") != "schedule":
+            success = False
+            details.append("message_type is not 'schedule'")
+        
+        # Check metadata
+        metadata = resp.get("metadata", {})
+        if metadata.get("date") != test_date:
+            success = False
+            details.append(f"metadata.date is not {test_date}")
+        
+        # Check week_number is 2 (next week)
+        if metadata.get("week_number") != 2:
+            success = False
+            details.append(f"metadata.week_number is not 2 (got {metadata.get('week_number')})")
+        
+        self.log_test("Send Schedule Next Week", success, "; ".join(details) if details else f"Schedule sent for {test_date}")
+        return success
+    
+    async def test_conversation_messages(self):
+        """Test 4: Verify the message appears in conversation"""
+        print("\n💬 Test 4: Verify messages in conversation")
+        
+        # Get conversations for user 77777
+        status, resp = await self.make_request("GET", "/messages/conversations/77777")
+        
+        if status != 200:
+            self.log_test("Get Conversations", False, f"HTTP {status}: {resp}")
+            return False
+        
+        conversations = resp.get("conversations", [])
+        if not conversations:
+            self.log_test("Get Conversations", False, "No conversations found")
+            return False
+        
+        # Get the first conversation ID
+        conversation_id = conversations[0]["id"]
+        self.log_test("Get Conversations", True, f"Found conversation: {conversation_id}")
+        
+        # Get messages in the conversation
+        params = {"telegram_id": 77777}
+        status, resp = await self.make_request("GET", f"/messages/{conversation_id}/messages", params=params)
+        
+        if status != 200:
+            self.log_test("Get Conversation Messages", False, f"HTTP {status}: {resp}")
+            return False
+        
+        messages = resp.get("messages", [])
+        if not messages:
+            self.log_test("Get Conversation Messages", False, "No messages found")
+            return False
+        
+        # Check for schedule messages
+        schedule_messages = [msg for msg in messages if msg.get("message_type") == "schedule"]
+        
+        if schedule_messages:
+            self.log_test("Verify Schedule Messages", True, f"Found {len(schedule_messages)} schedule messages")
+            
+            # Validate structure of the first schedule message
+            schedule_msg = schedule_messages[0]
+            metadata = schedule_msg.get("metadata", {})
+            
+            required_fields = ["date", "group_name", "sender_name", "items", "week_number", "day_name"]
+            missing_fields = [field for field in required_fields if field not in metadata]
+            
+            if not missing_fields:
+                self.log_test("Schedule Message Structure", True, "All required metadata fields present")
+            else:
+                self.log_test("Schedule Message Structure", False, f"Missing fields: {missing_fields}")
+        else:
+            self.log_test("Verify Schedule Messages", False, "No schedule messages found in conversation")
+            return False
+        
+        return True
+    
+    async def run_all_tests(self):
+        """Run all tests in sequence"""
+        print("🚀 Starting Schedule Sending Tests")
+        print("=" * 60)
+        
+        # Setup
+        if not await self.setup_test_users():
+            print("❌ Setup failed, aborting tests")
+            return
+        
+        # Run tests
+        await self.test_schedule_for_today()
+        await self.test_schedule_for_this_week()
+        await self.test_schedule_for_next_week()
+        await self.test_conversation_messages()
+        
+        # Print summary
+        print("\n" + "=" * 60)
+        print("📊 TEST SUMMARY")
+        print("=" * 60)
+        
+        passed = sum(1 for result in self.test_results if result["success"])
+        total = len(self.test_results)
         
         for result in self.test_results:
-            status = "✅" if result["passed"] else "❌"
+            status = "✅" if result["success"] else "❌"
             print(f"{status} {result['test']}")
-            if result["details"]:
-                print(f"   └─ {result['details']}")
-                
-        passed = sum(1 for r in self.test_results if r["passed"])
-        total = len(self.test_results)
-        success_rate = (passed / total * 100) if total > 0 else 0
         
-        print(f"\n📊 Overall Results: {passed}/{total} ({success_rate:.1f}%)")
+        print(f"\nResult: {passed}/{total} tests passed")
+        
+        if passed == total:
+            print("🎉 All tests passed! Schedule sending is working correctly.")
+        else:
+            print("⚠️ Some tests failed. Please check the details above.")
         
         return passed == total
 
-def main():
-    """Main test execution"""
-    print("=" * 60)
-    print("🧪 SSE FRIEND EVENTS SYSTEM TEST SUITE")
-    print("=" * 60)
-    
-    tester = BackendTester()
-    
-    try:
-        success = tester.run_all_tests()
-        tester.print_summary()
-        
-        if success:
-            print("\n🎉 ALL SSE TESTS COMPLETED SUCCESSFULLY!")
-        else:
-            print("\n⚠️  SOME SSE TESTS FAILED - CHECK LOGS ABOVE")
-            
-    except KeyboardInterrupt:
-        print("\n⚠️ Tests interrupted by user")
-    except Exception as e:
-        print(f"\n❌ Critical error during testing: {e}")
-        
+async def main():
+    """Main test runner"""
+    async with ScheduleTestRunner() as runner:
+        success = await runner.run_all_tests()
+        sys.exit(0 if success else 1)
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
