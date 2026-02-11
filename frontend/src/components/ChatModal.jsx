@@ -196,6 +196,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
   const isForwarded = message.message_type === 'forward' || message.forwarded_from;
   const isSchedule = message.message_type === 'schedule';
   const isMusic = message.message_type === 'music';
+  const isRoomInvite = message.message_type === 'room_invite';
 
   // Long press refs
   const longPressTimerRef = useRef(null);
