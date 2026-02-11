@@ -1,19 +1,46 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script
-Comprehensive validation after architectural refactoring on localhost:8001
-Validates all 7 key points from review request
+Messaging API Testing Script
+Tests the new messaging API endpoints as specified in the review request
 """
 
 import requests
 import json
-import uuid
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
 import sys
 
-# Configuration - testing on localhost:8001 as per review request
+# Configuration - using localhost:8001 as specified in review request
 BASE_URL = "http://localhost:8001/api"
-TEST_TELEGRAM_ID = 99999
+
+# Test users as specified in the review request
+USER1_ID = 55555
+USER2_ID = 66666
+USER1_DATA = {
+    "telegram_id": USER1_ID,
+    "username": "testuser1", 
+    "first_name": "Alice",
+    "last_name": "Test",
+    "group_id": "G1",
+    "group_name": "Test Group",
+    "facultet_id": "F1",
+    "level_id": "L1",
+    "kurs": "1",
+    "form_code": "ОФО"
+}
+
+USER2_DATA = {
+    "telegram_id": USER2_ID,
+    "username": "testuser2",
+    "first_name": "Bob", 
+    "last_name": "Test",
+    "group_id": "G1",
+    "group_name": "Test Group",
+    "facultet_id": "F1", 
+    "level_id": "L1",
+    "kurs": "1",
+    "form_code": "ОФО"
+}
 
 def print_test_result(test_name, success, details=None):
     """Print formatted test result"""
@@ -23,385 +50,401 @@ def print_test_result(test_name, success, details=None):
         print(f"   {details}")
     print()
 
-def print_test_result(test_name, success, details=None):
-    """Print formatted test result"""
-    status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status} {test_name}")
-    if details:
-        print(f"   {details}")
-    print()
+def print_step(step_num, description):
+    """Print test step"""
+    print(f"\n{step_num}. {description}")
 
-def test_api_health():
-    """Test 1: API health - GET /api/ → expect 200 with 'RUDN Schedule API is running'"""
-    print("🔄 Testing: API Health Check...")
+def setup_test_data():
+    """Set up test data as specified in the review request"""
+    print("🔧 Setting up test data...")
     
-    url = f"{BASE_URL}/"
-    
+    # Create user 55555
+    print_step(1, f"Creating user {USER1_ID}")
     try:
-        response = requests.get(url, timeout=10)
-        
+        response = requests.post(f"{BASE_URL}/user-settings", json=USER1_DATA, timeout=10)
+        if response.status_code == 200:
+            print(f"   ✅ User {USER1_ID} created successfully")
+        else:
+            print(f"   ⚠️ User {USER1_ID} creation status: {response.status_code}")
+    except Exception as e:
+        print(f"   ❌ Failed to create user {USER1_ID}: {e}")
+        return False
+    
+    # Create user 66666  
+    print_step(2, f"Creating user {USER2_ID}")
+    try:
+        response = requests.post(f"{BASE_URL}/user-settings", json=USER2_DATA, timeout=10)
+        if response.status_code == 200:
+            print(f"   ✅ User {USER2_ID} created successfully")
+        else:
+            print(f"   ⚠️ User {USER2_ID} creation status: {response.status_code}")
+    except Exception as e:
+        print(f"   ❌ Failed to create user {USER2_ID}: {e}")
+        return False
+    
+    # Send friend request
+    print_step(3, f"Sending friend request from {USER1_ID} to {USER2_ID}")
+    try:
+        friend_request_data = {"telegram_id": USER1_ID}
+        response = requests.post(f"{BASE_URL}/friends/request/{USER2_ID}", json=friend_request_data, timeout=10)
+        if response.status_code == 200:
+            print(f"   ✅ Friend request sent successfully")
+        else:
+            print(f"   ⚠️ Friend request status: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"   ❌ Failed to send friend request: {e}")
+        return False
+    
+    # Get friend requests to capture request_id
+    print_step(4, f"Getting friend requests for user {USER2_ID}")
+    try:
+        response = requests.get(f"{BASE_URL}/friends/{USER2_ID}/requests", timeout=10)
         if response.status_code == 200:
             data = response.json()
-            expected_message = "RUDN Schedule API is running"
+            print(f"   Response: {json.dumps(data, indent=2)[:200]}...")
             
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            
-            if 'message' in data and data['message'] == expected_message:
-                print_test_result("API Health Check", True, f"Correct response: {data['message']}")
-                return True
-            else:
-                print_test_result("API Health Check", False, f"Expected message '{expected_message}', got: {data}")
-                return False
-        else:
-            print_test_result("API Health Check", False, f"HTTP {response.status_code}: {response.text}")
-            return False
-            
-    except Exception as e:
-        print_test_result("API Health Check", False, f"Exception: {str(e)}")
-        return False
-
-def test_bot_info():
-    """Test 2: Bot info (dynamic) - GET /api/bot-info → expect 200 with {username: "devrudnbot", env: "test"}"""
-    print("🔄 Testing: Bot Info Endpoint...")
-    
-    url = f"{BASE_URL}/bot-info"
-    
-    try:
-        response = requests.get(url, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            print(f"   Response data: {json.dumps(data, indent=2)}")
-            
-            # Check required fields
-            required_fields = ['username', 'env']
-            missing_fields = []
-            
-            for field in required_fields:
-                if field not in data:
-                    missing_fields.append(field)
-            
-            if missing_fields:
-                print_test_result("Bot Info Endpoint", False, f"Missing fields: {missing_fields}")
-                return False
-            
-            # Validate username (should be "devrudnbot" for test environment)
-            username = data.get('username')
-            if username != "devrudnbot":
-                print_test_result("Bot Info Endpoint", False, f"Expected username 'devrudnbot', got '{username}'")
-                return False
-            
-            # Validate env (should be "test")
-            env = data.get('env')
-            if env != "test":
-                print_test_result("Bot Info Endpoint", False, f"Expected env 'test', got '{env}'")
-                return False
-            
-            print_test_result("Bot Info Endpoint", True, f"Username: {username}, Env: {env}")
-            return True
-        else:
-            print_test_result("Bot Info Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-            return False
-            
-    except Exception as e:
-        print_test_result("Bot Info Endpoint", False, f"Exception: {str(e)}")
-        return False
-
-def test_user_settings_crud():
-    """Test 3: User settings CRUD operations"""
-    print("🔄 Testing: User Settings CRUD...")
-    
-    # Test data as specified in review request
-    test_user_data = {
-        "telegram_id": TEST_TELEGRAM_ID,
-        "username": "archtest",
-        "first_name": "ArchTest",
-        "group_id": "G1",
-        "group_name": "G1",
-        "facultet_id": "F1",
-        "level_id": "L1",
-        "kurs": "1",
-        "form_code": "ОФО"
-    }
-    
-    try:
-        # Step 1: POST - Create user settings
-        print("   Testing: POST user-settings...")
-        post_url = f"{BASE_URL}/user-settings"
-        response = requests.post(post_url, json=test_user_data, timeout=10)
-        
-        if response.status_code != 200:
-            print_test_result("User Settings CRUD - POST", False, f"POST failed: HTTP {response.status_code}: {response.text}")
-            return False
-        
-        post_data = response.json()
-        print(f"   POST Response: {json.dumps(post_data, indent=2)}")
-        
-        # Step 2: GET - Retrieve user settings
-        print("   Testing: GET user-settings...")
-        get_url = f"{BASE_URL}/user-settings/{TEST_TELEGRAM_ID}"
-        response = requests.get(get_url, timeout=10)
-        
-        if response.status_code != 200:
-            print_test_result("User Settings CRUD - GET", False, f"GET failed: HTTP {response.status_code}: {response.text}")
-            return False
-        
-        get_data = response.json()
-        print(f"   GET Response: {json.dumps(get_data, indent=2)}")
-        
-        # Validate that retrieved data matches what we posted
-        for key, expected_value in test_user_data.items():
-            if key in get_data:
-                actual_value = get_data[key]
-                if actual_value != expected_value:
-                    print_test_result("User Settings CRUD - GET validation", False, f"Field '{key}': expected '{expected_value}', got '{actual_value}'")
-                    return False
-        
-        # Step 3: DELETE - Remove user settings
-        print("   Testing: DELETE user-settings...")
-        delete_url = f"{BASE_URL}/user-settings/{TEST_TELEGRAM_ID}"
-        response = requests.delete(delete_url, timeout=10)
-        
-        if response.status_code != 200:
-            print_test_result("User Settings CRUD - DELETE", False, f"DELETE failed: HTTP {response.status_code}: {response.text}")
-            return False
-        
-        delete_data = response.json()
-        print(f"   DELETE Response: {json.dumps(delete_data, indent=2)}")
-        
-        print_test_result("User Settings CRUD", True, "POST, GET, and DELETE operations successful")
-        return True
-        
-    except Exception as e:
-        print_test_result("User Settings CRUD", False, f"Exception: {str(e)}")
-        return False
-
-def test_server_stats():
-    """Test 4: Server stats - GET /api/admin/server-stats → expect 200 with cpu, memory, disk, uptime"""
-    print("🔄 Testing: Server Stats Endpoint...")
-    
-    url = f"{BASE_URL}/admin/server-stats"
-    
-    try:
-        response = requests.get(url, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            print(f"   Response keys: {list(data.keys())}")
-            
-            # Check required fields
-            required_fields = ['cpu', 'memory', 'disk', 'uptime']
-            missing_fields = []
-            
-            for field in required_fields:
-                if field not in data:
-                    missing_fields.append(field)
-            
-            if missing_fields:
-                print_test_result("Server Stats", False, f"Missing required fields: {missing_fields}")
-                return False
-            
-            # Validate CPU object
-            cpu = data.get('cpu', {})
-            if not isinstance(cpu, dict) or 'percent' not in cpu:
-                print_test_result("Server Stats", False, "CPU object invalid or missing 'percent' field")
-                return False
-            
-            # Validate Memory object
-            memory = data.get('memory', {})
-            if not isinstance(memory, dict) or 'percent' not in memory:
-                print_test_result("Server Stats", False, "Memory object invalid or missing 'percent' field")
-                return False
-            
-            # Validate Disk object
-            disk = data.get('disk', {})
-            if not isinstance(disk, dict) or 'percent' not in disk:
-                print_test_result("Server Stats", False, "Disk object invalid or missing 'percent' field")
-                return False
-            
-            # Validate Uptime object
-            uptime = data.get('uptime', {})
-            if not isinstance(uptime, dict) or 'seconds' not in uptime:
-                print_test_result("Server Stats", False, "Uptime object invalid or missing 'seconds' field")
-                return False
-            
-            print(f"   CPU: {cpu.get('percent', 'N/A')}%, Memory: {memory.get('percent', 'N/A')}%, Disk: {disk.get('percent', 'N/A')}%")
-            print_test_result("Server Stats", True, "All required fields present with valid structure")
-            return True
-        else:
-            print_test_result("Server Stats", False, f"HTTP {response.status_code}: {response.text}")
-            return False
-            
-    except Exception as e:
-        print_test_result("Server Stats", False, f"Exception: {str(e)}")
-        return False
-
-def test_server_stats_history():
-    """Test 5: Server stats history - GET /api/admin/server-stats-history?hours=1 → expect 200"""
-    print("🔄 Testing: Server Stats History Endpoint...")
-    
-    url = f"{BASE_URL}/admin/server-stats-history?hours=1"
-    
-    try:
-        response = requests.get(url, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            print(f"   Response keys: {list(data.keys())}")
-            
-            # Check for expected structure
-            expected_fields = ['period_hours', 'total_points']
-            missing_fields = []
-            
-            for field in expected_fields:
-                if field not in data:
-                    missing_fields.append(field)
-            
-            if missing_fields:
-                print_test_result("Server Stats History", False, f"Missing fields: {missing_fields}")
-                return False
-            
-            # Validate period_hours is 1 as requested
-            period_hours = data.get('period_hours')
-            if period_hours != 1:
-                print_test_result("Server Stats History", False, f"Expected period_hours=1, got {period_hours}")
-                return False
-            
-            print(f"   Period: {period_hours} hours, Data points: {data.get('total_points', 0)}")
-            print_test_result("Server Stats History", True, "Valid response structure")
-            return True
-        else:
-            print_test_result("Server Stats History", False, f"HTTP {response.status_code}: {response.text}")
-            return False
-            
-    except Exception as e:
-        print_test_result("Server Stats History", False, f"Exception: {str(e)}")
-        return False
-
-def test_faculties():
-    """Test 6: Faculties - GET /api/faculties → expect 200 or known error"""
-    print("🔄 Testing: Faculties Endpoint...")
-    
-    url = f"{BASE_URL}/faculties"
-    
-    try:
-        response = requests.get(url, timeout=30)
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if isinstance(data, list):
-                print(f"   Retrieved {len(data)} faculties")
-                print_test_result("Faculties", True, f"Successfully retrieved {len(data)} faculties")
-                return True
-            else:
-                print_test_result("Faculties", False, f"Expected list, got {type(data)}")
-                return False
-        else:
-            # Check if it's a known error (e.g., external API unavailable)
-            if response.status_code in [404, 500, 502, 503, 504]:
-                print(f"   Known error condition: HTTP {response.status_code}")
-                try:
-                    error_data = response.json()
-                    print(f"   Error details: {json.dumps(error_data, indent=2)}")
-                except:
-                    print(f"   Error text: {response.text[:200]}")
-                print_test_result("Faculties", True, f"Known error condition: HTTP {response.status_code} (acceptable)")
-                return True
-            else:
-                print_test_result("Faculties", False, f"Unexpected HTTP {response.status_code}: {response.text}")
-                return False
-            
-    except Exception as e:
-        print_test_result("Faculties", False, f"Exception: {str(e)}")
-        return False
-
-def test_cors_headers():
-    """Test 7: CORS headers check - Make request with Origin header and verify access-control-allow-origin is echoed back"""
-    print("🔄 Testing: CORS Headers...")
-    
-    url = f"{BASE_URL}/"
-    test_origin = "https://test-origin.com"
-    
-    try:
-        # Test with Origin header
-        headers = {'Origin': test_origin}
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            # Check if access-control-allow-origin header is present
-            cors_header = response.headers.get('access-control-allow-origin')
-            
-            if cors_header:
-                if cors_header == test_origin or cors_header == '*':
-                    print(f"   Origin sent: {test_origin}")
-                    print(f"   CORS header received: {cors_header}")
-                    print_test_result("CORS Headers", True, f"Origin echoed correctly: {cors_header}")
+            # Look for incoming requests
+            incoming = data.get('incoming', [])
+            if incoming:
+                request_id = incoming[0].get('request_id')
+                print(f"   ✅ Found request_id: {request_id}")
+                
+                # Accept friend request
+                print_step(5, f"Accepting friend request {request_id}")
+                accept_data = {"telegram_id": USER2_ID}
+                response = requests.post(f"{BASE_URL}/friends/accept/{request_id}", json=accept_data, timeout=10)
+                if response.status_code == 200:
+                    print(f"   ✅ Friend request accepted successfully")
                     return True
                 else:
-                    print_test_result("CORS Headers", False, f"Expected origin '{test_origin}' or '*', got '{cors_header}'")
+                    print(f"   ❌ Failed to accept friend request: {response.status_code} - {response.text}")
                     return False
             else:
-                print_test_result("CORS Headers", False, "Missing 'access-control-allow-origin' header")
+                print(f"   ❌ No incoming friend requests found")
                 return False
         else:
-            print_test_result("CORS Headers", False, f"HTTP {response.status_code}: {response.text}")
+            print(f"   ❌ Failed to get friend requests: {response.status_code} - {response.text}")
             return False
-            
     except Exception as e:
-        print_test_result("CORS Headers", False, f"Exception: {str(e)}")
+        print(f"   ❌ Failed to get friend requests: {e}")
         return False
 
+def test_messaging_endpoints():
+    """Test messaging endpoints in the specified order"""
+    print("\n🔄 Testing messaging endpoints...")
+    
+    conversation_id = None
+    first_message_id = None
+    test_results = []
+    
+    # Test 1: GET unread messages (should be 0 initially)
+    print_step(1, "GET unread messages for user 55555 (expect total_unread: 0)")
+    try:
+        response = requests.get(f"{BASE_URL}/messages/unread/{USER1_ID}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            total_unread = data.get('total_unread', -1)
+            if total_unread == 0:
+                print_test_result("Initial unread count", True, "total_unread is 0 as expected")
+                test_results.append(True)
+            else:
+                print_test_result("Initial unread count", False, f"Expected 0, got {total_unread}")
+                test_results.append(False)
+        else:
+            print_test_result("Initial unread count", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Initial unread count", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 2: Create conversation
+    print_step(2, "POST create/get conversation between users 55555 and 66666")
+    try:
+        conv_data = {"user1_id": USER1_ID, "user2_id": USER2_ID}
+        response = requests.post(f"{BASE_URL}/messages/conversations", json=conv_data, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            conversation_id = data.get('id')
+            if conversation_id:
+                print_test_result("Create conversation", True, f"Conversation created with ID: {conversation_id}")
+                test_results.append(True)
+            else:
+                print_test_result("Create conversation", False, "No conversation ID in response")
+                test_results.append(False)
+        else:
+            print_test_result("Create conversation", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Create conversation", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    if not conversation_id:
+        print("❌ Cannot continue without conversation_id")
+        return test_results
+    
+    # Test 3: Send first message
+    print_step(3, "POST send message from 55555 to 66666: 'Привет!'")
+    try:
+        msg_data = {
+            "sender_id": USER1_ID,
+            "receiver_id": USER2_ID, 
+            "text": "Привет!"
+        }
+        response = requests.post(f"{BASE_URL}/messages/send", json=msg_data, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            first_message_id = data.get('id')
+            if first_message_id:
+                print_test_result("Send first message", True, f"Message sent with ID: {first_message_id}")
+                test_results.append(True)
+            else:
+                print_test_result("Send first message", False, "No message ID in response")
+                test_results.append(False)
+        else:
+            print_test_result("Send first message", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Send first message", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 4: Send second message
+    print_step(4, "POST send message from 66666 to 55555: 'Привет! Как дела?'")
+    try:
+        msg_data = {
+            "sender_id": USER2_ID,
+            "receiver_id": USER1_ID,
+            "text": "Привет! Как дела?"
+        }
+        response = requests.post(f"{BASE_URL}/messages/send", json=msg_data, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            print_test_result("Send second message", True, "Message sent successfully")
+            test_results.append(True)
+        else:
+            print_test_result("Send second message", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Send second message", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 5: Get conversation messages
+    print_step(5, f"GET messages in conversation {conversation_id} for user 55555 (expect 2 messages)")
+    try:
+        response = requests.get(f"{BASE_URL}/messages/{conversation_id}/messages?telegram_id={USER1_ID}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            messages = data.get('messages', [])
+            message_count = len(messages)
+            if message_count == 2:
+                print_test_result("Get conversation messages", True, f"Found {message_count} messages as expected")
+                test_results.append(True)
+            else:
+                print_test_result("Get conversation messages", False, f"Expected 2 messages, got {message_count}")
+                test_results.append(False)
+        else:
+            print_test_result("Get conversation messages", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Get conversation messages", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 6: Check unread count (should be 1 now)
+    print_step(6, "GET unread messages for user 55555 (expect total_unread: 1)")
+    try:
+        response = requests.get(f"{BASE_URL}/messages/unread/{USER1_ID}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            total_unread = data.get('total_unread', -1)
+            if total_unread == 1:
+                print_test_result("Unread count after messages", True, "total_unread is 1 as expected")
+                test_results.append(True)
+            else:
+                print_test_result("Unread count after messages", False, f"Expected 1, got {total_unread}")
+                test_results.append(False)
+        else:
+            print_test_result("Unread count after messages", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Unread count after messages", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 7: Mark messages as read
+    print_step(7, f"PUT mark messages as read in conversation {conversation_id} by user 55555")
+    try:
+        read_data = {"telegram_id": USER1_ID}
+        response = requests.put(f"{BASE_URL}/messages/{conversation_id}/read", json=read_data, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            print_test_result("Mark messages as read", True, "Messages marked as read successfully")
+            test_results.append(True)
+        else:
+            print_test_result("Mark messages as read", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Mark messages as read", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 8: Check unread count again (should be 0)
+    print_step(8, "GET unread messages for user 55555 (expect total_unread: 0)")
+    try:
+        response = requests.get(f"{BASE_URL}/messages/unread/{USER1_ID}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            total_unread = data.get('total_unread', -1)
+            if total_unread == 0:
+                print_test_result("Unread count after read", True, "total_unread is 0 as expected")
+                test_results.append(True)
+            else:
+                print_test_result("Unread count after read", False, f"Expected 0, got {total_unread}")
+                test_results.append(False)
+        else:
+            print_test_result("Unread count after read", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Unread count after read", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 9: Delete message
+    if first_message_id:
+        print_step(9, f"DELETE message {first_message_id} by user 55555")
+        try:
+            delete_data = {"telegram_id": USER1_ID}
+            response = requests.delete(f"{BASE_URL}/messages/{first_message_id}", json=delete_data, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                print(f"   Response: {json.dumps(data, indent=2)}")
+                print_test_result("Delete message", True, "Message deleted successfully")
+                test_results.append(True)
+            else:
+                print_test_result("Delete message", False, f"HTTP {response.status_code}: {response.text}")
+                test_results.append(False)
+        except Exception as e:
+            print_test_result("Delete message", False, f"Exception: {e}")
+            test_results.append(False)
+    else:
+        print_step(9, "DELETE message (skipped - no message ID)")
+        test_results.append(False)
+    
+    # Test 10: Get conversations list
+    print_step(10, f"GET conversations for user {USER1_ID} (expect 1 conversation)")
+    try:
+        response = requests.get(f"{BASE_URL}/messages/conversations/{USER1_ID}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {json.dumps(data, indent=2)}")
+            conversations = data.get('conversations', [])
+            conv_count = len(conversations)
+            if conv_count == 1:
+                print_test_result("Get conversations", True, f"Found {conv_count} conversation as expected")
+                test_results.append(True)
+            else:
+                print_test_result("Get conversations", False, f"Expected 1 conversation, got {conv_count}")
+                test_results.append(False)
+        else:
+            print_test_result("Get conversations", False, f"HTTP {response.status_code}: {response.text}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Get conversations", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 11: Try to send message to non-friend (expect 403)
+    print_step(11, "POST send message to non-friend user 99999 (expect 403)")
+    try:
+        msg_data = {
+            "sender_id": USER1_ID,
+            "receiver_id": 99999,
+            "text": "test"
+        }
+        response = requests.post(f"{BASE_URL}/messages/send", json=msg_data, timeout=10)
+        if response.status_code == 403:
+            print(f"   Response: HTTP 403 (expected)")
+            print_test_result("Send to non-friend", True, "Got 403 as expected")
+            test_results.append(True)
+        else:
+            print(f"   Response: HTTP {response.status_code}: {response.text}")
+            print_test_result("Send to non-friend", False, f"Expected 403, got {response.status_code}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Send to non-friend", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    # Test 12: Try to create conversation with self (expect 400)
+    print_step(12, "POST create conversation with self (expect 400)")
+    try:
+        conv_data = {"user1_id": USER1_ID, "user2_id": USER1_ID}
+        response = requests.post(f"{BASE_URL}/messages/conversations", json=conv_data, timeout=10)
+        if response.status_code == 400:
+            print(f"   Response: HTTP 400 (expected)")
+            print_test_result("Create conversation with self", True, "Got 400 as expected")
+            test_results.append(True)
+        else:
+            print(f"   Response: HTTP {response.status_code}: {response.text}")
+            print_test_result("Create conversation with self", False, f"Expected 400, got {response.status_code}")
+            test_results.append(False)
+    except Exception as e:
+        print_test_result("Create conversation with self", False, f"Exception: {e}")
+        test_results.append(False)
+    
+    return test_results
+
 def main():
-    """Run all architectural refactoring validation tests"""
-    print("🚀 Starting Backend Architecture Refactoring Validation")
+    """Main test execution"""
+    print("🚀 Starting Messaging API Testing")
     print(f"Backend URL: {BASE_URL}")
     print("=" * 70)
     
-    tests = [
-        ("API Health Check", test_api_health),
-        ("Bot Info (Dynamic)", test_bot_info),
-        ("User Settings CRUD", test_user_settings_crud),
-        ("Server Stats", test_server_stats),
-        ("Server Stats History", test_server_stats_history),
-        ("Faculties", test_faculties),
-        ("CORS Headers", test_cors_headers)
-    ]
+    # Setup test data
+    setup_success = setup_test_data()
+    if not setup_success:
+        print("\n❌ Failed to set up test data. Cannot proceed with messaging tests.")
+        return 1
     
-    results = {}
-    
-    for test_name, test_func in tests:
-        print(f"\n{'='*50}")
-        result = test_func()
-        results[test_name] = result
+    # Test messaging endpoints
+    test_results = test_messaging_endpoints()
     
     # Summary
     print("\n" + "=" * 70)
-    print("📊 ARCHITECTURAL REFACTORING VALIDATION SUMMARY")
+    print("📊 MESSAGING API TEST SUMMARY")
     print("=" * 70)
     
-    passed = 0
-    failed = 0
+    test_names = [
+        "1. Initial unread count (0)",
+        "2. Create conversation", 
+        "3. Send first message",
+        "4. Send second message",
+        "5. Get conversation messages (2)",
+        "6. Unread count after messages (1)",
+        "7. Mark messages as read",
+        "8. Unread count after read (0)", 
+        "9. Delete message",
+        "10. Get conversations (1)",
+        "11. Send to non-friend (403)",
+        "12. Create conversation with self (400)"
+    ]
     
-    for test_name, result in results.items():
+    passed = sum(test_results)
+    failed = len(test_results) - passed
+    
+    for i, (test_name, result) in enumerate(zip(test_names, test_results)):
         status = "✅ PASS" if result else "❌ FAIL"
         print(f"{status} {test_name}")
-        if result:
-            passed += 1
-        else:
-            failed += 1
     
     print(f"\nTotal: {passed} passed, {failed} failed")
     
     if failed == 0:
-        print("\n🎉 All architectural refactoring validations passed!")
-        print("MongoDB connection pool, unified startup, CORS middleware, and core API functionality are working correctly.")
+        print("\n🎉 All messaging API tests passed!")
+        print("Messaging system is working correctly.")
         return 0
     else:
-        print(f"\n⚠️  {failed} validation(s) failed. Check the details above.")
+        print(f"\n⚠️  {failed} test(s) failed. Check the details above.")
         return 1
 
 if __name__ == "__main__":
