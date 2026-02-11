@@ -85,13 +85,12 @@ class TelegramNotificationService:
         # Собираем сообщение
         lines = []
         lines.append('<tg-emoji emoji-id="5816934234882839927">⏰</tg-emoji>  <b>Напоминание о паре</b>')
-        lines.append("")
         lines.append(urgency)
-        lines.append("")
         
-        lines.append(f'<tg-emoji emoji-id="5375163339154399459">🎓</tg-emoji>  <b>{discipline}</b>')
+        discipline_line = f'<tg-emoji emoji-id="5375163339154399459">🎓</tg-emoji>  {discipline}'
         if lesson_type:
-            lines.append(f'      <i>({lesson_type})</i>')
+            discipline_line += f' ({lesson_type})'
+        lines.append(discipline_line)
         
         if teacher:
             lines.append(f'<tg-emoji emoji-id="5373039692574893940">👨‍🏫</tg-emoji> {teacher}')
