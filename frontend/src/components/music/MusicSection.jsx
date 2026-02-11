@@ -51,6 +51,10 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
   const [listeningRoomModalOpen, setListeningRoomModalOpen] = useState(false);
   const [activeListeningRoom, setActiveListeningRoom] = useState(null);
   
+  // Send to Friend State
+  const [sendTrackModalOpen, setSendTrackModalOpen] = useState(false);
+  const [trackToSend, setTrackToSend] = useState(null);
+  
   // Expose openListeningRoom function via ref
   useEffect(() => {
     if (openListeningRoomRef) {
