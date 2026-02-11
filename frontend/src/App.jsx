@@ -1799,6 +1799,13 @@ const Home = () => {
               userSettings={userSettings}
               onFriendProfileOpen={setIsFriendProfileOpen}
               onChatOpen={setIsChatOpen}
+              onJoinListeningRoom={(inviteCode) => {
+                setPendingListenInvite(inviteCode);
+                setActiveTab('music');
+                setTimeout(() => {
+                  openListeningRoomRef.current?.();
+                }, 500);
+              }}
             />
           </ErrorBoundary>
         )}
