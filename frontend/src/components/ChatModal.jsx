@@ -11,9 +11,12 @@ import {
   ArrowLeft, Send, Loader2, Check, CheckCheck, Trash2,
   Pin, Reply, Pencil, Forward, Search, X, ChevronDown,
   Calendar, Music, ListTodo, Smile, MoreVertical, PinOff,
-  Copy, CheckCircle2
+  Copy, CheckCircle2, Play, Pause
 } from 'lucide-react';
 import { messagesAPI } from '../services/messagesAPI';
+import { musicAPI } from '../services/musicAPI';
+import { usePlayer } from './music/PlayerContext';
+import { TrackCover } from './music/TrackCover';
 import { getBackendURL } from '../utils/config';
 
 /* ============ Константы ============ */
