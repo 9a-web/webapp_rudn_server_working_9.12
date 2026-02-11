@@ -1692,7 +1692,7 @@ const formatBytes = (bytes) => {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 };
 
-const ServerTab = () => {
+const ServerTab = ({ onlineData }) => {
   const [serverData, setServerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
