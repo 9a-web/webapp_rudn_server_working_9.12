@@ -151,7 +151,8 @@ const MessageContextMenu = ({ isOpen, onClose, message, isMine, actions }) => {
 
   return (
     <motion.div ref={ref} initial={{ opacity: 0, scale: 0.85, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85 }}
-      className={`absolute ${isMine ? 'right-0' : 'left-10'} bottom-full mb-2 z-50 bg-gray-900/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[180px]`}>
+      className={`absolute ${isMine ? 'right-0' : 'left-10'} bottom-full mb-2 z-50 border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[180px]`}
+      style={{ backgroundColor: '#14141e' }}>
       {items.map(item => (
         <button key={item.action} onClick={() => { actions(item.action); onClose(); }}
           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.06] transition-colors text-left">
