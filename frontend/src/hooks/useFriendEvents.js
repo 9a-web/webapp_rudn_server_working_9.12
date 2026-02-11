@@ -35,6 +35,8 @@ export const useFriendEvents = (telegramId, onEvent) => {
 
   const connect = useCallback(() => {
     if (!telegramId) return;
+    // Проверяем поддержку EventSource
+    if (typeof EventSource === 'undefined') return;
 
     // Закрываем предыдущее соединение
     if (eventSourceRef.current) {
@@ -43,6 +45,7 @@ export const useFriendEvents = (telegramId, onEvent) => {
     }
 
     const backendUrl = getBackendURL();
+    if (!backendUrl) return;
     const url = `${backendUrl}/api/friends/events/${telegramId}`;
 
     try {
