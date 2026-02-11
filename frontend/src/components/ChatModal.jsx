@@ -1461,6 +1461,11 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
             {showForwardModal && <ForwardModal isOpen onClose={() => { setShowForwardModal(false); setForwardMessage(null); }}
               friends={allFriends?.filter(f => f.telegram_id !== friend?.telegram_id)} onForward={handleForward} />}
           </AnimatePresence>
+
+          {/* Music Picker Modal */}
+          <AnimatePresence>
+            {showMusicPicker && <ChatMusicPicker isOpen onClose={() => setShowMusicPicker(false)} onSelectTrack={handleMusicTrackSelected} />}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>
