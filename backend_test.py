@@ -312,12 +312,12 @@ class ScheduleTester:
 
 def main():
     """Main test execution"""
-    print("🧪 MESSAGING BUG FIXES TESTING")
+    print("🧪 SCHEDULE SENDING FIX TESTING")
     print("=" * 50)
     print(f"Base URL: {BASE_URL}")
     print(f"Test Users: 77777, 88888")
     
-    tester = MessageTester()
+    tester = ScheduleTester()
     
     try:
         # Setup users and friendship
@@ -325,18 +325,18 @@ def main():
             print("❌ Prerequisites setup failed!")
             return False
             
-        # Run all messaging tests  
-        if not tester.run_messaging_tests():
-            print("❌ Messaging tests failed!")
+        # Run schedule tests  
+        if not tester.run_schedule_tests():
+            print("❌ Schedule tests failed!")
             return False
             
         # Print summary
         success = tester.print_summary()
         
         if success:
-            print("\n🎉 ALL TESTS PASSED!")
+            print("\n🎉 ALL SCHEDULE TESTS PASSED!")
         else:
-            print("\n💥 SOME TESTS FAILED!")
+            print("\n💥 SOME SCHEDULE TESTS FAILED!")
             
         return success
         
