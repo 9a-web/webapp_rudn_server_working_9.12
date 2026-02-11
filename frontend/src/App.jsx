@@ -1788,6 +1788,8 @@ const Home = () => {
               telegramId={user?.id}
               onListeningRoomOpenChange={setIsListeningRoomOpen}
               openListeningRoomRef={openListeningRoomRef}
+              pendingListenInvite={pendingListenInvite}
+              onListenInviteHandled={() => setPendingListenInvite(null)}
             />
           </div>
         )}
