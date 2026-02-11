@@ -703,7 +703,7 @@ const AttachMenu = ({ isOpen, onClose, onAction }) => {
 };
 
 /* ============ Playable Music Card in Chat ============ */
-const MusicCardPlayable = ({ metadata, isMine }) => {
+const MusicCardPlayable = ({ metadata, isMine, onListenTogether }) => {
   const { currentTrack, isPlaying, play, toggle, isLoading: playerLoading } = usePlayer();
   const meta = metadata || {};
   const [playError, setPlayError] = useState(false);
@@ -747,38 +747,53 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
   };
 
   return (
-    <div
-      className={`mt-1.5 p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-        isCurrentTrack
-          ? (isMine ? 'bg-white/10 border-white/20' : 'bg-purple-500/15 border-purple-500/30')
-          : (isMine ? 'bg-white/[0.08] border-white/[0.08] hover:bg-white/[0.14]' : 'bg-white/[0.06] border-white/[0.06] hover:bg-white/[0.10]')
-      }`}
-      onClick={handlePlayClick}
-    >
-      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
-        {meta.cover_url ? (
-          <img src={meta.cover_url} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
-        ) : (
-          <Music className="w-5 h-5 text-purple-400" />
-        )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
-          {isLoadingThis ? (
-            <Loader2 className="w-4 h-4 text-white animate-spin" />
-          ) : isCurrentlyPlaying ? (
-            <Pause className="w-4 h-4 text-white" />
+    <div className="mt-1.5">
+      <div
+        className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+          isCurrentTrack
+            ? (isMine ? 'bg-white/10 border-white/20' : 'bg-purple-500/15 border-purple-500/30')
+            : (isMine ? 'bg-white/[0.08] border-white/[0.08] hover:bg-white/[0.14]' : 'bg-white/[0.06] border-white/[0.06] hover:bg-white/[0.10]')
+        }`}
+        onClick={handlePlayClick}
+      >
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+          {meta.cover_url ? (
+            <img src={meta.cover_url} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
           ) : (
-            <Play className="w-4 h-4 text-white ml-0.5" />
+            <Music className="w-5 h-5 text-purple-400" />
           )}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+            {isLoadingThis ? (
+              <Loader2 className="w-4 h-4 text-white animate-spin" />
+            ) : isCurrentlyPlaying ? (
+              <Pause className="w-4 h-4 text-white" />
+            ) : (
+              <Play className="w-4 h-4 text-white ml-0.5" />
+            )}
+          </div>
         </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-[13px] font-semibold truncate ${isCurrentTrack ? 'text-purple-300' : 'text-white'}`}>
+            {meta.track_title || 'Трек'}
+          </p>
+          <p className="text-[11px] text-gray-400 truncate">{meta.track_artist || 'Исполнитель'}</p>
+          {playError && <p className="text-[10px] text-red-400 mt-0.5">Трек недоступен</p>}
+        </div>
+        <div className="text-[11px] text-gray-500">{formatDur(meta.track_duration)}</div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-[13px] font-semibold truncate ${isCurrentTrack ? 'text-purple-300' : 'text-white'}`}>
-          {meta.track_title || 'Трек'}
-        </p>
-        <p className="text-[11px] text-gray-400 truncate">{meta.track_artist || 'Исполнитель'}</p>
-        {playError && <p className="text-[10px] text-red-400 mt-0.5">Трек недоступен</p>}
-      </div>
-      <div className="text-[11px] text-gray-500">{formatDur(meta.track_duration)}</div>
+      {/* Кнопка "Слушать вместе" — только для полученных сообщений */}
+      {!isMine && onListenTogether && meta.track_id && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onListenTogether(meta); }}
+          className="mt-1.5 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl 
+            bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/25
+            hover:from-purple-500/30 hover:to-pink-500/30 hover:border-purple-500/40
+            active:scale-[0.98] transition-all text-purple-300 text-[12px] font-medium"
+        >
+          <Users className="w-3.5 h-3.5" />
+          Слушать вместе
+        </button>
+      )}
     </div>
   );
 };
