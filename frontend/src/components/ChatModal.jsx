@@ -1333,7 +1333,7 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       if (msgDate !== lastDate) { groups.push({ type: 'date', date: msg.created_at, key: `date-${msgDate}` }); lastDate = msgDate; lastSenderId = null; }
       const nextMsg = messages[idx + 1];
       const isFirst = msg.sender_id !== lastSenderId;
-      const isLast = !nextMsg || nextMsg.sender_id !== msg.sender_id || new Date(nextMsg.created_at).toDateString() !== msgDate;
+      const isLast = !nextMsg || nextMsg.sender_id !== msg.sender_id || parseUTC(nextMsg.created_at).toDateString() !== msgDate;
       groups.push({ type: 'message', message: msg, isFirst, isLast, showAvatar: isFirst, key: msg.id });
       lastSenderId = msg.sender_id;
     });
