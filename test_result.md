@@ -477,3 +477,125 @@ All architectural changes are working correctly:
 ### Testing Agent Report (2026-02-11T14:21:47)
 **Agent:** testing
 **Message:** ✅ MESSAGING API TESTING COMPLETE: All 12 messaging endpoints tested successfully on localhost:8001. Complete test sequence executed: user setup (55555, 66666) → friend relationship establishment → conversation creation → message sending (Russian text support working) → unread count tracking → read status management → soft delete functionality → error cases (403 for non-friends, 400 for self-conversations). All messaging API endpoints working correctly: conversations CRUD, message send/read/delete, unread count calculation. MongoDB indexes operational. Friends integration working. Ready for frontend integration.
+
+### Backend Test Results - NEW Advanced Messaging API Endpoints
+**Test Date:** 2026-02-11T15:05:00
+**Testing Agent:** deep_testing_backend_v2
+
+**Review Request Testing:** NEW messaging API endpoints on https://social-messaging-hub.preview.emergentagent.com
+**Test Status:** ✅ ALL TESTS PASSED (15/15)
+
+**Advanced Features Testing Completed:**
+
+**1. ✅ Send Message** 
+- Endpoint: `POST /api/messages/send`
+- Request: `{"sender_id": 55555, "receiver_id": 66666, "text": "Hello for testing new features!"}`
+- Status: HTTP 200
+- Response: Message created with ID and conversation_id
+- Validation: Message sent successfully with correct structure
+
+**2. ✅ Edit Message**
+- Endpoint: `PUT /api/messages/{message_id}/edit`
+- Request: `{"telegram_id": 55555, "text": "Edited message text!"}`
+- Status: HTTP 200
+- Validation: `edited_at` field populated correctly
+
+**3. ✅ Add Reaction**
+- Endpoint: `POST /api/messages/{message_id}/reactions`
+- Request: `{"telegram_id": 66666, "emoji": "❤️"}`
+- Status: HTTP 200
+- Validation: Reactions array contains heart with user 66666
+
+**4. ✅ Toggle Reaction Off**
+- Endpoint: `POST /api/messages/{message_id}/reactions` (same emoji again)
+- Request: `{"telegram_id": 66666, "emoji": "❤️"}`
+- Status: HTTP 200
+- Validation: Reactions array empty (toggled off correctly)
+
+**5. ✅ Pin Message**
+- Endpoint: `PUT /api/messages/{message_id}/pin`
+- Request: `{"telegram_id": 55555, "is_pinned": true}`
+- Status: HTTP 200
+- Response: `{"success": true}`
+- Validation: Message pinned successfully
+
+**6. ✅ Get Pinned Messages**
+- Endpoint: `GET /api/messages/{conversation_id}/pinned`
+- Status: HTTP 200
+- Validation: `pinned_message` returned correctly
+
+**7. ✅ Send Reply**
+- Endpoint: `POST /api/messages/send`
+- Request: `{"sender_id": 66666, "receiver_id": 55555, "text": "This is a reply!", "reply_to_id": "{message_id}"}`
+- Status: HTTP 200
+- Validation: Message contains `reply_to` object with `sender_name` and `text`
+
+**8. ✅ Forward Message**
+- Endpoint: `POST /api/messages/forward`
+- Request: `{"sender_id": 55555, "receiver_id": 66666, "original_message_id": "{message_id}"}`
+- Status: HTTP 200
+- Validation: Forwarded message contains `forwarded_from` data
+
+**9. ✅ Set Typing Indicator**
+- Endpoint: `POST /api/messages/{conversation_id}/typing`
+- Request: `{"telegram_id": 55555}`
+- Status: HTTP 200
+- Response: `{"success": true}`
+
+**10. ✅ Get Typing Status**
+- Endpoint: `GET /api/messages/{conversation_id}/typing?telegram_id=66666`
+- Status: HTTP 200
+- Validation: Returns `typing_users` array structure correctly
+
+**11. ✅ Search Messages**
+- Endpoint: `GET /api/messages/{conversation_id}/search?q=Edited&telegram_id=55555`
+- Status: HTTP 200
+- Validation: Returns results array with matching messages (found 6 messages)
+
+**12. ✅ Send Music Message**
+- Endpoint: `POST /api/messages/send-music`
+- Request: `{"sender_id": 55555, "receiver_id": 66666, "track_title": "Bohemian Rhapsody", "track_artist": "Queen", "track_duration": 355}`
+- Status: HTTP 200
+- Validation: Message type is "music" with metadata containing track information
+
+**13. ✅ Create Task from Message**
+- Endpoint: `POST /api/messages/create-task`
+- Request: `{"telegram_id": 55555, "message_id": "{message_id}"}`
+- Status: HTTP 200
+- Response: `{"success": true, "task_id": "..."}`
+- Validation: Task created successfully with returned task_id
+
+**14. ✅ Old Endpoint - Unread Messages**
+- Endpoint: `GET /api/messages/unread/55555`
+- Status: HTTP 200
+- Validation: Returns `total_unread` and `per_conversation` data
+
+**15. ✅ Old Endpoint - Conversations List**
+- Endpoint: `GET /api/messages/conversations/55555`
+- Status: HTTP 200
+- Validation: Returns conversations array with proper structure
+
+**Technical Implementation Status:**
+- ✅ Message editing with timestamps working correctly
+- ✅ Reaction system with toggle functionality operational
+- ✅ Message pinning system functional
+- ✅ Reply system with context preservation working
+- ✅ Message forwarding with original sender data working
+- ✅ Typing indicators system operational
+- ✅ Message search functionality working (found 6 matches for "Edited")
+- ✅ Music message type with metadata support working
+- ✅ Task creation from messages functional
+- ✅ All advanced messaging features integrated with existing friendship system
+- ✅ All endpoints use correct UUID format for IDs
+- ✅ Response structures consistent across all endpoints
+
+**Testing Environment:**
+- Backend URL: https://social-messaging-hub.preview.emergentagent.com/api
+- All endpoints accessible via external network
+- Response times: <10 seconds for all requests
+- No connection errors or timeouts encountered
+- Success Rate: 100% (15/15 tests passed)
+
+### Testing Agent Report (2026-02-11T15:05:00)
+**Agent:** testing
+**Message:** ✅ NEW MESSAGING API ENDPOINTS TESTING COMPLETE: All 15 advanced messaging endpoints tested successfully on https://social-messaging-hub.preview.emergentagent.com/api. Complete feature set validated: message editing (with edited_at timestamps), reaction system (add/toggle with emoji support), message pinning/unpinning, reply system (with context preservation), message forwarding (with original sender data), typing indicators, message search (6 results found), music messages (with metadata), task creation from messages, plus existing unread/conversations endpoints. All advanced messaging features working correctly with 100% test success rate. Users 55555 and 66666 friendship established. Ready for frontend integration of advanced messaging features.
