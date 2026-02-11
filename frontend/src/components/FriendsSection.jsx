@@ -8,14 +8,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Search, UserPlus, Bell, Star, 
   RefreshCw, UserCheck, UserX, Clock, Send, 
-  QrCode, ScanLine, X, Sparkles, Heart, Loader2
+  QrCode, ScanLine, X, Sparkles, Heart, Loader2, MessageCircle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
 import { friendsAPI } from '../services/friendsAPI';
+import { messagesAPI } from '../services/messagesAPI';
 import FriendCard from './FriendCard';
 import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
+import ChatModal from './ChatModal';
+import ConversationsListModal from './ConversationsListModal';
 import { getBackendURL } from '../utils/config';
 
 // Русское склонение
