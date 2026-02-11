@@ -14434,10 +14434,12 @@ async def search_messages(conversation_id: str, q: str = "", telegram_id: int = 
             raise HTTPException(status_code=404, detail="Диалог не найден")
         if telegram_id and telegram_id not in conv.get("participant_ids", []):
             raise HTTPException(status_code=403, detail="Нет доступа")
+        # Экранируем спецсимволы regex для безопасного поиска
+        escaped_query = re.escape(q.strip())
         query_filter = {
             "conversation_id": conversation_id,
             "is_deleted": {"$ne": True},
-            "text": {"$regex": q.strip(), "$options": "i"},
+            "text": {"$regex": escaped_query, "$options": "i"},
         }
         total = await db.messages.count_documents(query_filter)
         docs = await db.messages.find(query_filter).sort("created_at", -1).limit(limit).to_list(limit)
