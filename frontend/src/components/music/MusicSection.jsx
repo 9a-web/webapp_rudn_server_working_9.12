@@ -68,6 +68,11 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, onSendTrac
     onListeningRoomOpenChange?.(listeningRoomModalOpen);
   }, [listeningRoomModalOpen, onListeningRoomOpenChange]);
 
+  // Уведомляем родительский компонент об изменении состояния модала отправки трека
+  useEffect(() => {
+    onSendTrackModalOpenChange?.(sendTrackModalOpen);
+  }, [sendTrackModalOpen, onSendTrackModalOpenChange]);
+
   // Обработка приглашения в комнату прослушивания из чата
   useEffect(() => {
     if (pendingListenInvite) {
