@@ -13865,6 +13865,361 @@ async def update_extended_notification_settings(telegram_id: int, settings: Exte
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ API для системы сообщений между друзьями (Messages / Dialogs) ============
+
+async def get_or_create_conversation(user1_id: int, user2_id: int) -> dict:
+    """Получить или создать диалог между двумя пользователями"""
+    participant_ids = sorted([user1_id, user2_id])
+    
+    conversation = await db.conversations.find_one({
+        "participant_ids": participant_ids
+    })
+    
+    if not conversation:
+        conversation = {
+            "id": str(uuid.uuid4()),
+            "participant_ids": participant_ids,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }
+        await db.conversations.insert_one(conversation)
+    
+    return conversation
+
+
+async def build_conversation_response(conversation: dict, current_user_id: int) -> ConversationResponse:
+    """Сформировать полный ответ о диалоге с информацией об участниках"""
+    participants = []
+    for pid in conversation["participant_ids"]:
+        user_data = await db.user_settings.find_one({"telegram_id": pid})
+        if user_data:
+            participants.append(ConversationParticipant(
+                telegram_id=pid,
+                first_name=user_data.get("first_name", ""),
+                last_name=user_data.get("last_name", ""),
+                username=user_data.get("username", ""),
+                is_online=user_data.get("is_online", False),
+                last_activity=user_data.get("last_activity"),
+            ))
+        else:
+            participants.append(ConversationParticipant(telegram_id=pid))
+    
+    # Последнее сообщение
+    last_msg_doc = await db.messages.find_one(
+        {"conversation_id": conversation["id"], "is_deleted": {"$ne": True}},
+        sort=[("created_at", -1)]
+    )
+    last_message = None
+    if last_msg_doc:
+        last_message = MessageResponse(
+            id=last_msg_doc["id"],
+            conversation_id=last_msg_doc["conversation_id"],
+            sender_id=last_msg_doc["sender_id"],
+            text=last_msg_doc["text"],
+            created_at=last_msg_doc["created_at"],
+            read_at=last_msg_doc.get("read_at"),
+            is_deleted=last_msg_doc.get("is_deleted", False),
+            edited_at=last_msg_doc.get("edited_at"),
+        )
+    
+    # Непрочитанные
+    unread_count = await db.messages.count_documents({
+        "conversation_id": conversation["id"],
+        "sender_id": {"$ne": current_user_id},
+        "read_at": None,
+        "is_deleted": {"$ne": True},
+    })
+    
+    return ConversationResponse(
+        id=conversation["id"],
+        participants=participants,
+        last_message=last_message,
+        unread_count=unread_count,
+        created_at=conversation["created_at"],
+        updated_at=conversation["updated_at"],
+    )
+
+
+@api_router.post("/messages/conversations", response_model=ConversationResponse)
+async def create_or_get_conversation(data: ConversationCreate):
+    """Создать или получить существующий диалог между двумя пользователями"""
+    try:
+        if data.user1_id == data.user2_id:
+            raise HTTPException(status_code=400, detail="Нельзя создать диалог с самим собой")
+        
+        # Проверяем, что пользователи друзья
+        participant_ids = sorted([data.user1_id, data.user2_id])
+        is_friend = await db.friends.find_one({
+            "$or": [
+                {"user_telegram_id": data.user1_id, "friend_telegram_id": data.user2_id},
+                {"user_telegram_id": data.user2_id, "friend_telegram_id": data.user1_id},
+                {"user1_id": data.user1_id, "user2_id": data.user2_id},
+                {"user1_id": data.user2_id, "user2_id": data.user1_id},
+            ]
+        })
+        if not is_friend:
+            raise HTTPException(status_code=403, detail="Отправлять сообщения можно только друзьям")
+        
+        conversation = await get_or_create_conversation(data.user1_id, data.user2_id)
+        return await build_conversation_response(conversation, data.user1_id)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create conversation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/conversations/{telegram_id}", response_model=ConversationsListResponse)
+async def get_user_conversations(telegram_id: int):
+    """Получить все диалоги пользователя"""
+    try:
+        conversations = await db.conversations.find(
+            {"participant_ids": telegram_id}
+        ).sort("updated_at", -1).to_list(100)
+        
+        result = []
+        for conv in conversations:
+            conv_response = await build_conversation_response(conv, telegram_id)
+            result.append(conv_response)
+        
+        return ConversationsListResponse(
+            conversations=result,
+            total=len(result)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get conversations error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/{conversation_id}/messages", response_model=MessagesListResponse)
+async def get_conversation_messages(conversation_id: str, limit: int = 50, offset: int = 0, telegram_id: int = 0):
+    """Получить сообщения в диалоге с пагинацией"""
+    try:
+        conversation = await db.conversations.find_one({"id": conversation_id})
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Диалог не найден")
+        
+        if telegram_id and telegram_id not in conversation.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
+        
+        total = await db.messages.count_documents({
+            "conversation_id": conversation_id,
+            "is_deleted": {"$ne": True},
+        })
+        
+        messages_docs = await db.messages.find(
+            {"conversation_id": conversation_id, "is_deleted": {"$ne": True}}
+        ).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+        
+        messages = [
+            MessageResponse(
+                id=msg["id"],
+                conversation_id=msg["conversation_id"],
+                sender_id=msg["sender_id"],
+                text=msg["text"],
+                created_at=msg["created_at"],
+                read_at=msg.get("read_at"),
+                is_deleted=msg.get("is_deleted", False),
+                edited_at=msg.get("edited_at"),
+            )
+            for msg in messages_docs
+        ]
+        
+        return MessagesListResponse(
+            messages=messages,
+            total=total,
+            has_more=(offset + limit) < total,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get messages error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/send", response_model=MessageResponse)
+async def send_message(data: MessageCreate):
+    """Отправить сообщение другу"""
+    try:
+        if data.sender_id == data.receiver_id:
+            raise HTTPException(status_code=400, detail="Нельзя отправить сообщение самому себе")
+        
+        # Проверяем дружбу
+        is_friend = await db.friends.find_one({
+            "$or": [
+                {"user_telegram_id": data.sender_id, "friend_telegram_id": data.receiver_id},
+                {"user_telegram_id": data.receiver_id, "friend_telegram_id": data.sender_id},
+                {"user1_id": data.sender_id, "user2_id": data.receiver_id},
+                {"user1_id": data.receiver_id, "user2_id": data.sender_id},
+            ]
+        })
+        if not is_friend:
+            raise HTTPException(status_code=403, detail="Отправлять сообщения можно только друзьям")
+        
+        # Получаем или создаём диалог
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": data.text.strip(),
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+        }
+        
+        await db.messages.insert_one(message_doc)
+        
+        # Обновляем время последнего сообщения в диалоге
+        await db.conversations.update_one(
+            {"id": conversation["id"]},
+            {"$set": {"updated_at": now}}
+        )
+        
+        # Создаём in-app уведомление для получателя
+        try:
+            sender_settings = await db.user_settings.find_one({"telegram_id": data.sender_id})
+            sender_name = "Пользователь"
+            if sender_settings:
+                sender_name = f"{sender_settings.get('first_name', '')} {sender_settings.get('last_name', '')}".strip() or sender_settings.get('username', 'Пользователь')
+            
+            text_preview = data.text.strip()[:100] + ("..." if len(data.text.strip()) > 100 else "")
+            
+            notification_doc = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": data.receiver_id,
+                "type": "new_message",
+                "category": "social",
+                "priority": "normal",
+                "title": f"Сообщение от {sender_name}",
+                "message": text_preview,
+                "emoji": "💬",
+                "data": {
+                    "conversation_id": conversation["id"],
+                    "sender_id": data.sender_id,
+                    "sender_name": sender_name,
+                    "message_id": message_doc["id"],
+                },
+                "is_read": False,
+                "created_at": now,
+            }
+            await db.in_app_notifications.insert_one(notification_doc)
+        except Exception as notif_err:
+            logger.warning(f"Failed to create message notification: {notif_err}")
+        
+        return MessageResponse(
+            id=message_doc["id"],
+            conversation_id=message_doc["conversation_id"],
+            sender_id=message_doc["sender_id"],
+            text=message_doc["text"],
+            created_at=message_doc["created_at"],
+            read_at=message_doc["read_at"],
+            is_deleted=message_doc["is_deleted"],
+            edited_at=message_doc["edited_at"],
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/messages/{conversation_id}/read")
+async def mark_messages_read(conversation_id: str, telegram_id: int = Body(..., embed=True)):
+    """Пометить все сообщения в диалоге как прочитанные"""
+    try:
+        conversation = await db.conversations.find_one({"id": conversation_id})
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Диалог не найден")
+        
+        if telegram_id not in conversation.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
+        
+        now = datetime.utcnow()
+        result = await db.messages.update_many(
+            {
+                "conversation_id": conversation_id,
+                "sender_id": {"$ne": telegram_id},
+                "read_at": None,
+                "is_deleted": {"$ne": True},
+            },
+            {"$set": {"read_at": now}}
+        )
+        
+        return {"success": True, "marked_count": result.modified_count}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark messages read error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/messages/{message_id}")
+async def delete_message(message_id: str, telegram_id: int = Body(..., embed=True)):
+    """Удалить своё сообщение (мягкое удаление)"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        
+        if message["sender_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно удалять только свои сообщения")
+        
+        await db.messages.update_one(
+            {"id": message_id},
+            {"$set": {"is_deleted": True, "text": ""}}
+        )
+        
+        return {"success": True, "message": "Сообщение удалено"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/unread/{telegram_id}", response_model=MessagesUnreadCountResponse)
+async def get_unread_messages_count(telegram_id: int):
+    """Получить количество непрочитанных сообщений"""
+    try:
+        # Найти все диалоги пользователя
+        conversations = await db.conversations.find(
+            {"participant_ids": telegram_id}
+        ).to_list(100)
+        
+        total_unread = 0
+        per_conversation = {}
+        
+        for conv in conversations:
+            count = await db.messages.count_documents({
+                "conversation_id": conv["id"],
+                "sender_id": {"$ne": telegram_id},
+                "read_at": None,
+                "is_deleted": {"$ne": True},
+            })
+            if count > 0:
+                per_conversation[conv["id"]] = count
+                total_unread += count
+        
+        return MessagesUnreadCountResponse(
+            total_unread=total_unread,
+            per_conversation=per_conversation,
+        )
+        
+    except Exception as e:
+        logger.error(f"Get unread count error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ Web Sessions (связка Telegram профиля через QR) ============
 
 # Словарь для хранения активных WebSocket соединений по session_token
