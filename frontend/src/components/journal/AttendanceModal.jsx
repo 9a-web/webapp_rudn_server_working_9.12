@@ -302,10 +302,10 @@ export const AttendanceModal = ({
                     </div>
                     
                     {/* Grade Buttons */}
-                    <div className="flex gap-2">
-                      <div className="flex items-center gap-1 mr-2">
+                    <div className="flex gap-2 items-center">
+                      <div className="flex items-center gap-1 mr-1 flex-shrink-0">
                         <Star className="w-4 h-4 text-gray-500" />
-                        <span className="text-xs text-gray-500">Оценка:</span>
+                        <span className="text-xs text-gray-500">Балл:</span>
                       </div>
                       {[5, 4, 3, 2, 1].map((grade) => {
                         const isSelected = student.grade === grade;
@@ -314,8 +314,8 @@ export const AttendanceModal = ({
                         return (
                           <button
                             key={grade}
-                            onClick={() => handleGradeChange(student.student_id, grade)}
-                            className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold transition-all ${
+                            onClick={() => { handleGradeChange(student.student_id, grade); setEditingGradeStudent(null); }}
+                            className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-bold transition-all ${
                               isSelected
                                 ? `${colors.bg} text-white shadow-lg scale-105`
                                 : `bg-white/5 ${colors.text} hover:${colors.bgLight}`
@@ -325,6 +325,37 @@ export const AttendanceModal = ({
                           </button>
                         );
                       })}
+                      {/* Custom grade input toggle */}
+                      {editingGradeStudent === student.student_id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            ref={customInputRef}
+                            type="number"
+                            inputMode="numeric"
+                            value={customGradeInput[student.student_id] || ''}
+                            onChange={e => setCustomGradeInput(prev => ({ ...prev, [student.student_id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') confirmCustomGrade(student.student_id); }}
+                            onBlur={() => confirmCustomGrade(student.student_id)}
+                            className="w-14 h-9 bg-white/10 border border-purple-500/50 rounded-xl text-center text-sm font-bold text-white outline-none focus:border-purple-400"
+                            placeholder="..."
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openCustomGradeInput(student.student_id, student.grade)}
+                          className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm transition-all ${
+                            student.grade != null && ![1,2,3,4,5].includes(student.grade)
+                              ? `${getGradeColors(student.grade).bg} text-white shadow-lg scale-105`
+                              : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                          }`}
+                          title="Произвольный балл"
+                        >
+                          {student.grade != null && ![1,2,3,4,5].includes(student.grade) 
+                            ? student.grade 
+                            : <Pencil className="w-3.5 h-3.5" />
+                          }
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}
