@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Star, ChevronRight, Wifi } from 'lucide-react';
+import { Star, ChevronRight, Wifi, MessageCircle } from 'lucide-react';
 import { getBackendURL } from '../utils/config';
 
 // Русское склонение
