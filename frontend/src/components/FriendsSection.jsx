@@ -232,10 +232,12 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
     hapticFeedback('impact', 'light');
     setChatFriend(friend);
     setShowConversations(false);
-  }, [hapticFeedback]);
+    onChatOpen?.(true);
+  }, [hapticFeedback, onChatOpen]);
 
   const handleCloseChat = useCallback(() => {
     setChatFriend(null);
+    onChatOpen?.(false);
     // Обновляем счётчик непрочитанных и список диалогов
     if (user?.id) {
       messagesAPI.getUnreadCount(user.id).then(data => {
@@ -245,7 +247,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
         setConversations(data.conversations || []);
       }).catch(() => {});
     }
-  }, [user?.id]);
+  }, [user?.id, onChatOpen]);
 
   // Загрузка диалогов при переключении на вкладку "Сообщения"
   const loadConversations = useCallback(async () => {
