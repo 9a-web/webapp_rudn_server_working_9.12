@@ -167,6 +167,17 @@ const FriendCard = ({ friend, onPress, onToggleFavorite, onMessage, index = 0 })
             whileTap={{ scale: 0.85 }}
             onClick={(e) => {
               e.stopPropagation();
+              onMessage?.();
+            }}
+            className="p-2 rounded-xl transition-all duration-200 bg-white/[0.04] text-gray-500 hover:text-purple-400 hover:bg-purple-500/10"
+            title="Написать"
+          >
+            <MessageCircle className="w-[18px] h-[18px]" />
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={(e) => {
+              e.stopPropagation();
               onToggleFavorite?.();
             }}
             className={`p-2 rounded-xl transition-all duration-200 ${
