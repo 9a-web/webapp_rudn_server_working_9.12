@@ -34,17 +34,27 @@ const getAvatarGradient = (id) => {
 };
 
 // Парсим дату — сервер хранит UTC без Z
-const parseUTC = (d) => { const s = String(d); return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z'); };
-const formatTime = (d) => parseUTC(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const parseUTC = (d) => {
+  if (!d) return new Date();
+  const s = String(d);
+  const parsed = new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+const formatTime = (d) => {
+  try { return parseUTC(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return ''; }
+};
 
 const formatDateSeparator = (d) => {
-  const date = parseUTC(d);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return 'Сегодня';
-  if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
-  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  try {
+    const date = parseUTC(d);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Сегодня';
+    if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (e) { return ''; }
 };
 
 /* ============ Мини-компоненты ============ */
