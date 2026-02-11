@@ -161,6 +161,17 @@ export const TrackCard = ({
         {formatDuration(track.duration)}
       </span>
 
+      {/* Send to friend button */}
+      {showSendToFriend && onSendToFriend && !isBlocked && (
+        <button
+          onClick={handleSendToFriend}
+          className="p-2 transition-all active:scale-90 text-white/30 hover:text-purple-400"
+          title="Отправить другу"
+        >
+          <Send className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Favorite button */}
       {showFavorite && (
         <button
