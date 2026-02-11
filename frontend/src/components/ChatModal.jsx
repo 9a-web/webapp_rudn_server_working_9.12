@@ -1427,7 +1427,7 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
               <AttachMenu isOpen={showAttachMenu} onClose={() => setShowAttachMenu(false)}
                 onAction={(a) => {
                   if (a === 'schedule') { setShowSchedulePicker(true); setShowAttachMenu(false); }
-                  if (a === 'music') handleSendMusic();
+                  if (a === 'music') { handleSendMusic(); }
                 }} />
             </AnimatePresence>
 
