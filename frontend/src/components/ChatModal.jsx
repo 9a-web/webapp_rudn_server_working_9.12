@@ -1356,6 +1356,39 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     setShowForwardModal(false); setForwardMessage(null);
   }, [forwardMessage, currentUserId]);
 
+
+  // Отправка приглашения в комнату совместного прослушивания
+  const handleSendRoomInvite = useCallback(async () => {
+    if (!roomInviteConfirm || !friend?.telegram_id) return;
+    const { room_id, invite_code, invite_link, trackMeta } = roomInviteConfirm;
+    try {
+      const inviteText = `🎧 Приглашение: совместное прослушивание\n🎵 ${trackMeta.track_title || 'Трек'} — ${trackMeta.track_artist || ''}`;
+      const msg = await messagesAPI.sendMessage(
+        currentUserId, friend.telegram_id, inviteText, null, 'room_invite',
+        {
+          room_id,
+          invite_code,
+          invite_link,
+          track_title: trackMeta.track_title || '',
+          track_artist: trackMeta.track_artist || '',
+          track_id: trackMeta.track_id || '',
+          track_duration: trackMeta.track_duration || 0,
+          cover_url: trackMeta.cover_url || null,
+        }
+      );
+      if (msg && msg.id) {
+        setMessages(prev => [...prev, msg]);
+      }
+      setToast('Приглашение отправлено!');
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
+    } catch (e) {
+      console.error('Send room invite error:', e);
+      setToast('Ошибка отправки приглашения');
+    } finally {
+      setRoomInviteConfirm(null);
+    }
+  }, [roomInviteConfirm, friend, currentUserId]);
+
   // Schedule share with date selection
   const handleSendSchedule = async (dateStr) => {
     if (!friend?.telegram_id) return;
