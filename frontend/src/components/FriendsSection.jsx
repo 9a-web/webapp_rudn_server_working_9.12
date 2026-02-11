@@ -804,8 +804,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
         </div>
 
         {/* Табы */}
-        <div className="relative flex gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {TABS.map((tab) => {
+        <div ref={tabsContainerRef} className="relative flex gap-1 bg-white/[0.04] p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {TABS.map((tab, index) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             const showBadge = (tab.id === 'requests' && unprocessedIncomingCount > 0) || (tab.id === 'messages' && unreadMessagesCount > 0);
@@ -814,9 +814,19 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
             return (
               <motion.button
                 key={tab.id}
-                onClick={() => {
+                onClick={(e) => {
                   setActiveTab(tab.id);
                   hapticFeedback('impact', 'light');
+                  // Автоскролл: прокрутить контейнер так, чтобы кнопка была видна
+                  const btn = e.currentTarget;
+                  const container = tabsContainerRef.current;
+                  if (container && btn) {
+                    const btnLeft = btn.offsetLeft;
+                    const btnWidth = btn.offsetWidth;
+                    const containerWidth = container.offsetWidth;
+                    const scrollTarget = btnLeft - (containerWidth / 2) + (btnWidth / 2);
+                    container.scrollTo({ left: scrollTarget, behavior: 'smooth' });
+                  }
                 }}
                 className={`flex-shrink-0 relative flex items-center justify-center gap-1.5 py-2.5 px-3.5 rounded-xl transition-all duration-200 z-10 whitespace-nowrap ${
                   isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
