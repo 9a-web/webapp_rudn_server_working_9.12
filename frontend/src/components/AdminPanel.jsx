@@ -241,7 +241,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
                     <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Панель управления</h2>
                     {lastUpdate && activeTab === 'stats' && (
                       <p className="text-[11px] text-gray-500 font-medium">
-                        Обновлено: {lastUpdate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        Обновлено: {lastUpdate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}
                       </p>
                     )}
                   </div>
