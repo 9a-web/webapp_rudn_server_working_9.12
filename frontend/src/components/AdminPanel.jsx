@@ -1715,6 +1715,7 @@ const ServerTab = ({ onlineData }) => {
           time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Moscow' }),
           cpu: res.data.cpu?.percent || 0,
           ram: res.data.memory?.percent || 0,
+          online: onlineDataRef.current?.online_now || 0,
         };
         const updated = [...prev, newPoint];
         return updated.slice(-30);
