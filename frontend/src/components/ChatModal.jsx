@@ -1282,6 +1282,67 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       case 'scrollToMessage':
         scrollToMessage(extra);
         break;
+      case 'listen_together': {
+        // message here is actually trackMeta from MusicCardPlayable
+        const trackMeta = message;
+        if (creatingRoom) break;
+        setCreatingRoom(true);
+        try {
+          window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium');
+        } catch (e) {}
+        try {
+          // Get user data for room creation
+          const userData = {
+            telegram_id: currentUserId,
+            first_name: '',
+            last_name: '',
+            username: '',
+          };
+          // Try to get user data from Telegram WebApp
+          try {
+            const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+            if (tgUser) {
+              userData.first_name = tgUser.first_name || '';
+              userData.last_name = tgUser.last_name || '';
+              userData.username = tgUser.username || '';
+            }
+          } catch (e) {}
+
+          const roomName = `🎵 ${trackMeta.track_title || 'Музыка'} — совместное`;
+          const result = await createListeningRoom(userData, roomName, 'everyone');
+          
+          if (result?.room_id) {
+            setRoomInviteConfirm({
+              room_id: result.room_id,
+              invite_code: result.invite_code,
+              invite_link: result.invite_link,
+              trackMeta,
+            });
+          } else {
+            setToast('Не удалось создать комнату');
+          }
+        } catch (e) {
+          console.error('Create listening room error:', e);
+          setToast('Ошибка создания комнаты');
+        } finally {
+          setCreatingRoom(false);
+        }
+        break;
+      }
+      case 'join_room': {
+        // message here is the room_invite message with metadata
+        const meta = message?.metadata || {};
+        if (meta.invite_code) {
+          try {
+            window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium');
+          } catch (e) {}
+          // Navigate to listening room
+          const roomUrl = meta.invite_link || `#listen_${meta.invite_code}`;
+          window.location.hash = `listen_${meta.invite_code}`;
+          setToast('Присоединяюсь к комнате...');
+        }
+        break;
+      }
       default: break;
     }
   }, [currentUserId, scrollToMessage, friendName]);
