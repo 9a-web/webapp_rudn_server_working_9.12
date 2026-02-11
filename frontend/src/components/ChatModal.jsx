@@ -1002,7 +1002,7 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
 };
 
 /* ============ MAIN ChatModal ============ */
-const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends }) => {
+const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends, onOpenProfile }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
