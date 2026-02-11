@@ -180,7 +180,7 @@ class MessageTester:
         result3 = self.test_request("POST", "/messages/send", reply_msg_data, 200, "3. Send Reply Message")
         if not result3:
             return False
-        self.message_ids.append(result3.get("message_id"))
+        self.message_ids.append(result3.get("id"))
         
         if not self.conversation_id:
             self.log("No conversation_id available for subsequent tests", False)
