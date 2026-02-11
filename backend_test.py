@@ -13,11 +13,12 @@ import sys
 # Base URL from frontend/.env REACT_APP_BACKEND_URL + /api
 BASE_URL = "https://music-chat-hub-1.preview.emergentagent.com/api"
 
-class ScheduleTestRunner:
+class MusicTestRunner:
     def __init__(self):
         self.session = None
         self.test_results = []
         self.conversation_id = None
+        self.request_id = None
         
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
