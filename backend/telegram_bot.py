@@ -165,8 +165,9 @@ async def send_device_linked_notification(
         now = datetime.utcnow()
         formatted_time = now.strftime("%d.%m.%Y в %H:%M")
         
+        from notifications import animate_emoji
         # Формируем сообщение
-        message_text = (
+        message_text = animate_emoji(
             f"🔗  <b>Новое устройство подключено</b>\n"
             f"\n"
             f"┌─────────────────────\n"
