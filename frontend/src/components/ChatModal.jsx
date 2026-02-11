@@ -800,6 +800,70 @@ const MusicCardPlayable = ({ metadata, isMine, onListenTogether }) => {
   );
 };
 
+/* ============ Room Invite Card in Chat ============ */
+const RoomInviteCard = ({ metadata, isMine, onJoinRoom }) => {
+  const meta = metadata || {};
+  const [joining, setJoining] = useState(false);
+
+  const handleJoin = async (e) => {
+    e.stopPropagation();
+    if (joining) return;
+    setJoining(true);
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium'); } catch (err) {}
+    onJoinRoom?.();
+    // joining state will reset when component unmounts or after timeout
+    setTimeout(() => setJoining(false), 3000);
+  };
+
+  return (
+    <div className="mt-1.5">
+      <div className={`p-3 rounded-xl border ${
+        isMine ? 'bg-white/[0.08] border-white/[0.08]' : 'bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20'
+      }`}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/40 to-pink-500/40 flex items-center justify-center">
+            <Headphones className="w-4 h-4 text-purple-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-semibold text-purple-300">Совместное прослушивание</p>
+            <p className="text-[10px] text-gray-500">Комната для музыки</p>
+          </div>
+        </div>
+        {meta.track_title && (
+          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-black/20">
+            <Music className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] text-white truncate">{meta.track_title}</p>
+              {meta.track_artist && <p className="text-[10px] text-gray-400 truncate">{meta.track_artist}</p>}
+            </div>
+          </div>
+        )}
+        {!isMine && onJoinRoom && (
+          <button
+            onClick={handleJoin}
+            disabled={joining}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl
+              bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400
+              active:scale-[0.97] transition-all text-white text-[13px] font-semibold
+              disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {joining ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Headphones className="w-4 h-4" />
+            )}
+            {joining ? 'Подключение...' : 'Присоединиться'}
+          </button>
+        )}
+        {isMine && (
+          <p className="text-[11px] text-gray-500 text-center italic">Приглашение отправлено</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
 /* ============ Chat Music Picker ============ */
 const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
   const [query, setQuery] = useState('');
