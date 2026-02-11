@@ -1329,7 +1329,7 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
   const groupedMessages = useMemo(() => {
     const groups = []; let lastDate = '', lastSenderId = null;
     messages.forEach((msg, idx) => {
-      const msgDate = new Date(msg.created_at).toDateString();
+      const msgDate = parseUTC(msg.created_at).toDateString();
       if (msgDate !== lastDate) { groups.push({ type: 'date', date: msg.created_at, key: `date-${msgDate}` }); lastDate = msgDate; lastSenderId = null; }
       const nextMsg = messages[idx + 1];
       const isFirst = msg.sender_id !== lastSenderId;
