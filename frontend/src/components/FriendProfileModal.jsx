@@ -313,6 +313,25 @@ const FriendProfileModal = ({
 
                     {/* Actions */}
                     <div className="space-y-2">
+                      {/* Написать сообщение */}
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          onMessage?.(friend);
+                          onClose();
+                        }}
+                        className="w-full flex items-center gap-3.5 p-4 bg-purple-500/[0.08] rounded-2xl text-left hover:bg-purple-500/[0.14] transition-all border border-purple-500/15"
+                      >
+                        <div className="p-2.5 rounded-xl bg-purple-500/15">
+                          <MessageCircle className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[14px] text-purple-400">Написать сообщение</p>
+                          <p className="text-[12px] text-gray-500 mt-0.5">Начать диалог</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-purple-400/50" />
+                      </motion.button>
+
                       {/* Открыть в Telegram */}
                       <motion.button
                         whileTap={{ scale: 0.98 }}
