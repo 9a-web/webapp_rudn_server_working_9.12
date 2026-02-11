@@ -48,7 +48,7 @@ const pluralize = (n, one, few, many) => {
   return `${n} ${many}`;
 };
 
-const FriendSearchModal = ({ isOpen, onClose, userSettings, currentUserId, onSendRequest }) => {
+const FriendSearchModal = ({ isOpen, onClose, userSettings, currentUserId, onSendRequest, refreshTrigger }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null);
