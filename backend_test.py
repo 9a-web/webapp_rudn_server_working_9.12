@@ -471,24 +471,32 @@ class MusicTestRunner:
             return True
     
     async def run_all_tests(self):
-        """Run all tests in sequence"""
-        print("🚀 Starting Schedule Sending Tests")
+        """Run all music sending tests in sequence"""
+        print("🚀 Starting Music Sending API Tests")
         print("=" * 60)
         
-        # Setup
+        # Prerequisites Setup (as per review request)
         if not await self.setup_test_users():
-            print("❌ Setup failed, aborting tests")
+            print("❌ Prerequisites setup failed, aborting tests")
             return
         
-        # Run tests
-        await self.test_schedule_for_today()
-        await self.test_schedule_for_this_week()
-        await self.test_schedule_for_next_week()
-        await self.test_conversation_messages()
+        # Run all test cases from review request
+        test_results = []
+        
+        test_results.append(await self.test_send_music_to_friend())
+        test_results.append(await self.test_verify_conversation_created())
+        test_results.append(await self.test_get_messages_in_conversation())
+        test_results.append(await self.test_send_music_to_non_friend())
+        test_results.append(await self.test_music_search())
+        test_results.append(await self.test_music_stream_url())
+        test_results.append(await self.test_get_friends_list())
+        test_results.append(await self.test_send_second_music_message())
+        test_results.append(await self.test_verify_both_music_messages())
+        test_results.append(await self.test_unread_count_after_music())
         
         # Print summary
         print("\n" + "=" * 60)
-        print("📊 TEST SUMMARY")
+        print("📊 MUSIC API TEST SUMMARY")
         print("=" * 60)
         
         passed = sum(1 for result in self.test_results if result["success"])
@@ -497,13 +505,15 @@ class MusicTestRunner:
         for result in self.test_results:
             status = "✅" if result["success"] else "❌"
             print(f"{status} {result['test']}")
+            if result["details"] and not result["success"]:
+                print(f"    ↳ {result['details']}")
         
         print(f"\nResult: {passed}/{total} tests passed")
         
         if passed == total:
-            print("🎉 All tests passed! Schedule sending is working correctly.")
+            print("🎉 All music sending tests passed! Music API is working correctly.")
         else:
-            print("⚠️ Some tests failed. Please check the details above.")
+            print("⚠️ Some music tests failed. Please check the details above.")
         
         return passed == total
 
