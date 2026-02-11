@@ -2070,9 +2070,9 @@ const ServerHistorySection = () => {
     ...m,
     time: (() => {
       const d = new Date(m.timestamp);
-      if (selectedPeriod <= 6) return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      if (selectedPeriod <= 24) return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      if (selectedPeriod <= 6) return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+      if (selectedPeriod <= 24) return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+      return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Moscow' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
     })(),
   }));
 
