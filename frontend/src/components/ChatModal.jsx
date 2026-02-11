@@ -764,14 +764,30 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
 const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [popularTracks, setPopularTracks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [sendingTrackId, setSendingTrackId] = useState(null);
   const inputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
+  // Загружаем популярные треки при открытии
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus(), 200);
+      // Загрузить популярные треки если ещё не загружены
+      if (popularTracks.length === 0) {
+        (async () => {
+          try {
+            const data = await musicAPI.search('популярное 2025', 15);
+            if (data?.tracks?.length > 0) {
+              setPopularTracks(data.tracks);
+            }
+          } catch (e) {
+            console.log('Popular tracks load failed:', e);
+          }
+        })();
+      }
     }
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -783,6 +799,7 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
       setQuery('');
       setResults([]);
       setSearched(false);
+      setSendingTrackId(null);
     }
   }, [isOpen]);
 
@@ -796,7 +813,7 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
     setSearched(true);
     try {
       const data = await musicAPI.search(q, 20);
-      setResults(data.tracks || []);
+      setResults(data?.tracks || []);
     } catch (e) {
       console.error('Music search error:', e);
       setResults([]);
@@ -810,6 +827,13 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
     setQuery(val);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => doSearch(val), 400);
+  };
+
+  const handleTrackClick = (track) => {
+    if (track.is_blocked || track.content_restricted || sendingTrackId) return;
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (e) {}
+    setSendingTrackId(track.id);
+    onSelectTrack(track);
   };
 
   const formatDuration = (sec) => {
