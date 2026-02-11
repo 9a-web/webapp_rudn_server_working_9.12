@@ -710,6 +710,24 @@ const EmptyChart = ({ text }) => (
 // ONLINE TAB
 // =============================================
 const OnlineTab = ({ onlineData, loading, onRefresh }) => {
+  const [onlineHistory, setOnlineHistory] = useState([]);
+  
+  // Обновляем историю при каждом обновлении onlineData
+  useEffect(() => {
+    if (onlineData?.online_now != null) {
+      setOnlineHistory(prev => {
+        const newPoint = {
+          time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Moscow' }),
+          online: onlineData.online_now || 0,
+          web: onlineData.web_online || 0,
+          telegram: onlineData.telegram_online || 0,
+        };
+        const updated = [...prev, newPoint];
+        return updated.slice(-60); // хранить 60 точек (5 мин при 5с интервале)
+      });
+    }
+  }, [onlineData]);
+
   return (
     <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6 space-y-5">
       {/* Header */}
