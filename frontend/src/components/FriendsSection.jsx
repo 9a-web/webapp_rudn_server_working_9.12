@@ -791,6 +791,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                     index={idx}
                     onPress={() => handleOpenProfile(friend)}
                     onToggleFavorite={() => handleToggleFavorite(friend.telegram_id, !friend.is_favorite)}
+                    onMessage={() => handleOpenChat(friend)}
                   />
                 ))
               ) : (
