@@ -7824,9 +7824,9 @@ async def process_journal_webapp_invite(data: ProcessJournalInviteRequest):
                 notification_type=NotificationType.JOURNAL_INVITE,
                 category=NotificationCategory.JOURNAL,
                 priority=NotificationPriority.HIGH,
-                title="Новая заявка в журнал",
-                message=f"{applicant_name} хочет присоединиться к журналу «{journal_name}»",
-                emoji="",
+                title="Новая заявка в журнал!",
+                message=f'<tg-emoji emoji-id="5258241049318418940">👤</tg-emoji> {applicant_name} хочет присоединиться к журналу «{journal_name}»',
+                emoji='<tg-emoji emoji-id="5454157610318063266">📋</tg-emoji>',
                 data={
                     "application_id": application.id,
                     "journal_id": journal_id,
