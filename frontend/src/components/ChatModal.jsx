@@ -549,6 +549,7 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
   const [pinnedMessage, setPinnedMessage] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
   const [highlightMsgId, setHighlightMsgId] = useState(null);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
