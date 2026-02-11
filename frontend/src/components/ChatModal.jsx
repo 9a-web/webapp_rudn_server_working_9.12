@@ -1124,7 +1124,16 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
                   </p>
                   <p className="text-[12px] text-gray-400 truncate">{editingMessage?.text || replyTo?.text}</p>
                 </div>
-                <button onClick={() => { setReplyTo(null); setEditingMessage(null); setInputText(''); }}
+                <button onClick={() => {
+                    if (editingMessage) {
+                      setEditingMessage(null);
+                      setInputText(preEditText);
+                      setPreEditText('');
+                    } else {
+                      setReplyTo(null);
+                    }
+                    resetTextareaHeight();
+                  }}
                   className="p-1.5 text-gray-500 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
               </motion.div>
             )}
