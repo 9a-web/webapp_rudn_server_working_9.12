@@ -168,10 +168,121 @@ const MessageContextMenu = ({ isOpen, onClose, message, isMine, actions }) => {
 const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst, isLast, currentUserId, highlightId }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [swipeX, setSwipeX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
   const isHighlighted = highlightId === message.id;
   const isForwarded = message.message_type === 'forward' || message.forwarded_from;
   const isSchedule = message.message_type === 'schedule';
   const isMusic = message.message_type === 'music';
+
+  // Long press refs
+  const longPressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
+  const swipeThreshold = 60;
+  const replyTriggered = useRef(false);
+
+  // Haptic feedback
+  const vibrate = () => {
+    try { navigator.vibrate?.(30); } catch (e) {}
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium'); } catch (e) {}
+  };
+
+  // Long press handlers
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    isLongPressRef.current = false;
+    replyTriggered.current = false;
+    setIsSwiping(false);
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      vibrate();
+      setShowMenu(true);
+    }, 300);
+  };
+
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+
+    // Если двигаем палец — отменяем long press
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+
+    // Горизонтальный свайп (только вправо для reply)
+    if (Math.abs(dx) > 15 && Math.abs(dy) < 40) {
+      setIsSwiping(true);
+      const clampedX = Math.max(0, Math.min(dx, 100));
+      setSwipeX(clampedX);
+
+      // Вибрация при достижении порога
+      if (clampedX >= swipeThreshold && !replyTriggered.current) {
+        replyTriggered.current = true;
+        vibrate();
+      }
+      if (clampedX < swipeThreshold) {
+        replyTriggered.current = false;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    // Если свайп достиг порога — reply
+    if (swipeX >= swipeThreshold) {
+      onAction?.('reply', message);
+    }
+
+    // Анимированный возврат
+    setSwipeX(0);
+    setIsSwiping(false);
+    isLongPressRef.current = false;
+  };
+
+  // Mouse long press (для десктопа)
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    touchStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    isLongPressRef.current = false;
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      vibrate();
+      setShowMenu(true);
+    }, 300);
+  };
+
+  const handleMouseUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
 
   const handleAction = (action) => {
     if (action === 'reaction') { setShowReactions(true); return; }
@@ -210,7 +321,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     if (!message.reply_to) return null;
     return (
       <div className={`mb-1.5 pl-2.5 border-l-2 ${isMine ? 'border-white/30' : 'border-purple-400/50'} rounded-sm`}
-        onClick={() => onAction?.('scrollToMessage', message, message.reply_to.message_id)}>
+        onClick={(e) => { e.stopPropagation(); onAction?.('scrollToMessage', message, message.reply_to.message_id); }}>
         <p className={`text-[11px] font-semibold ${isMine ? 'text-white/70' : 'text-purple-400/80'}`}>{message.reply_to.sender_name}</p>
         <p className={`text-[12px] truncate ${isMine ? 'text-white/50' : 'text-gray-400'}`}>{message.reply_to.text}</p>
       </div>
@@ -276,21 +387,55 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     ? (isFirst && isLast ? 'rounded-2xl' : isFirst ? 'rounded-2xl rounded-br-lg' : isLast ? 'rounded-2xl rounded-tr-lg' : 'rounded-xl rounded-r-lg')
     : (isFirst && isLast ? 'rounded-2xl' : isFirst ? 'rounded-2xl rounded-bl-lg' : isLast ? 'rounded-2xl rounded-tl-lg' : 'rounded-xl rounded-l-lg');
 
+  // Прогресс свайпа для визуальной индикации
+  const swipeProgress = Math.min(swipeX / swipeThreshold, 1);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.96 }}
       animate={{ opacity: isHighlighted ? [1, 0.5, 1] : 1, y: 0, scale: 1, backgroundColor: isHighlighted ? ['rgba(139,92,246,0.15)', 'rgba(139,92,246,0)', 'rgba(139,92,246,0)'] : 'transparent' }}
       transition={{ duration: 0.3 }}
       id={`msg-${message.id}`}
-      className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'} ${isFirst ? 'mt-1.5' : 'mt-0.5'} px-0.5`}
+      className={`relative flex gap-2 ${isMine ? 'justify-end' : 'justify-start'} ${isFirst ? 'mt-1.5' : 'mt-0.5'} px-0.5`}
     >
+      {/* Swipe reply indicator */}
+      <AnimatePresence>
+        {swipeX > 10 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: swipeProgress, scale: 0.6 + swipeProgress * 0.4 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center"
+            style={{ width: 36, height: 36 }}
+          >
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-150 ${
+              swipeProgress >= 1 ? 'bg-purple-500' : 'bg-white/10'
+            }`}>
+              <Reply className={`w-4 h-4 transition-colors duration-150 ${swipeProgress >= 1 ? 'text-white' : 'text-gray-400'}`} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!isMine && (
-        <div className="w-8 flex-shrink-0">
+        <div className="w-8 flex-shrink-0" style={{ transform: `translateX(${swipeX * 0.3}px)` }}>
           {showAvatar && <Avatar telegramId={friend?.telegram_id} firstName={friend?.first_name} size={32} />}
         </div>
       )}
 
-      <div className={`relative group max-w-[78%]`}>
+      <div
+        className={`relative group max-w-[78%] select-none`}
+        style={{
+          transform: `translateX(${swipeX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+      >
         {/* Context Menu */}
         <AnimatePresence>
           {showMenu && <MessageContextMenu isOpen message={message} isMine={isMine} actions={handleAction} onClose={() => setShowMenu(false)} />}
@@ -298,10 +443,9 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
         </AnimatePresence>
 
         <div
-          className={`relative px-3.5 py-2 cursor-pointer ${
+          className={`relative px-3.5 py-2 ${
             isMine ? `bg-purple-500/90 text-white ${bubbleRadius}` : `bg-white/[0.08] text-gray-100 ${bubbleRadius}`
           }`}
-          onClick={() => setShowMenu(!showMenu)}
         >
           {renderForwarded()}
           {renderReply()}
