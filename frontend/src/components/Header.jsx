@@ -31,13 +31,10 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
           if (photoUrl) {
             setProfilePhoto(photoUrl);
             photoLoadedRef.current = true;
-            console.log('Profile photo loaded successfully:', photoUrl);
           } else {
-            console.log('No profile photo available for user');
             setPhotoError(true);
           }
         } catch (error) {
-          console.error('Failed to load profile photo:', error);
           setPhotoError(true);
         } finally {
           setPhotoLoading(false);
