@@ -466,7 +466,8 @@ const ScheduleDatePicker = ({ isOpen, onClose, onSend }) => {
 
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
-      className="absolute bottom-full left-0 right-0 mb-2 mx-2 bg-gray-900/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 p-4">
+      className="absolute bottom-full left-0 right-0 mb-2 mx-2 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 p-4"
+      style={{ backgroundColor: '#14141e' }}>
       <div className="flex items-center gap-2 mb-3">
         <Calendar className="w-5 h-5 text-blue-400" />
         <h3 className="text-[15px] font-semibold text-white">Отправить расписание</h3>
