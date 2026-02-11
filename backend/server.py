@@ -13878,14 +13878,13 @@ async def update_extended_notification_settings(telegram_id: int, settings: Exte
 
 # ============ API для системы сообщений между друзьями (Messages / Dialogs) ============
 
+# In-memory typing indicators {conversation_id: {telegram_id: timestamp}}
+typing_indicators_store: dict = {}
+
 async def get_or_create_conversation(user1_id: int, user2_id: int) -> dict:
     """Получить или создать диалог между двумя пользователями"""
     participant_ids = sorted([user1_id, user2_id])
-    
-    conversation = await db.conversations.find_one({
-        "participant_ids": participant_ids
-    })
-    
+    conversation = await db.conversations.find_one({"participant_ids": participant_ids})
     if not conversation:
         conversation = {
             "id": str(uuid.uuid4()),
@@ -13894,12 +13893,43 @@ async def get_or_create_conversation(user1_id: int, user2_id: int) -> dict:
             "updated_at": datetime.utcnow(),
         }
         await db.conversations.insert_one(conversation)
-    
     return conversation
 
 
+def build_message_response(msg: dict) -> MessageResponse:
+    """Сформировать ответ сообщения из документа MongoDB"""
+    reply_to = None
+    if msg.get("reply_to"):
+        rt = msg["reply_to"]
+        reply_to = ReplyInfo(
+            message_id=rt.get("message_id", ""),
+            sender_id=rt.get("sender_id", 0),
+            sender_name=rt.get("sender_name", ""),
+            text=rt.get("text", ""),
+        )
+    reactions = []
+    for r in msg.get("reactions", []):
+        reactions.append(ReactionInfo(emoji=r["emoji"], users=r.get("users", [])))
+    return MessageResponse(
+        id=msg["id"],
+        conversation_id=msg["conversation_id"],
+        sender_id=msg["sender_id"],
+        text=msg["text"],
+        message_type=msg.get("message_type", "text"),
+        created_at=msg["created_at"],
+        read_at=msg.get("read_at"),
+        is_deleted=msg.get("is_deleted", False),
+        edited_at=msg.get("edited_at"),
+        is_pinned=msg.get("is_pinned", False),
+        reply_to=reply_to,
+        reactions=reactions,
+        metadata=msg.get("metadata"),
+        forwarded_from=msg.get("forwarded_from"),
+    )
+
+
 async def build_conversation_response(conversation: dict, current_user_id: int) -> ConversationResponse:
-    """Сформировать полный ответ о диалоге с информацией об участниках"""
+    """Сформировать полный ответ о диалоге"""
     participants = []
     for pid in conversation["participant_ids"]:
         user_data = await db.user_settings.find_one({"telegram_id": pid})
@@ -13914,66 +13944,63 @@ async def build_conversation_response(conversation: dict, current_user_id: int) 
             ))
         else:
             participants.append(ConversationParticipant(telegram_id=pid))
-    
-    # Последнее сообщение
     last_msg_doc = await db.messages.find_one(
         {"conversation_id": conversation["id"], "is_deleted": {"$ne": True}},
         sort=[("created_at", -1)]
     )
-    last_message = None
-    if last_msg_doc:
-        last_message = MessageResponse(
-            id=last_msg_doc["id"],
-            conversation_id=last_msg_doc["conversation_id"],
-            sender_id=last_msg_doc["sender_id"],
-            text=last_msg_doc["text"],
-            created_at=last_msg_doc["created_at"],
-            read_at=last_msg_doc.get("read_at"),
-            is_deleted=last_msg_doc.get("is_deleted", False),
-            edited_at=last_msg_doc.get("edited_at"),
-        )
-    
-    # Непрочитанные
+    last_message = build_message_response(last_msg_doc) if last_msg_doc else None
+    pinned_doc = await db.messages.find_one(
+        {"conversation_id": conversation["id"], "is_pinned": True, "is_deleted": {"$ne": True}},
+        sort=[("created_at", -1)]
+    )
+    pinned_message = build_message_response(pinned_doc) if pinned_doc else None
     unread_count = await db.messages.count_documents({
         "conversation_id": conversation["id"],
         "sender_id": {"$ne": current_user_id},
         "read_at": None,
         "is_deleted": {"$ne": True},
     })
-    
     return ConversationResponse(
         id=conversation["id"],
         participants=participants,
         last_message=last_message,
         unread_count=unread_count,
+        pinned_message=pinned_message,
         created_at=conversation["created_at"],
         updated_at=conversation["updated_at"],
     )
 
 
+async def get_user_name(telegram_id: int) -> str:
+    """Получить имя пользователя"""
+    u = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if u:
+        return f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or u.get('username', 'Пользователь')
+    return 'Пользователь'
+
+
+async def check_friendship(user1: int, user2: int) -> bool:
+    """Проверить дружбу"""
+    return bool(await db.friends.find_one({
+        "$or": [
+            {"user_telegram_id": user1, "friend_telegram_id": user2},
+            {"user_telegram_id": user2, "friend_telegram_id": user1},
+            {"user1_id": user1, "user2_id": user2},
+            {"user1_id": user2, "user2_id": user1},
+        ]
+    }))
+
+
 @api_router.post("/messages/conversations", response_model=ConversationResponse)
 async def create_or_get_conversation(data: ConversationCreate):
-    """Создать или получить существующий диалог между двумя пользователями"""
+    """Создать или получить существующий диалог"""
     try:
         if data.user1_id == data.user2_id:
             raise HTTPException(status_code=400, detail="Нельзя создать диалог с самим собой")
-        
-        # Проверяем, что пользователи друзья
-        participant_ids = sorted([data.user1_id, data.user2_id])
-        is_friend = await db.friends.find_one({
-            "$or": [
-                {"user_telegram_id": data.user1_id, "friend_telegram_id": data.user2_id},
-                {"user_telegram_id": data.user2_id, "friend_telegram_id": data.user1_id},
-                {"user1_id": data.user1_id, "user2_id": data.user2_id},
-                {"user1_id": data.user2_id, "user2_id": data.user1_id},
-            ]
-        })
-        if not is_friend:
+        if not await check_friendship(data.user1_id, data.user2_id):
             raise HTTPException(status_code=403, detail="Отправлять сообщения можно только друзьям")
-        
         conversation = await get_or_create_conversation(data.user1_id, data.user2_id)
         return await build_conversation_response(conversation, data.user1_id)
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -13988,17 +14015,10 @@ async def get_user_conversations(telegram_id: int):
         conversations = await db.conversations.find(
             {"participant_ids": telegram_id}
         ).sort("updated_at", -1).to_list(100)
-        
         result = []
         for conv in conversations:
-            conv_response = await build_conversation_response(conv, telegram_id)
-            result.append(conv_response)
-        
-        return ConversationsListResponse(
-            conversations=result,
-            total=len(result)
-        )
-        
+            result.append(await build_conversation_response(conv, telegram_id))
+        return ConversationsListResponse(conversations=result, total=len(result))
     except Exception as e:
         logger.error(f"Get conversations error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -14011,39 +14031,14 @@ async def get_conversation_messages(conversation_id: str, limit: int = 50, offse
         conversation = await db.conversations.find_one({"id": conversation_id})
         if not conversation:
             raise HTTPException(status_code=404, detail="Диалог не найден")
-        
         if telegram_id and telegram_id not in conversation.get("participant_ids", []):
             raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
-        
-        total = await db.messages.count_documents({
-            "conversation_id": conversation_id,
-            "is_deleted": {"$ne": True},
-        })
-        
+        total = await db.messages.count_documents({"conversation_id": conversation_id, "is_deleted": {"$ne": True}})
         messages_docs = await db.messages.find(
             {"conversation_id": conversation_id, "is_deleted": {"$ne": True}}
         ).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
-        
-        messages = [
-            MessageResponse(
-                id=msg["id"],
-                conversation_id=msg["conversation_id"],
-                sender_id=msg["sender_id"],
-                text=msg["text"],
-                created_at=msg["created_at"],
-                read_at=msg.get("read_at"),
-                is_deleted=msg.get("is_deleted", False),
-                edited_at=msg.get("edited_at"),
-            )
-            for msg in messages_docs
-        ]
-        
-        return MessagesListResponse(
-            messages=messages,
-            total=total,
-            has_more=(offset + limit) < total,
-        )
-        
+        messages = [build_message_response(msg) for msg in messages_docs]
+        return MessagesListResponse(messages=messages, total=total, has_more=(offset + limit) < total)
     except HTTPException:
         raise
     except Exception as e:
@@ -14057,88 +14052,379 @@ async def send_message(data: MessageCreate):
     try:
         if data.sender_id == data.receiver_id:
             raise HTTPException(status_code=400, detail="Нельзя отправить сообщение самому себе")
-        
-        # Проверяем дружбу
-        is_friend = await db.friends.find_one({
-            "$or": [
-                {"user_telegram_id": data.sender_id, "friend_telegram_id": data.receiver_id},
-                {"user_telegram_id": data.receiver_id, "friend_telegram_id": data.sender_id},
-                {"user1_id": data.sender_id, "user2_id": data.receiver_id},
-                {"user1_id": data.receiver_id, "user2_id": data.sender_id},
-            ]
-        })
-        if not is_friend:
+        if not await check_friendship(data.sender_id, data.receiver_id):
             raise HTTPException(status_code=403, detail="Отправлять сообщения можно только друзьям")
-        
-        # Получаем или создаём диалог
         conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
-        
         now = datetime.utcnow()
+        # Обработка reply
+        reply_to_data = None
+        if data.reply_to_id:
+            original = await db.messages.find_one({"id": data.reply_to_id})
+            if original:
+                reply_to_data = {
+                    "message_id": original["id"],
+                    "sender_id": original["sender_id"],
+                    "sender_name": await get_user_name(original["sender_id"]),
+                    "text": original["text"][:150],
+                }
         message_doc = {
             "id": str(uuid.uuid4()),
             "conversation_id": conversation["id"],
             "sender_id": data.sender_id,
             "text": data.text.strip(),
+            "message_type": data.message_type or "text",
             "created_at": now,
             "read_at": None,
             "is_deleted": False,
             "edited_at": None,
+            "is_pinned": False,
+            "reply_to": reply_to_data,
+            "reactions": [],
+            "metadata": data.metadata,
+            "forwarded_from": None,
         }
-        
         await db.messages.insert_one(message_doc)
-        
-        # Обновляем время последнего сообщения в диалоге
-        await db.conversations.update_one(
-            {"id": conversation["id"]},
-            {"$set": {"updated_at": now}}
-        )
-        
-        # Создаём in-app уведомление для получателя
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        # In-app notification
         try:
-            sender_settings = await db.user_settings.find_one({"telegram_id": data.sender_id})
-            sender_name = "Пользователь"
-            if sender_settings:
-                sender_name = f"{sender_settings.get('first_name', '')} {sender_settings.get('last_name', '')}".strip() or sender_settings.get('username', 'Пользователь')
-            
+            sender_name = await get_user_name(data.sender_id)
             text_preview = data.text.strip()[:100] + ("..." if len(data.text.strip()) > 100 else "")
-            
-            notification_doc = {
-                "id": str(uuid.uuid4()),
-                "telegram_id": data.receiver_id,
-                "type": "new_message",
-                "category": "social",
-                "priority": "normal",
-                "title": f"Сообщение от {sender_name}",
-                "message": text_preview,
-                "emoji": "💬",
-                "data": {
-                    "conversation_id": conversation["id"],
-                    "sender_id": data.sender_id,
-                    "sender_name": sender_name,
-                    "message_id": message_doc["id"],
-                },
-                "is_read": False,
-                "created_at": now,
-            }
-            await db.in_app_notifications.insert_one(notification_doc)
-        except Exception as notif_err:
-            logger.warning(f"Failed to create message notification: {notif_err}")
-        
-        return MessageResponse(
-            id=message_doc["id"],
-            conversation_id=message_doc["conversation_id"],
-            sender_id=message_doc["sender_id"],
-            text=message_doc["text"],
-            created_at=message_doc["created_at"],
-            read_at=message_doc["read_at"],
-            is_deleted=message_doc["is_deleted"],
-            edited_at=message_doc["edited_at"],
-        )
-        
+            await db.in_app_notifications.insert_one({
+                "id": str(uuid.uuid4()), "telegram_id": data.receiver_id,
+                "type": "new_message", "category": "social", "priority": "normal",
+                "title": f"Сообщение от {sender_name}", "message": text_preview, "emoji": "💬",
+                "data": {"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+                "is_read": False, "created_at": now,
+            })
+        except Exception as ne:
+            logger.warning(f"Notification error: {ne}")
+        return build_message_response(message_doc)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Send message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/messages/{message_id}/edit", response_model=MessageResponse)
+async def edit_message(message_id: str, data: MessageEdit):
+    """Редактировать сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        if message["sender_id"] != data.telegram_id:
+            raise HTTPException(status_code=403, detail="Можно редактировать только свои сообщения")
+        if message.get("is_deleted"):
+            raise HTTPException(status_code=400, detail="Нельзя редактировать удалённое сообщение")
+        now = datetime.utcnow()
+        await db.messages.update_one(
+            {"id": message_id},
+            {"$set": {"text": data.text.strip(), "edited_at": now}}
+        )
+        updated = await db.messages.find_one({"id": message_id})
+        return build_message_response(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Edit message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/{message_id}/reactions", response_model=MessageResponse)
+async def toggle_reaction(message_id: str, data: MessageReaction):
+    """Добавить или убрать реакцию на сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        reactions = message.get("reactions", [])
+        found = False
+        for r in reactions:
+            if r["emoji"] == data.emoji:
+                if data.telegram_id in r["users"]:
+                    r["users"].remove(data.telegram_id)
+                    if not r["users"]:
+                        reactions.remove(r)
+                else:
+                    r["users"].append(data.telegram_id)
+                found = True
+                break
+        if not found:
+            reactions.append({"emoji": data.emoji, "users": [data.telegram_id]})
+        await db.messages.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
+        updated = await db.messages.find_one({"id": message_id})
+        return build_message_response(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle reaction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/messages/{message_id}/pin")
+async def pin_message(message_id: str, data: MessagePin):
+    """Закрепить/открепить сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        conv = await db.conversations.find_one({"id": message["conversation_id"]})
+        if not conv or data.telegram_id not in conv.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа")
+        if data.is_pinned:
+            await db.messages.update_many(
+                {"conversation_id": message["conversation_id"], "is_pinned": True},
+                {"$set": {"is_pinned": False}}
+            )
+        await db.messages.update_one({"id": message_id}, {"$set": {"is_pinned": data.is_pinned}})
+        return {"success": True, "message": "Сообщение закреплено" if data.is_pinned else "Сообщение откреплено"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Pin message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/{conversation_id}/pinned")
+async def get_pinned_message(conversation_id: str):
+    """Получить закреплённое сообщение"""
+    try:
+        pinned = await db.messages.find_one(
+            {"conversation_id": conversation_id, "is_pinned": True, "is_deleted": {"$ne": True}}
+        )
+        if not pinned:
+            return {"pinned_message": None}
+        return {"pinned_message": build_message_response(pinned).dict()}
+    except Exception as e:
+        logger.error(f"Get pinned error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/forward", response_model=MessageResponse)
+async def forward_message(data: MessageForward):
+    """Переслать сообщение другому другу"""
+    try:
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Можно пересылать только друзьям")
+        original = await db.messages.find_one({"id": data.original_message_id})
+        if not original:
+            raise HTTPException(status_code=404, detail="Оригинальное сообщение не найдено")
+        original_sender_name = await get_user_name(original["sender_id"])
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": original["text"],
+            "message_type": "forward",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": None,
+            "reactions": [],
+            "metadata": original.get("metadata"),
+            "forwarded_from": {
+                "sender_id": original["sender_id"],
+                "sender_name": original_sender_name,
+                "original_type": original.get("message_type", "text"),
+            },
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Forward message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/send-schedule", response_model=MessageResponse)
+async def send_schedule_message(data: ScheduleShareMessage):
+    """Отправить расписание как сообщение"""
+    try:
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Можно отправлять только друзьям")
+        sender_settings = await db.user_settings.find_one({"telegram_id": data.sender_id})
+        if not sender_settings or not sender_settings.get("group_id"):
+            raise HTTPException(status_code=400, detail="Группа не указана в настройках")
+        target_date = data.date or datetime.utcnow().strftime("%Y-%m-%d")
+        # Получаем расписание из кэша или API
+        schedule_items = []
+        try:
+            from rudn_parser import RUDNParser
+            parser = RUDNParser()
+            schedule_data = await parser.get_schedule(sender_settings["group_id"])
+            if schedule_data:
+                schedule_items = schedule_data[:8]
+        except Exception:
+            pass
+        sender_name = await get_user_name(data.sender_id)
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": f"📅 Расписание на {target_date}",
+            "message_type": "schedule",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": None,
+            "reactions": [],
+            "metadata": {
+                "date": target_date,
+                "group_name": sender_settings.get("group_name", ""),
+                "sender_name": sender_name,
+                "items": schedule_items[:8],
+            },
+            "forwarded_from": None,
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send schedule error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/send-music", response_model=MessageResponse)
+async def send_music_message(data: MusicShareMessage):
+    """Отправить музыку как сообщение"""
+    try:
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Можно отправлять только друзьям")
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": f"🎵 {data.track_artist} — {data.track_title}",
+            "message_type": "music",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": None,
+            "reactions": [],
+            "metadata": {
+                "track_title": data.track_title,
+                "track_artist": data.track_artist,
+                "track_id": data.track_id,
+                "track_duration": data.track_duration,
+                "cover_url": data.cover_url,
+            },
+            "forwarded_from": None,
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send music error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/create-task")
+async def create_task_from_message(data: TaskFromMessage):
+    """Создать задачу из сообщения"""
+    try:
+        message = await db.messages.find_one({"id": data.message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        title = data.title or message["text"][:100]
+        task_id = str(uuid.uuid4())
+        now = datetime.utcnow()
+        task_doc = {
+            "id": task_id,
+            "telegram_id": data.telegram_id,
+            "title": title,
+            "description": message["text"] if len(message["text"]) > 100 else "",
+            "completed": False,
+            "priority": "medium",
+            "created_at": now,
+            "updated_at": now,
+            "source": "message",
+            "source_message_id": data.message_id,
+        }
+        await db.tasks.insert_one(task_doc)
+        return {"success": True, "message": "Задача создана", "task_id": task_id, "title": title}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create task from message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/{conversation_id}/typing")
+async def set_typing(conversation_id: str, data: TypingIndicator):
+    """Установить индикатор набора"""
+    try:
+        if conversation_id not in typing_indicators_store:
+            typing_indicators_store[conversation_id] = {}
+        typing_indicators_store[conversation_id][data.telegram_id] = datetime.utcnow()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False}
+
+
+@api_router.get("/messages/{conversation_id}/typing")
+async def get_typing(conversation_id: str, telegram_id: int = 0):
+    """Получить список печатающих"""
+    try:
+        now = datetime.utcnow()
+        typing_users = []
+        conv_typing = typing_indicators_store.get(conversation_id, {})
+        expired = []
+        for uid, ts in conv_typing.items():
+            if (now - ts).total_seconds() < 4 and uid != telegram_id:
+                name = await get_user_name(uid)
+                typing_users.append({"telegram_id": uid, "name": name})
+            elif (now - ts).total_seconds() >= 4:
+                expired.append(uid)
+        for uid in expired:
+            conv_typing.pop(uid, None)
+        return {"typing_users": typing_users}
+    except Exception as e:
+        return {"typing_users": []}
+
+
+@api_router.get("/messages/{conversation_id}/search")
+async def search_messages(conversation_id: str, q: str = "", telegram_id: int = 0, limit: int = 30):
+    """Поиск по сообщениям в диалоге"""
+    try:
+        if not q.strip():
+            return {"results": [], "total": 0}
+        conv = await db.conversations.find_one({"id": conversation_id})
+        if not conv:
+            raise HTTPException(status_code=404, detail="Диалог не найден")
+        if telegram_id and telegram_id not in conv.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа")
+        query_filter = {
+            "conversation_id": conversation_id,
+            "is_deleted": {"$ne": True},
+            "text": {"$regex": q.strip(), "$options": "i"},
+        }
+        total = await db.messages.count_documents(query_filter)
+        docs = await db.messages.find(query_filter).sort("created_at", -1).limit(limit).to_list(limit)
+        results = [build_message_response(d) for d in docs]
+        return {"results": [r.dict() for r in results], "total": total}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Search messages error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -14149,48 +14435,32 @@ async def mark_messages_read(conversation_id: str, telegram_id: int = Body(..., 
         conversation = await db.conversations.find_one({"id": conversation_id})
         if not conversation:
             raise HTTPException(status_code=404, detail="Диалог не найден")
-        
         if telegram_id not in conversation.get("participant_ids", []):
             raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
-        
         now = datetime.utcnow()
         result = await db.messages.update_many(
-            {
-                "conversation_id": conversation_id,
-                "sender_id": {"$ne": telegram_id},
-                "read_at": None,
-                "is_deleted": {"$ne": True},
-            },
+            {"conversation_id": conversation_id, "sender_id": {"$ne": telegram_id}, "read_at": None, "is_deleted": {"$ne": True}},
             {"$set": {"read_at": now}}
         )
-        
         return {"success": True, "marked_count": result.modified_count}
-        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Mark messages read error: {e}")
+        logger.error(f"Mark read error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.delete("/messages/{message_id}")
 async def delete_message(message_id: str, telegram_id: int = Body(..., embed=True)):
-    """Удалить своё сообщение (мягкое удаление)"""
+    """Удалить сообщение"""
     try:
         message = await db.messages.find_one({"id": message_id})
         if not message:
             raise HTTPException(status_code=404, detail="Сообщение не найдено")
-        
         if message["sender_id"] != telegram_id:
             raise HTTPException(status_code=403, detail="Можно удалять только свои сообщения")
-        
-        await db.messages.update_one(
-            {"id": message_id},
-            {"$set": {"is_deleted": True, "text": ""}}
-        )
-        
+        await db.messages.update_one({"id": message_id}, {"$set": {"is_deleted": True, "text": ""}})
         return {"success": True, "message": "Сообщение удалено"}
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -14200,32 +14470,20 @@ async def delete_message(message_id: str, telegram_id: int = Body(..., embed=Tru
 
 @api_router.get("/messages/unread/{telegram_id}", response_model=MessagesUnreadCountResponse)
 async def get_unread_messages_count(telegram_id: int):
-    """Получить количество непрочитанных сообщений"""
+    """Получить количество непрочитанных"""
     try:
-        # Найти все диалоги пользователя
-        conversations = await db.conversations.find(
-            {"participant_ids": telegram_id}
-        ).to_list(100)
-        
+        conversations = await db.conversations.find({"participant_ids": telegram_id}).to_list(100)
         total_unread = 0
         per_conversation = {}
-        
         for conv in conversations:
             count = await db.messages.count_documents({
-                "conversation_id": conv["id"],
-                "sender_id": {"$ne": telegram_id},
-                "read_at": None,
-                "is_deleted": {"$ne": True},
+                "conversation_id": conv["id"], "sender_id": {"$ne": telegram_id},
+                "read_at": None, "is_deleted": {"$ne": True},
             })
             if count > 0:
                 per_conversation[conv["id"]] = count
                 total_unread += count
-        
-        return MessagesUnreadCountResponse(
-            total_unread=total_unread,
-            per_conversation=per_conversation,
-        )
-        
+        return MessagesUnreadCountResponse(total_unread=total_unread, per_conversation=per_conversation)
     except Exception as e:
         logger.error(f"Get unread count error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
