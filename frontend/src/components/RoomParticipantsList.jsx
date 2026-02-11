@@ -149,12 +149,16 @@ const RoomParticipantsList = ({
       
       // Show error message
       const errorMessage = error.response?.data?.detail || 'Ошибка при добавлении друзей';
-      if (webApp?.showPopup) {
-        webApp.showPopup({
-          title: 'Ошибка',
-          message: errorMessage,
-          buttons: [{ type: 'ok' }]
-        });
+      if (webApp?.showPopup && webApp?.isVersionAtLeast?.('6.2')) {
+        try {
+          webApp.showPopup({
+            title: 'Ошибка',
+            message: errorMessage,
+            buttons: [{ type: 'ok' }]
+          });
+        } catch (e) { alert(errorMessage); }
+      } else {
+        alert(errorMessage);
       }
     } finally {
       setIsAddingFriends(false);
