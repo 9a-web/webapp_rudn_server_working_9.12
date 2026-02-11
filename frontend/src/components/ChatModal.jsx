@@ -387,22 +387,15 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     );
   };
 
-  // Рендер музыкальной карточки
+  // Рендер музыкальной карточки (кликабельная для воспроизведения)
   const renderMusicCard = () => {
     if (!isMusic) return null;
     const meta = message.metadata || {};
     return (
-      <div className="mt-1.5 p-3 bg-white/[0.06] rounded-xl border border-white/[0.06] flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-          {meta.cover_url ? <img src={meta.cover_url} alt="" className="w-full h-full object-cover" /> :
-            <Music className="w-5 h-5 text-purple-400" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-white truncate">{meta.track_title || 'Трек'}</p>
-          <p className="text-[11px] text-gray-400 truncate">{meta.track_artist || 'Исполнитель'}</p>
-        </div>
-        <div className="text-[11px] text-gray-500">{meta.track_duration ? `${Math.floor(meta.track_duration / 60)}:${String(meta.track_duration % 60).padStart(2, '0')}` : ''}</div>
-      </div>
+      <MusicCardPlayable
+        metadata={meta}
+        isMine={isMine}
+      />
     );
   };
 
