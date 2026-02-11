@@ -878,6 +878,161 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
             </motion.div>
           )}
 
+          {/* ===== Вкладка: Сообщения ===== */}
+          {activeTab === 'messages' && (
+            <motion.div
+              key="messages"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-2.5"
+            >
+              {conversationsLoading && conversations.length === 0 ? (
+                <div className="space-y-2.5">
+                  {[0, 1, 2].map(i => <SkeletonCard key={i} delay={i * 0.08} />)}
+                </div>
+              ) : conversations.length > 0 ? (
+                conversations.map((conv, idx) => {
+                  const other = conv.participants?.find(p => p.telegram_id !== user?.id);
+                  if (!other) return null;
+                  const displayName = [other.first_name, other.last_name].filter(Boolean).join(' ') || other.username || 'Пользователь';
+                  const lastMsg = conv.last_message;
+                  const isMineLastMsg = lastMsg?.sender_id === user?.id;
+                  const lastMsgPreview = lastMsg
+                    ? (isMineLastMsg ? 'Вы: ' : '') + (lastMsg.text?.substring(0, 50) || '') + (lastMsg.text?.length > 50 ? '...' : '')
+                    : 'Нет сообщений';
+
+                  const getTimeAgo = (dateStr) => {
+                    if (!dateStr) return '';
+                    const now = new Date();
+                    const d = new Date(dateStr);
+                    const diffMs = now - d;
+                    const diffMin = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMs / 3600000);
+                    const diffDays = Math.floor(diffMs / 86400000);
+                    if (diffMin < 1) return 'сейчас';
+                    if (diffMin < 60) return `${diffMin} мин`;
+                    if (diffHours < 24) return `${diffHours} ч`;
+                    if (diffDays < 7) return `${diffDays} дн`;
+                    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                  };
+
+                  return (
+                    <motion.div
+                      key={conv.id}
+                      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.35, delay: idx * 0.04 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleOpenChat({
+                        telegram_id: other.telegram_id,
+                        first_name: other.first_name,
+                        last_name: other.last_name,
+                        username: other.username,
+                        is_online: other.is_online,
+                        last_activity: other.last_activity,
+                      })}
+                      className="relative group cursor-pointer overflow-hidden rounded-2xl"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/[0.05] to-white/[0.02] backdrop-blur-xl" />
+                      <div className={`absolute inset-0 border rounded-2xl transition-all duration-300 ${
+                        conv.unread_count > 0 ? 'border-purple-500/20' : 'border-white/[0.08]'
+                      } group-hover:border-purple-500/25`} />
+
+                      <div className="relative p-4 flex items-center gap-3.5">
+                        {/* Аватар с онлайн-индикатором */}
+                        <div className="relative flex-shrink-0">
+                          <UserAvatar
+                            telegramId={other.telegram_id}
+                            firstName={other.first_name}
+                            username={other.username}
+                            size={52}
+                            className="rounded-[18px]"
+                          />
+                          {other.is_online && (
+                            <div className="absolute -bottom-0.5 -right-0.5">
+                              <div className="w-4 h-4 bg-emerald-500 rounded-full border-[2.5px] border-gray-900 relative">
+                                <div className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-40" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Информация */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className={`font-semibold text-[15px] truncate leading-tight ${
+                              conv.unread_count > 0 ? 'text-white' : 'text-gray-200'
+                            }`}>
+                              {displayName}
+                            </h4>
+                            {lastMsg && (
+                              <span className="text-[11px] text-gray-500 flex-shrink-0">
+                                {getTimeAgo(lastMsg.created_at)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {lastMsg && isMineLastMsg && (
+                              lastMsg.read_at ? (
+                                <CheckCheck className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                              ) : (
+                                <Check className="w-3 h-3 text-gray-500 flex-shrink-0" />
+                              )
+                            )}
+                            <p className={`text-[13px] truncate ${
+                              conv.unread_count > 0 ? 'text-gray-300 font-medium' : 'text-gray-500'
+                            }`}>
+                              {lastMsgPreview}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Бейдж непрочитанных */}
+                        {conv.unread_count > 0 && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="min-w-[22px] h-[22px] bg-purple-500 rounded-full flex items-center justify-center px-1.5 flex-shrink-0"
+                          >
+                            <span className="text-[11px] font-bold text-white">
+                              {conv.unread_count > 99 ? '99+' : conv.unread_count}
+                            </span>
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-16"
+                >
+                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-500/15 to-blue-500/15 flex items-center justify-center mx-auto mb-5">
+                    <MessageCircle className="w-10 h-10 text-purple-400/50" />
+                  </div>
+                  <h3 className="text-[17px] font-semibold text-gray-300 mb-2">Нет сообщений</h3>
+                  <p className="text-[13px] text-gray-500 max-w-[240px] mx-auto leading-relaxed mb-6">
+                    Напишите другу, чтобы начать диалог
+                  </p>
+                  {friends.length > 0 && (
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setActiveTab('friends')}
+                      className="inline-flex items-center gap-2 px-5 py-3 bg-purple-500 text-white rounded-2xl font-medium text-[14px] shadow-lg shadow-purple-500/20"
+                    >
+                      <Users className="w-4 h-4" />
+                      К друзьям
+                    </motion.button>
+                  )}
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+
           {/* ===== Вкладка: Запросы ===== */}
           {activeTab === 'requests' && (
             <motion.div
