@@ -106,8 +106,8 @@ class MusicTestRunner:
         
         if status == 200:
             self.log_test("Send friend request", True, "Friend request sent successfully")
-        elif status == 400 and "уже отправлен" in resp.get("detail", ""):
-            self.log_test("Send friend request", True, "Friend request already exists (from previous run)")
+        elif status == 400 and ("уже отправлен" in resp.get("detail", "") or "уже друзья" in resp.get("detail", "")):
+            self.log_test("Send friend request", True, "Users already have friendship connection")
         else:
             self.log_test("Send friend request", False, f"Friend request failed: {status} - {resp}")
             # Continue anyway in case they're already friends
