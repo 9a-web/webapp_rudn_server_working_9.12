@@ -706,7 +706,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-            const showBadge = tab.id === 'requests' && unprocessedIncomingCount > 0;
+            const showBadge = (tab.id === 'requests' && unprocessedIncomingCount > 0) || (tab.id === 'messages' && unreadMessagesCount > 0);
+            const badgeCount = tab.id === 'requests' ? unprocessedIncomingCount : unreadMessagesCount;
             
             return (
               <motion.button
