@@ -1480,7 +1480,48 @@ const Home = () => {
         }
       }
       
-      // 3. QR для присоединения к комнате (room_XXXXX)
+      // 3. QR для подключения к комнате прослушивания (listen_XXXXX или startapp=listen_XXXXX)
+      if (scannedText.includes('listen_')) {
+        const inviteCode = scannedText.match(/listen_([a-zA-Z0-9]+)/)?.[1];
+        if (inviteCode) {
+          console.log('🎵 Listening room QR detected:', inviteCode);
+          
+          // Показываем модальное окно с загрузкой
+          setListenRoomJoinModal({
+            isOpen: true,
+            inviteCode: inviteCode,
+            roomData: null,
+            loading: true
+          });
+          
+          // Загружаем информацию о комнате
+          try {
+            const { getListeningRoomPreview } = await import('./services/listeningRoomAPI');
+            const preview = await getListeningRoomPreview(inviteCode);
+            
+            setListenRoomJoinModal(prev => ({
+              ...prev,
+              roomData: preview.found ? preview : null,
+              loading: false
+            }));
+            
+            if (!preview.found) {
+              hapticFeedback('notification', 'error');
+            }
+          } catch (err) {
+            console.error('Error loading room preview:', err);
+            setListenRoomJoinModal(prev => ({
+              ...prev,
+              roomData: null,
+              loading: false
+            }));
+            hapticFeedback('notification', 'error');
+          }
+          return;
+        }
+      }
+      
+      // 4. QR для присоединения к комнате задач (room_XXXXX)
       if (scannedText.includes('room_')) {
         const roomId = scannedText.match(/room_([a-zA-Z0-9-]+)/)?.[1];
         if (roomId) {
