@@ -95,16 +95,13 @@ class TelegramNotificationService:
             True если уведомление отправлено успешно
         """
         try:
-            # Формируем текст сообщения
+            # Формируем текст сообщения (уже содержит tg-emoji теги)
             message = self._format_class_notification(class_info, minutes_before)
-            
-            # Заменяем обычные эмоджи на анимированные
-            animated_message = animate_emoji(message)
             
             # Отправляем сообщение
             await self.bot.send_message(
                 chat_id=telegram_id,
-                text=animated_message,
+                text=message,
                 parse_mode='HTML'
             )
             
