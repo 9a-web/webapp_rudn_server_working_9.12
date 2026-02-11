@@ -83,6 +83,14 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
   // Состояние присоединения
   const [inviteCode, setInviteCode] = useState('');
   
+  // Состояние модалки подтверждения QR-подключения
+  const [qrJoinConfirm, setQrJoinConfirm] = useState({
+    isOpen: false,
+    inviteCode: null,
+    roomData: null,
+    loading: false
+  });
+  
   // WebSocket и синхронизация
   const wsRef = useRef(null);
   const ignoreUntilRef = useRef(0);
