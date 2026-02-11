@@ -427,12 +427,13 @@ class ListenTogetherTestRunner:
         details = []
         
         # Validate room structure
-        participants = resp.get("participants", [])
+        room_data = resp.get("room", {})
+        participants = room_data.get("participants", [])
         if len(participants) != 2:
             success = False
             details.append(f"Expected 2 participants, got {len(participants)}")
         
-        queue = resp.get("queue", [])
+        queue = room_data.get("queue", [])
         if len(queue) != 1:
             success = False
             details.append(f"Expected 1 track in queue, got {len(queue)}")
