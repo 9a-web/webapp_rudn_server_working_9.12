@@ -208,6 +208,39 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
     loadData();
   }, [loadData]);
 
+  // Загрузка непрочитанных сообщений
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadUnread = async () => {
+      try {
+        const data = await messagesAPI.getUnreadCount(user.id);
+        setUnreadMessagesCount(data.total_unread || 0);
+      } catch (e) {
+        // silent
+      }
+    };
+    loadUnread();
+    const interval = setInterval(loadUnread, 10000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  // Открытие чата с другом
+  const handleOpenChat = useCallback((friend) => {
+    hapticFeedback('impact', 'light');
+    setChatFriend(friend);
+    setShowConversations(false);
+  }, [hapticFeedback]);
+
+  const handleCloseChat = useCallback(() => {
+    setChatFriend(null);
+    // Обновляем счётчик непрочитанных
+    if (user?.id) {
+      messagesAPI.getUnreadCount(user.id).then(data => {
+        setUnreadMessagesCount(data.total_unread || 0);
+      }).catch(() => {});
+    }
+  }, [user?.id]);
+
   // === Синхронизация с NotificationsPanel через CustomEvent ===
   useEffect(() => {
     const handleNotifAction = (e) => {
