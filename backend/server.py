@@ -12649,6 +12649,18 @@ async def accept_friend_request(request_id: str, telegram_id: int = Body(..., em
             await notify_friend_accepted(from_id, accepter_user)
         
         logger.info(f"👥 Friend request accepted: {from_id} <-> {telegram_id}")
+        
+        # SSE: уведомляем отправителя заявки что она принята
+        await _emit_friend_event(from_id, "friend_request_accepted", {
+            "by_telegram_id": telegram_id,
+            "request_id": request_id
+        })
+        # SSE: уведомляем принимающего (себя) для обновления UI
+        await _emit_friend_event(telegram_id, "friend_request_accepted_self", {
+            "friend_telegram_id": from_id,
+            "request_id": request_id
+        })
+        
         return FriendActionResponse(
             success=True,
             message="Запрос принят, вы теперь друзья!",
