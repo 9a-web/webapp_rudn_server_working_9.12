@@ -50,6 +50,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
   // Listening Room State
   const [listeningRoomModalOpen, setListeningRoomModalOpen] = useState(false);
   const [activeListeningRoom, setActiveListeningRoom] = useState(null);
+  const [pendingInviteCode, setPendingInviteCode] = useState(null);
   
   // Send to Friend State
   const [sendTrackModalOpen, setSendTrackModalOpen] = useState(false);
@@ -70,9 +71,8 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
   // Обработка приглашения в комнату прослушивания из чата
   useEffect(() => {
     if (pendingListenInvite) {
+      setPendingInviteCode(pendingListenInvite);
       setListeningRoomModalOpen(true);
-      // Передаём invite code через activeListeningRoom
-      setActiveListeningRoom({ invite_code: pendingListenInvite });
       onListenInviteHandled?.();
     }
   }, [pendingListenInvite, onListenInviteHandled]);
