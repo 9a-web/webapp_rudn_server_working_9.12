@@ -60,33 +60,33 @@ class MusicTestRunner:
             return 500, {"error": str(e)}
     
     async def setup_test_users(self):
-        """Setup test users 77777 and 88888 with friendship"""
+        """Setup test users 77777 and 88888 with friendship as per review request"""
         print("🔧 Setting up test users...")
         
-        # User data for 77777
+        # User data for 77777 as per review request
         user1_data = {
             "telegram_id": 77777,
-            "username": "testuser1",
-            "first_name": "Test1", 
+            "username": "musictest1",
+            "first_name": "MusicTest1",
             "last_name": "User1",
-            "group_id": "14966",
-            "group_name": "ИВБОп-ИВТ-11",
-            "facultet_id": "41",
-            "level_id": "1",
+            "group_id": "G1",
+            "group_name": "Группа1",
+            "facultet_id": "F1",
+            "level_id": "L1",
             "kurs": "1",
             "form_code": "ОФО"
         }
         
-        # User data for 88888
+        # User data for 88888 as per review request
         user2_data = {
             "telegram_id": 88888,
-            "username": "testuser2", 
-            "first_name": "Test2",
-            "last_name": "User2",
-            "group_id": "14966",
-            "group_name": "ИВБОп-ИВТ-11",
-            "facultet_id": "41",
-            "level_id": "1",
+            "username": "musictest2",
+            "first_name": "MusicTest2",
+            "last_name": "User2", 
+            "group_id": "G1",
+            "group_name": "Группа1",
+            "facultet_id": "F1",
+            "level_id": "L1",
             "kurs": "1",
             "form_code": "ОФО"
         }
@@ -96,47 +96,51 @@ class MusicTestRunner:
         status2, resp2 = await self.make_request("POST", "/user-settings", user2_data)
         
         if status1 == 200 and status2 == 200:
-            self.log_test("Setup Users", True, "Users 77777 and 88888 created/updated")
+            self.log_test("Create users 77777 and 88888", True, "Users created successfully")
         else:
-            self.log_test("Setup Users", False, f"User creation failed: {status1}, {status2}")
+            self.log_test("Create users 77777 and 88888", False, f"User creation failed: {status1}, {status2}")
             return False
         
-        # Check if they are already friends
-        status, friends = await self.make_request("GET", "/friends/77777")
+        # Step 3: Make them friends - POST /api/friends/request/88888 with body {"telegram_id": 77777}
+        status, resp = await self.make_request("POST", "/friends/request/88888", {"telegram_id": 77777})
         
-        friends_exist = False
-        if status == 200 and "friends" in friends:
-            for friend in friends["friends"]:
-                if friend.get("telegram_id") == 88888:
-                    friends_exist = True
-                    break
+        if status == 200:
+            self.log_test("Send friend request", True, "Friend request sent successfully")
+        else:
+            self.log_test("Send friend request", False, f"Friend request failed: {status} - {resp}")
+            # Continue anyway in case they're already friends
         
-        if not friends_exist:
-            # Send friend request from 77777 to 88888
-            status, resp = await self.make_request("POST", "/friends/request/88888", {"telegram_id": 77777})
+        # Step 4: Get requests - GET /api/friends/88888/requests 
+        status, requests_resp = await self.make_request("GET", "/friends/88888/requests")
+        
+        if status == 200 and requests_resp.get("requests"):
+            self.request_id = requests_resp["requests"][0]["id"]
+            self.log_test("Get friend requests", True, f"Found request: {self.request_id}")
             
-            if status != 200:
-                self.log_test("Friend Request", False, f"Friend request failed: {status}")
-                return False
-            
-            # Get friend requests for 88888
-            status, requests = await self.make_request("GET", "/friends/88888/requests")
-            
-            if status != 200 or not requests.get("requests"):
-                self.log_test("Get Friend Requests", False, f"Failed to get requests: {status}")
-                return False
-            
-            # Accept the request
-            request_id = requests["requests"][0]["id"]
-            status, resp = await self.make_request("POST", f"/friends/accept/{request_id}", {"telegram_id": 88888})
+            # Step 5: Accept - POST /api/friends/accept/{request_id} with body {"telegram_id": 88888}
+            status, resp = await self.make_request("POST", f"/friends/accept/{self.request_id}", {"telegram_id": 88888})
             
             if status == 200:
-                self.log_test("Establish Friendship", True, "Users are now friends")
+                self.log_test("Accept friend request", True, "Users are now friends")
             else:
-                self.log_test("Establish Friendship", False, f"Accept request failed: {status}")
+                self.log_test("Accept friend request", False, f"Accept failed: {status} - {resp}")
                 return False
         else:
-            self.log_test("Establish Friendship", True, "Users were already friends")
+            # Check if they're already friends
+            status, friends = await self.make_request("GET", "/friends/77777")
+            
+            friends_exist = False
+            if status == 200 and "friends" in friends:
+                for friend in friends["friends"]:
+                    if friend.get("telegram_id") == 88888:
+                        friends_exist = True
+                        break
+            
+            if friends_exist:
+                self.log_test("Check existing friendship", True, "Users were already friends")
+            else:
+                self.log_test("Get friend requests", False, f"No requests found and not friends: {status}")
+                return False
         
         return True
     
