@@ -139,6 +139,70 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
     }
   }, [isOpen, telegramId, loadMyRooms, currentRoom]);
   
+  // Авто-присоединение по invite_code из чата
+  const pendingInviteProcessedRef = useRef(null);
+  useEffect(() => {
+    if (!isOpen || !telegramId || !user || !pendingInviteCode) return;
+    // Не обрабатываем повторно тот же код
+    if (pendingInviteProcessedRef.current === pendingInviteCode) return;
+    pendingInviteProcessedRef.current = pendingInviteCode;
+    
+    const autoJoin = async () => {
+      setLoading(true);
+      setError(null);
+      setView('main'); // Показываем main с loading пока идёт подключение
+      try {
+        const result = await joinListeningRoom(pendingInviteCode.trim(), {
+          telegram_id: telegramId,
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
+          username: user.username || '',
+          photo_url: user.photo_url || null
+        });
+        
+        if (result.success && result.room) {
+          hapticFeedback?.('notification', 'success');
+          // Открываем комнату
+          const room = {
+            ...result.room,
+            is_host: result.room.host_id === telegramId,
+            online_count: result.room.online_count || 0
+          };
+          setCurrentRoom(room);
+          setIsConnected(false);
+          setConnectionStatus('disconnected');
+          setOnlineCount(room.online_count || 0);
+          setQueue(room.queue || []);
+          setHistory(room.history || []);
+          setSubView('info');
+          setView('room');
+          
+          // Подключаемся к WebSocket
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (isMountedRef.current) {
+            shouldReconnectRef.current = true;
+            currentRoomIdRef.current = room.id;
+            reconnectAttemptRef.current = 0;
+            setConnectionStatus('connecting');
+            wsRef.current = createListeningRoomConnection(room.id, telegramId, createSyncHandlers(room.id));
+          }
+        } else {
+          setError(result.message || 'Не удалось присоединиться к комнате');
+          hapticFeedback?.('notification', 'error');
+        }
+      } catch (err) {
+        console.error('Auto-join room error:', err);
+        setError(err.message || 'Ошибка присоединения');
+        hapticFeedback?.('notification', 'error');
+      } finally {
+        setLoading(false);
+        onInviteHandled?.();
+      }
+    };
+    
+    autoJoin();
+  }, [isOpen, telegramId, user, pendingInviteCode, onInviteHandled]);
+
   // Открыть комнату для просмотра
   const openRoom = useCallback((room) => {
     setCurrentRoom(room);
