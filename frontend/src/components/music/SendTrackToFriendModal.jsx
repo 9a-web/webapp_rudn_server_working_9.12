@@ -48,20 +48,24 @@ export const SendTrackToFriendModal = ({ isOpen, onClose, track, telegramId }) =
   const [sendingTo, setSendingTo] = useState(null);
   const [sentTo, setSentTo] = useState(new Set());
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
 
   // Загрузка друзей
   useEffect(() => {
     const loadFriends = async () => {
       if (!isOpen || !telegramId) return;
       setIsLoading(true);
+      setError(null);
       try {
         const data = await friendsAPI.getFriends(telegramId);
-        setFriends(data.friends || []);
-        setFilteredFriends(data.friends || []);
+        const friendsList = data?.friends || [];
+        setFriends(friendsList);
+        setFilteredFriends(friendsList);
       } catch (err) {
         console.error('Load friends error:', err);
         setFriends([]);
         setFilteredFriends([]);
+        setError('Не удалось загрузить список друзей');
       } finally {
         setIsLoading(false);
       }
