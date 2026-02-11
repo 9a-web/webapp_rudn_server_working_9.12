@@ -165,10 +165,10 @@ export const TrackCard = ({
       {showSendToFriend && onSendToFriend && !isBlocked && (
         <button
           onClick={handleSendToFriend}
-          className="p-2 transition-all active:scale-90 text-white/30 hover:text-purple-400"
+          className="p-2 rounded-lg transition-all active:scale-90 text-purple-400/70 hover:text-purple-300 hover:bg-purple-500/15"
           title="Отправить другу"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-[18px] h-[18px]" />
         </button>
       )}
 
