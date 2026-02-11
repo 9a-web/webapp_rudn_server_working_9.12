@@ -325,7 +325,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
             {activeTab === 'users' && <UsersTab />}
             {activeTab === 'classes' && <ClassesTab />}
             {activeTab === 'notifications' && <NotificationsTab />}
-            {activeTab === 'server' && <ServerTab />}
+            {activeTab === 'server' && <ServerTab onlineData={onlineData} />}
           </div>
         </motion.div>
       </div>
