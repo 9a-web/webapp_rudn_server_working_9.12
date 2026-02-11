@@ -772,7 +772,7 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
                 </span>
               </h4>
               <span className="text-[11px] text-gray-600">
-                {new Date(onlineData.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {new Date(onlineData.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Moscow' })}
               </span>
             </div>
             
