@@ -397,6 +397,13 @@ async def create_indexes():
         await safe_create_index(db.friend_requests, [("to_telegram_id", 1), ("status", 1)])
         await safe_create_index(db.user_blocks, [("blocker_telegram_id", 1), ("blocked_telegram_id", 1)], unique=True)
         
+        # Messages system indexes
+        await safe_create_index(db.conversations, [("participant_ids", 1)])
+        await safe_create_index(db.conversations, [("updated_at", -1)])
+        await safe_create_index(db.messages, [("conversation_id", 1), ("created_at", -1)])
+        await safe_create_index(db.messages, [("sender_id", 1)])
+        await safe_create_index(db.messages, [("conversation_id", 1), ("sender_id", 1), ("read_at", 1)])
+        
         # Schedule Cache - составной индекс для быстрого поиска кэша расписания
         await safe_create_index(db.schedule_cache, [("group_id", 1), ("week_number", 1)], unique=True)
         
