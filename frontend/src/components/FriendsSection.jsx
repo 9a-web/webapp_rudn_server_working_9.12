@@ -1274,14 +1274,6 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
         )}
       </AnimatePresence>
 
-      {/* Conversations List Modal */}
-      <ConversationsListModal
-        isOpen={showConversations}
-        onClose={() => setShowConversations(false)}
-        currentUserId={user?.id}
-        onOpenChat={handleOpenChat}
-      />
-
       {/* Chat Modal */}
       <ChatModal
         isOpen={!!chatFriend}
