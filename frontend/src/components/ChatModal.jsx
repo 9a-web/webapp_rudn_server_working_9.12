@@ -491,9 +491,10 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
         >
           {renderForwarded()}
           {renderReply()}
-          {!isSchedule && !isMusic && <p className="text-[14px] leading-[1.45] whitespace-pre-wrap break-words">{message.text}</p>}
+          {!isSchedule && !isMusic && !isRoomInvite && <p className="text-[14px] leading-[1.45] whitespace-pre-wrap break-words">{message.text}</p>}
           {isSchedule && renderScheduleCard()}
           {isMusic && renderMusicCard()}
+          {isRoomInvite && renderRoomInviteCard()}
 
           <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
             {message.edited_at && <span className={`text-[10px] ${isMine ? 'text-white/40' : 'text-gray-600'}`}>ред.</span>}
