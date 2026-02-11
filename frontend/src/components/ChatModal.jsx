@@ -956,7 +956,9 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     const c = messagesContainerRef.current;
     if (!c) return;
     const { scrollTop, scrollHeight, clientHeight } = c;
-    setShowScrollDown(scrollHeight - scrollTop - clientHeight > 120);
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setShowScrollDown(distanceFromBottom > 120);
+    isNearBottomRef.current = distanceFromBottom < 80;
     if (scrollTop < 80 && hasMore && !loadingMore) loadMore();
   };
 
