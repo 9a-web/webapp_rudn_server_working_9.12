@@ -671,6 +671,8 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
         onClose={() => setListeningRoomModalOpen(false)}
         telegramId={telegramId}
         onActiveRoomChange={setActiveListeningRoom}
+        pendingInviteCode={pendingInviteCode}
+        onInviteHandled={() => setPendingInviteCode(null)}
       />
       
       {/* Send Track to Friend Modal */}
