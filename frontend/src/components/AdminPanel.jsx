@@ -1704,7 +1704,7 @@ const ServerTab = () => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-gray-600">
-            {serverData?.timestamp ? new Date(serverData.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+            {serverData?.timestamp ? new Date(serverData.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Moscow' }) : ''}
           </span>
           <motion.button
             whileTap={{ scale: 0.9 }}
