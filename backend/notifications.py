@@ -201,11 +201,9 @@ class TelegramNotificationService:
             True если сообщение отправлено успешно
         """
         try:
-            # Заменяем обычные эмоджи на анимированные
-            animated_text = animate_emoji(text)
             await self.bot.send_message(
                 chat_id=telegram_id,
-                text=animated_text,
+                text=text,
                 parse_mode=parse_mode
             )
             
