@@ -216,6 +216,20 @@ export const SendTrackToFriendModal = ({ isOpen, onClose, track, telegramId }) =
               )}
             </AnimatePresence>
 
+            {/* Success */}
+            <AnimatePresence>
+              {successMsg && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mx-5 mb-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl"
+                >
+                  <p className="text-[12px] text-emerald-400">{successMsg}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Search */}
             <div className="px-5 pb-3">
               <div className="relative">
