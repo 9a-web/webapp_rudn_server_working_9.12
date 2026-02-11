@@ -9,12 +9,27 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Fix music sending feature from Music section to friend's DM. Improve MusicCardPlayable for playback in chat.
+Implement "Listen Together" (Слушать вместе) E2E flow: When friend sends a music message, user can create a joint listening room, add track to queue, send invite widget, and both navigate to the room.
 
-### Changes Made (Current Session - Music Sending Fix):
-1. **TrackCard.jsx** — Made Send-to-friend button more visible (larger, purple highlight, hover bg)
-2. **SendTrackToFriendModal.jsx** — Added success message display, improved track data mapping with fallbacks (track.title || track.track_title), added error handling for friend loading, added success toast
-3. **ChatModal.jsx** — Improved MusicCardPlayable: added loading state spinner, error state display, async play handler, useMemo for trackObj, better styling for isMine messages, image error handling
+### Changes Made (Current Session - Listen Together):
+1. **ChatModal.jsx** — After room creation, added track to queue via `addToListeningRoomQueue` API. After invite sent, creator is navigated to listening room via `onJoinListeningRoom`.
+2. **MusicSection.jsx** — Added `pendingInviteCode` state. Pass it to ListeningRoomModal as prop for auto-join. 
+3. **ListeningRoomModal.jsx** — Added `pendingInviteCode` and `onInviteHandled` props. Auto-joins room when invite code is provided (via useEffect). Connects to WebSocket after joining.
+
+### Backend Test Plan (Listen Together E2E):
+Prerequisites:
+1. Create user 77777: POST /api/user-settings {telegram_id: 77777, username: "testuser1", first_name: "TestUser1", last_name: "User", group_id: "G1", group_name: "Группа1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+2. Create user 88888: POST /api/user-settings {telegram_id: 88888, username: "testuser2", first_name: "TestUser2", last_name: "User", group_id: "G1", group_name: "Группа1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+3. Make them friends: POST /api/friends/request/88888 {telegram_id: 77777} → GET /api/friends/88888/requests → POST /api/friends/accept/{request_id} {telegram_id: 88888}
+
+Tests (ALL on http://localhost:8001):
+1. POST /api/music/rooms — create listening room with {telegram_id: 77777, first_name: "TestUser1", last_name: "User", username: "testuser1", name: "🎵 Test Song — совместное", control_mode: "everyone"} → expect success with room_id, invite_code
+2. POST /api/music/rooms/{room_id}/queue/add?telegram_id=77777 — add track {id: "track-123", title: "Test Song", artist: "Test Artist", duration: 200, cover: null} → expect success with queue_length: 1
+3. POST /api/music/rooms/join/{invite_code} — join with {telegram_id: 88888, first_name: "TestUser2", last_name: "User", username: "testuser2"} → expect success with room data including queue with track
+4. POST /api/messages/send — room_invite message {sender_id: 77777, receiver_id: 88888, text: "🎧 Приглашение", message_type: "room_invite", metadata: {room_id, invite_code, track_title: "Test Song", track_artist: "Test Artist", track_id: "track-123", track_duration: 200}} → expect 200 with message_type: "room_invite"
+5. GET /api/messages/conversations/88888 → verify last message is room_invite with metadata containing invite_code
+6. POST /api/music/rooms/join/INVALID_CODE — join with invalid code → expect success: false
+7. GET /api/music/rooms/{room_id}?telegram_id=77777 — get room info → expect room with 2 participants and 1 track in queue
 
 ### Backend Test Results - Music Sending Feature Fix (Current Session)
 **Test Date:** 2026-02-11T18:25:00
