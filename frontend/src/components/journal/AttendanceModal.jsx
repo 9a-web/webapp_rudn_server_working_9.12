@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, XCircle, Clock, HelpCircle, Users, Star } from 'lucide-react';
+import { X, Check, XCircle, Clock, HelpCircle, Users, Star, Pencil } from 'lucide-react';
 import { getSessionAttendance, markAttendance } from '../../services/journalAPI';
 
 const STATUSES = [
