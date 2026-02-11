@@ -31,6 +31,7 @@ const linkPulseAnimation = {
 export const MusicSection = ({ telegramId, onListeningRoomOpenChange, onSendTrackModalOpenChange, openListeningRoomRef, pendingListenInvite, onListenInviteHandled }) => {
   // По умолчанию открываем вкладку "Мои"
   const [activeTab, setActiveTab] = useState('my');
+  const [welcomeImageLoaded, setWelcomeImageLoaded] = useState(false);
   const [tracks, setTracks] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [favorites, setFavorites] = useState([]);
