@@ -107,6 +107,22 @@ const getAvatarGradient = (id) => {
   return gradients[Math.abs(id || 0) % gradients.length];
 };
 
+// Время для списка диалогов
+const getConversationTimeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMin < 1) return 'сейчас';
+  if (diffMin < 60) return `${diffMin} мин`;
+  if (diffHours < 24) return `${diffHours} ч`;
+  if (diffDays < 7) return `${diffDays} дн`;
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+};
+
 const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
   const { user, webApp } = useTelegram();
   const [activeTab, setActiveTab] = useState('friends');
