@@ -268,10 +268,10 @@ export const AttendanceModal = ({
                         )}
                       </div>
                       {/* Показываем текущую оценку */}
-                      {student.grade && (
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${GRADE_COLORS[student.grade].bgLight}`}>
-                          <Star className={`w-3 h-3 ${GRADE_COLORS[student.grade].text}`} />
-                          <span className={`text-sm font-bold ${GRADE_COLORS[student.grade].text}`}>
+                      {student.grade != null && (
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${getGradeColors(student.grade).bgLight}`}>
+                          <Star className={`w-3 h-3 ${getGradeColors(student.grade).text}`} />
+                          <span className={`text-sm font-bold ${getGradeColors(student.grade).text}`}>
                             {student.grade}
                           </span>
                         </div>
