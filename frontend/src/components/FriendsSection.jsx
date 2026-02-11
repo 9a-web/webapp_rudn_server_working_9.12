@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Search, UserPlus, Bell, Star, 
   RefreshCw, UserCheck, UserX, Clock, Send, 
-  QrCode, ScanLine, X, Sparkles, Heart, Loader2, MessageCircle
+  QrCode, ScanLine, X, Sparkles, Heart, Loader2, MessageCircle,
+  Check, CheckCheck
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
