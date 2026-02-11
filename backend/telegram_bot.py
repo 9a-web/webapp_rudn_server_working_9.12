@@ -749,9 +749,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                         from telegram import Bot
                         bot = Bot(token=TELEGRAM_BOT_TOKEN)
                         referrer_name = f"{first_name} {last_name}".strip()
+                        from notifications import animate_emoji as _anim_ref
                         await bot.send_message(
                             chat_id=referrer_id,
-                            text=(
+                            text=_anim_ref(
                                 f"🎉  <b>Новый реферал!</b>\n"
                                 f"\n"
                                 f"<b>{referrer_name}</b> присоединился\n"
