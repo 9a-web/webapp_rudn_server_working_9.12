@@ -585,6 +585,7 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       setMessages([]); setConversationId(null); setInputText(''); setIsLoading(true);
       setReplyTo(null); setEditingMessage(null); setPinnedMessage(null);
       setShowEmojiPicker(false); setShowSearch(false); setShowAttachMenu(false);
+      setShowSchedulePicker(false);
     };
   }, [isOpen, friend?.telegram_id, initConversation]);
 
