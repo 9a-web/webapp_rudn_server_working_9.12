@@ -98,10 +98,13 @@ class TelegramNotificationService:
             # Формируем текст сообщения
             message = self._format_class_notification(class_info, minutes_before)
             
+            # Заменяем обычные эмоджи на анимированные
+            animated_message = animate_emoji(message)
+            
             # Отправляем сообщение
             await self.bot.send_message(
                 chat_id=telegram_id,
-                text=message,
+                text=animated_message,
                 parse_mode='HTML'
             )
             
