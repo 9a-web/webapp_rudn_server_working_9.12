@@ -272,7 +272,6 @@ async def handle_revoke_device_callback(update: Update, context: ContextTypes.DE
             await query.edit_message_text(
                 text=(
                     f'<b><tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Сеанс удалён</b>\n'
-                    f'\n'
                     f'<tg-emoji emoji-id="5407025283456835913">📱</tg-emoji> {device_name}\n'
                     f'<i>Устройство отключено от вашего профиля.</i>'
                 ),
