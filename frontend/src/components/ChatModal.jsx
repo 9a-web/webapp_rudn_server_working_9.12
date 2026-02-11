@@ -691,6 +691,228 @@ const AttachMenu = ({ isOpen, onClose, onAction }) => {
   );
 };
 
+/* ============ Playable Music Card in Chat ============ */
+const MusicCardPlayable = ({ metadata, isMine }) => {
+  const { currentTrack, isPlaying, play, toggle } = usePlayer();
+  const meta = metadata || {};
+
+  const trackObj = {
+    id: meta.track_id,
+    title: meta.track_title || 'Трек',
+    artist: meta.track_artist || 'Исполнитель',
+    duration: meta.track_duration,
+    cover: meta.cover_url,
+  };
+
+  const isCurrentTrack = currentTrack?.id === meta.track_id;
+  const isCurrentlyPlaying = isCurrentTrack && isPlaying;
+
+  const handlePlayClick = (e) => {
+    e.stopPropagation();
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (err) {}
+    
+    if (isCurrentTrack) {
+      toggle();
+    } else if (meta.track_id) {
+      play(trackObj, [trackObj]);
+    }
+  };
+
+  const formatDur = (sec) => {
+    if (!sec) return '';
+    return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+  };
+
+  return (
+    <div
+      className={`mt-1.5 p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+        isCurrentTrack
+          ? 'bg-purple-500/15 border-purple-500/30'
+          : 'bg-white/[0.06] border-white/[0.06] hover:bg-white/[0.10]'
+      }`}
+      onClick={handlePlayClick}
+    >
+      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+        {meta.cover_url ? (
+          <img src={meta.cover_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <Music className="w-5 h-5 text-purple-400" />
+        )}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+          {isCurrentlyPlaying ? (
+            <Pause className="w-4 h-4 text-white" />
+          ) : (
+            <Play className="w-4 h-4 text-white ml-0.5" />
+          )}
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-[13px] font-semibold truncate ${isCurrentTrack ? 'text-purple-300' : 'text-white'}`}>
+          {meta.track_title || 'Трек'}
+        </p>
+        <p className="text-[11px] text-gray-400 truncate">{meta.track_artist || 'Исполнитель'}</p>
+      </div>
+      <div className="text-[11px] text-gray-500">{formatDur(meta.track_duration)}</div>
+    </div>
+  );
+};
+
+/* ============ Chat Music Picker ============ */
+const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const inputRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery('');
+      setResults([]);
+      setSearched(false);
+    }
+  }, [isOpen]);
+
+  const doSearch = async (q) => {
+    if (!q.trim()) {
+      setResults([]);
+      setSearched(false);
+      return;
+    }
+    setLoading(true);
+    setSearched(true);
+    try {
+      const data = await musicAPI.search(q, 20);
+      setResults(data.tracks || []);
+    } catch (e) {
+      console.error('Music search error:', e);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => doSearch(val), 400);
+  };
+
+  const formatDuration = (sec) => {
+    if (!sec) return '';
+    return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-[100] flex flex-col"
+      style={{ backgroundColor: 'rgba(10,10,16,0.99)' }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-3 border-b border-white/[0.06]"
+        style={{ backgroundColor: 'rgba(16,16,22,0.95)' }}>
+        <button onClick={onClose} className="p-2 text-gray-400 hover:text-white">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={handleInputChange}
+              placeholder="Найти музыку для отправки..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white/[0.06] border border-white/[0.08] rounded-xl text-white text-[14px] placeholder-gray-600 focus:outline-none focus:border-purple-500/40 transition-all"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto px-3 py-3">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+          </div>
+        ) : searched && results.length > 0 ? (
+          <div className="space-y-1.5">
+            {results.map((track, idx) => {
+              const isBlocked = track.is_blocked || track.content_restricted;
+              return (
+                <motion.div
+                  key={track.id || idx}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: isBlocked ? 0.4 : 1, y: 0 }}
+                  transition={{ delay: idx * 0.02 }}
+                  onClick={() => {
+                    if (!isBlocked) {
+                      try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (e) {}
+                      onSelectTrack(track);
+                    }
+                  }}
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                    isBlocked ? 'bg-white/[0.02] cursor-not-allowed' : 'bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer active:scale-[0.98]'
+                  }`}
+                >
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {track.cover ? (
+                      <img src={track.cover} alt="" className="w-full h-full object-cover rounded-xl" />
+                    ) : (
+                      <Music className="w-5 h-5 text-purple-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-white truncate">{track.title}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{track.artist}</p>
+                  </div>
+                  <span className="text-[11px] text-gray-500 flex-shrink-0">{formatDuration(track.duration)}</span>
+                  {!isBlocked && (
+                    <Send className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        ) : searched && results.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+              <Music className="w-8 h-8 text-gray-600" />
+            </div>
+            <p className="text-gray-400 text-[14px]">Ничего не найдено</p>
+            <p className="text-gray-600 text-[12px] mt-1">Попробуйте другой запрос</p>
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-500/15 to-pink-500/15 flex items-center justify-center mx-auto mb-5">
+              <Music className="w-10 h-10 text-purple-400/50" />
+            </div>
+            <h3 className="text-[17px] font-semibold text-gray-300 mb-2">Отправить музыку</h3>
+            <p className="text-[13px] text-gray-500 max-w-[240px] mx-auto leading-relaxed">
+              Найдите трек и нажмите на него, чтобы отправить
+            </p>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
 /* ============ MAIN ChatModal ============ */
 const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends }) => {
   const [messages, setMessages] = useState([]);
