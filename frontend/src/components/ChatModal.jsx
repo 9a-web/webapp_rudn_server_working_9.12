@@ -692,34 +692,40 @@ const AttachMenu = ({ isOpen, onClose, onAction }) => {
 
 /* ============ Playable Music Card in Chat ============ */
 const MusicCardPlayable = ({ metadata, isMine }) => {
-  const { currentTrack, isPlaying, play, toggle } = usePlayer();
+  const { currentTrack, isPlaying, play, toggle, isLoading: playerLoading } = usePlayer();
   const meta = metadata || {};
+  const [playError, setPlayError] = useState(false);
 
-  const trackObj = {
+  const trackObj = useMemo(() => ({
     id: meta.track_id,
     title: meta.track_title || 'Трек',
     artist: meta.track_artist || 'Исполнитель',
     duration: meta.track_duration,
     cover: meta.cover_url,
-    stream_url: meta.track_id ? `/api/music/stream/${meta.track_id}` : null,
-  };
+  }), [meta.track_id, meta.track_title, meta.track_artist, meta.track_duration, meta.cover_url]);
 
   const isCurrentTrack = Boolean(meta.track_id) && currentTrack?.id === meta.track_id;
   const isCurrentlyPlaying = isCurrentTrack && isPlaying;
+  const isLoadingThis = isCurrentTrack && playerLoading;
 
-  const handlePlayClick = (e) => {
+  const handlePlayClick = async (e) => {
     e.stopPropagation();
     try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (err) {}
+    setPlayError(false);
     
     try {
       if (isCurrentTrack) {
         toggle();
       } else if (meta.track_id) {
-        console.log('🎵 Playing track from chat message:', meta.track_title);
-        play(trackObj, [trackObj]);
+        console.log('🎵 Playing track from chat message:', meta.track_title, 'id:', meta.track_id);
+        await play(trackObj, [trackObj]);
+      } else {
+        console.warn('🎵 No track_id in music message metadata');
+        setPlayError(true);
       }
     } catch (err) {
       console.error('Music play error:', err);
+      setPlayError(true);
     }
   };
 
@@ -732,19 +738,21 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
     <div
       className={`mt-1.5 p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
         isCurrentTrack
-          ? 'bg-purple-500/15 border-purple-500/30'
-          : 'bg-white/[0.06] border-white/[0.06] hover:bg-white/[0.10]'
+          ? (isMine ? 'bg-white/10 border-white/20' : 'bg-purple-500/15 border-purple-500/30')
+          : (isMine ? 'bg-white/[0.08] border-white/[0.08] hover:bg-white/[0.14]' : 'bg-white/[0.06] border-white/[0.06] hover:bg-white/[0.10]')
       }`}
       onClick={handlePlayClick}
     >
       <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
         {meta.cover_url ? (
-          <img src={meta.cover_url} alt="" className="w-full h-full object-cover" />
+          <img src={meta.cover_url} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
         ) : (
           <Music className="w-5 h-5 text-purple-400" />
         )}
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
-          {isCurrentlyPlaying ? (
+          {isLoadingThis ? (
+            <Loader2 className="w-4 h-4 text-white animate-spin" />
+          ) : isCurrentlyPlaying ? (
             <Pause className="w-4 h-4 text-white" />
           ) : (
             <Play className="w-4 h-4 text-white ml-0.5" />
@@ -756,6 +764,7 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
           {meta.track_title || 'Трек'}
         </p>
         <p className="text-[11px] text-gray-400 truncate">{meta.track_artist || 'Исполнитель'}</p>
+        {playError && <p className="text-[10px] text-red-400 mt-0.5">Трек недоступен</p>}
       </div>
       <div className="text-[11px] text-gray-500">{formatDur(meta.track_duration)}</div>
     </div>
