@@ -389,7 +389,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
             {meta.items.slice(0, 5).map((item, i) => (
               <div key={i} className="text-[12px] text-gray-300 flex gap-2">
                 <span className="text-gray-500 flex-shrink-0">{item.time || `${i + 1}.`}</span>
-                <span className="truncate">{item.subject || item.name || item}</span>
+                <span className="truncate">{item.discipline || item.subject || item.name || (typeof item === 'string' ? item : 'Занятие')}</span>
               </div>
             ))}
           </div>
