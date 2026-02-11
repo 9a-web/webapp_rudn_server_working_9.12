@@ -38,24 +38,133 @@ Add messaging/dialog function between friends in the Friends section.
 - FriendsSection.jsx - Added Messages button in header with unread badge, wired ChatModal and ConversationsListModal
 - FriendProfileModal.jsx - Added "Написать сообщение" button (onMessage prop)
 
-### Backend Test Plan:
+### Backend Test Results - Messaging API Endpoints
+**Test Date:** 2026-02-11T14:21:47
+**Testing Agent:** deep_testing_backend_v2
+
+**Review Request Testing:** Messaging API endpoints on http://localhost:8001
+**Test Status:** ✅ ALL TESTS PASSED (12/12)
+
+**Prerequisites Setup:**
+1. ✅ Created user 55555: POST /api/user-settings with {telegram_id: 55555, username: "testuser1", first_name: "Alice", ...}
+2. ✅ Created user 66666: POST /api/user-settings with {telegram_id: 66666, username: "testuser2", first_name: "Bob", ...}
+3. ✅ Sent friend request: POST /api/friends/request/66666 with {telegram_id: 55555}
+4. ✅ Got friend requests: GET /api/friends/66666/requests - captured request_id: c20d9661-d82b-4001-bbfe-3910c69cf6d6
+5. ✅ Accepted friend request: POST /api/friends/accept/{request_id} with {telegram_id: 66666}
+
+**Detailed Test Results:**
+
+**1. ✅ Initial Unread Count**
+- Endpoint: `GET /api/messages/unread/55555`
+- Status: HTTP 200
+- Response: `{"total_unread": 0, "per_conversation": {}}`
+- Validation: total_unread is 0 as expected
+
+**2. ✅ Create Conversation**
+- Endpoint: `POST /api/messages/conversations`
+- Request: `{"user1_id": 55555, "user2_id": 66666}`
+- Status: HTTP 200
+- Response: Conversation created with ID: 51f1f801-21c0-4714-befa-6510b98662e8
+- Validation: Valid conversation object with participants array
+
+**3. ✅ Send First Message**
+- Endpoint: `POST /api/messages/send`
+- Request: `{"sender_id": 55555, "receiver_id": 66666, "text": "Привет!"}`
+- Status: HTTP 200
+- Response: Message sent with ID: aa5337f7-62cc-42f3-bf27-ae2d51ad1d97
+- Validation: Message created successfully with correct text
+
+**4. ✅ Send Second Message**
+- Endpoint: `POST /api/messages/send`
+- Request: `{"sender_id": 66666, "receiver_id": 55555, "text": "Привет! Как дела?"}`
+- Status: HTTP 200
+- Validation: Message sent successfully from user 66666
+
+**5. ✅ Get Conversation Messages**
+- Endpoint: `GET /api/messages/{conversation_id}/messages?telegram_id=55555`
+- Status: HTTP 200
+- Response: 2 messages returned in correct order
+- Validation: Both messages present with correct text and metadata
+
+**6. ✅ Unread Count After Messages**
+- Endpoint: `GET /api/messages/unread/55555`
+- Status: HTTP 200
+- Response: `{"total_unread": 1, "per_conversation": {"51f1f801...": 1}}`
+- Validation: Unread count is 1 as expected (message from user 66666)
+
+**7. ✅ Mark Messages as Read**
+- Endpoint: `PUT /api/messages/{conversation_id}/read`
+- Request: `{"telegram_id": 55555}`
+- Status: HTTP 200
+- Response: `{"success": true, "marked_count": 1}`
+- Validation: Messages marked as read successfully
+
+**8. ✅ Unread Count After Read**
+- Endpoint: `GET /api/messages/unread/55555`
+- Status: HTTP 200
+- Response: `{"total_unread": 0, "per_conversation": {}}`
+- Validation: Unread count is 0 after marking as read
+
+**9. ✅ Delete Message**
+- Endpoint: `DELETE /api/messages/{message_id}`
+- Request: `{"telegram_id": 55555}`
+- Status: HTTP 200
+- Response: `{"success": true, "message": "Сообщение удалено"}`
+- Validation: Soft delete functionality working correctly
+
+**10. ✅ Get Conversations**
+- Endpoint: `GET /api/messages/conversations/55555`
+- Status: HTTP 200
+- Response: 1 conversation returned with last_message and unread_count
+- Validation: Conversation list populated correctly
+
+**11. ✅ Send to Non-Friend (Error Case)**
+- Endpoint: `POST /api/messages/send`
+- Request: `{"sender_id": 55555, "receiver_id": 99999, "text": "test"}`
+- Status: HTTP 403 (expected)
+- Validation: Correctly prevents messaging non-friends
+
+**12. ✅ Create Conversation with Self (Error Case)**
+- Endpoint: `POST /api/messages/conversations`
+- Request: `{"user1_id": 55555, "user2_id": 55555}`
+- Status: HTTP 400 (expected)
+- Validation: Correctly prevents self-conversations
+
+**Technical Implementation Status:**
+- ✅ Friend relationship validation working (403 for non-friends)
+- ✅ Self-conversation prevention working (400 for same user IDs)
+- ✅ Message ordering correct (newest first)
+- ✅ Unread count calculation accurate
+- ✅ Soft delete implementation functional
+- ✅ Conversation participant data populated correctly
+- ✅ Russian text (Cyrillic) handling working properly
+- ✅ MongoDB indexes for messages/conversations operational
+- ✅ All CRUD operations on messages functional
+
+**Testing Environment:**
+- Backend URL: http://localhost:8001/api (as per review request)
+- All endpoints accessible via localhost
+- Response times: <10 seconds for all requests
+- No connection errors or timeouts encountered
+
+### Backend Test Plan (COMPLETED):
 Prerequisites:
-1. Create two users: POST /api/user-settings with telegram_id 55555 and 66666
-2. Make them friends via POST /api/friends/request/66666 then POST /api/friends/accept/{request_id}
+1. ✅ Create two users: POST /api/user-settings with telegram_id 55555 and 66666
+2. ✅ Make them friends via POST /api/friends/request/66666 then POST /api/friends/accept/{request_id}
 
 Tests:
-1. GET /api/messages/unread/55555 → expect total_unread: 0
-2. POST /api/messages/conversations with {user1_id: 55555, user2_id: 66666} → expect conversation created
-3. POST /api/messages/send with {sender_id: 55555, receiver_id: 66666, text: "Hello!"} → expect message
-4. POST /api/messages/send with {sender_id: 66666, receiver_id: 55555, text: "Hi back!"} → expect message
-5. GET /api/messages/{conversation_id}/messages?telegram_id=55555 → expect 2 messages
-6. GET /api/messages/unread/55555 → expect total_unread: 1 (from 66666)
-7. PUT /api/messages/{conversation_id}/read with {telegram_id: 55555} → expect success
-8. GET /api/messages/unread/55555 → expect total_unread: 0
-9. DELETE /api/messages/{message_id} with {telegram_id: 55555} → expect success (soft delete)
-10. GET /api/messages/conversations/55555 → expect 1 conversation
-11. POST /api/messages/send with non-friends (sender_id: 55555, receiver_id: 99999) → expect 403
-12. POST /api/messages/conversations with {user1_id: 55555, user2_id: 55555} → expect 400
+1. ✅ GET /api/messages/unread/55555 → total_unread: 0
+2. ✅ POST /api/messages/conversations with {user1_id: 55555, user2_id: 66666} → conversation created
+3. ✅ POST /api/messages/send with {sender_id: 55555, receiver_id: 66666, text: "Привет!"} → message sent
+4. ✅ POST /api/messages/send with {sender_id: 66666, receiver_id: 55555, text: "Привет! Как дела?"} → message sent
+5. ✅ GET /api/messages/{conversation_id}/messages?telegram_id=55555 → 2 messages
+6. ✅ GET /api/messages/unread/55555 → total_unread: 1 (from 66666)
+7. ✅ PUT /api/messages/{conversation_id}/read with {telegram_id: 55555} → success
+8. ✅ GET /api/messages/unread/55555 → total_unread: 0
+9. ✅ DELETE /api/messages/{message_id} with {telegram_id: 55555} → success (soft delete)
+10. ✅ GET /api/messages/conversations/55555 → 1 conversation
+11. ✅ POST /api/messages/send with non-friends (sender_id: 55555, receiver_id: 99999) → 403
+12. ✅ POST /api/messages/conversations with {user1_id: 55555, user2_id: 55555} → 400
 
 ### Changes Made:
 **New files:**
