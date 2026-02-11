@@ -13882,17 +13882,21 @@ async def update_extended_notification_settings(telegram_id: int, settings: Exte
 typing_indicators_store: dict = {}
 
 async def get_or_create_conversation(user1_id: int, user2_id: int) -> dict:
-    """Получить или создать диалог между двумя пользователями"""
+    """Получить или создать диалог между двумя пользователями (атомарная операция)"""
     participant_ids = sorted([user1_id, user2_id])
-    conversation = await db.conversations.find_one({"participant_ids": participant_ids})
-    if not conversation:
-        conversation = {
+    now = datetime.utcnow()
+    # Используем find_one_and_update с upsert для атомарности (без race condition)
+    conversation = await db.conversations.find_one_and_update(
+        {"participant_ids": participant_ids},
+        {"$setOnInsert": {
             "id": str(uuid.uuid4()),
             "participant_ids": participant_ids,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-        }
-        await db.conversations.insert_one(conversation)
+            "created_at": now,
+            "updated_at": now,
+        }},
+        upsert=True,
+        return_document=True
+    )
     return conversation
 
 
