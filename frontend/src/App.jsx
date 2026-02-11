@@ -319,6 +319,7 @@ const Home = () => {
     isJournalModalOpen || // from JournalSection
     isFullscreenPlayerOpen || // fullscreen music player
     isFriendProfileOpen || // friend profile modal
+    isChatOpen || // chat with friend
     isListeningRoomOpen; // listening room modal
 
   // Ref для отслеживания предыдущего счётчика уведомлений
