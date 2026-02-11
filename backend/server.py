@@ -14426,11 +14426,23 @@ async def send_schedule_message(data: ScheduleShareMessage):
             raise HTTPException(status_code=400, detail="Группа не указана в настройках")
         target_date = data.date or datetime.utcnow().strftime("%Y-%m-%d")
         
-        # Определяем номер недели по дате (ISO: чётная=2, нечётная=1)
+        # Определяем номер недели (1=текущая, 2=следующая) для RUDN парсера
+        # RUDN показывает текущую неделю (tab 1) и следующую (tab 2)
         try:
             dt = datetime.strptime(target_date, "%Y-%m-%d")
-            iso_week = dt.isocalendar()[1]
-            week_number = 2 if iso_week % 2 == 0 else 1
+            today = datetime.utcnow()
+            # Начало текущей недели (понедельник)
+            today_week_start = today - timedelta(days=today.weekday())
+            today_week_start = today_week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            # Начало целевой недели
+            target_week_start = dt - timedelta(days=dt.weekday())
+            target_week_start = target_week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            diff_days = (target_week_start - today_week_start).days
+            if diff_days < 7:
+                week_number = 1  # Текущая неделя
+            else:
+                week_number = 2  # Следующая неделя
         except Exception:
             week_number = 1
         
