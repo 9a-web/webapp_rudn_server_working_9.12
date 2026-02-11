@@ -14192,6 +14192,8 @@ async def pin_message(message_id: str, data: MessagePin):
         message = await db.messages.find_one({"id": message_id})
         if not message:
             raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        if message.get("is_deleted"):
+            raise HTTPException(status_code=400, detail="Нельзя закрепить удалённое сообщение")
         conv = await db.conversations.find_one({"id": message["conversation_id"]})
         if not conv or data.telegram_id not in conv.get("participant_ids", []):
             raise HTTPException(status_code=403, detail="Нет доступа")
