@@ -168,8 +168,7 @@ async def send_device_linked_notification(
         
         message_text = (
             f'<tg-emoji emoji-id="5190422665311050410">🔗</tg-emoji>  Новое устройство подключено:\n'
-            f'\n'
-            f'<tg-emoji emoji-id="5407025283456835913">📱</tg-emoji>  <b>{device_name}</b>\n'
+            f'<tg-emoji emoji-id="5407025283456835913">📱</tg-emoji>  {device_name}\n'
             f'<tg-emoji emoji-id="5384611567125928766">🕐</tg-emoji>  {moscow_time} МСК\n'
             f'\n'
             f'<tg-emoji emoji-id="5283215386496488657">⚠️</tg-emoji> Если это были не вы — немедленно удалите этот сеанс кнопкой ниже.'
