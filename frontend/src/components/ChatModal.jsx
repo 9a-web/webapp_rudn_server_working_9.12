@@ -1044,6 +1044,8 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [showMusicPicker, setShowMusicPicker] = useState(false);
   const [preEditText, setPreEditText] = useState(''); // текст до начала редактирования
+  const [roomInviteConfirm, setRoomInviteConfirm] = useState(null); // { room_id, invite_code, trackMeta }
+  const [creatingRoom, setCreatingRoom] = useState(false);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
