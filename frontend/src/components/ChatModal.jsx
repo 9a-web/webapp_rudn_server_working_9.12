@@ -614,6 +614,18 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
           });
         });
         await messagesAPI.markAsRead(conversationId, currentUserId);
+        // Обновляем pinned message
+        try {
+          const pinnedData = await messagesAPI.getPinnedMessage(conversationId);
+          const newPinned = pinnedData?.pinned_message || null;
+          setPinnedMessage(prev => {
+            if (!newPinned && !prev) return prev;
+            if (!newPinned && prev) return null;
+            if (newPinned && !prev) return newPinned;
+            if (newPinned && prev && newPinned.id !== prev.id) return newPinned;
+            return prev;
+          });
+        } catch (e) { /* silent */ }
         // Typing
         const typingData = await messagesAPI.getTyping(conversationId, currentUserId);
         setTypingUsers(typingData.typing_users || []);
