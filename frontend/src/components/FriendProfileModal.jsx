@@ -23,7 +23,7 @@ const getAvatarGradient = (id) => {
 };
 
 const FriendProfileModal = ({ 
-  isOpen, onClose, friend, currentUserId, userSettings, onRemoveFriend, onToggleFavorite
+  isOpen, onClose, friend, currentUserId, userSettings, onRemoveFriend, onToggleFavorite, onMessage
 }) => {
   const [profile, setProfile] = useState(null);
   const [schedule, setSchedule] = useState(null);
