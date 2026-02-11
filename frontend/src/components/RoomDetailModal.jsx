@@ -179,19 +179,22 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
     if (!room || !userSettings || isOwner) return;
 
     // Используем window.confirm как фоллбэк если webApp.showPopup не доступен
-    const confirmLeave = webApp?.showPopup
+    const canShowPopup2 = webApp?.showPopup && webApp?.isVersionAtLeast?.('6.2');
+    const confirmLeave = canShowPopup2
       ? await new Promise((resolve) => {
-          webApp.showPopup(
-            {
-              title: 'Покинуть комнату?',
-              message: 'Вы больше не сможете видеть задачи этой комнаты.',
-              buttons: [
-                { id: 'leave', type: 'destructive', text: 'Выйти' },
-                { type: 'cancel' }
-              ]
-            },
-            (buttonId) => resolve(buttonId === 'leave')
-          );
+          try {
+            webApp.showPopup(
+              {
+                title: 'Покинуть комнату?',
+                message: 'Вы больше не сможете видеть задачи этой комнаты.',
+                buttons: [
+                  { id: 'leave', type: 'destructive', text: 'Выйти' },
+                  { type: 'cancel' }
+                ]
+              },
+              (buttonId) => resolve(buttonId === 'leave')
+            );
+          } catch (e) { resolve(window.confirm('Покинуть комнату? Вы больше не сможете видеть задачи этой комнаты.')); }
         })
       : window.confirm('Покинуть комнату? Вы больше не сможете видеть задачи этой комнаты.');
 
