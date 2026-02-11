@@ -1745,6 +1745,90 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* QR Join Confirm Modal */}
+      <AnimatePresence>
+        {qrJoinConfirm.isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
+            onClick={handleQrJoinCancel}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-2xl overflow-hidden"
+              style={{
+                backgroundColor: 'rgba(30, 30, 30, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="text-center mb-5">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' }}
+                  >
+                    {qrJoinConfirm.loading ? (
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    ) : (
+                      <Music className="w-8 h-8 text-white" />
+                    )}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    Подключиться к комнате?
+                  </h3>
+                  {qrJoinConfirm.loading ? (
+                    <p className="text-gray-400 text-sm">Загрузка информации...</p>
+                  ) : qrJoinConfirm.roomData ? (
+                    <div>
+                      <p className="text-white font-semibold text-base mb-1">
+                        {qrJoinConfirm.roomData.name}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        Создатель: {qrJoinConfirm.roomData.host_name}
+                      </p>
+                      <div className="flex items-center justify-center gap-3 mt-2 text-xs text-gray-500">
+                        <span>👥 {qrJoinConfirm.roomData.participants_count} участн.</span>
+                        <span className="text-green-400">● {qrJoinConfirm.roomData.online_count} онлайн</span>
+                      </div>
+                      {qrJoinConfirm.roomData.current_track && (
+                        <p className="text-gray-400 text-xs mt-2 truncate">
+                          ▶ {qrJoinConfirm.roomData.current_track.artist} — {qrJoinConfirm.roomData.current_track.title}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-red-400 text-sm">Комната не найдена или закрыта</p>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleQrJoinCancel}
+                    className="flex-1 py-3 rounded-xl text-sm font-semibold text-gray-300 transition-all active:scale-95"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleQrJoinConfirm}
+                    disabled={qrJoinConfirm.loading || !qrJoinConfirm.roomData}
+                    className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' }}
+                  >
+                    {qrJoinConfirm.loading ? 'Загрузка...' : 'Подключиться'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };
