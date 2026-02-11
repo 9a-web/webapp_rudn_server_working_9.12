@@ -61,7 +61,12 @@ Tests (ALL on http://localhost:8001):
 15. POST /api/messages/{conversation_id}/typing {telegram_id: 77777} → expect 200
 16. GET /api/messages/{conversation_id}/typing?telegram_id=88888 → expect typing_users array
 
-### Changes Made:
+### Additional Backend Tests (Schedule Fix):
+17. POST /api/messages/send-schedule {sender_id: 77777, receiver_id: 88888, date: "2025-07-14"} → expect 200 with message_type "schedule" and metadata with week_number and day_name fields
+18. Verify send-schedule metadata contains: date, group_name, sender_name, items (array), week_number, day_name
+19. Verify send-schedule actually calls get_schedule() (check logs contain "Запрос расписания для группы")
+
+### Backend Test Results (Round 2):
 **New backend endpoints:**
 - POST /api/messages/conversations - Create or get existing conversation between two friends
 - GET /api/messages/conversations/{telegram_id} - Get all conversations for a user
