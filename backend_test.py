@@ -244,6 +244,7 @@ class MusicSendingTester:
             "telegram_id": self.new_user2_id,
             "username": "musictest2", 
             "first_name": "MusicTest2",
+            "last_name": "TestUser",
             "group_id": "G1",
             "group_name": "Группа1",
             "facultet_id": "F1",
