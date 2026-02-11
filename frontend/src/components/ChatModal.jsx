@@ -742,24 +742,41 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     if (!isLoading && messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isLoading]);
 
-  // Polling messages + typing
+  // Polling messages + typing (оптимизировано: 1 основной запрос + typing)
   useEffect(() => {
     if (!isOpen || !conversationId || !currentUserId) return;
-    pollRef.current = setInterval(async () => {
+    let isActive = true;
+    const poll = async () => {
+      if (!isActive) return;
       try {
+        // Основной запрос: сообщения (включает unread подсчёт через markAsRead)
         const data = await messagesAPI.getMessages(conversationId, currentUserId, 50, 0);
+        if (!isActive) return;
         const newMsgs = (data.messages || []).reverse();
         setMessages(prev => {
           if (newMsgs.length !== prev.length || (newMsgs.length > 0 && prev.length > 0 && newMsgs[newMsgs.length - 1]?.id !== prev[prev.length - 1]?.id)) return newMsgs;
-          return prev.map(msg => {
+          // Обновляем изменённые сообщения (reactions, read_at, edited_at, is_pinned)
+          let hasChanges = false;
+          const updated = prev.map(msg => {
             const fresh = newMsgs.find(m => m.id === msg.id);
-            return fresh && (fresh.read_at !== msg.read_at || JSON.stringify(fresh.reactions) !== JSON.stringify(msg.reactions) || fresh.edited_at !== msg.edited_at || fresh.is_pinned !== msg.is_pinned) ? fresh : msg;
+            if (fresh && (fresh.read_at !== msg.read_at || JSON.stringify(fresh.reactions) !== JSON.stringify(msg.reactions) || fresh.edited_at !== msg.edited_at || fresh.is_pinned !== msg.is_pinned)) {
+              hasChanges = true;
+              return fresh;
+            }
+            return msg;
           });
+          return hasChanges ? updated : prev;
         });
+        // markAsRead — только если есть непрочитанные (из data.total)
         await messagesAPI.markAsRead(conversationId, currentUserId);
-        // Обновляем pinned message
-        try {
-          const pinnedData = await messagesAPI.getPinnedMessage(conversationId);
+        
+        // Pinned + Typing в параллель  
+        const [pinnedData, typingData] = await Promise.all([
+          messagesAPI.getPinnedMessage(conversationId).catch(() => null),
+          messagesAPI.getTyping(conversationId, currentUserId).catch(() => ({ typing_users: [] })),
+        ]);
+        if (!isActive) return;
+        if (pinnedData) {
           const newPinned = pinnedData?.pinned_message || null;
           setPinnedMessage(prev => {
             if (!newPinned && !prev) return prev;
@@ -768,13 +785,12 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
             if (newPinned && prev && newPinned.id !== prev.id) return newPinned;
             return prev;
           });
-        } catch (e) { /* silent */ }
-        // Typing
-        const typingData = await messagesAPI.getTyping(conversationId, currentUserId);
-        setTypingUsers(typingData.typing_users || []);
+        }
+        setTypingUsers(typingData?.typing_users || []);
       } catch (e) { /* silent */ }
-    }, 2500);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    };
+    pollRef.current = setInterval(poll, 4000);
+    return () => { isActive = false; if (pollRef.current) clearInterval(pollRef.current); };
   }, [isOpen, conversationId, currentUserId]);
 
   // === Handlers ===
