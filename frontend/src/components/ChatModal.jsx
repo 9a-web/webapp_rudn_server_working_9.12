@@ -737,9 +737,12 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     };
   }, [isOpen, friend?.telegram_id, initConversation]);
 
-  // Auto-scroll
+  // Auto-scroll только если пользователь уже внизу (не читает старые сообщения)
+  const isNearBottomRef = useRef(true);
   useEffect(() => {
-    if (!isLoading && messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!isLoading && messagesEndRef.current && isNearBottomRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages.length, isLoading]);
 
   // Polling messages + typing (оптимизировано: 1 основной запрос + typing)
