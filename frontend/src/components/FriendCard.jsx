@@ -49,7 +49,7 @@ const getAvatarGradient = (id) => {
   return gradients[Math.abs(id || 0) % gradients.length];
 };
 
-const FriendCard = ({ friend, onPress, onToggleFavorite, index = 0 }) => {
+const FriendCard = ({ friend, onPress, onToggleFavorite, onMessage, index = 0 }) => {
   const {
     telegram_id,
     first_name,
