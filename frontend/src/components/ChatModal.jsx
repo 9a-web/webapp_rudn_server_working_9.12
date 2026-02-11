@@ -83,8 +83,8 @@ const EmojiPicker = ({ isOpen, onSelect, onClose }) => {
   if (!isOpen) return null;
   return (
     <motion.div ref={ref} initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }}
-      className="absolute bottom-full left-0 right-0 mb-2 mx-2 bg-gray-900/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
-      style={{ maxHeight: '280px' }}>
+      className="absolute bottom-full left-0 right-0 mb-2 mx-2 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
+      style={{ maxHeight: '280px', backgroundColor: '#14141e' }}>
       <div className="flex gap-1 p-2 border-b border-white/[0.06] overflow-x-auto scrollbar-hide">
         {Object.keys(EMOJI_CATEGORIES).map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)}
