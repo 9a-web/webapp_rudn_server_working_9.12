@@ -231,67 +231,62 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
 
   // === SSE: Real-time обновления дружбы ===
   const handleFriendEvent = useCallback((eventType, eventData) => {
-    console.log('[FriendEvents] SSE event:', eventType, eventData);
-    
-    // Обновляем trigger для FriendSearchModal
-    setFriendEventTrigger(prev => prev + 1);
-    
-    switch (eventType) {
-      case 'friend_request_received':
-        // Кто-то отправил нам заявку — обновляем список заявок
-        loadRequests();
-        try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
-        break;
-        
-      case 'friend_request_accepted':
-        // Наша исходящая заявка принята — обновляем друзей и заявки
-        loadFriends();
-        loadRequests();
-        try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
-        break;
-        
-      case 'friend_request_accepted_self':
-        // Мы приняли заявку — обновляем друзей и заявки (подтверждение)
-        loadFriends();
-        loadRequests();
-        break;
+    try {
+      console.log('[FriendEvents] SSE event:', eventType, eventData);
+      
+      // Обновляем trigger для FriendSearchModal
+      setFriendEventTrigger(prev => prev + 1);
+      
+      switch (eventType) {
+        case 'friend_request_received':
+          loadRequests();
+          try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
+          break;
+          
+        case 'friend_request_accepted':
+          loadFriends();
+          loadRequests();
+          try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
+          break;
+          
+        case 'friend_request_accepted_self':
+          loadFriends();
+          loadRequests();
+          break;
 
-      case 'friend_request_mutual_accepted':
-        // Взаимный запрос — обе стороны стали друзьями
-        loadFriends();
-        loadRequests();
-        try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
-        break;
+        case 'friend_request_mutual_accepted':
+          loadFriends();
+          loadRequests();
+          try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
+          break;
 
-      case 'friend_request_rejected':
-        // Наша исходящая заявка отклонена — обновляем заявки
-        loadRequests();
-        break;
+        case 'friend_request_rejected':
+          loadRequests();
+          break;
 
-      case 'friend_request_cancelled':
-        // Входящая заявка нам отменена — обновляем заявки
-        loadRequests();
-        break;
+        case 'friend_request_cancelled':
+          loadRequests();
+          break;
 
-      case 'friend_removed':
-        // Нас удалили из друзей — обновляем список друзей
-        loadFriends();
-        loadRequests();
-        break;
-        
-      case 'friend_removed_self':
-        // Мы удалили друга — обновляем список
-        loadFriends();
-        break;
+        case 'friend_removed':
+          loadFriends();
+          loadRequests();
+          break;
+          
+        case 'friend_removed_self':
+          loadFriends();
+          break;
 
-      case 'user_blocked':
-        // Нас заблокировали — обновляем всё
-        loadFriends();
-        loadRequests();
-        break;
+        case 'user_blocked':
+          loadFriends();
+          loadRequests();
+          break;
 
-      default:
-        break;
+        default:
+          break;
+      }
+    } catch (err) {
+      console.error('[FriendEvents] Error handling event:', err);
     }
   }, [loadFriends, loadRequests]);
 
