@@ -282,6 +282,7 @@ const Home = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   // Состояние для модального окна совместного прослушивания
   const [isListeningRoomOpen, setIsListeningRoomOpen] = useState(false);
+  const [isSendTrackModalOpen, setIsSendTrackModalOpen] = useState(false);
 
   // Состояния для связки Telegram профиля через QR
   const [showTelegramLinkScreen, setShowTelegramLinkScreen] = useState(false);
