@@ -13644,8 +13644,8 @@ async def notify_friend_request(to_telegram_id: int, from_user: dict, request_id
         category=NotificationCategory.SOCIAL,
         priority=NotificationPriority.HIGH,
         title="Заявка в друзья",
-        message=f"👤 {from_name} хочет добавить вас в друзья",
-        emoji="💌",
+        message=f'<tg-emoji emoji-id="5341588772347732638">👤</tg-emoji> {from_name} хочет добавить вас в друзья',
+        emoji='<tg-emoji emoji-id="5238039443008408242">💌</tg-emoji>',
         data={
             "request_id": request_id,
             "from_telegram_id": from_user.get("telegram_id"),
@@ -13668,8 +13668,8 @@ async def notify_friend_accepted(to_telegram_id: int, friend_user: dict):
         category=NotificationCategory.SOCIAL,
         priority=NotificationPriority.NORMAL,
         title="Вы теперь друзья!",
-        message=f"🤝 {friend_name} принял вашу заявку",
-        emoji="🎉",
+        message=f'<tg-emoji emoji-id="5267062246424473960">🤝</tg-emoji><tg-emoji emoji-id="5264739223168117981">🤝</tg-emoji> {friend_name} принял вашу заявку',
+        emoji='<tg-emoji emoji-id="5317026657540780588">🎉</tg-emoji>',
         data={
             "friend_telegram_id": friend_user.get("telegram_id"),
             "friend_name": friend_name
