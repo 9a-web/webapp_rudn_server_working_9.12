@@ -14292,16 +14292,63 @@ async def send_schedule_message(data: ScheduleShareMessage):
         if not sender_settings or not sender_settings.get("group_id"):
             raise HTTPException(status_code=400, detail="Группа не указана в настройках")
         target_date = data.date or datetime.utcnow().strftime("%Y-%m-%d")
-        # Получаем расписание из кэша или API
+        
+        # Определяем номер недели по дате (ISO: чётная=2, нечётная=1)
+        try:
+            dt = datetime.strptime(target_date, "%Y-%m-%d")
+            iso_week = dt.isocalendar()[1]
+            week_number = 2 if iso_week % 2 == 0 else 1
+        except Exception:
+            week_number = 1
+        
+        # Определяем день недели для фильтрации
+        day_names_ru = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        try:
+            dt = datetime.strptime(target_date, "%Y-%m-%d")
+            target_day_name = day_names_ru[dt.weekday()]
+        except Exception:
+            target_day_name = None
+        
+        # Получаем расписание через реальный API (get_schedule)
         schedule_items = []
         try:
-            from rudn_parser import RUDNParser
-            parser = RUDNParser()
-            schedule_data = await parser.get_schedule(sender_settings["group_id"])
-            if schedule_data:
-                schedule_items = schedule_data[:8]
-        except Exception:
-            pass
+            events = await get_schedule(
+                facultet_id=sender_settings.get("facultet_id", ""),
+                level_id=sender_settings.get("level_id", ""),
+                kurs=sender_settings.get("kurs", ""),
+                form_code=sender_settings.get("form_code", ""),
+                group_id=sender_settings["group_id"],
+                week_number=week_number
+            )
+            if events:
+                # Фильтруем по нужному дню
+                if target_day_name:
+                    day_events = [e for e in events if e.get("day") == target_day_name]
+                    schedule_items = day_events if day_events else events[:8]
+                else:
+                    schedule_items = events[:8]
+                logger.info(f"Schedule API: получено {len(schedule_items)} пар для {target_date}")
+        except Exception as parse_err:
+            logger.warning(f"Schedule API error: {parse_err}")
+        
+        # Fallback: кэш из MongoDB
+        if not schedule_items:
+            try:
+                cached = await db.schedule_cache.find_one({
+                    "group_id": sender_settings["group_id"],
+                    "week_number": week_number
+                })
+                if cached and cached.get("events"):
+                    all_cached = cached["events"]
+                    if target_day_name:
+                        day_events = [e for e in all_cached if e.get("day") == target_day_name]
+                        schedule_items = day_events if day_events else all_cached[:8]
+                    else:
+                        schedule_items = all_cached[:8]
+                    logger.info(f"Schedule cache: получено {len(schedule_items)} пар для {target_date}")
+            except Exception as cache_err:
+                logger.warning(f"Schedule cache error: {cache_err}")
+        
         sender_name = await get_user_name(data.sender_id)
         conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
         now = datetime.utcnow()
@@ -14323,6 +14370,8 @@ async def send_schedule_message(data: ScheduleShareMessage):
                 "group_name": sender_settings.get("group_name", ""),
                 "sender_name": sender_name,
                 "items": schedule_items[:8],
+                "week_number": week_number,
+                "day_name": target_day_name or "",
             },
             "forwarded_from": None,
         }
