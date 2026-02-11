@@ -1389,6 +1389,20 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
           const result = await createListeningRoom(userData, roomName, 'everyone');
           
           if (result?.room_id) {
+            // Добавляем трек в очередь комнаты
+            try {
+              await addToListeningRoomQueue(result.room_id, currentUserId, {
+                id: trackMeta.track_id,
+                title: trackMeta.track_title || 'Трек',
+                artist: trackMeta.track_artist || 'Исполнитель',
+                duration: trackMeta.track_duration || 0,
+                cover: trackMeta.cover_url || null,
+              });
+              console.log('🎵 Track added to room queue:', trackMeta.track_title);
+            } catch (qErr) {
+              console.warn('Failed to add track to room queue:', qErr);
+            }
+
             setRoomInviteConfirm({
               room_id: result.room_id,
               invite_code: result.invite_code,
