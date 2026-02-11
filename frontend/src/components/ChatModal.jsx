@@ -701,6 +701,7 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
     artist: meta.track_artist || 'Исполнитель',
     duration: meta.track_duration,
     cover: meta.cover_url,
+    stream_url: meta.track_id ? `/api/music/stream/${meta.track_id}` : null,
   };
 
   const isCurrentTrack = Boolean(meta.track_id) && currentTrack?.id === meta.track_id;
@@ -714,6 +715,7 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
       if (isCurrentTrack) {
         toggle();
       } else if (meta.track_id) {
+        console.log('🎵 Playing track from chat message:', meta.track_title);
         play(trackObj, [trackObj]);
       }
     } catch (err) {
