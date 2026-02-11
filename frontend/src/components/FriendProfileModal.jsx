@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Star, UserMinus, Calendar, Users, 
   MapPin, ChevronRight, AlertTriangle,
-  EyeOff, ChevronLeft, ChevronDown, Wifi, Trophy
+  EyeOff, ChevronLeft, ChevronDown, Wifi, Trophy, MessageCircle
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 import { groupScheduleItems } from '../utils/scheduleUtils';
