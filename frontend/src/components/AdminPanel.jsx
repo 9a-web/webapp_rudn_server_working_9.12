@@ -2013,7 +2013,7 @@ const HISTORY_PERIODS = [
 
 const PeakCard = ({ label, value, unit, timestamp, icon, color }) => {
   const formattedTime = timestamp 
-    ? new Date(timestamp).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    ? new Date(timestamp).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })
     : '—';
   
   return (
