@@ -824,7 +824,7 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-[100] flex flex-col"
+      className="fixed inset-0 z-[99999] flex flex-col"
       style={{ backgroundColor: 'rgba(10,10,16,0.99)' }}
     >
       {/* Header */}
