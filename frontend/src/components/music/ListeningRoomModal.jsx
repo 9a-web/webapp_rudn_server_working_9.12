@@ -677,6 +677,109 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
     }
   };
   
+  // QR-сканирование для присоединения к комнате
+  const handleScanQR = () => {
+    const webApp = window.Telegram?.WebApp;
+    if (!webApp?.showScanQrPopup) {
+      setError('QR-сканер недоступен');
+      return;
+    }
+    
+    hapticFeedback?.('impact', 'medium');
+    
+    webApp.showScanQrPopup(
+      { text: 'Наведите камеру на QR-код комнаты' },
+      async (scannedText) => {
+        if (!scannedText) return;
+        
+        // Извлекаем invite_code из URL или текста
+        const match = scannedText.match(/listen_([a-zA-Z0-9]+)/);
+        if (!match) {
+          // Пробуем как голый код (если просто набор символов)
+          const cleanCode = scannedText.trim().toUpperCase();
+          if (/^[A-Z0-9]{4,12}$/.test(cleanCode)) {
+            webApp.closeScanQrPopup();
+            hapticFeedback?.('notification', 'success');
+            showQrJoinConfirm(cleanCode);
+            return true;
+          }
+          return false; // не распознан — сканер остаётся открытым
+        }
+        
+        const code = match[1];
+        webApp.closeScanQrPopup();
+        hapticFeedback?.('notification', 'success');
+        showQrJoinConfirm(code);
+        return true;
+      }
+    );
+  };
+  
+  // Показать модалку подтверждения подключения
+  const showQrJoinConfirm = async (code) => {
+    setQrJoinConfirm({ isOpen: true, inviteCode: code, roomData: null, loading: true });
+    
+    try {
+      const preview = await getListeningRoomPreview(code);
+      setQrJoinConfirm(prev => ({
+        ...prev,
+        roomData: preview.found ? preview : null,
+        loading: false
+      }));
+      if (!preview.found) {
+        hapticFeedback?.('notification', 'error');
+      }
+    } catch (err) {
+      console.error('Error loading room preview:', err);
+      setQrJoinConfirm(prev => ({ ...prev, roomData: null, loading: false }));
+      hapticFeedback?.('notification', 'error');
+    }
+  };
+  
+  // Подтвердить присоединение из QR-модалки
+  const handleQrJoinConfirm = async () => {
+    const code = qrJoinConfirm.inviteCode;
+    setQrJoinConfirm({ isOpen: false, inviteCode: null, roomData: null, loading: false });
+    
+    if (!code || !telegramId || !user) return;
+    
+    setInviteCode(code);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await joinListeningRoom(code, {
+        telegram_id: telegramId,
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        username: user.username || '',
+        photo_url: user.photo_url || null
+      });
+      
+      if (result.success && result.room) {
+        hapticFeedback?.('notification', 'success');
+        openRoom({
+          ...result.room,
+          is_host: result.room.host_id === telegramId,
+          online_count: result.room.online_count || 0
+        });
+      } else {
+        setError(result.message || 'Не удалось присоединиться');
+        hapticFeedback?.('notification', 'error');
+      }
+    } catch (err) {
+      console.error('QR Join room error:', err);
+      setError(err.message);
+      hapticFeedback?.('notification', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleQrJoinCancel = () => {
+    setQrJoinConfirm({ isOpen: false, inviteCode: null, roomData: null, loading: false });
+  };
+  
   // Выход из комнаты
   const handleLeaveRoom = async () => {
     if (!currentRoom) return;
