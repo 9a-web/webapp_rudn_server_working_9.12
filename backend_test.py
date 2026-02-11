@@ -41,6 +41,8 @@ class TestResults:
         # Print key response data for successful tests
         if passed and response_data:
             if isinstance(response_data, dict):
+                if 'id' in response_data:
+                    print(f"   → message_id: {response_data['id']}")
                 if 'message_id' in response_data:
                     print(f"   → message_id: {response_data['message_id']}")
                 if 'conversation_id' in response_data:
