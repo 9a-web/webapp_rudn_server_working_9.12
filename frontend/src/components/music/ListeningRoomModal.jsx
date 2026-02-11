@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Users, Copy, Check, Share2, Crown, 
   Settings, UserPlus, LogOut, Trash2,
-  Play, Pause, Music, Radio, QrCode,
+  Play, Pause, Music, Radio, QrCode, ScanLine,
   ChevronRight, ChevronLeft, Loader2, Volume2,
   ListMusic, History, Plus, SkipForward, Clock,
   Wifi, WifiOff, Download
@@ -32,7 +32,8 @@ import {
   deleteListeningRoom,
   getUserListeningRooms,
   updateListeningRoomSettings,
-  createListeningRoomConnection
+  createListeningRoomConnection,
+  getListeningRoomPreview
 } from '../../services/listeningRoomAPI';
 import { fetchBotInfo } from '../../utils/botInfo';
 
