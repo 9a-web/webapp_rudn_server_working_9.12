@@ -930,7 +930,16 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
             {/* Attach Menu */}
             <AnimatePresence>
               <AttachMenu isOpen={showAttachMenu} onClose={() => setShowAttachMenu(false)}
-                onAction={(a) => { if (a === 'schedule') handleSendSchedule(); if (a === 'music') handleSendMusic(); }} />
+                onAction={(a) => {
+                  if (a === 'schedule') { setShowSchedulePicker(true); setShowAttachMenu(false); }
+                  if (a === 'music') handleSendMusic();
+                }} />
+            </AnimatePresence>
+
+            {/* Schedule Date Picker */}
+            <AnimatePresence>
+              <ScheduleDatePicker isOpen={showSchedulePicker} onClose={() => setShowSchedulePicker(false)}
+                onSend={handleSendSchedule} />
             </AnimatePresence>
 
             <div className="flex items-end gap-2">
