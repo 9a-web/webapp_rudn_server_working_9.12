@@ -444,6 +444,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
       )}
 
       <div
+        ref={bubbleRef}
         className={`relative group max-w-[78%] select-none`}
         style={{
           transform: `translateX(${swipeX}px)`,
@@ -458,8 +459,8 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
       >
         {/* Context Menu */}
         <AnimatePresence>
-          {showMenu && <MessageContextMenu isOpen message={message} isMine={isMine} actions={handleAction} onClose={() => setShowMenu(false)} />}
-          {showReactions && <ReactionBar isOpen onSelect={handleReaction} onClose={() => setShowReactions(false)} position="top" />}
+          {showMenu && <MessageContextMenu isOpen message={message} isMine={isMine} actions={handleAction} onClose={() => setShowMenu(false)} position={menuPosition} />}
+          {showReactions && <ReactionBar isOpen onSelect={handleReaction} onClose={() => setShowReactions(false)} position={menuPosition} />}
         </AnimatePresence>
 
         <div
