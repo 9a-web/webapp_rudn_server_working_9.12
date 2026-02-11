@@ -1789,6 +1789,7 @@ const Home = () => {
             <MusicSection 
               telegramId={user?.id}
               onListeningRoomOpenChange={setIsListeningRoomOpen}
+              onSendTrackModalOpenChange={setIsSendTrackModalOpen}
               openListeningRoomRef={openListeningRoomRef}
               pendingListenInvite={pendingListenInvite}
               onListenInviteHandled={() => setPendingListenInvite(null)}
