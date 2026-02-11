@@ -1098,6 +1098,22 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Conversations List Modal */}
+      <ConversationsListModal
+        isOpen={showConversations}
+        onClose={() => setShowConversations(false)}
+        currentUserId={user?.id}
+        onOpenChat={handleOpenChat}
+      />
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={!!chatFriend}
+        onClose={handleCloseChat}
+        friend={chatFriend}
+        currentUserId={user?.id}
+      />
     </div>
   );
 };
