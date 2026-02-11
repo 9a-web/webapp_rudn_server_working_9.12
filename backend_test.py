@@ -17,7 +17,7 @@ from datetime import datetime
 # Base URL as specified in the review request
 BASE_URL = "http://localhost:8001/api"
 
-class MessageTester:
+class ScheduleTester:
     def __init__(self):
         self.session = requests.Session()
         self.user1_id = 77777
