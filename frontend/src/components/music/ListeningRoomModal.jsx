@@ -325,6 +325,22 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
             }
           }, 300);
         }
+      } else {
+        // Нет текущего трека — автоматически запускаем первый трек из очереди
+        const availableQueue = queueFromServer || [];
+        if (availableQueue.length > 0 && canCtrl !== false) {
+          const firstTrack = availableQueue[0];
+          console.log('🎵 Auto-playing first track from queue:', firstTrack.title);
+          ignoreUntilRef.current = Date.now() + 2000;
+          lastRemoteEventRef.current = Date.now();
+          lastSeekTimeRef.current = Date.now();
+          
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              play(firstTrack, [firstTrack]);
+            }
+          }, 500);
+        }
       }
     },
     onPlay: (track, position, triggeredBy, triggeredByName) => {
