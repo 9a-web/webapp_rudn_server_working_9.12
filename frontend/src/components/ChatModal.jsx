@@ -1766,6 +1766,67 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
           {/* Music Picker Modal */}
           <AnimatePresence>
             {showMusicPicker && <ChatMusicPicker isOpen onClose={() => setShowMusicPicker(false)} onSelectTrack={handleMusicTrackSelected} />}
+
+            {/* Подтверждение отправки приглашения в комнату */}
+            {roomInviteConfirm && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+                onClick={() => setRoomInviteConfirm(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-[320px] bg-[#1a1a2e] border border-white/10 rounded-2xl p-5 shadow-2xl"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <Headphones className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold text-[15px]">Комната создана!</h3>
+                      <p className="text-gray-400 text-[12px]">Совместное прослушивание</p>
+                    </div>
+                  </div>
+
+                  {roomInviteConfirm.trackMeta?.track_title && (
+                    <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/[0.08]">
+                      <Music className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white truncate">{roomInviteConfirm.trackMeta.track_title}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{roomInviteConfirm.trackMeta.track_artist}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-gray-300 text-[13px] mb-4 leading-relaxed">
+                    Отправить <span className="text-purple-300 font-medium">{friendName}</span> приглашение присоединиться к совместному прослушиванию?
+                  </p>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setRoomInviteConfirm(null)}
+                      className="flex-1 py-2.5 rounded-xl bg-white/[0.06] text-gray-300 text-[13px] font-medium
+                        hover:bg-white/[0.10] active:scale-[0.97] transition-all"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={handleSendRoomInvite}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[13px] font-semibold
+                        hover:from-purple-400 hover:to-pink-400 active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      Отправить
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </motion.div>
       )}
