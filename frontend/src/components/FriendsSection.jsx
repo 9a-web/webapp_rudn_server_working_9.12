@@ -735,9 +735,9 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
                   <motion.span 
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center z-20 px-1"
+                    className={`absolute -top-1 -right-0.5 min-w-[18px] h-[18px] ${tab.id === 'messages' ? 'bg-purple-500' : 'bg-red-500'} text-white text-[10px] font-bold rounded-full flex items-center justify-center z-20 px-1`}
                   >
-                    {unprocessedIncomingCount}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </motion.span>
                 )}
               </motion.button>
