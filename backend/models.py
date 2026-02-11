@@ -2325,6 +2325,7 @@ class MessageType(str, Enum):
     MUSIC = "music"
     TASK = "task"
     FORWARD = "forward"
+    ROOM_INVITE = "room_invite"
 
 class ReactionInfo(BaseModel):
     """Информация о реакции"""
