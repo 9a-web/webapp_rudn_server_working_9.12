@@ -955,7 +955,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
                             </h4>
                             {lastMsg && (
                               <span className="text-[11px] text-gray-500 flex-shrink-0">
-                                {getTimeAgo(lastMsg.created_at)}
+                                {getConversationTimeAgo(lastMsg.created_at)}
                               </span>
                             )}
                           </div>
