@@ -241,7 +241,7 @@ class BackendTester:
                 self.log_result("Accept Events Setup", False, "No pending friend requests found")
                 return False
                 
-            request_id = incoming_requests[0]['id']
+            request_id = incoming_requests[0]['request_id']
             
             # Step 2: Start SSE for user 333333 (the sender)
             sse_client = SSEClient(f"{self.base_url}/friends/events/333333")
