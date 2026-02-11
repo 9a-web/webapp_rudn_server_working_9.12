@@ -134,7 +134,7 @@ export const WeekDateSelector = ({
   return (
     <div className="mb-2 -mx-2">
       {/* Контейнер с кнопками и датами - только горизонтальная прокрутка */}
-      <div className="flex items-center gap-2 px-2 w-full" style={{ touchAction: 'pan-x' }}>
+      <div className="flex items-center justify-center gap-2 px-2 w-full max-w-[560px] mx-auto" style={{ touchAction: 'pan-x' }}>
         {/* Кнопка предыдущей недели */}
         <motion.button
           onClick={handlePreviousWeek}
