@@ -125,6 +125,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
   const [chatFriend, setChatFriend] = useState(null);
   const [showConversations, setShowConversations] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
   const searchInputRef = useRef(null);
   
   // Debounced search
