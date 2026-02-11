@@ -407,6 +407,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
       <MusicCardPlayable
         metadata={meta}
         isMine={isMine}
+        onListenTogether={(trackMeta) => onAction('listen_together', trackMeta)}
       />
     );
   };
