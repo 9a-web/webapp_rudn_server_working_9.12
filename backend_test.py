@@ -172,6 +172,32 @@ class BackendTester:
             self.log_result("SSE Connection", False, f"Error: {e}")
             return False
             
+    def cleanup_test_users(self):
+        """Clean up test data before running tests"""
+        try:
+            # Remove any existing friendship
+            self.make_request("DELETE", "/friends/444444", {"telegram_id": 333333})
+            self.make_request("DELETE", "/friends/333333", {"telegram_id": 444444})
+            
+            # Cancel any pending friend requests
+            response = self.make_request("GET", "/friends/444444/requests")
+            if response.status_code == 200:
+                requests_data = response.json()
+                incoming_requests = requests_data.get('incoming', [])
+                for request in incoming_requests:
+                    if request.get('telegram_id') == 333333:
+                        # Try to cancel the request
+                        try:
+                            self.make_request("POST", f"/friends/cancel/{request['request_id']}", {"telegram_id": 333333})
+                        except:
+                            pass
+                            
+            print("✅ Test data cleanup completed")
+            return True
+        except Exception as e:
+            print(f"⚠️  Test cleanup warning: {e}")
+            return True  # Continue with tests even if cleanup fails
+            
     def test_sse_friend_request_events(self):
         """Test 2: SSE events on friend request"""
         print("\n=== Test 2: SSE Friend Request Events ===")
