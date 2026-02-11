@@ -9,7 +9,20 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Fix ALL bugs and improve messaging logic in Friends section. 20 bugs found and fixed.
+Fix music sending in chat (Friends > Messages tab) and add ability to send music to friend from Music section.
+
+### Changes Made (Music Sending Feature):
+1. **ChatModal.jsx** — Replaced placeholder `handleSendMusic` toast with `ChatMusicPicker` component (music search within chat). Added `MusicCardPlayable` component for playing music directly from chat messages.
+2. **TrackCard.jsx** — Added `onSendToFriend` and `showSendToFriend` props with Send button.
+3. **TrackList.jsx** — Propagated `onSendToFriend` and `showSendToFriend` to TrackCard.
+4. **MusicSearch.jsx** — Propagated `onSendToFriend` and `showSendToFriend`.
+5. **MusicSection.jsx** — Added `SendTrackToFriendModal` integration with `handleSendToFriend` handler.
+6. **NEW: SendTrackToFriendModal.jsx** — Friend selection modal for sending music (auto-creates conversation if needed).
+
+### Backend Endpoints Used (existing):
+- `POST /api/messages/send-music` — sends music message (auto-creates conversation)
+- `GET /api/friends/{id}` — gets friends list
+- `GET /api/music/search` — searches music
 
 ### Bug Fixes Applied:
 
