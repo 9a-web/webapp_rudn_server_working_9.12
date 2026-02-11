@@ -14567,19 +14567,34 @@ async def delete_message(message_id: str, telegram_id: int = Body(..., embed=Tru
 
 @api_router.get("/messages/unread/{telegram_id}", response_model=MessagesUnreadCountResponse)
 async def get_unread_messages_count(telegram_id: int):
-    """Получить количество непрочитанных"""
+    """Получить количество непрочитанных (оптимизировано через aggregation)"""
     try:
-        conversations = await db.conversations.find({"participant_ids": telegram_id}).to_list(100)
+        # Используем агрегацию для подсчёта за один запрос вместо N+1
+        pipeline = [
+            {"$match": {
+                "sender_id": {"$ne": telegram_id},
+                "read_at": None,
+                "is_deleted": {"$ne": True},
+            }},
+            {"$lookup": {
+                "from": "conversations",
+                "localField": "conversation_id",
+                "foreignField": "id",
+                "as": "conv"
+            }},
+            {"$unwind": "$conv"},
+            {"$match": {"conv.participant_ids": telegram_id}},
+            {"$group": {
+                "_id": "$conversation_id",
+                "count": {"$sum": 1}
+            }}
+        ]
+        results = await db.messages.aggregate(pipeline).to_list(200)
         total_unread = 0
         per_conversation = {}
-        for conv in conversations:
-            count = await db.messages.count_documents({
-                "conversation_id": conv["id"], "sender_id": {"$ne": telegram_id},
-                "read_at": None, "is_deleted": {"$ne": True},
-            })
-            if count > 0:
-                per_conversation[conv["id"]] = count
-                total_unread += count
+        for r in results:
+            per_conversation[r["_id"]] = r["count"]
+            total_unread += r["count"]
         return MessagesUnreadCountResponse(total_unread=total_unread, per_conversation=per_conversation)
     except Exception as e:
         logger.error(f"Get unread count error: {e}")
