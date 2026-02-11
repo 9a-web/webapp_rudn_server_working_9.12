@@ -1,15 +1,23 @@
 # Test Result
 
 ## Задача
-Изменить сообщение бота на команду /start для возвращающихся пользователей.
+Исправить подключение к комнате прослушивания музыки через QR-код. При сканировании QR через встроенный сканер Telegram — показывать модальное окно подтверждения.
 
 ## Что было изменено
-- **Файл:** `/app/backend/telegram_bot.py` (строки 954-959)
-- **Было:** Обычный текст с простыми эмодзи
-- **Стало:** HTML с кастомными Telegram эмодзи (tg-emoji)
+
+### Backend:
+- **`/app/backend/server.py`** — добавлен endpoint `GET /api/music/rooms/preview/{invite_code}` для получения информации о комнате без присоединения
+
+### Frontend:
+- **`/app/frontend/src/services/listeningRoomAPI.js`** — добавлена функция `getListeningRoomPreview()`
+- **`/app/frontend/src/App.jsx`**:
+  - Добавлено состояние `listenRoomJoinModal` для модального окна
+  - Добавлен обработчик `listen_` в `handleQRScanned` (case 3)
+  - Добавлены функции `handleListenRoomJoinConfirm()` и `handleListenRoomJoinCancel()`
+  - Добавлено модальное окно подтверждения подключения к комнате
 
 ## Статус
-✅ Изменение применено и backend перезапущен.
+✅ Все сервисы запущены и работают
 
 ## Testing Protocol
 - Backend тестируется через `deep_testing_backend_v2`
@@ -17,3 +25,7 @@
 
 ## Incorporate User Feedback
 - Всегда спрашивать пользователя перед внесением изменений
+
+## Backend Test Cases
+1. `GET /api/music/rooms/preview/TESTCODE` → `{"found": false, "message": "Комната не найдена..."}`
+2. При существующем invite_code → `{"found": true, "name": "...", "host_name": "...", "participants_count": N, ...}`
