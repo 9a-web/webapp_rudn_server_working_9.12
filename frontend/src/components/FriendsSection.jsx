@@ -1250,6 +1250,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
         userSettings={userSettings}
         currentUserId={user?.id}
         onSendRequest={handleSendRequest}
+        refreshTrigger={friendEventTrigger}
       />
 
       {/* QR Modal */}
