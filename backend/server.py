@@ -12569,6 +12569,13 @@ async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(.
             await notify_friend_request(target_telegram_id, sender_user, request.id)
         
         logger.info(f"👥 Friend request sent: {telegram_id} -> {target_telegram_id}")
+        
+        # SSE: уведомляем получателя о новой заявке
+        await _emit_friend_event(target_telegram_id, "friend_request_received", {
+            "from_telegram_id": telegram_id,
+            "request_id": request.id
+        })
+        
         return FriendActionResponse(
             success=True,
             message="Запрос на дружбу отправлен"
