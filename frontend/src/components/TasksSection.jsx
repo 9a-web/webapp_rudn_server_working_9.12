@@ -484,11 +484,13 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       hapticFeedback && hapticFeedback('notification', 'error');
       
       const errorMessage = error?.message || 'Не удалось загрузить расписание';
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert(errorMessage);
-      } else {
-        alert(errorMessage);
-      }
+      try {
+        if (window.Telegram?.WebApp?.isVersionAtLeast?.('6.2')) {
+          window.Telegram.WebApp.showAlert(errorMessage);
+        } else {
+          alert(errorMessage);
+        }
+      } catch (e) { alert(errorMessage); }
       setIsSyncPreviewOpen(false);
     } finally {
       setSyncPreviewLoading(false);
