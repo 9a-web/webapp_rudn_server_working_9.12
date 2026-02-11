@@ -10,8 +10,8 @@ import json
 from datetime import datetime, timedelta
 import sys
 
-# Base URL from frontend/.env REACT_APP_BACKEND_URL + /api
-BASE_URL = "https://music-chat-hub-1.preview.emergentagent.com/api"
+# Base URL from the review request: "ALL on http://localhost:8001"
+BASE_URL = "http://localhost:8001/api"
 
 class MusicTestRunner:
     def __init__(self):
