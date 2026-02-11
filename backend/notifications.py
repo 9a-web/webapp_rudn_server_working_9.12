@@ -209,9 +209,12 @@ class TelegramNotificationService:
                 "в настройках приложения.</i>"
             )
             
+            # Заменяем обычные эмоджи на анимированные
+            animated_message = animate_emoji(message)
+            
             await self.bot.send_message(
                 chat_id=telegram_id,
-                text=message,
+                text=animated_message,
                 parse_mode='HTML'
             )
             
