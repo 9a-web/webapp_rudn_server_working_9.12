@@ -14029,20 +14029,39 @@ async def get_user_conversations(telegram_id: int):
 
 
 @api_router.get("/messages/{conversation_id}/messages", response_model=MessagesListResponse)
-async def get_conversation_messages(conversation_id: str, limit: int = 50, offset: int = 0, telegram_id: int = 0):
-    """Получить сообщения в диалоге с пагинацией"""
+async def get_conversation_messages(conversation_id: str, limit: int = 50, offset: int = 0, telegram_id: int = 0, before: str = ""):
+    """Получить сообщения в диалоге с пагинацией (cursor-based через before)"""
     try:
         conversation = await db.conversations.find_one({"id": conversation_id})
         if not conversation:
             raise HTTPException(status_code=404, detail="Диалог не найден")
         if telegram_id and telegram_id not in conversation.get("participant_ids", []):
             raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
-        total = await db.messages.count_documents({"conversation_id": conversation_id, "is_deleted": {"$ne": True}})
-        messages_docs = await db.messages.find(
-            {"conversation_id": conversation_id, "is_deleted": {"$ne": True}}
-        ).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+        
+        base_filter = {"conversation_id": conversation_id, "is_deleted": {"$ne": True}}
+        total = await db.messages.count_documents(base_filter)
+        
+        # Cursor-based пагинация: загружать сообщения ДО определённого ID
+        if before:
+            anchor_msg = await db.messages.find_one({"id": before})
+            if anchor_msg:
+                base_filter["created_at"] = {"$lt": anchor_msg["created_at"]}
+        
+        messages_docs = await db.messages.find(base_filter).sort("created_at", -1).limit(limit).to_list(limit)
         messages = [build_message_response(msg) for msg in messages_docs]
-        return MessagesListResponse(messages=messages, total=total, has_more=(offset + limit) < total)
+        
+        # has_more: проверяем есть ли ещё более старые сообщения
+        has_more = False
+        if messages_docs:
+            oldest_in_batch = messages_docs[-1]["created_at"]
+            older_count = await db.messages.count_documents({
+                "conversation_id": conversation_id,
+                "is_deleted": {"$ne": True},
+                "created_at": {"$lt": oldest_in_batch}
+            })
+            has_more = older_count > 0
+        
+        return MessagesListResponse(messages=messages, total=total, has_more=has_more)
     except HTTPException:
         raise
     except Exception as e:
