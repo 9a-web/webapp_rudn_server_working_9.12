@@ -185,6 +185,16 @@ from models import (
     FriendScheduleResponse,
     PrivacySettingsUpdate,
     FriendActionResponse,
+    # Модели для системы сообщений
+    MessageCreate,
+    MessageResponse,
+    ConversationCreate,
+    ConversationParticipant,
+    ConversationResponse,
+    ConversationsListResponse,
+    MessagesListResponse,
+    MessagesUnreadCountResponse,
+    MessageActionResponse,
     # Модели для системы уведомлений
     NotificationType,
     NotificationCategory,
