@@ -387,7 +387,7 @@ async def test_new_messaging_endpoints():
             if response.status_code == 200:
                 data = response.json()
                 # Check if it's a music message with metadata
-                if data.get('type') == 'music' or 'track_title' in data:
+                if data.get('message_type') == 'music' and data.get('metadata'):
                     results.add_result("Send Music Message", True, response.status_code, data)
                 else:
                     results.add_result("Send Music Message", False, response.status_code,
