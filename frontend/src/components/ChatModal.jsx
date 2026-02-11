@@ -1206,7 +1206,10 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
   };
 
   // Music share — открыть пикер
-  const handleSendMusic = async () => {
+  const handleSendMusic = () => {
+    setShowAttachMenu(false);
+    setShowEmojiPicker(false);
+    setShowSchedulePicker(false);
     setShowMusicPicker(true);
   };
 
@@ -1215,20 +1218,24 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     if (!friend?.telegram_id || !track) return;
     setShowMusicPicker(false);
     try {
-      const msg = await messagesAPI.sendMusic(currentUserId, friend.telegram_id, {
-        track_title: track.title,
-        track_artist: track.artist,
-        track_id: track.id,
-        track_duration: track.duration,
+      const trackData = {
+        track_title: track.title || 'Трек',
+        track_artist: track.artist || 'Неизвестный',
+        track_id: track.id || null,
+        track_duration: track.duration || 0,
         cover_url: track.cover || null,
-      });
-      setMessages(prev => [...prev, msg]);
-      if (msg.conversation_id && !conversationId) setConversationId(msg.conversation_id);
-      isNearBottomRef.current = true;
-      setToast('Музыка отправлена 🎵');
+      };
+      console.log('🎵 Sending music:', trackData);
+      const msg = await messagesAPI.sendMusic(currentUserId, friend.telegram_id, trackData);
+      if (msg) {
+        setMessages(prev => [...prev, msg]);
+        if (msg.conversation_id && !conversationId) setConversationId(msg.conversation_id);
+        isNearBottomRef.current = true;
+        setToast('Музыка отправлена 🎵');
+      }
     } catch (e) {
       console.error('Send music error:', e);
-      setToast('Ошибка отправки музыки');
+      setToast('Ошибка отправки музыки: ' + (e.message || 'неизвестная ошибка'));
     }
   };
 
