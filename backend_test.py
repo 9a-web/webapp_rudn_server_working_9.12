@@ -350,11 +350,11 @@ class MusicSendingTester:
         }
         
         result = self.test_request("POST", "/messages/send-music", music_data, 403, "5.1 Send Music to Non-Friend")
-        if result is None:  # Expected to be None for 403
+        if result is not None:  # Expected to get a response for 403 (error details)
             self.log("  ✓ Correctly blocked sending music to non-friend (403)")
             return True
         else:
-            self.log("  ❌ Should have received 403 error", False) 
+            self.log("  ❌ Did not receive expected 403 error", False) 
             return False
             
     def test_music_search(self) -> bool:
