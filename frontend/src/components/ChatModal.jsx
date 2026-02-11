@@ -116,7 +116,8 @@ const ReactionBar = ({ isOpen, onSelect, onClose, position }) => {
   if (!isOpen) return null;
   return (
     <motion.div ref={ref} initial={{ opacity: 0, scale: 0.8, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.8 }}
-      className={`absolute ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} left-0 z-50 flex gap-0.5 p-1.5 bg-gray-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl`}>
+      className={`absolute ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} left-0 z-50 flex gap-0.5 p-1.5 border border-white/10 rounded-2xl shadow-2xl`}
+      style={{ backgroundColor: '#14141e' }}>
       {REACTION_EMOJIS.map(emoji => (
         <button key={emoji} onClick={() => { onSelect(emoji); onClose(); }}
           className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.1] transition-all text-lg hover:scale-125 active:scale-90">
