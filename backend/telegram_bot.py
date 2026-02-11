@@ -249,8 +249,9 @@ async def handle_revoke_device_callback(update: Update, context: ContextTypes.DE
         })
         
         if not session:
+            from notifications import animate_emoji as _anim
             await query.edit_message_text(
-                text="❌ <b>Сеанс не найден</b>\n\n<i>Возможно, он уже был удалён.</i>",
+                text=_anim("❌ <b>Сеанс не найден</b>\n\n<i>Возможно, он уже был удалён.</i>"),
                 parse_mode='HTML'
             )
             return
@@ -273,22 +274,25 @@ async def handle_revoke_device_callback(update: Update, context: ContextTypes.DE
         result = await db.web_sessions.delete_one({"_id": session["_id"]})
         
         if result.deleted_count > 0:
+            from notifications import animate_emoji as _anim2
             device_name = session.get("device_name", "Неизвестное устройство")
             await query.edit_message_text(
-                text=f"✅ <b>Сеанс удалён</b>\n\n📱 {device_name}\n\n<i>Устройство отключено от вашего профиля.</i>",
+                text=_anim2(f"✅ <b>Сеанс удалён</b>\n\n📱 {device_name}\n\n<i>Устройство отключено от вашего профиля.</i>"),
                 parse_mode='HTML'
             )
             logger.info(f"🗑️ Пользователь {telegram_id} удалил сеанс {session_token_prefix}...")
         else:
+            from notifications import animate_emoji as _anim3
             await query.edit_message_text(
-                text="❌ <b>Ошибка</b>\n\n<i>Не удалось удалить сеанс.</i>",
+                text=_anim3("❌ <b>Ошибка</b>\n\n<i>Не удалось удалить сеанс.</i>"),
                 parse_mode='HTML'
             )
             
     except Exception as e:
         logger.error(f"❌ Ошибка при удалении сеанса: {e}", exc_info=True)
+        from notifications import animate_emoji as _anim4
         await query.edit_message_text(
-            text="❌ <b>Произошла ошибка</b>\n\n<i>Попробуйте позже.</i>",
+            text=_anim4("❌ <b>Произошла ошибка</b>\n\n<i>Попробуйте позже.</i>"),
             parse_mode='HTML'
         )
 
