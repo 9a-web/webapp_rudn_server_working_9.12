@@ -830,6 +830,14 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     }
   }, [conversationId, currentUserId]);
 
+  // Reset textarea height
+  const resetTextareaHeight = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = '44px';
+    }
+  }, []);
+
   // Send message
   const handleSend = async () => {
     const text = inputText.trim();
@@ -841,7 +849,8 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       try {
         const updated = await messagesAPI.editMessage(editingMessage.id, currentUserId, text);
         setMessages(prev => prev.map(m => m.id === editingMessage.id ? updated : m));
-        setEditingMessage(null); setInputText('');
+        setEditingMessage(null); setInputText(''); setPreEditText('');
+        resetTextareaHeight();
         setToast('Сообщение отредактировано');
       } catch (e) { console.error(e); }
       finally { setIsSending(false); }
@@ -849,17 +858,21 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     }
 
     setIsSending(true); setInputText('');
-    const optimistic = { id: `temp-${Date.now()}`, conversation_id: conversationId, sender_id: currentUserId, text, message_type: 'text', created_at: new Date().toISOString(), read_at: null, is_deleted: false, reply_to: replyTo ? { message_id: replyTo.id, sender_id: replyTo.sender_id, sender_name: replyTo.sender_id === currentUserId ? 'Вы' : friendName, text: replyTo.text?.substring(0, 100) } : null, reactions: [], metadata: null, forwarded_from: null, _optimistic: true };
+    resetTextareaHeight();
+    const optimistic = { id: `temp-${Date.now()}`, conversation_id: conversationId, sender_id: currentUserId, text, message_type: 'text', created_at: new Date().toISOString(), read_at: null, is_deleted: false, edited_at: null, is_pinned: false, reply_to: replyTo ? { message_id: replyTo.id, sender_id: replyTo.sender_id, sender_name: replyTo.sender_id === currentUserId ? 'Вы' : friendName, text: replyTo.text?.substring(0, 100) } : null, reactions: [], metadata: null, forwarded_from: null, _optimistic: true };
     setMessages(prev => [...prev, optimistic]);
     setReplyTo(null);
+    isNearBottomRef.current = true; // Автоскролл к своему сообщению
 
     try {
       const sent = await messagesAPI.sendMessage(currentUserId, friend.telegram_id, text, replyTo?.id);
       setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
       if (sent.conversation_id && !conversationId) setConversationId(sent.conversation_id);
     } catch (e) {
+      // Показываем ошибку вместо молчаливого удаления
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
       setInputText(text);
+      setToast('Ошибка отправки');
     } finally { setIsSending(false); inputRef.current?.focus(); }
   };
 
