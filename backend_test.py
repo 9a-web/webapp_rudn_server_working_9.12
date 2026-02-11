@@ -90,7 +90,7 @@ async def test_new_messaging_endpoints():
             
             if response.status_code == 200:
                 data = response.json()
-                message_id = data.get('message_id')
+                message_id = data.get('id')  # Message ID is returned as 'id'
                 conversation_id = data.get('conversation_id')
                 results.add_result("Send Message", True, response.status_code, data)
             else:
