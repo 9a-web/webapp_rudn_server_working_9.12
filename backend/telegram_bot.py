@@ -748,12 +748,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                             chat_id=referrer_id,
                             text=(
                                 f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji>  <b>Новый реферал!</b>\n'
-                                f'\n'
-                                f'<b>{referrer_name}</b> присоединился\n'
-                                f'по вашей пригласительной ссылке.\n'
-                                f'\n'
+                                f'{referrer_name} присоединился по вашей пригласительной ссылке.\n'
                                 f'<tg-emoji emoji-id="5325521342643064145">💰</tg-emoji> Начислено: <b>+{bonus_points} баллов</b>\n'
-                                f'\n'
                                 f'Приглашайте друзей — получайте бонусы!'
                             ),
                             parse_mode='HTML'
