@@ -14467,6 +14467,7 @@ async def set_typing(conversation_id: str, data: TypingIndicator):
 @api_router.get("/messages/{conversation_id}/typing")
 async def get_typing(conversation_id: str, telegram_id: int = 0):
     """Получить список печатающих"""
+    global _typing_cleanup_counter
     try:
         now = datetime.utcnow()
         typing_users = []
@@ -14480,6 +14481,16 @@ async def get_typing(conversation_id: str, telegram_id: int = 0):
                 expired.append(uid)
         for uid in expired:
             conv_typing.pop(uid, None)
+        # Периодическая глобальная очистка (каждые 100 вызовов)
+        _typing_cleanup_counter += 1
+        if _typing_cleanup_counter >= 100:
+            _typing_cleanup_counter = 0
+            stale_convs = []
+            for cid, users in typing_indicators_store.items():
+                if not users or all((now - ts).total_seconds() >= 30 for ts in users.values()):
+                    stale_convs.append(cid)
+            for cid in stale_convs:
+                typing_indicators_store.pop(cid, None)
         return {"typing_users": typing_users}
     except Exception as e:
         return {"typing_users": []}
