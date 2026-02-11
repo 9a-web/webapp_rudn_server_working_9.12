@@ -9,7 +9,57 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Add messaging/dialog function between friends in the Friends section.
+Fix ALL bugs and improve messaging logic in Friends section. 20 bugs found and fixed.
+
+### Bug Fixes Applied:
+
+**Backend Fixes:**
+1. Text validation bypass — added @field_validator to strip before length check
+2. Regex injection in search — re.escape() for user input in $regex
+3. Pagination — switched to cursor-based (before param) instead of offset-based
+4. Pin deleted message — added is_deleted check in pin_message
+5. Missing notifications — added in-app notifications for forward/schedule/music
+6. Permission check — create_task_from_message now verifies conversation participant
+7. Typing memory leak — global periodic cleanup of stale typing indicators
+8. N+1 query optimization — aggregation pipeline for get_unread_messages_count
+9. Race condition — upsert in get_or_create_conversation
+
+**Frontend Fixes:**
+10. Duplicate schedule card rendering — removed duplicate condition
+11. Polling overload — combined API calls with Promise.all, interval 4sec
+12. LoadMore pagination — cursor-based with before parameter
+13. Auto-scroll — only if user near bottom
+14. Textarea height reset — reset after send
+15. Optimistic message — added missing edited_at, is_pinned fields
+16. getTimeAgo moved outside map loop — performance fix
+17. Edit cancel — saves/restores previous text (preEditText)
+18. Error indicator — shows toast on send failure
+19. ConversationsListModal — component exists but inline rendering used in messages tab
+20. Edit banner X button — properly restores state on cancel
+
+### Backend Test Plan
+Prerequisites:
+1. Create user 77777: POST /api/user-settings {telegram_id: 77777, username: "bugtest1", first_name: "BugTest1", group_id: "G1", group_name: "Группа1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+2. Create user 88888: POST /api/user-settings {telegram_id: 88888, username: "bugtest2", first_name: "BugTest2", group_id: "G1", group_name: "Группа1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+3. Make them friends: POST /api/friends/request/88888 {telegram_id: 77777} → GET /api/friends/88888/requests → POST /api/friends/accept/{request_id} {telegram_id: 88888}
+
+Tests (ALL on http://localhost:8001):
+1. POST /api/messages/send {sender_id: 77777, receiver_id: 88888, text: "   "} → expect 422 (blank text validation)
+2. POST /api/messages/send {sender_id: 77777, receiver_id: 88888, text: "Test message"} → expect 200
+3. POST /api/messages/send {sender_id: 88888, receiver_id: 77777, text: "Reply test"} → expect 200
+4. GET /api/messages/{conversation_id}/messages?telegram_id=77777&limit=50 → expect messages with correct structure
+5. GET /api/messages/{conversation_id}/messages?telegram_id=77777&before={first_msg_id}&limit=10 → cursor pagination test
+6. GET /api/messages/{conversation_id}/search?q=test&telegram_id=77777 → expect results (regex safe)
+7. GET /api/messages/{conversation_id}/search?q=(test)&telegram_id=77777 → expect no crash (escaped regex)
+8. DELETE /api/messages/{msg_id} {telegram_id: 77777} → soft delete
+9. PUT /api/messages/{deleted_msg_id}/pin {telegram_id: 77777, is_pinned: true} → expect 400 (can't pin deleted)
+10. PUT /api/messages/{normal_msg_id}/pin {telegram_id: 77777, is_pinned: true} → expect 200
+11. POST /api/messages/create-task {telegram_id: 99999, message_id: "{msg_id}"} → expect 403 (not participant)
+12. POST /api/messages/create-task {telegram_id: 77777, message_id: "{msg_id}"} → expect 200
+13. GET /api/messages/unread/77777 → expect correct counts (aggregation)
+14. POST /api/messages/forward {sender_id: 77777, receiver_id: 88888, original_message_id: "{msg_id}"} → expect 200 + in_app_notification check
+15. POST /api/messages/{conversation_id}/typing {telegram_id: 77777} → expect 200
+16. GET /api/messages/{conversation_id}/typing?telegram_id=88888 → expect typing_users array
 
 ### Changes Made:
 **New backend endpoints:**
