@@ -145,6 +145,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
   const [conversations, setConversations] = useState([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const searchInputRef = useRef(null);
+  const [friendEventTrigger, setFriendEventTrigger] = useState(0); // SSE refresh trigger
   
   // Debounced search
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
