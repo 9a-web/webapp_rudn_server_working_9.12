@@ -1351,6 +1351,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
         friend={chatFriend}
         currentUserId={user?.id}
         friends={friends}
+        onOpenProfile={handleOpenProfile}
       />
     </div>
   );
