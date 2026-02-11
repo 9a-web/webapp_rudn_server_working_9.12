@@ -937,6 +937,7 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
   const [typingUsers, setTypingUsers] = useState([]);
   const [highlightMsgId, setHighlightMsgId] = useState(null);
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
   const [preEditText, setPreEditText] = useState(''); // текст до начала редактирования
 
   const messagesEndRef = useRef(null);
