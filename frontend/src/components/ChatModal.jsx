@@ -195,6 +195,19 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium'); } catch (e) {}
   };
 
+  // Определяем позицию меню (сверху или снизу) по положению сообщения
+  const calcMenuPosition = useCallback(() => {
+    if (!bubbleRef.current) return 'top';
+    const rect = bubbleRef.current.getBoundingClientRect();
+    // Если до верха viewport менее 320px — показываем меню снизу
+    return rect.top < 320 ? 'bottom' : 'top';
+  }, []);
+
+  const openMenu = useCallback(() => {
+    setMenuPosition(calcMenuPosition());
+    setShowMenu(true);
+  }, [calcMenuPosition]);
+
   // Long press handlers
   const handleTouchStart = (e) => {
     const touch = e.touches[0];
@@ -206,7 +219,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     longPressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
       vibrate();
-      setShowMenu(true);
+      openMenu();
     }, 300);
   };
 
