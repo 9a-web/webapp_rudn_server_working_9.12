@@ -1643,7 +1643,7 @@ const ServerTab = () => {
       setError(null);
       setHistory(prev => {
         const newPoint = {
-          time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Moscow' }),
           cpu: res.data.cpu?.percent || 0,
           ram: res.data.memory?.percent || 0,
         };
