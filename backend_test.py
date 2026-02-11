@@ -115,11 +115,11 @@ class MessageTester:
             
         # Get friend requests to find request_id
         result4 = self.test_request("GET", f"/friends/{self.user2_id}/requests", None, 200, "Get Friend Requests")
-        if not result4 or not result4.get("requests"):
+        if not result4 or not result4.get("incoming"):
             self.log("No friend requests found", False)
             return False
             
-        self.request_id = result4["requests"][0]["request_id"]
+        self.request_id = result4["incoming"][0]["request_id"]
         self.log(f"Found request_id: {self.request_id}")
         
         # Accept friend request  
