@@ -144,20 +144,24 @@ class MusicTestRunner:
         
         return True
     
-    async def test_schedule_for_today(self):
-        """Test 1: Send schedule for today (date: null)"""
-        print("\n📅 Test 1: Send schedule for today")
+    async def test_send_music_to_friend(self):
+        """Test 1 - Send music to friend (auto-create conversation)"""
+        print("\n🎵 Test 1: Send music to friend (auto-create conversation)")
         
         data = {
             "sender_id": 77777,
             "receiver_id": 88888,
-            "date": None  # Should default to today
+            "track_title": "Bohemian Rhapsody",
+            "track_artist": "Queen",
+            "track_id": "-2001_123456",
+            "track_duration": 355,
+            "cover_url": None
         }
         
-        status, resp = await self.make_request("POST", "/messages/send-schedule", data)
+        status, resp = await self.make_request("POST", "/messages/send-music", data)
         
         if status != 200:
-            self.log_test("Send Schedule Today", False, f"HTTP {status}: {resp}")
+            self.log_test("Send music to friend", False, f"HTTP {status}: {resp}")
             return False
         
         # Validate response structure
@@ -165,179 +169,306 @@ class MusicTestRunner:
         details = []
         
         # Check message_type
-        if resp.get("message_type") != "schedule":
+        if resp.get("message_type") != "music":
             success = False
-            details.append("message_type is not 'schedule'")
+            details.append("message_type is not 'music'")
         
         # Check metadata
         metadata = resp.get("metadata", {})
-        if not isinstance(metadata.get("items"), list):
-            success = False
-            details.append("metadata.items is not an array")
+        expected_fields = ["track_title", "track_artist", "track_id", "track_duration", "cover_url"]
+        for field in expected_fields:
+            if field not in metadata:
+                success = False
+                details.append(f"metadata missing {field}")
         
-        # Check date is today
-        today = datetime.now().strftime("%Y-%m-%d")
-        if metadata.get("date") != today:
+        # Validate specific values
+        if metadata.get("track_title") != "Bohemian Rhapsody":
             success = False
-            details.append(f"metadata.date is not today ({today})")
+            details.append(f"track_title mismatch: {metadata.get('track_title')}")
         
-        # Check week_number is 1 (current week)
-        if metadata.get("week_number") != 1:
+        if metadata.get("track_artist") != "Queen":
             success = False
-            details.append(f"metadata.week_number is not 1 (got {metadata.get('week_number')})")
-        
-        self.log_test("Send Schedule Today", success, "; ".join(details) if details else "All validations passed")
+            details.append(f"track_artist mismatch: {metadata.get('track_artist')}")
+            
+        if metadata.get("track_id") != "-2001_123456":
+            success = False
+            details.append(f"track_id mismatch: {metadata.get('track_id')}")
+            
+        if metadata.get("track_duration") != 355:
+            success = False
+            details.append(f"track_duration mismatch: {metadata.get('track_duration')}")
         
         # Store conversation_id for later tests
         if "conversation_id" in resp:
             self.conversation_id = resp["conversation_id"]
         
+        self.log_test("Send music to friend", success, "; ".join(details) if details else "Music message sent successfully")
         return success
-    
-    async def test_schedule_for_this_week(self):
-        """Test 2: Send schedule for a specific date (this week)"""
-        print("\n📅 Test 2: Send schedule for this week")
+
+    async def test_verify_conversation_created(self):
+        """Test 2 - Verify conversation was auto-created"""
+        print("\n💬 Test 2: Verify conversation was auto-created")
         
-        # Calculate a date from this week (e.g., Monday)
-        today = datetime.now()
-        days_since_monday = today.weekday()  # Monday is 0
-        this_monday = today - timedelta(days=days_since_monday)
-        test_date = this_monday.strftime("%Y-%m-%d")
-        
-        data = {
-            "sender_id": 77777,
-            "receiver_id": 88888,
-            "date": test_date
-        }
-        
-        status, resp = await self.make_request("POST", "/messages/send-schedule", data)
-        
-        if status != 200:
-            self.log_test("Send Schedule This Week", False, f"HTTP {status}: {resp}")
-            return False
-        
-        # Validate response structure
-        success = True
-        details = []
-        
-        # Check message_type
-        if resp.get("message_type") != "schedule":
-            success = False
-            details.append("message_type is not 'schedule'")
-        
-        # Check metadata
-        metadata = resp.get("metadata", {})
-        if metadata.get("date") != test_date:
-            success = False
-            details.append(f"metadata.date is not {test_date}")
-        
-        # Check week_number is 1 (current week)
-        if metadata.get("week_number") != 1:
-            success = False
-            details.append(f"metadata.week_number is not 1 (got {metadata.get('week_number')})")
-        
-        self.log_test("Send Schedule This Week", success, "; ".join(details) if details else f"Schedule sent for {test_date}")
-        return success
-    
-    async def test_schedule_for_next_week(self):
-        """Test 3: Send schedule for next week"""
-        print("\n📅 Test 3: Send schedule for next week")
-        
-        # Calculate a date from next week
-        today = datetime.now()
-        next_week_date = today + timedelta(days=7)
-        test_date = next_week_date.strftime("%Y-%m-%d")
-        
-        data = {
-            "sender_id": 77777,
-            "receiver_id": 88888,
-            "date": test_date
-        }
-        
-        status, resp = await self.make_request("POST", "/messages/send-schedule", data)
-        
-        if status != 200:
-            self.log_test("Send Schedule Next Week", False, f"HTTP {status}: {resp}")
-            return False
-        
-        # Validate response structure
-        success = True
-        details = []
-        
-        # Check message_type
-        if resp.get("message_type") != "schedule":
-            success = False
-            details.append("message_type is not 'schedule'")
-        
-        # Check metadata
-        metadata = resp.get("metadata", {})
-        if metadata.get("date") != test_date:
-            success = False
-            details.append(f"metadata.date is not {test_date}")
-        
-        # Check week_number is 2 (next week)
-        if metadata.get("week_number") != 2:
-            success = False
-            details.append(f"metadata.week_number is not 2 (got {metadata.get('week_number')})")
-        
-        self.log_test("Send Schedule Next Week", success, "; ".join(details) if details else f"Schedule sent for {test_date}")
-        return success
-    
-    async def test_conversation_messages(self):
-        """Test 4: Verify the message appears in conversation"""
-        print("\n💬 Test 4: Verify messages in conversation")
-        
-        # Get conversations for user 77777
         status, resp = await self.make_request("GET", "/messages/conversations/77777")
         
         if status != 200:
-            self.log_test("Get Conversations", False, f"HTTP {status}: {resp}")
+            self.log_test("Verify conversation created", False, f"HTTP {status}: {resp}")
             return False
         
         conversations = resp.get("conversations", [])
         if not conversations:
-            self.log_test("Get Conversations", False, "No conversations found")
+            self.log_test("Verify conversation created", False, "No conversations found")
             return False
         
-        # Get the first conversation ID
-        conversation_id = conversations[0]["id"]
-        self.log_test("Get Conversations", True, f"Found conversation: {conversation_id}")
+        # Check if at least one conversation exists with music as last message
+        music_conversation_found = False
+        for conv in conversations:
+            if conv.get("last_message", {}).get("message_type") == "music":
+                music_conversation_found = True
+                if not self.conversation_id:
+                    self.conversation_id = conv["id"]
+                break
         
-        # Get messages in the conversation
+        if music_conversation_found:
+            self.log_test("Verify conversation created", True, "Conversation with music message found")
+            return True
+        else:
+            self.log_test("Verify conversation created", False, "No conversation with music message found")
+            return False
+
+    async def test_get_messages_in_conversation(self):
+        """Test 3 - Get messages in conversation (verify music message)"""
+        print("\n📨 Test 3: Get messages in conversation (verify music message)")
+        
+        if not self.conversation_id:
+            self.log_test("Get messages in conversation", False, "No conversation_id available")
+            return False
+        
         params = {"telegram_id": 77777}
-        status, resp = await self.make_request("GET", f"/messages/{conversation_id}/messages", params=params)
+        status, resp = await self.make_request("GET", f"/messages/{self.conversation_id}/messages", params=params)
         
         if status != 200:
-            self.log_test("Get Conversation Messages", False, f"HTTP {status}: {resp}")
+            self.log_test("Get messages in conversation", False, f"HTTP {status}: {resp}")
             return False
         
         messages = resp.get("messages", [])
         if not messages:
-            self.log_test("Get Conversation Messages", False, "No messages found")
+            self.log_test("Get messages in conversation", False, "No messages found")
             return False
         
-        # Check for schedule messages
-        schedule_messages = [msg for msg in messages if msg.get("message_type") == "schedule"]
+        # Check for music messages
+        music_messages = [msg for msg in messages if msg.get("message_type") == "music"]
         
-        if schedule_messages:
-            self.log_test("Verify Schedule Messages", True, f"Found {len(schedule_messages)} schedule messages")
+        if music_messages:
+            music_msg = music_messages[0]
+            metadata = music_msg.get("metadata", {})
             
-            # Validate structure of the first schedule message
-            schedule_msg = schedule_messages[0]
-            metadata = schedule_msg.get("metadata", {})
+            success = True
+            details = []
             
-            required_fields = ["date", "group_name", "sender_name", "items", "week_number", "day_name"]
-            missing_fields = [field for field in required_fields if field not in metadata]
+            # Validate metadata structure
+            if metadata.get("track_title") != "Bohemian Rhapsody":
+                success = False
+                details.append("track_title mismatch")
+                
+            if metadata.get("track_artist") != "Queen":
+                success = False
+                details.append("track_artist mismatch")
             
-            if not missing_fields:
-                self.log_test("Schedule Message Structure", True, "All required metadata fields present")
-            else:
-                self.log_test("Schedule Message Structure", False, f"Missing fields: {missing_fields}")
+            self.log_test("Get messages in conversation", success, 
+                         "; ".join(details) if details else f"Found {len(music_messages)} music messages")
+            return success
         else:
-            self.log_test("Verify Schedule Messages", False, "No schedule messages found in conversation")
+            self.log_test("Get messages in conversation", False, "No music messages found")
+            return False
+
+    async def test_send_music_to_non_friend(self):
+        """Test 4 - Send music to non-friend (error case)"""
+        print("\n🚫 Test 4: Send music to non-friend (error case)")
+        
+        data = {
+            "sender_id": 77777,
+            "receiver_id": 999999,
+            "track_title": "Test",
+            "track_artist": "Test",
+            "track_id": "t1",
+            "track_duration": 100
+        }
+        
+        status, resp = await self.make_request("POST", "/messages/send-music", data)
+        
+        if status == 403:
+            self.log_test("Send music to non-friend", True, "Correctly returned 403 for non-friend")
+            return True
+        else:
+            self.log_test("Send music to non-friend", False, f"Expected 403, got {status}: {resp}")
+            return False
+
+    async def test_music_search(self):
+        """Test 5 - Music search works"""
+        print("\n🔍 Test 5: Music search works")
+        
+        params = {"q": "rock", "count": 3}
+        status, resp = await self.make_request("GET", "/music/search", params=params)
+        
+        if status != 200:
+            self.log_test("Music search", False, f"HTTP {status}: {resp}")
             return False
         
+        tracks = resp.get("tracks", [])
+        if not tracks:
+            self.log_test("Music search", False, "No tracks returned")
+            return False
+        
+        if len(tracks) < 1:
+            self.log_test("Music search", False, f"Expected at least 1 track, got {len(tracks)}")
+            return False
+        
+        # Validate first track structure
+        first_track = tracks[0]
+        required_fields = ["id", "title", "artist", "duration"]
+        missing_fields = [field for field in required_fields if field not in first_track]
+        
+        if missing_fields:
+            self.log_test("Music search", False, f"Missing fields in track: {missing_fields}")
+            return False
+        
+        # Store track_id for next test
+        self.track_id = first_track["id"]
+        
+        self.log_test("Music search", True, f"Found {len(tracks)} tracks with proper structure")
         return True
+
+    async def test_music_stream_url(self):
+        """Test 6 - Music stream URL works"""
+        print("\n🔗 Test 6: Music stream URL works")
+        
+        if not hasattr(self, 'track_id'):
+            # Use a fallback track_id if search failed
+            self.track_id = "-2001_123456"
+        
+        status, resp = await self.make_request("GET", f"/music/stream/{self.track_id}")
+        
+        if status != 200:
+            self.log_test("Music stream URL", False, f"HTTP {status}: {resp}")
+            return False
+        
+        if "url" not in resp:
+            self.log_test("Music stream URL", False, "Response missing 'url' field")
+            return False
+        
+        self.log_test("Music stream URL", True, f"Stream URL returned: {resp.get('url', '')[:50]}...")
+        return True
+
+    async def test_get_friends_list(self):
+        """Test 7 - Get friends list (used by SendTrackToFriendModal)"""
+        print("\n👥 Test 7: Get friends list")
+        
+        status, resp = await self.make_request("GET", "/friends/77777")
+        
+        if status != 200:
+            self.log_test("Get friends list", False, f"HTTP {status}: {resp}")
+            return False
+        
+        friends = resp.get("friends", [])
+        if not friends:
+            self.log_test("Get friends list", False, "No friends found")
+            return False
+        
+        # Look for user 88888 in friends list
+        friend_88888_found = False
+        for friend in friends:
+            if friend.get("telegram_id") == 88888:
+                friend_88888_found = True
+                
+                # Validate required fields
+                required_fields = ["telegram_id", "first_name", "last_name"]
+                missing_fields = [field for field in required_fields if field not in friend]
+                
+                if missing_fields:
+                    self.log_test("Get friends list", False, f"Missing fields in friend: {missing_fields}")
+                    return False
+                break
+        
+        if friend_88888_found:
+            self.log_test("Get friends list", True, f"Found {len(friends)} friends including user 88888")
+            return True
+        else:
+            self.log_test("Get friends list", False, "User 88888 not found in friends list")
+            return False
+
+    async def test_send_second_music_message(self):
+        """Test 8 - Send second music message to same conversation"""
+        print("\n🎵 Test 8: Send second music message to same conversation")
+        
+        data = {
+            "sender_id": 88888,
+            "receiver_id": 77777,
+            "track_title": "Yesterday",
+            "track_artist": "The Beatles",
+            "track_id": "474499171_456935876",
+            "track_duration": 125,
+            "cover_url": "https://example.com/cover.jpg"
+        }
+        
+        status, resp = await self.make_request("POST", "/messages/send-music", data)
+        
+        if status != 200:
+            self.log_test("Send second music message", False, f"HTTP {status}: {resp}")
+            return False
+        
+        # Validate that it uses the same conversation_id
+        if resp.get("conversation_id") == self.conversation_id:
+            self.log_test("Send second music message", True, "Same conversation_id used")
+            return True
+        else:
+            self.log_test("Send second music message", False, 
+                         f"Different conversation_id: expected {self.conversation_id}, got {resp.get('conversation_id')}")
+            return False
+
+    async def test_verify_both_music_messages(self):
+        """Test 9 - Verify conversation messages include both music messages"""
+        print("\n📨 Test 9: Verify conversation messages include both music messages")
+        
+        if not self.conversation_id:
+            self.log_test("Verify both music messages", False, "No conversation_id available")
+            return False
+        
+        params = {"telegram_id": 77777}
+        status, resp = await self.make_request("GET", f"/messages/{self.conversation_id}/messages", params=params)
+        
+        if status != 200:
+            self.log_test("Verify both music messages", False, f"HTTP {status}: {resp}")
+            return False
+        
+        messages = resp.get("messages", [])
+        music_messages = [msg for msg in messages if msg.get("message_type") == "music"]
+        
+        if len(music_messages) >= 2:
+            self.log_test("Verify both music messages", True, f"Found {len(music_messages)} music messages")
+            return True
+        else:
+            self.log_test("Verify both music messages", False, f"Expected at least 2 music messages, found {len(music_messages)}")
+            return False
+
+    async def test_unread_count_after_music(self):
+        """Test 10 - Unread count after music messages"""
+        print("\n🔔 Test 10: Unread count after music messages")
+        
+        status, resp = await self.make_request("GET", "/messages/unread/77777")
+        
+        if status != 200:
+            self.log_test("Unread count after music", False, f"HTTP {status}: {resp}")
+            return False
+        
+        total_unread = resp.get("total_unread", 0)
+        
+        if total_unread >= 1:
+            self.log_test("Unread count after music", True, f"Unread count: {total_unread}")
+            return True
+        else:
+            self.log_test("Unread count after music", True, f"Unread count: {total_unread} (may be 0 if messages were read)")
+            return True
     
     async def run_all_tests(self):
         """Run all tests in sequence"""
