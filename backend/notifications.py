@@ -134,58 +134,34 @@ class TelegramNotificationService:
         import pytz
         moscow_tz = pytz.timezone('Europe/Moscow')
         current_time = datetime.now(moscow_tz).strftime('%H:%M')
-        
-        # Иконка типа занятия
-        type_icons = {
-            'лекция': '🎓', 'лек': '🎓',
-            'практика': '✏️', 'практ': '✏️', 'пр': '✏️',
-            'семинар': '💬', 'сем': '💬',
-            'лабораторная': '🔬', 'лаб': '🔬',
-            'экзамен': '📋', 'зачет': '📋', 'зачёт': '📋',
-        }
-        type_icon = '📖'
-        if lesson_type:
-            for key, icon in type_icons.items():
-                if key in lesson_type.lower():
-                    type_icon = icon
-                    break
 
         # Выбираем фразу по времени до начала
         if minutes_before <= 5:
-            urgency = "🔴  <b>Бегом! Пара вот-вот начнётся!</b>"
+            urgency = '<tg-emoji emoji-id="5274099962655816924">🔴</tg-emoji> <b>Бегом! Пара вот-вот начнётся!</b>'
         elif minutes_before <= 15:
-            urgency = "🟡  <b>Скоро начало — пора выходить!</b>"
+            urgency = f'<tg-emoji emoji-id="5274099962655816924">🟡</tg-emoji> <b>Скоро начало!</b> Через <b>{minutes_before} мин</b>'
         else:
-            urgency = f"🟢  <b>Через {minutes_before} мин — есть время собраться</b>"
+            urgency = f'<tg-emoji emoji-id="5274099962655816924">🟢</tg-emoji> <b>Через {minutes_before} мин</b> — есть время собраться'
         
-        # Собираем красивое сообщение
+        # Собираем сообщение
         lines = []
-        lines.append("⏰  <b>Напоминание о паре</b>")
+        lines.append('<tg-emoji emoji-id="5816934234882839927">⏰</tg-emoji>  <b>Напоминание о паре</b>')
         lines.append("")
         lines.append(urgency)
         lines.append("")
-        lines.append("┌─────────────────────")
         
-        if time:
-            lines.append(f"│  🕐  <b>{time}</b>")
-        
-        lines.append(f"│  {type_icon}  <b>{discipline}</b>")
-        
+        lines.append(f'<tg-emoji emoji-id="5375163339154399459">🎓</tg-emoji>  <b>{discipline}</b>')
         if lesson_type:
-            lines.append(f"│        <i>({lesson_type})</i>")
+            lines.append(f'      <i>({lesson_type})</i>')
         
         if teacher:
-            lines.append(f"│  👨‍🏫  {teacher}")
+            lines.append(f'<tg-emoji emoji-id="5373039692574893940">👨‍🏫</tg-emoji> {teacher}')
         
         if auditory:
-            lines.append(f"│  📍  <b>{auditory}</b>")
+            lines.append(f'<tg-emoji emoji-id="5391032818111363540">📍</tg-emoji>  {auditory}')
         
         if group_name:
-            lines.append(f"│  👥  {group_name}")
-        
-        lines.append("└─────────────────────")
-        lines.append("")
-        lines.append(f"🕐 Сейчас: <b>{current_time}</b> МСК")
+            lines.append(f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji>  {group_name}')
         
         return "\n".join(lines)
     
