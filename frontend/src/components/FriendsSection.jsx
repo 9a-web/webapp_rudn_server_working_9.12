@@ -15,6 +15,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
 import { friendsAPI } from '../services/friendsAPI';
 import { messagesAPI } from '../services/messagesAPI';
+import { useFriendEvents } from '../hooks/useFriendEvents';
 import FriendCard from './FriendCard';
 import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
