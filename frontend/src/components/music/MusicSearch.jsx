@@ -117,6 +117,8 @@ export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick, onSendT
           favorites={favorites}
           onFavorite={onFavorite}
           onArtistClick={onArtistClick}
+          onSendToFriend={onSendToFriend}
+          showSendToFriend={showSendToFriend}
           emptyMessage="Ничего не найдено"
         />
       )}
