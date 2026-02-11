@@ -158,6 +158,14 @@ const Home = () => {
     loading: false
   });
   
+  // Состояние для модального окна подтверждения подключения к комнате прослушивания
+  const [listenRoomJoinModal, setListenRoomJoinModal] = useState({
+    isOpen: false,
+    inviteCode: null,
+    roomData: null,
+    loading: false
+  });
+  
   // Ref для открытия ListeningRoom из MiniPlayer
   const openListeningRoomRef = useRef(null);
   
