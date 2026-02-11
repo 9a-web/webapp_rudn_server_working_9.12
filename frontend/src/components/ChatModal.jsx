@@ -1202,9 +1202,31 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     } catch (e) { setToast('Ошибка отправки расписания'); }
   };
 
-  // Music share (placeholder)
+  // Music share — открыть пикер
   const handleSendMusic = async () => {
-    setToast('Отправьте трек из раздела Музыка');
+    setShowMusicPicker(true);
+  };
+
+  // Обработчик выбора трека для отправки
+  const handleMusicTrackSelected = async (track) => {
+    if (!friend?.telegram_id || !track) return;
+    setShowMusicPicker(false);
+    try {
+      const msg = await messagesAPI.sendMusic(currentUserId, friend.telegram_id, {
+        track_title: track.title,
+        track_artist: track.artist,
+        track_id: track.id,
+        track_duration: track.duration,
+        cover_url: track.cover || null,
+      });
+      setMessages(prev => [...prev, msg]);
+      if (msg.conversation_id && !conversationId) setConversationId(msg.conversation_id);
+      isNearBottomRef.current = true;
+      setToast('Музыка отправлена 🎵');
+    } catch (e) {
+      console.error('Send music error:', e);
+      setToast('Ошибка отправки музыки');
+    }
   };
 
   // Scroll handler
