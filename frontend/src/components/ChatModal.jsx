@@ -1469,13 +1469,23 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       }
       setToast('Приглашение отправлено!');
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
+
+      // Перенаправляем создателя в комнату прослушивания
+      if (onJoinListeningRoom && invite_code) {
+        setRoomInviteConfirm(null);
+        // Небольшая задержка чтобы пользователь увидел тост
+        setTimeout(() => {
+          onJoinListeningRoom(invite_code);
+        }, 600);
+        return;
+      }
     } catch (e) {
       console.error('Send room invite error:', e);
       setToast('Ошибка отправки приглашения');
     } finally {
       setRoomInviteConfirm(null);
     }
-  }, [roomInviteConfirm, friend, currentUserId]);
+  }, [roomInviteConfirm, friend, currentUserId, onJoinListeningRoom]);
 
   // Schedule share with date selection
   const handleSendSchedule = async (dateStr) => {
