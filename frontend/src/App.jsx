@@ -1794,11 +1794,13 @@ const Home = () => {
 
         {/* Раздел "Друзья" */}
         {activeTab === 'friends' && (
-          <FriendsSection 
-            userSettings={userSettings}
-            onFriendProfileOpen={setIsFriendProfileOpen}
-            onChatOpen={setIsChatOpen}
-          />
+          <ErrorBoundary>
+            <FriendsSection 
+              userSettings={userSettings}
+              onFriendProfileOpen={setIsFriendProfileOpen}
+              onChatOpen={setIsChatOpen}
+            />
+          </ErrorBoundary>
         )}
         
         <Suspense fallback={null}>
