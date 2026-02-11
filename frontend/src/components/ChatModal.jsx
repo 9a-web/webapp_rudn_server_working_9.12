@@ -16,7 +16,6 @@ import {
 import { messagesAPI } from '../services/messagesAPI';
 import { musicAPI } from '../services/musicAPI';
 import { usePlayer } from './music/PlayerContext';
-import { TrackCover } from './music/TrackCover';
 import { getBackendURL } from '../utils/config';
 
 /* ============ Константы ============ */
