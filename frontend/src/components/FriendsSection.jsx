@@ -995,6 +995,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
         userSettings={userSettings}
         onRemoveFriend={handleRemoveFriend}
         onToggleFavorite={handleToggleFavorite}
+        onMessage={handleOpenChat}
       />
 
       <FriendSearchModal
