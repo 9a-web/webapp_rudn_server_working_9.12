@@ -279,7 +279,7 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     longPressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
       vibrate();
-      setShowMenu(true);
+      openMenu();
     }, 300);
   };
 
