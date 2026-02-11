@@ -165,18 +165,18 @@ async def send_device_linked_notification(
         now = datetime.utcnow()
         formatted_time = now.strftime("%d.%m.%Y в %H:%M")
         
-        from notifications import animate_emoji
-        # Формируем сообщение
-        message_text = animate_emoji(
-            f"🔗  <b>Новое устройство подключено</b>\n"
-            f"\n"
-            f"┌─────────────────────\n"
-            f"│  📱  <b>{device_name}</b>\n"
-            f"│  🕐  {formatted_time} UTC\n"
-            f"└─────────────────────\n"
-            f"\n"
-            f"⚠️ <i>Если это были не вы — немедленно\n"
-            f"удалите этот сеанс кнопкой ниже.</i>"
+        # Формируем время в МСК
+        import pytz
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        moscow_time = datetime.now(moscow_tz).strftime('%H:%M')
+        
+        message_text = (
+            f'<tg-emoji emoji-id="5190422665311050410">🔗</tg-emoji>  Новое устройство подключено:\n'
+            f'\n'
+            f'<tg-emoji emoji-id="5407025283456835913">📱</tg-emoji>  <b>{device_name}</b>\n'
+            f'<tg-emoji emoji-id="5384611567125928766">🕐</tg-emoji>  {moscow_time} МСК\n'
+            f'\n'
+            f'<tg-emoji emoji-id="5283215386496488657">⚠️</tg-emoji> Если это были не вы — немедленно удалите этот сеанс кнопкой ниже.'
         )
 
         # Создаём inline-кнопку для удаления сеанса
