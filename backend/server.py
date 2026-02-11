@@ -12694,6 +12694,13 @@ async def reject_friend_request(request_id: str, telegram_id: int = Body(..., em
         )
         
         logger.info(f"👥 Friend request rejected: {request['from_telegram_id']} -> {telegram_id}")
+        
+        # SSE: уведомляем отправителя что заявка отклонена
+        await _emit_friend_event(request["from_telegram_id"], "friend_request_rejected", {
+            "by_telegram_id": telegram_id,
+            "request_id": request_id
+        })
+        
         return FriendActionResponse(
             success=True,
             message="Запрос отклонен"
