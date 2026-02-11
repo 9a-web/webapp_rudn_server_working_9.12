@@ -472,6 +472,8 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
               favorites={favorites}
               onFavorite={handleFavorite}
               onArtistClick={handleArtistClick}
+              onSendToFriend={handleSendToFriend}
+              showSendToFriend={true}
             />
           </motion.div>
         ) : (activeTab === 'my' || activeTab === 'playlists') && !isVkConnected && !checkingVkAuth && !selectedPlaylist ? (
