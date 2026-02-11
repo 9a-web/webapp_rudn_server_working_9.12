@@ -11282,6 +11282,52 @@ async def get_listening_room(room_id: str, telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/music/rooms/preview/{invite_code}")
+async def preview_listening_room_by_code(invite_code: str):
+    """
+    Получить информацию о комнате по коду приглашения (без присоединения).
+    Используется для показа модального окна подтверждения при сканировании QR.
+    """
+    try:
+        room = await db.listening_rooms.find_one({
+            "invite_code": invite_code.upper(),
+            "is_active": True
+        })
+        
+        if not room:
+            return {"found": False, "message": "Комната не найдена или уже закрыта"}
+        
+        host = next((p for p in room.get("participants", []) if p["telegram_id"] == room.get("host_id")), None)
+        host_name = host.get("first_name", "Неизвестный") if host else "Неизвестный"
+        
+        online_count = len(listening_room_connections.get(room["id"], {}))
+        
+        current_track = room.get("state", {}).get("current_track")
+        track_info = None
+        if current_track:
+            track_info = {
+                "title": current_track.get("title", ""),
+                "artist": current_track.get("artist", "")
+            }
+        
+        return {
+            "found": True,
+            "room_id": room["id"],
+            "name": room.get("name", "Комната"),
+            "host_name": host_name,
+            "host_id": room.get("host_id"),
+            "participants_count": len(room.get("participants", [])),
+            "online_count": online_count,
+            "max_participants": room.get("max_participants", 50),
+            "current_track": track_info,
+            "invite_code": room["invite_code"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Preview listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.post("/music/rooms/join/{invite_code}", response_model=JoinListeningRoomResponse)
 async def join_listening_room_by_code(invite_code: str, request: JoinListeningRoomRequest):
     """
