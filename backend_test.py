@@ -257,6 +257,15 @@ class MusicSendingTester:
         if not result2:
             return False
             
+        # Check if they're already friends
+        friends_check = self.test_request("GET", f"/friends/{self.new_user1_id}", None, 200, "Check New Users Friendship Status")
+        if friends_check and friends_check.get("friends"):
+            # Check if user2 is in friends list
+            is_friend = any(f["telegram_id"] == self.new_user2_id for f in friends_check["friends"])
+            if is_friend:
+                self.log("✅ New users 111111 and 222222 are already friends - proceeding with tests")
+                return True
+        
         # Make them friends
         friend_req_data = {"telegram_id": self.new_user1_id}
         result3 = self.test_request("POST", f"/friends/request/{self.new_user2_id}", friend_req_data, 200, "Send Friend Request (111111->222222)")
