@@ -14404,6 +14404,10 @@ async def create_task_from_message(data: TaskFromMessage):
         message = await db.messages.find_one({"id": data.message_id})
         if not message:
             raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        # Проверяем что пользователь является участником диалога
+        conv = await db.conversations.find_one({"id": message["conversation_id"]})
+        if not conv or data.telegram_id not in conv.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа к этому сообщению")
         task_text = data.title or message["text"][:200]
         notes = message["text"] if len(message["text"]) > 200 else ""
         # Используем модель TaskCreate для правильного создания задачи
