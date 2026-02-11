@@ -12730,6 +12730,13 @@ async def cancel_friend_request(request_id: str, telegram_id: int = Body(..., em
         await db.friend_requests.delete_one({"id": request_id})
         
         logger.info(f"👥 Friend request cancelled: {telegram_id} -> {request['to_telegram_id']}")
+        
+        # SSE: уведомляем получателя что заявка отменена
+        await _emit_friend_event(request["to_telegram_id"], "friend_request_cancelled", {
+            "by_telegram_id": telegram_id,
+            "request_id": request_id
+        })
+        
         return FriendActionResponse(
             success=True,
             message="Запрос отменен"
