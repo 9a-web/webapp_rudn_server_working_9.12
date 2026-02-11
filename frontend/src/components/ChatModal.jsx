@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { messagesAPI } from '../services/messagesAPI';
 import { musicAPI } from '../services/musicAPI';
-import { createListeningRoom } from '../services/listeningRoomAPI';
+import { createListeningRoom, addToListeningRoomQueue } from '../services/listeningRoomAPI';
 import { usePlayer } from './music/PlayerContext';
 import { getBackendURL } from '../utils/config';
 
