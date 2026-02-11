@@ -1389,17 +1389,27 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
             <motion.button whileTap={{ scale: 0.85 }} onClick={onClose} className="p-2 -ml-1 rounded-xl text-gray-400 hover:text-white hover:bg-white/[0.06] transition-all">
               <ArrowLeft className="w-5 h-5" />
             </motion.button>
-            <Avatar telegramId={friend.telegram_id} firstName={friend.first_name} size={40} />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-[15px] text-white truncate leading-tight">{friendName}</h3>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {typingUsers.length > 0 ? (
-                  <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] text-purple-400 font-medium">печатает...</motion.span>
-                ) : friend.is_online ? (
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />в сети</span>
-                ) : (
-                  <span className="text-[11px] text-gray-500">{friend.group_name || (friend.username ? `@${friend.username}` : '')}</span>
-                )}
+            <div
+              className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer active:opacity-70 transition-opacity"
+              onClick={() => {
+                if (onOpenProfile && friend) {
+                  try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (e) {}
+                  onOpenProfile(friend);
+                }
+              }}
+            >
+              <Avatar telegramId={friend.telegram_id} firstName={friend.first_name} size={40} />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[15px] text-white truncate leading-tight">{friendName}</h3>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {typingUsers.length > 0 ? (
+                    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] text-purple-400 font-medium">печатает...</motion.span>
+                  ) : friend.is_online ? (
+                    <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />в сети</span>
+                  ) : (
+                    <span className="text-[11px] text-gray-500">{friend.group_name || (friend.username ? `@${friend.username}` : '')}</span>
+                  )}
+                </div>
               </div>
             </div>
             <motion.button whileTap={{ scale: 0.85 }} onClick={() => setShowSearch(true)}
