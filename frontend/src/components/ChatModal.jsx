@@ -11,10 +11,11 @@ import {
   ArrowLeft, Send, Loader2, Check, CheckCheck, Trash2,
   Pin, Reply, Pencil, Forward, Search, X, ChevronDown,
   Calendar, Music, ListTodo, Smile, MoreVertical, PinOff,
-  Copy, CheckCircle2, Play, Pause
+  Copy, CheckCircle2, Play, Pause, Users, Headphones
 } from 'lucide-react';
 import { messagesAPI } from '../services/messagesAPI';
 import { musicAPI } from '../services/musicAPI';
+import { createListeningRoom } from '../services/listeningRoomAPI';
 import { usePlayer } from './music/PlayerContext';
 import { getBackendURL } from '../utils/config';
 
