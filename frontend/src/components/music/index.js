@@ -10,3 +10,4 @@ export { PlaylistCard } from './PlaylistCard';
 export { ArtistCard } from './ArtistCard';
 export { VKAuthModal } from './VKAuthModal';
 export { default as ListeningRoomModal } from './ListeningRoomModal';
+export { SendTrackToFriendModal } from './SendTrackToFriendModal';
