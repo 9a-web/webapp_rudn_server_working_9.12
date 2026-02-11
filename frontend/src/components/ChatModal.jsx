@@ -803,12 +803,18 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     if (!conversationId || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const data = await messagesAPI.getMessages(conversationId, currentUserId, 30, messages.length);
-      setMessages(prev => [...(data.messages || []).reverse(), ...prev]);
+      // Cursor-based: загружаем сообщения ДО самого старого в текущем списке
+      const oldestMsg = messages[0]; // messages отсортированы от старых к новым
+      const beforeId = oldestMsg?.id || '';
+      const data = await messagesAPI.getMessages(conversationId, currentUserId, 30, 0, beforeId);
+      const olderMsgs = (data.messages || []).reverse();
+      if (olderMsgs.length > 0) {
+        setMessages(prev => [...olderMsgs, ...prev]);
+      }
       setHasMore(data.has_more || false);
     } catch (e) { console.error(e); }
     finally { setLoadingMore(false); }
-  }, [conversationId, currentUserId, messages.length, loadingMore, hasMore]);
+  }, [conversationId, currentUserId, messages, loadingMore, hasMore]);
 
   // Send typing indicator
   const sendTypingIndicator = useCallback(() => {
