@@ -42,6 +42,9 @@ export const AttendanceModal = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [changes, setChanges] = useState({});
+  const [customGradeInput, setCustomGradeInput] = useState({}); // { studentId: '10' }
+  const [editingGradeStudent, setEditingGradeStudent] = useState(null);
+  const customInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen && sessionId) {
