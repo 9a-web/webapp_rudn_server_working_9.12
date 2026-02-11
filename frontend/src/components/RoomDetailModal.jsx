@@ -133,19 +133,22 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
     if (!room || !userSettings || !isOwner) return;
 
     // Используем window.confirm как фоллбэк если webApp.showPopup не доступен
-    const confirmDelete = webApp?.showPopup 
+    const canShowPopup = webApp?.showPopup && webApp?.isVersionAtLeast?.('6.2');
+    const confirmDelete = canShowPopup 
       ? await new Promise((resolve) => {
-          webApp.showPopup(
-            {
-              title: 'Удалить комнату?',
-              message: 'Все задачи будут удалены. Это действие нельзя отменить.',
-              buttons: [
-                { id: 'delete', type: 'destructive', text: 'Удалить' },
-                { type: 'cancel' }
-              ]
-            },
-            (buttonId) => resolve(buttonId === 'delete')
-          );
+          try {
+            webApp.showPopup(
+              {
+                title: 'Удалить комнату?',
+                message: 'Все задачи будут удалены. Это действие нельзя отменить.',
+                buttons: [
+                  { id: 'delete', type: 'destructive', text: 'Удалить' },
+                  { type: 'cancel' }
+                ]
+              },
+              (buttonId) => resolve(buttonId === 'delete')
+            );
+          } catch (e) { resolve(window.confirm('Удалить комнату? Все задачи будут удалены. Это действие нельзя отменить.')); }
         })
       : window.confirm('Удалить комнату? Все задачи будут удалены. Это действие нельзя отменить.');
 
