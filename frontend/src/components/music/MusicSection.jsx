@@ -352,6 +352,12 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
     setVkAuthModalOpen(true);
   };
 
+  // Отправить трек другу
+  const handleSendToFriend = useCallback((track) => {
+    setTrackToSend(track);
+    setSendTrackModalOpen(true);
+  }, []);
+
   return (
     <div className="pb-36">
       {/* Компактная кнопка "Получить токен" - показывается на ВСЕХ вкладках КРОМЕ "Мои" и "Плейлисты" (если VK не подключен) */}
