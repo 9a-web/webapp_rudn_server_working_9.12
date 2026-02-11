@@ -161,10 +161,6 @@ async def send_device_linked_notification(
     try:
         bot = Bot(token=TELEGRAM_BOT_TOKEN)
         
-        # Форматируем время подключения
-        now = datetime.utcnow()
-        formatted_time = now.strftime("%d.%m.%Y в %H:%M")
-        
         # Формируем время в МСК
         import pytz
         moscow_tz = pytz.timezone('Europe/Moscow')
