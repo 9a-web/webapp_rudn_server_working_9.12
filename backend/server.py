@@ -14377,6 +14377,18 @@ async def send_music_message(data: MusicShareMessage):
         }
         await db.messages.insert_one(message_doc)
         await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        # In-app notification for music message
+        try:
+            sender_name = await get_user_name(data.sender_id)
+            await db.in_app_notifications.insert_one({
+                "id": str(uuid.uuid4()), "telegram_id": data.receiver_id,
+                "type": "new_message", "category": "social", "priority": "normal",
+                "title": f"Музыка от {sender_name}", "message": f"🎵 {data.track_artist} — {data.track_title}", "emoji": "🎵",
+                "data": {"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+                "is_read": False, "created_at": now,
+            })
+        except Exception as ne:
+            logger.warning(f"Music notification error: {ne}")
         return build_message_response(message_doc)
     except HTTPException:
         raise
