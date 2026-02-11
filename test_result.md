@@ -19,7 +19,9 @@ Fix music sending in chat (Friends > Messages tab) and add ability to send music
 5. **MusicSection.jsx** — Added `SendTrackToFriendModal` integration with `handleSendToFriend` handler.
 6. **NEW: SendTrackToFriendModal.jsx** — Friend selection modal for sending music (auto-creates conversation if needed).
 
-### Backend Endpoints for Real-time (SSE):
+### Schedule Sending Fix:
+The week_number calculation was wrong (used ISO week parity instead of current/next week comparison).
+Fixed to compare target date's week with current week to determine correct RUDN table tab.
 - `GET /api/friends/events/{telegram_id}` — SSE stream for friend events
 - Events emitted on: send_request, accept, reject, cancel, remove, block
 
