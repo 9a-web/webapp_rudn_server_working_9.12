@@ -19,7 +19,6 @@ import FriendCard from './FriendCard';
 import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
 import ChatModal from './ChatModal';
-import ConversationsListModal from './ConversationsListModal';
 import { getBackendURL } from '../utils/config';
 
 // Русское склонение
