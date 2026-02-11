@@ -9,7 +9,53 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Add comprehensive journal editing functionality (Edit Journal, Edit Subject, Edit Session).
+Add messaging/dialog function between friends in the Friends section.
+
+### Changes Made:
+**New backend endpoints:**
+- POST /api/messages/conversations - Create or get existing conversation between two friends
+- GET /api/messages/conversations/{telegram_id} - Get all conversations for a user
+- GET /api/messages/{conversation_id}/messages - Get messages in a conversation (with pagination)
+- POST /api/messages/send - Send a message to a friend
+- PUT /api/messages/{conversation_id}/read - Mark messages as read
+- DELETE /api/messages/{message_id} - Delete a message (soft delete)
+- GET /api/messages/unread/{telegram_id} - Get unread message count
+
+**New MongoDB collections:** conversations, messages (with indexes)
+
+**New Pydantic models in models.py:**
+- MessageCreate, MessageResponse, ConversationCreate, ConversationParticipant
+- ConversationResponse, ConversationsListResponse, MessagesListResponse
+- MessagesUnreadCountResponse, MessageActionResponse
+
+**New frontend files:**
+- frontend/src/services/messagesAPI.js - API service for messages
+- frontend/src/components/ChatModal.jsx - Full chat interface with bubbles, animations
+- frontend/src/components/ConversationsListModal.jsx - Conversations list modal
+
+**Modified frontend files:**
+- FriendCard.jsx - Added MessageCircle button (onMessage prop)
+- FriendsSection.jsx - Added Messages button in header with unread badge, wired ChatModal and ConversationsListModal
+- FriendProfileModal.jsx - Added "Написать сообщение" button (onMessage prop)
+
+### Backend Test Plan:
+Prerequisites:
+1. Create two users: POST /api/user-settings with telegram_id 55555 and 66666
+2. Make them friends via POST /api/friends/request/66666 then POST /api/friends/accept/{request_id}
+
+Tests:
+1. GET /api/messages/unread/55555 → expect total_unread: 0
+2. POST /api/messages/conversations with {user1_id: 55555, user2_id: 66666} → expect conversation created
+3. POST /api/messages/send with {sender_id: 55555, receiver_id: 66666, text: "Hello!"} → expect message
+4. POST /api/messages/send with {sender_id: 66666, receiver_id: 55555, text: "Hi back!"} → expect message
+5. GET /api/messages/{conversation_id}/messages?telegram_id=55555 → expect 2 messages
+6. GET /api/messages/unread/55555 → expect total_unread: 1 (from 66666)
+7. PUT /api/messages/{conversation_id}/read with {telegram_id: 55555} → expect success
+8. GET /api/messages/unread/55555 → expect total_unread: 0
+9. DELETE /api/messages/{message_id} with {telegram_id: 55555} → expect success (soft delete)
+10. GET /api/messages/conversations/55555 → expect 1 conversation
+11. POST /api/messages/send with non-friends (sender_id: 55555, receiver_id: 99999) → expect 403
+12. POST /api/messages/conversations with {user1_id: 55555, user2_id: 55555} → expect 400
 
 ### Changes Made:
 **New files:**
