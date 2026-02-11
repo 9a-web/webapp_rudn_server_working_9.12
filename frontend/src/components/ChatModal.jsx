@@ -129,7 +129,7 @@ const ReactionBar = ({ isOpen, onSelect, onClose, position }) => {
 };
 
 /* ============ Context Menu ============ */
-const MessageContextMenu = ({ isOpen, onClose, message, isMine, actions }) => {
+const MessageContextMenu = ({ isOpen, onClose, message, isMine, actions, position = 'top' }) => {
   const ref = useRef(null);
   useEffect(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -149,9 +149,14 @@ const MessageContextMenu = ({ isOpen, onClose, message, isMine, actions }) => {
     ...(isMine ? [{ icon: Trash2, label: 'Удалить', action: 'delete', color: 'text-red-400' }] : []),
   ];
 
+  const isBelow = position === 'bottom';
+
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, scale: 0.85, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.85 }}
-      className={`absolute ${isMine ? 'right-0' : 'left-10'} bottom-full mb-2 z-[99990] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[180px]`}
+    <motion.div ref={ref}
+      initial={{ opacity: 0, scale: 0.85, y: isBelow ? 8 : -8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.85 }}
+      className={`absolute ${isMine ? 'right-0' : 'left-10'} ${isBelow ? 'top-full mt-2' : 'bottom-full mb-2'} z-[99990] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[180px] max-h-[70vh] overflow-y-auto`}
       style={{ backgroundColor: '#14141e' }}>
       {items.map(item => (
         <button key={item.action} onClick={() => { actions(item.action); onClose(); }}
