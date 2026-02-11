@@ -600,6 +600,8 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
               favorites={favorites}
               onFavorite={handleFavorite}
               onArtistClick={handleArtistClick}
+              onSendToFriend={handleSendToFriend}
+              showSendToFriend={true}
               emptyMessage={
                 activeTab === 'favorites' 
                   ? 'Нет избранных треков' 
