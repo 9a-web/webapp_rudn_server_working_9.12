@@ -19,6 +19,17 @@ const GRADE_COLORS = {
   1: { bg: 'bg-red-500', text: 'text-red-400', bgLight: 'bg-red-500/20' },
 };
 
+// Цвета для произвольных оценок
+const getGradeColors = (grade) => {
+  if (GRADE_COLORS[grade]) return GRADE_COLORS[grade];
+  // fallback для произвольных значений
+  if (grade >= 5) return { bg: 'bg-green-500', text: 'text-green-400', bgLight: 'bg-green-500/20' };
+  if (grade >= 4) return { bg: 'bg-lime-500', text: 'text-lime-400', bgLight: 'bg-lime-500/20' };
+  if (grade >= 3) return { bg: 'bg-yellow-500', text: 'text-yellow-400', bgLight: 'bg-yellow-500/20' };
+  if (grade >= 2) return { bg: 'bg-orange-500', text: 'text-orange-400', bgLight: 'bg-orange-500/20' };
+  return { bg: 'bg-red-500', text: 'text-red-400', bgLight: 'bg-red-500/20' };
+};
+
 export const AttendanceModal = ({ 
   isOpen, 
   onClose, 
