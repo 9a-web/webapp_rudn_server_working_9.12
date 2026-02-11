@@ -995,7 +995,17 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-    if (e.key === 'Escape') { setReplyTo(null); setEditingMessage(null); setInputText(''); }
+    if (e.key === 'Escape') {
+      if (editingMessage) {
+        setEditingMessage(null);
+        setInputText(preEditText); // Восстанавливаем текст до редактирования
+        setPreEditText('');
+      } else {
+        setReplyTo(null);
+        setInputText('');
+      }
+      resetTextareaHeight();
+    }
   };
 
   if (!friend) return null;
