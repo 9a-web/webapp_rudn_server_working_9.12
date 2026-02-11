@@ -2347,6 +2347,13 @@ class MessageCreate(BaseModel):
     reply_to_id: Optional[str] = None
     metadata: Optional[dict] = None
 
+    @field_validator('text')
+    @classmethod
+    def text_must_not_be_blank(cls, v):
+        if not v.strip():
+            raise ValueError('Сообщение не может быть пустым')
+        return v
+
 class MessageEdit(BaseModel):
     """Редактирование сообщения"""
     telegram_id: int
