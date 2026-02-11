@@ -1409,14 +1409,11 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       case 'join_room': {
         // message here is the room_invite message with metadata
         const meta = message?.metadata || {};
-        if (meta.invite_code) {
+        if (meta.invite_code && onJoinListeningRoom) {
           try {
             window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium');
           } catch (e) {}
-          // Navigate to listening room
-          const roomUrl = meta.invite_link || `#listen_${meta.invite_code}`;
-          window.location.hash = `listen_${meta.invite_code}`;
-          setToast('Присоединяюсь к комнате...');
+          onJoinListeningRoom(meta.invite_code);
         }
         break;
       }
