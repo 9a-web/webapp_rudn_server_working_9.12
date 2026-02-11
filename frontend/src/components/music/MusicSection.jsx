@@ -67,6 +67,16 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
     onListeningRoomOpenChange?.(listeningRoomModalOpen);
   }, [listeningRoomModalOpen, onListeningRoomOpenChange]);
 
+  // Обработка приглашения в комнату прослушивания из чата
+  useEffect(() => {
+    if (pendingListenInvite) {
+      setListeningRoomModalOpen(true);
+      // Передаём invite code через activeListeningRoom
+      setActiveListeningRoom({ invite_code: pendingListenInvite });
+      onListenInviteHandled?.();
+    }
+  }, [pendingListenInvite, onListenInviteHandled]);
+
   // Используем useRef для offset чтобы избежать race conditions
   const offsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
