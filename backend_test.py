@@ -164,7 +164,7 @@ class MessageTester:
         result2 = self.test_request("POST", "/messages/send", normal_msg_data, 200, "2. Send Test Message")
         if not result2:
             return False
-        self.message_ids.append(result2.get("message_id"))
+        self.message_ids.append(result2.get("id"))
         
         # Get conversation_id from first message
         if not self.conversation_id and result2:
