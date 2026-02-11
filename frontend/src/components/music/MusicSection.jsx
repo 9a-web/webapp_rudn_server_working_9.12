@@ -663,6 +663,14 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, openListen
         onActiveRoomChange={setActiveListeningRoom}
       />
       
+      {/* Send Track to Friend Modal */}
+      <SendTrackToFriendModal
+        isOpen={sendTrackModalOpen}
+        onClose={() => { setSendTrackModalOpen(false); setTrackToSend(null); }}
+        track={trackToSend}
+        telegramId={telegramId}
+      />
+      
       {/* Floating Button for Listening Room - Premium Style */}
       <motion.div
         initial={{ scale: 0, opacity: 0 }}
