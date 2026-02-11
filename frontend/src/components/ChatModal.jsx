@@ -173,6 +173,8 @@ const MessageContextMenu = ({ isOpen, onClose, message, isMine, actions, positio
 const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst, isLast, currentUserId, highlightId }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [menuPosition, setMenuPosition] = useState('top');
+  const bubbleRef = useRef(null);
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const isHighlighted = highlightId === message.id;
