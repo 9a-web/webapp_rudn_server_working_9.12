@@ -14344,23 +14344,41 @@ async def create_task_from_message(data: TaskFromMessage):
         message = await db.messages.find_one({"id": data.message_id})
         if not message:
             raise HTTPException(status_code=404, detail="Сообщение не найдено")
-        title = data.title or message["text"][:100]
-        task_id = str(uuid.uuid4())
+        task_text = data.title or message["text"][:200]
+        notes = message["text"] if len(message["text"]) > 200 else ""
+        # Используем модель TaskCreate для правильного создания задачи
+        max_order_task = await db.tasks.find_one(
+            {"telegram_id": data.telegram_id},
+            sort=[("order", -1)]
+        )
+        next_order = (max_order_task.get("order", -1) + 1) if max_order_task else 0
         now = datetime.utcnow()
-        task_doc = {
-            "id": task_id,
+        task_dict = {
+            "id": str(uuid.uuid4()),
             "telegram_id": data.telegram_id,
-            "title": title,
-            "description": message["text"] if len(message["text"]) > 100 else "",
+            "text": task_text,
             "completed": False,
+            "completed_at": None,
+            "skipped": False,
+            "category": None,
             "priority": "medium",
+            "deadline": None,
+            "target_date": None,
+            "subject": None,
+            "discipline_id": None,
+            "notes": notes,
+            "subtasks": [],
+            "time_start": None,
+            "time_end": None,
+            "is_fixed": False,
+            "origin": "message",
+            "source_task_id": None,
+            "order": next_order,
             "created_at": now,
             "updated_at": now,
-            "source": "message",
-            "source_message_id": data.message_id,
         }
-        await db.tasks.insert_one(task_doc)
-        return {"success": True, "message": "Задача создана", "task_id": task_id, "title": title}
+        await db.tasks.insert_one(task_dict)
+        return {"success": True, "message": "Задача создана", "task_id": task_dict["id"], "text": task_text}
     except HTTPException:
         raise
     except Exception as e:
