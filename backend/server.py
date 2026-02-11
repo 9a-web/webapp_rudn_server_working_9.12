@@ -12830,6 +12830,12 @@ async def block_user(target_telegram_id: int, telegram_id: int = Body(..., embed
         await update_friends_stats(target_telegram_id)
         
         logger.info(f"🚫 User blocked: {telegram_id} blocked {target_telegram_id}")
+        
+        # SSE: уведомляем заблокированного пользователя
+        await _emit_friend_event(target_telegram_id, "user_blocked", {
+            "by_telegram_id": telegram_id
+        })
+        
         return FriendActionResponse(
             success=True,
             message="Пользователь заблокирован"
