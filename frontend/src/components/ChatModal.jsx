@@ -434,6 +434,71 @@ const SearchPanel = ({ isOpen, onClose, conversationId, telegramId, onScrollToMe
   );
 };
 
+/* ============ Schedule Date Picker ============ */
+const ScheduleDatePicker = ({ isOpen, onClose, onSend }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    if (isOpen) document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  // Генерация дней (сегодня + 6 дней вперёд)
+  const days = [];
+  const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const monthNames = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    days.push({
+      date: d.toISOString().split('T')[0],
+      day: d.getDate(),
+      dayName: dayNames[d.getDay()],
+      monthName: monthNames[d.getMonth()],
+      isToday: i === 0,
+      isTomorrow: i === 1,
+    });
+  }
+
+  return (
+    <motion.div ref={ref} initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
+      className="absolute bottom-full left-0 right-0 mb-2 mx-2 bg-gray-900/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Calendar className="w-5 h-5 text-blue-400" />
+        <h3 className="text-[15px] font-semibold text-white">Отправить расписание</h3>
+      </div>
+      <p className="text-[12px] text-gray-500 mb-3">Выберите день:</p>
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {days.map(d => (
+          <motion.button key={d.date} whileTap={{ scale: 0.92 }}
+            onClick={() => { onSend(d.date); onClose(); }}
+            className={`relative p-3 rounded-xl border text-center transition-all hover:border-blue-500/40 hover:bg-blue-500/10 ${
+              d.isToday ? 'border-blue-500/30 bg-blue-500/[0.08]' : 'border-white/[0.06] bg-white/[0.03]'
+            }`}>
+            <p className="text-[11px] text-gray-500 mb-0.5">{d.isToday ? 'Сегодня' : d.isTomorrow ? 'Завтра' : d.dayName}</p>
+            <p className="text-[18px] font-bold text-white">{d.day}</p>
+            <p className="text-[10px] text-gray-500">{d.monthName}</p>
+          </motion.button>
+        ))}
+        {/* Кнопка "Вся неделя" */}
+        <motion.button whileTap={{ scale: 0.92 }}
+          onClick={() => {
+            const dates = days.map(d => d.date);
+            onSend(dates.join(','));
+            onClose();
+          }}
+          className="p-3 rounded-xl border border-purple-500/20 bg-purple-500/[0.06] text-center transition-all hover:border-purple-500/40 hover:bg-purple-500/10">
+          <p className="text-[11px] text-purple-400 mb-0.5">Всю</p>
+          <p className="text-[16px] font-bold text-purple-300">📅</p>
+          <p className="text-[10px] text-purple-400">неделю</p>
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
+
 /* ============ Attach Menu ============ */
 const AttachMenu = ({ isOpen, onClose, onAction }) => {
   const ref = useRef(null);
