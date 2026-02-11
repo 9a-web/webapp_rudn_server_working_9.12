@@ -12550,6 +12550,15 @@ async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(.
             await check_and_award_achievements(db, telegram_id, stats)
             
             friend_card = await build_friend_card(target_user, telegram_id, datetime.utcnow())
+            
+            # SSE: уведомляем обе стороны о взаимной дружбе
+            await _emit_friend_event(telegram_id, "friend_request_mutual_accepted", {
+                "friend_telegram_id": target_telegram_id
+            })
+            await _emit_friend_event(target_telegram_id, "friend_request_mutual_accepted", {
+                "friend_telegram_id": telegram_id
+            })
+            
             return FriendActionResponse(
                 success=True,
                 message="Запрос принят, вы теперь друзья!",
