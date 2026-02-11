@@ -112,7 +112,9 @@ const getAvatarGradient = (id) => {
 const getConversationTimeAgo = (dateStr) => {
   if (!dateStr) return '';
   const now = new Date();
-  const d = new Date(dateStr);
+  // Сервер хранит UTC без суффикса Z — добавляем
+  const raw = String(dateStr);
+  const d = new Date(raw.endsWith('Z') || raw.includes('+') ? raw : raw + 'Z');
   const diffMs = now - d;
   const diffMin = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
