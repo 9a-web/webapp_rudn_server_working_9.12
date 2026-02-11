@@ -236,13 +236,43 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
 
   const handleCloseChat = useCallback(() => {
     setChatFriend(null);
-    // Обновляем счётчик непрочитанных
+    // Обновляем счётчик непрочитанных и список диалогов
     if (user?.id) {
       messagesAPI.getUnreadCount(user.id).then(data => {
         setUnreadMessagesCount(data.total_unread || 0);
       }).catch(() => {});
+      messagesAPI.getConversations(user.id).then(data => {
+        setConversations(data.conversations || []);
+      }).catch(() => {});
     }
   }, [user?.id]);
+
+  // Загрузка диалогов при переключении на вкладку "Сообщения"
+  const loadConversations = useCallback(async () => {
+    if (!user?.id) return;
+    setConversationsLoading(true);
+    try {
+      const data = await messagesAPI.getConversations(user.id);
+      setConversations(data.conversations || []);
+    } catch (e) {
+      console.error('Load conversations error:', e);
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'messages' && user?.id) {
+      loadConversations();
+    }
+  }, [activeTab, user?.id, loadConversations]);
+
+  // Polling для обновления диалогов
+  useEffect(() => {
+    if (activeTab !== 'messages' || !user?.id) return;
+    const interval = setInterval(loadConversations, 5000);
+    return () => clearInterval(interval);
+  }, [activeTab, user?.id, loadConversations]);
 
   // === Синхронизация с NotificationsPanel через CustomEvent ===
   useEffect(() => {
