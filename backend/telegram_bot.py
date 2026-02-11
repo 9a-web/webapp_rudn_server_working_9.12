@@ -398,15 +398,16 @@ async def send_room_join_notifications(bot, room_data: dict, new_user_name: str,
     
     # Отправляем уведомление новому участнику
     try:
-        from notifications import animate_emoji
-        new_member_message = animate_emoji(f"""🎉 <b>Добро пожаловать в комнату!</b>
-
-👥 Комната: <b>{room_name}</b>
-👥 Участников: {len(participants)}
-
-✅ Вы успешно присоединились к командной комнате для совместного выполнения задач!
-
-<i>Откройте приложение, чтобы увидеть задачи комнаты 👇</i>""")
+        new_member_message = (
+            f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
+            f'\n'
+            f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+            f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
+            f'\n'
+            f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
+            f'\n'
+            f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
+        )
         
         await bot.send_message(
             chat_id=new_user_id,
@@ -426,14 +427,13 @@ async def send_room_join_notifications(bot, room_data: dict, new_user_name: str,
             continue
         
         try:
-            from notifications import animate_emoji as _anim_bot
-            existing_member_message = _anim_bot(f"""👋 <b>Новый участник в комнате!</b>
-
-👥 Комната: <b>{room_name}</b>
-✨ К команде присоединился: <b>{new_user_name}</b>
-👥 Всего участников: {len(participants)}
-
-<i>Продолжайте выполнять задачи вместе! 💪</i>""")
+            existing_member_message = (
+                f'<tg-emoji emoji-id="5170203290721321766">👋</tg-emoji> <b>Новый участник в комнате!</b>\n'
+                f'\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+                f'<tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> К команде присоединился: <b>{new_user_name}</b>\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Всего участников: {len(participants)}'
+            )
             
             await bot.send_message(
                 chat_id=participant_id,
