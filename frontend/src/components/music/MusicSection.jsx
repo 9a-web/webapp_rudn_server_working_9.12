@@ -501,18 +501,26 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, onSendTrac
             className="music-welcome-card relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-2xl overflow-hidden"
             style={{ aspectRatio: 'auto', minHeight: '70vh', marginTop: '15px' }}
           >
+            {/* Прелоадер пока изображение не загрузилось */}
+            {!welcomeImageLoaded && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1c1c1e]">
+                <div className="w-8 h-8 border-2 border-orange-400/30 border-t-orange-400 rounded-full animate-spin" />
+              </div>
+            )}
             {/* Фоновое изображение: мобильное и десктопное */}
             <img 
               src="/music-welcome-owl-mobile.png" 
               alt="" 
               className="absolute inset-0 w-full h-full object-cover md:hidden"
               style={{ objectPosition: '58% center' }}
+              onLoad={() => setWelcomeImageLoaded(true)}
             />
             <img 
               src="/music-welcome-owl.png" 
               alt="" 
               className="absolute inset-0 w-full h-full object-cover hidden md:block"
               style={{ objectPosition: '58% center' }}
+              onLoad={() => setWelcomeImageLoaded(true)}
             />
             {/* Затемнение для читаемости текста */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
