@@ -1284,10 +1284,15 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
       const dates = dateStr.split(',').filter(Boolean);
       for (const date of dates) {
         const msg = await messagesAPI.sendSchedule(currentUserId, friend.telegram_id, date);
-        setMessages(prev => [...prev, msg]);
+        if (msg && msg.id) {
+          setMessages(prev => [...prev, msg]);
+        }
       }
       setToast(dates.length > 1 ? `Расписание на ${dates.length} дней отправлено` : 'Расписание отправлено');
-    } catch (e) { setToast('Ошибка отправки расписания'); }
+    } catch (e) {
+      console.error('Send schedule error:', e);
+      setToast('Ошибка отправки расписания');
+    }
   };
 
   // Music share — открыть пикер
