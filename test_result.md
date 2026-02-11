@@ -9,7 +9,12 @@
 - Apply user feedback directly without asking clarifying questions
 
 ## Current Task
-Fix music sending in chat (Friends > Messages tab) and add ability to send music to friend from Music section.
+Fix music sending feature from Music section to friend's DM. Improve MusicCardPlayable for playback in chat.
+
+### Changes Made (Current Session - Music Sending Fix):
+1. **TrackCard.jsx** — Made Send-to-friend button more visible (larger, purple highlight, hover bg)
+2. **SendTrackToFriendModal.jsx** — Added success message display, improved track data mapping with fallbacks (track.title || track.track_title), added error handling for friend loading, added success toast
+3. **ChatModal.jsx** — Improved MusicCardPlayable: added loading state spinner, error state display, async play handler, useMemo for trackObj, better styling for isMine messages, image error handling
 
 ### Changes Made (Music Sending Feature):
 1. **ChatModal.jsx** — Replaced placeholder `handleSendMusic` toast with `ChatMusicPicker` component (music search within chat). Added `MusicCardPlayable` component for playing music directly from chat messages.
