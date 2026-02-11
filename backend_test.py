@@ -9,8 +9,8 @@ import asyncio
 import json
 from typing import Dict, Any
 
-# Backend URL from frontend/.env 
-BASE_URL = "https://music-chat-party.preview.emergentagent.com/api"
+# Backend URL - using localhost since external routing has issues
+BASE_URL = "http://localhost:8001/api"
 
 class BackendTester:
     def __init__(self):
