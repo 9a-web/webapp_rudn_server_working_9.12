@@ -10,6 +10,7 @@ import { ArtistCard } from './ArtistCard';
 import { usePlayer } from './PlayerContext';
 import { VKAuthModal } from './VKAuthModal';
 import ListeningRoomModal from './ListeningRoomModal';
+import { SendTrackToFriendModal } from './SendTrackToFriendModal';
 
 // Стили анимации пульсации
 const pulseAnimation = {
