@@ -70,7 +70,6 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
     
     // Если фото не загрузилось, пробуем загрузить снова
     if (photoError && user?.id) {
-      console.log('Retrying profile photo load...');
       photoLoadedRef.current = false;
       setPhotoError(false);
       setProfilePhoto(null);
