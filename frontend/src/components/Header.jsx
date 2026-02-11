@@ -476,9 +476,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                   alt="Profile Avatar" 
                   className="w-full h-full object-cover rounded-full relative z-10"
                   style={{ objectPosition: 'center' }}
-                  onLoad={() => {
-                    console.log('Profile photo loaded into img element');
-                  }}
+                  onLoad={() => {}}
                   onError={(e) => {
                     // Фото не загрузилось — тихо показываем иконку
                     setPhotoError(true);
