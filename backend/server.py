@@ -12229,6 +12229,82 @@ async def add_to_listening_room_queue(room_id: str, telegram_id: int, track: dic
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ SSE система реального времени для друзей ============
+
+import json as _json
+
+# In-memory хранилище подписчиков: { telegram_id: [asyncio.Queue, ...] }
+_friend_event_subscribers: dict[int, list[asyncio.Queue]] = {}
+
+def _subscribe_friend_events(telegram_id: int) -> asyncio.Queue:
+    """Подписаться на события друзей для пользователя"""
+    q = asyncio.Queue(maxsize=50)
+    if telegram_id not in _friend_event_subscribers:
+        _friend_event_subscribers[telegram_id] = []
+    _friend_event_subscribers[telegram_id].append(q)
+    return q
+
+def _unsubscribe_friend_events(telegram_id: int, q: asyncio.Queue):
+    """Отписаться от событий"""
+    if telegram_id in _friend_event_subscribers:
+        try:
+            _friend_event_subscribers[telegram_id].remove(q)
+        except ValueError:
+            pass
+        if not _friend_event_subscribers[telegram_id]:
+            del _friend_event_subscribers[telegram_id]
+
+async def _emit_friend_event(telegram_id: int, event_type: str, data: dict = None):
+    """Отправить событие пользователю"""
+    if telegram_id not in _friend_event_subscribers:
+        return
+    payload = _json.dumps({"type": event_type, "data": data or {}}, ensure_ascii=False, default=str)
+    dead_queues = []
+    for q in _friend_event_subscribers[telegram_id]:
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead_queues.append(q)
+    for dq in dead_queues:
+        _unsubscribe_friend_events(telegram_id, dq)
+
+
+@api_router.get("/friends/events/{telegram_id}")
+async def friend_events_sse(telegram_id: int, request: Request):
+    """SSE endpoint для real-time обновлений друзей"""
+    q = _subscribe_friend_events(telegram_id)
+
+    async def event_generator():
+        try:
+            # Отправляем начальный ping
+            yield f"data: {_json.dumps({'type': 'connected'})}\n\n"
+            while True:
+                # Проверяем отключение клиента
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"data: {payload}\n\n"
+                except asyncio.TimeoutError:
+                    # Heartbeat каждые 25 сек чтобы соединение не закрылось
+                    yield f"data: {_json.dumps({'type': 'ping'})}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _unsubscribe_friend_events(telegram_id, q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
 # ============ API для системы друзей (Friends) ============
 
 # Вспомогательные функции для друзей
