@@ -113,8 +113,8 @@ class MusicTestRunner:
         # Step 4: Get requests - GET /api/friends/88888/requests 
         status, requests_resp = await self.make_request("GET", "/friends/88888/requests")
         
-        if status == 200 and requests_resp.get("requests"):
-            self.request_id = requests_resp["requests"][0]["id"]
+        if status == 200 and requests_resp.get("incoming"):
+            self.request_id = requests_resp["incoming"][0]["request_id"]  # Note: request_id field
             self.log_test("Get friend requests", True, f"Found request: {self.request_id}")
             
             # Step 5: Accept - POST /api/friends/accept/{request_id} with body {"telegram_id": 88888}
