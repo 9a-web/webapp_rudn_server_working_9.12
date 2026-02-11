@@ -1,506 +1,399 @@
 #!/usr/bin/env python3
 """
-Music Sending API Testing Script
-Tests music sending via messages API on http://localhost:8001
-
-Usage: python backend_test.py
+Backend Test for SSE (Server-Sent Events) Friend Events System
+Testing the SSE friend events system on http://localhost:8001
 """
-
-import requests
+import asyncio
 import json
-import sys
-from typing import Optional, Dict, Any
+import requests
 import time
-import uuid
-from datetime import datetime
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Any
+import urllib3
 
-# Base URL as specified in the review request
-BASE_URL = "http://localhost:8001/api"
+# Disable SSL warnings for localhost
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-class MusicSendingTester:
+class SSEClient:
+    """SSE Client for testing Server-Sent Events"""
+    
+    def __init__(self, url: str):
+        self.url = url
+        self.events = []
+        self.running = False
+        self.thread = None
+        
+    def start_listening(self, timeout: int = 30):
+        """Start listening to SSE stream with timeout"""
+        self.running = True
+        self.thread = threading.Thread(target=self._listen, args=(timeout,))
+        self.thread.start()
+        # Give a moment for connection to establish
+        time.sleep(1)
+        
+    def _listen(self, timeout: int):
+        """Listen to SSE stream"""
+        try:
+            response = requests.get(
+                self.url,
+                stream=True,
+                timeout=timeout,
+                headers={'Accept': 'text/event-stream'}
+            )
+            
+            for line in response.iter_lines(decode_unicode=True):
+                if not self.running:
+                    break
+                    
+                if line and line.startswith('data: '):
+                    try:
+                        data = json.loads(line[6:])  # Remove 'data: ' prefix
+                        self.events.append(data)
+                        print(f"SSE Event received: {data}")
+                    except json.JSONDecodeError as e:
+                        print(f"Failed to parse SSE event: {line}, error: {e}")
+                        
+        except requests.RequestException as e:
+            if self.running:  # Only log if we're still supposed to be running
+                print(f"SSE Connection error: {e}")
+                
+    def stop_listening(self):
+        """Stop listening to SSE stream"""
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=2)
+            
+    def get_events(self) -> List[Dict[str, Any]]:
+        """Get all received events"""
+        return self.events.copy()
+    
+    def wait_for_event(self, event_type: str, timeout: int = 10) -> Dict[str, Any]:
+        """Wait for a specific event type"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            for event in self.events:
+                if event.get('type') == event_type:
+                    return event
+            time.sleep(0.1)
+        return None
+
+class BackendTester:
+    """Backend tester for SSE friend events system"""
+    
     def __init__(self):
+        self.base_url = "http://localhost:8001/api"
+        self.test_results = []
         self.session = requests.Session()
-        self.existing_user1_id = 77777
-        self.existing_user2_id = 88888
-        self.new_user1_id = 111111
-        self.new_user2_id = 222222
-        self.non_friend_user_id = 999999
-        self.conversation_id = None
-        self.message_ids = []
-        self.request_id = None
-        self.results = []
         
-    def log(self, message: str, success: bool = True):
-        """Log test results"""
-        status = "✅" if success else "❌"
-        print(f"{status} {message}")
-        self.results.append({"message": message, "success": success})
+    def log_result(self, test_name: str, passed: bool, details: str = ""):
+        """Log test result"""
+        status = "✅ PASSED" if passed else "❌ FAILED"
+        result = f"{status}: {test_name}"
+        if details:
+            result += f" - {details}"
+        print(result)
+        self.test_results.append({
+            "test": test_name,
+            "passed": passed,
+            "details": details
+        })
         
-    def test_request(self, method: str, endpoint: str, data: Optional[Dict[Any, Any]] = None, 
-                    expected_status: int = 200, test_name: str = "") -> Optional[Dict[Any, Any]]:
-        """Make test request and validate response"""
-        url = f"{BASE_URL}{endpoint}"
-        
+    def make_request(self, method: str, endpoint: str, data: Dict = None, timeout: int = 10) -> requests.Response:
+        """Make HTTP request to backend"""
+        url = f"{self.base_url}{endpoint}"
         try:
             if method.upper() == "GET":
-                response = self.session.get(url)
+                return self.session.get(url, timeout=timeout)
             elif method.upper() == "POST":
-                response = self.session.post(url, json=data)
-            elif method.upper() == "PUT":
-                response = self.session.put(url, json=data)
+                return self.session.post(url, json=data, timeout=timeout)
             elif method.upper() == "DELETE":
-                response = self.session.delete(url, json=data)
+                return self.session.delete(url, json=data, timeout=timeout)
             else:
-                self.log(f"Test {test_name}: Invalid method {method}", False)
-                return None
-                
-            if response.status_code == expected_status:
-                self.log(f"Test {test_name}: {method} {endpoint} → {response.status_code}")
-                try:
-                    return response.json()
-                except:
-                    return {"status": "success"}
+                raise ValueError(f"Unsupported method: {method}")
+        except Exception as e:
+            print(f"Request error for {method} {url}: {e}")
+            raise
+            
+    def create_test_user(self, telegram_id: int, username: str, first_name: str) -> bool:
+        """Create a test user"""
+        try:
+            response = self.make_request("POST", "/user-settings", {
+                "telegram_id": telegram_id,
+                "username": username,
+                "first_name": first_name,
+                "group_id": "G1",
+                "group_name": "Группа1",
+                "facultet_id": "F1",
+                "level_id": "L1",
+                "kurs": "1",
+                "form_code": "ОФО"
+            })
+            
+            if response.status_code in [200, 201]:
+                print(f"✅ User {telegram_id} ({username}) created/updated successfully")
+                return True
             else:
-                self.log(f"Test {test_name}: {method} {endpoint} → Expected {expected_status}, got {response.status_code}", False)
-                try:
-                    error_detail = response.json().get('detail', 'Unknown error')
-                    self.log(f"  Error: {error_detail}", False)
-                except:
-                    self.log(f"  Raw response: {response.text[:200]}", False)
-                return None
+                print(f"❌ Failed to create user {telegram_id}: {response.status_code} - {response.text}")
+                return False
                 
         except Exception as e:
-            self.log(f"Test {test_name}: Request failed - {str(e)}", False)
-            return None
-    
-    def setup_existing_users(self) -> bool:
-        """Setup prerequisite users (77777 and 88888) and verify friendship"""
-        print("\n=== EXISTING USERS SETUP (Prerequisites) ===")
-        
-        # Create user 77777
-        user1_data = {
-            "telegram_id": self.existing_user1_id,
-            "username": "musictest77777", 
-            "first_name": "MusicTest77777",
-            "last_name": "TestUser",
-            "group_id": "G1",
-            "group_name": "Группа1",
-            "facultet_id": "F1", 
-            "level_id": "L1",
-            "kurs": "1",
-            "form_code": "ОФО"
-        }
-        
-        result1 = self.test_request("POST", "/user-settings", user1_data, 200, "Create User 77777")
-        if not result1:
-            # User may already exist, try to continue
-            self.log("User 77777 might already exist, continuing...")
-            
-        # Create user 88888
-        user2_data = {
-            "telegram_id": self.existing_user2_id,
-            "username": "musictest88888",
-            "first_name": "MusicTest88888",
-            "last_name": "TestUser", 
-            "group_id": "G1",
-            "group_name": "Группа1",
-            "facultet_id": "F1",
-            "level_id": "L1", 
-            "kurs": "1",
-            "form_code": "ОФО"
-        }
-        
-        result2 = self.test_request("POST", "/user-settings", user2_data, 200, "Create User 88888")
-        if not result2:
-            # User may already exist, try to continue
-            self.log("User 88888 might already exist, continuing...")
-            
-        # Check if they're already friends
-        friends_check = self.test_request("GET", f"/friends/{self.existing_user1_id}", None, 200, "Check Friendship Status")
-        if friends_check and friends_check.get("friends"):
-            # Check if user2 is in friends list
-            is_friend = any(f["telegram_id"] == self.existing_user2_id for f in friends_check["friends"])
-            if is_friend:
-                self.log("✅ Users 77777 and 88888 are already friends - proceeding with tests")
-                return True
-        
-        # Send friend request
-        friend_req_data = {"telegram_id": self.existing_user1_id}
-        result3 = self.test_request("POST", f"/friends/request/{self.existing_user2_id}", friend_req_data, 200, "Send Friend Request")
-        if not result3:
-            self.log("Friend request might have failed, trying to continue...", False)
+            print(f"❌ Error creating user {telegram_id}: {e}")
             return False
             
-        # Get friend requests to find request_id
-        result4 = self.test_request("GET", f"/friends/{self.existing_user2_id}/requests", None, 200, "Get Friend Requests")
-        if not result4 or not result4.get("incoming"):
-            self.log("No friend requests found", False)
-            return False
+    def test_sse_connection(self):
+        """Test 1: SSE Connection - should start with connected event"""
+        print("\n=== Test 1: SSE Connection ===")
+        
+        try:
+            # Start SSE client
+            sse_client = SSEClient(f"{self.base_url}/friends/events/77777")
+            sse_client.start_listening(timeout=5)
             
-        self.request_id = result4["incoming"][0]["request_id"]
-        self.log(f"Found request_id: {self.request_id}")
-        
-        # Accept friend request  
-        accept_data = {"telegram_id": self.existing_user2_id}
-        result5 = self.test_request("POST", f"/friends/accept/{self.request_id}", accept_data, 200, "Accept Friend Request")
-        if not result5:
-            return False
+            # Wait for connected event
+            time.sleep(2)
+            events = sse_client.get_events()
+            sse_client.stop_listening()
             
-        self.log("✅ Existing users setup complete - 77777 and 88888 are now friends")
-        return True
-        
-    def test_music_sending_existing_friends(self) -> bool:
-        """Test 1: Send music between existing friends and verify conversation"""
-        print("\n=== TEST 1: Music Sending Between Existing Friends ===")
-        
-        # Send music message from 77777 to 88888
-        music_data = {
-            "sender_id": self.existing_user1_id,
-            "receiver_id": self.existing_user2_id,
-            "track_title": "Bohemian Rhapsody",
-            "track_artist": "Queen",
-            "track_id": "test_track_123",
-            "track_duration": 355,
-            "cover_url": None
-        }
-        
-        result = self.test_request("POST", "/messages/send-music", music_data, 200, "1.1 Send Music Message")
-        if not result:
-            return False
-            
-        # Verify response structure
-        if result.get("message_type") != "music":
-            self.log(f"  Expected message_type='music', got '{result.get('message_type')}'", False)
-            return False
-        else:
-            self.log("  ✓ message_type = 'music'")
-            
-        # Verify metadata contains all required fields
-        metadata = result.get("metadata", {})
-        expected_fields = {
-            "track_title": "Bohemian Rhapsody",
-            "track_artist": "Queen", 
-            "track_id": "test_track_123",
-            "track_duration": 355
-        }
-        
-        for field, expected_value in expected_fields.items():
-            actual_value = metadata.get(field)
-            if actual_value != expected_value:
-                self.log(f"  Expected metadata.{field}='{expected_value}', got '{actual_value}'", False)
+            # Check if we got the connected event
+            if events and len(events) > 0:
+                first_event = events[0]
+                if first_event.get('type') == 'connected':
+                    self.log_result("SSE Connection", True, "Connected event received successfully")
+                    return True
+                else:
+                    self.log_result("SSE Connection", False, f"Expected 'connected' event, got: {first_event}")
+                    return False
+            else:
+                self.log_result("SSE Connection", False, "No events received from SSE stream")
                 return False
-            else:
-                self.log(f"  ✓ metadata.{field} = {actual_value}")
                 
-        # Store conversation ID for later use
-        self.conversation_id = result.get("conversation_id")
-        message_id = result.get("id")
-        if message_id:
-            self.message_ids.append(message_id)
-            
-        return True
-        
-    def test_conversation_verification(self) -> bool:
-        """Test 2: Verify conversation was created/fetched"""
-        print("\n=== TEST 2: Conversation Verification ===")
-        
-        result = self.test_request("GET", f"/messages/conversations/{self.existing_user1_id}", None, 200, "2.1 Get User Conversations")
-        if not result:
+        except Exception as e:
+            self.log_result("SSE Connection", False, f"Error: {e}")
             return False
             
-        conversations = result.get("conversations", [])
-        if len(conversations) < 1:
-            self.log("  Expected at least 1 conversation", False)
-            return False
-        else:
-            self.log(f"  ✓ Found {len(conversations)} conversation(s)")
+    def test_sse_friend_request_events(self):
+        """Test 2: SSE events on friend request"""
+        print("\n=== Test 2: SSE Friend Request Events ===")
+        
+        try:
+            # Step 1: Create test users
+            user1_created = self.create_test_user(333333, "ssetest1", "SSETest1")
+            user2_created = self.create_test_user(444444, "ssetest2", "SSETest2")
             
-        return True
-        
-    def setup_new_users(self) -> bool:
-        """Setup new test users for conversation auto-creation test"""
-        print("\n=== NEW USERS SETUP ===")
-        
-        # Create user 111111
-        user1_data = {
-            "telegram_id": self.new_user1_id,
-            "username": "musictest1",
-            "first_name": "MusicTest1",
-            "last_name": "TestUser",
-            "group_id": "G1",
-            "group_name": "Группа1",
-            "facultet_id": "F1",
-            "level_id": "L1",
-            "kurs": "1",
-            "form_code": "ОФО"
-        }
-        
-        result1 = self.test_request("POST", "/user-settings", user1_data, 200, "Create User 111111")
-        if not result1:
-            return False
-            
-        # Create user 222222
-        user2_data = {
-            "telegram_id": self.new_user2_id,
-            "username": "musictest2", 
-            "first_name": "MusicTest2",
-            "last_name": "TestUser",
-            "group_id": "G1",
-            "group_name": "Группа1",
-            "facultet_id": "F1",
-            "level_id": "L1",
-            "kurs": "1", 
-            "form_code": "ОФО"
-        }
-        
-        result2 = self.test_request("POST", "/user-settings", user2_data, 200, "Create User 222222")
-        if not result2:
-            return False
-            
-        # Check if they're already friends
-        friends_check = self.test_request("GET", f"/friends/{self.new_user1_id}", None, 200, "Check New Users Friendship Status")
-        if friends_check and friends_check.get("friends"):
-            # Check if user2 is in friends list
-            is_friend = any(f["telegram_id"] == self.new_user2_id for f in friends_check["friends"])
-            if is_friend:
-                self.log("✅ New users 111111 and 222222 are already friends - proceeding with tests")
-                return True
-        
-        # Make them friends
-        friend_req_data = {"telegram_id": self.new_user1_id}
-        result3 = self.test_request("POST", f"/friends/request/{self.new_user2_id}", friend_req_data, 200, "Send Friend Request (111111->222222)")
-        if not result3:
-            return False
-            
-        # Get friend requests
-        result4 = self.test_request("GET", f"/friends/{self.new_user2_id}/requests", None, 200, "Get Friend Requests")
-        if not result4 or not result4.get("incoming"):
-            self.log("No friend requests found", False)
-            return False
-            
-        new_request_id = result4["incoming"][0]["request_id"] 
-        self.log(f"Found new request_id: {new_request_id}")
-        
-        # Accept friend request
-        accept_data = {"telegram_id": self.new_user2_id}
-        result5 = self.test_request("POST", f"/friends/accept/{new_request_id}", accept_data, 200, "Accept Friend Request")
-        if not result5:
-            return False
-            
-        self.log("✅ New users setup complete - 111111 and 222222 are now friends")
-        return True
-        
-    def test_music_sending_auto_conversation(self) -> bool:
-        """Test 3: Send music without existing conversation (test auto-creation)"""
-        print("\n=== TEST 3: Music Sending Auto-Conversation Creation ===")
-        
-        # Send music from 111111 to 222222 (first message, no conversation exists)
-        music_data = {
-            "sender_id": self.new_user1_id,
-            "receiver_id": self.new_user2_id,
-            "track_title": "Yesterday",
-            "track_artist": "The Beatles", 
-            "track_id": "beatles_123",
-            "track_duration": 125,
-            "cover_url": None
-        }
-        
-        result = self.test_request("POST", "/messages/send-music", music_data, 200, "3.1 Send Music (Auto-create Conversation)")
-        if not result:
-            return False
-            
-        # Verify response structure
-        if result.get("message_type") != "music":
-            self.log(f"  Expected message_type='music', got '{result.get('message_type')}'", False)
-            return False
-        else:
-            self.log("  ✓ message_type = 'music'")
-            self.log("  ✓ Conversation auto-created")
-            
-        return True
-        
-    def test_new_conversation_verification(self) -> bool:
-        """Test 4: Verify the new conversation exists"""
-        print("\n=== TEST 4: New Conversation Verification ===")
-        
-        result = self.test_request("GET", f"/messages/conversations/{self.new_user1_id}", None, 200, "4.1 Get New User Conversations")
-        if not result:
-            return False
-            
-        conversations = result.get("conversations", [])
-        if len(conversations) < 1:
-            self.log("  Expected 1 conversation", False)
-            return False
-        else:
-            self.log(f"  ✓ Found {len(conversations)} conversation(s)")
-            
-        # Check that last message is the music message
-        if conversations:
-            last_message = conversations[0].get("last_message")
-            if last_message and last_message.get("message_type") == "music":
-                self.log("  ✓ Last message is music message")
-            else:
-                self.log("  ⚠️  Last message is not music message (may be expected)", True)
+            if not (user1_created and user2_created):
+                self.log_result("Friend Request Events Setup", False, "Failed to create test users")
+                return False
                 
-        return True
+            # Step 2: Start SSE listening for user 444444 (receiver)
+            sse_client = SSEClient(f"{self.base_url}/friends/events/444444")
+            sse_client.start_listening(timeout=15)
+            
+            # Wait for connected event
+            time.sleep(1)
+            
+            # Step 3: Send friend request from 333333 to 444444
+            response = self.make_request("POST", "/friends/request/444444", {"telegram_id": 333333})
+            
+            if response.status_code not in [200, 201]:
+                sse_client.stop_listening()
+                self.log_result("Friend Request Send", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+                
+            # Step 4: Wait for friend_request_received event
+            time.sleep(2)
+            friend_request_event = sse_client.wait_for_event("friend_request_received", timeout=5)
+            sse_client.stop_listening()
+            
+            if friend_request_event:
+                expected_data = friend_request_event.get('data', {})
+                if expected_data.get('from_telegram_id') == 333333:
+                    self.log_result("Friend Request Events", True, "friend_request_received event received correctly")
+                    return True
+                else:
+                    self.log_result("Friend Request Events", False, f"Event data incorrect: {expected_data}")
+                    return False
+            else:
+                all_events = sse_client.get_events()
+                self.log_result("Friend Request Events", False, f"friend_request_received event not received. All events: {all_events}")
+                return False
+                
+        except Exception as e:
+            self.log_result("Friend Request Events", False, f"Error: {e}")
+            return False
+            
+    def test_sse_accept_events(self):
+        """Test 3: SSE events on accept"""
+        print("\n=== Test 3: SSE Accept Events ===")
         
-    def test_send_music_to_non_friend(self) -> bool:
-        """Test 5: Send music to non-friend (should get 403)"""
-        print("\n=== TEST 5: Send Music to Non-Friend (Error Case) ===")
+        try:
+            # Step 1: Get friend requests for 444444
+            response = self.make_request("GET", "/friends/444444/requests")
+            
+            if response.status_code != 200:
+                self.log_result("Get Friend Requests", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+                
+            requests_data = response.json()
+            incoming_requests = requests_data.get('incoming', [])
+            
+            if not incoming_requests:
+                self.log_result("Accept Events Setup", False, "No pending friend requests found")
+                return False
+                
+            request_id = incoming_requests[0]['id']
+            
+            # Step 2: Start SSE for user 333333 (the sender)
+            sse_client = SSEClient(f"{self.base_url}/friends/events/333333")
+            sse_client.start_listening(timeout=15)
+            
+            # Wait for connected event
+            time.sleep(1)
+            
+            # Step 3: Accept the request
+            response = self.make_request("POST", f"/friends/accept/{request_id}", {"telegram_id": 444444})
+            
+            if response.status_code not in [200, 201]:
+                sse_client.stop_listening()
+                self.log_result("Friend Request Accept", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+                
+            # Step 4: Wait for friend_request_accepted event
+            time.sleep(2)
+            accept_event = sse_client.wait_for_event("friend_request_accepted", timeout=5)
+            sse_client.stop_listening()
+            
+            if accept_event:
+                expected_data = accept_event.get('data', {})
+                if expected_data.get('by_telegram_id') == 444444:
+                    self.log_result("Accept Events", True, "friend_request_accepted event received correctly")
+                    return True
+                else:
+                    self.log_result("Accept Events", False, f"Event data incorrect: {expected_data}")
+                    return False
+            else:
+                all_events = sse_client.get_events()
+                self.log_result("Accept Events", False, f"friend_request_accepted event not received. All events: {all_events}")
+                return False
+                
+        except Exception as e:
+            self.log_result("Accept Events", False, f"Error: {e}")
+            return False
+            
+    def test_sse_remove_friend_events(self):
+        """Test 4: SSE events on remove friend"""
+        print("\n=== Test 4: SSE Remove Friend Events ===")
         
-        music_data = {
-            "sender_id": self.new_user1_id,
-            "receiver_id": self.non_friend_user_id,
-            "track_title": "Test",
-            "track_artist": "Test",
-            "track_id": "x",
-            "track_duration": 100,
-            "cover_url": None
-        }
+        try:
+            # Step 1: Start SSE for user 444444
+            sse_client = SSEClient(f"{self.base_url}/friends/events/444444")
+            sse_client.start_listening(timeout=15)
+            
+            # Wait for connected event
+            time.sleep(1)
+            
+            # Step 2: Remove friend - DELETE /api/friends/444444 with {"telegram_id": 333333}
+            response = self.make_request("DELETE", "/friends/444444", {"telegram_id": 333333})
+            
+            if response.status_code not in [200, 201]:
+                sse_client.stop_listening()
+                self.log_result("Remove Friend", False, f"HTTP {response.status_code}: {response.text}")
+                return False
+                
+            # Step 3: Wait for friend_removed event
+            time.sleep(2)
+            remove_event = sse_client.wait_for_event("friend_removed", timeout=5)
+            sse_client.stop_listening()
+            
+            if remove_event:
+                expected_data = remove_event.get('data', {})
+                if expected_data.get('by_telegram_id') == 333333:
+                    self.log_result("Remove Friend Events", True, "friend_removed event received correctly")
+                    return True
+                else:
+                    self.log_result("Remove Friend Events", False, f"Event data incorrect: {expected_data}")
+                    return False
+            else:
+                all_events = sse_client.get_events()
+                self.log_result("Remove Friend Events", False, f"friend_removed event not received. All events: {all_events}")
+                return False
+                
+        except Exception as e:
+            self.log_result("Remove Friend Events", False, f"Error: {e}")
+            return False
+            
+    def run_all_tests(self):
+        """Run all SSE tests"""
+        print("🚀 Starting SSE Friend Events System Tests")
+        print(f"Backend URL: {self.base_url}")
         
-        result = self.test_request("POST", "/messages/send-music", music_data, 403, "5.1 Send Music to Non-Friend")
-        if result is not None:  # Expected to get a response for 403 (error details)
-            self.log("  ✓ Correctly blocked sending music to non-friend (403)")
+        tests = [
+            self.test_sse_connection,
+            self.test_sse_friend_request_events,
+            self.test_sse_accept_events,
+            self.test_sse_remove_friend_events
+        ]
+        
+        passed_tests = 0
+        
+        for test in tests:
+            try:
+                if test():
+                    passed_tests += 1
+                time.sleep(1)  # Brief pause between tests
+            except Exception as e:
+                print(f"❌ Test failed with exception: {e}")
+                
+        print(f"\n📊 Test Results: {passed_tests}/{len(tests)} tests passed")
+        
+        if passed_tests == len(tests):
+            print("🎉 ALL TESTS PASSED!")
             return True
         else:
-            self.log("  ❌ Did not receive expected 403 error", False) 
+            print("❌ Some tests failed")
             return False
-            
-    def test_music_search(self) -> bool:
-        """Test 6: Music search endpoint"""
-        print("\n=== TEST 6: Music Search Endpoint ===")
-        
-        result = self.test_request("GET", "/music/search?q=rock&count=5", None, 200, "6.1 Music Search")
-        if not result:
-            return False
-            
-        # Check structure - may be empty if VK not configured
-        tracks = result.get("tracks", [])
-        count = result.get("count", 0)
-        
-        self.log(f"  ✓ Music search returned {count} tracks")
-        self.log("  ✓ No 500 error occurred")
-        
-        if count > 0:
-            self.log(f"  ✓ VK music integration working - found {count} tracks")
-        else:
-            self.log("  ⚠️  No tracks found (VK may not be configured - this is acceptable)")
-            
-        return True
-            
-    def cleanup(self):
-        """Clean up test data"""
-        print("\n=== CLEANUP ===")
-        
-        # Delete test users
-        try:
-            self.test_request("DELETE", f"/user-settings/{self.existing_user1_id}", None, 200, "Delete User 77777")
-            self.test_request("DELETE", f"/user-settings/{self.existing_user2_id}", None, 200, "Delete User 88888") 
-            self.test_request("DELETE", f"/user-settings/{self.new_user1_id}", None, 200, "Delete User 111111")
-            self.test_request("DELETE", f"/user-settings/{self.new_user2_id}", None, 200, "Delete User 222222")
-        except:
-            pass
             
     def print_summary(self):
-        """Print test summary"""
-        print("\n=== TEST SUMMARY ===")
+        """Print detailed test summary"""
+        print("\n" + "="*50)
+        print("📋 DETAILED TEST SUMMARY")
+        print("="*50)
         
-        total_tests = len(self.results)
-        passed_tests = sum(1 for r in self.results if r["success"])
-        failed_tests = total_tests - passed_tests
+        for result in self.test_results:
+            status = "✅" if result["passed"] else "❌"
+            print(f"{status} {result['test']}")
+            if result["details"]:
+                print(f"   └─ {result['details']}")
+                
+        passed = sum(1 for r in self.test_results if r["passed"])
+        total = len(self.test_results)
+        success_rate = (passed / total * 100) if total > 0 else 0
         
-        print(f"Total Tests: {total_tests}")
-        print(f"Passed: {passed_tests} ✅") 
-        print(f"Failed: {failed_tests} ❌")
+        print(f"\n📊 Overall Results: {passed}/{total} ({success_rate:.1f}%)")
         
-        if failed_tests > 0:
-            print("\nFAILED TESTS:")
-            for result in self.results:
-                if not result["success"]:
-                    print(f"  ❌ {result['message']}")
-                    
-        success_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
-        print(f"\nSuccess Rate: {success_rate:.1f}%")
-        
-        return failed_tests == 0
+        return passed == total
 
 def main():
     """Main test execution"""
-    print("🎵 MUSIC SENDING API TESTING")
-    print("=" * 50)
-    print(f"Base URL: {BASE_URL}")
-    print("Test Plan:")
-    print("1. Send music between existing friends (77777, 88888)")
-    print("2. Verify conversation creation/fetching")
-    print("3. Create new users and make them friends")
-    print("4. Send music with auto-conversation creation")
-    print("5. Verify new conversation exists") 
-    print("6. Test sending music to non-friend (403 error)")
-    print("7. Test music search endpoint")
+    print("=" * 60)
+    print("🧪 SSE FRIEND EVENTS SYSTEM TEST SUITE")
+    print("=" * 60)
     
-    tester = MusicSendingTester()
+    tester = BackendTester()
     
     try:
-        # Setup existing users and friendship
-        if not tester.setup_existing_users():
-            print("❌ Existing users setup failed!")
-            return False
-            
-        # Test music sending between existing friends
-        if not tester.test_music_sending_existing_friends():
-            print("❌ Music sending test failed!")
-            return False
-            
-        # Verify conversation
-        if not tester.test_conversation_verification():
-            print("❌ Conversation verification failed!")
-            return False
-            
-        # Setup new users
-        if not tester.setup_new_users():
-            print("❌ New users setup failed!")
-            return False
-            
-        # Test auto-conversation creation
-        if not tester.test_music_sending_auto_conversation():
-            print("❌ Auto-conversation test failed!")
-            return False
-            
-        # Verify new conversation
-        if not tester.test_new_conversation_verification():
-            print("❌ New conversation verification failed!")
-            return False
-            
-        # Test non-friend error case
-        if not tester.test_send_music_to_non_friend():
-            print("❌ Non-friend test failed!")
-            return False
-            
-        # Test music search
-        if not tester.test_music_search():
-            print("❌ Music search test failed!")
-            return False
-            
-        # Print summary
-        success = tester.print_summary()
+        success = tester.run_all_tests()
+        tester.print_summary()
         
         if success:
-            print("\n🎉 ALL MUSIC SENDING TESTS PASSED!")
+            print("\n🎉 ALL SSE TESTS COMPLETED SUCCESSFULLY!")
         else:
-            print("\n💥 SOME MUSIC SENDING TESTS FAILED!")
+            print("\n⚠️  SOME SSE TESTS FAILED - CHECK LOGS ABOVE")
             
-        return success
-        
     except KeyboardInterrupt:
-        print("\n⚠️  Tests interrupted by user")
-        return False
+        print("\n⚠️ Tests interrupted by user")
     except Exception as e:
-        print(f"\n💥 Unexpected error: {e}")
-        return False
-    finally:
-        # Always try to cleanup
-        tester.cleanup()
-
+        print(f"\n❌ Critical error during testing: {e}")
+        
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    main()
