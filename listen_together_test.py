@@ -48,13 +48,13 @@ class ListenTogetherTestRunner:
                 async with self.session.get(url, params=params) as resp:
                     return resp.status, await resp.json()
             elif method.upper() == "POST":
-                async with self.session.post(url, json=data) as resp:
+                async with self.session.post(url, json=data, params=params) as resp:
                     return resp.status, await resp.json()
             elif method.upper() == "PUT":
-                async with self.session.put(url, json=data) as resp:
+                async with self.session.put(url, json=data, params=params) as resp:
                     return resp.status, await resp.json()
             elif method.upper() == "DELETE":
-                async with self.session.delete(url, json=data) as resp:
+                async with self.session.delete(url, json=data, params=params) as resp:
                     return resp.status, await resp.json()
         except Exception as e:
             return 500, {"error": str(e)}
