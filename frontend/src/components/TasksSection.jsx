@@ -526,22 +526,26 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
         
         hapticFeedback && hapticFeedback('notification', 'success');
         
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.showAlert(message);
-        } else {
-          alert(message);
-        }
+        try {
+          if (window.Telegram?.WebApp?.isVersionAtLeast?.('6.2')) {
+            window.Telegram.WebApp.showAlert(message);
+          } else {
+            alert(message);
+          }
+        } catch (e) { alert(message); }
       }
     } catch (error) {
       console.error('Error syncing selected events:', error);
       hapticFeedback && hapticFeedback('notification', 'error');
       
       const errorMessage = error?.message || 'Не удалось синхронизировать пары';
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert(errorMessage);
-      } else {
-        alert(errorMessage);
-      }
+      try {
+        if (window.Telegram?.WebApp?.isVersionAtLeast?.('6.2')) {
+          window.Telegram.WebApp.showAlert(errorMessage);
+        } else {
+          alert(errorMessage);
+        }
+      } catch (e) { alert(errorMessage); }
     } finally {
       setSyncingSchedule(false);
     }
