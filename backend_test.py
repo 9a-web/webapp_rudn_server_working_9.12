@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Messaging Bug Fixes Testing Script
-Tests all 16 messaging API endpoints according to the Backend Test Plan
+Schedule Sending Fix Testing Script
+Tests the schedule sending fix and z-index changes
 
 Usage: python backend_test.py
 """
@@ -12,6 +12,7 @@ import sys
 from typing import Optional, Dict, Any
 import time
 import uuid
+from datetime import datetime
 
 # Base URL as specified in the review request
 BASE_URL = "http://localhost:8001/api"
