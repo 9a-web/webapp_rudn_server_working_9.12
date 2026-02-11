@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { musicAPI } from '../../services/musicAPI';
 import { TrackList } from './TrackList';
 
-export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick }) => {
+export const MusicSearch = ({ favorites = [], onFavorite, onArtistClick, onSendToFriend, showSendToFriend = false }) => {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(false);
