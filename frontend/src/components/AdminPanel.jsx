@@ -779,6 +779,51 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
             ))}
           </div>
 
+          {/* Online History Chart */}
+          {onlineHistory.length > 1 && (
+            <GlassChartCard title="История онлайна" icon={<Activity className="w-4 h-4" />}>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={onlineHistory} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradOnline" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradWeb" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradTelegram" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="time" stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip content={<GlassTooltip formatter={(v, name) => [v, name === 'online' ? 'Всего' : name === 'web' ? 'Веб' : 'Telegram']} />} />
+                  <Area type="monotone" dataKey="online" stroke="#22c55e" strokeWidth={2} fill="url(#gradOnline)" name="online" dot={false} />
+                  <Area type="monotone" dataKey="web" stroke="#2dd4bf" strokeWidth={1.5} fill="url(#gradWeb)" name="web" dot={false} />
+                  <Area type="monotone" dataKey="telegram" stroke="#60a5fa" strokeWidth={1.5} fill="url(#gradTelegram)" name="telegram" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+              <div className="flex items-center justify-center gap-5 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-1.5 rounded-full bg-green-500" />
+                  <span className="text-[11px] text-gray-500">Всего</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-1.5 rounded-full bg-teal-400" />
+                  <span className="text-[11px] text-gray-500">Веб</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-[11px] text-gray-500">Telegram</span>
+                </div>
+              </div>
+            </GlassChartCard>
+          )}
+
           {/* Users List */}
           <div className={`${GLASS.card} rounded-2xl overflow-hidden`}>
             <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
