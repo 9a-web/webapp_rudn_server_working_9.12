@@ -1338,9 +1338,10 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
   // Group messages by date
   const groupedMessages = useMemo(() => {
     const groups = []; let lastDate = '', lastSenderId = null;
-    messages.forEach((msg, idx) => {
+    messages.filter(Boolean).forEach((msg, idx) => {
+      if (!msg || !msg.id) return;
       const msgDate = parseUTC(msg.created_at).toDateString();
-      if (msgDate !== lastDate) { groups.push({ type: 'date', date: msg.created_at, key: `date-${msgDate}` }); lastDate = msgDate; lastSenderId = null; }
+      if (msgDate !== lastDate) { groups.push({ type: 'date', date: msg.created_at, key: `date-${msgDate}-${idx}` }); lastDate = msgDate; lastSenderId = null; }
       const nextMsg = messages[idx + 1];
       const isFirst = msg.sender_id !== lastSenderId;
       const isLast = !nextMsg || nextMsg.sender_id !== msg.sender_id || parseUTC(nextMsg.created_at).toDateString() !== msgDate;
