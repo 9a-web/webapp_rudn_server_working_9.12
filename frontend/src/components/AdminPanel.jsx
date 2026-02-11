@@ -220,7 +220,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
           style={{ touchAction: 'none' }}
         >
           {/* Glassmorphic Background */}
-          <div className="absolute inset-0 bg-[#0c0c18]/90 backdrop-blur-2xl" />
+          <div className="absolute inset-0 bg-[#0c0c18]" />
           <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-blue-900/10" />
           <div className="absolute top-0 left-1/3 w-96 h-96 bg-purple-600/5 rounded-full blur-[120px]" />
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-blue-600/5 rounded-full blur-[100px]" />
