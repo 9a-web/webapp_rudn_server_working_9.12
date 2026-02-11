@@ -2359,6 +2359,13 @@ class MessageEdit(BaseModel):
     telegram_id: int
     text: str = Field(..., min_length=1, max_length=4000)
 
+    @field_validator('text')
+    @classmethod
+    def text_must_not_be_blank(cls, v):
+        if not v.strip():
+            raise ValueError('Сообщение не может быть пустым')
+        return v
+
 class MessageReaction(BaseModel):
     """Добавление/удаление реакции"""
     telegram_id: int
