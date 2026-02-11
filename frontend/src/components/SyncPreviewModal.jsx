@@ -96,11 +96,13 @@ const SyncPreviewModal = ({
       }));
     
     if (selectedEvents.length === 0) {
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('Выберите хотя бы одну пару для синхронизации');
-      } else {
-        alert('Выберите хотя бы одну пару для синхронизации');
-      }
+      try {
+        if (window.Telegram?.WebApp?.isVersionAtLeast?.('6.2')) {
+          window.Telegram.WebApp.showAlert('Выберите хотя бы одну пару для синхронизации');
+        } else {
+          alert('Выберите хотя бы одну пару для синхронизации');
+        }
+      } catch (e) { alert('Выберите хотя бы одну пару для синхронизации'); }
       return;
     }
     
