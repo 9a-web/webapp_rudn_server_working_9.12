@@ -387,7 +387,17 @@ export const TelegramProvider = ({ children }) => {
 
   const showAlert = (message) => {
     if (webApp) {
-      webApp.showAlert(message);
+      try {
+        // showAlert requires WebApp version 6.2+
+        if (typeof webApp.isVersionAtLeast === 'function' && webApp.isVersionAtLeast('6.2')) {
+          webApp.showAlert(message);
+        } else {
+          alert(message);
+        }
+      } catch (e) {
+        // Fallback for unsupported versions
+        alert(message);
+      }
     } else {
       alert(message);
     }
@@ -396,7 +406,15 @@ export const TelegramProvider = ({ children }) => {
   const showConfirm = (message) => {
     return new Promise((resolve) => {
       if (webApp) {
-        webApp.showConfirm(message, resolve);
+        try {
+          if (typeof webApp.isVersionAtLeast === 'function' && webApp.isVersionAtLeast('6.2')) {
+            webApp.showConfirm(message, resolve);
+          } else {
+            resolve(window.confirm(message));
+          }
+        } catch (e) {
+          resolve(window.confirm(message));
+        }
       } else {
         resolve(window.confirm(message));
       }
@@ -406,9 +424,19 @@ export const TelegramProvider = ({ children }) => {
   const showPopup = (params) => {
     return new Promise((resolve) => {
       if (webApp) {
-        webApp.showPopup(params, resolve);
+        try {
+          if (typeof webApp.isVersionAtLeast === 'function' && webApp.isVersionAtLeast('6.2')) {
+            webApp.showPopup(params, resolve);
+          } else {
+            alert(params.message || '');
+            resolve(null);
+          }
+        } catch (e) {
+          alert(params.message || '');
+          resolve(null);
+        }
       } else {
-        alert(params.message);
+        alert(params.message || '');
         resolve(null);
       }
     });
