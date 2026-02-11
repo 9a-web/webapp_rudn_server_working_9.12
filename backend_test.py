@@ -1,451 +1,484 @@
 #!/usr/bin/env python3
 """
-Messaging API Testing Script
-Tests the new messaging API endpoints as specified in the review request
+Backend Test Script for NEW Messaging API Endpoints
+Tests advanced messaging features: editing, reactions, pinning, replies, forwarding, typing, search, music, tasks
 """
 
-import requests
+import asyncio
+import httpx
 import json
-import time
 from datetime import datetime
-import sys
+from typing import Dict, Any, Optional
 
-# Configuration - using localhost:8001 as specified in review request
-BASE_URL = "http://localhost:8001/api"
+# Backend URL from review request
+BASE_URL = "https://social-messaging-hub.preview.emergentagent.com"
+API_BASE = f"{BASE_URL}/api"
 
-# Test users as specified in the review request
-USER1_ID = 55555
-USER2_ID = 66666
-USER1_DATA = {
-    "telegram_id": USER1_ID,
-    "username": "testuser1", 
-    "first_name": "Alice",
-    "last_name": "Test",
-    "group_id": "G1",
-    "group_name": "Test Group",
-    "facultet_id": "F1",
-    "level_id": "L1",
-    "kurs": "1",
-    "form_code": "ОФО"
-}
-
-USER2_DATA = {
-    "telegram_id": USER2_ID,
-    "username": "testuser2",
-    "first_name": "Bob", 
-    "last_name": "Test",
-    "group_id": "G1",
-    "group_name": "Test Group",
-    "facultet_id": "F1", 
-    "level_id": "L1",
-    "kurs": "1",
-    "form_code": "ОФО"
-}
-
-def print_test_result(test_name, success, details=None):
-    """Print formatted test result"""
-    status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status} {test_name}")
-    if details:
-        print(f"   {details}")
-    print()
-
-def print_step(step_num, description):
-    """Print test step"""
-    print(f"\n{step_num}. {description}")
-
-def setup_test_data():
-    """Set up test data as specified in the review request"""
-    print("🔧 Setting up test data...")
+class TestResults:
+    def __init__(self):
+        self.results = []
+        self.passed = 0
+        self.failed = 0
     
-    # Create user 55555
-    print_step(1, f"Creating user {USER1_ID}")
-    try:
-        response = requests.post(f"{BASE_URL}/user-settings", json=USER1_DATA, timeout=10)
-        if response.status_code == 200:
-            print(f"   ✅ User {USER1_ID} created successfully")
+    def add_result(self, test_name: str, passed: bool, status_code: Optional[int] = None, 
+                  response_data: Any = None, error: Optional[str] = None):
+        result = {
+            'test': test_name,
+            'passed': passed,
+            'status_code': status_code,
+            'response': response_data,
+            'error': error,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        self.results.append(result)
+        if passed:
+            self.passed += 1
+            print(f"✅ {test_name} - Status: {status_code}")
         else:
-            print(f"   ⚠️ User {USER1_ID} creation status: {response.status_code}")
-    except Exception as e:
-        print(f"   ❌ Failed to create user {USER1_ID}: {e}")
-        return False
+            self.failed += 1
+            print(f"❌ {test_name} - Status: {status_code} - Error: {error}")
+        
+        # Print key response data for successful tests
+        if passed and response_data:
+            if isinstance(response_data, dict):
+                if 'message_id' in response_data:
+                    print(f"   → message_id: {response_data['message_id']}")
+                if 'conversation_id' in response_data:
+                    print(f"   → conversation_id: {response_data['conversation_id']}")
+                if 'edited_at' in response_data:
+                    print(f"   → edited_at: {response_data['edited_at']}")
+                if 'reactions' in response_data:
+                    print(f"   → reactions: {response_data['reactions']}")
+                if 'success' in response_data:
+                    print(f"   → success: {response_data['success']}")
+                if 'task_id' in response_data:
+                    print(f"   → task_id: {response_data['task_id']}")
     
-    # Create user 66666  
-    print_step(2, f"Creating user {USER2_ID}")
-    try:
-        response = requests.post(f"{BASE_URL}/user-settings", json=USER2_DATA, timeout=10)
-        if response.status_code == 200:
-            print(f"   ✅ User {USER2_ID} created successfully")
-        else:
-            print(f"   ⚠️ User {USER2_ID} creation status: {response.status_code}")
-    except Exception as e:
-        print(f"   ❌ Failed to create user {USER2_ID}: {e}")
-        return False
-    
-    # Send friend request
-    print_step(3, f"Sending friend request from {USER1_ID} to {USER2_ID}")
-    try:
-        friend_request_data = {"telegram_id": USER1_ID}
-        response = requests.post(f"{BASE_URL}/friends/request/{USER2_ID}", json=friend_request_data, timeout=10)
-        if response.status_code == 200:
-            print(f"   ✅ Friend request sent successfully")
-        else:
-            print(f"   ⚠️ Friend request status: {response.status_code} - {response.text}")
-    except Exception as e:
-        print(f"   ❌ Failed to send friend request: {e}")
-        return False
-    
-    # Get friend requests to capture request_id
-    print_step(4, f"Getting friend requests for user {USER2_ID}")
-    try:
-        response = requests.get(f"{BASE_URL}/friends/{USER2_ID}/requests", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)[:200]}...")
-            
-            # Look for incoming requests
-            incoming = data.get('incoming', [])
-            if incoming:
-                request_id = incoming[0].get('request_id')
-                print(f"   ✅ Found request_id: {request_id}")
-                
-                # Accept friend request
-                print_step(5, f"Accepting friend request {request_id}")
-                accept_data = {"telegram_id": USER2_ID}
-                response = requests.post(f"{BASE_URL}/friends/accept/{request_id}", json=accept_data, timeout=10)
-                if response.status_code == 200:
-                    print(f"   ✅ Friend request accepted successfully")
-                    return True
-                else:
-                    print(f"   ❌ Failed to accept friend request: {response.status_code} - {response.text}")
-                    return False
-            else:
-                print(f"   ❌ No incoming friend requests found")
-                return False
-        else:
-            print(f"   ❌ Failed to get friend requests: {response.status_code} - {response.text}")
-            return False
-    except Exception as e:
-        print(f"   ❌ Failed to get friend requests: {e}")
-        return False
+    def get_summary(self):
+        return {
+            'total': len(self.results),
+            'passed': self.passed,
+            'failed': self.failed,
+            'success_rate': f"{(self.passed / len(self.results) * 100):.1f}%" if self.results else "0%"
+        }
 
-def test_messaging_endpoints():
-    """Test messaging endpoints in the specified order"""
-    print("\n🔄 Testing messaging endpoints...")
+async def test_new_messaging_endpoints():
+    """Test all NEW messaging API endpoints as per review request"""
+    print("🚀 Starting NEW Messaging API Endpoints Testing")
+    print(f"Backend URL: {API_BASE}")
+    print("-" * 60)
     
+    results = TestResults()
+    
+    # Test data storage
+    message_id = None
     conversation_id = None
-    first_message_id = None
-    test_results = []
     
-    # Test 1: GET unread messages (should be 0 initially)
-    print_step(1, "GET unread messages for user 55555 (expect total_unread: 0)")
-    try:
-        response = requests.get(f"{BASE_URL}/messages/unread/{USER1_ID}", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            total_unread = data.get('total_unread', -1)
-            if total_unread == 0:
-                print_test_result("Initial unread count", True, "total_unread is 0 as expected")
-                test_results.append(True)
-            else:
-                print_test_result("Initial unread count", False, f"Expected 0, got {total_unread}")
-                test_results.append(False)
-        else:
-            print_test_result("Initial unread count", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Initial unread count", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 2: Create conversation
-    print_step(2, "POST create/get conversation between users 55555 and 66666")
-    try:
-        conv_data = {"user1_id": USER1_ID, "user2_id": USER2_ID}
-        response = requests.post(f"{BASE_URL}/messages/conversations", json=conv_data, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            conversation_id = data.get('id')
-            if conversation_id:
-                print_test_result("Create conversation", True, f"Conversation created with ID: {conversation_id}")
-                test_results.append(True)
-            else:
-                print_test_result("Create conversation", False, "No conversation ID in response")
-                test_results.append(False)
-        else:
-            print_test_result("Create conversation", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Create conversation", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    if not conversation_id:
-        print("❌ Cannot continue without conversation_id")
-        return test_results
-    
-    # Test 3: Send first message
-    print_step(3, "POST send message from 55555 to 66666: 'Привет!'")
-    try:
-        msg_data = {
-            "sender_id": USER1_ID,
-            "receiver_id": USER2_ID, 
-            "text": "Привет!"
-        }
-        response = requests.post(f"{BASE_URL}/messages/send", json=msg_data, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            first_message_id = data.get('id')
-            if first_message_id:
-                print_test_result("Send first message", True, f"Message sent with ID: {first_message_id}")
-                test_results.append(True)
-            else:
-                print_test_result("Send first message", False, "No message ID in response")
-                test_results.append(False)
-        else:
-            print_test_result("Send first message", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Send first message", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 4: Send second message
-    print_step(4, "POST send message from 66666 to 55555: 'Привет! Как дела?'")
-    try:
-        msg_data = {
-            "sender_id": USER2_ID,
-            "receiver_id": USER1_ID,
-            "text": "Привет! Как дела?"
-        }
-        response = requests.post(f"{BASE_URL}/messages/send", json=msg_data, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            print_test_result("Send second message", True, "Message sent successfully")
-            test_results.append(True)
-        else:
-            print_test_result("Send second message", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Send second message", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 5: Get conversation messages
-    print_step(5, f"GET messages in conversation {conversation_id} for user 55555 (expect 2 messages)")
-    try:
-        response = requests.get(f"{BASE_URL}/messages/{conversation_id}/messages?telegram_id={USER1_ID}", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            messages = data.get('messages', [])
-            message_count = len(messages)
-            if message_count == 2:
-                print_test_result("Get conversation messages", True, f"Found {message_count} messages as expected")
-                test_results.append(True)
-            else:
-                print_test_result("Get conversation messages", False, f"Expected 2 messages, got {message_count}")
-                test_results.append(False)
-        else:
-            print_test_result("Get conversation messages", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Get conversation messages", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 6: Check unread count (should be 1 now)
-    print_step(6, "GET unread messages for user 55555 (expect total_unread: 1)")
-    try:
-        response = requests.get(f"{BASE_URL}/messages/unread/{USER1_ID}", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            total_unread = data.get('total_unread', -1)
-            if total_unread == 1:
-                print_test_result("Unread count after messages", True, "total_unread is 1 as expected")
-                test_results.append(True)
-            else:
-                print_test_result("Unread count after messages", False, f"Expected 1, got {total_unread}")
-                test_results.append(False)
-        else:
-            print_test_result("Unread count after messages", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Unread count after messages", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 7: Mark messages as read
-    print_step(7, f"PUT mark messages as read in conversation {conversation_id} by user 55555")
-    try:
-        read_data = {"telegram_id": USER1_ID}
-        response = requests.put(f"{BASE_URL}/messages/{conversation_id}/read", json=read_data, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            print_test_result("Mark messages as read", True, "Messages marked as read successfully")
-            test_results.append(True)
-        else:
-            print_test_result("Mark messages as read", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Mark messages as read", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 8: Check unread count again (should be 0)
-    print_step(8, "GET unread messages for user 55555 (expect total_unread: 0)")
-    try:
-        response = requests.get(f"{BASE_URL}/messages/unread/{USER1_ID}", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            total_unread = data.get('total_unread', -1)
-            if total_unread == 0:
-                print_test_result("Unread count after read", True, "total_unread is 0 as expected")
-                test_results.append(True)
-            else:
-                print_test_result("Unread count after read", False, f"Expected 0, got {total_unread}")
-                test_results.append(False)
-        else:
-            print_test_result("Unread count after read", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Unread count after read", False, f"Exception: {e}")
-        test_results.append(False)
-    
-    # Test 9: Delete message
-    if first_message_id:
-        print_step(9, f"DELETE message {first_message_id} by user 55555")
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        
+        # Test 1: Send a new message first
+        print("\n1. 📤 Testing: Send Message")
         try:
-            delete_data = {"telegram_id": USER1_ID}
-            response = requests.delete(f"{BASE_URL}/messages/{first_message_id}", json=delete_data, timeout=10)
+            response = await client.post(
+                f"{API_BASE}/messages/send",
+                json={
+                    "sender_id": 55555,
+                    "receiver_id": 66666,
+                    "text": "Hello for testing new features!"
+                }
+            )
+            
             if response.status_code == 200:
                 data = response.json()
-                print(f"   Response: {json.dumps(data, indent=2)}")
-                print_test_result("Delete message", True, "Message deleted successfully")
-                test_results.append(True)
+                message_id = data.get('message_id')
+                conversation_id = data.get('conversation_id')
+                results.add_result("Send Message", True, response.status_code, data)
             else:
-                print_test_result("Delete message", False, f"HTTP {response.status_code}: {response.text}")
-                test_results.append(False)
+                results.add_result("Send Message", False, response.status_code, error=response.text)
+                
         except Exception as e:
-            print_test_result("Delete message", False, f"Exception: {e}")
-            test_results.append(False)
-    else:
-        print_step(9, "DELETE message (skipped - no message ID)")
-        test_results.append(False)
-    
-    # Test 10: Get conversations list
-    print_step(10, f"GET conversations for user {USER1_ID} (expect 1 conversation)")
-    try:
-        response = requests.get(f"{BASE_URL}/messages/conversations/{USER1_ID}", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"   Response: {json.dumps(data, indent=2)}")
-            conversations = data.get('conversations', [])
-            conv_count = len(conversations)
-            if conv_count == 1:
-                print_test_result("Get conversations", True, f"Found {conv_count} conversation as expected")
-                test_results.append(True)
+            results.add_result("Send Message", False, error=str(e))
+        
+        # Test 2: Edit message (requires message_id from Test 1)
+        if message_id:
+            print(f"\n2. ✏️ Testing: Edit Message (ID: {message_id})")
+            try:
+                response = await client.put(
+                    f"{API_BASE}/messages/{message_id}/edit",
+                    json={
+                        "telegram_id": 55555,
+                        "text": "Edited message text!"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Check if edited_at is not null
+                    if data.get('edited_at') is not None:
+                        results.add_result("Edit Message", True, response.status_code, data)
+                    else:
+                        results.add_result("Edit Message", False, response.status_code, 
+                                         error="edited_at should not be null")
+                else:
+                    results.add_result("Edit Message", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Edit Message", False, error=str(e))
+        else:
+            results.add_result("Edit Message", False, error="No message_id from previous test")
+        
+        # Test 3: Add Reaction
+        if message_id:
+            print(f"\n3. ❤️ Testing: Add Reaction (ID: {message_id})")
+            try:
+                response = await client.post(
+                    f"{API_BASE}/messages/{message_id}/reactions",
+                    json={
+                        "telegram_id": 66666,
+                        "emoji": "❤️"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Check if reactions array contains heart with user 66666
+                    reactions = data.get('reactions', [])
+                    heart_found = any(r.get('emoji') == '❤️' and 66666 in r.get('users', []) 
+                                    for r in reactions)
+                    if heart_found:
+                        results.add_result("Add Reaction", True, response.status_code, data)
+                    else:
+                        results.add_result("Add Reaction", False, response.status_code,
+                                         error="Heart reaction with user 66666 not found in response")
+                else:
+                    results.add_result("Add Reaction", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Add Reaction", False, error=str(e))
+        else:
+            results.add_result("Add Reaction", False, error="No message_id from previous test")
+        
+        # Test 4: Toggle Reaction Off (same reaction again)
+        if message_id:
+            print(f"\n4. 💔 Testing: Toggle Reaction Off (ID: {message_id})")
+            try:
+                response = await client.post(
+                    f"{API_BASE}/messages/{message_id}/reactions",
+                    json={
+                        "telegram_id": 66666,
+                        "emoji": "❤️"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Check if reactions array is empty (toggled off)
+                    reactions = data.get('reactions', [])
+                    if len(reactions) == 0:
+                        results.add_result("Toggle Reaction Off", True, response.status_code, data)
+                    else:
+                        results.add_result("Toggle Reaction Off", False, response.status_code,
+                                         error="Reactions should be empty after toggle off")
+                else:
+                    results.add_result("Toggle Reaction Off", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Toggle Reaction Off", False, error=str(e))
+        else:
+            results.add_result("Toggle Reaction Off", False, error="No message_id from previous test")
+        
+        # Test 5: Pin Message
+        if message_id:
+            print(f"\n5. 📌 Testing: Pin Message (ID: {message_id})")
+            try:
+                response = await client.put(
+                    f"{API_BASE}/messages/{message_id}/pin",
+                    json={
+                        "telegram_id": 55555,
+                        "is_pinned": True
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success') is True:
+                        results.add_result("Pin Message", True, response.status_code, data)
+                    else:
+                        results.add_result("Pin Message", False, response.status_code,
+                                         error="success should be true")
+                else:
+                    results.add_result("Pin Message", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Pin Message", False, error=str(e))
+        else:
+            results.add_result("Pin Message", False, error="No message_id from previous test")
+        
+        # Test 6: Get Pinned Messages
+        if conversation_id:
+            print(f"\n6. 📍 Testing: Get Pinned Messages (Conversation: {conversation_id})")
+            try:
+                response = await client.get(f"{API_BASE}/messages/{conversation_id}/pinned")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('pinned_message') is not None:
+                        results.add_result("Get Pinned Messages", True, response.status_code, data)
+                    else:
+                        results.add_result("Get Pinned Messages", False, response.status_code,
+                                         error="pinned_message should not be null")
+                else:
+                    results.add_result("Get Pinned Messages", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Get Pinned Messages", False, error=str(e))
+        else:
+            results.add_result("Get Pinned Messages", False, error="No conversation_id from previous test")
+        
+        # Test 7: Send Reply
+        if message_id:
+            print(f"\n7. 💬 Testing: Send Reply (Reply to: {message_id})")
+            try:
+                response = await client.post(
+                    f"{API_BASE}/messages/send",
+                    json={
+                        "sender_id": 66666,
+                        "receiver_id": 55555,
+                        "text": "This is a reply!",
+                        "reply_to_id": message_id
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    reply_to = data.get('reply_to')
+                    if reply_to and reply_to.get('sender_name') and reply_to.get('text'):
+                        results.add_result("Send Reply", True, response.status_code, data)
+                    else:
+                        results.add_result("Send Reply", False, response.status_code,
+                                         error="reply_to should contain sender_name and text")
+                else:
+                    results.add_result("Send Reply", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Send Reply", False, error=str(e))
+        else:
+            results.add_result("Send Reply", False, error="No message_id from previous test")
+        
+        # Test 8: Forward Message
+        if message_id:
+            print(f"\n8. ↩️ Testing: Forward Message (Original: {message_id})")
+            try:
+                response = await client.post(
+                    f"{API_BASE}/messages/forward",
+                    json={
+                        "sender_id": 55555,
+                        "receiver_id": 66666,
+                        "original_message_id": message_id
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    forwarded_from = data.get('forwarded_from')
+                    if forwarded_from:
+                        results.add_result("Forward Message", True, response.status_code, data)
+                    else:
+                        results.add_result("Forward Message", False, response.status_code,
+                                         error="forwarded_from data should be present")
+                else:
+                    results.add_result("Forward Message", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Forward Message", False, error=str(e))
+        else:
+            results.add_result("Forward Message", False, error="No message_id from previous test")
+        
+        # Test 9: Set Typing Indicator
+        if conversation_id:
+            print(f"\n9. ⌨️ Testing: Set Typing Indicator (Conversation: {conversation_id})")
+            try:
+                response = await client.post(
+                    f"{API_BASE}/messages/{conversation_id}/typing",
+                    json={
+                        "telegram_id": 55555
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success') is True:
+                        results.add_result("Set Typing Indicator", True, response.status_code, data)
+                    else:
+                        results.add_result("Set Typing Indicator", False, response.status_code,
+                                         error="success should be true")
+                else:
+                    results.add_result("Set Typing Indicator", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Set Typing Indicator", False, error=str(e))
+        else:
+            results.add_result("Set Typing Indicator", False, error="No conversation_id from previous test")
+        
+        # Test 10: Get Typing Status
+        if conversation_id:
+            print(f"\n10. 👀 Testing: Get Typing Status (Conversation: {conversation_id})")
+            try:
+                response = await client.get(
+                    f"{API_BASE}/messages/{conversation_id}/typing?telegram_id=66666"
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    typing_users = data.get('typing_users', [])
+                    if 55555 in typing_users:
+                        results.add_result("Get Typing Status", True, response.status_code, data)
+                    else:
+                        results.add_result("Get Typing Status", False, response.status_code,
+                                         error="User 55555 should be in typing_users array")
+                else:
+                    results.add_result("Get Typing Status", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Get Typing Status", False, error=str(e))
+        else:
+            results.add_result("Get Typing Status", False, error="No conversation_id from previous test")
+        
+        # Test 11: Search Messages
+        if conversation_id:
+            print(f"\n11. 🔍 Testing: Search Messages (Conversation: {conversation_id})")
+            try:
+                response = await client.get(
+                    f"{API_BASE}/messages/{conversation_id}/search?q=Edited&telegram_id=55555"
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    results_array = data.get('results', [])
+                    if len(results_array) >= 1:
+                        results.add_result("Search Messages", True, response.status_code, data)
+                    else:
+                        results.add_result("Search Messages", False, response.status_code,
+                                         error="Should find at least 1 message with 'Edited' text")
+                else:
+                    results.add_result("Search Messages", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Search Messages", False, error=str(e))
+        else:
+            results.add_result("Search Messages", False, error="No conversation_id from previous test")
+        
+        # Test 12: Send Music Message
+        print(f"\n12. 🎵 Testing: Send Music Message")
+        try:
+            response = await client.post(
+                f"{API_BASE}/messages/send-music",
+                json={
+                    "sender_id": 55555,
+                    "receiver_id": 66666,
+                    "track_title": "Bohemian Rhapsody",
+                    "track_artist": "Queen",
+                    "track_duration": 355
+                }
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Check if it's a music message with metadata
+                if data.get('type') == 'music' or 'track_title' in data:
+                    results.add_result("Send Music Message", True, response.status_code, data)
+                else:
+                    results.add_result("Send Music Message", False, response.status_code,
+                                     error="Should be music message with metadata")
             else:
-                print_test_result("Get conversations", False, f"Expected 1 conversation, got {conv_count}")
-                test_results.append(False)
+                results.add_result("Send Music Message", False, response.status_code, error=response.text)
+                
+        except Exception as e:
+            results.add_result("Send Music Message", False, error=str(e))
+        
+        # Test 13: Create Task from Message
+        if message_id:
+            print(f"\n13. ✅ Testing: Create Task from Message (ID: {message_id})")
+            try:
+                response = await client.post(
+                    f"{API_BASE}/messages/create-task",
+                    json={
+                        "telegram_id": 55555,
+                        "message_id": message_id
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success') is True and data.get('task_id'):
+                        results.add_result("Create Task from Message", True, response.status_code, data)
+                    else:
+                        results.add_result("Create Task from Message", False, response.status_code,
+                                         error="Should return success=true and task_id")
+                else:
+                    results.add_result("Create Task from Message", False, response.status_code, error=response.text)
+                    
+            except Exception as e:
+                results.add_result("Create Task from Message", False, error=str(e))
         else:
-            print_test_result("Get conversations", False, f"HTTP {response.status_code}: {response.text}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Get conversations", False, f"Exception: {e}")
-        test_results.append(False)
+            results.add_result("Create Task from Message", False, error="No message_id from previous test")
+        
+        # Test 14: Check Old Endpoints
+        print(f"\n14. 🔄 Testing: Old Endpoints Check")
+        
+        # Test 14a: Unread messages
+        try:
+            response = await client.get(f"{API_BASE}/messages/unread/55555")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'total_unread' in data:
+                    results.add_result("Old Endpoint - Unread Messages", True, response.status_code, data)
+                else:
+                    results.add_result("Old Endpoint - Unread Messages", False, response.status_code,
+                                     error="Should contain total_unread field")
+            else:
+                results.add_result("Old Endpoint - Unread Messages", False, response.status_code, error=response.text)
+                
+        except Exception as e:
+            results.add_result("Old Endpoint - Unread Messages", False, error=str(e))
+        
+        # Test 14b: Conversations list
+        try:
+            response = await client.get(f"{API_BASE}/messages/conversations/55555")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, dict) and 'conversations' in data:
+                    results.add_result("Old Endpoint - Conversations List", True, response.status_code, data)
+                else:
+                    results.add_result("Old Endpoint - Conversations List", False, response.status_code,
+                                     error="Should contain conversations field")
+            else:
+                results.add_result("Old Endpoint - Conversations List", False, response.status_code, error=response.text)
+                
+        except Exception as e:
+            results.add_result("Old Endpoint - Conversations List", False, error=str(e))
     
-    # Test 11: Try to send message to non-friend (expect 403)
-    print_step(11, "POST send message to non-friend user 99999 (expect 403)")
-    try:
-        msg_data = {
-            "sender_id": USER1_ID,
-            "receiver_id": 99999,
-            "text": "test"
-        }
-        response = requests.post(f"{BASE_URL}/messages/send", json=msg_data, timeout=10)
-        if response.status_code == 403:
-            print(f"   Response: HTTP 403 (expected)")
-            print_test_result("Send to non-friend", True, "Got 403 as expected")
-            test_results.append(True)
-        else:
-            print(f"   Response: HTTP {response.status_code}: {response.text}")
-            print_test_result("Send to non-friend", False, f"Expected 403, got {response.status_code}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Send to non-friend", False, f"Exception: {e}")
-        test_results.append(False)
+    # Print Summary
+    print("\n" + "=" * 60)
+    print("🏁 NEW MESSAGING API ENDPOINTS TEST SUMMARY")
+    print("=" * 60)
     
-    # Test 12: Try to create conversation with self (expect 400)
-    print_step(12, "POST create conversation with self (expect 400)")
-    try:
-        conv_data = {"user1_id": USER1_ID, "user2_id": USER1_ID}
-        response = requests.post(f"{BASE_URL}/messages/conversations", json=conv_data, timeout=10)
-        if response.status_code == 400:
-            print(f"   Response: HTTP 400 (expected)")
-            print_test_result("Create conversation with self", True, "Got 400 as expected")
-            test_results.append(True)
-        else:
-            print(f"   Response: HTTP {response.status_code}: {response.text}")
-            print_test_result("Create conversation with self", False, f"Expected 400, got {response.status_code}")
-            test_results.append(False)
-    except Exception as e:
-        print_test_result("Create conversation with self", False, f"Exception: {e}")
-        test_results.append(False)
+    summary = results.get_summary()
+    print(f"Total Tests: {summary['total']}")
+    print(f"Passed: {summary['passed']} ✅")
+    print(f"Failed: {summary['failed']} ❌")
+    print(f"Success Rate: {summary['success_rate']}")
     
-    return test_results
-
-def main():
-    """Main test execution"""
-    print("🚀 Starting Messaging API Testing")
-    print(f"Backend URL: {BASE_URL}")
-    print("=" * 70)
+    # Print failed tests details
+    if results.failed > 0:
+        print(f"\n❌ FAILED TESTS DETAILS:")
+        for result in results.results:
+            if not result['passed']:
+                print(f"  • {result['test']}: {result['error']} (Status: {result['status_code']})")
     
-    # Setup test data
-    setup_success = setup_test_data()
-    if not setup_success:
-        print("\n❌ Failed to set up test data. Cannot proceed with messaging tests.")
-        return 1
-    
-    # Test messaging endpoints
-    test_results = test_messaging_endpoints()
-    
-    # Summary
-    print("\n" + "=" * 70)
-    print("📊 MESSAGING API TEST SUMMARY")
-    print("=" * 70)
-    
-    test_names = [
-        "1. Initial unread count (0)",
-        "2. Create conversation", 
-        "3. Send first message",
-        "4. Send second message",
-        "5. Get conversation messages (2)",
-        "6. Unread count after messages (1)",
-        "7. Mark messages as read",
-        "8. Unread count after read (0)", 
-        "9. Delete message",
-        "10. Get conversations (1)",
-        "11. Send to non-friend (403)",
-        "12. Create conversation with self (400)"
-    ]
-    
-    passed = sum(test_results)
-    failed = len(test_results) - passed
-    
-    for i, (test_name, result) in enumerate(zip(test_names, test_results)):
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{status} {test_name}")
-    
-    print(f"\nTotal: {passed} passed, {failed} failed")
-    
-    if failed == 0:
-        print("\n🎉 All messaging API tests passed!")
-        print("Messaging system is working correctly.")
-        return 0
-    else:
-        print(f"\n⚠️  {failed} test(s) failed. Check the details above.")
-        return 1
+    return results
 
 if __name__ == "__main__":
-    sys.exit(main())
+    asyncio.run(test_new_messaging_endpoints())
