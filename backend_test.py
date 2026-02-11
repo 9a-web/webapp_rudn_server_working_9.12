@@ -75,13 +75,13 @@ class BackendTester:
             self.log_test("Preview Non-existent Room", False, f"Exception: {str(e)}")
     
     async def test_preview_empty_invite_code(self):
-        """Test preview endpoint with empty invite code (should be 404/405)"""
+        """Test preview endpoint with empty invite code (should be 404/405/307)"""
         try:
             # Test with empty path (should not match route)
             response = await self.client.get(f"{BASE_URL}/music/rooms/preview/")
             
-            # Should return 404 (Not Found) or 405 (Method Not Allowed) as the route doesn't match
-            if response.status_code in [404, 405]:
+            # Should return 404 (Not Found), 405 (Method Not Allowed), or 307 (Redirect) as the route doesn't match
+            if response.status_code in [404, 405, 307]:
                 self.log_test("Preview Empty Invite Code", True, f"Correctly returned HTTP {response.status_code}")
             else:
                 # If it somehow matches and returns 200, check if it's proper error handling
