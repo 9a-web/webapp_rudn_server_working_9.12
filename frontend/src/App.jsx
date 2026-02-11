@@ -1605,6 +1605,26 @@ const Home = () => {
     setFriendRequestModal({ isOpen: false, friendId: null, friendData: null, loading: false });
   };
 
+  // Обработчик подтверждения подключения к комнате прослушивания
+  const handleListenRoomJoinConfirm = () => {
+    const inviteCode = listenRoomJoinModal.inviteCode;
+    setListenRoomJoinModal({ isOpen: false, inviteCode: null, roomData: null, loading: false });
+    
+    if (inviteCode) {
+      // Устанавливаем pendingListenInvite и переключаемся на вкладку музыки
+      setPendingListenInvite(inviteCode);
+      setActiveTab('music');
+      setTimeout(() => {
+        openListeningRoomRef.current?.();
+      }, 300);
+      hapticFeedback('success');
+    }
+  };
+
+  const handleListenRoomJoinCancel = () => {
+    setListenRoomJoinModal({ isOpen: false, inviteCode: null, roomData: null, loading: false });
+  };
+
   // Рендерим новогоднюю тему для всех экранов
   const renderNewYearTheme = () => {
     // Определяем, показывать ли снег
