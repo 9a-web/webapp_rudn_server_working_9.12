@@ -12770,6 +12770,15 @@ async def remove_friend(friend_telegram_id: int, telegram_id: int = Body(..., em
         await update_friends_stats(friend_telegram_id)
         
         logger.info(f"👥 Friend removed: {telegram_id} X {friend_telegram_id}")
+        
+        # SSE: уведомляем обе стороны об удалении
+        await _emit_friend_event(friend_telegram_id, "friend_removed", {
+            "by_telegram_id": telegram_id
+        })
+        await _emit_friend_event(telegram_id, "friend_removed_self", {
+            "friend_telegram_id": friend_telegram_id
+        })
+        
         return FriendActionResponse(
             success=True,
             message="Удален из друзей"
