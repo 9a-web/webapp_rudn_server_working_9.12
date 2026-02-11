@@ -19,10 +19,14 @@ Fix music sending in chat (Friends > Messages tab) and add ability to send music
 5. **MusicSection.jsx** — Added `SendTrackToFriendModal` integration with `handleSendToFriend` handler.
 6. **NEW: SendTrackToFriendModal.jsx** — Friend selection modal for sending music (auto-creates conversation if needed).
 
-### Backend Endpoints Used (existing):
-- `POST /api/messages/send-music` — sends music message (auto-creates conversation)
-- `GET /api/friends/{id}` — gets friends list
-- `GET /api/music/search` — searches music
+### Backend Endpoints for Real-time (SSE):
+- `GET /api/friends/events/{telegram_id}` — SSE stream for friend events
+- Events emitted on: send_request, accept, reject, cancel, remove, block
+
+### Test SSE real-time:
+1. Connect to SSE: `GET /api/friends/events/{user_id}` - should receive `connected` event
+2. In another request, perform friend action - SSE should emit event
+3. All friend action endpoints now emit SSE events to both parties
 
 ### Bug Fixes Applied:
 
