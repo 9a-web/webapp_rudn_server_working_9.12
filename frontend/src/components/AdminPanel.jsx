@@ -1914,7 +1914,7 @@ const ServerTab = () => {
               { label: 'VMS память', value: `${proc.memory_vms_mb || 0} MB`, icon: '📊' },
               { label: 'Потоки', value: proc.threads, icon: '🧵' },
               { label: 'CPU', value: `${proc.cpu_percent || 0}%`, icon: '⚡' },
-              { label: 'Запущен', value: proc.started_at ? new Date(proc.started_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—', icon: '🕐' },
+              { label: 'Запущен', value: proc.started_at ? new Date(proc.started_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' }) : '—', icon: '🕐' },
             ].map((item) => (
               <div key={item.label} className="p-2.5 bg-white/[0.03] rounded-xl border border-white/[0.05]">
                 <div className="text-[10px] text-gray-600 mb-1">{item.icon} {item.label}</div>
