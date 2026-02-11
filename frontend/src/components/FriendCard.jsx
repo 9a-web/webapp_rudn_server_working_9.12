@@ -21,7 +21,9 @@ const pluralFriends = (n) => {
 const getLastSeen = (lastActivity) => {
   if (!lastActivity) return '';
   const now = new Date();
-  const last = new Date(lastActivity);
+  // Сервер хранит UTC, но без суффикса Z — добавляем
+  const raw = String(lastActivity);
+  const last = new Date(raw.endsWith('Z') || raw.includes('+') ? raw : raw + 'Z');
   const diffMs = now - last;
   const diffMin = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
