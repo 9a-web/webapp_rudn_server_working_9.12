@@ -321,7 +321,8 @@ const Home = () => {
     isFullscreenPlayerOpen || // fullscreen music player
     isFriendProfileOpen || // friend profile modal
     isChatOpen || // chat with friend
-    isListeningRoomOpen; // listening room modal
+    isListeningRoomOpen || // listening room modal
+    isSendTrackModalOpen; // send track to friend modal
 
   // Ref для отслеживания предыдущего счётчика уведомлений
   const prevUnreadCountRef = React.useRef(0);
