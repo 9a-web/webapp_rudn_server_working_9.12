@@ -42,9 +42,10 @@ export const messagesAPI = {
   },
 
   // === Сообщения ===
-  getMessages: async (conversationId, telegramId, limit = 50, offset = 0) => {
+  getMessages: async (conversationId, telegramId, limit = 50, offset = 0, before = '') => {
     try {
-      const params = new URLSearchParams({ limit, offset, telegram_id: telegramId });
+      const params = new URLSearchParams({ limit, telegram_id: telegramId });
+      if (before) params.append('before', before);
       const r = await api.get(`/messages/${conversationId}/messages?${params}`);
       return r.data;
     } catch (e) { handleError(e); }
