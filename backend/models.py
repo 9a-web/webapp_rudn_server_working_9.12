@@ -2369,7 +2369,7 @@ class MessagesListResponse(BaseModel):
     total: int = 0
     has_more: bool = False
 
-class UnreadCountResponse(BaseModel):
+class MessagesUnreadCountResponse(BaseModel):
     """Количество непрочитанных сообщений"""
     total_unread: int = 0
     per_conversation: dict = {}
