@@ -668,6 +668,22 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
           <div className="flex items-center gap-2">
             <motion.button
               whileTap={{ scale: 0.85 }}
+              onClick={() => { hapticFeedback('impact', 'light'); setShowConversations(true); }}
+              className="relative p-2.5 bg-white/[0.06] rounded-xl text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+            >
+              <MessageCircle className="w-[18px] h-[18px]" />
+              {unreadMessagesCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-purple-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1"
+                >
+                  {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                </motion.span>
+              )}
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.85 }}
               onClick={handleOpenQR}
               className="p-2.5 bg-white/[0.06] rounded-xl text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
             >
