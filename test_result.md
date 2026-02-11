@@ -1254,3 +1254,97 @@ Step 3: ✅ SSE event received on 444444's stream: `{"type": "friend_removed", "
 ### Testing Agent Report (2026-02-11T18:22:00)
 **Agent:** testing
 **Message:** ✅ MUSIC SENDING API TESTING COMPLETE: All 13 music sending tests passed successfully on localhost:8001 as per review request. Complete validation of music messaging functionality: POST /api/messages/send-music working correctly with proper metadata (track_title, track_artist, track_id, track_duration, cover_url), conversation auto-creation for first music messages, friend relationship validation (403 for non-friends), GET /api/messages/conversations/{telegram_id} working, GET /api/music/search working with VK integration (3 tracks found), GET /api/music/stream/{track_id} working with URL generation, GET /api/friends/{telegram_id} working with proper friend data structure. Users 77777 and 88888 setup and friendship validation successful. Music message type validation, metadata population, unread count tracking, and all messaging API endpoints working correctly. VK music integration operational. All 10 music sending test cases from review request validated successfully with 100% test pass rate.
+
+### Backend Test Results - Listen Together E2E Flow
+**Test Date:** 2026-02-11T19:32:00
+**Testing Agent:** testing
+
+**Review Request Testing:** Listen Together E2E flow APIs on http://localhost:8001
+**Test Status:** ✅ ALL TESTS PASSED (10/10)
+
+**Prerequisites Setup:**
+1. ✅ Create user 77777: POST /api/user-settings with {telegram_id: 77777, username: "listentest1", first_name: "ListenTest1", last_name: "User", group_id: "G1", group_name: "Группа1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+2. ✅ Create user 88888: POST /api/user-settings with {telegram_id: 88888, username: "listentest2", first_name: "ListenTest2", last_name: "User", group_id: "G1", group_name: "Группа1", facultet_id: "F1", level_id: "L1", kurs: "1", form_code: "ОФО"}
+3. ✅ Make them friends: POST /api/friends/request/88888 with {telegram_id: 77777} → GET /api/friends/88888/requests (found request_id from "incoming" array) → POST /api/friends/accept/{request_id} with {telegram_id: 88888}
+
+**Detailed Test Results:**
+
+**Test 1: ✅ Create listening room**
+- Endpoint: `POST /api/music/rooms`
+- Request: `{"telegram_id": 77777, "first_name": "ListenTest1", "last_name": "User", "username": "listentest1", "name": "🎵 Bohemian Rhapsody — совместное", "control_mode": "everyone"}`
+- Status: HTTP 200
+- Response Validation:
+  - ✅ success = true (correct)
+  - ✅ room_id present (b2cafc0a-668b-4abf-8b72-699c3914abf0)
+  - ✅ invite_code present (F587A2AA)
+
+**Test 2: ✅ Add track to room queue**
+- Endpoint: `POST /api/music/rooms/{room_id}/queue/add?telegram_id=77777`
+- Request: `{"id": "track-123", "title": "Bohemian Rhapsody", "artist": "Queen", "duration": 355, "cover": null}`
+- Status: HTTP 200
+- Response Validation:
+  - ✅ success = true (correct)
+  - ✅ queue_length = 1 (correct)
+
+**Test 3: ✅ Join room by invite code**
+- Endpoint: `POST /api/music/rooms/join/{invite_code}`
+- Request: `{"telegram_id": 88888, "first_name": "ListenTest2", "last_name": "User", "username": "listentest2"}`
+- Status: HTTP 200
+- Response Validation:
+  - ✅ success = true (correct)
+  - ✅ room object with 2 participants (correct)
+  - ✅ queue containing the track "Bohemian Rhapsody" by Queen (correct)
+
+**Test 4: ✅ Send room invite message**
+- Endpoint: `POST /api/messages/send`
+- Request: `{"sender_id": 77777, "receiver_id": 88888, "text": "🎧 Приглашение: совместное прослушивание\n🎵 Bohemian Rhapsody — Queen", "message_type": "room_invite", "metadata": {"room_id": "{room_id}", "invite_code": "{invite_code}", "track_title": "Bohemian Rhapsody", "track_artist": "Queen", "track_id": "track-123", "track_duration": 355}}`
+- Status: HTTP 200
+- Response Validation:
+  - ✅ message_type = "room_invite" (correct)
+  - ✅ metadata contains invite_code (correct)
+
+**Test 5: ✅ Verify room_invite in conversations**
+- Endpoint: `GET /api/messages/conversations/88888`
+- Status: HTTP 200
+- Validation: ✅ Room invite message found in conversations with correct metadata
+
+**Test 6: ✅ Join with invalid code**
+- Endpoint: `POST /api/music/rooms/join/INVALIDCODE`
+- Request: `{"telegram_id": 88888, "first_name": "Test", "last_name": "User", "username": "test"}`
+- Status: HTTP 200
+- Response Validation: ✅ success = false (correct error handling)
+
+**Test 7: ✅ Get room info**
+- Endpoint: `GET /api/music/rooms/{room_id}?telegram_id=77777`
+- Status: HTTP 200
+- Response Validation:
+  - ✅ Room has 2 participants (77777 and 88888)
+  - ✅ Queue contains 1 track ("Bohemian Rhapsody" by Queen)
+
+**Technical Implementation Status:**
+- ✅ Listening room creation with all metadata working correctly
+- ✅ Queue management (add track) working with proper authorization
+- ✅ Room joining by invite code working with participant tracking
+- ✅ Room invite messaging system operational
+- ✅ Message type "room_invite" with metadata support working
+- ✅ Conversation system integration with room invites working
+- ✅ Error handling for invalid invite codes working
+- ✅ Room state retrieval with participants and queue working
+- ✅ Friend relationship validation working throughout the flow
+- ✅ All Listen Together E2E APIs functional on localhost:8001
+- ✅ Russian text (Cyrillic) handling working properly
+
+**Testing Environment:**
+- Backend URL: http://localhost:8001/api (as per review request)
+- All endpoints accessible via localhost
+- Response times: <2 seconds for all requests
+- No connection errors or timeouts encountered
+- Success Rate: 100% (10/10 tests passed)
+
+**Minor Fix Applied During Testing:**
+- Fixed query parameter handling in test suite to properly pass `telegram_id` as query parameter for queue/add endpoint
+- Fixed response structure validation to access nested `room` data in room info endpoint
+
+### Testing Agent Report (2026-02-11T19:32:00)
+**Agent:** testing
+**Message:** ✅ LISTEN TOGETHER E2E FLOW TESTING COMPLETE: All 10 Listen Together E2E flow tests passed successfully on localhost:8001 as per review request. Complete validation of Listen Together functionality: POST /api/music/rooms working with room creation, POST /api/music/rooms/{room_id}/queue/add working with track addition (queue_length=1), POST /api/music/rooms/join/{invite_code} working with 2 participants and queue preservation, POST /api/messages/send working with room_invite message type and metadata, GET /api/messages/conversations/{telegram_id} working with room invite verification, error handling for invalid codes working (success=false), GET /api/music/rooms/{room_id} working with room state retrieval (2 participants, 1 track). Users 77777 and 88888 setup and friendship validation successful. All listening room APIs, queue management, invite system, and messaging integration working correctly. Listen Together E2E flow requirements from review request validated successfully with 100% test pass rate.
