@@ -13880,6 +13880,8 @@ async def update_extended_notification_settings(telegram_id: int, settings: Exte
 
 # In-memory typing indicators {conversation_id: {telegram_id: timestamp}}
 typing_indicators_store: dict = {}
+# Счётчик вызовов для периодической очистки
+_typing_cleanup_counter = 0
 
 async def get_or_create_conversation(user1_id: int, user2_id: int) -> dict:
     """Получить или создать диалог между двумя пользователями (атомарная операция)"""
