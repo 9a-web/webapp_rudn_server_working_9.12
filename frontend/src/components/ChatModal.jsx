@@ -746,13 +746,17 @@ const ChatModal = ({ isOpen, onClose, friend, currentUserId, friends: allFriends
     setShowForwardModal(false); setForwardMessage(null);
   }, [forwardMessage, currentUserId]);
 
-  // Schedule share
-  const handleSendSchedule = async () => {
+  // Schedule share with date selection
+  const handleSendSchedule = async (dateStr) => {
     if (!friend?.telegram_id) return;
     try {
-      const msg = await messagesAPI.sendSchedule(currentUserId, friend.telegram_id);
-      setMessages(prev => [...prev, msg]);
-      setToast('Расписание отправлено');
+      // dateStr can be single date "2025-07-10" or multiple "2025-07-10,2025-07-11,..."
+      const dates = dateStr.split(',').filter(Boolean);
+      for (const date of dates) {
+        const msg = await messagesAPI.sendSchedule(currentUserId, friend.telegram_id, date);
+        setMessages(prev => [...prev, msg]);
+      }
+      setToast(dates.length > 1 ? `Расписание на ${dates.length} дней отправлено` : 'Расписание отправлено');
     } catch (e) { setToast('Ошибка отправки расписания'); }
   };
 
