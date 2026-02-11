@@ -94,6 +94,7 @@ export const SendTrackToFriendModal = ({ isOpen, onClose, track, telegramId }) =
       setSentTo(new Set());
       setSendingTo(null);
       setError(null);
+      setSuccessMsg(null);
     }
   }, [isOpen]);
 
@@ -101,23 +102,33 @@ export const SendTrackToFriendModal = ({ isOpen, onClose, track, telegramId }) =
     if (!track || !telegramId || sendingTo) return;
     setSendingTo(friend.telegram_id);
     setError(null);
+    setSuccessMsg(null);
 
     try {
-      await messagesAPI.sendMusic(telegramId, friend.telegram_id, {
-        track_title: track.title,
-        track_artist: track.artist,
-        track_id: track.id,
-        track_duration: track.duration,
-        cover_url: track.cover || null,
-      });
+      const trackData = {
+        track_title: track.title || track.track_title || 'Трек',
+        track_artist: track.artist || track.track_artist || 'Неизвестный',
+        track_id: track.id || track.track_id || null,
+        track_duration: track.duration || track.track_duration || 0,
+        cover_url: track.cover || track.cover_url || null,
+      };
+      
+      console.log('🎵 Sending music to friend:', { to: friend.telegram_id, track: trackData });
+      
+      await messagesAPI.sendMusic(telegramId, friend.telegram_id, trackData);
 
       setSentTo(prev => new Set([...prev, friend.telegram_id]));
+      
+      const friendName = [friend.first_name, friend.last_name].filter(Boolean).join(' ') || friend.username || 'Друг';
+      setSuccessMsg(`Отправлено ${friendName} ✓`);
+      setTimeout(() => setSuccessMsg(null), 3000);
 
       // Haptic feedback
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (e) {}
     } catch (err) {
       console.error('Send music error:', err);
-      setError(`Ошибка отправки: ${err.message}`);
+      const errMsg = err?.message || 'Неизвестная ошибка';
+      setError(`Ошибка: ${errMsg}`);
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error'); } catch (e) {}
     } finally {
       setSendingTo(null);
