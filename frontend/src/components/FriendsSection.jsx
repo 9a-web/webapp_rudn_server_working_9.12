@@ -107,7 +107,7 @@ const getAvatarGradient = (id) => {
   return gradients[Math.abs(id || 0) % gradients.length];
 };
 
-const FriendsSection = ({ userSettings, onFriendProfileOpen }) => {
+const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen }) => {
   const { user, webApp } = useTelegram();
   const [activeTab, setActiveTab] = useState('friends');
   const [friends, setFriends] = useState([]);
