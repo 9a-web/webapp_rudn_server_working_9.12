@@ -120,17 +120,10 @@ class TelegramNotificationService:
         Форматировать текст уведомления о паре
         """
         discipline = class_info.get('discipline', 'Пара')
-        time = class_info.get('time', '')
         teacher = class_info.get('teacher', '')
         auditory = class_info.get('auditory', '')
         lesson_type = class_info.get('lessonType', '')
         group_name = class_info.get('group_name', '')
-        
-        # Получаем текущее время в московском часовом поясе
-        from datetime import timezone
-        import pytz
-        moscow_tz = pytz.timezone('Europe/Moscow')
-        current_time = datetime.now(moscow_tz).strftime('%H:%M')
 
         # Выбираем фразу по времени до начала
         if minutes_before <= 5:
