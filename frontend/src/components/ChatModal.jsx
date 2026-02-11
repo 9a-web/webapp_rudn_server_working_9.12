@@ -710,10 +710,14 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
     e.stopPropagation();
     try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (err) {}
     
-    if (isCurrentTrack) {
-      toggle();
-    } else if (meta.track_id) {
-      play(trackObj, [trackObj]);
+    try {
+      if (isCurrentTrack) {
+        toggle();
+      } else if (meta.track_id) {
+        play(trackObj, [trackObj]);
+      }
+    } catch (err) {
+      console.error('Music play error:', err);
     }
   };
 
