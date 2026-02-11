@@ -1698,6 +1698,12 @@ const ServerTab = ({ onlineData }) => {
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
   const intervalRef = useRef(null);
+  const onlineDataRef = useRef(onlineData);
+  
+  // Синхронизируем ref с актуальным onlineData
+  useEffect(() => {
+    onlineDataRef.current = onlineData;
+  }, [onlineData]);
 
   const fetchServerStats = useCallback(async () => {
     try {
