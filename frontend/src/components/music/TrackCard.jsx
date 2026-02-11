@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart, Ban } from 'lucide-react';
+import { Play, Pause, Heart, Ban, Send } from 'lucide-react';
 import { usePlayer } from './PlayerContext';
 import { TrackCover } from './TrackCover';
 
@@ -10,7 +10,9 @@ export const TrackCard = ({
   onFavorite, 
   isFavorite = false,
   showFavorite = true,
-  onArtistClick
+  onArtistClick,
+  onSendToFriend,
+  showSendToFriend = false,
 }) => {
   const { currentTrack, isPlaying, play, toggle } = usePlayer();
   const [isHovered, setIsHovered] = useState(false);
