@@ -750,18 +750,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                         from telegram import Bot
                         bot = Bot(token=TELEGRAM_BOT_TOKEN)
                         referrer_name = f"{first_name} {last_name}".strip()
-                        from notifications import animate_emoji as _anim_ref
                         await bot.send_message(
                             chat_id=referrer_id,
-                            text=_anim_ref(
-                                f"🎉  <b>Новый реферал!</b>\n"
-                                f"\n"
-                                f"<b>{referrer_name}</b> присоединился\n"
-                                f"по вашей пригласительной ссылке.\n"
-                                f"\n"
-                                f"💰 Начислено: <b>+{bonus_points} баллов</b>\n"
-                                f"\n"
-                                f"<i>Приглашайте друзей — получайте бонусы!</i>"
+                            text=(
+                                f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji>  <b>Новый реферал!</b>\n'
+                                f'\n'
+                                f'<b>{referrer_name}</b> присоединился\n'
+                                f'по вашей пригласительной ссылке.\n'
+                                f'\n'
+                                f'<tg-emoji emoji-id="5325521342643064145">💰</tg-emoji> Начислено: <b>+{bonus_points} баллов</b>\n'
+                                f'\n'
+                                f'Приглашайте друзей — получайте бонусы!'
                             ),
                             parse_mode='HTML'
                         )
