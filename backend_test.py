@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Test Script for Schedule Sending in Messages
-Testing schedule sending endpoints on http://localhost:8001
+Backend Test Script for Music Sending API Endpoints
+Testing music sending endpoints as per review request
 """
 
 import asyncio
@@ -10,8 +10,8 @@ import json
 from datetime import datetime, timedelta
 import sys
 
-# Base URL from the review request
-BASE_URL = "http://localhost:8001/api"
+# Base URL from frontend/.env REACT_APP_BACKEND_URL + /api
+BASE_URL = "https://music-chat-hub-1.preview.emergentagent.com/api"
 
 class ScheduleTestRunner:
     def __init__(self):
