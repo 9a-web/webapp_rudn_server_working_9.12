@@ -484,8 +484,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                     console.log('Profile photo loaded into img element');
                   }}
                   onError={(e) => {
-                    // Если не удалось загрузить фото, показываем иконку
-                    console.error('Failed to load profile photo image, showing default icon');
+                    // Фото не загрузилось — тихо показываем иконку
                     setPhotoError(true);
                     setProfilePhoto(null);
                     photoLoadedRef.current = false;
