@@ -519,7 +519,7 @@ class MusicTestRunner:
 
 async def main():
     """Main test runner"""
-    async with ScheduleTestRunner() as runner:
+    async with MusicTestRunner() as runner:
         success = await runner.run_all_tests()
         sys.exit(0 if success else 1)
 
