@@ -36,7 +36,7 @@ import {
 } from '../../services/listeningRoomAPI';
 import { fetchBotInfo } from '../../utils/botInfo';
 
-const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange }) => {
+const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, pendingInviteCode, onInviteHandled }) => {
   const { hapticFeedback, user } = useTelegram();
   const { 
     currentTrack, isPlaying, progress, play, pause, seek,
