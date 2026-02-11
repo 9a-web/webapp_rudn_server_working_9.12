@@ -1860,11 +1860,11 @@ const ServerTab = ({ onlineData }) => {
         </motion.div>
       </div>
 
-      {/* CPU & RAM History Chart */}
+      {/* CPU, RAM & Online History Chart */}
       {history.length > 1 && (
-        <GlassChartCard title="CPU и RAM в реальном времени" icon={<Activity className="w-4 h-4" />}>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={history} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+        <GlassChartCard title="CPU, RAM и Онлайн в реальном времени" icon={<Activity className="w-4 h-4" />}>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={history} margin={{ top: 5, right: 35, left: -15, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradCpuHist" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
@@ -1874,13 +1874,23 @@ const ServerTab = ({ onlineData }) => {
                   <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="gradOnlineHist" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
               <XAxis dataKey="time" stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} />
-              <YAxis stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} domain={[0, 100]} />
-              <Tooltip content={<GlassTooltip formatter={(v, name) => [`${v}%`, name === 'cpu' ? 'CPU' : 'RAM']} />} />
-              <Area type="monotone" dataKey="cpu" stroke="#06b6d4" strokeWidth={2} fill="url(#gradCpuHist)" name="cpu" dot={false} />
-              <Area type="monotone" dataKey="ram" stroke="#a78bfa" strokeWidth={2} fill="url(#gradRamHist)" name="ram" dot={false} />
+              <YAxis yAxisId="percent" stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} domain={[0, 100]} />
+              <YAxis yAxisId="online" orientation="right" stroke="transparent" tick={{ fill: '#22c55e', fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip content={<GlassTooltip formatter={(v, name) => {
+                if (name === 'cpu') return [`${v}%`, 'CPU'];
+                if (name === 'ram') return [`${v}%`, 'RAM'];
+                return [v, 'Онлайн'];
+              }} />} />
+              <Area yAxisId="percent" type="monotone" dataKey="cpu" stroke="#06b6d4" strokeWidth={2} fill="url(#gradCpuHist)" name="cpu" dot={false} />
+              <Area yAxisId="percent" type="monotone" dataKey="ram" stroke="#a78bfa" strokeWidth={2} fill="url(#gradRamHist)" name="ram" dot={false} />
+              <Area yAxisId="online" type="monotone" dataKey="online" stroke="#22c55e" strokeWidth={2} fill="url(#gradOnlineHist)" name="online" dot={false} strokeDasharray="4 2" />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex items-center justify-center gap-6 mt-2">
@@ -1891,6 +1901,10 @@ const ServerTab = ({ onlineData }) => {
             <div className="flex items-center gap-2">
               <div className="w-3 h-1.5 rounded-full bg-purple-400" />
               <span className="text-[11px] text-gray-500">RAM</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-1.5 rounded-full bg-green-500" style={{ borderBottom: '1px dashed #22c55e' }} />
+              <span className="text-[11px] text-gray-500">Онлайн</span>
             </div>
           </div>
         </GlassChartCard>
