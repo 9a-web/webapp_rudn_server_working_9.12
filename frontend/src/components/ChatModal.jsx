@@ -413,6 +413,17 @@ const MessageBubble = ({ message, isMine, showAvatar, friend, onAction, isFirst,
     );
   };
 
+  const renderRoomInviteCard = () => {
+    if (!isRoomInvite) return null;
+    return (
+      <RoomInviteCard
+        metadata={message.metadata}
+        isMine={isMine}
+        onJoinRoom={() => onAction('join_room', message)}
+      />
+    );
+  };
+
   const bubbleRadius = isMine
     ? (isFirst && isLast ? 'rounded-2xl' : isFirst ? 'rounded-2xl rounded-br-lg' : isLast ? 'rounded-2xl rounded-tr-lg' : 'rounded-xl rounded-r-lg')
     : (isFirst && isLast ? 'rounded-2xl' : isFirst ? 'rounded-2xl rounded-bl-lg' : isLast ? 'rounded-2xl rounded-tl-lg' : 'rounded-xl rounded-l-lg');
