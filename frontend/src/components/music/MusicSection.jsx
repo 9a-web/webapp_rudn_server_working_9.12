@@ -391,12 +391,12 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, onSendTrac
               repeat: Infinity,
               ease: "easeInOut"
             }}
-            className="w-full p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-blue-600/20 
-                     border border-blue-500/30 hover:from-blue-500/30 hover:to-blue-600/30
+            className="w-full p-3 rounded-xl bg-gradient-to-r from-pink-400/20 to-orange-400/20 
+                     border border-orange-400/30 hover:from-pink-400/30 hover:to-orange-400/30
                      transition-all flex items-center justify-center gap-2"
           >
-            <Key className="w-4 h-4 text-blue-400" />
-            <span className="text-sm font-medium text-blue-400">
+            <Key className="w-4 h-4 text-orange-400" />
+            <span className="text-sm font-medium text-orange-400">
               Получить токен для доступа к музыке
             </span>
           </motion.button>
