@@ -115,12 +115,14 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
         webApp.HapticFeedback.notificationOccurred('success');
       }
 
-      if (webApp?.showPopup) {
-        webApp.showPopup({
-          title: 'Готово!',
-          message: 'Ссылка скопирована в буфер обмена',
-          buttons: [{ type: 'ok' }]
-        });
+      if (webApp?.showPopup && webApp?.isVersionAtLeast?.('6.2')) {
+        try {
+          webApp.showPopup({
+            title: 'Готово!',
+            message: 'Ссылка скопирована в буфер обмена',
+            buttons: [{ type: 'ok' }]
+          });
+        } catch (e) { /* ignore */ }
       }
 
       setShowShareOptions(false);
