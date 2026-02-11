@@ -353,6 +353,9 @@ class BackendTester:
         print("🚀 Starting SSE Friend Events System Tests")
         print(f"Backend URL: {self.base_url}")
         
+        # Clean up any existing test data first
+        self.cleanup_test_users()
+        
         tests = [
             self.test_sse_connection,
             self.test_sse_friend_request_events,
