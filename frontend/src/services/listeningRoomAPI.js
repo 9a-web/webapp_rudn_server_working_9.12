@@ -71,6 +71,20 @@ export const getListeningRoom = async (roomId, telegramId) => {
 };
 
 /**
+ * Предпросмотр комнаты по invite_code (без присоединения)
+ */
+export const getListeningRoomPreview = async (inviteCode) => {
+  const backendUrl = getBackendURL();
+  const response = await fetchWithRetry(`${backendUrl}/api/music/rooms/preview/${inviteCode}`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch room preview');
+  }
+  
+  return response.json();
+};
+
+/**
  * Присоединиться к комнате по коду
  */
 export const joinListeningRoom = async (inviteCode, userData) => {
