@@ -491,10 +491,18 @@ async def get_or_create_user_stats(db, telegram_id: int) -> UserStats:
     stats_data = await db.user_stats.find_one({"telegram_id": telegram_id})
     
     if not stats_data:
-        # Создаем новую статистику
-        stats = UserStats(telegram_id=telegram_id)
-        await db.user_stats.insert_one(stats.dict())
-        return stats
+        # Создаем новую статистику с обработкой race condition (duplicate key)
+        try:
+            stats = UserStats(telegram_id=telegram_id)
+            await db.user_stats.insert_one(stats.dict())
+            return stats
+        except Exception as e:
+            if "E11000" in str(e) or "duplicate key" in str(e):
+                # Race condition: другой запрос уже создал запись — просто читаем
+                stats_data = await db.user_stats.find_one({"telegram_id": telegram_id})
+                if stats_data:
+                    return UserStats(**stats_data)
+            raise
     
     return UserStats(**stats_data)
 
