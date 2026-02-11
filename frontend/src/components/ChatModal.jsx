@@ -703,7 +703,7 @@ const MusicCardPlayable = ({ metadata, isMine }) => {
     cover: meta.cover_url,
   };
 
-  const isCurrentTrack = currentTrack?.id === meta.track_id;
+  const isCurrentTrack = Boolean(meta.track_id) && currentTrack?.id === meta.track_id;
   const isCurrentlyPlaying = isCurrentTrack && isPlaying;
 
   const handlePlayClick = (e) => {
