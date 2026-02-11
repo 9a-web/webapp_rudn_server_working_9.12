@@ -1797,6 +1797,7 @@ const Home = () => {
           <FriendsSection 
             userSettings={userSettings}
             onFriendProfileOpen={setIsFriendProfileOpen}
+            onChatOpen={setIsChatOpen}
           />
         )}
         
