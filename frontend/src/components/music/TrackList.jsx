@@ -60,6 +60,8 @@ export const TrackList = ({
           isFavorite={favoriteIds.has(track.id)}
           onFavorite={onFavorite}
           onArtistClick={onArtistClick}
+          onSendToFriend={onSendToFriend}
+          showSendToFriend={showSendToFriend}
         />
       ))}
     </div>
