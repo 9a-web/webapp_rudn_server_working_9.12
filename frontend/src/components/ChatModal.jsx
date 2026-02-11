@@ -33,10 +33,12 @@ const getAvatarGradient = (id) => {
   return g[Math.abs(id || 0) % g.length];
 };
 
-const formatTime = (d) => new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+// Парсим дату — сервер хранит UTC без Z
+const parseUTC = (d) => { const s = String(d); return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z'); };
+const formatTime = (d) => parseUTC(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
 const formatDateSeparator = (d) => {
-  const date = new Date(d);
+  const date = parseUTC(d);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
