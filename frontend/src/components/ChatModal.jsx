@@ -881,19 +881,16 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
           <div className="space-y-1.5">
             {results.map((track, idx) => {
               const isBlocked = track.is_blocked || track.content_restricted;
+              const isSending = sendingTrackId === track.id;
               return (
                 <motion.div
                   key={track.id || idx}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: isBlocked ? 0.4 : 1, y: 0 }}
                   transition={{ delay: idx * 0.02 }}
-                  onClick={() => {
-                    if (!isBlocked) {
-                      try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (e) {}
-                      onSelectTrack(track);
-                    }
-                  }}
+                  onClick={() => handleTrackClick(track)}
                   className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                    isSending ? 'bg-purple-500/10 border border-purple-500/20' :
                     isBlocked ? 'bg-white/[0.02] cursor-not-allowed' : 'bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer active:scale-[0.98]'
                   }`}
                 >
@@ -910,6 +907,7 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
                   </div>
                   <span className="text-[11px] text-gray-500 flex-shrink-0">{formatDuration(track.duration)}</span>
                   {!isBlocked && (
+                    isSending ? <Loader2 className="w-4 h-4 text-purple-400 animate-spin flex-shrink-0" /> :
                     <Send className="w-4 h-4 text-purple-400 flex-shrink-0" />
                   )}
                 </motion.div>
@@ -923,6 +921,46 @@ const ChatMusicPicker = ({ isOpen, onClose, onSelectTrack }) => {
             </div>
             <p className="text-gray-400 text-[14px]">Ничего не найдено</p>
             <p className="text-gray-600 text-[12px] mt-1">Попробуйте другой запрос</p>
+          </div>
+        ) : popularTracks.length > 0 ? (
+          <div>
+            <p className="text-[12px] text-gray-500 font-medium uppercase tracking-wider mb-3 px-1">Популярное</p>
+            <div className="space-y-1.5">
+              {popularTracks.map((track, idx) => {
+                const isBlocked = track.is_blocked || track.content_restricted;
+                const isSending = sendingTrackId === track.id;
+                return (
+                  <motion.div
+                    key={track.id || idx}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: isBlocked ? 0.4 : 1, y: 0 }}
+                    transition={{ delay: idx * 0.02 }}
+                    onClick={() => handleTrackClick(track)}
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                      isSending ? 'bg-purple-500/10 border border-purple-500/20' :
+                      isBlocked ? 'bg-white/[0.02] cursor-not-allowed' : 'bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {track.cover ? (
+                        <img src={track.cover} alt="" className="w-full h-full object-cover rounded-xl" />
+                      ) : (
+                        <Music className="w-5 h-5 text-purple-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-white truncate">{track.title}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{track.artist}</p>
+                    </div>
+                    <span className="text-[11px] text-gray-500 flex-shrink-0">{formatDuration(track.duration)}</span>
+                    {!isBlocked && (
+                      isSending ? <Loader2 className="w-4 h-4 text-purple-400 animate-spin flex-shrink-0" /> :
+                      <Send className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <div className="text-center py-16">
