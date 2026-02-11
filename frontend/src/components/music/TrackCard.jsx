@@ -64,6 +64,18 @@ export const TrackCard = ({
     }
   };
 
+  const handleSendToFriend = (e) => {
+    e.stopPropagation();
+    
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+    
+    if (onSendToFriend) {
+      onSendToFriend(track);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
