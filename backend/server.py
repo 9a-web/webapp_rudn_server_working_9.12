@@ -6968,15 +6968,18 @@ async def get_server_stats_history(hours: int = 24):
             }
         
         # Агрегируем данные для больших периодов (чтобы не отдавать тысячи точек)
-        # Для 1ч — каждая минута, для 6ч — каждые 5 мин, для 24ч+ — каждые 15 мин
         if hours <= 1:
             interval_minutes = 1
         elif hours <= 6:
             interval_minutes = 5
         elif hours <= 24:
             interval_minutes = 15
-        else:
+        elif hours <= 168:
             interval_minutes = 30
+        elif hours <= 720:
+            interval_minutes = 60
+        else:
+            interval_minutes = 180  # 3 часа для всего времени
         
         # Группируем по интервалам
         aggregated = []
