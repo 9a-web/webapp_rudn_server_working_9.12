@@ -700,6 +700,47 @@ async def root():
     return {"message": "RUDN Schedule API is running"}
 
 
+@api_router.get("/health")
+async def health_check():
+    """
+    Health-check эндпоинт для мониторинга.
+    Проверяет подключение к MongoDB и возвращает статус.
+    Полезен для load-balancer, Uptime Robot, и ваших мониторинговых систем.
+    """
+    mongo_ok = False
+    mongo_latency_ms = None
+    mongo_error = None
+    try:
+        t0 = _time_module.time()
+        await client.admin.command("ping")
+        mongo_latency_ms = round((_time_module.time() - t0) * 1000, 1)
+        mongo_ok = True
+    except Exception as exc:
+        mongo_error = str(exc)
+
+    status = "healthy" if mongo_ok else "degraded"
+    status_code = 200 if mongo_ok else 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": status,
+            "timestamp": datetime.utcnow().isoformat(),
+            "mongodb": {
+                "connected": mongo_ok,
+                "latency_ms": mongo_latency_ms,
+                "error": mongo_error,
+                "url_host": mongo_url.split("@")[-1].split("/")[0] if "@" in mongo_url else mongo_url.replace("mongodb://", "").split("/")[0],
+            },
+            "watchdog": {
+                "healthy": _mongo_healthy,
+                "last_error": _mongo_last_error or None,
+                "last_check_ago_s": round(_time_module.time() - _mongo_last_check, 1) if _mongo_last_check else None,
+            },
+        },
+    )
+
+
 @api_router.get("/bot-info")
 async def get_bot_info():
     """Возвращает информацию о текущем Telegram боте (username, ENV)."""
