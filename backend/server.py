@@ -13846,7 +13846,7 @@ async def create_notification(
         await db.in_app_notifications.insert_one(notification.dict())
         
         # Отправляем push если нужно
-        if (send_push is True) or (send_push is None and should_push and priority == NotificationPriority.HIGH):
+        if (send_push is True) or (send_push is None and should_push):
             try:
                 from notifications import get_notification_service
                 notification_service = get_notification_service()
