@@ -835,10 +835,10 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
             ))}
           </div>
 
-          {/* Online History Chart */}
+          {/* Realtime Online Chart (current session) */}
           {onlineHistory.length > 1 && (
-            <GlassChartCard title="История онлайна" icon={<Activity className="w-4 h-4" />}>
-              <ResponsiveContainer width="100%" height={200}>
+            <GlassChartCard title="Онлайн — реальное время" icon={<Activity className="w-4 h-4" />}>
+              <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={onlineHistory} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradOnline" x1="0" y1="0" x2="0" y2="1">
@@ -878,6 +878,171 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
                 </div>
               </div>
             </GlassChartCard>
+          )}
+
+          {/* ====== PERSISTENT Online History (from DB) ====== */}
+          <div className="flex items-center gap-3 pt-2">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <Clock className="w-4 h-4 text-green-400" />
+              История онлайна
+            </h3>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </div>
+
+          {/* Period Selector */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {ONLINE_HISTORY_PERIODS.map((p) => (
+              <motion.button
+                key={p.hours}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setHistoryPeriod(p.hours)}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+                  historyPeriod === p.hours
+                    ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-300 border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.15)]'
+                    : `${GLASS.card} text-gray-500 hover:text-gray-300 ${GLASS.cardHover}`
+                }`}
+              >
+                {p.label}
+              </motion.button>
+            ))}
+            <div className="ml-auto">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => fetchOnlineHistory(historyPeriod)}
+                className={`p-2 ${GLASS.card} rounded-xl text-gray-400 ${GLASS.cardHover}`}
+              >
+                <RefreshCw className={`w-4 h-4 ${historyLoading ? 'animate-spin' : ''}`} />
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Peak Online Card */}
+          {persistentHistory?.peaks?.online_now && (
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`${GLASS.card} rounded-2xl p-4 relative overflow-hidden`}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-full blur-3xl" />
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/10 rounded-lg border border-green-500/10">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500 font-medium uppercase tracking-wider">Пик онлайна</div>
+                    <div className="text-2xl font-bold text-white">{persistentHistory.peaks.online_now.value}</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[11px] text-gray-600">
+                    {persistentHistory.peaks.online_now.timestamp 
+                      ? new Date(persistentHistory.peaks.online_now.timestamp).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' }) + ' МСК'
+                      : '—'}
+                  </div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">
+                    за {ONLINE_HISTORY_PERIODS.find(p => p.hours === historyPeriod)?.label || '—'}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Persistent Online Chart */}
+          {persistentChartData.length > 1 ? (
+            <>
+              <GlassChartCard title="Онлайн — история" icon={<Users className="w-4 h-4" />}>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={persistentChartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradOnlineHist" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradWebHist" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2dd4bf" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#2dd4bf" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradTgHist" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="time" stroke="transparent" tick={{ fill: '#6b7280', fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                    <YAxis stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip content={<GlassTooltip formatter={(v, name) => [v, name === 'online' ? 'Всего онлайн' : name === 'web' ? 'Веб' : name === 'telegram' ? 'Telegram' : name]} />} />
+                    <Area type="monotone" dataKey="online" stroke="#22c55e" strokeWidth={2} fill="url(#gradOnlineHist)" name="online" dot={false} />
+                    <Area type="monotone" dataKey="web" stroke="#2dd4bf" strokeWidth={1.5} fill="url(#gradWebHist)" name="web" dot={false} />
+                    <Area type="monotone" dataKey="telegram" stroke="#60a5fa" strokeWidth={1.5} fill="url(#gradTgHist)" name="telegram" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-5 mt-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1.5 rounded-full bg-green-500" />
+                    <span className="text-[11px] text-gray-500">Всего</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1.5 rounded-full bg-teal-400" />
+                    <span className="text-[11px] text-gray-500">Веб</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1.5 rounded-full bg-blue-400" />
+                    <span className="text-[11px] text-gray-500">Telegram</span>
+                  </div>
+                </div>
+                <div className="text-center mt-2 text-[10px] text-gray-600">
+                  {persistentHistory?.total_points || 0} точек • интервал {persistentHistory?.interval_minutes || '—'} мин • МСК
+                </div>
+              </GlassChartCard>
+
+              {/* Active users 1h & 24h history */}
+              <GlassChartCard title="Охват — уникальных за 1ч / 24ч" icon={<Activity className="w-4 h-4" />}>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={persistentChartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradOnline1h" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradOnline24h" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="time" stroke="transparent" tick={{ fill: '#6b7280', fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                    <YAxis stroke="transparent" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip content={<GlassTooltip formatter={(v, name) => [v, name === 'online_1h' ? 'За 1 час' : 'За 24 часа']} />} />
+                    <Area type="monotone" dataKey="online_24h" stroke="#a78bfa" strokeWidth={1.5} fill="url(#gradOnline24h)" name="online_24h" dot={false} />
+                    <Area type="monotone" dataKey="online_1h" stroke="#f59e0b" strokeWidth={2} fill="url(#gradOnline1h)" name="online_1h" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex items-center justify-center gap-5 mt-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1.5 rounded-full bg-amber-400" />
+                    <span className="text-[11px] text-gray-500">За 1 час</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1.5 rounded-full bg-purple-400" />
+                    <span className="text-[11px] text-gray-500">За 24 часа</span>
+                  </div>
+                </div>
+              </GlassChartCard>
+            </>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className={`${GLASS.card} rounded-2xl p-8 flex flex-col items-center justify-center`}
+            >
+              <Clock className="w-12 h-12 text-gray-700 mb-3" />
+              <p className="text-sm text-gray-500 text-center">
+                {historyLoading ? 'Загрузка истории...' : 'Данные истории ещё собираются'}
+              </p>
+              <p className="text-[11px] text-gray-600 mt-1 text-center">Статистика онлайна записывается каждую минуту.</p>
+            </motion.div>
           )}
 
           {/* Users List */}
