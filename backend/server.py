@@ -14345,17 +14345,19 @@ async def send_message(data: MessageCreate):
         }
         await db.messages.insert_one(message_doc)
         await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
-        # In-app notification
+        # In-app + Telegram push notification
         try:
             sender_name = await get_user_name(data.sender_id)
             text_preview = data.text.strip()[:100] + ("..." if len(data.text.strip()) > 100 else "")
-            await db.in_app_notifications.insert_one({
-                "id": str(uuid.uuid4()), "telegram_id": data.receiver_id,
-                "type": "new_message", "category": "social", "priority": "normal",
-                "title": f"Сообщение от {sender_name}", "message": text_preview, "emoji": "💬",
-                "data": {"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
-                "is_read": False, "created_at": now,
-            })
+            await create_notification(
+                telegram_id=data.receiver_id,
+                notification_type=NotificationType.NEW_MESSAGE,
+                category=NotificationCategory.SOCIAL,
+                title=f"Сообщение от {sender_name}",
+                message=text_preview,
+                emoji="💬",
+                data={"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+            )
         except Exception as ne:
             logger.warning(f"Notification error: {ne}")
         return build_message_response(message_doc)
