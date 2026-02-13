@@ -28,10 +28,11 @@ const CATEGORIES = [
     icon: Users,
     color: 'purple',
     title: 'Социальные',
-    description: 'Заявки в друзья и уведомления',
+    description: 'Заявки в друзья и сообщения',
     settings: [
       { key: 'social_enabled', label: 'Включить' },
       { key: 'social_push', label: 'Push в Telegram' },
+      { key: 'social_messages', label: 'Сообщения от друзей' },
       { key: 'social_friend_requests', label: 'Заявки в друзья' },
       { key: 'social_friend_accepted', label: 'Принятие заявок' }
     ]
