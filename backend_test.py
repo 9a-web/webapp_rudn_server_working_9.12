@@ -126,17 +126,33 @@ class MessageNotificationTester:
     async def test_4_setup_test_users_and_friendship(self):
         """Test 4: Setup test users and establish friendship"""
         try:
-            # Step 1: Create user settings for sender
+            # Step 1: Create user settings for sender (with required fields)
             sender_data = {
                 "telegram_id": self.test_user_sender, 
-                "first_name": "TestSender"
+                "first_name": "TestSender",
+                "group_id": "test_group_111",
+                "group_name": "Тест группа 111", 
+                "facultet_id": "test_faculty",
+                "facultet_name": "Тестовый факультет",
+                "level_id": "test_level",
+                "kurs": "1",
+                "form_code": "test_form",
+                "notifications_enabled": True
             }
             sender_response = await self.client.post(f"{BASE_URL}/user-settings", json=sender_data)
             
             # Step 2: Create user settings for receiver  
             receiver_data = {
                 "telegram_id": self.test_user_receiver, 
-                "first_name": "TestReceiver"
+                "first_name": "TestReceiver",
+                "group_id": "test_group_222",
+                "group_name": "Тест группа 222", 
+                "facultet_id": "test_faculty",
+                "facultet_name": "Тестовый факультет",
+                "level_id": "test_level",
+                "kurs": "1",
+                "form_code": "test_form",
+                "notifications_enabled": True
             }
             receiver_response = await self.client.post(f"{BASE_URL}/user-settings", json=receiver_data)
             
@@ -152,39 +168,53 @@ class MessageNotificationTester:
                 return
             
             # Step 3: Send friend request from sender to receiver
-            friend_request_data = {"target_telegram_id": self.test_user_receiver}
             request_response = await self.client.post(
-                f"{BASE_URL}/friends/request/{self.test_user_sender}", 
-                json=friend_request_data
+                f"{BASE_URL}/friends/request/{self.test_user_receiver}", 
+                json={"telegram_id": self.test_user_sender}
             )
             
-            # Step 4: Try to accept friendship - check what endpoint exists
-            # First try the accept endpoint mentioned in the test case
-            accept_data = {"from_telegram_id": self.test_user_sender}
-            accept_response = await self.client.post(
-                f"{BASE_URL}/friends/accept/{self.test_user_receiver}", 
-                json=accept_data
-            )
-            
-            # If that doesn't work, let's check for alternative endpoints
-            if accept_response.status_code == 404:
-                # Try alternative endpoint structure
-                accept_response = await self.client.post(
-                    f"{BASE_URL}/friends/{self.test_user_receiver}/accept", 
-                    json=accept_data
-                )
-            
-            friendship_established = (
-                request_response.status_code in [200, 201, 409] and  # Request sent or already exists
-                accept_response.status_code in [200, 201, 409]       # Accepted or already friends
-            )
-            
-            if friendship_established:
+            # Step 4: Get the request ID and accept it
+            if request_response.status_code in [200, 201]:
+                # Get friend requests for receiver to find the request ID
+                requests_response = await self.client.get(f"{BASE_URL}/friends/{self.test_user_receiver}/requests")
+                
+                if requests_response.status_code == 200:
+                    requests_data = requests_response.json()
+                    pending_requests = requests_data.get("incoming", [])
+                    
+                    # Find the request from our test sender
+                    request_id = None
+                    for req in pending_requests:
+                        if req.get("sender", {}).get("telegram_id") == self.test_user_sender:
+                            request_id = req.get("id")
+                            break
+                    
+                    if request_id:
+                        # Accept the friend request
+                        accept_response = await self.client.post(
+                            f"{BASE_URL}/friends/accept/{request_id}", 
+                            json={"telegram_id": self.test_user_receiver}
+                        )
+                        
+                        if accept_response.status_code in [200, 201]:
+                            self.log_test("Setup Test Users and Friendship", True, 
+                                        f"Test users created and friendship established successfully")
+                        else:
+                            self.log_test("Setup Test Users and Friendship", False, 
+                                        f"Failed to accept friend request: HTTP {accept_response.status_code}: {accept_response.text}")
+                    else:
+                        self.log_test("Setup Test Users and Friendship", False, 
+                                    f"Could not find friend request to accept in: {requests_data}")
+                else:
+                    self.log_test("Setup Test Users and Friendship", False, 
+                                f"Failed to get friend requests: HTTP {requests_response.status_code}: {requests_response.text}")
+            elif request_response.status_code == 409:
+                # Already friends or request already exists - that's fine
                 self.log_test("Setup Test Users and Friendship", True, 
-                            f"Test users created and friendship established. Request: {request_response.status_code}, Accept: {accept_response.status_code}")
+                            f"Test users and friendship already exist (conflict expected)")
             else:
                 self.log_test("Setup Test Users and Friendship", False, 
-                            f"Failed to establish friendship. Request: {request_response.status_code} ({request_response.text}), Accept: {accept_response.status_code} ({accept_response.text})")
+                            f"Failed to send friend request: HTTP {request_response.status_code}: {request_response.text}")
                 
         except Exception as e:
             self.log_test("Setup Test Users and Friendship", False, f"Exception: {str(e)}")
