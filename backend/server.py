@@ -441,6 +441,29 @@ async def add_cors_headers(request, call_next):
     return response
 
 
+# ============ MongoDB Error Handling Middleware ============
+@app.middleware("http")
+async def mongodb_error_handler(request: Request, call_next):
+    """
+    Перехватывает ошибки MongoDB и возвращает 503 вместо падения приложения.
+    Позволяет приложению оставаться доступным даже если БД временно недоступна.
+    """
+    try:
+        response = await call_next(request)
+        return response
+    except (ServerSelectionTimeoutError, ConnectionFailure, AutoReconnect, NetworkTimeout) as exc:
+        logger.error(f"🔴 MongoDB ошибка при обработке {request.method} {request.url.path}: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "База данных временно недоступна. Попробуйте через несколько секунд.",
+                "error": "database_unavailable",
+                "retry_after": 5,
+            },
+            headers={"Retry-After": "5"},
+        )
+
+
 # ============ Database Indexes Optimization ============
 async def safe_create_index(collection, keys, **kwargs):
     """Безопасное создание индекса — игнорирует конфликты с существующими индексами"""
