@@ -16,8 +16,6 @@ class AdminPanelStatsTester:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
         self.test_results = []
-        self.test_user_sender = 111111
-        self.test_user_receiver = 222222
         
     async def __aenter__(self):
         return self
