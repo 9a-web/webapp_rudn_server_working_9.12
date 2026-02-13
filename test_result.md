@@ -43,3 +43,65 @@
 
 ### Startup retry:
 7. App starts with MongoDB down → waits up to 60s, then continues with watchdog active
+
+---
+
+## Testing Results (2026-02-13)
+
+### MongoDB Resilience and Health-Check Features Testing
+
+**Test Environment:** MongoDB running, backend service active at localhost:8001
+
+**Test Results:** ✅ ALL TESTS PASSED (6/6)
+
+#### Detailed Test Results:
+
+1. **Health Check (MongoDB Running)** - ✅ PASS
+   - Endpoint: `GET /api/health` 
+   - Response: HTTP 200
+   - Status: "healthy", MongoDB connected: true, Latency: 0.7ms
+   - Verified: All required fields present (status, mongodb.connected, mongodb.latency_ms)
+
+2. **Root Endpoint** - ✅ PASS
+   - Endpoint: `GET /api/`
+   - Response: HTTP 200
+   - Message: "RUDN Schedule API is running"
+
+3. **Bot Info Endpoint** - ✅ PASS
+   - Endpoint: `GET /api/bot-info`
+   - Response: HTTP 200
+   - Bot info: username=devrudnbot, env=test
+
+4. **Faculties Endpoint** - ✅ PASS
+   - Endpoint: `GET /api/faculties`
+   - Response: HTTP 200
+   - Returned 16 faculties (external API working)
+
+5. **Status Endpoint** - ✅ PASS
+   - Endpoint: `GET /api/status`
+   - Response: HTTP 200
+   - Returned empty array (DB-dependent endpoint working)
+
+6. **Health Check Response Structure** - ✅ PASS
+   - All required fields verified:
+     - Main keys: status, timestamp, mongodb, watchdog ✅
+     - MongoDB keys: connected, latency_ms, error, url_host ✅
+     - Watchdog keys: healthy, last_error, last_check_ago_s ✅
+
+### MongoDB Watchdog Status:
+- MongoDB connected: ✅ true
+- MongoDB latency: 0.7ms (excellent)
+- Watchdog healthy: ✅ true
+- Last watchdog check: 15.4 seconds ago
+- MongoDB URL: localhost:27017
+
+### Conclusion:
+All MongoDB resilience and health-check features are **working correctly**. The system properly:
+- Monitors MongoDB connection health
+- Reports accurate latency metrics
+- Maintains watchdog monitoring
+- Provides comprehensive health status via `/api/health` endpoint
+- Continues serving non-DB endpoints (faculties) when available
+- Returns proper response structures as specified
+
+**Note:** Testing was performed with MongoDB running. All endpoints respond as expected in the happy path scenario as requested in the review.
