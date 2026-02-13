@@ -293,8 +293,8 @@ class AdminPanelStatsTester:
             self.log_test("Online Users Current", False, f"Exception: {str(e)}")
     
     async def run_all_tests(self):
-        """Run all message notification tests"""
-        print("🚀 Starting Message Notification Feature Backend Tests")
+        """Run all admin panel statistics tests"""
+        print("🚀 Starting Admin Panel Statistics Backend Tests")
         print("=" * 70)
         print(f"Backend URL: {BASE_URL}")
         print(f"Environment: test (using test bot, test database)")
@@ -302,11 +302,13 @@ class AdminPanelStatsTester:
         
         # Run tests in sequence as specified in review request
         await self.test_1_health_check()
-        await self.test_2_notification_settings_include_social_messages()
-        await self.test_3_update_notification_settings_social_messages()
-        await self.test_4_setup_test_users_and_friendship()
-        await self.test_5_send_message_creates_notification()
-        await self.test_6_notification_structure()
+        await self.test_2_online_stats_history_1h()
+        await self.test_3_online_stats_history_all_time()
+        await self.test_4_server_stats_history_no_limit()
+        await self.test_5_server_stats_history_30_days()
+        await self.test_6_hourly_activity_moscow_timezone()
+        await self.test_7_weekly_activity()
+        await self.test_8_online_users_current()
         
         print("\n" + "=" * 70)
         print("📊 TEST SUMMARY")
@@ -333,7 +335,7 @@ class AdminPanelStatsTester:
 
 async def main():
     """Main test runner"""
-    async with MessageNotificationTester() as tester:
+    async with AdminPanelStatsTester() as tester:
         success = await tester.run_all_tests()
         return success
 
