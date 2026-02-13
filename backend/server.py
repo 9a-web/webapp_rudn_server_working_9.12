@@ -571,6 +571,9 @@ async def create_indexes():
         await safe_create_index(db.web_sessions, "session_token", unique=True)
         await safe_create_index(db.web_sessions, [("telegram_id", 1), ("status", 1)])
         
+        # Online Stats History - индекс по времени
+        await safe_create_index(db.online_stats_history, [("timestamp", 1)])
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
