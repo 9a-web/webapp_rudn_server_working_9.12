@@ -6848,14 +6848,12 @@ async def get_server_stats():
 
 
 # --- Background task: сбор метрик сервера каждые 60 секунд ---
-_metrics_cleanup_counter = 0  # Счётчик циклов для периодической очистки
 
 async def collect_server_metrics_loop():
-    """Фоновая задача для периодического сбора метрик сервера в MongoDB"""
-    global _metrics_cleanup_counter
-    import time as _time
+    """Фоновая задача для периодического сбора метрик сервера + онлайн-статистики в MongoDB.
+    Данные хранятся НАВСЕГДА (без очистки)."""
     await asyncio.sleep(5)  # ждём старт приложения
-    logger.info("📊 Server metrics collector started (interval: 60s, cleanup: every 60 cycles/~1h)")
+    logger.info("📊 Server metrics collector started (interval: 60s, хранение: бессрочное)")
     
     while True:
         try:
@@ -6902,14 +6900,35 @@ async def collect_server_metrics_loop():
 
             await db.server_metrics_history.insert_one(metric)
 
-            # Очистка старых записей раз в ~1 час (60 циклов × 60 сек), а не каждый цикл
-            _metrics_cleanup_counter += 1
-            if _metrics_cleanup_counter >= 60:
-                _metrics_cleanup_counter = 0
-                cutoff = datetime.utcnow() - timedelta(days=7)
-                deleted = await db.server_metrics_history.delete_many({"timestamp": {"$lt": cutoff}})
-                if deleted.deleted_count > 0:
-                    logger.info(f"🧹 Cleaned up {deleted.deleted_count} old server metrics")
+            # --- Сохраняем онлайн-статистику ---
+            try:
+                now_utc = datetime.utcnow()
+                threshold_5m = now_utc - timedelta(minutes=5)
+                threshold_1h = now_utc - timedelta(hours=1)
+                threshold_24h = now_utc - timedelta(hours=24)
+
+                online_now = await db.user_settings.count_documents({"last_activity": {"$gte": threshold_5m}})
+                online_1h = await db.user_settings.count_documents({"last_activity": {"$gte": threshold_1h}})
+                online_24h = await db.user_settings.count_documents({"last_activity": {"$gte": threshold_24h}})
+
+                # Web vs Telegram
+                active_web = await db.web_sessions.count_documents({
+                    "status": "linked",
+                    "last_active": {"$gte": threshold_5m}
+                })
+
+                online_point = {
+                    "id": str(uuid.uuid4()),
+                    "timestamp": now_utc,
+                    "online_now": online_now,
+                    "online_1h": online_1h,
+                    "online_24h": online_24h,
+                    "web_online": active_web,
+                    "telegram_online": max(0, online_now - active_web),
+                }
+                await db.online_stats_history.insert_one(online_point)
+            except Exception as oe:
+                logger.warning(f"⚠️ Error collecting online stats: {oe}")
 
         except Exception as e:
             logger.warning(f"⚠️ Error collecting server metrics: {e}")
