@@ -2093,6 +2093,8 @@ const HISTORY_PERIODS = [
   { label: '24ч', hours: 24 },
   { label: '3д', hours: 72 },
   { label: '7д', hours: 168 },
+  { label: '30д', hours: 720 },
+  { label: 'Всё', hours: 0 },
 ];
 
 const PeakCard = ({ label, value, unit, timestamp, icon, color }) => {
