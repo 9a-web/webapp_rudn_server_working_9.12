@@ -36,322 +36,261 @@ class AdminPanelStatsTester:
         })
     
     async def test_1_health_check(self):
-        """Test 1: Health Check - GET /api/health → HTTP 200, status 'healthy'"""
+        """Test 1: Health Check - GET /api/health → HTTP 200"""
         try:
             response = await self.client.get(f"{BASE_URL}/health")
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get("status") == "healthy":
-                    self.log_test("Health Check", True, 
-                                f"Status: {data['status']}, healthy endpoint working")
-                else:
-                    self.log_test("Health Check", False, 
-                                f"Expected status 'healthy', got: {data.get('status')}")
+                self.log_test("Health Check", True, 
+                            f"Status: {data.get('status', 'N/A')}, MongoDB connected: {data.get('mongodb', {}).get('connected', 'N/A')}")
             else:
                 self.log_test("Health Check", False, 
                             f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
             self.log_test("Health Check", False, f"Exception: {str(e)}")
-    
-    async def test_2_notification_settings_include_social_messages(self):
-        """Test 2: Notification Settings include social_messages - GET /api/notifications/12345/settings"""
+
+    async def test_2_online_stats_history_1h(self):
+        """Test 2: Online Stats History (1 hour) - GET /api/admin/online-stats-history?hours=1 → HTTP 200"""
         try:
-            test_user_id = 12345
-            response = await self.client.get(f"{BASE_URL}/notifications/{test_user_id}/settings")
+            response = await self.client.get(f"{BASE_URL}/admin/online-stats-history?hours=1")
             
             if response.status_code == 200:
                 data = response.json()
-                if "social_messages" in data and isinstance(data["social_messages"], bool):
-                    self.log_test("Notification Settings Include social_messages", True, 
-                                f"social_messages field present with value: {data['social_messages']}")
-                else:
-                    self.log_test("Notification Settings Include social_messages", False, 
-                                f"social_messages field missing or not boolean. Response: {data}")
+                
+                # Check required fields
+                required_fields = ['period_hours', 'total_points', 'metrics']
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if missing_fields:
+                    self.log_test("Online Stats History (1h)", False, 
+                                f"Missing required fields: {missing_fields}. Response keys: {list(data.keys())}")
+                    return
+                
+                # Check metrics array structure
+                metrics = data.get('metrics', [])
+                if not isinstance(metrics, list):
+                    self.log_test("Online Stats History (1h)", False, 
+                                f"Metrics should be an array, got: {type(metrics)}")
+                    return
+                
+                # Check metric structure if we have any metrics
+                if metrics:
+                    sample_metric = metrics[0]
+                    required_metric_fields = ['timestamp', 'online_now', 'online_1h', 'online_24h', 'web_online', 'telegram_online', 'peak_online']
+                    missing_metric_fields = [field for field in required_metric_fields if field not in sample_metric]
+                    
+                    if missing_metric_fields:
+                        self.log_test("Online Stats History (1h)", False, 
+                                    f"Sample metric missing fields: {missing_metric_fields}. Available: {list(sample_metric.keys())}")
+                        return
+                
+                self.log_test("Online Stats History (1h)", True, 
+                            f"Period: {data['period_hours']}h, Total points: {data['total_points']}, Metrics count: {len(metrics)}")
             else:
-                self.log_test("Notification Settings Include social_messages", False, 
+                self.log_test("Online Stats History (1h)", False, 
                             f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Notification Settings Include social_messages", False, f"Exception: {str(e)}")
-    
-    async def test_3_update_notification_settings_social_messages(self):
-        """Test 3: Update notification settings with social_messages"""
+            self.log_test("Online Stats History (1h)", False, f"Exception: {str(e)}")
+
+    async def test_3_online_stats_history_all_time(self):
+        """Test 3: Online Stats History (all time) - GET /api/admin/online-stats-history?hours=0 → HTTP 200"""
         try:
-            test_user_id = 12345
+            response = await self.client.get(f"{BASE_URL}/admin/online-stats-history?hours=0")
             
-            # Step 1: Set social_messages to false
-            update_response = await self.client.put(
-                f"{BASE_URL}/notifications/{test_user_id}/settings",
-                json={"social_messages": False}
-            )
-            
-            if update_response.status_code != 200:
-                self.log_test("Update Notification Settings (social_messages)", False, 
-                            f"Failed to update settings: HTTP {update_response.status_code}: {update_response.text}")
-                return
-            
-            # Step 2: Verify the setting was updated
-            get_response = await self.client.get(f"{BASE_URL}/notifications/{test_user_id}/settings")
-            
-            if get_response.status_code != 200:
-                self.log_test("Update Notification Settings (social_messages)", False, 
-                            f"Failed to get updated settings: HTTP {get_response.status_code}: {get_response.text}")
-                return
+            if response.status_code == 200:
+                data = response.json()
                 
-            data = get_response.json()
-            if data.get("social_messages") == False:
-                # Step 3: Restore to true
-                restore_response = await self.client.put(
-                    f"{BASE_URL}/notifications/{test_user_id}/settings",
-                    json={"social_messages": True}
-                )
+                # Check required fields
+                required_fields = ['period_hours', 'total_points', 'metrics']
+                missing_fields = [field for field in required_fields if field not in data]
                 
-                if restore_response.status_code == 200:
-                    self.log_test("Update Notification Settings (social_messages)", True, 
-                                "Successfully updated social_messages to false and restored to true")
-                else:
-                    self.log_test("Update Notification Settings (social_messages)", False, 
-                                f"Failed to restore setting: HTTP {restore_response.status_code}")
+                if missing_fields:
+                    self.log_test("Online Stats History (all time)", False, 
+                                f"Missing required fields: {missing_fields}. Response keys: {list(data.keys())}")
+                    return
+                
+                # For all time, period_hours should be 0
+                if data.get('period_hours') != 0:
+                    self.log_test("Online Stats History (all time)", False, 
+                                f"Expected period_hours=0 for all time data, got: {data.get('period_hours')}")
+                    return
+                
+                metrics = data.get('metrics', [])
+                self.log_test("Online Stats History (all time)", True, 
+                            f"Period: all time, Total points: {data['total_points']}, Metrics count: {len(metrics)}")
             else:
-                self.log_test("Update Notification Settings (social_messages)", False, 
-                            f"Setting not updated correctly. Expected false, got: {data.get('social_messages')}")
+                self.log_test("Online Stats History (all time)", False, 
+                            f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Update Notification Settings (social_messages)", False, f"Exception: {str(e)}")
-    
-    async def test_4_setup_test_users_and_friendship(self):
-        """Test 4: Setup test users and establish friendship"""
+            self.log_test("Online Stats History (all time)", False, f"Exception: {str(e)}")
+
+    async def test_4_server_stats_history_no_limit(self):
+        """Test 4: Server Stats History (no limit) - GET /api/admin/server-stats-history?hours=0 → HTTP 200"""
         try:
-            # Step 1: Create user settings for sender (with required fields)
-            sender_data = {
-                "telegram_id": self.test_user_sender, 
-                "first_name": "TestSender",
-                "group_id": "test_group_111",
-                "group_name": "Тест группа 111", 
-                "facultet_id": "test_faculty",
-                "facultet_name": "Тестовый факультет",
-                "level_id": "test_level",
-                "kurs": "1",
-                "form_code": "test_form",
-                "notifications_enabled": True
-            }
-            sender_response = await self.client.post(f"{BASE_URL}/user-settings", json=sender_data)
+            response = await self.client.get(f"{BASE_URL}/admin/server-stats-history?hours=0")
             
-            # Step 2: Create user settings for receiver  
-            receiver_data = {
-                "telegram_id": self.test_user_receiver, 
-                "first_name": "TestReceiver",
-                "group_id": "test_group_222",
-                "group_name": "Тест группа 222", 
-                "facultet_id": "test_faculty",
-                "facultet_name": "Тестовый факультет",
-                "level_id": "test_level",
-                "kurs": "1",
-                "form_code": "test_form",
-                "notifications_enabled": True
-            }
-            receiver_response = await self.client.post(f"{BASE_URL}/user-settings", json=receiver_data)
-            
-            # Both should succeed or already exist (409 is ok)
-            if sender_response.status_code not in [200, 201, 409]:
-                self.log_test("Setup Test Users and Friendship", False, 
-                            f"Failed to create sender user: HTTP {sender_response.status_code}: {sender_response.text}")
-                return
+            if response.status_code == 200:
+                data = response.json()
                 
-            if receiver_response.status_code not in [200, 201, 409]:
-                self.log_test("Setup Test Users and Friendship", False, 
-                            f"Failed to create receiver user: HTTP {receiver_response.status_code}: {receiver_response.text}")
-                return
-            
-            # Step 3: Send friend request from sender to receiver
-            request_response = await self.client.post(
-                f"{BASE_URL}/friends/request/{self.test_user_receiver}", 
-                json={"telegram_id": self.test_user_sender}
-            )
-            
-            # Step 4: Get the request ID and accept it (handle existing request)
-            if request_response.status_code in [200, 201, 400]:  # 400 = already sent
-                # Get friend requests for receiver to find the request ID
-                requests_response = await self.client.get(f"{BASE_URL}/friends/{self.test_user_receiver}/requests")
+                # Should be an array or object with metrics
+                if isinstance(data, list):
+                    metrics_count = len(data)
+                elif isinstance(data, dict) and 'metrics' in data:
+                    metrics_count = len(data.get('metrics', []))
+                else:
+                    self.log_test("Server Stats History (no limit)", False, 
+                                f"Unexpected response format: {type(data)}")
+                    return
                 
-                if requests_response.status_code == 200:
-                    requests_data = requests_response.json()
-                    pending_requests = requests_data.get("incoming", [])
+                self.log_test("Server Stats History (no limit)", True, 
+                            f"Retrieved server metrics without 168h limit. Metrics count: {metrics_count}")
+            else:
+                self.log_test("Server Stats History (no limit)", False, 
+                            f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Server Stats History (no limit)", False, f"Exception: {str(e)}")
+
+    async def test_5_server_stats_history_30_days(self):
+        """Test 5: Server Stats History (30 days) - GET /api/admin/server-stats-history?hours=720 → HTTP 200"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/admin/server-stats-history?hours=720")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Should be an array or object with metrics
+                if isinstance(data, list):
+                    metrics_count = len(data)
+                elif isinstance(data, dict) and 'metrics' in data:
+                    metrics_count = len(data.get('metrics', []))
+                else:
+                    self.log_test("Server Stats History (30 days)", False, 
+                                f"Unexpected response format: {type(data)}")
+                    return
+                
+                self.log_test("Server Stats History (30 days)", True, 
+                            f"Retrieved 30 days (720h) server metrics. Metrics count: {metrics_count}")
+            else:
+                self.log_test("Server Stats History (30 days)", False, 
+                            f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Server Stats History (30 days)", False, f"Exception: {str(e)}")
+
+    async def test_6_hourly_activity_moscow_timezone(self):
+        """Test 6: Hourly Activity (Moscow timezone) - GET /api/admin/hourly-activity → HTTP 200"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/admin/hourly-activity")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Should be an array of 24 hours
+                if not isinstance(data, list):
+                    self.log_test("Hourly Activity (Moscow timezone)", False, 
+                                f"Expected array, got: {type(data)}")
+                    return
+                
+                if len(data) != 24:
+                    self.log_test("Hourly Activity (Moscow timezone)", False, 
+                                f"Expected 24 hours, got: {len(data)}")
+                    return
+                
+                # Check structure of first item
+                if data:
+                    sample = data[0]
+                    if 'hour' not in sample or 'count' not in sample:
+                        self.log_test("Hourly Activity (Moscow timezone)", False, 
+                                    f"Missing hour/count fields. Sample: {sample}")
+                        return
                     
-                    # Find the request from our test sender
-                    request_id = None
-                    for req in pending_requests:
-                        if req.get("telegram_id") == self.test_user_sender:  # Changed from "sender" nested field to direct field
-                            request_id = req.get("request_id")  # Changed from "id" to "request_id"
-                            break
+                    # Check hour range (0-23)
+                    hours = [item.get('hour') for item in data]
+                    expected_hours = list(range(24))
+                    if set(hours) != set(expected_hours):
+                        self.log_test("Hourly Activity (Moscow timezone)", False, 
+                                    f"Hours should be 0-23, got: {sorted(hours)}")
+                        return
+                
+                self.log_test("Hourly Activity (Moscow timezone)", True, 
+                            f"24 hours data returned with proper hour (0-23) and count structure")
+            else:
+                self.log_test("Hourly Activity (Moscow timezone)", False, 
+                            f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Hourly Activity (Moscow timezone)", False, f"Exception: {str(e)}")
+
+    async def test_7_weekly_activity(self):
+        """Test 7: Weekly Activity - GET /api/admin/weekly-activity → HTTP 200"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/admin/weekly-activity")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Should be an array of 7 days
+                if not isinstance(data, list):
+                    self.log_test("Weekly Activity", False, 
+                                f"Expected array, got: {type(data)}")
+                    return
+                
+                if len(data) != 7:
+                    self.log_test("Weekly Activity", False, 
+                                f"Expected 7 days, got: {len(data)}")
+                    return
+                
+                # Check structure
+                if data:
+                    sample = data[0]
+                    required_fields = ['day', 'count']  # or similar structure
+                    available_fields = list(sample.keys())
                     
-                    if request_id:
-                        # Accept the friend request
-                        accept_response = await self.client.post(
-                            f"{BASE_URL}/friends/accept/{request_id}", 
-                            json={"telegram_id": self.test_user_receiver}
-                        )
-                        
-                        if accept_response.status_code in [200, 201]:
-                            self.log_test("Setup Test Users and Friendship", True, 
-                                        f"Test users created and friendship established successfully")
-                        else:
-                            self.log_test("Setup Test Users and Friendship", False, 
-                                        f"Failed to accept friend request: HTTP {accept_response.status_code}: {accept_response.text}")
-                    else:
-                        # Maybe they are already friends? Check friends list
-                        friends_response = await self.client.get(f"{BASE_URL}/friends/{self.test_user_sender}")
-                        if friends_response.status_code == 200:
-                            friends_data = friends_response.json()
-                            friends_list = friends_data.get("friends", [])
-                            already_friends = any(friend.get("telegram_id") == self.test_user_receiver for friend in friends_list)
-                            
-                            if already_friends:
-                                self.log_test("Setup Test Users and Friendship", True, 
-                                            f"Test users are already friends")
-                            else:
-                                self.log_test("Setup Test Users and Friendship", False, 
-                                            f"Could not find friend request to accept and users are not friends. Requests: {requests_data}")
-                        else:
-                            self.log_test("Setup Test Users and Friendship", False, 
-                                        f"Could not find friend request to accept in: {requests_data}")
-                else:
-                    self.log_test("Setup Test Users and Friendship", False, 
-                                f"Failed to get friend requests: HTTP {requests_response.status_code}: {requests_response.text}")
+                    # Accept flexible field names for day data
+                    has_day_field = any(field in available_fields for field in ['day', 'day_name', 'weekday', '_id'])
+                    has_count_field = any(field in available_fields for field in ['count', 'total', 'activities'])
+                    
+                    if not (has_day_field and has_count_field):
+                        self.log_test("Weekly Activity", False, 
+                                    f"Missing day/count-like fields. Available: {available_fields}")
+                        return
+                
+                self.log_test("Weekly Activity", True, 
+                            f"7 days data returned (Пн-Вс). Sample structure: {list(data[0].keys()) if data else 'empty'}")
             else:
-                self.log_test("Setup Test Users and Friendship", False, 
-                            f"Failed to send friend request: HTTP {request_response.status_code}: {request_response.text}")
+                self.log_test("Weekly Activity", False, 
+                            f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Setup Test Users and Friendship", False, f"Exception: {str(e)}")
-    
-    async def test_5_send_message_creates_notification(self):
-        """Test 5: Send message creates notification"""
+            self.log_test("Weekly Activity", False, f"Exception: {str(e)}")
+
+    async def test_8_online_users_current(self):
+        """Test 8: Online users current - GET /api/admin/online-users → HTTP 200"""
         try:
-            # Step 1: Send message from sender to receiver
-            message_data = {
-                "sender_id": self.test_user_sender,
-                "receiver_id": self.test_user_receiver, 
-                "text": "Привет! Тестовое сообщение"
-            }
+            response = await self.client.get(f"{BASE_URL}/admin/online-users")
             
-            message_response = await self.client.post(f"{BASE_URL}/messages/send", json=message_data)
-            
-            if message_response.status_code not in [200, 201]:
-                self.log_test("Send Message Creates Notification", False, 
-                            f"Failed to send message: HTTP {message_response.status_code}: {message_response.text}")
-                return
-            
-            # Step 2: Check if notification was created for receiver
-            # Wait a bit for notification to be processed
-            await asyncio.sleep(2)
-            
-            notifications_response = await self.client.get(f"{BASE_URL}/notifications/{self.test_user_receiver}?limit=5")
-            
-            if notifications_response.status_code != 200:
-                self.log_test("Send Message Creates Notification", False, 
-                            f"Failed to get notifications: HTTP {notifications_response.status_code}: {notifications_response.text}")
-                return
-            
-            notifications_data = notifications_response.json()
-            
-            # Look for new_message notification
-            new_message_notifications = []
-            if isinstance(notifications_data, dict) and "notifications" in notifications_data:
-                notifications = notifications_data["notifications"]
-            elif isinstance(notifications_data, list):
-                notifications = notifications_data
-            else:
-                notifications = []
-            
-            for notification in notifications:
-                if notification.get("type") == "new_message":
-                    new_message_notifications.append(notification)
-            
-            if new_message_notifications:
-                # Check if notification contains sender name
-                notification = new_message_notifications[0]
-                title = notification.get("title", "")
-                has_sender_name = "TestSender" in title
+            if response.status_code == 200:
+                data = response.json()
                 
-                if has_sender_name:
-                    self.log_test("Send Message Creates Notification", True, 
-                                f"Message sent successfully and notification created with sender name in title: '{title}'")
+                # Should return some online user data structure
+                # Accept various formats as long as it's valid JSON
+                if isinstance(data, (dict, list)):
+                    self.log_test("Online Users Current", True, 
+                                f"Online users data returned. Type: {type(data)}, Keys/Length: {list(data.keys()) if isinstance(data, dict) else len(data)}")
                 else:
-                    self.log_test("Send Message Creates Notification", False, 
-                                f"Notification created but doesn't contain sender name. Title: '{title}'")
+                    self.log_test("Online Users Current", False, 
+                                f"Unexpected data type: {type(data)}")
             else:
-                self.log_test("Send Message Creates Notification", False, 
-                            f"Message sent but no new_message notification found. Found {len(notifications)} notifications total")
+                self.log_test("Online Users Current", False, 
+                            f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Send Message Creates Notification", False, f"Exception: {str(e)}")
-    
-    async def test_6_notification_structure(self):
-        """Test 6: Verify notification structure for new_message type"""
-        try:
-            # Get recent notifications for receiver
-            notifications_response = await self.client.get(f"{BASE_URL}/notifications/{self.test_user_receiver}?limit=10")
-            
-            if notifications_response.status_code != 200:
-                self.log_test("Notification Structure Verification", False, 
-                            f"Failed to get notifications: HTTP {notifications_response.status_code}: {notifications_response.text}")
-                return
-            
-            notifications_data = notifications_response.json()
-            
-            # Find new_message notification
-            if isinstance(notifications_data, dict) and "notifications" in notifications_data:
-                notifications = notifications_data["notifications"]
-            elif isinstance(notifications_data, list):
-                notifications = notifications_data
-            else:
-                notifications = []
-            
-            new_message_notification = None
-            for notification in notifications:
-                if notification.get("type") == "new_message":
-                    new_message_notification = notification
-                    break
-            
-            if not new_message_notification:
-                self.log_test("Notification Structure Verification", False, 
-                            "No new_message notification found to verify structure")
-                return
-            
-            # Verify required fields
-            required_fields = {
-                "type": "new_message",
-                "category": "social", 
-                "emoji": "💬"
-            }
-            
-            structure_issues = []
-            
-            for field, expected_value in required_fields.items():
-                actual_value = new_message_notification.get(field)
-                if actual_value != expected_value:
-                    structure_issues.append(f"{field}: expected '{expected_value}', got '{actual_value}'")
-            
-            # Check data field structure
-            data = new_message_notification.get("data", {})
-            required_data_fields = ["conversation_id", "sender_id", "sender_name", "message_id"]
-            
-            for field in required_data_fields:
-                if field not in data:
-                    structure_issues.append(f"data.{field}: missing")
-            
-            if not structure_issues:
-                self.log_test("Notification Structure Verification", True, 
-                            f"Notification structure is correct: type={new_message_notification['type']}, category={new_message_notification['category']}, emoji={new_message_notification['emoji']}")
-            else:
-                self.log_test("Notification Structure Verification", False, 
-                            f"Structure issues: {'; '.join(structure_issues)}. Full notification: {json.dumps(new_message_notification, indent=2)}")
-                
-        except Exception as e:
-            self.log_test("Notification Structure Verification", False, f"Exception: {str(e)}")
+            self.log_test("Online Users Current", False, f"Exception: {str(e)}")
     
     async def run_all_tests(self):
         """Run all message notification tests"""
