@@ -229,7 +229,7 @@ class MessageNotificationTester:
                 "text": "Привет! Тестовое сообщение"
             }
             
-            message_response = await self.client.post(f"{BASE_URL}/messages", json=message_data)
+            message_response = await self.client.post(f"{BASE_URL}/messages/send", json=message_data)
             
             if message_response.status_code not in [200, 201]:
                 self.log_test("Send Message Creates Notification", False, 
