@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Message Notification Feature
-Tests the new message notification feature on RUDN Schedule backend.
+Backend API Testing Script for Admin Panel Statistics Features
+Tests the admin panel online statistics history and server metrics features on RUDN Schedule backend.
 """
 
 import httpx
 import asyncio
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Backend URL - using the external URL from frontend/.env
 BASE_URL = "https://db-reconnect-1.preview.emergentagent.com/api"
 
-class MessageNotificationTester:
+class AdminPanelStatsTester:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
         self.test_results = []
