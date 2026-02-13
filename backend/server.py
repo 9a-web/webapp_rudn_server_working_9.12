@@ -3,6 +3,13 @@ from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse,
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import (
+    ServerSelectionTimeoutError,
+    ConnectionFailure,
+    AutoReconnect,
+    NetworkTimeout,
+    OperationFailure,
+)
 import os
 import logging
 from pathlib import Path
@@ -17,6 +24,8 @@ import asyncio
 import threading
 import psutil
 import platform
+import subprocess as _subprocess
+import time as _time_module
 
 # Импорт модулей парсера и моделей
 from rudn_parser import (
