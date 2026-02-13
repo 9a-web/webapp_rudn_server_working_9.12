@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for MongoDB Resilience and Health-Check Features
-Tests the MongoDB resilience features and health check endpoints.
+Backend API Testing Script for Message Notification Feature
+Tests the new message notification feature on RUDN Schedule backend.
 """
 
 import httpx
@@ -9,13 +9,15 @@ import asyncio
 import json
 from typing import Dict, Any, Optional
 
-# Backend URL - using localhost as external URL is not available
-BASE_URL = "http://localhost:8001/api"
+# Backend URL - using the external URL from frontend/.env
+BASE_URL = "https://db-reconnect-1.preview.emergentagent.com/api"
 
-class BackendTester:
+class MessageNotificationTester:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
         self.test_results = []
+        self.test_user_sender = 111111
+        self.test_user_receiver = 222222
         
     async def __aenter__(self):
         return self
@@ -35,164 +37,299 @@ class BackendTester:
             'details': details
         })
     
-    async def test_health_check_mongodb_running(self):
-        """Test 1: Health Check (MongoDB running) - GET /api/health"""
+    async def test_1_health_check(self):
+        """Test 1: Health Check - GET /api/health → HTTP 200, status 'healthy'"""
         try:
             response = await self.client.get(f"{BASE_URL}/health")
             
             if response.status_code == 200:
                 data = response.json()
-                
-                # Verify required fields
-                if (data.get("status") == "healthy" and 
-                    data.get("mongodb", {}).get("connected") is True and
-                    isinstance(data.get("mongodb", {}).get("latency_ms"), (int, float))):
-                    self.log_test("Health Check (MongoDB Running)", True, 
-                                f"Status: {data['status']}, MongoDB connected: {data['mongodb']['connected']}, "
-                                f"Latency: {data['mongodb']['latency_ms']}ms")
+                if data.get("status") == "healthy":
+                    self.log_test("Health Check", True, 
+                                f"Status: {data['status']}, healthy endpoint working")
                 else:
-                    self.log_test("Health Check (MongoDB Running)", False, 
-                                f"Unexpected response structure: {data}")
+                    self.log_test("Health Check", False, 
+                                f"Expected status 'healthy', got: {data.get('status')}")
             else:
-                self.log_test("Health Check (MongoDB Running)", False, 
+                self.log_test("Health Check", False, 
                             f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Health Check (MongoDB Running)", False, f"Exception: {str(e)}")
+            self.log_test("Health Check", False, f"Exception: {str(e)}")
     
-    async def test_root_endpoint(self):
-        """Test 2: Root endpoint still works - GET /api/"""
+    async def test_2_notification_settings_include_social_messages(self):
+        """Test 2: Notification Settings include social_messages - GET /api/notifications/12345/settings"""
         try:
-            response = await self.client.get(f"{BASE_URL}/")
+            test_user_id = 12345
+            response = await self.client.get(f"{BASE_URL}/notifications/{test_user_id}/settings")
             
             if response.status_code == 200:
                 data = response.json()
-                
-                if data.get("message") == "RUDN Schedule API is running":
-                    self.log_test("Root Endpoint", True, f"Root endpoint working: {data}")
+                if "social_messages" in data and isinstance(data["social_messages"], bool):
+                    self.log_test("Notification Settings Include social_messages", True, 
+                                f"social_messages field present with value: {data['social_messages']}")
                 else:
-                    self.log_test("Root Endpoint", False, f"Unexpected message: {data}")
+                    self.log_test("Notification Settings Include social_messages", False, 
+                                f"social_messages field missing or not boolean. Response: {data}")
             else:
-                self.log_test("Root Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Root Endpoint", False, f"Exception: {str(e)}")
-    
-    async def test_bot_info_endpoint(self):
-        """Test 3: Bot info endpoint - GET /api/bot-info"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/bot-info")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if "username" in data and "env" in data:
-                    self.log_test("Bot Info Endpoint", True, 
-                                f"Bot info: username={data.get('username')}, env={data.get('env')}")
-                else:
-                    self.log_test("Bot Info Endpoint", False, 
-                                f"Missing username or env fields: {data}")
-            else:
-                self.log_test("Bot Info Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Bot Info Endpoint", False, f"Exception: {str(e)}")
-    
-    async def test_faculties_endpoint(self):
-        """Test 4: Faculties endpoint (external API, no DB) - GET /api/faculties"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/faculties")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if isinstance(data, list):
-                    self.log_test("Faculties Endpoint", True, 
-                                f"Faculties endpoint working, returned {len(data)} faculties")
-                else:
-                    self.log_test("Faculties Endpoint", False, 
-                                f"Expected array, got: {type(data).__name__}")
-            else:
-                self.log_test("Faculties Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Faculties Endpoint", False, f"Exception: {str(e)}")
-    
-    async def test_status_endpoint(self):
-        """Test 5: Status endpoint (DB-dependent) - GET /api/status"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/status")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if isinstance(data, list):
-                    self.log_test("Status Endpoint", True, 
-                                f"Status endpoint working, returned {len(data)} status checks")
-                else:
-                    self.log_test("Status Endpoint", False, 
-                                f"Expected array, got: {type(data).__name__}")
-            else:
-                self.log_test("Status Endpoint", False, f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Status Endpoint", False, f"Exception: {str(e)}")
-    
-    async def test_health_check_response_structure(self):
-        """Test 6: Health check response structure verification"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/health")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check main keys
-                required_keys = ["status", "timestamp", "mongodb", "watchdog"]
-                missing_keys = [key for key in required_keys if key not in data]
-                
-                # Check mongodb sub-keys
-                mongodb_keys = ["connected", "latency_ms", "error", "url_host"]
-                mongodb_data = data.get("mongodb", {})
-                missing_mongodb_keys = [key for key in mongodb_keys if key not in mongodb_data]
-                
-                # Check watchdog sub-keys
-                watchdog_keys = ["healthy", "last_error", "last_check_ago_s"]
-                watchdog_data = data.get("watchdog", {})
-                missing_watchdog_keys = [key for key in watchdog_keys if key not in watchdog_data]
-                
-                if not missing_keys and not missing_mongodb_keys and not missing_watchdog_keys:
-                    self.log_test("Health Check Response Structure", True, 
-                                "All required fields present in health check response")
-                else:
-                    missing_info = []
-                    if missing_keys:
-                        missing_info.append(f"main keys: {missing_keys}")
-                    if missing_mongodb_keys:
-                        missing_info.append(f"mongodb keys: {missing_mongodb_keys}")
-                    if missing_watchdog_keys:
-                        missing_info.append(f"watchdog keys: {missing_watchdog_keys}")
-                    
-                    self.log_test("Health Check Response Structure", False, 
-                                f"Missing fields: {', '.join(missing_info)}")
-            else:
-                self.log_test("Health Check Response Structure", False, 
+                self.log_test("Notification Settings Include social_messages", False, 
                             f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Health Check Response Structure", False, f"Exception: {str(e)}")
+            self.log_test("Notification Settings Include social_messages", False, f"Exception: {str(e)}")
+    
+    async def test_3_update_notification_settings_social_messages(self):
+        """Test 3: Update notification settings with social_messages"""
+        try:
+            test_user_id = 12345
+            
+            # Step 1: Set social_messages to false
+            update_response = await self.client.put(
+                f"{BASE_URL}/notifications/{test_user_id}/settings",
+                json={"social_messages": False}
+            )
+            
+            if update_response.status_code != 200:
+                self.log_test("Update Notification Settings (social_messages)", False, 
+                            f"Failed to update settings: HTTP {update_response.status_code}: {update_response.text}")
+                return
+            
+            # Step 2: Verify the setting was updated
+            get_response = await self.client.get(f"{BASE_URL}/notifications/{test_user_id}/settings")
+            
+            if get_response.status_code != 200:
+                self.log_test("Update Notification Settings (social_messages)", False, 
+                            f"Failed to get updated settings: HTTP {get_response.status_code}: {get_response.text}")
+                return
+                
+            data = get_response.json()
+            if data.get("social_messages") == False:
+                # Step 3: Restore to true
+                restore_response = await self.client.put(
+                    f"{BASE_URL}/notifications/{test_user_id}/settings",
+                    json={"social_messages": True}
+                )
+                
+                if restore_response.status_code == 200:
+                    self.log_test("Update Notification Settings (social_messages)", True, 
+                                "Successfully updated social_messages to false and restored to true")
+                else:
+                    self.log_test("Update Notification Settings (social_messages)", False, 
+                                f"Failed to restore setting: HTTP {restore_response.status_code}")
+            else:
+                self.log_test("Update Notification Settings (social_messages)", False, 
+                            f"Setting not updated correctly. Expected false, got: {data.get('social_messages')}")
+                
+        except Exception as e:
+            self.log_test("Update Notification Settings (social_messages)", False, f"Exception: {str(e)}")
+    
+    async def test_4_setup_test_users_and_friendship(self):
+        """Test 4: Setup test users and establish friendship"""
+        try:
+            # Step 1: Create user settings for sender
+            sender_data = {
+                "telegram_id": self.test_user_sender, 
+                "first_name": "TestSender"
+            }
+            sender_response = await self.client.post(f"{BASE_URL}/user-settings", json=sender_data)
+            
+            # Step 2: Create user settings for receiver  
+            receiver_data = {
+                "telegram_id": self.test_user_receiver, 
+                "first_name": "TestReceiver"
+            }
+            receiver_response = await self.client.post(f"{BASE_URL}/user-settings", json=receiver_data)
+            
+            # Both should succeed or already exist (409 is ok)
+            if sender_response.status_code not in [200, 201, 409]:
+                self.log_test("Setup Test Users and Friendship", False, 
+                            f"Failed to create sender user: HTTP {sender_response.status_code}: {sender_response.text}")
+                return
+                
+            if receiver_response.status_code not in [200, 201, 409]:
+                self.log_test("Setup Test Users and Friendship", False, 
+                            f"Failed to create receiver user: HTTP {receiver_response.status_code}: {receiver_response.text}")
+                return
+            
+            # Step 3: Send friend request from sender to receiver
+            friend_request_data = {"target_telegram_id": self.test_user_receiver}
+            request_response = await self.client.post(
+                f"{BASE_URL}/friends/request/{self.test_user_sender}", 
+                json=friend_request_data
+            )
+            
+            # Step 4: Try to accept friendship - check what endpoint exists
+            # First try the accept endpoint mentioned in the test case
+            accept_data = {"from_telegram_id": self.test_user_sender}
+            accept_response = await self.client.post(
+                f"{BASE_URL}/friends/accept/{self.test_user_receiver}", 
+                json=accept_data
+            )
+            
+            # If that doesn't work, let's check for alternative endpoints
+            if accept_response.status_code == 404:
+                # Try alternative endpoint structure
+                accept_response = await self.client.post(
+                    f"{BASE_URL}/friends/{self.test_user_receiver}/accept", 
+                    json=accept_data
+                )
+            
+            friendship_established = (
+                request_response.status_code in [200, 201, 409] and  # Request sent or already exists
+                accept_response.status_code in [200, 201, 409]       # Accepted or already friends
+            )
+            
+            if friendship_established:
+                self.log_test("Setup Test Users and Friendship", True, 
+                            f"Test users created and friendship established. Request: {request_response.status_code}, Accept: {accept_response.status_code}")
+            else:
+                self.log_test("Setup Test Users and Friendship", False, 
+                            f"Failed to establish friendship. Request: {request_response.status_code} ({request_response.text}), Accept: {accept_response.status_code} ({accept_response.text})")
+                
+        except Exception as e:
+            self.log_test("Setup Test Users and Friendship", False, f"Exception: {str(e)}")
+    
+    async def test_5_send_message_creates_notification(self):
+        """Test 5: Send message creates notification"""
+        try:
+            # Step 1: Send message from sender to receiver
+            message_data = {
+                "sender_id": self.test_user_sender,
+                "receiver_id": self.test_user_receiver, 
+                "text": "Привет! Тестовое сообщение"
+            }
+            
+            message_response = await self.client.post(f"{BASE_URL}/messages", json=message_data)
+            
+            if message_response.status_code not in [200, 201]:
+                self.log_test("Send Message Creates Notification", False, 
+                            f"Failed to send message: HTTP {message_response.status_code}: {message_response.text}")
+                return
+            
+            # Step 2: Check if notification was created for receiver
+            # Wait a bit for notification to be processed
+            await asyncio.sleep(2)
+            
+            notifications_response = await self.client.get(f"{BASE_URL}/notifications/{self.test_user_receiver}?limit=5")
+            
+            if notifications_response.status_code != 200:
+                self.log_test("Send Message Creates Notification", False, 
+                            f"Failed to get notifications: HTTP {notifications_response.status_code}: {notifications_response.text}")
+                return
+            
+            notifications_data = notifications_response.json()
+            
+            # Look for new_message notification
+            new_message_notifications = []
+            if isinstance(notifications_data, dict) and "notifications" in notifications_data:
+                notifications = notifications_data["notifications"]
+            elif isinstance(notifications_data, list):
+                notifications = notifications_data
+            else:
+                notifications = []
+            
+            for notification in notifications:
+                if notification.get("type") == "new_message":
+                    new_message_notifications.append(notification)
+            
+            if new_message_notifications:
+                # Check if notification contains sender name
+                notification = new_message_notifications[0]
+                title = notification.get("title", "")
+                has_sender_name = "TestSender" in title
+                
+                if has_sender_name:
+                    self.log_test("Send Message Creates Notification", True, 
+                                f"Message sent successfully and notification created with sender name in title: '{title}'")
+                else:
+                    self.log_test("Send Message Creates Notification", False, 
+                                f"Notification created but doesn't contain sender name. Title: '{title}'")
+            else:
+                self.log_test("Send Message Creates Notification", False, 
+                            f"Message sent but no new_message notification found. Found {len(notifications)} notifications total")
+                
+        except Exception as e:
+            self.log_test("Send Message Creates Notification", False, f"Exception: {str(e)}")
+    
+    async def test_6_notification_structure(self):
+        """Test 6: Verify notification structure for new_message type"""
+        try:
+            # Get recent notifications for receiver
+            notifications_response = await self.client.get(f"{BASE_URL}/notifications/{self.test_user_receiver}?limit=10")
+            
+            if notifications_response.status_code != 200:
+                self.log_test("Notification Structure Verification", False, 
+                            f"Failed to get notifications: HTTP {notifications_response.status_code}: {notifications_response.text}")
+                return
+            
+            notifications_data = notifications_response.json()
+            
+            # Find new_message notification
+            if isinstance(notifications_data, dict) and "notifications" in notifications_data:
+                notifications = notifications_data["notifications"]
+            elif isinstance(notifications_data, list):
+                notifications = notifications_data
+            else:
+                notifications = []
+            
+            new_message_notification = None
+            for notification in notifications:
+                if notification.get("type") == "new_message":
+                    new_message_notification = notification
+                    break
+            
+            if not new_message_notification:
+                self.log_test("Notification Structure Verification", False, 
+                            "No new_message notification found to verify structure")
+                return
+            
+            # Verify required fields
+            required_fields = {
+                "type": "new_message",
+                "category": "social", 
+                "emoji": "💬"
+            }
+            
+            structure_issues = []
+            
+            for field, expected_value in required_fields.items():
+                actual_value = new_message_notification.get(field)
+                if actual_value != expected_value:
+                    structure_issues.append(f"{field}: expected '{expected_value}', got '{actual_value}'")
+            
+            # Check data field structure
+            data = new_message_notification.get("data", {})
+            required_data_fields = ["conversation_id", "sender_id", "sender_name", "message_id"]
+            
+            for field in required_data_fields:
+                if field not in data:
+                    structure_issues.append(f"data.{field}: missing")
+            
+            if not structure_issues:
+                self.log_test("Notification Structure Verification", True, 
+                            f"Notification structure is correct: type={new_message_notification['type']}, category={new_message_notification['category']}, emoji={new_message_notification['emoji']}")
+            else:
+                self.log_test("Notification Structure Verification", False, 
+                            f"Structure issues: {'; '.join(structure_issues)}. Full notification: {json.dumps(new_message_notification, indent=2)}")
+                
+        except Exception as e:
+            self.log_test("Notification Structure Verification", False, f"Exception: {str(e)}")
     
     async def run_all_tests(self):
-        """Run all backend tests"""
-        print("🚀 Starting MongoDB Resilience and Health-Check Backend Tests")
+        """Run all message notification tests"""
+        print("🚀 Starting Message Notification Feature Backend Tests")
+        print("=" * 70)
+        print(f"Backend URL: {BASE_URL}")
+        print(f"Environment: test (using test bot, test database)")
         print("=" * 70)
         
-        # Test in order specified in review request
-        await self.test_health_check_mongodb_running()
-        await self.test_root_endpoint()
-        await self.test_bot_info_endpoint()
-        await self.test_faculties_endpoint()
-        await self.test_status_endpoint()
-        await self.test_health_check_response_structure()
+        # Run tests in sequence as specified in review request
+        await self.test_1_health_check()
+        await self.test_2_notification_settings_include_social_messages()
+        await self.test_3_update_notification_settings_social_messages()
+        await self.test_4_setup_test_users_and_friendship()
+        await self.test_5_send_message_creates_notification()
+        await self.test_6_notification_structure()
         
         print("\n" + "=" * 70)
         print("📊 TEST SUMMARY")
@@ -219,7 +356,7 @@ class BackendTester:
 
 async def main():
     """Main test runner"""
-    async with BackendTester() as tester:
+    async with MessageNotificationTester() as tester:
         success = await tester.run_all_tests()
         return success
 
