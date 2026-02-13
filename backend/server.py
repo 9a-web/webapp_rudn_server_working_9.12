@@ -580,6 +580,17 @@ async def startup_event():
     """Единая точка инициализации при запуске приложения"""
     logger.info("🚀 Starting RUDN Schedule API...")
     
+    # 0. ⚡ Ожидаем доступности MongoDB (до 60 с с авто-перезапуском)
+    mongo_ok = await _wait_for_mongodb(max_attempts=30, delay=2.0)
+    if not mongo_ok:
+        logger.error(
+            "⚠️ MongoDB недоступна при старте! Приложение запускается без БД. "
+            "Watchdog будет пытаться восстановить подключение."
+        )
+    
+    # 0.1. 🛡️ Запускаем MongoDB Watchdog (фоновая проверка каждые 30 сек)
+    asyncio.create_task(_mongodb_watchdog())
+    
     # 1. Setup Playwright browser symlinks for LK RUDN parser
     import subprocess
     try:
@@ -597,7 +608,8 @@ async def startup_event():
         logger.warning(f"⚠️ Failed to init cover service: {e}")
     
     # 3. Создаём индексы БД (в фоне, чтобы не блокировать старт)
-    asyncio.create_task(create_indexes())
+    if mongo_ok:
+        asyncio.create_task(create_indexes())
     
     # 4. Запускаем сбор метрик сервера (фоновый цикл)
     asyncio.create_task(collect_server_metrics_loop())
