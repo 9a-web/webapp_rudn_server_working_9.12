@@ -13786,6 +13786,9 @@ async def should_send_notification(telegram_id: int, category: NotificationCateg
             in_app = in_app and settings.social_friend_requests
         elif notification_type == NotificationType.FRIEND_ACCEPTED:
             in_app = in_app and settings.social_friend_accepted
+        elif notification_type == NotificationType.NEW_MESSAGE:
+            in_app = in_app and settings.social_messages
+            push = push and settings.social_messages
     elif category == NotificationCategory.ROOMS:
         in_app = settings.rooms_enabled
         push = settings.rooms_push
