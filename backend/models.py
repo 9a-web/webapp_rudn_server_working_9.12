@@ -2158,6 +2158,7 @@ class ExtendedNotificationSettings(BaseModel):
     social_push: bool = True
     social_friend_requests: bool = True
     social_friend_accepted: bool = True
+    social_messages: bool = True
     rooms_enabled: bool = True
     rooms_push: bool = True
     rooms_new_tasks: bool = True
