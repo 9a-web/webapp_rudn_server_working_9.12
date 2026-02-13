@@ -185,8 +185,8 @@ class MessageNotificationTester:
                     # Find the request from our test sender
                     request_id = None
                     for req in pending_requests:
-                        if req.get("sender", {}).get("telegram_id") == self.test_user_sender:
-                            request_id = req.get("id")
+                        if req.get("telegram_id") == self.test_user_sender:  # Changed from "sender" nested field to direct field
+                            request_id = req.get("request_id")  # Changed from "id" to "request_id"
                             break
                     
                     if request_id:
