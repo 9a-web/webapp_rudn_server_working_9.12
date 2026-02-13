@@ -9,8 +9,8 @@ import asyncio
 import json
 from typing import Dict, Any, Optional
 
-# Backend URL - using external URL from frontend .env
-BASE_URL = "https://rudn-dev.preview.emergentagent.com/api"
+# Backend URL - using localhost as external URL is not available
+BASE_URL = "http://localhost:8001/api"
 
 class BackendTester:
     def __init__(self):
