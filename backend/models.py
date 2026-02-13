@@ -1950,6 +1950,7 @@ class NotificationType(str, Enum):
     FRIEND_REQUEST = "friend_request"
     FRIEND_ACCEPTED = "friend_accepted"
     FRIEND_JOINED = "friend_joined"
+    NEW_MESSAGE = "new_message"
     
     # Комнаты
     ROOM_INVITE = "room_invite"
