@@ -173,8 +173,8 @@ class MessageNotificationTester:
                 json={"telegram_id": self.test_user_sender}
             )
             
-            # Step 4: Get the request ID and accept it
-            if request_response.status_code in [200, 201]:
+            # Step 4: Get the request ID and accept it (handle existing request)
+            if request_response.status_code in [200, 201, 400]:  # 400 = already sent
                 # Get friend requests for receiver to find the request ID
                 requests_response = await self.client.get(f"{BASE_URL}/friends/{self.test_user_receiver}/requests")
                 
@@ -203,15 +203,25 @@ class MessageNotificationTester:
                             self.log_test("Setup Test Users and Friendship", False, 
                                         f"Failed to accept friend request: HTTP {accept_response.status_code}: {accept_response.text}")
                     else:
-                        self.log_test("Setup Test Users and Friendship", False, 
-                                    f"Could not find friend request to accept in: {requests_data}")
+                        # Maybe they are already friends? Check friends list
+                        friends_response = await self.client.get(f"{BASE_URL}/friends/{self.test_user_sender}")
+                        if friends_response.status_code == 200:
+                            friends_data = friends_response.json()
+                            friends_list = friends_data.get("friends", [])
+                            already_friends = any(friend.get("telegram_id") == self.test_user_receiver for friend in friends_list)
+                            
+                            if already_friends:
+                                self.log_test("Setup Test Users and Friendship", True, 
+                                            f"Test users are already friends")
+                            else:
+                                self.log_test("Setup Test Users and Friendship", False, 
+                                            f"Could not find friend request to accept and users are not friends. Requests: {requests_data}")
+                        else:
+                            self.log_test("Setup Test Users and Friendship", False, 
+                                        f"Could not find friend request to accept in: {requests_data}")
                 else:
                     self.log_test("Setup Test Users and Friendship", False, 
                                 f"Failed to get friend requests: HTTP {requests_response.status_code}: {requests_response.text}")
-            elif request_response.status_code == 409:
-                # Already friends or request already exists - that's fine
-                self.log_test("Setup Test Users and Friendship", True, 
-                            f"Test users and friendship already exist (conflict expected)")
             else:
                 self.log_test("Setup Test Users and Friendship", False, 
                             f"Failed to send friend request: HTTP {request_response.status_code}: {request_response.text}")
