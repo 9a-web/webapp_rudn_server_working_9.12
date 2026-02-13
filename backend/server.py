@@ -6943,11 +6943,13 @@ async def get_server_stats_history(hours: int = 24):
     Возвращает метрики + пиковые значения.
     
     Query params:
-    - hours: период в часах (1, 6, 24, 72, 168). По умолчанию 24.
+    - hours: период в часах (1, 6, 24, 72, 168, 720, 0=всё). По умолчанию 24.
     """
     try:
-        hours = min(hours, 168)  # максимум 7 дней
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        if hours <= 0:
+            cutoff = datetime(2020, 1, 1)  # всё время
+        else:
+            cutoff = datetime.utcnow() - timedelta(hours=hours)
         
         cursor = db.server_metrics_history.find(
             {"timestamp": {"$gte": cutoff}},
