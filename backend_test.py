@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Listening Room Preview Feature
-Tests the new preview endpoint and verifies existing functionality.
+Backend API Testing Script for MongoDB Resilience and Health-Check Features
+Tests the MongoDB resilience features and health check endpoints.
 """
 
 import httpx
 import asyncio
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-# Backend URL - using localhost since external routing has issues
-BASE_URL = "http://localhost:8001/api"
+# Backend URL - using external URL from frontend .env
+BASE_URL = "https://rudn-dev.preview.emergentagent.com/api"
 
 class BackendTester:
     def __init__(self):
