@@ -709,10 +709,22 @@ const EmptyChart = ({ text }) => (
 // =============================================
 // ONLINE TAB
 // =============================================
+const ONLINE_HISTORY_PERIODS = [
+  { label: '1ч', hours: 1 },
+  { label: '6ч', hours: 6 },
+  { label: '24ч', hours: 24 },
+  { label: '7д', hours: 168 },
+  { label: '30д', hours: 720 },
+  { label: 'Всё', hours: 0 },
+];
+
 const OnlineTab = ({ onlineData, loading, onRefresh }) => {
   const [onlineHistory, setOnlineHistory] = useState([]);
+  const [persistentHistory, setPersistentHistory] = useState(null);
+  const [historyPeriod, setHistoryPeriod] = useState(24);
+  const [historyLoading, setHistoryLoading] = useState(false);
   
-  // Обновляем историю при каждом обновлении onlineData
+  // Realtime in-memory история (для графика за текущую сессию)
   useEffect(() => {
     if (onlineData?.online_now != null) {
       setOnlineHistory(prev => {
@@ -723,10 +735,54 @@ const OnlineTab = ({ onlineData, loading, onRefresh }) => {
           telegram: onlineData.telegram_online || 0,
         };
         const updated = [...prev, newPoint];
-        return updated.slice(-60); // хранить 60 точек (5 мин при 5с интервале)
+        return updated.slice(-60);
       });
     }
   }, [onlineData]);
+
+  // Persistent история из API
+  const fetchOnlineHistory = useCallback(async (hours) => {
+    setHistoryLoading(true);
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/online-stats-history?hours=${hours}`);
+      setPersistentHistory(res.data);
+    } catch (err) {
+      console.error('Online history fetch error:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOnlineHistory(historyPeriod);
+    const interval = setInterval(() => fetchOnlineHistory(historyPeriod), 60000);
+    return () => clearInterval(interval);
+  }, [historyPeriod, fetchOnlineHistory]);
+
+  // Форматируем persistent данные для графика
+  const persistentChartData = useMemo(() => {
+    if (!persistentHistory?.metrics) return [];
+    return persistentHistory.metrics.map(m => {
+      const d = new Date(m.timestamp);
+      let timeLabel;
+      if (historyPeriod <= 6) {
+        timeLabel = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+      } else if (historyPeriod <= 24) {
+        timeLabel = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+      } else {
+        timeLabel = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Moscow' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+      }
+      return {
+        time: timeLabel,
+        online: Math.round(m.online_now),
+        web: Math.round(m.web_online),
+        telegram: Math.round(m.telegram_online),
+        peak: m.peak_online || Math.round(m.online_now),
+        online_1h: Math.round(m.online_1h),
+        online_24h: Math.round(m.online_24h),
+      };
+    });
+  }, [persistentHistory, historyPeriod]);
 
   return (
     <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6 space-y-5">
