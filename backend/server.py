@@ -7065,6 +7065,107 @@ def _aggregate_bucket(items, bucket_time):
     }
 
 
+# ============ Online Statistics History API ============
+
+@api_router.get("/admin/online-stats-history")
+async def get_online_stats_history(hours: int = 24):
+    """
+    История онлайн-пользователей за указанный период.
+    Данные хранятся БЕССРОЧНО.
+    
+    Query params:
+    - hours: период (1, 6, 24, 72, 168, 720, 0=всё). По умолчанию 24.
+    """
+    try:
+        if hours <= 0:
+            cutoff = datetime(2020, 1, 1)
+        else:
+            cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        cursor = db.online_stats_history.find(
+            {"timestamp": {"$gte": cutoff}},
+            {"_id": 0}
+        ).sort("timestamp", 1)
+
+        all_points = await cursor.to_list(length=None)
+
+        if not all_points:
+            return {
+                "period_hours": hours,
+                "total_points": 0,
+                "metrics": [],
+                "peaks": None,
+            }
+
+        # Агрегируем для больших периодов
+        if hours <= 1:
+            interval_minutes = 1
+        elif hours <= 6:
+            interval_minutes = 5
+        elif hours <= 24:
+            interval_minutes = 10
+        elif hours <= 168:
+            interval_minutes = 30
+        elif hours <= 720:
+            interval_minutes = 60
+        else:
+            interval_minutes = 180
+
+        aggregated = []
+        bucket_start = None
+        bucket_items = []
+
+        for m in all_points:
+            ts = m["timestamp"]
+            bucket_key = ts.replace(
+                minute=(ts.minute // interval_minutes) * interval_minutes,
+                second=0, microsecond=0
+            )
+            if bucket_start is None or bucket_key != bucket_start:
+                if bucket_items:
+                    aggregated.append(_aggregate_online_bucket(bucket_items, bucket_start))
+                bucket_start = bucket_key
+                bucket_items = [m]
+            else:
+                bucket_items.append(m)
+
+        if bucket_items:
+            aggregated.append(_aggregate_online_bucket(bucket_items, bucket_start))
+
+        # Пиковые значения
+        peak_online = max(all_points, key=lambda x: x.get("online_now", 0))
+
+        return {
+            "period_hours": hours,
+            "total_points": len(aggregated),
+            "interval_minutes": interval_minutes,
+            "metrics": aggregated,
+            "peaks": {
+                "online_now": {
+                    "value": peak_online.get("online_now", 0),
+                    "timestamp": peak_online["timestamp"].isoformat(),
+                },
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting online stats history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _aggregate_online_bucket(items, bucket_time):
+    """Агрегирует онлайн-метрики в одну точку (среднее / максимум)"""
+    n = len(items)
+    return {
+        "timestamp": bucket_time.isoformat(),
+        "online_now": round(sum(m.get("online_now", 0) for m in items) / n, 1),
+        "online_1h": round(sum(m.get("online_1h", 0) for m in items) / n, 1),
+        "online_24h": round(sum(m.get("online_24h", 0) for m in items) / n, 1),
+        "web_online": round(sum(m.get("web_online", 0) for m in items) / n, 1),
+        "telegram_online": round(sum(m.get("telegram_online", 0) for m in items) / n, 1),
+        "peak_online": max(m.get("online_now", 0) for m in items),
+    }
+
+
 # ============ API для ЛК РУДН (lk.rudn.ru) ============
 
 @api_router.post("/lk/connect", response_model=LKConnectionResponse)
