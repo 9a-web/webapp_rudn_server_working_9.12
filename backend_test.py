@@ -35,165 +35,164 @@ class BackendTester:
             'details': details
         })
     
-    async def test_server_health(self):
-        """Test main server health check"""
+    async def test_health_check_mongodb_running(self):
+        """Test 1: Health Check (MongoDB running) - GET /api/health"""
         try:
-            response = await self.client.get(f"{BASE_URL}/faculties")
-            
-            if response.status_code == 200:
-                faculties = response.json()
-                if isinstance(faculties, list) and len(faculties) > 0:
-                    self.log_test("Server Health Check", True, f"Server is healthy, got {len(faculties)} faculties")
-                else:
-                    self.log_test("Server Health Check", False, "Empty faculties list")
-            else:
-                self.log_test("Server Health Check", False, f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Server Health Check", False, f"Exception: {str(e)}")
-    
-    async def test_preview_nonexistent_room(self):
-        """Test preview endpoint with non-existent invite code"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/music/rooms/preview/NONEXISTENT")
+            response = await self.client.get(f"{BASE_URL}/health")
             
             if response.status_code == 200:
                 data = response.json()
-                expected_response = {
-                    "found": False,
-                    "message": "Комната не найдена или уже закрыта"
-                }
                 
-                if data == expected_response:
-                    self.log_test("Preview Non-existent Room", True, "Correct response for non-existent room")
+                # Verify required fields
+                if (data.get("status") == "healthy" and 
+                    data.get("mongodb", {}).get("connected") is True and
+                    isinstance(data.get("mongodb", {}).get("latency_ms"), (int, float))):
+                    self.log_test("Health Check (MongoDB Running)", True, 
+                                f"Status: {data['status']}, MongoDB connected: {data['mongodb']['connected']}, "
+                                f"Latency: {data['mongodb']['latency_ms']}ms")
                 else:
-                    self.log_test("Preview Non-existent Room", False, f"Unexpected response: {data}")
+                    self.log_test("Health Check (MongoDB Running)", False, 
+                                f"Unexpected response structure: {data}")
             else:
-                self.log_test("Preview Non-existent Room", False, f"HTTP {response.status_code}: {response.text}")
+                self.log_test("Health Check (MongoDB Running)", False, 
+                            f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("Preview Non-existent Room", False, f"Exception: {str(e)}")
+            self.log_test("Health Check (MongoDB Running)", False, f"Exception: {str(e)}")
     
-    async def test_preview_empty_invite_code(self):
-        """Test preview endpoint with empty invite code (should be 404/405/307)"""
+    async def test_root_endpoint(self):
+        """Test 2: Root endpoint still works - GET /api/"""
         try:
-            # Test with empty path (should not match route)
-            response = await self.client.get(f"{BASE_URL}/music/rooms/preview/")
-            
-            # Should return 404 (Not Found), 405 (Method Not Allowed), or 307 (Redirect) as the route doesn't match
-            if response.status_code in [404, 405, 307]:
-                self.log_test("Preview Empty Invite Code", True, f"Correctly returned HTTP {response.status_code}")
-            else:
-                # If it somehow matches and returns 200, check if it's proper error handling
-                if response.status_code == 200:
-                    data = response.json()
-                    if not data.get("found", True):  # If found is False, it's handling empty code gracefully
-                        self.log_test("Preview Empty Invite Code", True, f"Graceful handling: {data}")
-                    else:
-                        self.log_test("Preview Empty Invite Code", False, f"Unexpected success: {data}")
-                else:
-                    self.log_test("Preview Empty Invite Code", False, f"Unexpected HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Preview Empty Invite Code", False, f"Exception: {str(e)}")
-    
-    async def test_join_nonexistent_room(self):
-        """Test existing join endpoint still works with non-existent room"""
-        try:
-            payload = {
-                "telegram_id": 123,
-                "first_name": "Test"
-            }
-            
-            response = await self.client.post(
-                f"{BASE_URL}/music/rooms/join/TESTCODE",
-                json=payload
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                expected_keys = ["success", "message"]
-                
-                if all(key in data for key in expected_keys):
-                    if not data["success"] and "не найдена" in data["message"]:
-                        self.log_test("Join Non-existent Room", True, f"Correct join response: {data}")
-                    else:
-                        self.log_test("Join Non-existent Room", False, f"Unexpected join response: {data}")
-                else:
-                    self.log_test("Join Non-existent Room", False, f"Missing keys in response: {data}")
-            else:
-                self.log_test("Join Non-existent Room", False, f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Join Non-existent Room", False, f"Exception: {str(e)}")
-    
-    async def test_preview_existing_room(self):
-        """Test preview endpoint with existing room (if any exists)"""
-        try:
-            # Try a few common test codes
-            test_codes = ["TEST", "DEMO", "SAMPLE", "TESTROOM"]
-            
-            found_room = False
-            
-            for code in test_codes:
-                response = await self.client.get(f"{BASE_URL}/music/rooms/preview/{code}")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    if data.get("found", False):
-                        # Found an existing room
-                        expected_keys = ["found", "room_id", "name", "host_name", "host_id", 
-                                       "participants_count", "online_count", "max_participants", 
-                                       "current_track", "invite_code"]
-                        
-                        if all(key in data for key in expected_keys):
-                            self.log_test("Preview Existing Room", True, f"Found room {code}: {data['name']} by {data['host_name']}")
-                            found_room = True
-                            break
-                        else:
-                            missing_keys = [key for key in expected_keys if key not in data]
-                            self.log_test("Preview Existing Room", False, f"Missing keys in existing room response: {missing_keys}")
-                            found_room = True
-                            break
-            
-            if not found_room:
-                # No existing rooms found - this is expected behavior, not a failure
-                self.log_test("Preview Existing Room", True, "No existing rooms found (expected)")
-                
-        except Exception as e:
-            self.log_test("Preview Existing Room", False, f"Exception: {str(e)}")
-    
-    async def test_api_endpoint_structure(self):
-        """Test that the API endpoints are properly structured"""
-        try:
-            # Test that the API responds to basic requests
             response = await self.client.get(f"{BASE_URL}/")
             
             if response.status_code == 200:
                 data = response.json()
-                if isinstance(data, dict) and "message" in data:
-                    self.log_test("API Endpoint Structure", True, f"API root responds correctly: {data}")
+                
+                if data.get("message") == "RUDN Schedule API is running":
+                    self.log_test("Root Endpoint", True, f"Root endpoint working: {data}")
                 else:
-                    self.log_test("API Endpoint Structure", False, f"Unexpected API root response: {data}")
+                    self.log_test("Root Endpoint", False, f"Unexpected message: {data}")
             else:
-                self.log_test("API Endpoint Structure", False, f"API root HTTP {response.status_code}")
+                self.log_test("Root Endpoint", False, f"HTTP {response.status_code}: {response.text}")
                 
         except Exception as e:
-            self.log_test("API Endpoint Structure", False, f"Exception: {str(e)}")
+            self.log_test("Root Endpoint", False, f"Exception: {str(e)}")
+    
+    async def test_bot_info_endpoint(self):
+        """Test 3: Bot info endpoint - GET /api/bot-info"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/bot-info")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if "username" in data and "env" in data:
+                    self.log_test("Bot Info Endpoint", True, 
+                                f"Bot info: username={data.get('username')}, env={data.get('env')}")
+                else:
+                    self.log_test("Bot Info Endpoint", False, 
+                                f"Missing username or env fields: {data}")
+            else:
+                self.log_test("Bot Info Endpoint", False, f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Bot Info Endpoint", False, f"Exception: {str(e)}")
+    
+    async def test_faculties_endpoint(self):
+        """Test 4: Faculties endpoint (external API, no DB) - GET /api/faculties"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/faculties")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if isinstance(data, list):
+                    self.log_test("Faculties Endpoint", True, 
+                                f"Faculties endpoint working, returned {len(data)} faculties")
+                else:
+                    self.log_test("Faculties Endpoint", False, 
+                                f"Expected array, got: {type(data).__name__}")
+            else:
+                self.log_test("Faculties Endpoint", False, f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Faculties Endpoint", False, f"Exception: {str(e)}")
+    
+    async def test_status_endpoint(self):
+        """Test 5: Status endpoint (DB-dependent) - GET /api/status"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/status")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if isinstance(data, list):
+                    self.log_test("Status Endpoint", True, 
+                                f"Status endpoint working, returned {len(data)} status checks")
+                else:
+                    self.log_test("Status Endpoint", False, 
+                                f"Expected array, got: {type(data).__name__}")
+            else:
+                self.log_test("Status Endpoint", False, f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Status Endpoint", False, f"Exception: {str(e)}")
+    
+    async def test_health_check_response_structure(self):
+        """Test 6: Health check response structure verification"""
+        try:
+            response = await self.client.get(f"{BASE_URL}/health")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check main keys
+                required_keys = ["status", "timestamp", "mongodb", "watchdog"]
+                missing_keys = [key for key in required_keys if key not in data]
+                
+                # Check mongodb sub-keys
+                mongodb_keys = ["connected", "latency_ms", "error", "url_host"]
+                mongodb_data = data.get("mongodb", {})
+                missing_mongodb_keys = [key for key in mongodb_keys if key not in mongodb_data]
+                
+                # Check watchdog sub-keys
+                watchdog_keys = ["healthy", "last_error", "last_check_ago_s"]
+                watchdog_data = data.get("watchdog", {})
+                missing_watchdog_keys = [key for key in watchdog_keys if key not in watchdog_data]
+                
+                if not missing_keys and not missing_mongodb_keys and not missing_watchdog_keys:
+                    self.log_test("Health Check Response Structure", True, 
+                                "All required fields present in health check response")
+                else:
+                    missing_info = []
+                    if missing_keys:
+                        missing_info.append(f"main keys: {missing_keys}")
+                    if missing_mongodb_keys:
+                        missing_info.append(f"mongodb keys: {missing_mongodb_keys}")
+                    if missing_watchdog_keys:
+                        missing_info.append(f"watchdog keys: {missing_watchdog_keys}")
+                    
+                    self.log_test("Health Check Response Structure", False, 
+                                f"Missing fields: {', '.join(missing_info)}")
+            else:
+                self.log_test("Health Check Response Structure", False, 
+                            f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Health Check Response Structure", False, f"Exception: {str(e)}")
     
     async def run_all_tests(self):
         """Run all backend tests"""
-        print("🚀 Starting Backend API Tests for Listening Room Preview Feature")
+        print("🚀 Starting MongoDB Resilience and Health-Check Backend Tests")
         print("=" * 70)
         
-        # Test in order of importance
-        await self.test_server_health()
-        await self.test_api_endpoint_structure()
-        await self.test_preview_nonexistent_room()
-        await self.test_preview_empty_invite_code()
-        await self.test_join_nonexistent_room()
-        await self.test_preview_existing_room()
+        # Test in order specified in review request
+        await self.test_health_check_mongodb_running()
+        await self.test_root_endpoint()
+        await self.test_bot_info_endpoint()
+        await self.test_faculties_endpoint()
+        await self.test_status_endpoint()
+        await self.test_health_check_response_structure()
         
         print("\n" + "=" * 70)
         print("📊 TEST SUMMARY")
