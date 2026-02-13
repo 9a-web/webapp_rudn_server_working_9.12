@@ -278,19 +278,122 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info(f"📋 Logging level: {logging.getLevelName(_log_level)} (ENV={ENV})")
 
-# MongoDB connection (с оптимизированными настройками пула)
+# MongoDB connection (с улучшенной отказоустойчивостью)
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(
-    mongo_url,
-    maxPoolSize=50,
-    minPoolSize=5,
-    serverSelectionTimeoutMS=5000,
-    connectTimeoutMS=5000,
-    socketTimeoutMS=30000,
-    retryWrites=True,
-    retryReads=True,
-)
-db = client[os.environ['DB_NAME']]
+_db_name = os.environ['DB_NAME']
+
+# --- Флаг состояния MongoDB (для middleware и health-check) ---
+_mongo_healthy: bool = False
+_mongo_last_error: str = ""
+_mongo_last_check: float = 0.0
+
+def _create_mongo_client() -> AsyncIOMotorClient:
+    """Создаёт Motor-клиент с параметрами, повышающими устойчивость к сбоям."""
+    return AsyncIOMotorClient(
+        mongo_url,
+        maxPoolSize=50,
+        minPoolSize=5,
+        # Даём MongoDB до 30 с на восстановление, прежде чем считать операцию неудачной
+        serverSelectionTimeoutMS=30000,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=30000,
+        # Быстрее обнаруживаем восстановление (по умолчанию 10 с)
+        heartbeatFrequencyMS=5000,
+        retryWrites=True,
+        retryReads=True,
+    )
+
+client = _create_mongo_client()
+db = client[_db_name]
+
+
+# ============ Утилиты MongoDB: retry при запуске и watchdog ============
+
+async def _wait_for_mongodb(max_attempts: int = 30, delay: float = 2.0) -> bool:
+    """
+    Ожидает доступности MongoDB при старте приложения.
+    Пробует до *max_attempts* раз с интервалом *delay* секунд.
+    Возвращает True если подключились, False — если не дождались.
+    """
+    global _mongo_healthy, _mongo_last_error, _mongo_last_check
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await client.admin.command("ping")
+            _mongo_healthy = True
+            _mongo_last_error = ""
+            _mongo_last_check = _time_module.time()
+            logger.info(f"✅ MongoDB доступна (попытка {attempt}/{max_attempts})")
+            return True
+        except Exception as exc:
+            _mongo_healthy = False
+            _mongo_last_error = str(exc)
+            _mongo_last_check = _time_module.time()
+            logger.warning(
+                f"⏳ MongoDB недоступна (попытка {attempt}/{max_attempts}): {exc}"
+            )
+            # Пробуем перезапустить mongod, если он на этом же сервере
+            if attempt % 5 == 0:
+                _try_restart_mongod()
+            await asyncio.sleep(delay)
+
+    logger.error(
+        f"❌ MongoDB не стала доступна после {max_attempts} попыток ({max_attempts * delay}s). "
+        "Приложение продолжит работу и будет пытаться переподключиться."
+    )
+    return False
+
+
+def _try_restart_mongod():
+    """Безопасная попытка перезапустить mongod через systemctl / supervisorctl."""
+    for cmd in (
+        ["sudo", "systemctl", "restart", "mongod"],
+        ["sudo", "supervisorctl", "restart", "mongodb"],
+    ):
+        try:
+            result = _subprocess.run(
+                cmd, capture_output=True, timeout=15, text=True,
+            )
+            if result.returncode == 0:
+                logger.info(f"🔄 MongoDB перезапущена: {' '.join(cmd)}")
+                return
+        except Exception:
+            continue
+    logger.debug("ℹ️ Автоматический перезапуск MongoDB не удался (команда не найдена или нет прав)")
+
+
+async def _mongodb_watchdog():
+    """
+    Фоновая задача — каждые 30 секунд проверяет MongoDB.
+    При обнаружении проблемы пытается перезапустить mongod и уведомляет в логах.
+    """
+    global _mongo_healthy, _mongo_last_error, _mongo_last_check
+    await asyncio.sleep(10)  # ждём инициализацию приложения
+    logger.info("🛡️ MongoDB Watchdog запущен (интервал: 30 с)")
+    consecutive_failures = 0
+
+    while True:
+        try:
+            await client.admin.command("ping")
+            if not _mongo_healthy:
+                logger.info("✅ MongoDB восстановлена!")
+            _mongo_healthy = True
+            _mongo_last_error = ""
+            consecutive_failures = 0
+        except Exception as exc:
+            consecutive_failures += 1
+            _mongo_healthy = False
+            _mongo_last_error = str(exc)
+            logger.error(
+                f"🔴 MongoDB Watchdog: соединение потеряно "
+                f"(ошибка #{consecutive_failures}): {exc}"
+            )
+            # Каждые 3 неудачных проверки пробуем перезапустить
+            if consecutive_failures % 3 == 0:
+                _try_restart_mongod()
+        finally:
+            _mongo_last_check = _time_module.time()
+
+        await asyncio.sleep(30)
 
 # Global bot application instance
 bot_application = None
