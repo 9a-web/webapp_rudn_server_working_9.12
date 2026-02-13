@@ -5819,7 +5819,7 @@ async def get_weekly_activity(days: Optional[int] = 30):
         else:
             start_date = datetime(2020, 1, 1)
         
-        # Агрегация по дням недели (используем last_activity)
+        # Агрегация по дням недели Московского времени (используем last_activity)
         pipeline = [
             {
                 "$match": {
@@ -5829,7 +5829,10 @@ async def get_weekly_activity(days: Optional[int] = 30):
             {
                 "$group": {
                     "_id": {
-                        "$dayOfWeek": "$last_activity"
+                        "$dayOfWeek": {
+                            "date": "$last_activity",
+                            "timezone": "Europe/Moscow"
+                        }
                     },
                     "count": {"$sum": 1}
                 }
