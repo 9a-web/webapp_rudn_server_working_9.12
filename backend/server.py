@@ -5762,7 +5762,7 @@ async def get_hourly_activity(days: Optional[int] = 30):
         else:
             start_date = datetime(2020, 1, 1)
         
-        # Агрегация по часам (используем last_activity)
+        # Агрегация по часам Московского времени (используем last_activity)
         pipeline = [
             {
                 "$match": {
@@ -5772,7 +5772,10 @@ async def get_hourly_activity(days: Optional[int] = 30):
             {
                 "$group": {
                     "_id": {
-                        "$hour": "$last_activity"
+                        "$hour": {
+                            "date": "$last_activity",
+                            "timezone": "Europe/Moscow"
+                        }
                     },
                     "count": {"$sum": 1}
                 }
