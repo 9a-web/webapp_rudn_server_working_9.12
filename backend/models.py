@@ -2182,6 +2182,7 @@ class ExtendedNotificationSettingsUpdate(BaseModel):
     social_push: Optional[bool] = None
     social_friend_requests: Optional[bool] = None
     social_friend_accepted: Optional[bool] = None
+    social_messages: Optional[bool] = None
     rooms_enabled: Optional[bool] = None
     rooms_push: Optional[bool] = None
     rooms_new_tasks: Optional[bool] = None
