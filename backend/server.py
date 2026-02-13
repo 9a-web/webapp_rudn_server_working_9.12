@@ -5711,7 +5711,7 @@ async def get_users_activity(days: Optional[int] = 30):
             # Если не указано, берем все записи
             start_date = datetime(2020, 1, 1)
         
-        # Агрегация по дням
+        # Агрегация по дням (Московское время)
         pipeline = [
             {
                 "$match": {
@@ -5723,7 +5723,8 @@ async def get_users_activity(days: Optional[int] = 30):
                     "_id": {
                         "$dateToString": {
                             "format": "%Y-%m-%d",
-                            "date": "$created_at"
+                            "date": "$created_at",
+                            "timezone": "Europe/Moscow"
                         }
                     },
                     "count": {"$sum": 1}
