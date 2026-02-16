@@ -1023,6 +1023,8 @@ class RoomAddFriendsRequest(BaseModel):
 class AdminStatsResponse(BaseModel):
     """Общая статистика для админ панели"""
     total_users: int
+    telegram_users: int = 0  # Реальные Telegram пользователи
+    web_guest_users: int = 0  # Веб/гостевые пользователи (device ID)
     active_users_today: int
     active_users_week: int
     active_users_month: int
