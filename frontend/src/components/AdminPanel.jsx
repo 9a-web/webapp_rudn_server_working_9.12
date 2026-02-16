@@ -2799,11 +2799,11 @@ const ReferralLinksTab = () => {
                 )}
               </div>
 
-              {/* Recent clicks */}
-              {analytics.recent_clicks && analytics.recent_clicks.length > 0 && (
-                <GlassChartCard title="Последние переходы" icon={<Clock className="w-4 h-4" />}>
+              {/* Recent events */}
+              {analytics.recent_events && analytics.recent_events.length > 0 && (
+                <GlassChartCard title="Последние события" icon={<Clock className="w-4 h-4" />}>
                   <div className="space-y-1.5 max-h-80 overflow-y-auto">
-                    {analytics.recent_clicks.map((click, i) => (
+                    {analytics.recent_events.map((evt, i) => (
                       <motion.div
                         key={i}
                         initial={{ opacity: 0, x: -10 }}
@@ -2811,22 +2811,26 @@ const ReferralLinksTab = () => {
                         transition={{ delay: i * 0.03 }}
                         className="flex items-center gap-3 p-2.5 bg-white/[0.02] rounded-xl hover:bg-white/[0.04] transition-colors"
                       >
-                        <span className="text-base">{click.device_type === 'mobile' ? '📱' : click.device_type === 'tablet' ? '📟' : '💻'}</span>
+                        <span className="text-base">{evt.event_type === 'click' ? '👆' : evt.event_type === 'registration' ? '🆕' : '🔑'}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-white font-medium truncate">{click.link_name || click.link_code}</span>
-                            <span className="text-[10px] font-mono text-purple-400/60">{click.link_code}</span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                              evt.event_type === 'click' ? 'bg-purple-500/15 text-purple-400' :
+                              evt.event_type === 'registration' ? 'bg-emerald-500/15 text-emerald-400' :
+                              'bg-blue-500/15 text-blue-400'
+                            }`}>
+                              {evt.event_type === 'click' ? 'КЛИК' : evt.event_type === 'registration' ? 'РЕГИСТРАЦИЯ' : 'ВХОД'}
+                            </span>
+                            <span className="text-xs text-white font-medium truncate">{evt.link_name || evt.link_code}</span>
                           </div>
-                          {click.referer && (
-                            <div className="text-[10px] text-gray-600 truncate">от: {click.referer}</div>
+                          {evt.telegram_name && (
+                            <div className="text-[10px] text-gray-500 mt-0.5">{evt.telegram_name}{evt.telegram_username ? ` (@${evt.telegram_username})` : ''}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {click.is_unique && (
-                            <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded-md font-semibold">NEW</span>
-                          )}
+                          <span className="text-[10px] text-gray-600">{evt.device_type === 'mobile' ? '📱' : '💻'}</span>
                           <span className="text-[10px] text-gray-600 whitespace-nowrap">
-                            {new Date(click.timestamp).toLocaleString('ru-RU', { 
+                            {new Date(evt.timestamp).toLocaleString('ru-RU', { 
                               day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' 
                             })}
                           </span>
