@@ -2057,10 +2057,14 @@ const ReferralLinksTab = () => {
 
   const handleToggleActive = async (link) => {
     try {
-      await axios.put(`${BACKEND_URL}/api/admin/referral-links/${link.id}`, {
+      const res = await axios.put(`${BACKEND_URL}/api/admin/referral-links/${link.id}`, {
         is_active: !link.is_active
       });
       await fetchLinks();
+      // Обновляем selectedLink с актуальными данными
+      if (selectedLink && selectedLink.id === link.id) {
+        setSelectedLink(res.data);
+      }
     } catch (error) {
       console.error('Error toggling link:', error);
     }
