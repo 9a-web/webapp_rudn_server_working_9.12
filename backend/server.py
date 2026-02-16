@@ -253,7 +253,8 @@ from models import (
     AdminReferralLinkCreate,
     AdminReferralLinkUpdate,
     AdminReferralLink,
-    ReferralLinkClick,
+    ReferralLinkEvent,
+    AdminReferralTrackRequest,
     AdminReferralLinkResponse,
     ReferralLinksAnalytics,
 )
