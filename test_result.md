@@ -153,10 +153,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Admin Referral Links CRUD endpoints"
-    - "Admin Referral Links analytics endpoints"
-    - "Referral link click tracking"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
