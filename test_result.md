@@ -118,11 +118,22 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All admin panel statistics endpoints tested and working"
+    - "Admin Referral Links CRUD endpoints"
+    - "Admin Referral Links analytics endpoints"
+    - "Referral link click tracking"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
-  - agent: "testing"
-    message: "All 8 backend admin panel statistics endpoints tested successfully. All APIs return proper responses with correct data structures. Health check, online stats history (1h and all-time), server stats history (no limit and 30-day), hourly activity with Moscow timezone, weekly activity, and current online users - all working as expected."
+  - agent: "main"
+    message: "New feature added: Admin Referral Links system. New backend endpoints to test:
+    1. POST /api/admin/referral-links - Create a new referral link (body: {name, code?, description?, destination_url?, campaign?, source?, medium?})
+    2. GET /api/admin/referral-links - List all links with stats (query: search?, is_active?, sort_by?, sort_order?)
+    3. GET /api/admin/referral-links/analytics?days=30 - Overall analytics
+    4. GET /api/admin/referral-links/{link_id} - Get single link details with charts data
+    5. PUT /api/admin/referral-links/{link_id} - Update link (body: {name?, is_active?, etc})
+    6. DELETE /api/admin/referral-links/{link_id} - Delete link and clicks
+    7. POST /api/referral-track/{code} - Track click (public endpoint)
+    8. GET /api/r/{code} - Redirect + track click (public endpoint)
+    Test full CRUD workflow and analytics."
