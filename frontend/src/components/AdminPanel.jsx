@@ -1178,6 +1178,7 @@ const UsersTab = () => {
   const [detailUser, setDetailUser] = useState(null);
   const [detailProfile, setDetailProfile] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [userTypeFilter, setUserTypeFilter] = useState(null); // null = all, 'telegram', 'web'
   const searchTimerRef = useRef(null);
 
   // Загрузка детального профиля
