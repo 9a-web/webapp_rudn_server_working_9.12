@@ -409,13 +409,13 @@ def test_admin_referral_system():
     if redirect_create_response["success"]:
         redirect_link_id = redirect_create_response["data"].get("id")
         
-        # Test redirect
-        redirect_response = make_request("GET", "/r/REDIRECTTEST", expected_status=302)
+        # Test redirect - don't follow redirects to check status code
+        redirect_response = make_request("GET", "/r/REDIRECTTEST", expected_status=302, allow_redirects=False)
         if redirect_response["status_code"] == 302:
             results.add_result(
                 "Redirect Endpoint", True,
                 "Redirect endpoint returns 302 as expected",
-                f"Status: {redirect_response['status_code']}"
+                f"Status: {redirect_response['status_code']}, Redirect URL: {redirect_response.get('data', {}).get('redirect_url', 'N/A')}"
             )
         else:
             results.add_result(
