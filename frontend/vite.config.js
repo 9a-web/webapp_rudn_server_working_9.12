@@ -41,6 +41,13 @@ export default defineConfig(({ mode }) => {
       host: true,
       strictPort: true,
       allowedHosts: true,
+      // Отключаем HMR — предотвращает перезагрузки в Telegram WebView
+      // при потере/восстановлении WebSocket соединения
+      hmr: false,
+      // Отключаем слежение за файлами (не нужно без HMR)
+      watch: {
+        ignored: ['**'],
+      },
       // Проксируем /api/* запросы к бэкенду на порту 8001
       proxy: {
         '/api': {
