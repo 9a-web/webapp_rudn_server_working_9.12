@@ -2529,6 +2529,7 @@ class AdminReferralLink(BaseModel):
     medium: str = ""
     tags: List[str] = []
     is_active: bool = True
+    modal_config: Optional[dict] = None  # Конфигурация модального окна (ModalPatternConfig)
     # Счётчики по типам событий
     total_clicks: int = 0       # Все клики (переходы)
     unique_clicks: int = 0      # Уникальные клики
