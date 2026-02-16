@@ -464,36 +464,54 @@ const Home = () => {
     }
   }, [isReady, user, syncedUser, startParam, referralProcessed]);
 
-  // 📊 Обработка админской реферальной ссылки (adref_) — этап 1: трекинг клика
-  const adrefClickTracked = useRef(false);
+  // 📊 Обработка админской реферальной ссылки (adref_)
+  // Используем localStorage чтобы:
+  // 1. Не считать клик дважды при перемонтировании компонента
+  // 2. Не считать клик при обновлении страницы (startParam сохраняется в Telegram)
   useEffect(() => {
-    if (!startParam || !startParam.startsWith('adref_') || adrefClickTracked.current) return;
+    if (!startParam || !startParam.startsWith('adref_')) return;
     
     const code = startParam.replace('adref_', '');
-    console.log('📊 Обнаружена админская реферальная ссылка:', code);
-    adrefClickTracked.current = true;
-    setAdrefCode(code);
+    const storageKey = `adref_click_${code}`;
+    const storageAuthKey = `adref_auth_${code}`;
     
-    // Немедленно трекаем клик (даже без авторизации)
-    trackAdminReferralEvent({ code, event_type: 'click' })
-      .then(res => {
-        if (res?.success) {
-          console.log('✅ Клик по реферальной ссылке зафиксирован:', res.link_name);
-        }
-      })
-      .catch(err => console.error('❌ Ошибка трекинга клика:', err));
+    // Проверяем: был ли клик уже зафиксирован для этого кода?
+    const alreadyClicked = localStorage.getItem(storageKey);
+    
+    if (!alreadyClicked) {
+      // Первый раз — фиксируем клик
+      localStorage.setItem(storageKey, Date.now().toString());
+      console.log('📊 Обнаружена админская реферальная ссылка:', code);
+      
+      trackAdminReferralEvent({ code, event_type: 'click' })
+        .then(res => {
+          if (res?.success) {
+            console.log('✅ Клик по реферальной ссылке зафиксирован:', res.link_name);
+          }
+        })
+        .catch(err => console.error('❌ Ошибка трекинга клика:', err));
+    }
+    
+    // Сохраняем код для этапа 2 (регистрация/вход), если ещё не обработан
+    if (!localStorage.getItem(storageAuthKey)) {
+      setAdrefCode(code);
+    }
   }, [startParam]);
 
-  // 📊 Обработка админской реферальной ссылки (adref_) — этап 2: регистрация/вход
-  const adrefAuthTracked = useRef(false);
+  // 📊 Этап 2: регистрация/вход (после авторизации пользователя)
   useEffect(() => {
-    if (!adrefCode || adrefAuthTracked.current) return;
+    if (!adrefCode) return;
     const currentUser = syncedUser || user;
     if (!currentUser || !isReady) return;
     
-    adrefAuthTracked.current = true;
+    const storageAuthKey = `adref_auth_${adrefCode}`;
+    if (localStorage.getItem(storageAuthKey)) {
+      setAdrefCode(null);
+      return;
+    }
     
-    // Определяем: новый пользователь (registration) или существующий (login)
+    localStorage.setItem(storageAuthKey, Date.now().toString());
+    
     const processAdrefAuth = async () => {
       try {
         let eventType = 'login';
@@ -506,22 +524,18 @@ const Home = () => {
         
         console.log(`📊 adref: пользователь ${currentUser.id} — ${eventType}`);
         
-        const res = await trackAdminReferralEvent({
+        await trackAdminReferralEvent({
           code: adrefCode,
           event_type: eventType,
           telegram_id: currentUser.id,
           telegram_username: currentUser.username || '',
           telegram_name: (currentUser.first_name || '') + ' ' + (currentUser.last_name || ''),
         });
-        
-        if (res.success) {
-          console.log(`✅ ${eventType} по ссылке зафиксирован`);
-        }
       } catch (error) {
         console.error('❌ Ошибка трекинга adref auth:', error);
+        // Если ошибка — убираем флаг, чтобы попробовать ещё раз
+        localStorage.removeItem(storageAuthKey);
       }
-      
-      // Очищаем код, чтобы не повторять
       setAdrefCode(null);
     };
     
