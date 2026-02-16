@@ -392,7 +392,7 @@ const Home = () => {
   // 📊 Отслеживание активности пользователя (для админ панели - онлайн статус)
   useEffect(() => {
     const currentUser = syncedUser || user;
-    if (!isReady || !currentUser?.id) return;
+    if (!isReady || !currentUser?.id || currentUser?.is_guest) return;
     
     // Отправляем heartbeat с текущим разделом
     const sendActivityHeartbeat = () => {
