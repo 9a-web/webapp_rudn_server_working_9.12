@@ -859,6 +859,14 @@ const Home = () => {
       // Проверяем, является ли пользователь связанным с Telegram (не гостевым)
       const isLinkedUser = currentUser.is_linked || (!currentUser.is_guest && !currentUser.device_id);
       
+      // Гостевые пользователи (device_id) — сразу показываем Welcome Screen, не дёргаем API
+      if (currentUser.is_guest) {
+        console.log('👤 Гостевой пользователь — показываем Welcome Screen');
+        setShowWelcomeScreen(true);
+        setLoading(false);
+        return;
+      }
+      
       // Пробуем загрузить настройки из localStorage сначала (для быстрого восстановления)
       const savedUserSettings = localStorage.getItem('user_settings');
       let cachedSettings = null;
