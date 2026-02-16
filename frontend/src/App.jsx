@@ -2314,6 +2314,29 @@ const Home = () => {
         sessionToken={linkSessionToken}
         onSuccess={handleLinkConfirmSuccess}
       />
+      
+      {/* Модальное окно реферальной ссылки */}
+      <ReferralModal
+        isOpen={showReferralModal}
+        config={referralModalConfig}
+        onClose={() => setShowReferralModal(false)}
+        onNavigate={(tabName) => {
+          setActiveTab(tabName);
+          setShowReferralModal(false);
+        }}
+        onReward={async (points) => {
+          try {
+            const currentUser = syncedUser || user;
+            if (currentUser?.id) {
+              await achievementsAPI.trackAction(currentUser.id, 'referral_reward', { points });
+              showAlert(`🎁 Вы получили ${points} баллов!`);
+            }
+          } catch (err) {
+            console.error('Error giving reward:', err);
+          }
+          setShowReferralModal(false);
+        }}
+      />
     </div>
   );
 };
