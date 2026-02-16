@@ -70,7 +70,7 @@ const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 30 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-sm sm:rounded-3xl rounded-t-3xl overflow-hidden border border-white/[0.08] shadow-2xl"
+            className="relative w-full max-w-sm rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl"
             style={{ maxHeight: '85vh' }}
             onClick={(e) => e.stopPropagation()}
           >
