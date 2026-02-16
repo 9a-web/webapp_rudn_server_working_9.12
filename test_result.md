@@ -121,7 +121,7 @@ backend:
         agent: "testing"
         comment: "GET /api/admin/referral-links/analytics?days=30 returns comprehensive analytics including total_links, total_clicks, clicks_by_day, top_links, clicks_by_source. All required analytics fields present and data properly aggregated."
 
-  - task: "Referral link click tracking"
+  - task: "Admin Referral Links with 3 event types: click, registration, login"
     implemented: true
     working: true
     file: "server.py"
@@ -131,7 +131,7 @@ backend:
     status_history:
       - working: true
         agent: "testing"
-        comment: "Click tracking working correctly: POST /api/referral-track/{code} properly tracks clicks with uniqueness detection (first click is_unique=true, subsequent clicks is_unique=false). GET /api/r/{code} redirect endpoint returns 302 with proper t.me redirect URL. Inactive links correctly return 404. Click data includes device detection, IP hashing, and proper stats aggregation."
+        comment: "Complete reworked referral system tested successfully. All 11 test scenarios passed: ✅ Create Link (TESTCODE with registrations=0, logins=0) ✅ Click Tracking (3 events tracked, cloud environment handles different IPs correctly) ✅ Registration Tracking (2 unique users tracked) ✅ Duplicate Registration (correctly detected and blocked) ✅ Login Tracking (1 login event tracked) ✅ Invalid Event Type (400 error returned) ✅ Analytics (correct totals: clicks=3, registrations=2, logins=1) ✅ Link Details (proper counts and registered_users list) ✅ Link Deactivation (inactive link blocks tracking) ✅ Link Deletion (successful cleanup) ✅ Redirect Endpoint (302 status returned). Collection changed from referral_link_clicks to referral_link_events. Main tracking endpoint POST /api/admin/referral-track handles all 3 event types with proper uniqueness logic."
 
 frontend:
   - task: "Admin Panel Online Statistics History"
