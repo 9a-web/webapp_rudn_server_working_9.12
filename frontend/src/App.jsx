@@ -411,13 +411,14 @@ const Home = () => {
   }, [isReady, user?.id, syncedUser?.id, activeTab]);
 
   // Загрузка данных пользователя при монтировании
+  // Сравниваем по ID вместо ссылки на объект, чтобы избежать лишних перезагрузок
   useEffect(() => {
     if (isReady && (user || syncedUser)) {
       loadUserData();
       loadAchievementsData();
       trackTimeBasedAchievements();
     }
-  }, [isReady, user, syncedUser]);
+  }, [isReady, user?.id, syncedUser?.id]);
   
   // 🔗 Обработка реферального кода из Web App ссылки
   useEffect(() => {
