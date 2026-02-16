@@ -86,6 +86,8 @@ def test_create_referral_link_auto_code():
     
     if not result["success"]:
         log_test("Test 1", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        if result.get("raw_response"):
+            print(f"    Raw response: {result['raw_response']}")
         return None
     
     data = result["data"]
