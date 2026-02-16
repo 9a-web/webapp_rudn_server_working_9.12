@@ -3,9 +3,9 @@
  */
 
 import axios from 'axios';
+import { getBackendURL } from '../utils/config';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 
-                     (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8001');
+const API_BASE_URL = getBackendURL();
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
