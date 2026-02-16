@@ -437,11 +437,11 @@ def test_admin_referral_system():
     return results
 
 if __name__ == "__main__":
-    print("Starting Admin Referral Links Backend Test Suite")
+    print("Starting User Type Filtering Backend Test Suite")
     print(f"Backend URL: {BACKEND_URL}")
     print("="*80)
     
-    test_results = test_admin_referral_system()
+    test_results = test_user_type_filtering()
     test_results.print_summary()
     
     # Return exit code based on results
