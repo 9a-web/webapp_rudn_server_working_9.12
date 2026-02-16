@@ -51,6 +51,7 @@ import TelegramLinkConfirmModal from './components/TelegramLinkConfirmModal';
 
 import ErrorBoundary from './components/ErrorBoundary';
 import { useFaviconBadge } from './hooks/useFaviconBadge';
+import ReferralModal from './components/ReferralModal';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
