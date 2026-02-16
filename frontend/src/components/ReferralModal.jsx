@@ -4,16 +4,6 @@ import { X, ExternalLink, Gift, ArrowRight } from 'lucide-react';
 
 const BACKEND_URL = (import.meta.env?.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
 
-/**
- * Модальное окно, показываемое при переходе по реферальной ссылке (после онбординга).
- * 
- * Props:
- * - isOpen: boolean
- * - config: { title, description, image_url, button_text, button_action, button_url, button_navigate_to, reward_points }
- * - onClose: () => void
- * - onNavigate: (tabName) => void  — переход к разделу приложения
- * - onReward: (points) => void     — начисление награды
- */
 const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
   if (!isOpen || !config) return null;
 
@@ -21,7 +11,6 @@ const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
     switch (config.button_action) {
       case 'open_url':
         if (config.button_url) {
-          // В Telegram открываем через openLink, в браузере — через window.open
           if (window.Telegram?.WebApp?.openLink) {
             window.Telegram.WebApp.openLink(config.button_url);
           } else {
@@ -69,7 +58,7 @@ const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center p-0 sm:p-4"
           onClick={onClose}
         >
           {/* Backdrop */}
@@ -77,67 +66,107 @@ const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
           
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            exit={{ opacity: 0, scale: 0.95, y: 30 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-sm bg-[#1C1C1E] rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl"
+            className="relative w-full max-w-sm sm:rounded-3xl rounded-t-3xl overflow-hidden border border-white/[0.08] shadow-2xl"
+            style={{ maxHeight: '85vh' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
+            {/* Close button — всегда поверх */}
             <button
               onClick={onClose}
-              className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-sm text-white/60 hover:text-white transition-colors"
+              className="absolute top-4 right-4 z-30 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-md text-white/70 hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
 
-            {/* Image */}
-            {imageUrl && (
-              <div className="w-full aspect-[4/3] overflow-hidden">
+            {/* Фото на весь контейнер */}
+            {imageUrl ? (
+              <div className="relative w-full" style={{ minHeight: '420px' }}>
+                {/* Изображение */}
                 <img
                   src={imageUrl}
                   alt={config.title || ''}
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover"
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
-              </div>
-            )}
+                
+                {/* Градиент снизу: прозрачный → чёрный */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                
+                {/* Контент поверх изображения */}
+                <div className="relative z-10 flex flex-col justify-end h-full p-6 pt-16" style={{ minHeight: '420px' }}>
+                  <div className="space-y-4">
+                    {config.title && (
+                      <h2 className="text-2xl font-bold text-white text-center leading-tight drop-shadow-lg">
+                        {config.title}
+                      </h2>
+                    )}
+                    
+                    {config.description && (
+                      <p className="text-sm text-gray-200 text-center leading-relaxed drop-shadow-md">
+                        {config.description}
+                      </p>
+                    )}
 
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              {config.title && (
-                <h2 className="text-xl font-bold text-white text-center leading-tight">
-                  {config.title}
-                </h2>
-              )}
-              
-              {config.description && (
-                <p className="text-sm text-gray-400 text-center leading-relaxed">
-                  {config.description}
-                </p>
-              )}
+                    {/* Reward badge */}
+                    {config.button_action === 'reward' && config.reward_points > 0 && (
+                      <div className="flex justify-center">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-500/30">
+                          <Gift className="w-4 h-4 text-amber-400" />
+                          <span className="text-sm font-semibold text-amber-300">+{config.reward_points} баллов</span>
+                        </div>
+                      </div>
+                    )}
 
-              {/* Reward badge */}
-              {config.button_action === 'reward' && config.reward_points > 0 && (
-                <div className="flex justify-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/15 border border-amber-500/20">
-                    <Gift className="w-4 h-4 text-amber-400" />
-                    <span className="text-sm font-semibold text-amber-400">+{config.reward_points} баллов</span>
+                    {/* Button */}
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleButtonClick}
+                      className="w-full py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:shadow-emerald-500/10"
+                    >
+                      {getButtonIcon()}
+                      {config.button_text || 'OK'}
+                    </motion.button>
                   </div>
                 </div>
-              )}
+              </div>
+            ) : (
+              /* Без изображения — обычный тёмный фон */
+              <div className="bg-[#1C1C1E] p-6 space-y-4">
+                {config.title && (
+                  <h2 className="text-xl font-bold text-white text-center leading-tight">
+                    {config.title}
+                  </h2>
+                )}
+                
+                {config.description && (
+                  <p className="text-sm text-gray-400 text-center leading-relaxed">
+                    {config.description}
+                  </p>
+                )}
 
-              {/* Button */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleButtonClick}
-                className="w-full py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:shadow-emerald-500/10"
-              >
-                {getButtonIcon()}
-                {config.button_text || 'OK'}
-              </motion.button>
-            </div>
+                {config.button_action === 'reward' && config.reward_points > 0 && (
+                  <div className="flex justify-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/15 border border-amber-500/20">
+                      <Gift className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-400">+{config.reward_points} баллов</span>
+                    </div>
+                  </div>
+                )}
+
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleButtonClick}
+                  className="w-full py-3.5 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/20"
+                >
+                  {getButtonIcon()}
+                  {config.button_text || 'OK'}
+                </motion.button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
