@@ -160,7 +160,18 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "MAJOR REWORK of referral links system. Now tracks 3 event types.
+    message: "Added user_type filtering to admin endpoints to distinguish Telegram vs Web/Guest users.
+    KEY CHANGES:
+    1. GET /api/admin/users - NEW param: user_type (telegram|web|null for all). Returns user_type field per user.
+    2. GET /api/admin/stats - NEW fields: telegram_users, web_guest_users (separate from total_users).
+    Logic: telegram_id < 10_000_000_000 = real Telegram user, >= 10B = web/guest (device UUID-based).
+    TEST PLAN:
+    - Create 2 Telegram users (IDs < 10B) and 1 web user (ID >= 10B)
+    - GET /api/admin/users → returns 3 users, each with user_type field
+    - GET /api/admin/users?user_type=telegram → returns only 2 Telegram users
+    - GET /api/admin/users?user_type=web → returns only 1 web user
+    - GET /api/admin/stats → telegram_users=2, web_guest_users=1, total_users=3
+    - Search with user_type combined: search=Иван&user_type=telegram → returns 1"
     Collection changed from referral_link_clicks to referral_link_events.
     KEY ENDPOINTS TO TEST:
     1. POST /api/admin/referral-links - Create link (same as before)
