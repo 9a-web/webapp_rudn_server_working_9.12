@@ -969,7 +969,7 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, syncedUser]);
+  }, [user?.id, syncedUser?.id]);
 
   // Обработчик изменения настройки новогодней темы
   const handleThemeChange = useCallback((mode) => {
