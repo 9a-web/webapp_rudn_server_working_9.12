@@ -438,8 +438,8 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
           <GlassStatCard
             icon={<Users className="w-5 h-5 text-white" />}
             title="Пользователи"
-            value={generalStats.telegram_users || generalStats.total_users}
-            subtitle={`Веб: ${formatNumber(generalStats.web_guest_users || 0)} · Активных: ${formatNumber(generalStats.active_users_today)}`}
+            value={generalStats.total_users}
+            subtitle={`Telegram: ${formatNumber(generalStats.telegram_users || 0)} · Веб: ${formatNumber(generalStats.web_guest_users || 0)}`}
             gradientFrom="from-purple-500" gradientTo="to-violet-600"
             delay={0}
           />
