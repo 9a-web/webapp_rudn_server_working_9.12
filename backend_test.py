@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Backend Test Suite for Admin Referral Links System (Reworked)
-Tests 3 event types: click, registration, login
+Backend Test Suite for User Type Filtering Feature
+Tests user_type filtering on admin endpoints
 """
 
 import requests
 import json
 import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 # Backend URL from frontend .env
 BACKEND_URL = "https://ref-tracker-admin.preview.emergentagent.com/api"
