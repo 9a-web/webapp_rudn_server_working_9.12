@@ -2514,6 +2514,7 @@ class AdminReferralLinkUpdate(BaseModel):
     medium: Optional[str] = None
     tags: Optional[List[str]] = None
     is_active: Optional[bool] = None
+    modal_config: Optional[ModalPatternConfig] = None
 
 class AdminReferralLink(BaseModel):
     """Реферальная ссылка созданная админом"""
