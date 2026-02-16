@@ -1269,8 +1269,13 @@ const UsersTab = () => {
                 {user.first_name?.[0]?.toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-white text-sm truncate">
+                <div className="font-medium text-white text-sm truncate flex items-center gap-1.5">
                   {user.first_name} {user.last_name}
+                  {(user.user_type === 'web' || user.telegram_id >= 10000000000) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/20 leading-none">
+                      ВЕБ
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-gray-600 flex items-center gap-1.5 mt-0.5 truncate">
                   <span className="truncate">{user.group_name || 'Без группы'}</span>
