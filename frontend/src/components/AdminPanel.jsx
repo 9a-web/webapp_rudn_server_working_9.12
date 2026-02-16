@@ -2348,27 +2348,33 @@ const ReferralLinksTab = () => {
                   )}
                 </div>
 
-                {/* Clicks by day chart */}
-                {selectedLink.clicks_by_day && selectedLink.clicks_by_day.length > 0 && (
+                {/* Events by day chart */}
+                {selectedLink.events_by_day && selectedLink.events_by_day.length > 0 && (
                   <div className={`${GLASS.card} rounded-xl p-4`}>
                     <div className="flex items-center gap-2 mb-4">
                       <TrendingUp className="w-4 h-4 text-purple-400" />
-                      <span className="text-sm font-semibold text-white">Динамика кликов</span>
+                      <span className="text-sm font-semibold text-white">Динамика событий</span>
                     </div>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={selectedLink.clicks_by_day}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={selectedLink.events_by_day}>
                         <defs>
-                          <linearGradient id="detailGradient" x1="0" y1="0" x2="0" y2="1">
+                          <linearGradient id="detailClicksGrad" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.3} />
                             <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="detailRegsGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
                         <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => v.slice(5)} />
                         <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
                         <Tooltip content={<GlassTooltip />} />
-                        <Area type="monotone" dataKey="clicks" stroke="#a78bfa" fill="url(#detailGradient)" strokeWidth={2} />
-                        <Area type="monotone" dataKey="unique" stroke="#34d399" fill="none" strokeWidth={1.5} strokeDasharray="4 2" />
+                        <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} />
+                        <Area type="monotone" dataKey="clicks" name="Клики" stroke="#a78bfa" fill="url(#detailClicksGrad)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="registrations" name="Регистрации" stroke="#34d399" fill="url(#detailRegsGrad)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="logins" name="Входы" stroke="#60a5fa" fill="none" strokeWidth={1.5} strokeDasharray="4 2" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
