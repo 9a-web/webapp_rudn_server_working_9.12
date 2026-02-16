@@ -7003,12 +7003,11 @@ async def track_admin_referral_event(data: AdminReferralTrackRequest, request: R
         
         await db.referral_link_events.insert_one(event.model_dump())
         
-        # Обновляем кешированные счётчики на ссылке
+        # Обновляем кешированные счётчики на ссылке (дубликаты уже отсеяны выше)
         inc_data = {}
         if event_type == "click":
             inc_data["total_clicks"] = 1
-            if is_unique:
-                inc_data["unique_clicks"] = 1
+            inc_data["unique_clicks"] = 1
         elif event_type == "registration":
             inc_data["registrations"] = 1
         elif event_type == "login":
