@@ -82,7 +82,7 @@ def make_admin_request(method: str, endpoint: str, data: Dict[Any, Any] = None, 
             "success": response.status_code == expected_status,
             "error": "Invalid JSON response"
         }
-    """Make HTTP request with error handling"""
+def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expected_status: int = 200, allow_redirects: bool = True) -> Dict[Any, Any]:
     url = f"{BACKEND_URL}{endpoint}"
     
     try:
