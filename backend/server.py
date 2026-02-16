@@ -6666,7 +6666,7 @@ async def get_referral_links_analytics(days: int = 30):
                 "foreignField": "id",
                 "as": "link_info"
             }},
-            {"$unwind": {"path": "$link_info", "preserveNullAndEmptyCount": True}},
+            {"$unwind": {"path": "$link_info", "preserveNullAndEmptyArrays": True}},
             {"$group": {
                 "_id": {"$ifNull": ["$link_info.source", "direct"]},
                 "clicks": {"$sum": 1}
