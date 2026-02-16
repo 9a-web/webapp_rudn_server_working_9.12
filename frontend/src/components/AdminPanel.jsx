@@ -2111,10 +2111,12 @@ const ReferralLinksTab = () => {
         campaign: formCampaign.trim(),
         source: formSource,
         medium: formMedium,
+        modal_config: getModalConfig(),
       });
       setShowCreateForm(false);
       setFormName(''); setFormCode(''); setFormDescription(''); 
       setFormDestination(''); setFormCampaign(''); setFormSource(''); setFormMedium('');
+      resetModalForm();
       await fetchAll();
     } catch (error) {
       alert(error.response?.data?.detail || 'Ошибка создания ссылки');
