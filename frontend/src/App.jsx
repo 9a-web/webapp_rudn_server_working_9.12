@@ -606,7 +606,7 @@ const Home = () => {
     if (isReady && (user || syncedUser) && startParam) {
       processJournalInvite();
     }
-  }, [isReady, user, syncedUser, startParam, journalInviteProcessed]);
+  }, [isReady, user?.id, syncedUser?.id, startParam, journalInviteProcessed]);
 
   // 🚪 Обработка приглашения в комнату из Web App ссылки
   useEffect(() => {
