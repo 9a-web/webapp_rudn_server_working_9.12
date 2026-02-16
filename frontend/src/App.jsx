@@ -2328,8 +2328,19 @@ const Home = () => {
           try {
             const currentUser = syncedUser || user;
             if (currentUser?.id) {
-              await achievementsAPI.trackAction(currentUser.id, 'referral_reward', { points });
-              showAlert(`🎁 Вы получили ${points} баллов!`);
+              const BURL = (import.meta.env?.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
+              const code = startParam?.replace('adref_', '') || '';
+              const res = await fetch(`${BURL}/api/referral-reward`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: currentUser.id, points, code })
+              });
+              const data = await res.json();
+              if (data.success) {
+                showAlert(`🎁 Вы получили ${points} баллов!`);
+              } else {
+                showAlert(data.message || 'Награда уже получена');
+              }
             }
           } catch (err) {
             console.error('Error giving reward:', err);
