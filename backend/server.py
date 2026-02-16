@@ -586,9 +586,11 @@ async def create_indexes():
         await safe_create_index(db.admin_referral_links, "code", unique=True)
         await safe_create_index(db.admin_referral_links, [("is_active", 1)])
         await safe_create_index(db.admin_referral_links, [("created_at", -1)])
-        await safe_create_index(db.referral_link_clicks, [("link_id", 1), ("timestamp", -1)])
-        await safe_create_index(db.referral_link_clicks, [("link_code", 1)])
-        await safe_create_index(db.referral_link_clicks, [("timestamp", -1)])
+        await safe_create_index(db.referral_link_events, [("link_id", 1), ("timestamp", -1)])
+        await safe_create_index(db.referral_link_events, [("link_code", 1)])
+        await safe_create_index(db.referral_link_events, [("event_type", 1)])
+        await safe_create_index(db.referral_link_events, [("timestamp", -1)])
+        await safe_create_index(db.referral_link_events, [("telegram_id", 1)])
         
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
