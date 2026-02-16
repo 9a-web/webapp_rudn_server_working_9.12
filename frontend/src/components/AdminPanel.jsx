@@ -2704,17 +2704,17 @@ const ReferralLinksTab = () => {
                 />
               </div>
 
-              {/* Clicks by day chart */}
+              {/* Events by day chart */}
               {analytics.clicks_by_day && analytics.clicks_by_day.length > 0 && (
-                <GlassChartCard title="Динамика кликов" icon={<TrendingUp className="w-4 h-4" />}>
+                <GlassChartCard title="Динамика событий" icon={<TrendingUp className="w-4 h-4" />}>
                   <ResponsiveContainer width="100%" height={280}>
                     <AreaChart data={analytics.clicks_by_day}>
                       <defs>
-                        <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="analyticsClicksGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
                           <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
                         </linearGradient>
-                        <linearGradient id="uniqueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="analyticsRegsGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={CHART_COLORS.tertiary} stopOpacity={0.2} />
                           <stop offset="95%" stopColor={CHART_COLORS.tertiary} stopOpacity={0} />
                         </linearGradient>
@@ -2724,8 +2724,9 @@ const ReferralLinksTab = () => {
                       <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
                       <Tooltip content={<GlassTooltip />} />
                       <Legend wrapperStyle={{ fontSize: '11px', color: '#9ca3af' }} />
-                      <Area type="monotone" dataKey="clicks" name="Все клики" stroke={CHART_COLORS.primary} fill="url(#analyticsGradient)" strokeWidth={2} />
-                      <Area type="monotone" dataKey="unique" name="Уникальные" stroke={CHART_COLORS.tertiary} fill="url(#uniqueGradient)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="clicks" name="Клики" stroke={CHART_COLORS.primary} fill="url(#analyticsClicksGrad)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="registrations" name="Регистрации" stroke={CHART_COLORS.tertiary} fill="url(#analyticsRegsGrad)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="logins" name="Входы" stroke="#60a5fa" fill="none" strokeWidth={1.5} strokeDasharray="4 2" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </GlassChartCard>
