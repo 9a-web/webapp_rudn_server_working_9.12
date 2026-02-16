@@ -2314,10 +2314,13 @@ const ReferralLinksTab = () => {
                     { label: 'За неделю', value: selectedLink.clicks_week || 0, color: 'from-cyan-400 to-blue-500', icon: '📊' },
                   ].map((stat, i) => (
                     <div key={i} className={`${GLASS.card} rounded-xl p-3.5`}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-sm">{stat.icon}</span>
+                        <div className="text-[11px] text-gray-500">{stat.label}</div>
+                      </div>
                       <div className={`text-xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
                         {stat.value}
                       </div>
-                      <div className="text-[11px] text-gray-500 mt-0.5">{stat.label}</div>
                     </div>
                   ))}
                 </div>
