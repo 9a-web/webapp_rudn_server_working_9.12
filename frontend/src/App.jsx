@@ -520,6 +520,26 @@ const Home = () => {
     }
   }, [startParam]);
 
+  // 🎯 Показываем модалку реферальной ссылки когда:
+  // 1. Конфиг модалки загружен (referralModalConfig)
+  // 2. Пользователь прошёл онбординг (userSettings есть, GroupSelector не показан)
+  // 3. Модалка ещё не показывалась (localStorage)
+  useEffect(() => {
+    if (!referralModalConfig || !referralModalConfig.has_modal) return;
+    if (!userSettings) return; // Онбординг ещё не пройден
+    if (showGroupSelector) return; // Ещё выбирает группу
+    if (showReferralModal) return; // Уже показана
+    
+    const code = startParam?.replace('adref_', '') || '';
+    const modalShownKey = `adref_modal_shown_${code}`;
+    if (localStorage.getItem(modalShownKey)) return; // Уже показывали
+    
+    localStorage.setItem(modalShownKey, Date.now().toString());
+    console.log('🎯 Показываем модалку реферальной ссылки');
+    setTimeout(() => setShowReferralModal(true), 600);
+  }, [referralModalConfig, userSettings, showGroupSelector]);
+
+
   // 📊 Этап 2: регистрация/вход (после авторизации пользователя)
   useEffect(() => {
     if (!adrefCode) return;
