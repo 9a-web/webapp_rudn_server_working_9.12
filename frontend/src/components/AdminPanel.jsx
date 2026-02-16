@@ -1913,6 +1913,873 @@ const formatBytes = (bytes) => {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 };
 
+// =============================================
+// REFERRAL LINKS TAB (Admin Referral Links)
+// =============================================
+const ReferralLinksTab = () => {
+  const [links, setLinks] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedLink, setSelectedLink] = useState(null);
+  const [search, setSearch] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+  const [view, setView] = useState('list'); // 'list' | 'analytics'
+  
+  // Create form state
+  const [formName, setFormName] = useState('');
+  const [formCode, setFormCode] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formDestination, setFormDestination] = useState('');
+  const [formCampaign, setFormCampaign] = useState('');
+  const [formSource, setFormSource] = useState('');
+  const [formMedium, setFormMedium] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const SOURCE_OPTIONS = [
+    { value: '', label: 'Не указан' },
+    { value: 'telegram', label: 'Telegram' },
+    { value: 'vk', label: 'ВКонтакте' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'tiktok', label: 'TikTok' },
+    { value: 'website', label: 'Сайт' },
+    { value: 'email', label: 'Email' },
+    { value: 'qr', label: 'QR-код' },
+    { value: 'offline', label: 'Оффлайн' },
+    { value: 'other', label: 'Другое' },
+  ];
+
+  const MEDIUM_OPTIONS = [
+    { value: '', label: 'Не указан' },
+    { value: 'social', label: 'Соцсети' },
+    { value: 'post', label: 'Пост' },
+    { value: 'story', label: 'Сторис' },
+    { value: 'ad', label: 'Реклама' },
+    { value: 'banner', label: 'Баннер' },
+    { value: 'email', label: 'Email-рассылка' },
+    { value: 'direct', label: 'Прямая ссылка' },
+    { value: 'print', label: 'Печать' },
+  ];
+
+  const fetchLinks = useCallback(async () => {
+    try {
+      const params = search ? `?search=${encodeURIComponent(search)}` : '';
+      const res = await axios.get(`${BACKEND_URL}/api/admin/referral-links${params}`);
+      setLinks(res.data.links || []);
+    } catch (error) {
+      console.error('Error loading referral links:', error);
+    }
+  }, [search]);
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/referral-links/analytics?days=30`);
+      setAnalytics(res.data);
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+    }
+  }, []);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([fetchLinks(), fetchAnalytics()]);
+    setLoading(false);
+  }, [fetchLinks, fetchAnalytics]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const handleCreate = async () => {
+    if (!formName.trim()) return;
+    setCreating(true);
+    try {
+      await axios.post(`${BACKEND_URL}/api/admin/referral-links`, {
+        name: formName.trim(),
+        code: formCode.trim() || undefined,
+        description: formDescription.trim(),
+        destination_url: formDestination.trim(),
+        campaign: formCampaign.trim(),
+        source: formSource,
+        medium: formMedium,
+      });
+      setShowCreateForm(false);
+      setFormName(''); setFormCode(''); setFormDescription(''); 
+      setFormDestination(''); setFormCampaign(''); setFormSource(''); setFormMedium('');
+      await fetchAll();
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Ошибка создания ссылки');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (linkId) => {
+    if (!window.confirm('Удалить ссылку и все данные кликов?')) return;
+    setDeleting(linkId);
+    try {
+      await axios.delete(`${BACKEND_URL}/api/admin/referral-links/${linkId}`);
+      setSelectedLink(null);
+      await fetchAll();
+    } catch (error) {
+      alert('Ошибка удаления');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleToggleActive = async (link) => {
+    try {
+      await axios.put(`${BACKEND_URL}/api/admin/referral-links/${link.id}`, {
+        is_active: !link.is_active
+      });
+      await fetchLinks();
+    } catch (error) {
+      console.error('Error toggling link:', error);
+    }
+  };
+
+  const handleCopy = (text, id) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const fetchLinkDetails = async (linkId) => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/referral-links/${linkId}`);
+      setSelectedLink(res.data);
+    } catch (error) {
+      console.error('Error loading link details:', error);
+    }
+  };
+
+  if (loading) return <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6"><GlassLoader /></div>;
+
+  return (
+    <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6 space-y-5">
+      {/* Header with view toggle and create button */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex p-0.5 bg-white/[0.04] rounded-xl border border-white/[0.06]">
+            <button
+              onClick={() => { setView('list'); setSelectedLink(null); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                view === 'list' ? 'bg-white/[0.1] text-white border border-white/[0.1]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Ссылки
+            </button>
+            <button
+              onClick={() => { setView('analytics'); setSelectedLink(null); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                view === 'analytics' ? 'bg-white/[0.1] text-white border border-white/[0.1]' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Аналитика
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {view === 'list' && (
+            <div className="relative flex-1 sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск..."
+                className={`w-full pl-9 pr-3 py-2 ${GLASS.input} rounded-xl text-white placeholder-gray-600 text-xs outline-none transition-all`}
+              />
+            </div>
+          )}
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl text-white text-xs font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-all flex-shrink-0"
+          >
+            <span className="text-base leading-none">+</span> Создать
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={fetchAll}
+            className={`p-2 ${GLASS.card} rounded-xl transition-all ${GLASS.cardHover} flex-shrink-0`}
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Create Form Modal */}
+      <AnimatePresence>
+        {showCreateForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateForm(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-2xl p-5 sm:p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
+                    <Share2 className="w-4 h-4 text-white" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">Новая ссылка</h3>
+                </div>
+                <button onClick={() => setShowCreateForm(false)} className="p-1.5 hover:bg-white/[0.05] rounded-lg transition-colors">
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-3.5">
+                {/* Name - required */}
+                <div>
+                  <label className="text-[11px] text-gray-400 font-medium mb-1 block">Название *</label>
+                  <input
+                    type="text"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="Например: VK Реклама Зима 2025"
+                    className={`w-full px-3.5 py-2.5 ${GLASS.input} rounded-xl text-white placeholder-gray-600 text-sm outline-none`}
+                  />
+                </div>
+
+                {/* Custom code */}
+                <div>
+                  <label className="text-[11px] text-gray-400 font-medium mb-1 block">Код (необязательно)</label>
+                  <input
+                    type="text"
+                    value={formCode}
+                    onChange={(e) => setFormCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
+                    placeholder="Авто-генерация если пусто"
+                    maxLength={20}
+                    className={`w-full px-3.5 py-2.5 ${GLASS.input} rounded-xl text-white placeholder-gray-600 text-sm outline-none font-mono`}
+                  />
+                  <p className="text-[10px] text-gray-600 mt-0.5">Латинские буквы, цифры, - и _</p>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="text-[11px] text-gray-400 font-medium mb-1 block">Описание</label>
+                  <textarea
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="Для чего эта ссылка..."
+                    rows={2}
+                    className={`w-full px-3.5 py-2.5 ${GLASS.input} rounded-xl text-white placeholder-gray-600 text-sm outline-none resize-none`}
+                  />
+                </div>
+
+                {/* Destination URL */}
+                <div>
+                  <label className="text-[11px] text-gray-400 font-medium mb-1 block">URL назначения</label>
+                  <input
+                    type="text"
+                    value={formDestination}
+                    onChange={(e) => setFormDestination(e.target.value)}
+                    placeholder="Оставьте пустым для бота по умолчанию"
+                    className={`w-full px-3.5 py-2.5 ${GLASS.input} rounded-xl text-white placeholder-gray-600 text-sm outline-none`}
+                  />
+                </div>
+
+                {/* Campaign */}
+                <div>
+                  <label className="text-[11px] text-gray-400 font-medium mb-1 block">Кампания</label>
+                  <input
+                    type="text"
+                    value={formCampaign}
+                    onChange={(e) => setFormCampaign(e.target.value)}
+                    placeholder="Например: winter_promo_2025"
+                    className={`w-full px-3.5 py-2.5 ${GLASS.input} rounded-xl text-white placeholder-gray-600 text-sm outline-none`}
+                  />
+                </div>
+
+                {/* Source + Medium row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-gray-400 font-medium mb-1 block">Источник</label>
+                    <select
+                      value={formSource}
+                      onChange={(e) => setFormSource(e.target.value)}
+                      className={`w-full px-3 py-2.5 ${GLASS.input} rounded-xl text-white text-sm outline-none appearance-none cursor-pointer`}
+                    >
+                      {SOURCE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-400 font-medium mb-1 block">Канал</label>
+                    <select
+                      value={formMedium}
+                      onChange={(e) => setFormMedium(e.target.value)}
+                      className={`w-full px-3 py-2.5 ${GLASS.input} rounded-xl text-white text-sm outline-none appearance-none cursor-pointer`}
+                    >
+                      {MEDIUM_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Submit */}
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleCreate}
+                  disabled={!formName.trim() || creating}
+                  className={`w-full py-3 mt-2 rounded-xl font-semibold text-sm transition-all ${
+                    formName.trim() && !creating
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40'
+                      : 'bg-white/[0.05] text-gray-600 cursor-not-allowed'
+                  }`}
+                >
+                  {creating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin" /> Создаю...
+                    </span>
+                  ) : 'Создать ссылку'}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Link Details Modal */}
+      <AnimatePresence>
+        {selectedLink && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedLink(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-2xl shadow-2xl"
+            >
+              {/* Detail Header */}
+              <div className="sticky top-0 z-10 bg-[#0f0f1e]/95 backdrop-blur-xl border-b border-white/[0.06] p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${selectedLink.is_active 
+                      ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20' 
+                      : 'bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/20'
+                    }`}>
+                      <Share2 className={`w-5 h-5 ${selectedLink.is_active ? 'text-emerald-400' : 'text-red-400'}`} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">{selectedLink.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md">{selectedLink.code}</span>
+                        {selectedLink.campaign && (
+                          <span className="text-[11px] text-gray-500">{selectedLink.campaign}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedLink(null)} className="p-2 hover:bg-white/[0.05] rounded-xl transition-colors">
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-5">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Всего кликов', value: selectedLink.total_clicks, color: 'from-purple-500 to-violet-500' },
+                    { label: 'Уникальных', value: selectedLink.unique_clicks, color: 'from-blue-500 to-cyan-500' },
+                    { label: 'Сегодня', value: selectedLink.clicks_today || 0, color: 'from-emerald-500 to-teal-500' },
+                    { label: 'За неделю', value: selectedLink.clicks_week || 0, color: 'from-orange-500 to-amber-500' },
+                  ].map((stat, i) => (
+                    <div key={i} className={`${GLASS.card} rounded-xl p-3.5`}>
+                      <div className={`text-xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
+                        {stat.value}
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Referral URL with copy */}
+                <div className={`${GLASS.card} rounded-xl p-4`}>
+                  <div className="text-[11px] text-gray-500 font-medium mb-2">Ссылка для распространения</div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-white/[0.03] rounded-lg border border-white/[0.05] text-xs text-purple-300 font-mono truncate">
+                      {selectedLink.full_url}
+                    </div>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => handleCopy(selectedLink.full_url, 'detail-full')}
+                      className="p-2.5 bg-purple-500/15 hover:bg-purple-500/25 rounded-lg transition-colors flex-shrink-0"
+                    >
+                      {copiedId === 'detail-full' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
+                    </motion.button>
+                  </div>
+                  {selectedLink.destination_url && (
+                    <div className="mt-2">
+                      <div className="text-[10px] text-gray-600 mb-1">Назначение</div>
+                      <div className="text-[11px] text-gray-400 truncate">{selectedLink.destination_url}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Clicks by day chart */}
+                {selectedLink.clicks_by_day && selectedLink.clicks_by_day.length > 0 && (
+                  <div className={`${GLASS.card} rounded-xl p-4`}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-4 h-4 text-purple-400" />
+                      <span className="text-sm font-semibold text-white">Динамика кликов</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart data={selectedLink.clicks_by_day}>
+                        <defs>
+                          <linearGradient id="detailGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => v.slice(5)} />
+                        <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
+                        <Tooltip content={<GlassTooltip />} />
+                        <Area type="monotone" dataKey="clicks" stroke="#a78bfa" fill="url(#detailGradient)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="unique" stroke="#34d399" fill="none" strokeWidth={1.5} strokeDasharray="4 2" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Device breakdown */}
+                {selectedLink.clicks_by_device && selectedLink.clicks_by_device.length > 0 && (
+                  <div className={`${GLASS.card} rounded-xl p-4`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Smartphone className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm font-semibold text-white">Устройства</span>
+                    </div>
+                    <div className="space-y-2">
+                      {selectedLink.clicks_by_device.map((d, i) => {
+                        const total = selectedLink.clicks_by_device.reduce((s, x) => s + x.count, 0);
+                        const pct = total ? Math.round(d.count / total * 100) : 0;
+                        const deviceIcon = d.device === 'mobile' ? '📱' : d.device === 'tablet' ? '📟' : '💻';
+                        const deviceLabel = d.device === 'mobile' ? 'Мобильные' : d.device === 'tablet' ? 'Планшеты' : d.device === 'desktop' ? 'Десктоп' : d.device;
+                        return (
+                          <div key={i} className="flex items-center gap-3">
+                            <span className="text-sm">{deviceIcon}</span>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-gray-300">{deviceLabel}</span>
+                                <span className="text-xs text-gray-500">{d.count} ({pct}%)</span>
+                              </div>
+                              <div className="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${pct}%` }}
+                                  transition={{ duration: 0.8 }}
+                                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent clicks */}
+                {selectedLink.recent_clicks && selectedLink.recent_clicks.length > 0 && (
+                  <div className={`${GLASS.card} rounded-xl p-4`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="w-4 h-4 text-orange-400" />
+                      <span className="text-sm font-semibold text-white">Последние клики</span>
+                    </div>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                      {selectedLink.recent_clicks.map((click, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 bg-white/[0.02] rounded-lg text-xs">
+                          <span className="text-sm">{click.device_type === 'mobile' ? '📱' : '💻'}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-gray-400 truncate">{click.user_agent ? click.user_agent.slice(0, 50) + '...' : 'N/A'}</div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {click.is_unique && <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded-md font-medium">NEW</span>}
+                            <span className="text-[10px] text-gray-600">
+                              {new Date(click.timestamp).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 pt-2">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleToggleActive(selectedLink)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                      selectedLink.is_active 
+                        ? 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20' 
+                        : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/20'
+                    }`}
+                  >
+                    {selectedLink.is_active ? '⏸ Деактивировать' : '▶ Активировать'}
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleDelete(selectedLink.id)}
+                    disabled={deleting === selectedLink.id}
+                    className="px-4 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-semibold border border-red-500/15 transition-all"
+                  >
+                    {deleting === selectedLink.id ? '...' : '🗑 Удалить'}
+                  </motion.button>
+                </div>
+
+                {/* Meta info */}
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  {[
+                    { label: 'Источник', value: selectedLink.source || '—' },
+                    { label: 'Канал', value: selectedLink.medium || '—' },
+                    { label: 'Создана', value: new Date(selectedLink.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Moscow' }) },
+                    { label: 'Обновлена', value: new Date(selectedLink.updated_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Moscow' }) },
+                  ].map((m, i) => (
+                    <div key={i} className="bg-white/[0.02] rounded-lg p-2.5">
+                      <span className="text-gray-600">{m.label}: </span>
+                      <span className="text-gray-400">{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MAIN CONTENT */}
+      {view === 'list' ? (
+        <>
+          {/* Summary cards */}
+          {analytics && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <GlassStatCard
+                icon={<Share2 className="w-4 h-4 text-white" />}
+                title="Всего ссылок"
+                value={analytics.total_links}
+                subtitle={`${analytics.active_links} активных`}
+                gradientFrom="from-purple-500"
+                gradientTo="to-violet-600"
+                delay={0}
+              />
+              <GlassStatCard
+                icon={<Eye className="w-4 h-4 text-white" />}
+                title="Всего кликов"
+                value={analytics.total_clicks}
+                subtitle={`${analytics.total_unique_clicks} уникальных`}
+                gradientFrom="from-blue-500"
+                gradientTo="to-cyan-500"
+                delay={1}
+              />
+              <GlassStatCard
+                icon={<TrendingUp className="w-4 h-4 text-white" />}
+                title="Сегодня"
+                value={analytics.clicks_today}
+                subtitle="кликов"
+                gradientFrom="from-emerald-500"
+                gradientTo="to-teal-500"
+                delay={2}
+              />
+              <GlassStatCard
+                icon={<Calendar className="w-4 h-4 text-white" />}
+                title="За неделю"
+                value={analytics.clicks_week}
+                subtitle="кликов"
+                gradientFrom="from-orange-500"
+                gradientTo="to-amber-500"
+                delay={3}
+              />
+            </div>
+          )}
+
+          {/* Links list */}
+          {links.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className={`${GLASS.card} rounded-2xl p-10 flex flex-col items-center justify-center`}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mb-4 border border-purple-500/10">
+                <Share2 className="w-8 h-8 text-purple-500/40" />
+              </div>
+              <p className="text-sm text-gray-400 font-medium mb-1">Нет реферальных ссылок</p>
+              <p className="text-[11px] text-gray-600 text-center">Создайте первую ссылку для отслеживания трафика</p>
+            </motion.div>
+          ) : (
+            <div className="space-y-2">
+              {links.map((link, idx) => (
+                <motion.div
+                  key={link.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className={`${GLASS.card} rounded-xl p-4 transition-all duration-300 ${GLASS.cardHover} cursor-pointer group`}
+                  onClick={() => fetchLinkDetails(link.id)}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Status indicator */}
+                    <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${link.is_active ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]' : 'bg-gray-600'}`} />
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-white truncate">{link.name}</span>
+                        <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded flex-shrink-0">{link.code}</span>
+                        {link.source && (
+                          <span className="text-[10px] text-gray-600 bg-white/[0.03] px-1.5 py-0.5 rounded flex-shrink-0">
+                            {link.source}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {link.description && (
+                        <p className="text-[11px] text-gray-500 truncate mb-1.5">{link.description}</p>
+                      )}
+                      
+                      <div className="flex items-center gap-4 text-[11px]">
+                        <span className="text-gray-400">
+                          <span className="text-white font-semibold">{link.total_clicks}</span> кликов
+                        </span>
+                        <span className="text-gray-400">
+                          <span className="text-cyan-400 font-semibold">{link.unique_clicks}</span> уникальных
+                        </span>
+                        {link.clicks_today > 0 && (
+                          <span className="text-emerald-400 font-medium flex items-center gap-0.5">
+                            <ArrowUpRight className="w-3 h-3" /> +{link.clicks_today} сегодня
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Copy button */}
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopy(link.full_url, link.id);
+                      }}
+                      className="p-2 bg-white/[0.03] hover:bg-purple-500/15 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
+                    >
+                      {copiedId === link.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-gray-500" />}
+                    </motion.button>
+                    
+                    <ChevronRight className="w-4 h-4 text-gray-700 group-hover:text-gray-400 transition-colors flex-shrink-0 mt-1" />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        /* ANALYTICS VIEW */
+        <>
+          {analytics ? (
+            <div className="space-y-5">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <GlassStatCard
+                  icon={<Share2 className="w-4 h-4 text-white" />}
+                  title="Ссылок"
+                  value={analytics.total_links}
+                  subtitle={`${analytics.active_links} активных`}
+                  gradientFrom="from-purple-500"
+                  gradientTo="to-violet-600"
+                  delay={0}
+                />
+                <GlassStatCard
+                  icon={<Eye className="w-4 h-4 text-white" />}
+                  title="Всего кликов"
+                  value={analytics.total_clicks}
+                  subtitle={`${analytics.total_unique_clicks} уникальных`}
+                  gradientFrom="from-blue-500"
+                  gradientTo="to-cyan-500"
+                  delay={1}
+                />
+                <GlassStatCard
+                  icon={<Activity className="w-4 h-4 text-white" />}
+                  title="Сегодня"
+                  value={analytics.clicks_today}
+                  subtitle="кликов за день"
+                  gradientFrom="from-emerald-500"
+                  gradientTo="to-teal-500"
+                  delay={2}
+                />
+                <GlassStatCard
+                  icon={<Calendar className="w-4 h-4 text-white" />}
+                  title="За месяц"
+                  value={analytics.clicks_month}
+                  subtitle="кликов за 30 дней"
+                  gradientFrom="from-orange-500"
+                  gradientTo="to-amber-500"
+                  delay={3}
+                />
+              </div>
+
+              {/* Clicks by day chart */}
+              {analytics.clicks_by_day && analytics.clicks_by_day.length > 0 && (
+                <GlassChartCard title="Динамика кликов" icon={<TrendingUp className="w-4 h-4" />}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={analytics.clicks_by_day}>
+                      <defs>
+                        <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="uniqueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={CHART_COLORS.tertiary} stopOpacity={0.2} />
+                          <stop offset="95%" stopColor={CHART_COLORS.tertiary} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => v.slice(5)} />
+                      <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} allowDecimals={false} />
+                      <Tooltip content={<GlassTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: '11px', color: '#9ca3af' }} />
+                      <Area type="monotone" dataKey="clicks" name="Все клики" stroke={CHART_COLORS.primary} fill="url(#analyticsGradient)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="unique" name="Уникальные" stroke={CHART_COLORS.tertiary} fill="url(#uniqueGradient)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </GlassChartCard>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Top links */}
+                {analytics.top_links && analytics.top_links.length > 0 && (
+                  <GlassChartCard title="Топ ссылок" icon={<Star className="w-4 h-4" />}>
+                    <div className="space-y-2.5">
+                      {analytics.top_links.map((link, i) => {
+                        const maxClicks = analytics.top_links[0]?.total_clicks || 1;
+                        const pct = Math.round(link.total_clicks / maxClicks * 100);
+                        return (
+                          <div key={i} className="group">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[10px] text-gray-600 font-mono w-4">#{i + 1}</span>
+                                <span className="text-xs text-white font-medium truncate">{link.name}</span>
+                                <span className="text-[10px] font-mono text-purple-400/60">{link.code}</span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-xs text-white font-bold">{link.total_clicks}</span>
+                                <span className="text-[10px] text-gray-600">/ {link.unique_clicks} уник</span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 bg-white/[0.03] rounded-full overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.8, delay: i * 0.1 }}
+                                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </GlassChartCard>
+                )}
+
+                {/* Clicks by source */}
+                {analytics.clicks_by_source && analytics.clicks_by_source.length > 0 && (
+                  <GlassChartCard title="Источники трафика" icon={<Globe className="w-4 h-4" />}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={analytics.clicks_by_source}
+                          dataKey="clicks"
+                          nameKey="source"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={85}
+                          strokeWidth={0}
+                        >
+                          {analytics.clicks_by_source.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<GlassTooltip />} />
+                        <Legend
+                          wrapperStyle={{ fontSize: '11px' }}
+                          formatter={(value) => <span className="text-gray-400">{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </GlassChartCard>
+                )}
+              </div>
+
+              {/* Recent clicks */}
+              {analytics.recent_clicks && analytics.recent_clicks.length > 0 && (
+                <GlassChartCard title="Последние переходы" icon={<Clock className="w-4 h-4" />}>
+                  <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                    {analytics.recent_clicks.map((click, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="flex items-center gap-3 p-2.5 bg-white/[0.02] rounded-xl hover:bg-white/[0.04] transition-colors"
+                      >
+                        <span className="text-base">{click.device_type === 'mobile' ? '📱' : click.device_type === 'tablet' ? '📟' : '💻'}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-white font-medium truncate">{click.link_name || click.link_code}</span>
+                            <span className="text-[10px] font-mono text-purple-400/60">{click.link_code}</span>
+                          </div>
+                          {click.referer && (
+                            <div className="text-[10px] text-gray-600 truncate">от: {click.referer}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {click.is_unique && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded-md font-semibold">NEW</span>
+                          )}
+                          <span className="text-[10px] text-gray-600 whitespace-nowrap">
+                            {new Date(click.timestamp).toLocaleString('ru-RU', { 
+                              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' 
+                            })}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </GlassChartCard>
+              )}
+            </div>
+          ) : (
+            <GlassLoader />
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 const ServerTab = ({ onlineData }) => {
   const [serverData, setServerData] = useState(null);
   const [loading, setLoading] = useState(true);
