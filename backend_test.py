@@ -255,7 +255,7 @@ def test_user_type_filtering():
     
     # Step 3: Test GET /api/admin/users (no filter) - should return 3 users with user_type field
     print("\n3. Testing admin users endpoint (no filter)...")
-    response = make_request("GET", "/admin/users?limit=100")
+    response = make_admin_request("GET", "/admin/users?limit=100")
     if response["success"] and isinstance(response["data"], list):
         users = response["data"]
         
