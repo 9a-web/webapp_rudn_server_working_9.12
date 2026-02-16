@@ -463,7 +463,7 @@ const Home = () => {
     if (isReady && (user || syncedUser) && startParam) {
       processReferral();
     }
-  }, [isReady, user, syncedUser, startParam, referralProcessed]);
+  }, [isReady, user?.id, syncedUser?.id, startParam, referralProcessed]);
 
   // 📊 Обработка админской реферальной ссылки (adref_)
   // Используем localStorage чтобы:
