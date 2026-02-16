@@ -6268,8 +6268,15 @@ async def get_admin_stats(days: Optional[int] = None):
     def date_filter(field_name="created_at"):
         return {field_name: {"$gte": start_date}} if start_date else {}
 
-    # 1. Total Users — ВСЕГДА считаем ВСЕХ пользователей (не зависит от фильтра)
+    # Порог для определения веб/гостевых пользователей
+    # Реальные Telegram ID: < 10 млрд (9-10 цифр)
+    # Device-generated ID: ~10^14 (13-15 цифр, из UUID hex)
+    WEB_GUEST_THRESHOLD = 10_000_000_000
+    
+    # 1. Total Users — считаем ВСЕХ + раздельно Telegram и веб
     total_users = await db.user_settings.count_documents({})
+    telegram_users = await db.user_settings.count_documents({"telegram_id": {"$lt": WEB_GUEST_THRESHOLD}})
+    web_guest_users = await db.user_settings.count_documents({"telegram_id": {"$gte": WEB_GUEST_THRESHOLD}})
     
     # 2. Active Users Today
     today_start = datetime(now.year, now.month, now.day)
