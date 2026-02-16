@@ -6875,6 +6875,8 @@ async def update_admin_referral_link(link_id: str, data: AdminReferralLinkUpdate
             update_data["tags"] = data.tags
         if data.is_active is not None:
             update_data["is_active"] = data.is_active
+        if data.modal_config is not None:
+            update_data["modal_config"] = data.modal_config.model_dump()
         
         update_data["updated_at"] = datetime.utcnow()
         
