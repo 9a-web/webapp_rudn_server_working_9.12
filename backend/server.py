@@ -6516,17 +6516,13 @@ def generate_short_code(length: int = 8) -> str:
 async def create_admin_referral_link(data: AdminReferralLinkCreate):
     """Создать новую реферальную ссылку"""
     try:
-        # Генерируем или используем кастомный код
         code = data.code.strip().upper() if data.code else generate_short_code()
         
-        # Проверяем уникальность кода
         existing = await db.admin_referral_links.find_one({"code": code})
         if existing:
             raise HTTPException(status_code=400, detail=f"Ссылка с кодом '{code}' уже существует")
         
-        # Формируем полный URL (ссылка ведёт к API для отслеживания)
         bot_username = get_telegram_bot_username()
-        # Ссылка на бота с реферальным кодом
         destination = data.destination_url.strip() if data.destination_url else f"https://t.me/{bot_username}/app?startapp=ref_{code}"
         full_url = f"https://t.me/{bot_username}/app?startapp=adref_{code}"
         
@@ -6555,14 +6551,14 @@ async def create_admin_referral_link(data: AdminReferralLinkCreate):
 
 @api_router.get("/admin/referral-links")
 async def list_admin_referral_links(
-    skip: int = 0, 
+    skip: int = 0,
     limit: int = 50,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc"
 ):
-    """Получить список всех реферальных ссылок"""
+    """Получить список всех реферальных ссылок с подробной статистикой"""
     try:
         query = {}
         if is_active is not None:
@@ -6578,7 +6574,6 @@ async def list_admin_referral_links(
         sort_dir = -1 if sort_order == "desc" else 1
         cursor = db.admin_referral_links.find(query).sort(sort_by, sort_dir).skip(skip).limit(limit)
         links = await cursor.to_list(length=limit)
-        
         total = await db.admin_referral_links.count_documents(query)
         
         now = datetime.utcnow()
@@ -6586,21 +6581,36 @@ async def list_admin_referral_links(
         week_ago = now - timedelta(days=7)
         month_ago = now - timedelta(days=30)
         
-        # Обогащаем данные статистикой кликов
         result = []
         for link in links:
             link["_id"] = str(link.get("_id", ""))
             link_id = link["id"]
             
-            link["clicks_today"] = await db.referral_link_clicks.count_documents({
-                "link_id": link_id, "timestamp": {"$gte": today_start}
+            # Подсчёт кликов по периодам
+            link["clicks_today"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "timestamp": {"$gte": today_start}
             })
-            link["clicks_week"] = await db.referral_link_clicks.count_documents({
-                "link_id": link_id, "timestamp": {"$gte": week_ago}
+            link["clicks_week"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "timestamp": {"$gte": week_ago}
             })
-            link["clicks_month"] = await db.referral_link_clicks.count_documents({
-                "link_id": link_id, "timestamp": {"$gte": month_ago}
+            link["clicks_month"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "timestamp": {"$gte": month_ago}
             })
+            
+            # Актуальные счётчики из коллекции событий (не из кеша на ссылке)
+            link["total_clicks"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click"
+            })
+            link["unique_clicks"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "is_unique": True
+            })
+            link["registrations"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "registration"
+            })
+            link["logins"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "login"
+            })
+            
             result.append(link)
         
         return {"links": result, "total": total}
@@ -6621,48 +6631,78 @@ async def get_referral_links_analytics(days: int = 30):
         total_links = await db.admin_referral_links.count_documents({})
         active_links = await db.admin_referral_links.count_documents({"is_active": True})
         
-        total_clicks = await db.referral_link_clicks.count_documents({})
-        total_unique = await db.referral_link_clicks.count_documents({"is_unique": True})
+        # Статистика по типам событий
+        total_clicks = await db.referral_link_events.count_documents({"event_type": "click"})
+        total_unique = await db.referral_link_events.count_documents({"event_type": "click", "is_unique": True})
+        total_registrations = await db.referral_link_events.count_documents({"event_type": "registration"})
+        total_logins = await db.referral_link_events.count_documents({"event_type": "login"})
         
-        clicks_today = await db.referral_link_clicks.count_documents({"timestamp": {"$gte": today_start}})
-        clicks_week = await db.referral_link_clicks.count_documents({"timestamp": {"$gte": week_ago}})
-        clicks_month = await db.referral_link_clicks.count_documents({"timestamp": {"$gte": month_ago}})
+        clicks_today = await db.referral_link_events.count_documents({"event_type": "click", "timestamp": {"$gte": today_start}})
+        clicks_week = await db.referral_link_events.count_documents({"event_type": "click", "timestamp": {"$gte": week_ago}})
+        clicks_month = await db.referral_link_events.count_documents({"event_type": "click", "timestamp": {"$gte": month_ago}})
         
         # Топ ссылки по кликам
         top_pipeline = [
-            {"$group": {"_id": "$link_id", "total": {"$sum": 1}, "unique": {"$sum": {"$cond": ["$is_unique", 1, 0]}}}},
+            {"$match": {"event_type": "click"}},
+            {"$group": {
+                "_id": "$link_id", 
+                "total": {"$sum": 1}, 
+                "unique": {"$sum": {"$cond": ["$is_unique", 1, 0]}}
+            }},
             {"$sort": {"total": -1}},
             {"$limit": 10}
         ]
-        top_data = await db.referral_link_clicks.aggregate(top_pipeline).to_list(length=10)
+        top_data = await db.referral_link_events.aggregate(top_pipeline).to_list(length=10)
         
         top_links = []
         for item in top_data:
             link = await db.admin_referral_links.find_one({"id": item["_id"]})
             if link:
+                regs = await db.referral_link_events.count_documents({"link_id": item["_id"], "event_type": "registration"})
+                logins = await db.referral_link_events.count_documents({"link_id": item["_id"], "event_type": "login"})
                 top_links.append({
                     "link_id": item["_id"],
                     "name": link.get("name", ""),
                     "code": link.get("code", ""),
                     "total_clicks": item["total"],
-                    "unique_clicks": item["unique"]
+                    "unique_clicks": item["unique"],
+                    "registrations": regs,
+                    "logins": logins
                 })
         
-        # Клики по дням (последние N дней)
+        # Клики, регистрации и входы по дням
         days_pipeline = [
             {"$match": {"timestamp": {"$gte": month_ago}}},
             {"$group": {
-                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
-                "clicks": {"$sum": 1},
-                "unique": {"$sum": {"$cond": ["$is_unique", 1, 0]}}
+                "_id": {
+                    "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                    "event_type": "$event_type"
+                },
+                "count": {"$sum": 1}
             }},
-            {"$sort": {"_id": 1}}
+            {"$sort": {"_id.date": 1}}
         ]
-        days_data = await db.referral_link_clicks.aggregate(days_pipeline).to_list(length=days)
-        clicks_by_day = [{"date": d["_id"], "clicks": d["clicks"], "unique": d["unique"]} for d in days_data]
+        days_data = await db.referral_link_events.aggregate(days_pipeline).to_list(length=days * 3)
+        
+        # Собираем данные по дням
+        days_map = {}
+        for d in days_data:
+            date = d["_id"]["date"]
+            etype = d["_id"]["event_type"]
+            if date not in days_map:
+                days_map[date] = {"date": date, "clicks": 0, "registrations": 0, "logins": 0}
+            if etype == "click":
+                days_map[date]["clicks"] = d["count"]
+            elif etype == "registration":
+                days_map[date]["registrations"] = d["count"]
+            elif etype == "login":
+                days_map[date]["logins"] = d["count"]
+        
+        clicks_by_day = sorted(days_map.values(), key=lambda x: x["date"])
         
         # Клики по источникам
         source_pipeline = [
+            {"$match": {"event_type": "click"}},
             {"$lookup": {
                 "from": "admin_referral_links",
                 "localField": "link_id",
@@ -6676,32 +6716,33 @@ async def get_referral_links_analytics(days: int = 30):
             }},
             {"$sort": {"clicks": -1}}
         ]
-        source_data = await db.referral_link_clicks.aggregate(source_pipeline).to_list(length=20)
+        source_data = await db.referral_link_events.aggregate(source_pipeline).to_list(length=20)
         clicks_by_source = [{"source": s["_id"] or "direct", "clicks": s["clicks"]} for s in source_data]
         
-        # Последние клики
-        recent_cursor = db.referral_link_clicks.find({}).sort("timestamp", -1).limit(20)
+        # Последние события (все типы)
+        recent_cursor = db.referral_link_events.find({}).sort("timestamp", -1).limit(20)
         recent_data = await recent_cursor.to_list(length=20)
-        recent_clicks = []
-        for click in recent_data:
-            click["_id"] = str(click.get("_id", ""))
-            link = await db.admin_referral_links.find_one({"id": click.get("link_id")})
-            click["link_name"] = link.get("name", "") if link else ""
-            click["link_code"] = link.get("code", "") if link else click.get("link_code", "")
-            recent_clicks.append(click)
+        recent_events = []
+        for evt in recent_data:
+            evt["_id"] = str(evt.get("_id", ""))
+            link = await db.admin_referral_links.find_one({"id": evt.get("link_id")})
+            evt["link_name"] = link.get("name", "") if link else ""
+            recent_events.append(evt)
         
         return {
             "total_links": total_links,
             "active_links": active_links,
             "total_clicks": total_clicks,
             "total_unique_clicks": total_unique,
+            "total_registrations": total_registrations,
+            "total_logins": total_logins,
             "clicks_today": clicks_today,
             "clicks_week": clicks_week,
             "clicks_month": clicks_month,
             "top_links": top_links,
             "clicks_by_day": clicks_by_day,
             "clicks_by_source": clicks_by_source,
-            "recent_clicks": recent_clicks
+            "recent_events": recent_events
         }
     except Exception as e:
         logger.error(f"Ошибка при получении аналитики: {e}")
@@ -6723,44 +6764,73 @@ async def get_admin_referral_link(link_id: str):
         week_ago = now - timedelta(days=7)
         month_ago = now - timedelta(days=30)
         
-        link["clicks_today"] = await db.referral_link_clicks.count_documents({
-            "link_id": link_id, "timestamp": {"$gte": today_start}
+        # Актуальные счётчики
+        link["total_clicks"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "click"})
+        link["unique_clicks"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "click", "is_unique": True})
+        link["registrations"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "registration"})
+        link["logins"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "login"})
+        
+        link["clicks_today"] = await db.referral_link_events.count_documents({
+            "link_id": link_id, "event_type": "click", "timestamp": {"$gte": today_start}
         })
-        link["clicks_week"] = await db.referral_link_clicks.count_documents({
-            "link_id": link_id, "timestamp": {"$gte": week_ago}
+        link["clicks_week"] = await db.referral_link_events.count_documents({
+            "link_id": link_id, "event_type": "click", "timestamp": {"$gte": week_ago}
         })
-        link["clicks_month"] = await db.referral_link_clicks.count_documents({
-            "link_id": link_id, "timestamp": {"$gte": month_ago}
+        link["clicks_month"] = await db.referral_link_events.count_documents({
+            "link_id": link_id, "event_type": "click", "timestamp": {"$gte": month_ago}
         })
         
-        # Клики по дням для этой ссылки
+        # Все события по дням для этой ссылки
         days_pipeline = [
             {"$match": {"link_id": link_id, "timestamp": {"$gte": month_ago}}},
             {"$group": {
-                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
-                "clicks": {"$sum": 1},
-                "unique": {"$sum": {"$cond": ["$is_unique", 1, 0]}}
+                "_id": {
+                    "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                    "event_type": "$event_type"
+                },
+                "count": {"$sum": 1}
             }},
-            {"$sort": {"_id": 1}}
+            {"$sort": {"_id.date": 1}}
         ]
-        days_data = await db.referral_link_clicks.aggregate(days_pipeline).to_list(length=30)
-        link["clicks_by_day"] = [{"date": d["_id"], "clicks": d["clicks"], "unique": d["unique"]} for d in days_data]
+        days_data = await db.referral_link_events.aggregate(days_pipeline).to_list(length=90)
+        days_map = {}
+        for d in days_data:
+            date = d["_id"]["date"]
+            etype = d["_id"]["event_type"]
+            if date not in days_map:
+                days_map[date] = {"date": date, "clicks": 0, "registrations": 0, "logins": 0}
+            if etype == "click":
+                days_map[date]["clicks"] = d["count"]
+            elif etype == "registration":
+                days_map[date]["registrations"] = d["count"]
+            elif etype == "login":
+                days_map[date]["logins"] = d["count"]
+        link["events_by_day"] = sorted(days_map.values(), key=lambda x: x["date"])
         
         # Клики по устройствам
         device_pipeline = [
-            {"$match": {"link_id": link_id}},
+            {"$match": {"link_id": link_id, "event_type": "click"}},
             {"$group": {"_id": "$device_type", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}}
         ]
-        device_data = await db.referral_link_clicks.aggregate(device_pipeline).to_list(length=10)
+        device_data = await db.referral_link_events.aggregate(device_pipeline).to_list(length=10)
         link["clicks_by_device"] = [{"device": d["_id"] or "unknown", "count": d["count"]} for d in device_data]
         
-        # Последние 20 кликов
-        recent_cursor = db.referral_link_clicks.find({"link_id": link_id}).sort("timestamp", -1).limit(20)
-        recent = await recent_cursor.to_list(length=20)
+        # Последние 30 событий (все типы)
+        recent_cursor = db.referral_link_events.find({"link_id": link_id}).sort("timestamp", -1).limit(30)
+        recent = await recent_cursor.to_list(length=30)
         for r in recent:
             r["_id"] = str(r.get("_id", ""))
-        link["recent_clicks"] = recent
+        link["recent_events"] = recent
+        
+        # Список зарегистрированных пользователей
+        reg_cursor = db.referral_link_events.find({
+            "link_id": link_id, "event_type": "registration"
+        }).sort("timestamp", -1).limit(50)
+        reg_events = await reg_cursor.to_list(length=50)
+        for r in reg_events:
+            r["_id"] = str(r.get("_id", ""))
+        link["registered_users"] = reg_events
         
         return link
     except HTTPException:
@@ -6798,10 +6868,7 @@ async def update_admin_referral_link(link_id: str, data: AdminReferralLinkUpdate
         
         update_data["updated_at"] = datetime.utcnow()
         
-        await db.admin_referral_links.update_one(
-            {"id": link_id},
-            {"$set": update_data}
-        )
+        await db.admin_referral_links.update_one({"id": link_id}, {"$set": update_data})
         
         updated = await db.admin_referral_links.find_one({"id": link_id})
         updated["_id"] = str(updated.get("_id", ""))
@@ -6817,19 +6884,17 @@ async def update_admin_referral_link(link_id: str, data: AdminReferralLinkUpdate
 
 @api_router.delete("/admin/referral-links/{link_id}")
 async def delete_admin_referral_link(link_id: str):
-    """Удалить реферальную ссылку и все её клики"""
+    """Удалить реферальную ссылку и все её события"""
     try:
         link = await db.admin_referral_links.find_one({"id": link_id})
         if not link:
             raise HTTPException(status_code=404, detail="Ссылка не найдена")
         
-        # Удаляем ссылку
         await db.admin_referral_links.delete_one({"id": link_id})
-        # Удаляем все клики
-        deleted_clicks = await db.referral_link_clicks.delete_many({"link_id": link_id})
+        deleted_events = await db.referral_link_events.delete_many({"link_id": link_id})
         
-        logger.info(f"✅ Удалена реферальная ссылка: {link.get('name')} ({link.get('code')}), кликов удалено: {deleted_clicks.deleted_count}")
-        return {"success": True, "message": "Ссылка удалена", "deleted_clicks": deleted_clicks.deleted_count}
+        logger.info(f"✅ Удалена реферальная ссылка: {link.get('name')} ({link.get('code')}), событий удалено: {deleted_events.deleted_count}")
+        return {"success": True, "message": "Ссылка удалена", "deleted_events": deleted_events.deleted_count}
     except HTTPException:
         raise
     except Exception as e:
@@ -6837,23 +6902,38 @@ async def delete_admin_referral_link(link_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_router.post("/referral-track/{code}")
-async def track_referral_click(code: str, request: Request):
-    """Отслеживание клика по реферальной ссылке (публичный endpoint)"""
+@api_router.post("/admin/referral-track")
+async def track_admin_referral_event(data: AdminReferralTrackRequest, request: Request):
+    """
+    Универсальный трекинг событий реферальных ссылок.
+    Вызывается фронтендом при:
+    - event_type="click" — пользователь открыл приложение по ссылке
+    - event_type="registration" — новый пользователь зарегистрировался
+    - event_type="login" — существующий пользователь вошёл
+    """
     try:
-        link = await db.admin_referral_links.find_one({"code": code.upper(), "is_active": True})
+        code = data.code.strip().upper()
+        event_type = data.event_type
+        
+        if event_type not in ("click", "registration", "login"):
+            raise HTTPException(status_code=400, detail=f"Неверный event_type: {event_type}. Допустимые: click, registration, login")
+        
+        link = await db.admin_referral_links.find_one({"code": code})
         if not link:
-            raise HTTPException(status_code=404, detail="Ссылка не найдена или неактивна")
+            logger.warning(f"⚠️ Реферальная ссылка не найдена: {code}")
+            raise HTTPException(status_code=404, detail="Ссылка не найдена")
+        
+        if not link.get("is_active", True):
+            logger.info(f"⏸ Ссылка {code} неактивна, событие {event_type} игнорируется")
+            return {"success": False, "message": "Ссылка неактивна"}
         
         import hashlib
         
-        # Получаем информацию о клике
         client_ip = request.client.host if request.client else "unknown"
         ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
         user_agent = request.headers.get("user-agent", "")
         referer = request.headers.get("referer", "")
         
-        # Определяем тип устройства
         ua_lower = user_agent.lower()
         device_type = "desktop"
         if any(kw in ua_lower for kw in ["mobile", "android", "iphone", "ipad"]):
@@ -6861,64 +6941,101 @@ async def track_referral_click(code: str, request: Request):
         elif "tablet" in ua_lower:
             device_type = "tablet"
         
-        # Проверяем уникальность (по хешу IP + link_id за последние 24 часа)
-        day_ago = datetime.utcnow() - timedelta(hours=24)
-        existing_click = await db.referral_link_clicks.find_one({
-            "link_id": link["id"],
-            "ip_hash": ip_hash,
-            "timestamp": {"$gte": day_ago}
-        })
-        is_unique = existing_click is None
+        is_unique = False
+        if event_type == "click":
+            # Уникальность клика: по IP за 24 часа
+            day_ago = datetime.utcnow() - timedelta(hours=24)
+            existing = await db.referral_link_events.find_one({
+                "link_id": link["id"],
+                "event_type": "click",
+                "ip_hash": ip_hash,
+                "timestamp": {"$gte": day_ago}
+            })
+            is_unique = existing is None
+        elif event_type == "registration":
+            # Уникальность регистрации: один пользователь на одну ссылку
+            if data.telegram_id:
+                existing = await db.referral_link_events.find_one({
+                    "link_id": link["id"],
+                    "event_type": "registration",
+                    "telegram_id": data.telegram_id
+                })
+                is_unique = existing is None
+                if not is_unique:
+                    logger.info(f"ℹ️ Повторная регистрация user={data.telegram_id} через ссылку {code}")
+                    return {"success": True, "message": "Уже зарегистрирован через эту ссылку", "is_unique": False}
+            else:
+                is_unique = True
+        elif event_type == "login":
+            # Уникальность входа: один пользователь за 24 часа
+            if data.telegram_id:
+                day_ago = datetime.utcnow() - timedelta(hours=24)
+                existing = await db.referral_link_events.find_one({
+                    "link_id": link["id"],
+                    "event_type": "login",
+                    "telegram_id": data.telegram_id,
+                    "timestamp": {"$gte": day_ago}
+                })
+                is_unique = existing is None
+            else:
+                is_unique = True
         
-        click = ReferralLinkClick(
+        event = ReferralLinkEvent(
             link_id=link["id"],
-            link_code=code.upper(),
+            link_code=code,
+            event_type=event_type,
             ip_hash=ip_hash,
             user_agent=user_agent[:500],
             referer=referer[:500],
+            telegram_id=data.telegram_id,
+            telegram_username=data.telegram_username,
+            telegram_name=data.telegram_name,
             device_type=device_type,
             is_unique=is_unique,
         )
         
-        await db.referral_link_clicks.insert_one(click.model_dump())
+        await db.referral_link_events.insert_one(event.model_dump())
         
-        # Обновляем счётчики на ссылке
-        inc_data = {"total_clicks": 1}
-        if is_unique:
-            inc_data["unique_clicks"] = 1
-        await db.admin_referral_links.update_one(
-            {"id": link["id"]},
-            {"$inc": inc_data}
-        )
+        # Обновляем кешированные счётчики на ссылке
+        inc_data = {}
+        if event_type == "click":
+            inc_data["total_clicks"] = 1
+            if is_unique:
+                inc_data["unique_clicks"] = 1
+        elif event_type == "registration":
+            inc_data["registrations"] = 1
+        elif event_type == "login":
+            inc_data["logins"] = 1
         
-        logger.info(f"📊 Клик по ссылке {code}: unique={is_unique}, device={device_type}")
+        if inc_data:
+            await db.admin_referral_links.update_one({"id": link["id"]}, {"$inc": inc_data})
+        
+        logger.info(f"📊 Событие {event_type} по ссылке {code}: tg_id={data.telegram_id}, unique={is_unique}, device={device_type}")
         
         return {
             "success": True,
-            "destination_url": link.get("destination_url", ""),
-            "link_name": link.get("name", ""),
-            "is_unique": is_unique
+            "event_type": event_type,
+            "is_unique": is_unique,
+            "link_name": link.get("name", "")
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка при отслеживании клика: {e}")
+        logger.error(f"Ошибка при трекинге события: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.get("/r/{code}")
 async def redirect_referral_link(code: str, request: Request):
-    """Редирект по реферальной ссылке с отслеживанием"""
+    """Редирект по реферальной ссылке с отслеживанием клика"""
     try:
         link = await db.admin_referral_links.find_one({"code": code.upper()})
         if not link or not link.get("is_active", True):
-            # Если ссылка не найдена — перенаправляем на главную бота
             bot_username = get_telegram_bot_username()
             return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
         
         import hashlib
         
-        # Трекинг клика
         client_ip = request.client.host if request.client else "unknown"
         ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
         user_agent = request.headers.get("user-agent", "")
@@ -6932,16 +7049,18 @@ async def redirect_referral_link(code: str, request: Request):
             device_type = "tablet"
         
         day_ago = datetime.utcnow() - timedelta(hours=24)
-        existing_click = await db.referral_link_clicks.find_one({
+        existing = await db.referral_link_events.find_one({
             "link_id": link["id"],
+            "event_type": "click",
             "ip_hash": ip_hash,
             "timestamp": {"$gte": day_ago}
         })
-        is_unique = existing_click is None
+        is_unique = existing is None
         
-        click = ReferralLinkClick(
+        event = ReferralLinkEvent(
             link_id=link["id"],
             link_code=code.upper(),
+            event_type="click",
             ip_hash=ip_hash,
             user_agent=user_agent[:500],
             referer=referer[:500],
@@ -6949,15 +7068,12 @@ async def redirect_referral_link(code: str, request: Request):
             is_unique=is_unique,
         )
         
-        await db.referral_link_clicks.insert_one(click.model_dump())
+        await db.referral_link_events.insert_one(event.model_dump())
         
         inc_data = {"total_clicks": 1}
         if is_unique:
             inc_data["unique_clicks"] = 1
-        await db.admin_referral_links.update_one(
-            {"id": link["id"]},
-            {"$inc": inc_data}
-        )
+        await db.admin_referral_links.update_one({"id": link["id"]}, {"$inc": inc_data})
         
         logger.info(f"🔗 Редирект по ссылке {code} → {link.get('destination_url')}")
         
