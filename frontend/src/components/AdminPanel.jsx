@@ -2568,7 +2568,10 @@ const ReferralLinksTab = () => {
                           <span className="text-white font-semibold">{link.total_clicks}</span> кликов
                         </span>
                         <span className="text-gray-400">
-                          <span className="text-cyan-400 font-semibold">{link.unique_clicks}</span> уникальных
+                          <span className="text-emerald-400 font-semibold">{link.registrations || 0}</span> регистр.
+                        </span>
+                        <span className="text-gray-400">
+                          <span className="text-blue-400 font-semibold">{link.logins || 0}</span> входов
                         </span>
                         {link.clicks_today > 0 && (
                           <span className="text-emerald-400 font-medium flex items-center gap-0.5">
