@@ -7104,12 +7104,23 @@ async def redirect_referral_link(code: str, request: Request):
         return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
 
 
-async def get_admin_users(limit: int = 50, skip: int = 0, search: Optional[str] = None):
-    """Get list of users for admin panel with search capability"""
+@api_router.get("/admin/users")
+async def get_admin_users(limit: int = 50, skip: int = 0, search: Optional[str] = None, user_type: Optional[str] = None):
+    """Get list of users for admin panel with search and user_type filter.
+    user_type: 'telegram' | 'web' | None (all)
+    """
+    WEB_GUEST_THRESHOLD = 10_000_000_000
     query = {}
+    
+    # Фильтр по типу пользователя
+    if user_type == "telegram":
+        query["telegram_id"] = {"$lt": WEB_GUEST_THRESHOLD}
+    elif user_type == "web":
+        query["telegram_id"] = {"$gte": WEB_GUEST_THRESHOLD}
+    
     if search:
         # Case-insensitive search by name, username, or group
-        query["$or"] = [
+        or_conditions = [
             {"username": {"$regex": search, "$options": "i"}},
             {"first_name": {"$regex": search, "$options": "i"}},
             {"last_name": {"$regex": search, "$options": "i"}},
@@ -7117,10 +7128,24 @@ async def get_admin_users(limit: int = 50, skip: int = 0, search: Optional[str] 
         ]
         # Check if search is a number (telegram_id)
         if search.isdigit():
-            query["$or"].append({"telegram_id": int(search)})
+            or_conditions.append({"telegram_id": int(search)})
+        
+        if "telegram_id" in query:
+            # Combine type filter with search via $and
+            query = {"$and": [{"telegram_id": query["telegram_id"]}, {"$or": or_conditions}]}
+        else:
+            query["$or"] = or_conditions
 
     cursor = db.user_settings.find(query).sort("created_at", -1).skip(skip).limit(limit)
     users = await cursor.to_list(length=limit)
+    
+    # Добавляем поле user_type к каждому юзеру
+    for u in users:
+        tid = u.get("telegram_id", 0)
+        u["user_type"] = "web" if tid >= WEB_GUEST_THRESHOLD else "telegram"
+        if "_id" in u:
+            u["_id"] = str(u["_id"])
+    
     return users
 
 @api_router.get("/admin/journals", response_model=List[JournalResponse])
