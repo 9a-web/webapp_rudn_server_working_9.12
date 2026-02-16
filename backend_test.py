@@ -59,7 +59,8 @@ def make_request(method: str, endpoint: str, data: Optional[Dict] = None) -> Dic
             "status_code": response.status_code,
             "success": 200 <= response.status_code < 300,
             "data": response.json() if response.content else {},
-            "error": None
+            "error": None,
+            "raw_response": response.text[:500] if hasattr(response, 'text') else ""
         }
     except requests.exceptions.RequestException as e:
         return {
