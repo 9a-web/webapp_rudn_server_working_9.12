@@ -21,7 +21,7 @@
     "serve": "^14.2.5"
   },
   "scripts": {
-    "start": "vite",
+    "start": "serve build -l 3000 -s --no-clipboard",
     "build": "vite build",
     "preview": "vite preview",
     "test": "echo 'Tests not configured yet' && exit 0"
