@@ -1964,6 +1964,88 @@ const ReferralLinksTab = () => {
   const [formMedium, setFormMedium] = useState('');
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  
+  // Modal pattern config state
+  const [modalEnabled, setModalEnabled] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalDescription, setModalDescription] = useState('');
+  const [modalButtonText, setModalButtonText] = useState('OK');
+  const [modalButtonAction, setModalButtonAction] = useState('close');
+  const [modalButtonUrl, setModalButtonUrl] = useState('');
+  const [modalNavigateTo, setModalNavigateTo] = useState('');
+  const [modalRewardPoints, setModalRewardPoints] = useState(0);
+  const [modalImageId, setModalImageId] = useState('');
+  const [modalImages, setModalImages] = useState([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  
+  const ACTION_OPTIONS = [
+    { value: 'close', label: 'Закрыть модалку' },
+    { value: 'open_url', label: 'Открыть ссылку (URL)' },
+    { value: 'navigate', label: 'Перейти в раздел' },
+    { value: 'reward', label: 'Получить награду (баллы)' },
+  ];
+  
+  const NAVIGATE_OPTIONS = [
+    { value: 'schedule', label: 'Расписание' },
+    { value: 'friends', label: 'Друзья' },
+    { value: 'music', label: 'Музыка' },
+    { value: 'rooms', label: 'Комнаты' },
+    { value: 'journal', label: 'Журнал' },
+    { value: 'settings', label: 'Настройки' },
+  ];
+  
+  const fetchModalImages = useCallback(async () => {
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/admin/modal-images`);
+      setModalImages(res.data || []);
+    } catch (e) { console.error('Error loading modal images:', e); }
+  }, []);
+  
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await axios.post(`${BACKEND_URL}/api/admin/modal-images`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchModalImages();
+      setModalImageId(res.data.id);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Ошибка загрузки');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+  
+  const resetModalForm = () => {
+    setModalEnabled(false);
+    setModalTitle('');
+    setModalDescription('');
+    setModalButtonText('OK');
+    setModalButtonAction('close');
+    setModalButtonUrl('');
+    setModalNavigateTo('');
+    setModalRewardPoints(0);
+    setModalImageId('');
+  };
+  
+  const getModalConfig = () => {
+    if (!modalEnabled) return null;
+    return {
+      enabled: true,
+      image_id: modalImageId,
+      title: modalTitle,
+      description: modalDescription,
+      button_text: modalButtonText,
+      button_action: modalButtonAction,
+      button_url: modalButtonUrl,
+      button_navigate_to: modalNavigateTo,
+      reward_points: modalRewardPoints,
+    };
+  };
 
   const SOURCE_OPTIONS = [
     { value: '', label: 'Не указан' },
