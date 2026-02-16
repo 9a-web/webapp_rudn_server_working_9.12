@@ -1221,7 +1221,7 @@ const UsersTab = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-lg">
+      <div className="p-4 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-lg space-y-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <input
@@ -1231,6 +1231,26 @@ const UsersTab = () => {
             onChange={(e) => setSearch(e.target.value)}
             className={`w-full ${GLASS.input} rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-600 text-sm outline-none transition-all duration-300`}
           />
+        </div>
+        {/* Фильтр: Все / Telegram / Веб-сессии */}
+        <div className="flex gap-2">
+          {[
+            { key: null, label: 'Все' },
+            { key: 'telegram', label: 'Telegram', color: 'from-[#2AABEE]/20 to-[#2AABEE]/10 border-[#2AABEE]/30 text-[#2AABEE]' },
+            { key: 'web', label: 'Веб-сессии', color: 'from-orange-500/20 to-amber-500/10 border-orange-500/30 text-orange-400' },
+          ].map(f => (
+            <button
+              key={f.key || 'all'}
+              onClick={() => setUserTypeFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                userTypeFilter === f.key
+                  ? (f.color || 'from-white/10 to-white/5 border-white/20 text-white') + ' bg-gradient-to-r'
+                  : 'border-white/[0.06] text-gray-500 hover:text-gray-300 hover:border-white/10'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
       
