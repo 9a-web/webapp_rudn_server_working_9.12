@@ -827,6 +827,7 @@ const Home = () => {
   }, [schedule]);
 
   // Загрузка syncedUser из localStorage при старте (для QR синхронизации)
+  // Зависимость только от user — syncedUser убран чтобы избежать цикла перерендеров
   useEffect(() => {
     const savedSyncedUser = localStorage.getItem('synced_user');
     if (savedSyncedUser && !user) {
@@ -839,7 +840,7 @@ const Home = () => {
         localStorage.removeItem('synced_user');
       }
     }
-  }, [user, syncedUser]);
+  }, [user]);
 
   const loadUserData = useCallback(async () => {
     // Используем effectiveUser (syncedUser из QR имеет приоритет над user из Telegram)
