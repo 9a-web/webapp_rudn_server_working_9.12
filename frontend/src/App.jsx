@@ -526,7 +526,7 @@ const Home = () => {
     };
     
     processAdrefAuth();
-  }, [adrefCode, user, syncedUser, isReady]);
+  }, [adrefCode, isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 📚 Обработка приглашения в журнал из Web App ссылки
   useEffect(() => {
