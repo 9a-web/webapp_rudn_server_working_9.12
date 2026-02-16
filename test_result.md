@@ -133,6 +133,18 @@ backend:
         agent: "testing"
         comment: "Complete reworked referral system tested successfully. All 11 test scenarios passed: ✅ Create Link (TESTCODE with registrations=0, logins=0) ✅ Click Tracking (3 events tracked, cloud environment handles different IPs correctly) ✅ Registration Tracking (2 unique users tracked) ✅ Duplicate Registration (correctly detected and blocked) ✅ Login Tracking (1 login event tracked) ✅ Invalid Event Type (400 error returned) ✅ Analytics (correct totals: clicks=3, registrations=2, logins=1) ✅ Link Details (proper counts and registered_users list) ✅ Link Deactivation (inactive link blocks tracking) ✅ Link Deletion (successful cleanup) ✅ Redirect Endpoint (302 status returned). Collection changed from referral_link_clicks to referral_link_events. Main tracking endpoint POST /api/admin/referral-track handles all 3 event types with proper uniqueness logic."
 
+  - task: "User Type Filtering on Admin Endpoints"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL USER TYPE FILTERING TESTS PASSED SUCCESSFULLY: (1) ✅ Cleanup Test Users - Removed existing test data (2) ✅ Create Telegram User 1 - Created 'Иван' with ID 123456789 (3) ✅ Create Telegram User 2 - Created 'Мария' with ID 987654321 (4) ✅ Create Web User - Created web guest 'Пользователь' with ID 142191465619684 (5) ✅ Admin Users No Filter - Found 3 test users, all have user_type field (6) ✅ Admin Users Telegram Filter - Found 2 Telegram users with user_type='telegram' (7) ✅ Admin Users Web Filter - Found 1 web user with user_type='web' (8) ✅ Admin Stats User Types - Correct stats: telegram_users=2, web_guest_users=1, total_users=3 (9) ✅ Search with User Type Filter - Found 1 'Иван' user with telegram type filtering. Logic working correctly: telegram_id < 10B = 'telegram', >= 10B = 'web'. Note: Admin endpoints are network-protected and only accessible internally (security feature)."
+
 frontend:
   - task: "Admin Panel Online Statistics History"
     implemented: true
