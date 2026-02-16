@@ -1477,6 +1477,16 @@ const Home = () => {
         
         // Не показываем GroupSelector - сразу к главному экрану
         setShowGroupSelector(false);
+        
+        // Показываем модалку реферальной ссылки если есть
+        if (referralModalConfig && referralModalConfig.has_modal) {
+          const code = startParam?.replace('adref_', '') || '';
+          const modalShownKey = `adref_modal_shown_${code}`;
+          if (!localStorage.getItem(modalShownKey)) {
+            localStorage.setItem(modalShownKey, Date.now().toString());
+            setTimeout(() => setShowReferralModal(true), 800);
+          }
+        }
         return;
       }
     }
