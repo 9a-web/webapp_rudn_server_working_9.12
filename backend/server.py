@@ -248,7 +248,14 @@ from models import (
     JoinListeningRoomResponse,
     ListeningRoomResponse,
     UpdateListeningRoomSettingsRequest,
-    ListeningRoomSyncEvent
+    ListeningRoomSyncEvent,
+    # Модели для админских реферальных ссылок
+    AdminReferralLinkCreate,
+    AdminReferralLinkUpdate,
+    AdminReferralLink,
+    ReferralLinkClick,
+    AdminReferralLinkResponse,
+    ReferralLinksAnalytics,
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
