@@ -2652,6 +2652,22 @@ const ReferralLinksTab = () => {
                 )}
 
                 {/* Recent events */}
+                {/* Modal config badge */}
+                {selectedLink.modal_config?.enabled && (
+                  <div className={`${GLASS.card} rounded-xl p-4`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm">🖼</span>
+                      <span className="text-sm font-semibold text-white">Модальное окно</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/20">Активно</span>
+                    </div>
+                    <div className="space-y-1 text-[11px] text-gray-400">
+                      {selectedLink.modal_config.title && <div>Заголовок: <span className="text-gray-300">{selectedLink.modal_config.title}</span></div>}
+                      <div>Кнопка: <span className="text-gray-300">{selectedLink.modal_config.button_text || 'OK'}</span> → <span className="text-purple-400">{selectedLink.modal_config.button_action}</span></div>
+                      {selectedLink.modal_config.button_action === 'reward' && <div>Баллы: <span className="text-amber-400">+{selectedLink.modal_config.reward_points}</span></div>}
+                    </div>
+                  </div>
+                )}
+                
                 {selectedLink.recent_events && selectedLink.recent_events.length > 0 && (
                   <div className={`${GLASS.card} rounded-xl p-4`}>
                     <div className="flex items-center gap-2 mb-3">
