@@ -724,7 +724,7 @@ const Home = () => {
     if (isReady && (user || syncedUser) && startParam) {
       processFriendInvite();
     }
-  }, [isReady, user, syncedUser, startParam, friendInviteProcessed]);
+  }, [isReady, user?.id, syncedUser?.id, startParam, friendInviteProcessed]);
 
   // Обработка связки Telegram профиля (startapp=link_{token})
   const [linkInviteProcessed, setLinkInviteProcessed] = useState(false);
