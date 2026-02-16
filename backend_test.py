@@ -348,7 +348,7 @@ def test_user_type_filtering():
     
     # Step 6: Test GET /api/admin/stats - should have telegram_users=2, web_guest_users=1
     print("\n6. Testing admin stats endpoint...")
-    response = make_request("GET", "/admin/stats")
+    response = make_admin_request("GET", "/admin/stats")
     if response["success"] and response["data"]:
         stats = response["data"]
         telegram_count = stats.get("telegram_users", 0)
