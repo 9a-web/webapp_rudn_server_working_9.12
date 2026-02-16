@@ -253,7 +253,6 @@ const Home = () => {
   const [referralProcessed, setReferralProcessed] = useState(false);
   
   // Состояние для админской реферальной ссылки (adref_)
-  const [adrefProcessed, setAdrefProcessed] = useState(false);
   const [adrefCode, setAdrefCode] = useState(null);
   
   // Состояние для обработки приглашения в журнал
