@@ -256,6 +256,10 @@ const Home = () => {
   // Состояние для админской реферальной ссылки (adref_)
   const [adrefCode, setAdrefCode] = useState(null);
   
+  // Состояние модального окна реферальной ссылки
+  const [referralModalConfig, setReferralModalConfig] = useState(null);
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  
   // Состояние для обработки приглашения в журнал
   const [journalInviteProcessed, setJournalInviteProcessed] = useState(false);
   
