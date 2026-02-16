@@ -76,43 +76,42 @@ export const TelegramProvider = ({ children }) => {
       // 1. Готовим WebApp
       tg.ready();
       
-      // 2. ⭐️ АГРЕССИВНЫЙ ПОЛНОЭКРАННЫЙ РЕЖИМ
-      // Вызываем expand() многократно для надежности
-      const forceExpand = () => {
-        console.log('🔄 Попытка expand()... isExpanded:', tg.isExpanded);
-        tg.expand();
-        
-        // Проверяем результат через 10ms
-        setTimeout(() => {
-          console.log('📏 После expand(): isExpanded =', tg.isExpanded, ', viewportHeight =', tg.viewportHeight);
-        }, 10);
+      // 2. Развёртываем на весь экран (один раз с проверкой)
+      const timeoutIds = [];
+      
+      const tryExpand = () => {
+        if (!tg.isExpanded) {
+          tg.expand();
+        }
       };
       
       // Первый вызов сразу
-      forceExpand();
+      tryExpand();
       
-      // Повторные вызовы с разными интервалами
-      setTimeout(forceExpand, 10);
-      setTimeout(forceExpand, 50);
-      setTimeout(forceExpand, 100);
-      setTimeout(forceExpand, 200);
-      setTimeout(forceExpand, 300);
-      setTimeout(forceExpand, 500);
-      setTimeout(forceExpand, 1000);
+      // Повторные вызовы только если не развернулось
+      const retryExpand = (delay) => {
+        const id = setTimeout(() => {
+          if (!tg.isExpanded) {
+            console.log('🔄 Попытка expand()... isExpanded:', tg.isExpanded);
+            tg.expand();
+          }
+        }, delay);
+        timeoutIds.push(id);
+      };
       
-      // 3. Постоянная проверка и принудительное разворачивание
-      const intervalId = setInterval(() => {
+      retryExpand(100);
+      retryExpand(500);
+      retryExpand(1000);
+      
+      // Одна проверка через 2 секунды
+      const checkId = setTimeout(() => {
         if (!tg.isExpanded) {
-          console.warn('⚠️ WebApp НЕ развернут! Принудительный expand()...');
+          console.warn('⚠️ WebApp НЕ развернут после 2с. Принудительный expand()...');
           tg.expand();
         }
-      }, 500);
-      
-      // Останавливаем через 5 секунд
-      setTimeout(() => {
-        clearInterval(intervalId);
-        console.log('✅ Проверка expand завершена. Финальное состояние: isExpanded =', tg.isExpanded);
-      }, 5000);
+        console.log('📏 Финальное состояние: isExpanded =', tg.isExpanded, ', viewportHeight =', tg.viewportHeight);
+      }, 2000);
+      timeoutIds.push(checkId);
       
       // 4. Отключаем вертикальные свайпы
       try {
