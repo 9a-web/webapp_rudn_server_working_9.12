@@ -770,7 +770,7 @@ const Home = () => {
     if (isReady && (user || syncedUser) && startParam) {
       processLinkInvite();
     }
-  }, [isReady, user, syncedUser, startParam, linkInviteProcessed]);
+  }, [isReady, user?.id, syncedUser?.id, startParam, linkInviteProcessed]);
 
   // Обработка приглашения в комнату прослушивания (startapp=listen_{invite_code})
   const [listenInviteProcessed, setListenInviteProcessed] = useState(false);
