@@ -466,36 +466,44 @@ const Home = () => {
   }, [isReady, user, syncedUser, startParam, referralProcessed]);
 
   // 📊 Обработка админской реферальной ссылки (adref_) — этап 1: трекинг клика
+  const adrefClickTracked = useRef(false);
   useEffect(() => {
-    if (!startParam || !startParam.startsWith('adref_') || adrefProcessed) return;
+    if (!startParam || !startParam.startsWith('adref_') || adrefClickTracked.current) return;
     
     const code = startParam.replace('adref_', '');
     console.log('📊 Обнаружена админская реферальная ссылка:', code);
+    adrefClickTracked.current = true;
     setAdrefCode(code);
     
     // Немедленно трекаем клик (даже без авторизации)
     trackAdminReferralEvent({ code, event_type: 'click' })
       .then(res => {
-        if (res.success) {
+        if (res?.success) {
           console.log('✅ Клик по реферальной ссылке зафиксирован:', res.link_name);
         }
       })
       .catch(err => console.error('❌ Ошибка трекинга клика:', err));
-    
-    setAdrefProcessed(true);
-  }, [startParam, adrefProcessed]);
+  }, [startParam]);
 
   // 📊 Обработка админской реферальной ссылки (adref_) — этап 2: регистрация/вход
+  const adrefAuthTracked = useRef(false);
   useEffect(() => {
-    if (!adrefCode) return;
+    if (!adrefCode || adrefAuthTracked.current) return;
     const currentUser = syncedUser || user;
     if (!currentUser || !isReady) return;
+    
+    adrefAuthTracked.current = true;
     
     // Определяем: новый пользователь (registration) или существующий (login)
     const processAdrefAuth = async () => {
       try {
-        const settings = await userAPI.getUserSettings(currentUser.id);
-        const eventType = settings ? 'login' : 'registration';
+        let eventType = 'login';
+        try {
+          const settings = await userAPI.getUserSettings(currentUser.id);
+          eventType = settings ? 'login' : 'registration';
+        } catch {
+          eventType = 'registration';
+        }
         
         console.log(`📊 adref: пользователь ${currentUser.id} — ${eventType}`);
         
