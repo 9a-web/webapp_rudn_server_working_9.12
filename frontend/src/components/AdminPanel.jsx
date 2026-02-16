@@ -1205,7 +1205,7 @@ const UsersTab = () => {
       const currentPage = reset ? 0 : page;
       const skip = currentPage * 50;
       const res = await axios.get(`${BACKEND_URL}/api/admin/users`, {
-        params: { limit: 50, skip, search: debouncedSearch || undefined }
+        params: { limit: 50, skip, search: debouncedSearch || undefined, user_type: userTypeFilter || undefined }
       });
       if (reset) { setUsers(res.data); setPage(1); }
       else { setUsers(prev => [...prev, ...res.data]); setPage(prev => prev + 1); }
@@ -1215,9 +1215,9 @@ const UsersTab = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, userTypeFilter]);
 
-  useEffect(() => { fetchUsers(true); }, [debouncedSearch]);
+  useEffect(() => { fetchUsers(true); }, [debouncedSearch, userTypeFilter]);
 
   return (
     <div className="flex flex-col h-full">
