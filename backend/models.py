@@ -2480,6 +2480,18 @@ class MessageActionResponse(BaseModel):
 
 # ============ Модели для админских реферальных ссылок ============
 
+class ModalPatternConfig(BaseModel):
+    """Конфигурация модального окна для реферальной ссылки"""
+    enabled: bool = False
+    image_id: str = ""  # ID предзагруженного изображения
+    title: str = ""
+    description: str = ""
+    button_text: str = "OK"
+    button_action: str = "close"  # close | open_url | navigate | reward
+    button_url: str = ""  # Для action=open_url
+    button_navigate_to: str = ""  # Для action=navigate (schedule, friends, music, etc.)
+    reward_points: int = 0  # Для action=reward
+
 class AdminReferralLinkCreate(BaseModel):
     """Создание реферальной ссылки админом"""
     name: str  # Название кампании / ссылки
@@ -2490,6 +2502,7 @@ class AdminReferralLinkCreate(BaseModel):
     source: str = ""  # Источник трафика (vk, telegram, instagram, etc)
     medium: str = ""  # Тип канала (social, email, banner, etc)
     tags: List[str] = []  # Теги для фильтрации
+    modal_config: Optional[ModalPatternConfig] = None  # Настройка модального окна
 
 class AdminReferralLinkUpdate(BaseModel):
     """Обновление реферальной ссылки"""
