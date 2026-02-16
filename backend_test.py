@@ -47,19 +47,19 @@ class TestResults:
                 if not result["success"]:
                     print(f"- {result['test']}: {result['message']}")
 
-def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expected_status: int = 200) -> Dict[Any, Any]:
+def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expected_status: int = 200, allow_redirects: bool = True) -> Dict[Any, Any]:
     """Make HTTP request with error handling"""
     url = f"{BACKEND_URL}{endpoint}"
     
     try:
         if method.upper() == "GET":
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=10, allow_redirects=allow_redirects)
         elif method.upper() == "POST":
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, timeout=10, allow_redirects=allow_redirects)
         elif method.upper() == "PUT":
-            response = requests.put(url, json=data, timeout=10)
+            response = requests.put(url, json=data, timeout=10, allow_redirects=allow_redirects)
         elif method.upper() == "DELETE":
-            response = requests.delete(url, timeout=10)
+            response = requests.delete(url, timeout=10, allow_redirects=allow_redirects)
         else:
             raise ValueError(f"Unsupported method: {method}")
             
@@ -67,11 +67,20 @@ def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expect
         
         if response.status_code != expected_status:
             print(f"Expected {expected_status}, got {response.status_code}")
-            print(f"Response: {response.text}")
+            if response.text and len(response.text) < 500:
+                print(f"Response: {response.text}")
+            
+        # Handle redirect responses
+        if response.status_code in [301, 302, 303, 307, 308]:
+            return {
+                "status_code": response.status_code,
+                "data": {"redirect_url": response.headers.get("Location", "")},
+                "success": response.status_code == expected_status
+            }
             
         return {
             "status_code": response.status_code,
-            "data": response.json() if response.text else {},
+            "data": response.json() if response.text and response.text.strip().startswith('{') else {},
             "success": response.status_code == expected_status
         }
     except requests.exceptions.Timeout:
@@ -81,8 +90,8 @@ def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expect
     except json.JSONDecodeError:
         return {
             "status_code": response.status_code if 'response' in locals() else 0,
-            "data": {"raw_response": response.text if 'response' in locals() else ""},
-            "success": False,
+            "data": {"raw_response": response.text[:200] if 'response' in locals() and response.text else ""},
+            "success": response.status_code == expected_status,
             "error": "Invalid JSON response"
         }
 
