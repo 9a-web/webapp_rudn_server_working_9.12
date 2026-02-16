@@ -2417,26 +2417,56 @@ const ReferralLinksTab = () => {
                   </div>
                 )}
 
-                {/* Recent clicks */}
-                {selectedLink.recent_clicks && selectedLink.recent_clicks.length > 0 && (
+                {/* Recent events */}
+                {selectedLink.recent_events && selectedLink.recent_events.length > 0 && (
                   <div className={`${GLASS.card} rounded-xl p-4`}>
                     <div className="flex items-center gap-2 mb-3">
                       <Clock className="w-4 h-4 text-orange-400" />
-                      <span className="text-sm font-semibold text-white">Последние клики</span>
+                      <span className="text-sm font-semibold text-white">Последние события</span>
                     </div>
                     <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                      {selectedLink.recent_clicks.map((click, i) => (
+                      {selectedLink.recent_events.map((evt, i) => (
                         <div key={i} className="flex items-center gap-3 p-2 bg-white/[0.02] rounded-lg text-xs">
-                          <span className="text-sm">{click.device_type === 'mobile' ? '📱' : '💻'}</span>
+                          <span className="text-sm">{evt.event_type === 'click' ? '👆' : evt.event_type === 'registration' ? '🆕' : '🔑'}</span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-gray-400 truncate">{click.user_agent ? click.user_agent.slice(0, 50) + '...' : 'N/A'}</div>
+                            <div className="text-gray-300 font-medium">
+                              {evt.event_type === 'click' ? 'Клик' : evt.event_type === 'registration' ? 'Регистрация' : 'Вход'}
+                              {evt.telegram_name && <span className="text-gray-500 ml-1.5">— {evt.telegram_name}</span>}
+                            </div>
+                            {evt.device_type && <span className="text-[10px] text-gray-600">{evt.device_type === 'mobile' ? '📱' : '💻'} {evt.device_type}</span>}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {click.is_unique && <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded-md font-medium">NEW</span>}
+                            {evt.is_unique && evt.event_type === 'click' && <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 rounded-md font-medium">NEW</span>}
                             <span className="text-[10px] text-gray-600">
-                              {new Date(click.timestamp).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}
+                              {new Date(evt.timestamp).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}
                             </span>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Registered users list */}
+                {selectedLink.registered_users && selectedLink.registered_users.length > 0 && (
+                  <div className={`${GLASS.card} rounded-xl p-4`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-semibold text-white">Зарегистрированные пользователи ({selectedLink.registered_users.length})</span>
+                    </div>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                      {selectedLink.registered_users.map((reg, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 bg-white/[0.02] rounded-lg text-xs">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 flex items-center justify-center text-white text-[10px] font-bold border border-emerald-500/20">
+                            {(reg.telegram_name?.[0] || '?').toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-gray-300 font-medium truncate">{reg.telegram_name || 'Пользователь'}</div>
+                            {reg.telegram_username && <div className="text-[10px] text-gray-600">@{reg.telegram_username}</div>}
+                          </div>
+                          <span className="text-[10px] text-gray-600 flex-shrink-0">
+                            {new Date(reg.timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'Europe/Moscow' })}
+                          </span>
                         </div>
                       ))}
                     </div>
