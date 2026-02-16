@@ -73,8 +73,9 @@ def make_request(method: str, endpoint: str, data: Optional[Dict] = None) -> Dic
         return {
             "status_code": response.status_code,
             "success": False,
-            "data": {"raw_content": response.text},
-            "error": f"JSON decode error: {str(e)}"
+            "data": {"raw_content": response.text[:500]},
+            "error": f"JSON decode error: {str(e)}",
+            "raw_response": response.text[:500]
         }
 
 def test_create_referral_link_auto_code():
