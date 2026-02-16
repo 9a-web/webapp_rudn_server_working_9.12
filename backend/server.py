@@ -6374,6 +6374,8 @@ async def get_admin_stats(days: Optional[int] = None):
 
     return AdminStatsResponse(
         total_users=total_users,
+        telegram_users=telegram_users,
+        web_guest_users=web_guest_users,
         active_users_today=active_users_today,
         active_users_week=active_users_week,
         active_users_month=active_users_month,
