@@ -2513,24 +2513,37 @@ class AdminReferralLink(BaseModel):
     medium: str = ""
     tags: List[str] = []
     is_active: bool = True
-    total_clicks: int = 0
-    unique_clicks: int = 0
+    # Счётчики по типам событий
+    total_clicks: int = 0       # Все клики (переходы)
+    unique_clicks: int = 0      # Уникальные клики
+    registrations: int = 0      # Новые регистрации через эту ссылку
+    logins: int = 0             # Входы существующих пользователей
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-class ReferralLinkClick(BaseModel):
-    """Клик по реферальной ссылке"""
+class ReferralLinkEvent(BaseModel):
+    """Событие по реферальной ссылке (клик, регистрация, вход)"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     link_id: str  # ID реферальной ссылки
     link_code: str  # Код ссылки
+    event_type: str  # "click" | "registration" | "login"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     ip_hash: str = ""  # Хеш IP для определения уникальности (анонимизированный)
     user_agent: str = ""
     referer: str = ""  # Откуда пришёл
-    telegram_id: Optional[int] = None  # Если известен Telegram ID
-    country: str = ""  # Страна (если определена)
+    telegram_id: Optional[int] = None  # Telegram ID пользователя (для registration/login)
+    telegram_username: str = ""  # Username Telegram
+    telegram_name: str = ""  # Имя пользователя Telegram
     device_type: str = ""  # mobile/desktop/tablet
-    is_unique: bool = True  # Уникальный ли клик
+    is_unique: bool = True  # Уникальный ли клик (для event_type=click)
+
+class AdminReferralTrackRequest(BaseModel):
+    """Запрос на трекинг события от фронтенда"""
+    code: str  # Код ссылки
+    event_type: str = "click"  # "click" | "registration" | "login"
+    telegram_id: Optional[int] = None
+    telegram_username: str = ""
+    telegram_name: str = ""
 
 class AdminReferralLinkResponse(BaseModel):
     """Ответ с полной информацией о ссылке"""
@@ -2547,6 +2560,8 @@ class AdminReferralLinkResponse(BaseModel):
     is_active: bool
     total_clicks: int
     unique_clicks: int
+    registrations: int
+    logins: int
     created_at: datetime
     updated_at: datetime
     # Дополнительная аналитика
@@ -2560,11 +2575,13 @@ class ReferralLinksAnalytics(BaseModel):
     active_links: int = 0
     total_clicks: int = 0
     total_unique_clicks: int = 0
+    total_registrations: int = 0
+    total_logins: int = 0
     clicks_today: int = 0
     clicks_week: int = 0
     clicks_month: int = 0
     top_links: List[dict] = []  # Топ ссылок по кликам
     clicks_by_day: List[dict] = []  # Клики по дням (для графика)
     clicks_by_source: List[dict] = []  # Клики по источникам
-    recent_clicks: List[dict] = []  # Последние клики
+    recent_events: List[dict] = []  # Последние события
 
