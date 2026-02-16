@@ -55,9 +55,26 @@ export const processReferralWebApp = async (data) => {
   return response.data;
 };
 
+/**
+ * Трекинг события по админской реферальной ссылке (adref_)
+ * event_type: "click" | "registration" | "login"
+ * @param {Object} data - { code, event_type, telegram_id?, telegram_username?, telegram_name? }
+ * @returns {Promise} - { success, event_type, is_unique, link_name }
+ */
+export const trackAdminReferralEvent = async (data) => {
+  try {
+    const response = await api.post('/admin/referral-track', data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Ошибка трекинга реферального события:', error);
+    return { success: false, message: error?.response?.data?.detail || 'Ошибка' };
+  }
+};
+
 export default {
   getReferralCode,
   getReferralStats,
   getReferralTree,
   processReferralWebApp,
+  trackAdminReferralEvent,
 };
