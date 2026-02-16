@@ -808,7 +808,7 @@ const Home = () => {
     if (isReady && user && startParam) {
       processListenInvite();
     }
-  }, [isReady, user, startParam, listenInviteProcessed]);
+  }, [isReady, user?.id, startParam, listenInviteProcessed]);
 
   // Загрузка расписания при изменении настроек или недели
   useEffect(() => {
