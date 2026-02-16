@@ -2474,3 +2474,97 @@ class MessageActionResponse(BaseModel):
     success: bool
     message: str
 
+
+
+# ============ Модели для админских реферальных ссылок ============
+
+class AdminReferralLinkCreate(BaseModel):
+    """Создание реферальной ссылки админом"""
+    name: str  # Название кампании / ссылки
+    description: str = ""  # Описание
+    code: Optional[str] = None  # Кастомный код (если пустой - генерируется автоматически)
+    destination_url: str = ""  # URL назначения (если пустой - ведёт в бота)
+    campaign: str = ""  # Название кампании
+    source: str = ""  # Источник трафика (vk, telegram, instagram, etc)
+    medium: str = ""  # Тип канала (social, email, banner, etc)
+    tags: List[str] = []  # Теги для фильтрации
+
+class AdminReferralLinkUpdate(BaseModel):
+    """Обновление реферальной ссылки"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    destination_url: Optional[str] = None
+    campaign: Optional[str] = None
+    source: Optional[str] = None
+    medium: Optional[str] = None
+    tags: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+class AdminReferralLink(BaseModel):
+    """Реферальная ссылка созданная админом"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: str = ""
+    code: str  # Уникальный короткий код
+    destination_url: str = ""  # URL назначения
+    full_url: str = ""  # Полная ссылка для отслеживания
+    campaign: str = ""
+    source: str = ""
+    medium: str = ""
+    tags: List[str] = []
+    is_active: bool = True
+    total_clicks: int = 0
+    unique_clicks: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ReferralLinkClick(BaseModel):
+    """Клик по реферальной ссылке"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    link_id: str  # ID реферальной ссылки
+    link_code: str  # Код ссылки
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    ip_hash: str = ""  # Хеш IP для определения уникальности (анонимизированный)
+    user_agent: str = ""
+    referer: str = ""  # Откуда пришёл
+    telegram_id: Optional[int] = None  # Если известен Telegram ID
+    country: str = ""  # Страна (если определена)
+    device_type: str = ""  # mobile/desktop/tablet
+    is_unique: bool = True  # Уникальный ли клик
+
+class AdminReferralLinkResponse(BaseModel):
+    """Ответ с полной информацией о ссылке"""
+    id: str
+    name: str
+    description: str
+    code: str
+    destination_url: str
+    full_url: str
+    campaign: str
+    source: str
+    medium: str
+    tags: List[str]
+    is_active: bool
+    total_clicks: int
+    unique_clicks: int
+    created_at: datetime
+    updated_at: datetime
+    # Дополнительная аналитика
+    clicks_today: int = 0
+    clicks_week: int = 0
+    clicks_month: int = 0
+
+class ReferralLinksAnalytics(BaseModel):
+    """Общая аналитика по всем ссылкам"""
+    total_links: int = 0
+    active_links: int = 0
+    total_clicks: int = 0
+    total_unique_clicks: int = 0
+    clicks_today: int = 0
+    clicks_week: int = 0
+    clicks_month: int = 0
+    top_links: List[dict] = []  # Топ ссылок по кликам
+    clicks_by_day: List[dict] = []  # Клики по дням (для графика)
+    clicks_by_source: List[dict] = []  # Клики по источникам
+    recent_clicks: List[dict] = []  # Последние клики
+
