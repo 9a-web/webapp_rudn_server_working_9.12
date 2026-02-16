@@ -1,351 +1,468 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Admin Panel Statistics Features
-Tests the admin panel online statistics history and server metrics features on RUDN Schedule backend.
+Backend Testing Script for Admin Referral Links Feature
+Tests all CRUD operations, analytics, and click tracking endpoints.
 """
 
-import httpx
-import asyncio
+import requests
 import json
-from typing import Dict, Any, Optional, List
+import time
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 
-# Backend URL - using the external URL from frontend/.env
-BASE_URL = "https://db-reconnect-1.preview.emergentagent.com/api"
+# Backend URL from frontend env
+BACKEND_URL = "https://db-reconnect-1.preview.emergentagent.com/api"
 
-class AdminPanelStatsTester:
-    def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
-        self.test_results = []
-        
-    async def __aenter__(self):
-        return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.client.aclose()
+# Test data
+TEST_LINK_1 = {
+    "name": "Test Link VK",
+    "source": "vk", 
+    "medium": "ad",
+    "campaign": "test_campaign",
+    "description": "Test description"
+}
+
+TEST_LINK_2 = {
+    "name": "Telegram Channel",
+    "code": "TESTCODE",
+    "source": "telegram",
+    "medium": "post"
+}
+
+def log_test(test_name: str, status: str, message: str = "", data: Any = None):
+    """Log test results with timestamp"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {test_name}: {status}")
+    if message:
+        print(f"    {message}")
+    if data and isinstance(data, dict):
+        print(f"    Data: {json.dumps(data, indent=2)}")
+    print()
+
+def make_request(method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
+    """Make HTTP request and return parsed response"""
+    url = f"{BACKEND_URL}{endpoint}"
     
-    def log_test(self, test_name: str, success: bool, details: str):
-        """Log test result"""
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} - {test_name}")
-        if not success:
-            print(f"   Details: {details}")
-        self.test_results.append({
-            'test': test_name,
-            'success': success,
-            'details': details
-        })
-    
-    async def test_1_health_check(self):
-        """Test 1: Health Check - GET /api/health → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/health")
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log_test("Health Check", True, 
-                            f"Status: {data.get('status', 'N/A')}, MongoDB connected: {data.get('mongodb', {}).get('connected', 'N/A')}")
-            else:
-                self.log_test("Health Check", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Health Check", False, f"Exception: {str(e)}")
-
-    async def test_2_online_stats_history_1h(self):
-        """Test 2: Online Stats History (1 hour) - GET /api/admin/online-stats-history?hours=1 → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/online-stats-history?hours=1")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check required fields
-                required_fields = ['period_hours', 'total_points', 'metrics']
-                missing_fields = [field for field in required_fields if field not in data]
-                
-                if missing_fields:
-                    self.log_test("Online Stats History (1h)", False, 
-                                f"Missing required fields: {missing_fields}. Response keys: {list(data.keys())}")
-                    return
-                
-                # Check metrics array structure
-                metrics = data.get('metrics', [])
-                if not isinstance(metrics, list):
-                    self.log_test("Online Stats History (1h)", False, 
-                                f"Metrics should be an array, got: {type(metrics)}")
-                    return
-                
-                # Check metric structure if we have any metrics
-                if metrics:
-                    sample_metric = metrics[0]
-                    required_metric_fields = ['timestamp', 'online_now', 'online_1h', 'online_24h', 'web_online', 'telegram_online', 'peak_online']
-                    missing_metric_fields = [field for field in required_metric_fields if field not in sample_metric]
-                    
-                    if missing_metric_fields:
-                        self.log_test("Online Stats History (1h)", False, 
-                                    f"Sample metric missing fields: {missing_metric_fields}. Available: {list(sample_metric.keys())}")
-                        return
-                
-                self.log_test("Online Stats History (1h)", True, 
-                            f"Period: {data['period_hours']}h, Total points: {data['total_points']}, Metrics count: {len(metrics)}")
-            else:
-                self.log_test("Online Stats History (1h)", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Online Stats History (1h)", False, f"Exception: {str(e)}")
-
-    async def test_3_online_stats_history_all_time(self):
-        """Test 3: Online Stats History (all time) - GET /api/admin/online-stats-history?hours=0 → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/online-stats-history?hours=0")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Check required fields
-                required_fields = ['period_hours', 'total_points', 'metrics']
-                missing_fields = [field for field in required_fields if field not in data]
-                
-                if missing_fields:
-                    self.log_test("Online Stats History (all time)", False, 
-                                f"Missing required fields: {missing_fields}. Response keys: {list(data.keys())}")
-                    return
-                
-                # For all time, period_hours should be 0
-                if data.get('period_hours') != 0:
-                    self.log_test("Online Stats History (all time)", False, 
-                                f"Expected period_hours=0 for all time data, got: {data.get('period_hours')}")
-                    return
-                
-                metrics = data.get('metrics', [])
-                self.log_test("Online Stats History (all time)", True, 
-                            f"Period: all time, Total points: {data['total_points']}, Metrics count: {len(metrics)}")
-            else:
-                self.log_test("Online Stats History (all time)", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Online Stats History (all time)", False, f"Exception: {str(e)}")
-
-    async def test_4_server_stats_history_no_limit(self):
-        """Test 4: Server Stats History (no limit) - GET /api/admin/server-stats-history?hours=0 → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/server-stats-history?hours=0")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Should be an array or object with metrics
-                if isinstance(data, list):
-                    metrics_count = len(data)
-                elif isinstance(data, dict) and 'metrics' in data:
-                    metrics_count = len(data.get('metrics', []))
-                else:
-                    self.log_test("Server Stats History (no limit)", False, 
-                                f"Unexpected response format: {type(data)}")
-                    return
-                
-                self.log_test("Server Stats History (no limit)", True, 
-                            f"Retrieved server metrics without 168h limit. Metrics count: {metrics_count}")
-            else:
-                self.log_test("Server Stats History (no limit)", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Server Stats History (no limit)", False, f"Exception: {str(e)}")
-
-    async def test_5_server_stats_history_30_days(self):
-        """Test 5: Server Stats History (30 days) - GET /api/admin/server-stats-history?hours=720 → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/server-stats-history?hours=720")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Should be an array or object with metrics
-                if isinstance(data, list):
-                    metrics_count = len(data)
-                elif isinstance(data, dict) and 'metrics' in data:
-                    metrics_count = len(data.get('metrics', []))
-                else:
-                    self.log_test("Server Stats History (30 days)", False, 
-                                f"Unexpected response format: {type(data)}")
-                    return
-                
-                self.log_test("Server Stats History (30 days)", True, 
-                            f"Retrieved 30 days (720h) server metrics. Metrics count: {metrics_count}")
-            else:
-                self.log_test("Server Stats History (30 days)", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Server Stats History (30 days)", False, f"Exception: {str(e)}")
-
-    async def test_6_hourly_activity_moscow_timezone(self):
-        """Test 6: Hourly Activity (Moscow timezone) - GET /api/admin/hourly-activity → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/hourly-activity")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Should be an array of 24 hours
-                if not isinstance(data, list):
-                    self.log_test("Hourly Activity (Moscow timezone)", False, 
-                                f"Expected array, got: {type(data)}")
-                    return
-                
-                if len(data) != 24:
-                    self.log_test("Hourly Activity (Moscow timezone)", False, 
-                                f"Expected 24 hours, got: {len(data)}")
-                    return
-                
-                # Check structure of first item
-                if data:
-                    sample = data[0]
-                    if 'hour' not in sample or 'count' not in sample:
-                        self.log_test("Hourly Activity (Moscow timezone)", False, 
-                                    f"Missing hour/count fields. Sample: {sample}")
-                        return
-                    
-                    # Check hour range (0-23)
-                    hours = [item.get('hour') for item in data]
-                    expected_hours = list(range(24))
-                    if set(hours) != set(expected_hours):
-                        self.log_test("Hourly Activity (Moscow timezone)", False, 
-                                    f"Hours should be 0-23, got: {sorted(hours)}")
-                        return
-                
-                self.log_test("Hourly Activity (Moscow timezone)", True, 
-                            f"24 hours data returned with proper hour (0-23) and count structure")
-            else:
-                self.log_test("Hourly Activity (Moscow timezone)", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Hourly Activity (Moscow timezone)", False, f"Exception: {str(e)}")
-
-    async def test_7_weekly_activity(self):
-        """Test 7: Weekly Activity - GET /api/admin/weekly-activity → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/weekly-activity")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Should be an array of 7 days
-                if not isinstance(data, list):
-                    self.log_test("Weekly Activity", False, 
-                                f"Expected array, got: {type(data)}")
-                    return
-                
-                if len(data) != 7:
-                    self.log_test("Weekly Activity", False, 
-                                f"Expected 7 days, got: {len(data)}")
-                    return
-                
-                # Check structure
-                if data:
-                    sample = data[0]
-                    required_fields = ['day', 'count']  # or similar structure
-                    available_fields = list(sample.keys())
-                    
-                    # Accept flexible field names for day data
-                    has_day_field = any(field in available_fields for field in ['day', 'day_name', 'weekday', '_id'])
-                    has_count_field = any(field in available_fields for field in ['count', 'total', 'activities'])
-                    
-                    if not (has_day_field and has_count_field):
-                        self.log_test("Weekly Activity", False, 
-                                    f"Missing day/count-like fields. Available: {available_fields}")
-                        return
-                
-                self.log_test("Weekly Activity", True, 
-                            f"7 days data returned (Пн-Вс). Sample structure: {list(data[0].keys()) if data else 'empty'}")
-            else:
-                self.log_test("Weekly Activity", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Weekly Activity", False, f"Exception: {str(e)}")
-
-    async def test_8_online_users_current(self):
-        """Test 8: Online users current - GET /api/admin/online-users → HTTP 200"""
-        try:
-            response = await self.client.get(f"{BASE_URL}/admin/online-users")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Should return some online user data structure
-                # Accept various formats as long as it's valid JSON
-                if isinstance(data, (dict, list)):
-                    self.log_test("Online Users Current", True, 
-                                f"Online users data returned. Type: {type(data)}, Keys/Length: {list(data.keys()) if isinstance(data, dict) else len(data)}")
-                else:
-                    self.log_test("Online Users Current", False, 
-                                f"Unexpected data type: {type(data)}")
-            else:
-                self.log_test("Online Users Current", False, 
-                            f"HTTP {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_test("Online Users Current", False, f"Exception: {str(e)}")
-    
-    async def run_all_tests(self):
-        """Run all admin panel statistics tests"""
-        print("🚀 Starting Admin Panel Statistics Backend Tests")
-        print("=" * 70)
-        print(f"Backend URL: {BASE_URL}")
-        print(f"Environment: test (using test bot, test database)")
-        print("=" * 70)
-        
-        # Run tests in sequence as specified in review request
-        await self.test_1_health_check()
-        await self.test_2_online_stats_history_1h()
-        await self.test_3_online_stats_history_all_time()
-        await self.test_4_server_stats_history_no_limit()
-        await self.test_5_server_stats_history_30_days()
-        await self.test_6_hourly_activity_moscow_timezone()
-        await self.test_7_weekly_activity()
-        await self.test_8_online_users_current()
-        
-        print("\n" + "=" * 70)
-        print("📊 TEST SUMMARY")
-        print("=" * 70)
-        
-        passed = sum(1 for result in self.test_results if result['success'])
-        total = len(self.test_results)
-        
-        print(f"Tests Passed: {passed}/{total}")
-        
-        if passed == total:
-            print("🎉 ALL TESTS PASSED!")
+    try:
+        if method.upper() == "GET":
+            response = requests.get(url)
+        elif method.upper() == "POST":
+            response = requests.post(url, json=data)
+        elif method.upper() == "PUT":
+            response = requests.put(url, json=data)
+        elif method.upper() == "DELETE":
+            response = requests.delete(url)
         else:
-            print("⚠️  Some tests failed. Check details above.")
-        
-        print("\nDetailed Results:")
-        for result in self.test_results:
-            status = "✅" if result['success'] else "❌"
-            print(f"{status} {result['test']}")
-            if not result['success'] and result['details']:
-                print(f"   -> {result['details']}")
-        
-        return passed == total
+            raise ValueError(f"Unsupported HTTP method: {method}")
+            
+        return {
+            "status_code": response.status_code,
+            "success": 200 <= response.status_code < 300,
+            "data": response.json() if response.content else {},
+            "error": None
+        }
+    except requests.exceptions.RequestException as e:
+        return {
+            "status_code": 0,
+            "success": False,
+            "data": {},
+            "error": str(e)
+        }
+    except json.JSONDecodeError as e:
+        return {
+            "status_code": response.status_code,
+            "success": False,
+            "data": {"raw_content": response.text},
+            "error": f"JSON decode error: {str(e)}"
+        }
 
-async def main():
-    """Main test runner"""
-    async with AdminPanelStatsTester() as tester:
-        success = await tester.run_all_tests()
-        return success
+def test_create_referral_link_auto_code():
+    """Test 1: Create referral link with auto-generated code"""
+    log_test("Test 1", "STARTING", "Create referral link with auto-generated code")
+    
+    result = make_request("POST", "/admin/referral-links", TEST_LINK_1)
+    
+    if not result["success"]:
+        log_test("Test 1", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return None
+    
+    data = result["data"]
+    
+    # Validate response structure
+    required_fields = ["id", "name", "code", "full_url", "source", "medium", "campaign", "description"]
+    missing_fields = [field for field in required_fields if field not in data]
+    
+    if missing_fields:
+        log_test("Test 1", "FAILED", f"Missing fields in response: {missing_fields}", data)
+        return None
+    
+    # Validate field values
+    if data["name"] != TEST_LINK_1["name"]:
+        log_test("Test 1", "FAILED", f"Name mismatch: expected '{TEST_LINK_1['name']}', got '{data['name']}'")
+        return None
+        
+    if not data["code"] or len(data["code"]) < 4:
+        log_test("Test 1", "FAILED", f"Invalid auto-generated code: '{data['code']}'")
+        return None
+        
+    if not data["full_url"] or "t.me" not in data["full_url"]:
+        log_test("Test 1", "FAILED", f"Invalid full_url: '{data['full_url']}'")
+        return None
+    
+    log_test("Test 1", "PASSED", f"Created link with auto-generated code: {data['code']}", {
+        "id": data["id"],
+        "name": data["name"], 
+        "code": data["code"],
+        "full_url": data["full_url"]
+    })
+    return data
+
+def test_create_referral_link_custom_code():
+    """Test 2: Create referral link with custom code"""
+    log_test("Test 2", "STARTING", "Create referral link with custom code")
+    
+    result = make_request("POST", "/admin/referral-links", TEST_LINK_2)
+    
+    if not result["success"]:
+        log_test("Test 2", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return None
+    
+    data = result["data"]
+    
+    # Validate custom code
+    if data["code"] != TEST_LINK_2["code"]:
+        log_test("Test 2", "FAILED", f"Code mismatch: expected '{TEST_LINK_2['code']}', got '{data['code']}'")
+        return None
+    
+    if data["name"] != TEST_LINK_2["name"]:
+        log_test("Test 2", "FAILED", f"Name mismatch: expected '{TEST_LINK_2['name']}', got '{data['name']}'")
+        return None
+    
+    log_test("Test 2", "PASSED", f"Created link with custom code: {data['code']}", {
+        "id": data["id"],
+        "name": data["name"],
+        "code": data["code"]
+    })
+    return data
+
+def test_list_referral_links():
+    """Test 3: List all referral links"""
+    log_test("Test 3", "STARTING", "List all referral links")
+    
+    result = make_request("GET", "/admin/referral-links")
+    
+    if not result["success"]:
+        log_test("Test 3", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    # Validate response structure
+    if "links" not in data or "total" not in data:
+        log_test("Test 3", "FAILED", "Response missing 'links' or 'total' field", data)
+        return False
+    
+    if not isinstance(data["links"], list):
+        log_test("Test 3", "FAILED", f"'links' should be a list, got {type(data['links'])}")
+        return False
+    
+    if data["total"] < 2:
+        log_test("Test 3", "FAILED", f"Expected at least 2 links, got {data['total']}")
+        return False
+    
+    # Check that each link has required stats fields
+    for link in data["links"]:
+        required_stats = ["clicks_today", "clicks_week", "clicks_month"]
+        missing_stats = [stat for stat in required_stats if stat not in link]
+        if missing_stats:
+            log_test("Test 3", "FAILED", f"Link missing stats fields: {missing_stats}", link)
+            return False
+    
+    log_test("Test 3", "PASSED", f"Retrieved {data['total']} links with proper stats", {
+        "total": data["total"],
+        "links_count": len(data["links"])
+    })
+    return True
+
+def test_track_click_first_time():
+    """Test 4: Track click (first time - should be unique)"""
+    log_test("Test 4", "STARTING", "Track click (first time)")
+    
+    result = make_request("POST", "/referral-track/TESTCODE", {})
+    
+    if not result["success"]:
+        log_test("Test 4", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    # Validate response
+    if not data.get("success"):
+        log_test("Test 4", "FAILED", f"Track response success=False: {data}")
+        return False
+    
+    if not data.get("is_unique"):
+        log_test("Test 4", "FAILED", f"First click should be unique, got is_unique=False")
+        return False
+    
+    log_test("Test 4", "PASSED", "First click tracked as unique", {
+        "success": data["success"],
+        "is_unique": data["is_unique"]
+    })
+    return True
+
+def test_track_click_second_time():
+    """Test 5: Track click (second time - should not be unique)"""
+    log_test("Test 5", "STARTING", "Track click (second time)")
+    
+    # Wait a moment to ensure different timestamp
+    time.sleep(1)
+    
+    result = make_request("POST", "/referral-track/TESTCODE", {})
+    
+    if not result["success"]:
+        log_test("Test 5", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    if not data.get("success"):
+        log_test("Test 5", "FAILED", f"Track response success=False: {data}")
+        return False
+    
+    if data.get("is_unique"):
+        log_test("Test 5", "FAILED", f"Second click should not be unique, got is_unique=True")
+        return False
+    
+    log_test("Test 5", "PASSED", "Second click tracked as non-unique", {
+        "success": data["success"],
+        "is_unique": data["is_unique"]
+    })
+    return True
+
+def test_analytics():
+    """Test 6: Get referral links analytics"""
+    log_test("Test 6", "STARTING", "Get analytics")
+    
+    result = make_request("GET", "/admin/referral-links/analytics?days=30")
+    
+    if not result["success"]:
+        log_test("Test 6", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    # Validate analytics structure
+    required_fields = [
+        "total_links", "total_clicks", "clicks_by_day", 
+        "top_links", "clicks_by_source"
+    ]
+    missing_fields = [field for field in required_fields if field not in data]
+    
+    if missing_fields:
+        log_test("Test 6", "FAILED", f"Missing fields in analytics: {missing_fields}", data)
+        return False
+    
+    # Validate we have some data
+    if data["total_links"] < 2:
+        log_test("Test 6", "FAILED", f"Expected at least 2 links, got {data['total_links']}")
+        return False
+    
+    if data["total_clicks"] < 2:
+        log_test("Test 6", "FAILED", f"Expected at least 2 clicks from our tests, got {data['total_clicks']}")
+        return False
+    
+    log_test("Test 6", "PASSED", "Analytics retrieved successfully", {
+        "total_links": data["total_links"],
+        "total_clicks": data["total_clicks"],
+        "top_links_count": len(data["top_links"]),
+        "clicks_by_source_count": len(data["clicks_by_source"])
+    })
+    return True
+
+def test_get_link_details(link_id: str):
+    """Test 7: Get single link details"""
+    log_test("Test 7", "STARTING", f"Get link details for {link_id}")
+    
+    result = make_request("GET", f"/admin/referral-links/{link_id}")
+    
+    if not result["success"]:
+        log_test("Test 7", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    # Validate detailed response
+    required_fields = ["id", "name", "code", "clicks_today", "clicks_week", "clicks_month",
+                      "clicks_by_day", "clicks_by_device", "recent_clicks"]
+    missing_fields = [field for field in required_fields if field not in data]
+    
+    if missing_fields:
+        log_test("Test 7", "FAILED", f"Missing fields in link details: {missing_fields}", data)
+        return False
+    
+    if data["id"] != link_id:
+        log_test("Test 7", "FAILED", f"ID mismatch: expected {link_id}, got {data['id']}")
+        return False
+    
+    log_test("Test 7", "PASSED", f"Retrieved detailed info for link {link_id}", {
+        "id": data["id"],
+        "name": data["name"],
+        "code": data["code"],
+        "clicks_today": data["clicks_today"],
+        "recent_clicks_count": len(data["recent_clicks"])
+    })
+    return True
+
+def test_update_link(link_id: str):
+    """Test 8: Update link (deactivate)"""
+    log_test("Test 8", "STARTING", f"Update link {link_id} - deactivate")
+    
+    update_data = {"is_active": False}
+    result = make_request("PUT", f"/admin/referral-links/{link_id}", update_data)
+    
+    if not result["success"]:
+        log_test("Test 8", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    if data.get("is_active") != False:
+        log_test("Test 8", "FAILED", f"Expected is_active=False, got {data.get('is_active')}")
+        return False
+    
+    log_test("Test 8", "PASSED", f"Successfully deactivated link {link_id}", {
+        "id": data["id"],
+        "is_active": data["is_active"]
+    })
+    return True
+
+def test_track_click_inactive_link():
+    """Test 9: Track click on inactive link (should return 404)"""
+    log_test("Test 9", "STARTING", "Track click on inactive link")
+    
+    result = make_request("POST", "/referral-track/TESTCODE", {})
+    
+    if result["status_code"] != 404:
+        log_test("Test 9", "FAILED", f"Expected 404 for inactive link, got {result['status_code']}")
+        return False
+    
+    log_test("Test 9", "PASSED", "Inactive link correctly returns 404", {
+        "status_code": result["status_code"]
+    })
+    return True
+
+def test_delete_link(link_id: str):
+    """Test 10: Delete link"""
+    log_test("Test 10", "STARTING", f"Delete link {link_id}")
+    
+    result = make_request("DELETE", f"/admin/referral-links/{link_id}")
+    
+    if not result["success"]:
+        log_test("Test 10", "FAILED", f"HTTP {result['status_code']}: {result.get('error', 'Unknown error')}")
+        return False
+    
+    data = result["data"]
+    
+    if not data.get("success"):
+        log_test("Test 10", "FAILED", f"Delete response success=False: {data}")
+        return False
+    
+    if "deleted_clicks" not in data:
+        log_test("Test 10", "FAILED", "Response missing 'deleted_clicks' field", data)
+        return False
+    
+    log_test("Test 10", "PASSED", f"Successfully deleted link {link_id}", {
+        "success": data["success"],
+        "deleted_clicks": data["deleted_clicks"]
+    })
+    return True
+
+def test_redirect_endpoint(code: str):
+    """Test 11: Test redirect endpoint"""
+    log_test("Test 11", "STARTING", f"Test redirect endpoint for code {code}")
+    
+    # For redirect test, we use requests with allow_redirects=False to check the redirect response
+    url = f"{BACKEND_URL}/r/{code}"
+    try:
+        response = requests.get(url, allow_redirects=False)
+        
+        if response.status_code not in [302, 301]:
+            log_test("Test 11", "FAILED", f"Expected redirect (301/302), got {response.status_code}")
+            return False
+        
+        location = response.headers.get('Location', '')
+        if not location or 't.me' not in location:
+            log_test("Test 11", "FAILED", f"Invalid redirect location: {location}")
+            return False
+        
+        log_test("Test 11", "PASSED", f"Redirect works correctly", {
+            "status_code": response.status_code,
+            "location": location
+        })
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        log_test("Test 11", "FAILED", f"Request error: {str(e)}")
+        return False
+
+def run_all_tests():
+    """Run all tests in sequence"""
+    print("=" * 60)
+    print("ADMIN REFERRAL LINKS - BACKEND TESTING")
+    print("=" * 60)
+    print()
+    
+    # Store created links for later use
+    link1_data = None
+    link2_data = None
+    
+    # Test 1: Create link with auto-generated code
+    link1_data = test_create_referral_link_auto_code()
+    if not link1_data:
+        print("❌ Test 1 failed - aborting remaining tests")
+        return False
+    
+    # Test 2: Create link with custom code
+    link2_data = test_create_referral_link_custom_code()
+    if not link2_data:
+        print("❌ Test 2 failed - continuing with remaining tests")
+    
+    # Test 3: List links
+    if not test_list_referral_links():
+        print("❌ Test 3 failed")
+    
+    # Test 4 & 5: Track clicks (if we have TESTCODE link)
+    if link2_data and link2_data.get("code") == "TESTCODE":
+        test_track_click_first_time()
+        test_track_click_second_time()
+    
+    # Test 6: Analytics
+    test_analytics()
+    
+    # Test 7: Get link details (use link2 if available)
+    if link2_data and link2_data.get("id"):
+        test_get_link_details(link2_data["id"])
+    
+    # Test 8: Update link (deactivate link2)
+    if link2_data and link2_data.get("id"):
+        test_update_link(link2_data["id"])
+    
+    # Test 9: Track click on inactive link
+    test_track_click_inactive_link()
+    
+    # Test 10: Delete link
+    if link2_data and link2_data.get("id"):
+        test_delete_link(link2_data["id"])
+    
+    # Test 11: Redirect endpoint (use link1 if available)
+    if link1_data and link1_data.get("code"):
+        test_redirect_endpoint(link1_data["code"])
+    
+    print("=" * 60)
+    print("TESTING COMPLETED")
+    print("=" * 60)
+    return True
 
 if __name__ == "__main__":
-    try:
-        success = asyncio.run(main())
-        exit(0 if success else 1)
-    except KeyboardInterrupt:
-        print("\n🛑 Tests interrupted by user")
-        exit(1)
-    except Exception as e:
-        print(f"\n💥 Test runner crashed: {e}")
-        exit(1)
+    run_all_tests()
