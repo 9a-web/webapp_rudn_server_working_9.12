@@ -16432,6 +16432,52 @@ async def get_referral_modal_config(code: str):
         return {"has_modal": False}
 
 
+@api_router.post("/referral-reward")
+async def claim_referral_reward(data: dict = Body(...)):
+    """Начислить баллы пользователю за реферальную ссылку"""
+    try:
+        telegram_id = data.get("telegram_id")
+        points = data.get("points", 0)
+        code = data.get("code", "")
+        
+        if not telegram_id or points <= 0:
+            raise HTTPException(status_code=400, detail="telegram_id и points обязательны")
+        
+        # Проверяем что награда ещё не была получена
+        existing = await db.referral_rewards.find_one({
+            "telegram_id": telegram_id,
+            "code": code
+        })
+        if existing:
+            return {"success": False, "message": "Награда уже получена", "points": 0}
+        
+        # Начисляем баллы
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$inc": {"referral_points_earned": points}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Записываем факт получения награды
+        await db.referral_rewards.insert_one({
+            "telegram_id": telegram_id,
+            "code": code,
+            "points": points,
+            "claimed_at": datetime.utcnow()
+        })
+        
+        logger.info(f"🎁 Начислено {points} баллов пользователю {telegram_id} за ссылку {code}")
+        return {"success": True, "points": points, "message": f"Начислено {points} баллов"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка начисления награды: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
