@@ -465,6 +465,62 @@ const Home = () => {
     }
   }, [isReady, user, syncedUser, startParam, referralProcessed]);
 
+  // 📊 Обработка админской реферальной ссылки (adref_) — этап 1: трекинг клика
+  useEffect(() => {
+    if (!startParam || !startParam.startsWith('adref_') || adrefProcessed) return;
+    
+    const code = startParam.replace('adref_', '');
+    console.log('📊 Обнаружена админская реферальная ссылка:', code);
+    setAdrefCode(code);
+    
+    // Немедленно трекаем клик (даже без авторизации)
+    trackAdminReferralEvent({ code, event_type: 'click' })
+      .then(res => {
+        if (res.success) {
+          console.log('✅ Клик по реферальной ссылке зафиксирован:', res.link_name);
+        }
+      })
+      .catch(err => console.error('❌ Ошибка трекинга клика:', err));
+    
+    setAdrefProcessed(true);
+  }, [startParam, adrefProcessed]);
+
+  // 📊 Обработка админской реферальной ссылки (adref_) — этап 2: регистрация/вход
+  useEffect(() => {
+    if (!adrefCode) return;
+    const currentUser = syncedUser || user;
+    if (!currentUser || !isReady) return;
+    
+    // Определяем: новый пользователь (registration) или существующий (login)
+    const processAdrefAuth = async () => {
+      try {
+        const settings = await userAPI.getUserSettings(currentUser.id);
+        const eventType = settings ? 'login' : 'registration';
+        
+        console.log(`📊 adref: пользователь ${currentUser.id} — ${eventType}`);
+        
+        const res = await trackAdminReferralEvent({
+          code: adrefCode,
+          event_type: eventType,
+          telegram_id: currentUser.id,
+          telegram_username: currentUser.username || '',
+          telegram_name: (currentUser.first_name || '') + ' ' + (currentUser.last_name || ''),
+        });
+        
+        if (res.success) {
+          console.log(`✅ ${eventType} по ссылке зафиксирован`);
+        }
+      } catch (error) {
+        console.error('❌ Ошибка трекинга adref auth:', error);
+      }
+      
+      // Очищаем код, чтобы не повторять
+      setAdrefCode(null);
+    };
+    
+    processAdrefAuth();
+  }, [adrefCode, user, syncedUser, isReady]);
+
   // 📚 Обработка приглашения в журнал из Web App ссылки
   useEffect(() => {
     const processJournalInvite = async () => {
