@@ -2304,12 +2304,14 @@ const ReferralLinksTab = () => {
 
               <div className="p-5 space-y-5">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { label: 'Всего кликов', value: selectedLink.total_clicks, color: 'from-purple-500 to-violet-500' },
-                    { label: 'Уникальных', value: selectedLink.unique_clicks, color: 'from-blue-500 to-cyan-500' },
-                    { label: 'Сегодня', value: selectedLink.clicks_today || 0, color: 'from-emerald-500 to-teal-500' },
-                    { label: 'За неделю', value: selectedLink.clicks_week || 0, color: 'from-orange-500 to-amber-500' },
+                    { label: 'Клики', value: selectedLink.total_clicks, color: 'from-purple-500 to-violet-500', icon: '👆' },
+                    { label: 'Регистрации', value: selectedLink.registrations || 0, color: 'from-emerald-500 to-teal-500', icon: '🆕' },
+                    { label: 'Входы', value: selectedLink.logins || 0, color: 'from-blue-500 to-cyan-500', icon: '🔑' },
+                    { label: 'Уникальных кликов', value: selectedLink.unique_clicks, color: 'from-orange-500 to-amber-500', icon: '👤' },
+                    { label: 'Сегодня', value: selectedLink.clicks_today || 0, color: 'from-pink-500 to-rose-500', icon: '📅' },
+                    { label: 'За неделю', value: selectedLink.clicks_week || 0, color: 'from-cyan-400 to-blue-500', icon: '📊' },
                   ].map((stat, i) => (
                     <div key={i} className={`${GLASS.card} rounded-xl p-3.5`}>
                       <div className={`text-xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
