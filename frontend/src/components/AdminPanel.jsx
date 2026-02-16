@@ -2750,7 +2750,8 @@ const ReferralLinksTab = () => {
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <span className="text-xs text-white font-bold">{link.total_clicks}</span>
-                                <span className="text-[10px] text-gray-600">/ {link.unique_clicks} уник</span>
+                                <span className="text-[10px] text-emerald-400">{link.registrations || 0} рег</span>
+                                <span className="text-[10px] text-blue-400">{link.logins || 0} вх</span>
                               </div>
                             </div>
                             <div className="h-1.5 bg-white/[0.03] rounded-full overflow-hidden">
