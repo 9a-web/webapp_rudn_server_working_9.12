@@ -10,8 +10,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
-# Backend URL from frontend env
-BACKEND_URL = "https://db-reconnect-1.preview.emergentagent.com/api"
+# Backend URL - using localhost since external URL is not working
+BACKEND_URL = "http://localhost:8001/api"
 
 # Test data
 TEST_LINK_1 = {
