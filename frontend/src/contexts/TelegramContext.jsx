@@ -270,7 +270,7 @@ export const TelegramProvider = ({ children }) => {
       
       // Cleanup
       return () => {
-        clearInterval(intervalId);
+        timeoutIds.forEach(id => clearTimeout(id));
         tg.offEvent('viewportChanged', handleViewportChanged);
       };
     } else {
