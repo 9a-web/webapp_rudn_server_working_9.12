@@ -2351,6 +2351,126 @@ const ReferralLinksTab = () => {
                   </div>
                 </div>
 
+                {/* ===== Modal Pattern Config ===== */}
+                <div className="pt-3 border-t border-white/[0.06]">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`relative w-10 h-5 rounded-full transition-all ${modalEnabled ? 'bg-purple-500' : 'bg-white/[0.08]'}`}
+                      onClick={() => setModalEnabled(!modalEnabled)}
+                    >
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${modalEnabled ? 'left-5.5 translate-x-0.5' : 'left-0.5'}`} />
+                    </div>
+                    <span className="text-sm font-medium text-white">Модальное окно при переходе</span>
+                  </label>
+                  
+                  {modalEnabled && (
+                    <div className="mt-3 space-y-3 pl-0">
+                      {/* Image picker */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1.5 block">Изображение</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {modalImages.map(img => (
+                            <div
+                              key={img.id}
+                              onClick={() => setModalImageId(img.id)}
+                              className={`w-16 h-16 rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${
+                                modalImageId === img.id ? 'border-purple-500 shadow-lg shadow-purple-500/20' : 'border-white/[0.06] hover:border-white/20'
+                              }`}
+                            >
+                              <img src={`${BACKEND_URL}${img.url}`} alt={img.original_name} className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                          <label className={`w-16 h-16 rounded-xl border-2 border-dashed border-white/[0.1] flex items-center justify-center cursor-pointer hover:border-white/20 transition-all ${uploadingImage ? 'opacity-50' : ''}`}>
+                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />
+                            <span className="text-xl text-gray-600">{uploadingImage ? '⏳' : '+'}</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      {/* Title */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Заголовок</label>
+                        <input
+                          value={modalTitle} onChange={(e) => setModalTitle(e.target.value)}
+                          placeholder="Добро пожаловать!"
+                          className={`w-full px-3 py-2 ${GLASS.input} rounded-xl text-white text-sm outline-none`}
+                        />
+                      </div>
+                      
+                      {/* Description */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Описание</label>
+                        <textarea
+                          value={modalDescription} onChange={(e) => setModalDescription(e.target.value)}
+                          placeholder="Текст модального окна..."
+                          rows={2}
+                          className={`w-full px-3 py-2 ${GLASS.input} rounded-xl text-white text-sm outline-none resize-none`}
+                        />
+                      </div>
+                      
+                      {/* Button text */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Текст кнопки</label>
+                        <input
+                          value={modalButtonText} onChange={(e) => setModalButtonText(e.target.value)}
+                          placeholder="OK"
+                          className={`w-full px-3 py-2 ${GLASS.input} rounded-xl text-white text-sm outline-none`}
+                        />
+                      </div>
+                      
+                      {/* Action type */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Действие кнопки</label>
+                        <select
+                          value={modalButtonAction} onChange={(e) => setModalButtonAction(e.target.value)}
+                          className={`w-full px-3 py-2.5 ${GLASS.input} rounded-xl text-white text-sm outline-none appearance-none cursor-pointer`}
+                        >
+                          {ACTION_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Conditional fields based on action */}
+                      {modalButtonAction === 'open_url' && (
+                        <div>
+                          <label className="text-[11px] text-gray-500 mb-1 block">URL для открытия</label>
+                          <input
+                            value={modalButtonUrl} onChange={(e) => setModalButtonUrl(e.target.value)}
+                            placeholder="https://example.com"
+                            className={`w-full px-3 py-2 ${GLASS.input} rounded-xl text-white text-sm outline-none`}
+                          />
+                        </div>
+                      )}
+                      
+                      {modalButtonAction === 'navigate' && (
+                        <div>
+                          <label className="text-[11px] text-gray-500 mb-1 block">Раздел приложения</label>
+                          <select
+                            value={modalNavigateTo} onChange={(e) => setModalNavigateTo(e.target.value)}
+                            className={`w-full px-3 py-2.5 ${GLASS.input} rounded-xl text-white text-sm outline-none appearance-none cursor-pointer`}
+                          >
+                            <option value="" className="bg-[#1a1a2e] text-gray-500">Выберите раздел</option>
+                            {NAVIGATE_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value} className="bg-[#1a1a2e] text-white">{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      
+                      {modalButtonAction === 'reward' && (
+                        <div>
+                          <label className="text-[11px] text-gray-500 mb-1 block">Количество баллов</label>
+                          <input
+                            type="number" min="0"
+                            value={modalRewardPoints} onChange={(e) => setModalRewardPoints(parseInt(e.target.value) || 0)}
+                            className={`w-full px-3 py-2 ${GLASS.input} rounded-xl text-white text-sm outline-none`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Submit */}
                 <motion.button
                   whileTap={{ scale: 0.97 }}
