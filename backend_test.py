@@ -286,7 +286,7 @@ def test_user_type_filtering():
     
     # Step 4: Test GET /api/admin/users?user_type=telegram - should return exactly 2 users
     print("\n4. Testing admin users endpoint (telegram filter)...")
-    response = make_request("GET", "/admin/users?user_type=telegram&limit=100")
+    response = make_admin_request("GET", "/admin/users?user_type=telegram&limit=100")
     if response["success"] and isinstance(response["data"], list):
         telegram_users = response["data"]
         
