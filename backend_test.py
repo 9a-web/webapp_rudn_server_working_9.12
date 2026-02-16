@@ -95,343 +95,283 @@ def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expect
             "error": "Invalid JSON response"
         }
 
-def test_admin_referral_system():
-    """Test the complete Admin Referral Links system with 3 event types"""
+def test_user_type_filtering():
+    """Test user_type filtering feature on admin endpoints"""
     results = TestResults()
-    link_id = None  # Will store the created link ID
     
-    print(f"Testing Admin Referral Links System at {BACKEND_URL}")
+    print(f"Testing User Type Filtering Feature at {BACKEND_URL}")
     print("="*80)
     
-    # Test 1: Create referral link
-    print("\n1. Testing Create Referral Link...")
-    create_data = {
-        "name": "Test Link",
-        "code": "TESTCODE",
-        "source": "vk",
-        "medium": "ad"
+    # Test user data following the test plan
+    test_telegram_users = [
+        {
+            "telegram_id": 123456789,  # < 10B = Telegram user "Иван"
+            "username": "ivan_user",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "group_id": "test_group_1",
+            "group_name": "ИСИТ-23-1",
+            "facultet_id": "test_faculty",
+            "level_id": "bachelor", 
+            "kurs": 2,
+            "form_code": "full_time"
+        },
+        {
+            "telegram_id": 987654321,  # < 10B = Telegram user "Мария"
+            "username": "maria_user",
+            "first_name": "Мария",
+            "last_name": "Сидорова",
+            "group_id": "test_group_2", 
+            "group_name": "ИСИТ-23-2",
+            "facultet_id": "test_faculty",
+            "level_id": "bachelor",
+            "kurs": 2,
+            "form_code": "full_time"
+        }
+    ]
+    
+    test_web_user = {
+        "telegram_id": 142191465619684,  # >= 10B = Web guest "Пользователь"
+        "username": "web_guest_user",
+        "first_name": "Пользователь",
+        "last_name": "Веб",
+        "group_id": "test_group_3",
+        "group_name": "ИСИТ-23-3",
+        "facultet_id": "test_faculty", 
+        "level_id": "bachelor",
+        "kurs": 2,
+        "form_code": "full_time"
     }
     
-    response = make_request("POST", "/admin/referral-links", create_data)
-    if response["success"] and response["data"]:
-        data = response["data"]
-        link_id = data.get("id")
-        if (data.get("code") == "TESTCODE" and 
-            data.get("registrations", 0) == 0 and 
-            data.get("logins", 0) == 0):
-            results.add_result(
-                "Create Link", True, 
-                f"Link created successfully with ID: {link_id}",
-                f"Response: {json.dumps(data, indent=2)}"
-            )
+    created_user_ids = []
+    
+    # Step 1: Clean up existing test users
+    print("\n1. Cleaning up existing test users...")
+    test_ids = [123456789, 987654321, 142191465619684]
+    cleanup_success = 0
+    
+    for user_id in test_ids:
+        response = make_request("DELETE", f"/user-settings/{user_id}", expected_status=200)
+        if response["success"] or response["status_code"] == 404:
+            cleanup_success += 1
+            print(f"   ✓ Cleaned up user {user_id} (or didn't exist)")
         else:
-            results.add_result(
-                "Create Link", False,
-                "Link created but with incorrect initial values",
-                f"Expected registrations=0, logins=0, got {data}"
-            )
+            print(f"   ⚠ Failed to clean user {user_id}: {response}")
+    
+    results.add_result(
+        "Cleanup Test Users", True,
+        f"Cleaned up {cleanup_success}/{len(test_ids)} test users successfully",
+        "Existing test users removed or didn't exist"
+    )
+    
+    # Step 2: Create test users
+    print("\n2. Creating test users...")
+    
+    # Create first Telegram user
+    response = make_request("POST", "/user-settings", test_telegram_users[0])
+    if response["success"] and response["data"]:
+        telegram_user_1_id = response["data"].get("telegram_id")
+        created_user_ids.append(telegram_user_1_id)
+        results.add_result(
+            "Create Telegram User 1", True,
+            f"Created Telegram user 'Иван' with ID {telegram_user_1_id}",
+            f"Response: {response['data']}"
+        )
     else:
         results.add_result(
-            "Create Link", False, 
-            "Failed to create referral link",
+            "Create Telegram User 1", False,
+            "Failed to create first Telegram user",
             f"Response: {response}"
         )
-        return results  # Can't continue without link
+        return results  # Can't continue without users
     
-    # Test 2: Track 3 clicks (cloud environment has different IPs per request)
-    print("\n2. Testing Click Tracking (3 clicks)...")
-    print("   Note: In cloud environment, requests may come from different IPs")
-    click_data = {
-        "code": "TESTCODE",
-        "event_type": "click"
-    }
+    # Create second Telegram user
+    response = make_request("POST", "/user-settings", test_telegram_users[1])
+    if response["success"] and response["data"]:
+        telegram_user_2_id = response["data"].get("telegram_id")
+        created_user_ids.append(telegram_user_2_id)
+        results.add_result(
+            "Create Telegram User 2", True,
+            f"Created Telegram user 'Мария' with ID {telegram_user_2_id}",
+            f"Response: {response['data']}"
+        )
+    else:
+        results.add_result(
+            "Create Telegram User 2", False,
+            "Failed to create second Telegram user",
+            f"Response: {response}"
+        )
     
-    click_results = []
-    for i in range(3):
-        response = make_request("POST", "/admin/referral-track", click_data)
-        if response["success"]:
-            click_results.append(response["data"])
-        time.sleep(0.5)  # Small delay between clicks
+    # Create web guest user
+    response = make_request("POST", "/user-settings", test_web_user)
+    if response["success"] and response["data"]:
+        web_user_id = response["data"].get("telegram_id")
+        created_user_ids.append(web_user_id)
+        results.add_result(
+            "Create Web User", True,
+            f"Created web guest user 'Пользователь' with ID {web_user_id}",
+            f"Response: {response['data']}"
+        )
+    else:
+        results.add_result(
+            "Create Web User", False,
+            "Failed to create web guest user",
+            f"Response: {response}"
+        )
     
-    if len(click_results) == 3:
-        # In cloud environment, each request may have different IP, so all might be unique
-        all_successful = all(r.get("success") == True for r in click_results)
-        all_clicks = all(r.get("event_type") == "click" for r in click_results)
+    # Step 3: Test GET /api/admin/users (no filter) - should return 3 users with user_type field
+    print("\n3. Testing admin users endpoint (no filter)...")
+    response = make_request("GET", "/admin/users?limit=100")
+    if response["success"] and isinstance(response["data"], list):
+        users = response["data"]
         
-        if all_successful and all_clicks:
-            results.add_result(
-                "Click Tracking", True,
-                "All click events tracked successfully (cloud environment - different IPs expected)",
-                f"Results: {click_results}"
-            )
-        else:
-            results.add_result(
-                "Click Tracking", False,
-                "Click tracking failed - not all events successful",
-                f"Results: {click_results}"
-            )
-    else:
-        results.add_result(
-            "Click Tracking", False,
-            f"Failed to track all 3 clicks, only got {len(click_results)}",
-            f"Responses: {click_results}"
-        )
-    
-    # Test 3: Track 2 registrations (different telegram_ids)
-    print("\n3. Testing Registration Tracking (2 users)...")
-    reg1_data = {
-        "code": "TESTCODE",
-        "event_type": "registration",
-        "telegram_id": 111,
-        "telegram_username": "user1",
-        "telegram_name": "User One"
-    }
-    
-    reg2_data = {
-        "code": "TESTCODE", 
-        "event_type": "registration",
-        "telegram_id": 222,
-        "telegram_username": "user2",
-        "telegram_name": "User Two"
-    }
-    
-    reg1_response = make_request("POST", "/admin/referral-track", reg1_data)
-    reg2_response = make_request("POST", "/admin/referral-track", reg2_data)
-    
-    if (reg1_response["success"] and reg2_response["success"] and
-        reg1_response["data"].get("is_unique") == True and
-        reg2_response["data"].get("is_unique") == True):
-        results.add_result(
-            "Registration Tracking", True,
-            "Both registrations tracked as unique",
-            f"Reg1: {reg1_response['data']}, Reg2: {reg2_response['data']}"
-        )
-    else:
-        results.add_result(
-            "Registration Tracking", False,
-            "Registration tracking failed or incorrect uniqueness",
-            f"Reg1 response: {reg1_response}, Reg2 response: {reg2_response}"
-        )
-    
-    # Test 4: Test duplicate registration (same telegram_id)
-    print("\n4. Testing Duplicate Registration...")
-    duplicate_data = {
-        "code": "TESTCODE",
-        "event_type": "registration", 
-        "telegram_id": 111,  # Same as first registration
-        "telegram_username": "user1",
-        "telegram_name": "User One"
-    }
-    
-    dup_response = make_request("POST", "/admin/referral-track", duplicate_data)
-    if (dup_response["success"] and 
-        dup_response["data"].get("is_unique") == False and
-        "уже зарегистрирован" in dup_response["data"].get("message", "").lower()):
-        results.add_result(
-            "Duplicate Registration", True,
-            "Duplicate registration correctly detected",
-            f"Response: {dup_response['data']}"
-        )
-    else:
-        results.add_result(
-            "Duplicate Registration", False,
-            "Duplicate registration not handled correctly",
-            f"Response: {dup_response}"
-        )
-    
-    # Test 5: Track 1 login
-    print("\n5. Testing Login Tracking...")
-    login_data = {
-        "code": "TESTCODE",
-        "event_type": "login",
-        "telegram_id": 333,
-        "telegram_username": "user3", 
-        "telegram_name": "User Three"
-    }
-    
-    login_response = make_request("POST", "/admin/referral-track", login_data)
-    if (login_response["success"] and 
-        login_response["data"].get("event_type") == "login"):
-        results.add_result(
-            "Login Tracking", True,
-            "Login event tracked successfully",
-            f"Response: {login_response['data']}"
-        )
-    else:
-        results.add_result(
-            "Login Tracking", False,
-            "Login tracking failed",
-            f"Response: {login_response}"
-        )
-    
-    # Test 6: Test invalid event_type
-    print("\n6. Testing Invalid Event Type...")
-    invalid_data = {
-        "code": "TESTCODE",
-        "event_type": "invalid"
-    }
-    
-    invalid_response = make_request("POST", "/admin/referral-track", invalid_data, expected_status=400)
-    if invalid_response["status_code"] == 400:
-        results.add_result(
-            "Invalid Event Type", True,
-            "Invalid event_type correctly returned 400",
-            f"Response: {invalid_response['data']}"
-        )
-    else:
-        results.add_result(
-            "Invalid Event Type", False,
-            f"Expected 400, got {invalid_response['status_code']}",
-            f"Response: {invalid_response}"
-        )
-    
-    # Test 7: Check analytics
-    print("\n7. Testing Analytics Endpoint...")
-    analytics_response = make_request("GET", "/admin/referral-links/analytics")
-    if analytics_response["success"]:
-        analytics = analytics_response["data"]
-        total_clicks = analytics.get("total_clicks", 0)
-        total_registrations = analytics.get("total_registrations", 0)
-        total_logins = analytics.get("total_logins", 0)
+        # Find our test users
+        test_users_found = [u for u in users if u.get("telegram_id") in created_user_ids]
         
-        if (total_clicks >= 3 and total_registrations >= 2 and total_logins >= 1):
+        # Check if all users have user_type field
+        users_with_type = [u for u in test_users_found if "user_type" in u]
+        
+        if len(test_users_found) >= 3 and len(users_with_type) >= 3:
             results.add_result(
-                "Analytics", True,
-                f"Analytics correct: clicks={total_clicks}, registrations={total_registrations}, logins={total_logins}",
-                f"Full analytics: {json.dumps(analytics, indent=2, default=str)}"
+                "Admin Users No Filter", True,
+                f"Found {len(test_users_found)} test users, all have user_type field",
+                f"User types found: {[u.get('user_type') for u in users_with_type]}"
             )
         else:
             results.add_result(
-                "Analytics", False,
-                f"Analytics incorrect: clicks={total_clicks}, registrations={total_registrations}, logins={total_logins}",
-                f"Expected at least: clicks=3, registrations=2, logins=1. Full response: {analytics}"
+                "Admin Users No Filter", False,
+                f"Expected 3 users with user_type field, found {len(test_users_found)} test users, {len(users_with_type)} with user_type",
+                f"Test users: {test_users_found}"
             )
     else:
         results.add_result(
-            "Analytics", False,
-            "Failed to get analytics",
-            f"Response: {analytics_response}"
+            "Admin Users No Filter", False,
+            "Failed to get admin users list",
+            f"Response: {response}"
         )
     
-    # Test 8: Get link details
-    print(f"\n8. Testing Link Details (ID: {link_id})...")
-    if link_id:
-        details_response = make_request("GET", f"/admin/referral-links/{link_id}")
-        if details_response["success"]:
-            details = details_response["data"]
-            total_clicks = details.get("total_clicks", 0)
-            registrations = details.get("registrations", 0)
-            logins = details.get("logins", 0)
-            registered_users = details.get("registered_users", [])
-            
-            if (total_clicks >= 3 and registrations >= 2 and logins >= 1 and len(registered_users) >= 2):
-                results.add_result(
-                    "Link Details", True,
-                    f"Link details correct: clicks={total_clicks}, registrations={registrations}, logins={logins}, users={len(registered_users)}",
-                    f"Registered users: {registered_users}"
-                )
-            else:
-                results.add_result(
-                    "Link Details", False,
-                    f"Link details incorrect: clicks={total_clicks}, registrations={registrations}, logins={logins}, users={len(registered_users)}",
-                    f"Expected: clicks>=3, registrations>=2, logins>=1, users>=2. Full response: {details}"
-                )
-        else:
-            results.add_result(
-                "Link Details", False,
-                "Failed to get link details",
-                f"Response: {details_response}"
-            )
-    
-    # Test 9: Deactivate link and test tracking
-    print(f"\n9. Testing Link Deactivation...")
-    if link_id:
-        deactivate_data = {"is_active": False}
-        deactivate_response = make_request("PUT", f"/admin/referral-links/{link_id}", deactivate_data)
+    # Step 4: Test GET /api/admin/users?user_type=telegram - should return exactly 2 users
+    print("\n4. Testing admin users endpoint (telegram filter)...")
+    response = make_request("GET", "/admin/users?user_type=telegram&limit=100")
+    if response["success"] and isinstance(response["data"], list):
+        telegram_users = response["data"]
         
-        if deactivate_response["success"]:
-            # Try to track on deactivated link
-            inactive_track_data = {
-                "code": "TESTCODE",
-                "event_type": "click"
-            }
-            inactive_response = make_request("POST", "/admin/referral-track", inactive_track_data)
-            
-            if (inactive_response["success"] and 
-                inactive_response["data"].get("success") == False and
-                "неактивна" in inactive_response["data"].get("message", "").lower()):
-                results.add_result(
-                    "Link Deactivation", True,
-                    "Deactivated link correctly blocks tracking",
-                    f"Inactive response: {inactive_response['data']}"
-                )
-            else:
-                results.add_result(
-                    "Link Deactivation", False,
-                    "Deactivated link does not block tracking correctly",
-                    f"Inactive response: {inactive_response}"
-                )
-        else:
-            results.add_result(
-                "Link Deactivation", False,
-                "Failed to deactivate link",
-                f"Response: {deactivate_response}"
-            )
-    
-    # Test 10: Delete link
-    print(f"\n10. Testing Link Deletion...")
-    if link_id:
-        delete_response = make_request("DELETE", f"/admin/referral-links/{link_id}")
-        if delete_response["success"]:
-            results.add_result(
-                "Link Deletion", True,
-                "Link deleted successfully",
-                f"Response: {delete_response['data']}"
-            )
-        else:
-            results.add_result(
-                "Link Deletion", False,
-                "Failed to delete link",
-                f"Response: {delete_response}"
-            )
-    
-    # Test 11: Test redirect endpoint
-    print(f"\n11. Testing Redirect Endpoint...")
-    # Create a new link for redirect testing
-    redirect_link_data = {
-        "name": "Redirect Test Link",
-        "code": "REDIRECTTEST",
-        "source": "test",
-        "medium": "redirect"
-    }
-    
-    redirect_create_response = make_request("POST", "/admin/referral-links", redirect_link_data)
-    if redirect_create_response["success"]:
-        redirect_link_id = redirect_create_response["data"].get("id")
+        # Find our test telegram users
+        test_telegram_found = [u for u in telegram_users if u.get("telegram_id") in [123456789, 987654321]]
         
-        # Test redirect - don't follow redirects to check status code
-        redirect_response = make_request("GET", "/r/REDIRECTTEST", expected_status=302, allow_redirects=False)
-        if redirect_response["status_code"] == 302:
+        # Verify all returned users are telegram type
+        all_telegram = all(u.get("user_type") == "telegram" for u in telegram_users if "user_type" in u)
+        
+        if len(test_telegram_found) >= 2 and all_telegram:
             results.add_result(
-                "Redirect Endpoint", True,
-                "Redirect endpoint returns 302 as expected",
-                f"Status: {redirect_response['status_code']}, Redirect URL: {redirect_response.get('data', {}).get('redirect_url', 'N/A')}"
+                "Admin Users Telegram Filter", True,
+                f"Found {len(test_telegram_found)} test Telegram users, all have user_type='telegram'",
+                f"Telegram users: {[u.get('first_name') for u in test_telegram_found]}"
             )
         else:
             results.add_result(
-                "Redirect Endpoint", False,
-                f"Expected 302 redirect, got {redirect_response['status_code']}",
-                f"Response: {redirect_response}"
+                "Admin Users Telegram Filter", False,
+                f"Expected 2 Telegram users, found {len(test_telegram_found)}, all_telegram={all_telegram}",
+                f"Response: {telegram_users[:5]}"  # Show first 5 for debugging
             )
-        
-        # Clean up redirect test link
-        if redirect_link_id:
-            make_request("DELETE", f"/admin/referral-links/{redirect_link_id}")
     else:
         results.add_result(
-            "Redirect Endpoint", False,
-            "Could not create link for redirect testing",
-            f"Response: {redirect_create_response}"
+            "Admin Users Telegram Filter", False,
+            "Failed to get telegram users list",
+            f"Response: {response}"
+        )
+    
+    # Step 5: Test GET /api/admin/users?user_type=web - should return exactly 1 user
+    print("\n5. Testing admin users endpoint (web filter)...")
+    response = make_request("GET", "/admin/users?user_type=web&limit=100")
+    if response["success"] and isinstance(response["data"], list):
+        web_users = response["data"]
+        
+        # Find our test web user
+        test_web_found = [u for u in web_users if u.get("telegram_id") == 142191465619684]
+        
+        # Verify all returned users are web type
+        all_web = all(u.get("user_type") == "web" for u in web_users if "user_type" in u)
+        
+        if len(test_web_found) >= 1 and all_web:
+            results.add_result(
+                "Admin Users Web Filter", True,
+                f"Found {len(test_web_found)} test web user, all have user_type='web'",
+                f"Web user: {test_web_found[0].get('first_name') if test_web_found else 'None'}"
+            )
+        else:
+            results.add_result(
+                "Admin Users Web Filter", False,
+                f"Expected 1 web user, found {len(test_web_found)}, all_web={all_web}",
+                f"Response: {web_users[:5]}"  # Show first 5 for debugging
+            )
+    else:
+        results.add_result(
+            "Admin Users Web Filter", False,
+            "Failed to get web users list",
+            f"Response: {response}"
+        )
+    
+    # Step 6: Test GET /api/admin/stats - should have telegram_users=2, web_guest_users=1
+    print("\n6. Testing admin stats endpoint...")
+    response = make_request("GET", "/admin/stats")
+    if response["success"] and response["data"]:
+        stats = response["data"]
+        telegram_count = stats.get("telegram_users", 0)
+        web_count = stats.get("web_guest_users", 0)
+        total_count = stats.get("total_users", 0)
+        
+        # We expect at least our test users
+        if telegram_count >= 2 and web_count >= 1 and total_count >= 3:
+            results.add_result(
+                "Admin Stats User Types", True,
+                f"Stats correct: telegram_users={telegram_count}, web_guest_users={web_count}, total_users={total_count}",
+                f"Full stats: telegram_users={telegram_count}, web_guest_users={web_count}, total_users={total_count}"
+            )
+        else:
+            results.add_result(
+                "Admin Stats User Types", False,
+                f"Stats incorrect: telegram_users={telegram_count}, web_guest_users={web_count}, total_users={total_count}",
+                f"Expected at least: telegram_users>=2, web_guest_users>=1, total_users>=3"
+            )
+    else:
+        results.add_result(
+            "Admin Stats User Types", False,
+            "Failed to get admin stats",
+            f"Response: {response}"
+        )
+    
+    # Step 7: Test search + filter: GET /api/admin/users?search=Иван&user_type=telegram
+    print("\n7. Testing search with user type filter...")
+    response = make_request("GET", "/admin/users?search=Иван&user_type=telegram&limit=100")
+    if response["success"] and isinstance(response["data"], list):
+        search_results = response["data"]
+        
+        # Should find our "Иван" user
+        ivan_found = [u for u in search_results if u.get("first_name") == "Иван" and u.get("user_type") == "telegram"]
+        
+        # All results should be telegram type and contain search term
+        all_telegram = all(u.get("user_type") == "telegram" for u in search_results if "user_type" in u)
+        contains_ivan = all("иван" in (u.get("first_name", "") + u.get("last_name", "") + u.get("username", "")).lower() 
+                           for u in search_results)
+        
+        if len(ivan_found) >= 1 and all_telegram and contains_ivan:
+            results.add_result(
+                "Search with User Type Filter", True,
+                f"Found {len(ivan_found)} 'Иван' users with telegram type",
+                f"Results: {[{'name': u.get('first_name'), 'type': u.get('user_type')} for u in search_results]}"
+            )
+        else:
+            results.add_result(
+                "Search with User Type Filter", False,
+                f"Search failed: found {len(ivan_found)} Ivan users, all_telegram={all_telegram}, contains_ivan={contains_ivan}",
+                f"Search results: {search_results}"
+            )
+    else:
+        results.add_result(
+            "Search with User Type Filter", False,
+            "Failed to search users with filter",
+            f"Response: {response}"
         )
     
     return results
