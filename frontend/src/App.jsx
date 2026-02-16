@@ -841,7 +841,7 @@ const Home = () => {
         localStorage.removeItem('synced_user');
       }
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadUserData = useCallback(async () => {
     // Используем effectiveUser (syncedUser из QR имеет приоритет над user из Telegram)
