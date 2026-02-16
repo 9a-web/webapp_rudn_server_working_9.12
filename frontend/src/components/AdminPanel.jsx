@@ -2093,9 +2093,9 @@ const ReferralLinksTab = () => {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchLinks(), fetchAnalytics()]);
+    await Promise.all([fetchLinks(), fetchAnalytics(), fetchModalImages()]);
     setLoading(false);
-  }, [fetchLinks, fetchAnalytics]);
+  }, [fetchLinks, fetchAnalytics, fetchModalImages]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
