@@ -6545,6 +6545,7 @@ async def create_admin_referral_link(data: AdminReferralLinkCreate):
             source=data.source.strip() if data.source else "",
             medium=data.medium.strip() if data.medium else "",
             tags=data.tags or [],
+            modal_config=data.modal_config.model_dump() if data.modal_config else None,
         )
         
         await db.admin_referral_links.insert_one(link.model_dump())
