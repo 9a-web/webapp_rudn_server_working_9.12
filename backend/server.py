@@ -581,6 +581,14 @@ async def create_indexes():
         # Online Stats History - индекс по времени
         await safe_create_index(db.online_stats_history, [("timestamp", 1)])
         
+        # Admin Referral Links
+        await safe_create_index(db.admin_referral_links, "code", unique=True)
+        await safe_create_index(db.admin_referral_links, [("is_active", 1)])
+        await safe_create_index(db.admin_referral_links, [("created_at", -1)])
+        await safe_create_index(db.referral_link_clicks, [("link_id", 1), ("timestamp", -1)])
+        await safe_create_index(db.referral_link_clicks, [("link_code", 1)])
+        await safe_create_index(db.referral_link_clicks, [("timestamp", -1)])
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
