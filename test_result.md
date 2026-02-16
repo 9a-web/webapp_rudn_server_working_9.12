@@ -153,22 +153,30 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Admin Referral Links with 3 event types: click, registration, login"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "New feature added: Admin Referral Links system. New backend endpoints to test:
-    1. POST /api/admin/referral-links - Create a new referral link (body: {name, code?, description?, destination_url?, campaign?, source?, medium?})
-    2. GET /api/admin/referral-links - List all links with stats (query: search?, is_active?, sort_by?, sort_order?)
-    3. GET /api/admin/referral-links/analytics?days=30 - Overall analytics
-    4. GET /api/admin/referral-links/{link_id} - Get single link details with charts data
-    5. PUT /api/admin/referral-links/{link_id} - Update link (body: {name?, is_active?, etc})
-    6. DELETE /api/admin/referral-links/{link_id} - Delete link and clicks
-    7. POST /api/referral-track/{code} - Track click (public endpoint)
-    8. GET /api/r/{code} - Redirect + track click (public endpoint)
-    Test full CRUD workflow and analytics."
-  - agent: "testing"
-    message: "✅ COMPREHENSIVE TESTING COMPLETED - Admin Referral Links feature is fully functional. All 11 test scenarios passed successfully including: 1) Create links with auto/custom codes 2) List links with proper stats 3) Click tracking with uniqueness detection 4) Analytics with comprehensive metrics 5) Individual link details with charts data 6) Update operations (deactivation) 7) Delete with click cleanup 8) Redirect functionality 9) Proper error handling for inactive links. The complete CRUD workflow works perfectly. All endpoints return correct response structures, handle edge cases properly, and maintain data integrity. Feature ready for production use."
+    message: "MAJOR REWORK of referral links system. Now tracks 3 event types.
+    Collection changed from referral_link_clicks to referral_link_events.
+    KEY ENDPOINTS TO TEST:
+    1. POST /api/admin/referral-links - Create link (same as before)
+    2. GET /api/admin/referral-links - List links (now returns: total_clicks, unique_clicks, registrations, logins)
+    3. POST /api/admin/referral-track - MAIN TRACKING ENDPOINT body: {code, event_type: click|registration|login, telegram_id?, telegram_username?, telegram_name?}
+    4. GET /api/admin/referral-links/analytics - Returns total_registrations, total_logins, clicks_by_day: [{date, clicks, registrations, logins}]
+    5. GET /api/admin/referral-links/{id} - Returns events_by_day, recent_events, registered_users
+    6. PUT/DELETE same as before
+    7. GET /api/r/{code} - Redirect with click tracking
+    TEST PLAN:
+    - Create link with code TESTCODE
+    - Track 3 clicks, 2 registrations (different tg_ids), 1 login
+    - Verify duplicate registration (same tg_id) returns success false
+    - Verify analytics: clicks=3, registrations=2, logins=1
+    - Verify link details has registered_users list
+    - Test deactivation - tracking returns success false
+    - Test deletion
+    - Test invalid event_type returns 400"
