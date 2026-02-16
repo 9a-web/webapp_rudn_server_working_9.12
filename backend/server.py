@@ -16435,6 +16435,10 @@ async def get_referral_modal_config(code: str):
 # Include the router in the main app
 app.include_router(api_router)
 
+# Mount static files for modal images
+app.mount("/api/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+
+
 
 # ============ WebSocket для Web Sessions (связка Telegram профиля) ============
 
