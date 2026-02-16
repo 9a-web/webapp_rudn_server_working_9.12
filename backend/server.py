@@ -6942,8 +6942,10 @@ async def track_admin_referral_event(data: AdminReferralTrackRequest, request: R
             device_type = "tablet"
         
         is_unique = False
+        should_record = True  # Записывать ли событие в БД
+        
         if event_type == "click":
-            # Уникальность клика: по IP за 24 часа
+            # Дедупликация клика: по IP за 24 часа — повторный клик НЕ записывается
             day_ago = datetime.utcnow() - timedelta(hours=24)
             existing = await db.referral_link_events.find_one({
                 "link_id": link["id"],
@@ -6951,23 +6953,27 @@ async def track_admin_referral_event(data: AdminReferralTrackRequest, request: R
                 "ip_hash": ip_hash,
                 "timestamp": {"$gte": day_ago}
             })
-            is_unique = existing is None
+            if existing:
+                # Клик уже зафиксирован — пропускаем
+                logger.info(f"ℹ️ Повторный клик по ссылке {code} (IP уже был)")
+                return {"success": True, "event_type": "click", "is_unique": False, "link_name": link.get("name", ""), "duplicate": True}
+            is_unique = True
+            
         elif event_type == "registration":
-            # Уникальность регистрации: один пользователь на одну ссылку
+            # Дедупликация регистрации: один пользователь на одну ссылку — навсегда
             if data.telegram_id:
                 existing = await db.referral_link_events.find_one({
                     "link_id": link["id"],
                     "event_type": "registration",
                     "telegram_id": data.telegram_id
                 })
-                is_unique = existing is None
-                if not is_unique:
+                if existing:
                     logger.info(f"ℹ️ Повторная регистрация user={data.telegram_id} через ссылку {code}")
-                    return {"success": True, "message": "Уже зарегистрирован через эту ссылку", "is_unique": False}
-            else:
-                is_unique = True
+                    return {"success": True, "message": "Уже зарегистрирован через эту ссылку", "is_unique": False, "duplicate": True}
+            is_unique = True
+            
         elif event_type == "login":
-            # Уникальность входа: один пользователь за 24 часа
+            # Дедупликация входа: один пользователь за 24 часа
             if data.telegram_id:
                 day_ago = datetime.utcnow() - timedelta(hours=24)
                 existing = await db.referral_link_events.find_one({
@@ -6976,9 +6982,10 @@ async def track_admin_referral_event(data: AdminReferralTrackRequest, request: R
                     "telegram_id": data.telegram_id,
                     "timestamp": {"$gte": day_ago}
                 })
-                is_unique = existing is None
-            else:
-                is_unique = True
+                if existing:
+                    logger.info(f"ℹ️ Повторный вход user={data.telegram_id} через ссылку {code}")
+                    return {"success": True, "message": "Вход уже зафиксирован", "is_unique": False, "duplicate": True}
+            is_unique = True
         
         event = ReferralLinkEvent(
             link_id=link["id"],
