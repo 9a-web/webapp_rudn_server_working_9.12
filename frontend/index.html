@@ -25,6 +25,39 @@
         <!-- Telegram WebApp SDK -->
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         
+        <!-- 🛑 Блокируем Vite HMR full-reload в Telegram WebView -->
+        <script>
+          // Перехватываем событие beforeunload от Vite HMR,
+          // предотвращаем автоматическую перезагрузку страницы
+          (function() {
+            if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
+              // В Telegram WebView — блокируем location.reload от HMR
+              var origReload = window.location.reload.bind(window.location);
+              var reloadBlocked = false;
+              Object.defineProperty(window.location, 'reload', {
+                value: function() {
+                  // Разрешаем только явные reload (от пользователя), блокируем от HMR
+                  if (reloadBlocked) return;
+                  reloadBlocked = true;
+                  setTimeout(function() { reloadBlocked = false; }, 2000);
+                  console.log('🛑 Vite HMR reload заблокирован в Telegram WebView');
+                },
+                writable: true,
+                configurable: true
+              });
+            }
+
+            // Также перехватываем import.meta.hot events если Vite client загрузится
+            if (typeof window !== 'undefined') {
+              window.__vite_plugin_react_preamble_installed__ = true;
+              window.addEventListener('vite:beforeFullReload', function(e) {
+                console.log('🛑 Заблокирован vite:beforeFullReload');
+                e.preventDefault();
+              });
+            }
+          })();
+        </script>
+
         <!-- ⭐️ Telegram Full Screen Initialization -->
         <script>
             // Инициализируем full screen сразу при загрузке
