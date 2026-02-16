@@ -139,7 +139,7 @@ def test_user_type_filtering():
         "group_name": "ИСИТ-23-3",
         "facultet_id": "test_faculty", 
         "level_id": "bachelor",
-        "kurs": 2,
+        "kurs": "2",
         "form_code": "full_time"
     }
     
