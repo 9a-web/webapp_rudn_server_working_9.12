@@ -2647,7 +2647,7 @@ const ReferralLinksTab = () => {
           {analytics ? (
             <div className="space-y-5">
               {/* Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <GlassStatCard
                   icon={<Share2 className="w-4 h-4 text-white" />}
                   title="Ссылок"
@@ -2659,7 +2659,7 @@ const ReferralLinksTab = () => {
                 />
                 <GlassStatCard
                   icon={<Eye className="w-4 h-4 text-white" />}
-                  title="Всего кликов"
+                  title="Клики"
                   value={analytics.total_clicks}
                   subtitle={`${analytics.total_unique_clicks} уникальных`}
                   gradientFrom="from-blue-500"
@@ -2667,22 +2667,40 @@ const ReferralLinksTab = () => {
                   delay={1}
                 />
                 <GlassStatCard
+                  icon={<Users className="w-4 h-4 text-white" />}
+                  title="Регистрации"
+                  value={analytics.total_registrations || 0}
+                  subtitle="новых пользователей"
+                  gradientFrom="from-emerald-500"
+                  gradientTo="to-teal-500"
+                  delay={2}
+                />
+                <GlassStatCard
+                  icon={<Zap className="w-4 h-4 text-white" />}
+                  title="Входы"
+                  value={analytics.total_logins || 0}
+                  subtitle="повторных визитов"
+                  gradientFrom="from-orange-500"
+                  gradientTo="to-amber-500"
+                  delay={3}
+                />
+                <GlassStatCard
                   icon={<Activity className="w-4 h-4 text-white" />}
                   title="Сегодня"
                   value={analytics.clicks_today}
                   subtitle="кликов за день"
-                  gradientFrom="from-emerald-500"
-                  gradientTo="to-teal-500"
-                  delay={2}
+                  gradientFrom="from-pink-500"
+                  gradientTo="to-rose-500"
+                  delay={4}
                 />
                 <GlassStatCard
                   icon={<Calendar className="w-4 h-4 text-white" />}
                   title="За месяц"
                   value={analytics.clicks_month}
                   subtitle="кликов за 30 дней"
-                  gradientFrom="from-orange-500"
-                  gradientTo="to-amber-500"
-                  delay={3}
+                  gradientFrom="from-cyan-400"
+                  gradientTo="to-blue-500"
+                  delay={5}
                 />
               </div>
 
