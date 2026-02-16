@@ -317,7 +317,7 @@ def test_user_type_filtering():
     
     # Step 5: Test GET /api/admin/users?user_type=web - should return exactly 1 user
     print("\n5. Testing admin users endpoint (web filter)...")
-    response = make_request("GET", "/admin/users?user_type=web&limit=100")
+    response = make_admin_request("GET", "/admin/users?user_type=web&limit=100")
     if response["success"] and isinstance(response["data"], list):
         web_users = response["data"]
         
