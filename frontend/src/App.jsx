@@ -21,7 +21,7 @@ import StatusTester from './StatusTester';
 import { TelegramProvider, useTelegram } from './contexts/TelegramContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Import ThemeProvider
 import { scheduleAPI, userAPI, achievementsAPI, tasksAPI, activityAPI, getBackendURL } from './services/api';
-import { processReferralWebApp } from './services/referralAPI';
+import { processReferralWebApp, trackAdminReferralEvent } from './services/referralAPI';
 import { processJournalWebAppInvite } from './services/journalAPI';
 import { joinRoomByToken } from './services/roomsAPI';
 import { friendsAPI } from './services/friendsAPI';
