@@ -377,7 +377,7 @@ def test_user_type_filtering():
     
     # Step 7: Test search + filter: GET /api/admin/users?search=Иван&user_type=telegram
     print("\n7. Testing search with user type filter...")
-    response = make_request("GET", "/admin/users?search=Иван&user_type=telegram&limit=100")
+    response = make_admin_request("GET", "/admin/users?search=Иван&user_type=telegram&limit=100")
     if response["success"] and isinstance(response["data"], list):
         search_results = response["data"]
         
