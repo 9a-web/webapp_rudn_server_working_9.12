@@ -16313,6 +16313,125 @@ async def cleanup_expired_sessions():
     except Exception as e:
         logger.warning(f"Session cleanup error: {e}")
 
+
+# =============================================
+# MODAL IMAGES & REFERRAL MODAL CONFIG
+# =============================================
+import os
+import shutil
+
+MODAL_IMAGES_DIR = os.path.join(os.path.dirname(__file__), "static", "modal_images")
+os.makedirs(MODAL_IMAGES_DIR, exist_ok=True)
+
+@api_router.post("/admin/modal-images")
+async def upload_modal_image(file: UploadFile = File(...)):
+    """Загрузить изображение для модальных окон"""
+    try:
+        allowed = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in allowed:
+            raise HTTPException(status_code=400, detail=f"Формат {ext} не поддерживается. Допустимые: {', '.join(allowed)}")
+        
+        import uuid as _uuid
+        image_id = str(_uuid.uuid4())[:8]
+        filename = f"{image_id}{ext}"
+        filepath = os.path.join(MODAL_IMAGES_DIR, filename)
+        
+        with open(filepath, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        
+        # Сохраняем метаданные в БД
+        meta = {
+            "id": image_id,
+            "filename": filename,
+            "original_name": file.filename,
+            "content_type": file.content_type,
+            "uploaded_at": datetime.utcnow(),
+        }
+        await db.modal_images.insert_one(meta)
+        
+        logger.info(f"✅ Загружено изображение для модалок: {filename}")
+        return {"id": image_id, "filename": filename, "url": f"/api/static/modal_images/{filename}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка загрузки изображения: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/modal-images")
+async def list_modal_images():
+    """Список всех загруженных изображений для модалок"""
+    try:
+        images = await db.modal_images.find().sort("uploaded_at", -1).to_list(length=100)
+        result = []
+        for img in images:
+            result.append({
+                "id": img["id"],
+                "filename": img["filename"],
+                "original_name": img.get("original_name", ""),
+                "url": f"/api/static/modal_images/{img['filename']}",
+                "uploaded_at": img.get("uploaded_at", ""),
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка получения списка изображений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/admin/modal-images/{image_id}")
+async def delete_modal_image(image_id: str):
+    """Удалить изображение модалки"""
+    try:
+        img = await db.modal_images.find_one({"id": image_id})
+        if not img:
+            raise HTTPException(status_code=404, detail="Изображение не найдено")
+        
+        filepath = os.path.join(MODAL_IMAGES_DIR, img["filename"])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        await db.modal_images.delete_one({"id": image_id})
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/referral-modal/{code}")
+async def get_referral_modal_config(code: str):
+    """Получить конфигурацию модалки по коду реферальной ссылки (публичный endpoint)"""
+    try:
+        link = await db.admin_referral_links.find_one({"code": code.upper(), "is_active": True})
+        if not link:
+            return {"has_modal": False}
+        
+        modal_config = link.get("modal_config")
+        if not modal_config or not modal_config.get("enabled"):
+            return {"has_modal": False}
+        
+        # Подставляем полный URL изображения
+        image_id = modal_config.get("image_id", "")
+        image_url = ""
+        if image_id:
+            img = await db.modal_images.find_one({"id": image_id})
+            if img:
+                image_url = f"/api/static/modal_images/{img['filename']}"
+        
+        return {
+            "has_modal": True,
+            "title": modal_config.get("title", ""),
+            "description": modal_config.get("description", ""),
+            "image_url": image_url,
+            "button_text": modal_config.get("button_text", "OK"),
+            "button_action": modal_config.get("button_action", "close"),
+            "button_url": modal_config.get("button_url", ""),
+            "button_navigate_to": modal_config.get("button_navigate_to", ""),
+            "reward_points": modal_config.get("reward_points", 0),
+        }
+    except Exception as e:
+        logger.error(f"Ошибка получения modal config: {e}")
+        return {"has_modal": False}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
