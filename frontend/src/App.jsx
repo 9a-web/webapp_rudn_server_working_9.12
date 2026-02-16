@@ -672,7 +672,7 @@ const Home = () => {
     if (isReady && (user || syncedUser) && startParam) {
       processRoomInvite();
     }
-  }, [isReady, user, syncedUser, startParam, roomInviteProcessed]);
+  }, [isReady, user?.id, syncedUser?.id, startParam, roomInviteProcessed]);
 
   // Обработка приглашения от друга
   const [friendInviteProcessed, setFriendInviteProcessed] = useState(false);
