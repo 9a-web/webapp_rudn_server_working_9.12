@@ -1261,16 +1261,6 @@ const Home = () => {
       setShowGroupSelector(false);
       showAlert(t('common.groupSelected', { groupName: groupData.group_name }));
 
-      // Показываем модальное окно реферальной ссылки после онбординга
-      if (referralModalConfig && referralModalConfig.has_modal) {
-        const code = startParam?.replace('adref_', '') || '';
-        const modalShownKey = `adref_modal_shown_${code}`;
-        if (!localStorage.getItem(modalShownKey)) {
-          localStorage.setItem(modalShownKey, Date.now().toString());
-          setTimeout(() => setShowReferralModal(true), 500);
-        }
-      }
-
       // Отслеживаем выбор группы для достижений
       if (effectiveUser) {
         try {
