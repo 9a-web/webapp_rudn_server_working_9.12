@@ -47,7 +47,41 @@ class TestResults:
                 if not result["success"]:
                     print(f"- {result['test']}: {result['message']}")
 
-def make_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expected_status: int = 200, allow_redirects: bool = True) -> Dict[Any, Any]:
+def make_admin_request(method: str, endpoint: str, data: Dict[Any, Any] = None, expected_status: int = 200) -> Dict[Any, Any]:
+    """Make HTTP request to admin endpoints using internal URL"""
+    # Admin endpoints are only accessible internally
+    internal_url = f"http://localhost:8001/api{endpoint}"
+    
+    try:
+        if method.upper() == "GET":
+            response = requests.get(internal_url, timeout=10)
+        elif method.upper() == "POST":
+            response = requests.post(internal_url, json=data, timeout=10)
+        elif method.upper() == "PUT":
+            response = requests.put(internal_url, json=data, timeout=10)
+        elif method.upper() == "DELETE":
+            response = requests.delete(internal_url, timeout=10)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+            
+        print(f"{method} {endpoint} (internal) -> {response.status_code}")
+        
+        return {
+            "status_code": response.status_code,
+            "data": response.json() if response.text and response.text.strip().startswith('{') or response.text.strip().startswith('[') else {},
+            "success": response.status_code == expected_status
+        }
+    except requests.exceptions.Timeout:
+        return {"status_code": 0, "data": {}, "success": False, "error": "Request timeout"}
+    except requests.exceptions.RequestException as e:
+        return {"status_code": 0, "data": {}, "success": False, "error": str(e)}
+    except json.JSONDecodeError:
+        return {
+            "status_code": response.status_code if 'response' in locals() else 0,
+            "data": {"raw_response": response.text[:200] if 'response' in locals() and response.text else ""},
+            "success": response.status_code == expected_status,
+            "error": "Invalid JSON response"
+        }
     """Make HTTP request with error handling"""
     url = f"{BACKEND_URL}{endpoint}"
     
