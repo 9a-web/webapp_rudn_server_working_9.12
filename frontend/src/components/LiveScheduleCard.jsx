@@ -13,8 +13,6 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   const { theme } = useTheme();
   
   const isWinter = theme === 'winter';
-  const [testMode, setTestMode] = useState(false);
-  const [testProgress, setTestProgress] = useState(65);
 
   // Оптимизация: обновляем только каждые 10 секунд вместо каждой секунды
   useEffect(() => {
