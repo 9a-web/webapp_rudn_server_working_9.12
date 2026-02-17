@@ -429,6 +429,67 @@ const GlassChartCard = ({ title, icon, children, className = '' }) => (
 );
 
 // =============================================
+// TELEGRAM CHANNEL STATS
+// =============================================
+const ChannelStatsCard = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${BACKEND_URL}/api/admin/channel-stats`)
+      .then(res => { if (!cancelled) setData(res.data); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) return null;
+  if (!data) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`${GLASS.card} rounded-2xl p-5 relative overflow-hidden`}
+    >
+      <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[#2AABEE]/10 to-blue-600/10 rounded-full blur-3xl" />
+      <div className="flex items-center justify-between relative z-10 mb-4">
+        <h3 className="text-sm font-semibold text-[#2AABEE] flex items-center gap-2">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
+          </svg>
+          Telegram-канал
+        </h3>
+        <a
+          href={`https://t.me/${data.username}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] text-[#2AABEE] hover:text-[#2AABEE]/80 transition-colors flex items-center gap-1 font-medium"
+        >
+          @{data.username} <ArrowUpRight className="w-3 h-3" />
+        </a>
+      </div>
+      <div className="flex items-center gap-4 relative z-10">
+        <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2AABEE]/20 to-blue-600/20 border border-[#2AABEE]/20 flex items-center justify-center">
+          <svg className="w-7 h-7 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-white font-semibold text-base truncate">{data.title}</div>
+          <div className="text-[11px] text-gray-500 mt-0.5 truncate">{data.description}</div>
+        </div>
+        <div className="flex-shrink-0 text-center px-3">
+          <div className="text-3xl font-bold text-white"><AnimatedNumber value={data.member_count} /></div>
+          <div className="text-[10px] text-gray-500 font-medium mt-0.5">подписчиков</div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// =============================================
 // STATS CONTENT
 // =============================================
 const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActivity, featureUsage, topUsers, facultyStats, courseStats }) => {
