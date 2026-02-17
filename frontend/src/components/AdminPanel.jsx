@@ -1320,6 +1320,298 @@ const UsersTab = () => {
 };
 
 // =============================================
+// USER DETAIL MODAL (shared)
+// =============================================
+const UserDetailModal = ({ user: detailUser, profile: detailProfile, loading: detailLoading, onClose }) => {
+  const isWebUser = detailUser.user_type === 'web' || detailUser.telegram_id >= 10000000000;
+  return (
+    <motion.div
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center sm:justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div
+        className="relative w-full sm:w-[440px] max-h-[85vh] overflow-y-auto
+                   rounded-t-[24px] sm:rounded-[20px] border border-white/[0.1]
+                   shadow-[0_8px_48px_rgba(0,0,0,0.5)]"
+        style={{ background: 'linear-gradient(135deg, rgba(20,20,35,0.95) 0%, rgba(15,15,30,0.98) 100%)', backdropFilter: 'blur(40px)' }}
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 100, opacity: 0 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 sm:hidden"><div className="w-10 h-1 rounded-full bg-white/20" /></div>
+        
+        {/* Header */}
+        <div className="px-5 pt-4 pb-5 text-center relative">
+          <button onClick={onClose} className="absolute right-4 top-4 p-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] transition-colors">
+            <X className="w-4 h-4 text-white/50" />
+          </button>
+          <div className={`w-16 h-16 mx-auto rounded-full ${isWebUser ? 'bg-gradient-to-br from-orange-500/40 to-amber-500/40 shadow-orange-500/10' : 'bg-gradient-to-br from-purple-500/40 to-blue-500/40 shadow-purple-500/10'} flex items-center justify-center text-2xl font-bold text-white border-2 border-white/10 shadow-lg`}>
+            {isWebUser ? <Globe className="w-7 h-7 text-orange-300" /> : (detailUser.first_name?.[0]?.toUpperCase() || 'U')}
+          </div>
+          <h3 className="text-lg font-bold text-white mt-3">
+            {detailUser.first_name || 'Гость'} {detailUser.last_name || ''}
+          </h3>
+          {detailUser.username && (
+            <p className="text-sm text-gray-500 mt-0.5">@{detailUser.username}</p>
+          )}
+          {isWebUser && (
+            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-400 text-[11px] font-semibold border border-orange-500/20">
+              <Globe className="w-3 h-3" />
+              Веб-посетитель
+            </span>
+          )}
+          {!isWebUser && detailProfile?.is_online && (
+            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 text-[11px] font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Онлайн
+            </span>
+          )}
+        </div>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+
+        {detailLoading ? (
+          <div className="py-12 text-center"><GlassLoader /></div>
+        ) : (
+          <div className="px-5 py-4 space-y-3">
+            {/* Info grid */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {[
+                { label: isWebUser ? 'ID посетителя' : 'Telegram ID', value: detailUser.telegram_id, icon: '🆔' },
+                { label: 'Группа', value: detailUser.group_name || '—', icon: '👥' },
+                { label: 'Факультет', value: detailProfile?.facultet_name || detailUser.facultet_name || '—', icon: '🏛️' },
+                { label: 'Курс', value: detailProfile?.kurs || detailUser.kurs || '—', icon: '📚' },
+                { label: isWebUser ? 'Первый визит' : 'Регистрация', value: detailUser.created_at ? new Date(detailUser.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Moscow' }) : '—', icon: '📅' },
+                { label: 'Последняя активность', value: detailProfile?.last_activity ? (() => { const d = new Date(detailProfile.last_activity); const diff = Math.floor((Date.now() - d.getTime()) / 60000); return diff < 5 ? 'Только что' : diff < 60 ? `${diff} мин назад` : diff < 1440 ? `${Math.floor(diff/60)} ч назад` : d.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }); })() : detailUser.last_activity ? new Date(detailUser.last_activity).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—', icon: '⏱️' },
+              ].map((item) => (
+                <div key={item.label} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">{item.icon} {item.label}</div>
+                  <div className="text-[13px] text-white/80 font-medium truncate">{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Stats row — only for Telegram users */}
+            {!isWebUser && detailProfile && (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Друзья', value: detailProfile.friends_count, gradient: 'from-blue-500 to-cyan-500' },
+                  { label: 'Достижения', value: detailProfile.achievements_count, gradient: 'from-amber-500 to-orange-500' },
+                  { label: 'Баллы', value: detailProfile.total_points, gradient: 'from-purple-500 to-pink-500' },
+                ].map((s) => (
+                  <div key={s.label} className="text-center p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <div className={`text-xl font-bold bg-gradient-to-r ${s.gradient} bg-clip-text text-transparent`}>{s.value}</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Notifications — only for Telegram users */}
+            {!isWebUser && (
+              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1.5">🔔 Уведомления</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] text-white/80">{detailUser.notifications_enabled ? 'Включены' : 'Отключены'}</span>
+                  <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${detailUser.notifications_enabled ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                    {detailUser.notifications_enabled ? `за ${detailUser.notification_time || 10} мин` : 'OFF'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1">
+              {!isWebUser && (
+                <button
+                  onClick={() => {
+                    const url = detailUser.username 
+                      ? `https://t.me/${detailUser.username}` 
+                      : `tg://user?id=${detailUser.telegram_id}`;
+                    try { window.Telegram?.WebApp?.openTelegramLink?.(url) || window.open(url, '_blank'); }
+                    catch { window.open(url, '_blank'); }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#2AABEE]/15 hover:bg-[#2AABEE]/25 transition-colors border border-[#2AABEE]/20"
+                >
+                  <svg className="w-4 h-4 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
+                  </svg>
+                  <span className="text-[13px] font-semibold text-[#2AABEE]">Telegram</span>
+                </button>
+              )}
+              <button
+                onClick={() => { navigator.clipboard?.writeText(String(detailUser.telegram_id)); }}
+                className={`${isWebUser ? 'flex-1' : ''} flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors border border-white/[0.06]`}
+              >
+                <Copy className="w-4 h-4 text-gray-500" />
+                <span className="text-[13px] text-gray-400">Копировать ID</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// =============================================
+// VISITS TAB (Web visitors)
+// =============================================
+const VisitsTab = () => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [detailUser, setDetailUser] = useState(null);
+  const [detailProfile, setDetailProfile] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const searchTimerRef = useRef(null);
+
+  // Загрузка детального профиля
+  useEffect(() => {
+    if (!detailUser) { setDetailProfile(null); return; }
+    let cancelled = false;
+    setDetailLoading(true);
+    axios.get(`${BACKEND_URL}/api/profile/${detailUser.telegram_id}`)
+      .then(res => { if (!cancelled) setDetailProfile(res.data); })
+      .catch(() => { if (!cancelled) setDetailProfile(null); })
+      .finally(() => { if (!cancelled) setDetailLoading(false); });
+    return () => { cancelled = true; };
+  }, [detailUser]);
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
+
+  const fetchUsers = useCallback(async (reset = false) => {
+    setLoading(true);
+    try {
+      const currentPage = reset ? 0 : page;
+      const skip = currentPage * 50;
+      const res = await axios.get(`${BACKEND_URL}/api/admin/users`, {
+        params: { limit: 50, skip, search: debouncedSearch || undefined, user_type: 'web' }
+      });
+      if (reset) { setUsers(res.data); setPage(1); }
+      else { setUsers(prev => [...prev, ...res.data]); setPage(prev => prev + 1); }
+      setHasMore(res.data.length === 50);
+    } catch (error) {
+      console.error('Failed to fetch web visitors:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debouncedSearch]);
+
+  useEffect(() => { fetchUsers(true); }, [debouncedSearch]);
+
+  const formatVisitDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    const diff = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (diff < 5) return 'Только что';
+    if (diff < 60) return `${diff} мин назад`;
+    if (diff < 1440) return `${Math.floor(diff / 60)} ч назад`;
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: 'Europe/Moscow' });
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-lg space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input
+            type="text"
+            placeholder="Поиск посетителей..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`w-full ${GLASS.input} rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-gray-600 text-sm outline-none transition-all duration-300`}
+          />
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-gray-500">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
+            <Globe className="w-3 h-3 text-orange-400" />
+            <span className="text-orange-400 font-medium">Веб-посетители сайта</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {users.map((user, i) => (
+          <motion.div
+            key={user.id || user.telegram_id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i * 0.02, 0.5) }}
+            onClick={() => setDetailUser(user)}
+            className={`${GLASS.card} rounded-xl p-3 transition-all duration-300 ${GLASS.cardHover} cursor-pointer active:scale-[0.98]`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex-shrink-0 rounded-full bg-gradient-to-br from-orange-500/30 to-amber-500/30 backdrop-blur-sm flex items-center justify-center border border-orange-500/20">
+                <Globe className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-white text-sm truncate flex items-center gap-1.5">
+                  {user.first_name || 'Гость'} {user.last_name || ''}
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/20 leading-none">
+                    ВЕБ
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-600 flex items-center gap-1.5 mt-0.5 truncate">
+                  <span className="truncate">{user.group_name || 'Без группы'}</span>
+                  {user.last_activity && (
+                    <span className="text-gray-700">• {formatVisitDate(user.last_activity)}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+              </div>
+            </div>
+          </motion.div>
+        ))}
+        
+        {loading && <GlassLoader />}
+        
+        {!loading && users.length === 0 && (
+          <div className="text-center text-gray-600 py-14">
+            <Globe className="w-12 h-12 mx-auto mb-3 opacity-20" />
+            <p className="text-sm">Веб-посетители не найдены</p>
+            <p className="text-xs text-gray-700 mt-1">Здесь будут отображаться пользователи, зашедшие на сайт без Telegram</p>
+          </div>
+        )}
+        
+        {!loading && hasMore && (
+          <motion.button 
+            whileTap={{ scale: 0.98 }}
+            onClick={() => fetchUsers(false)}
+            className={`w-full py-3 ${GLASS.card} rounded-xl text-gray-400 text-sm transition-all ${GLASS.cardHover} font-medium`}
+          >
+            Загрузить еще
+          </motion.button>
+        )}
+      </div>
+
+      {/* Visitor Detail Modal */}
+      <AnimatePresence>
+        {detailUser && (
+          <UserDetailModal user={detailUser} profile={detailProfile} loading={detailLoading} onClose={() => setDetailUser(null)} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// =============================================
 // CLASSES TAB
 // =============================================
 const ClassesTab = () => {
