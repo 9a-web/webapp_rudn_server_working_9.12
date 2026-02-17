@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Calendar, Flag, Tag, BookOpen, ListChecks, Plus, Check, Trash2, Play, ExternalLink } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { X, Edit2, Calendar, Flag, Tag, BookOpen, ListChecks, Plus, Check, Trash2, Play, ExternalLink, GripVertical } from 'lucide-react';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
 import { tasksAPI } from '../services/api';
 import { YouTubePreview } from './YouTubePreview';
