@@ -593,6 +593,9 @@ async def create_indexes():
         await safe_create_index(db.referral_link_events, [("timestamp", -1)])
         await safe_create_index(db.referral_link_events, [("telegram_id", 1)])
         
+        # Channel Stats History
+        await safe_create_index(db.channel_stats_history, [("timestamp", 1)])
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
