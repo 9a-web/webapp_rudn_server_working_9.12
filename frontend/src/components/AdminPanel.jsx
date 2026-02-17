@@ -2334,6 +2334,7 @@ const ReferralLinksTab = () => {
   const [modalNavigateTo, setModalNavigateTo] = useState('');
   const [modalRewardPoints, setModalRewardPoints] = useState(0);
   const [modalImageId, setModalImageId] = useState('');
+  const [modalAlwaysShow, setModalAlwaysShow] = useState(false);
   const [modalImages, setModalImages] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   
