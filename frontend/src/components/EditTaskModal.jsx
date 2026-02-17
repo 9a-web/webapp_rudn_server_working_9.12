@@ -261,6 +261,16 @@ export const EditTaskModal = ({
       handleAddSubtask();
     }
   };
+
+  const handleReorderSubtasks = async (newOrder) => {
+    setSubtasks(newOrder);
+    try {
+      const subtaskIds = newOrder.map(s => s.subtask_id);
+      await tasksAPI.reorderSubtasks(task.id, subtaskIds);
+    } catch (error) {
+      console.error('Error reordering subtasks:', error);
+    }
+  };
   
   // Вычисление прогресса подзадач
   const subtasksProgress = subtasks.length > 0 
