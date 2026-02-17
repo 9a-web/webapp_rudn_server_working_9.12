@@ -273,135 +273,8 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
           </h1>
         </motion.div>
 
-        {/* Right side - Notifications, Menu, and Profile buttons */}
+        {/* Right side - QR, Friends, Notifications, Profile buttons */}
         <div className="flex items-center gap-2">
-          {/* Notifications button */}
-          <motion.button
-            onClick={() => {
-              if (hapticFeedback) hapticFeedback('impact', 'medium');
-              onNotificationsClick();
-            }}
-            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative group"
-            style={{
-              backgroundColor: 'rgba(52, 52, 52, 0.6)',
-              backdropFilter: 'blur(20px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(180%)'
-            }}
-            aria-label="Open notifications"
-            custom={2}
-            initial="initial"
-            animate="animate"
-            variants={headerItemVariants}
-          >
-            {/* Gradient glow effect */}
-            <div className="absolute inset-0 rounded-xl overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-400/20 via-rose-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            </div>
-            
-            {/* Pulse ripple waves animation - при новом уведомлении */}
-            <AnimatePresence>
-              {hasNewNotification && (
-                <>
-                  {/* Первая волна - очень плавная анимация */}
-                  <motion.div
-                    key="ripple1"
-                    className="absolute inset-0 rounded-xl border border-pink-500/40"
-                    initial={{ scale: 1, opacity: 0 }}
-                    animate={{ 
-                      scale: [1, 1.6],
-                      opacity: [0.5, 0]
-                    }}
-                    transition={{ 
-                      duration: 7, 
-                      repeat: Infinity,
-                      ease: [0.25, 0.1, 0.25, 1]
-                    }}
-                  />
-                  {/* Вторая волна с задержкой */}
-                  <motion.div
-                    key="ripple2"
-                    className="absolute inset-0 rounded-xl border border-red-500/30"
-                    initial={{ scale: 1, opacity: 0 }}
-                    animate={{ 
-                      scale: [1, 1.8],
-                      opacity: [0.4, 0]
-                    }}
-                    transition={{ 
-                      duration: 7, 
-                      repeat: Infinity,
-                      delay: 2.33,
-                      ease: [0.25, 0.1, 0.25, 1]
-                    }}
-                  />
-                  {/* Третья волна */}
-                  <motion.div
-                    key="ripple3"
-                    className="absolute inset-0 rounded-xl border border-purple-500/25"
-                    initial={{ scale: 1, opacity: 0 }}
-                    animate={{ 
-                      scale: [1, 2],
-                      opacity: [0.3, 0]
-                    }}
-                    transition={{ 
-                      duration: 7, 
-                      repeat: Infinity,
-                      delay: 4.66,
-                      ease: [0.25, 0.1, 0.25, 1]
-                    }}
-                  />
-                  {/* Свечение кнопки - мягкое пульсирование */}
-                  <motion.div
-                    key="glow"
-                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/20 via-red-500/20 to-purple-500/20"
-                    initial={{ opacity: 0.15 }}
-                    animate={{ 
-                      opacity: [0.15, 0.4, 0.15]
-                    }}
-                    transition={{ 
-                      duration: 7, 
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  />
-                </>
-              )}
-            </AnimatePresence>
-            
-            {/* Bell icon с анимацией покачивания - плавное и синхронизированное */}
-            <motion.div
-              className="relative z-10"
-              animate={hasNewNotification ? {
-                rotate: [0, -8, 8, -5, 5, -2, 2, 0],
-                scale: [1, 1.05, 1.05, 1.02, 1.02, 1, 1, 1],
-              } : {}}
-              transition={hasNewNotification ? {
-                duration: 1.4,
-                repeat: Infinity,
-                repeatDelay: 5.6,
-                ease: "easeInOut"
-              } : {}}
-            >
-              <Bell className="w-5 h-5 md:w-6 md:h-6" style={{ color: hasNewNotification ? '#ff6b9d' : '#E7E7E7' }} />
-            </motion.div>
-            
-            {/* Unread notifications badge */}
-            {unreadNotificationsCount > 0 && (
-              <motion.span 
-                className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg"
-                animate={hasNewNotification ? {
-                  scale: [1, 1.1, 1],
-                } : {}}
-                transition={hasNewNotification ? {
-                  duration: 7,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                } : {}}
-              >
-                {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-              </motion.span>
-            )}
-          </motion.button>
-
           {/* QR Scanner button - только в Telegram */}
           {isQRScannerAvailable && (
             <motion.button
@@ -413,14 +286,13 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                 WebkitBackdropFilter: 'blur(20px) saturate(180%)'
               }}
               aria-label="Scan QR code"
-              custom={2.5}
+              custom={2}
               initial="initial"
               animate="animate"
               variants={headerItemVariants}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              {/* Gradient glow effect */}
               <div className="absolute inset-0 rounded-xl overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/20 via-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
@@ -442,7 +314,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               WebkitBackdropFilter: 'blur(20px) saturate(180%)'
             }}
             aria-label="Open friends"
-            custom={3}
+            custom={2.5}
             initial="initial"
             animate="animate"
             variants={headerItemVariants}
@@ -455,25 +327,93 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
             <Users className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
           </motion.button>
 
-          {/* Menu button - скрыта */}
-          {/* <motion.button
-            onClick={handleMenuClick}
-            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative overflow-hidden group"
+          {/* Notifications button */}
+          <motion.button
+            onClick={() => {
+              if (hapticFeedback) hapticFeedback('impact', 'medium');
+              onNotificationsClick();
+            }}
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative group"
             style={{
               backgroundColor: 'rgba(52, 52, 52, 0.6)',
               backdropFilter: 'blur(20px) saturate(180%)',
               WebkitBackdropFilter: 'blur(20px) saturate(180%)'
             }}
-            aria-label="Open menu"
+            aria-label="Open notifications"
             custom={3}
             initial="initial"
             animate="animate"
             variants={headerItemVariants}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 via-pink-400/20 to-blue-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            {/* Gradient glow effect */}
+            <div className="absolute inset-0 rounded-xl overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-400/20 via-rose-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </div>
             
-            <Menu className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
-          </motion.button> */}
+            {/* Pulse ripple waves animation - при новом уведомлении */}
+            <AnimatePresence>
+              {hasNewNotification && (
+                <>
+                  <motion.div
+                    key="ripple1"
+                    className="absolute inset-0 rounded-xl border border-pink-500/40"
+                    initial={{ scale: 1, opacity: 0 }}
+                    animate={{ scale: [1, 1.6], opacity: [0.5, 0] }}
+                    transition={{ duration: 7, repeat: Infinity, ease: [0.25, 0.1, 0.25, 1] }}
+                  />
+                  <motion.div
+                    key="ripple2"
+                    className="absolute inset-0 rounded-xl border border-red-500/30"
+                    initial={{ scale: 1, opacity: 0 }}
+                    animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
+                    transition={{ duration: 7, repeat: Infinity, delay: 2.33, ease: [0.25, 0.1, 0.25, 1] }}
+                  />
+                  <motion.div
+                    key="ripple3"
+                    className="absolute inset-0 rounded-xl border border-purple-500/25"
+                    initial={{ scale: 1, opacity: 0 }}
+                    animate={{ scale: [1, 2], opacity: [0.3, 0] }}
+                    transition={{ duration: 7, repeat: Infinity, delay: 4.66, ease: [0.25, 0.1, 0.25, 1] }}
+                  />
+                  <motion.div
+                    key="glow"
+                    className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/20 via-red-500/20 to-purple-500/20"
+                    initial={{ opacity: 0.15 }}
+                    animate={{ opacity: [0.15, 0.4, 0.15] }}
+                    transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                </>
+              )}
+            </AnimatePresence>
+            
+            {/* Bell icon */}
+            <motion.div
+              className="relative z-10"
+              animate={hasNewNotification ? {
+                rotate: [0, -8, 8, -5, 5, -2, 2, 0],
+                scale: [1, 1.05, 1.05, 1.02, 1.02, 1, 1, 1],
+              } : {}}
+              transition={hasNewNotification ? {
+                duration: 1.4,
+                repeat: Infinity,
+                repeatDelay: 5.6,
+                ease: "easeInOut"
+              } : {}}
+            >
+              <Bell className="w-5 h-5 md:w-6 md:h-6" style={{ color: hasNewNotification ? '#ff6b9d' : '#E7E7E7' }} />
+            </motion.div>
+            
+            {/* Unread notifications badge */}
+            {unreadNotificationsCount > 0 && (
+              <motion.span 
+                className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 z-30 shadow-lg"
+                animate={hasNewNotification ? { scale: [1, 1.1, 1] } : {}}
+                transition={hasNewNotification ? { duration: 7, repeat: Infinity, ease: "easeInOut" } : {}}
+              >
+                {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+              </motion.span>
+            )}
+          </motion.button>
 
           {/* Profile button */}
           {user && (
