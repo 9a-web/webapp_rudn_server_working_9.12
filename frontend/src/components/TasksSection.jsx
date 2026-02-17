@@ -2796,7 +2796,7 @@ const TodayTaskItem = ({
                       }
                     }}
                     placeholder="Название подзадачи..."
-                    className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-yellow-400 focus:bg-white"
+                    className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-yellow-400 focus:bg-white text-[#1c1c1c]"
                     autoFocus
                     disabled={savingSubtask}
                   />
