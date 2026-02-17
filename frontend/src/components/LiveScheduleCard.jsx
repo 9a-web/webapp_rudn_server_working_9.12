@@ -255,20 +255,13 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               </AnimatePresence>
             </div>
 
-            {/* Right side - Gradient circle with time and progress bar */}
+            {/* Right side - Progress ring (стиль как в WeekDateSelector) */}
             <motion.div 
               className="relative flex items-center justify-center flex-shrink-0 w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36"
               style={{ overflow: 'visible' }}
               initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ 
-                scale: 1,
-                opacity: 1
-              }}
-              transition={{ 
-                duration: 0.4,
-                delay: 0.3,
-                ease: "easeOut"
-              }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
             >
               {/* Glowing background effect */}
               <div
@@ -281,21 +274,18 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                 }}
               />
               
-              {/* SVG Progress Bar (всегда отображается) */}
+              {/* SVG Ring — thin, clean like WeekDateSelector */}
               <svg 
-                className="absolute w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36"
-                style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
+                className="absolute w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 -rotate-90"
                 viewBox="0 0 120 120"
+                style={{ overflow: 'visible' }}
               >
                 <defs>
-                  {/* Winter Gradient */}
                   <linearGradient id="progressGradientWinter" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#E0F2FE" /> {/* Sky-100 */}
-                    <stop offset="50%" stopColor="#38BDF8" /> {/* Sky-400 */}
-                    <stop offset="100%" stopColor="#0EA5E9" /> {/* Sky-500 */}
+                    <stop offset="0%" stopColor="#E0F2FE" />
+                    <stop offset="50%" stopColor="#38BDF8" />
+                    <stop offset="100%" stopColor="#0EA5E9" />
                   </linearGradient>
-                  
-                  {/* Default Gradient */}
                   <linearGradient id="progressGradientDefault" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#A3F7BF" />
                     <stop offset="25%" stopColor="#FFE66D" />
@@ -303,59 +293,40 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                     <stop offset="75%" stopColor="#C4A3FF" />
                     <stop offset="100%" stopColor="#80E8FF" />
                   </linearGradient>
-
-                  <filter id="glowFilter" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
                 </defs>
                 
-                {/* Background circle */}
+                {/* Background circle — тонкий, полупрозрачный */}
                 <circle
                   cx="60"
                   cy="60"
-                  r={circleRadius}
-                  stroke={themeStyles.circle.bgStroke.includes('url') ? themeStyles.circle.bgStroke : themeStyles.circle.bgStroke}
-                  strokeWidth={bgStrokeWidth}
+                  r="52"
+                  stroke={currentClass ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)'}
+                  strokeWidth="3.5"
                   fill="none"
-                  strokeLinecap="round"
-                  style={{
-                    opacity: currentClass ? undefined : 0.3,
-                    animation: currentClass ? 'breathe 4s ease-in-out infinite' : 'none'
-                  }}
                 />
                 
-                {/* Progress circle */}
+                {/* Progress circle — тонкий, с градиентом и закруглёнными концами */}
                 <motion.circle
                   cx="60"
                   cy="60"
-                  r={circleRadius}
+                  r="52"
                   stroke={`url(#${themeStyles.circle.strokeId})`}
-                  strokeWidth={progressStrokeWidth}
+                  strokeWidth="3.5"
                   fill="none"
                   strokeLinecap="round"
-                  initial={{ 
-                    strokeDasharray: circleCircumference,
-                    strokeDashoffset: 0
-                  }}
+                  strokeDasharray={2 * Math.PI * 52}
+                  initial={{ strokeDashoffset: 2 * Math.PI * 52 }}
                   animate={{ 
                     strokeDashoffset: currentClass 
-                      ? circleCircumference - (circleCircumference * progressPercentage) / 100
-                      : 0
+                      ? 2 * Math.PI * 52 * (1 - progressPercentage / 100)
+                      : 2 * Math.PI * 52
                   }}
-                  transition={{ 
-                    duration: 1,
-                    ease: [0.25, 0.1, 0.25, 1]
-                  }}
+                  transition={{ duration: 0.8, ease: 'easeInOut' }}
                   style={{
                     filter: currentClass 
-                      ? `drop-shadow(0 0 12px ${isWinter ? 'rgba(56, 189, 248, 0.6)' : 'rgba(163, 247, 191, 0.8)'})`
-                      : 'url(#glowFilter)'
+                      ? `drop-shadow(0 0 6px ${isWinter ? 'rgba(56, 189, 248, 0.5)' : 'rgba(163, 247, 191, 0.5)'})`
+                      : 'none'
                   }}
-                  opacity={1}
                 />
               </svg>
               
@@ -372,11 +343,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                     ? themeStyles.circle.shadowActive
                     : themeStyles.circle.shadowInactive
                 }}
-                transition={{ 
-                  duration: 2.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
               >
                 <AnimatePresence mode="wait">
                   <motion.span 
