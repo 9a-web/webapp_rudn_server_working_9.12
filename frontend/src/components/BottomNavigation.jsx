@@ -71,7 +71,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       initial={{ y: 100, opacity: 0, x: '-50%' }}
       animate={{ y: isHidden ? 100 : 0, opacity: isHidden ? 0 : 1, x: '-50%' }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
-      className="fixed bottom-4 z-50"
+      className="fixed bottom-6 z-50"
       style={{ left: '50%', overflow: 'visible' }}
     >
       {/* Outer wrapper — pill измеряется относительно него */}
