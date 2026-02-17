@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, User, Sparkles, ScanLine } from 'lucide-react';
+import { Menu, Bell, User, Sparkles, ScanLine, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { headerItemVariants } from '../utils/animations';
