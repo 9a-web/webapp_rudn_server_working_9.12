@@ -2409,7 +2409,7 @@ const TodayTaskItem = ({
                   onCancelEdit();
                 }
               }}
-              className="flex-1 text-xs bg-white border border-yellow-300 rounded px-2 py-1 focus:outline-none focus:border-yellow-400"
+              className="flex-1 text-xs bg-white border border-yellow-300 rounded px-2 py-1 focus:outline-none focus:border-yellow-400 text-[#1c1c1c]"
               autoFocus
             />
             <button
