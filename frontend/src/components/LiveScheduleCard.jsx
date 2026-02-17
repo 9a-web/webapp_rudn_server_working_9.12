@@ -253,10 +253,38 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
             >
+              {/* Свечение за кольцом */}
+              <motion.div
+                className="absolute w-24 h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full"
+                style={{
+                  background: isWinter
+                    ? 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)'
+                    : 'radial-gradient(circle, rgba(163, 247, 191, 0.3) 0%, rgba(255, 230, 109, 0.15) 40%, transparent 70%)',
+                  filter: 'blur(10px)',
+                }}
+                animate={{
+                  opacity: [0.5, 1, 0.5],
+                  scale: [0.95, 1.05, 0.95],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              />
+
               {/* SVG Ring — чистое кольцо как в WeekDateSelector */}
-              <svg 
+              <motion.svg 
                 className="absolute inset-0 w-full h-full -rotate-90"
                 viewBox="0 0 100 100"
+                animate={{
+                  scale: [1, 1.03, 1],
+                }}
+                transition={{
+                  duration: 2.5,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
               >
                 <defs>
                   <linearGradient id="progressGradientWinter" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -271,6 +299,13 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                     <stop offset="75%" stopColor="#C4A3FF" />
                     <stop offset="100%" stopColor="#80E8FF" />
                   </linearGradient>
+                  <filter id="glowFilter">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
                 </defs>
                 
                 {/* Фоновый круг */}
@@ -278,12 +313,12 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   cx="50"
                   cy="50"
                   r="40"
-                  stroke={displayCurrentClass ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)'}
+                  stroke="rgba(255,255,255,0.12)"
                   strokeWidth="6"
                   fill="none"
                 />
                 
-                {/* Прогресс круг — с градиентом */}
+                {/* Прогресс круг — с градиентом и свечением */}
                 <motion.circle
                   cx="50"
                   cy="50"
@@ -292,19 +327,20 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   strokeWidth="6"
                   fill="none"
                   strokeLinecap="round"
+                  filter="url(#glowFilter)"
                   strokeDasharray={2 * Math.PI * 40}
                   initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
                   animate={{ 
                     strokeDashoffset: displayCurrentClass 
                       ? 2 * Math.PI * 40 * (1 - progressPercentage / 100)
-                      : 2 * Math.PI * 40
+                      : 0
                   }}
                   transition={{ 
-                    duration: 0.5, 
+                    duration: 0.8, 
                     ease: 'easeInOut' 
                   }}
                 />
-              </svg>
+              </motion.svg>
               
               {/* Время по центру */}
               <AnimatePresence mode="wait">
