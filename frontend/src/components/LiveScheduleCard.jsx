@@ -275,8 +275,9 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
 
               {/* SVG Ring — чистое кольцо как в WeekDateSelector */}
               <motion.svg 
-                className="absolute inset-0 w-full h-full -rotate-90"
+                className="absolute inset-0 w-full h-full"
                 viewBox="0 0 100 100"
+                style={{ rotate: -90 }}
                 animate={{
                   scale: [1, 1.03, 1],
                 }}
