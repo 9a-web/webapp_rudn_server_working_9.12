@@ -537,7 +537,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, onSendTrac
             <div className="music-welcome-content relative h-full flex flex-col items-center justify-end md:justify-center text-center space-y-4 sm:space-y-5 p-6 sm:p-8" style={{ paddingBottom: 'calc(2rem + 5px)' }}>
                 {/* Логотипы VK и РУДН с иконкой связи */}
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <Icon28LogoVkColor width={48} height={48} className="sm:w-14 sm:h-14" />
+                  <VkLogoIcon width={48} height={48} className="sm:w-14 sm:h-14" />
                   <motion.div
                     animate={linkPulseAnimation}
                     transition={{
