@@ -215,7 +215,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.15, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                     >
-                      {testMode ? 'Тестовая пара' : translateDiscipline(currentClass, i18n.language)}
+                      {translateDiscipline(currentClass, i18n.language)}
                     </motion.p>
                   )}
                 </motion.div>
