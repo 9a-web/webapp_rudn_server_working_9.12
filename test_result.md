@@ -234,3 +234,16 @@ agent_communication:
     TEST: Verify GET /api/admin/users?user_type=telegram returns only TG users,
     GET /api/admin/users?user_type=web returns only web visitors.
     Test data: 5 TG users + 3 web visitors seeded in test_database."
+  - agent: "testing"
+    message: "✅ ADMIN USER TYPE FILTERING SEEDED DATA TESTING COMPLETE - All 5 test scenarios executed successfully with the pre-seeded database containing exactly the expected users:
+    • 5 Telegram users (IDs: 765963392, 1311283832, 523439151, 987654321, 111222333)
+    • 3 Web visitors (IDs: 10000000000001, 10000000000002, 10000000000003)
+    
+    VERIFIED FUNCTIONALITY:
+    ✅ GET /api/admin/users?user_type=telegram → Returns exactly 5 users, all with user_type='telegram' 
+    ✅ GET /api/admin/users?user_type=web → Returns exactly 3 users, all with user_type='web'
+    ✅ GET /api/admin/users (no filter) → Returns all 8 users with proper user_type classification
+    ✅ GET /api/admin/stats → Shows telegram_users=5, web_guest_users=3, total_users=8
+    ✅ GET /api/admin/users?user_type=telegram&search=Оле → Returns 1 user (Олег Новиков) with combined filtering
+    
+    The user type classification logic (telegram_id < 10,000,000,000 = 'telegram', >= 10B = 'web') is working perfectly. Admin endpoints are network-protected and only accessible via localhost:8001 for security. The feature is production-ready with no issues found."
