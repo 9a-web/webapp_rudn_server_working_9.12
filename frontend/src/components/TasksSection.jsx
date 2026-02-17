@@ -2356,6 +2356,145 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   );
 };
 
+// Drag & Drop список подзадач (pointer-based, работает на мобилке)
+const SubtaskDragList = ({ taskId, subtasks, onToggle, onReorder, hapticFeedback }) => {
+  const [items, setItems] = useState(subtasks);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const listRef = useRef(null);
+
+  useEffect(() => { setItems(subtasks); }, [subtasks]);
+
+  const handleDragStart = (e, idx) => {
+    e.stopPropagation();
+    setDragIdx(idx);
+    hapticFeedback && hapticFeedback('impact', 'light');
+  };
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragIdx === null || idx === overIdx) return;
+    setOverIdx(idx);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragIdx === null || overIdx === null || dragIdx === overIdx) {
+      setDragIdx(null);
+      setOverIdx(null);
+      return;
+    }
+    const reordered = [...items];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(overIdx, 0, moved);
+    setItems(reordered);
+    onReorder && onReorder(taskId, reordered);
+    hapticFeedback && hapticFeedback('notification', 'success');
+    setDragIdx(null);
+    setOverIdx(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIdx(null);
+    setOverIdx(null);
+  };
+
+  // Touch-based drag (long press + move)
+  const touchState = useRef({ idx: null, startY: 0, moved: false });
+
+  const handleTouchStart = (e, idx) => {
+    touchState.current = { idx, startY: e.touches[0].clientY, moved: false };
+  };
+
+  const handleTouchMove = (e) => {
+    if (touchState.current.idx === null) return;
+    const touch = e.touches[0];
+    const diff = Math.abs(touch.clientY - touchState.current.startY);
+    if (diff > 8) touchState.current.moved = true;
+    
+    if (!touchState.current.moved) return;
+    e.preventDefault();
+    
+    // Find which element we're over
+    const els = listRef.current?.children;
+    if (!els) return;
+    for (let i = 0; i < els.length; i++) {
+      const rect = els[i].getBoundingClientRect();
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        if (i !== overIdx) setOverIdx(i);
+        if (dragIdx !== touchState.current.idx) setDragIdx(touchState.current.idx);
+        break;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchState.current.moved && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+      const reordered = [...items];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(overIdx, 0, moved);
+      setItems(reordered);
+      onReorder && onReorder(taskId, reordered);
+      hapticFeedback && hapticFeedback('notification', 'success');
+    }
+    touchState.current = { idx: null, startY: 0, moved: false };
+    setDragIdx(null);
+    setOverIdx(null);
+  };
+
+  return (
+    <div ref={listRef} className="space-y-0.5" onDragOver={(e) => e.preventDefault()}>
+      {items.map((subtask, idx) => (
+        <div
+          key={subtask.subtask_id}
+          draggable
+          onDragStart={(e) => handleDragStart(e, idx)}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
+          onTouchStart={(e) => handleTouchStart(e, idx)}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`
+            flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg transition-all duration-150
+            ${dragIdx === idx ? 'opacity-40 scale-95' : ''}
+            ${overIdx === idx && dragIdx !== null && dragIdx !== idx ? 'bg-yellow-50 border-l-2 border-yellow-400' : ''}
+          `}
+        >
+          {/* Drag Handle ⠿ */}
+          <div className="cursor-grab active:cursor-grabbing flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors select-none text-[10px] leading-none" style={{ touchAction: 'none' }}>
+            ⠿
+          </div>
+          {/* Checkbox */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(taskId, subtask.subtask_id, subtask.completed);
+            }}
+            className={`
+              w-3 h-3 rounded flex-shrink-0 flex items-center justify-center
+              cursor-pointer transition-all duration-200 touch-manipulation active:scale-90
+              ${subtask.completed 
+                ? 'bg-green-400' 
+                : 'bg-white border border-gray-300 hover:border-green-400'
+              }
+            `}
+          >
+            {subtask.completed && (
+              <Check className="w-2 h-2 text-white" strokeWidth={3} />
+            )}
+          </button>
+          <span className={`text-xs flex-1 ${subtask.completed ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
+            {subtask.title}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // Компонент задачи для карточки "Сегодня" с drag and drop
 const TodayTaskItem = ({ 
   task, 
