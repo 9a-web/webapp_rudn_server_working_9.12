@@ -433,8 +433,12 @@ const GlassChartCard = ({ title, icon, children, className = '' }) => (
 // =============================================
 const ChannelStatsCard = () => {
   const [data, setData] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyDelta, setHistoryDelta] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState(168); // 7 days default
 
+  // Fetch channel info
   useEffect(() => {
     let cancelled = false;
     axios.get(`${BACKEND_URL}/api/admin/channel-stats`)
@@ -444,8 +448,33 @@ const ChannelStatsCard = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Fetch history on period change
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${BACKEND_URL}/api/admin/channel-stats-history`, { params: { hours: period } })
+      .then(res => {
+        if (cancelled) return;
+        const pts = (res.data.history || []).map(p => ({
+          time: new Date(p.timestamp).getTime(),
+          count: p.member_count,
+          label: new Date(p.timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: 'Europe/Moscow' }),
+        }));
+        setHistory(pts);
+        setHistoryDelta(res.data.delta || 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [period]);
+
   if (loading) return null;
   if (!data) return null;
+
+  const periods = [
+    { value: 24, label: '24ч' },
+    { value: 72, label: '3д' },
+    { value: 168, label: '7д' },
+    { value: 720, label: '30д' },
+  ];
 
   return (
     <motion.div
@@ -454,6 +483,8 @@ const ChannelStatsCard = () => {
       className={`${GLASS.card} rounded-2xl p-5 relative overflow-hidden`}
     >
       <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[#2AABEE]/10 to-blue-600/10 rounded-full blur-3xl" />
+
+      {/* Header */}
       <div className="flex items-center justify-between relative z-10 mb-4">
         <h3 className="text-sm font-semibold text-[#2AABEE] flex items-center gap-2">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -470,7 +501,9 @@ const ChannelStatsCard = () => {
           @{data.username} <ArrowUpRight className="w-3 h-3" />
         </a>
       </div>
-      <div className="flex items-center gap-4 relative z-10">
+
+      {/* Channel info row */}
+      <div className="flex items-center gap-4 relative z-10 mb-5">
         <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2AABEE]/20 to-blue-600/20 border border-[#2AABEE]/20 flex items-center justify-center">
           <svg className="w-7 h-7 text-[#2AABEE]" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.63 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.97-3.44 3.8-1.58 4.59-1.86 5.1-1.87.11 0 .37.03.54.17.14.12.18.28.2.47-.01.06.01.24 0 .37z"/>
@@ -485,6 +518,101 @@ const ChannelStatsCard = () => {
           <div className="text-[10px] text-gray-500 font-medium mt-0.5">подписчиков</div>
         </div>
       </div>
+
+      {/* Period selector + delta */}
+      <div className="flex items-center justify-between relative z-10 mb-3">
+        <div className="flex gap-1.5">
+          {periods.map(p => (
+            <button
+              key={p.value}
+              onClick={() => setPeriod(p.value)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 border ${
+                period === p.value
+                  ? 'bg-[#2AABEE]/15 border-[#2AABEE]/30 text-[#2AABEE]'
+                  : 'border-white/[0.06] text-gray-500 hover:text-gray-300 hover:border-white/10'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {historyDelta !== 0 && (
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+            historyDelta > 0
+              ? 'bg-green-500/10 text-green-400'
+              : 'bg-red-500/10 text-red-400'
+          }`}>
+            {historyDelta > 0 ? '+' : ''}{historyDelta}
+          </span>
+        )}
+      </div>
+
+      {/* Chart */}
+      {history.length > 1 && (
+        <div className="relative z-10" style={{ height: 160 }}>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={history} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="channelGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2AABEE" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#2AABEE" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <XAxis
+                dataKey="label"
+                tick={{ fill: '#555', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={40}
+              />
+              <YAxis
+                tick={{ fill: '#555', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                domain={['dataMin - 2', 'dataMax + 2']}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(20,20,35,0.95)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px',
+                  backdropFilter: 'blur(20px)',
+                  fontSize: '12px',
+                  color: 'white',
+                }}
+                labelStyle={{ color: '#888' }}
+                formatter={(value) => [`${value} подп.`, 'Подписчики']}
+                labelFormatter={(_, payload) => {
+                  if (payload?.[0]?.payload?.time) {
+                    return new Date(payload[0].payload.time).toLocaleString('ru-RU', {
+                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow'
+                    });
+                  }
+                  return '';
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="count"
+                stroke="#2AABEE"
+                strokeWidth={2}
+                fill="url(#channelGrad)"
+                dot={false}
+                activeDot={{ r: 4, fill: '#2AABEE', stroke: '#fff', strokeWidth: 2 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {history.length <= 1 && !loading && (
+        <div className="text-center text-gray-600 text-[11px] py-6 relative z-10">
+          Данные собираются... График появится через некоторое время.
+        </div>
+      )}
     </motion.div>
   );
 };
