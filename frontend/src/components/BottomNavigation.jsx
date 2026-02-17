@@ -1,9 +1,9 @@
 import React, { useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Home, ClipboardList, FileCheck, Music, Users } from 'lucide-react';
+import { Home, ClipboardList, FileCheck, Music, Users, Undo2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
-export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false }) => {
+export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false, onBackFromFriends }) => {
   const { t } = useTranslation();
 
   const tabs = [
