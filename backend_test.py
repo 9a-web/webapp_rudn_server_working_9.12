@@ -12,8 +12,8 @@ import os
 from typing import Dict, List, Any
 import json
 
-# Get backend URL from environment
-BACKEND_URL = "https://session-debug-1.preview.emergentagent.com/api"
+# Use localhost for admin endpoints (they are network-protected)
+BACKEND_URL = "http://localhost:8001/api"
 
 class AdminEndpointsTest:
     def __init__(self):
