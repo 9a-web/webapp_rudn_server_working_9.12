@@ -18,32 +18,41 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
   const tabRefs = useRef({});
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
-  // Measure active tab position and update pill
-  const updatePill = useCallback(() => {
+  const measure = useCallback(() => {
     const container = containerRef.current;
     const activeEl = tabRefs.current[activeTab];
     if (!container || !activeEl) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const tabRect = activeEl.getBoundingClientRect();
-
-    setPillStyle({
-      left: tabRect.left - containerRect.left,
-      width: tabRect.width,
-    });
+    const cRect = container.getBoundingClientRect();
+    const tRect = activeEl.getBoundingClientRect();
+    setPillStyle({ left: tRect.left - cRect.left, width: tRect.width });
   }, [activeTab]);
 
+  // Re-measure whenever activeTab changes AND continuously via ResizeObserver
   useLayoutEffect(() => {
-    // Small delay to let DOM settle after tab content change
-    const raf = requestAnimationFrame(updatePill);
-    return () => cancelAnimationFrame(raf);
-  }, [activeTab, updatePill]);
+    measure();
+  }, [activeTab, measure]);
 
-  // Also update on resize
   useEffect(() => {
-    window.addEventListener('resize', updatePill);
-    return () => window.removeEventListener('resize', updatePill);
-  }, [updatePill]);
+    const el = tabRefs.current[activeTab];
+    if (!el) return;
+
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+
+    // Also re-measure a few times during the text expand animation
+    const t1 = setTimeout(measure, 50);
+    const t2 = setTimeout(measure, 150);
+    const t3 = setTimeout(measure, 300);
+
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('resize', measure);
+    };
+  }, [activeTab, measure]);
 
   const handleTabClick = useCallback((tabId) => {
     if (hapticFeedback?.impactOccurred) {
@@ -63,21 +72,14 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       style={{ left: '50%', overflow: 'visible' }}
     >
       <div className="relative" style={{ height: '50px' }}>
-        {/* Glow behind active tab */}
+        {/* Glow */}
         <motion.div
           className="absolute pointer-events-none blur-2xl"
-          animate={{
-            left: pillStyle.left,
-            width: pillStyle.width,
-            opacity: pillStyle.width > 0 ? 0.3 : 0,
-          }}
+          animate={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.width > 0 ? 0.3 : 0 }}
           transition={{ type: 'spring', stiffness: 350, damping: 30 }}
           style={{
-            top: 0,
-            height: '100%',
-            borderRadius: '9999px',
+            top: 0, height: '100%', borderRadius: '9999px', zIndex: -1,
             background: activeTabData ? `linear-gradient(135deg, ${activeTabData.color}, ${activeTabData.color}88)` : 'transparent',
-            zIndex: -1,
           }}
         />
 
@@ -85,8 +87,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
         <div
           className="absolute inset-0 border border-white/10"
           style={{
-            borderRadius: '9999px',
-            overflow: 'hidden',
+            borderRadius: '9999px', overflow: 'hidden',
             backgroundColor: 'rgba(28, 28, 30, 0.7)',
             backdropFilter: 'blur(40px) saturate(180%)',
             WebkitBackdropFilter: 'blur(40px) saturate(180%)',
@@ -95,19 +96,12 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
 
         {/* Content */}
         <div ref={containerRef} className="relative h-full px-2 py-1">
-          {/* Sliding pill */}
+          {/* Sliding pill — follows measured left+width */}
           <motion.div
             className="absolute bg-white/[0.07] border border-white/[0.1]"
-            animate={{
-              left: pillStyle.left,
-              width: pillStyle.width,
-            }}
+            animate={{ left: pillStyle.left, width: pillStyle.width }}
             transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-            style={{
-              top: '4px',
-              height: '42px',
-              borderRadius: '9999px',
-            }}
+            style={{ top: '4px', height: '42px', borderRadius: '9999px' }}
           />
 
           <div className="flex items-center justify-center gap-1 h-full">
@@ -123,7 +117,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                   className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150"
                   style={{
                     height: '42px',
-                    padding: isActive ? '0 14px' : '0 12px',
+                    paddingLeft: isActive ? '6px' : '12px',
+                    paddingRight: isActive ? '14px' : '12px',
                     borderRadius: '9999px',
                     minWidth: '42px',
                   }}
@@ -141,20 +136,11 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                       </div>
                     )}
 
-                    <AnimatePresence mode="wait">
-                      {isActive && (
-                        <motion.span
-                          key={`label-${tab.id}`}
-                          initial={{ opacity: 0, width: 0 }}
-                          animate={{ opacity: 1, width: 'auto' }}
-                          exit={{ opacity: 0, width: 0 }}
-                          transition={{ duration: 0.2, ease: 'easeOut' }}
-                          className="text-white text-[13px] font-semibold whitespace-nowrap overflow-hidden pr-1"
-                        >
-                          {tab.shortLabel}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
+                    {isActive && (
+                      <span className="text-white text-[13px] font-semibold whitespace-nowrap">
+                        {tab.shortLabel}
+                      </span>
+                    )}
                   </div>
                 </button>
               );
