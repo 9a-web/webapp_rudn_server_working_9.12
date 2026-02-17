@@ -2829,6 +2829,16 @@ const ReferralLinksTab = () => {
                           />
                         </div>
                       )}
+                      
+                      {/* Always show toggle */}
+                      <label className="flex items-center gap-3 cursor-pointer group pt-1">
+                        <div className={`relative w-10 h-5 rounded-full transition-all ${modalAlwaysShow ? 'bg-green-500' : 'bg-white/[0.08]'}`}
+                          onClick={() => setModalAlwaysShow(!modalAlwaysShow)}
+                        >
+                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${modalAlwaysShow ? 'left-5.5 translate-x-0.5' : 'left-0.5'}`} />
+                        </div>
+                        <span className="text-sm text-gray-400">Показывать каждый раз</span>
+                      </label>
                     </div>
                   )}
                 </div>
