@@ -137,72 +137,142 @@ const TextWithVideoBadge = ({
   );
 };
 
-// Отдельный компонент для каждой перетаскиваемой подзадачи (нужен свой useDragControls)
-const DraggableSubtaskItem = ({ subtask, onToggle, onDelete, saving }) => {
-  const dragControls = useDragControls();
-  
-  return (
-    <Reorder.Item
-      value={subtask}
-      dragListener={false}
-      dragControls={dragControls}
-      className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl group select-none"
-      whileDrag={{ scale: 1.03, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', backgroundColor: '#ffffff', zIndex: 50 }}
-    >
-      {/* Drag Handle */}
-      <div
-        className="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 -ml-1 rounded touch-none"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          dragControls.start(e);
-        }}
-      >
-        <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-      </div>
+// Drag & Drop для подзадач в модальном окне (pointer-based)
+const ModalSubtaskDragList = ({ subtasks, onReorder, onToggle, onDelete, saving }) => {
+  const [items, setItems] = useState(subtasks);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const listRef = useRef(null);
 
-      {/* Checkbox */}
-      <button
-        onClick={() => onToggle(subtask)}
-        disabled={saving}
-        className={`
-          flex-shrink-0 w-5 h-5 rounded-md border-2 
-          flex items-center justify-center transition-all
-          touch-manipulation active:scale-95
-          ${subtask.completed
-            ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500'
-            : 'bg-white border-gray-300 hover:border-blue-400'
-          }
-          disabled:opacity-50
-        `}
-      >
-        {subtask.completed && (
-          <Check className="w-3 h-3 text-white" strokeWidth={3} />
-        )}
-      </button>
-      
-      {/* Название */}
-      <span className={`
-        flex-1 text-sm
-        ${subtask.completed 
-          ? 'line-through text-gray-400' 
-          : 'text-[#1C1C1E]'
-        }
-      `}>
-        {subtask.title}
-      </span>
-      
-      {/* Кнопка удаления */}
-      <button
-        onClick={() => onDelete(subtask.subtask_id)}
-        disabled={saving}
-        className="flex-shrink-0 p-1 rounded-md
-                 text-gray-400 hover:text-red-500 hover:bg-red-50
-                 transition-colors touch-manipulation active:scale-95
-                 opacity-0 group-hover:opacity-100 disabled:opacity-50"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
-    </Reorder.Item>
+  useEffect(() => { setItems(subtasks); }, [subtasks]);
+
+  const handleDragStart = (e, idx) => {
+    e.stopPropagation();
+    setDragIdx(idx);
+  };
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragIdx === null || idx === overIdx) return;
+    setOverIdx(idx);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragIdx === null || overIdx === null || dragIdx === overIdx) {
+      setDragIdx(null); setOverIdx(null); return;
+    }
+    const reordered = [...items];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(overIdx, 0, moved);
+    setItems(reordered);
+    onReorder(reordered);
+    setDragIdx(null); setOverIdx(null);
+  };
+
+  const handleDragEnd = () => { setDragIdx(null); setOverIdx(null); };
+
+  // Touch drag
+  const touchState = useRef({ idx: null, startY: 0, moved: false });
+
+  const handleTouchStart = (e, idx) => {
+    touchState.current = { idx, startY: e.touches[0].clientY, moved: false };
+  };
+
+  const handleTouchMove = (e) => {
+    if (touchState.current.idx === null) return;
+    const touch = e.touches[0];
+    if (Math.abs(touch.clientY - touchState.current.startY) > 8) touchState.current.moved = true;
+    if (!touchState.current.moved) return;
+    e.preventDefault();
+    const els = listRef.current?.children;
+    if (!els) return;
+    for (let i = 0; i < els.length; i++) {
+      const rect = els[i].getBoundingClientRect();
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        if (i !== overIdx) setOverIdx(i);
+        if (dragIdx !== touchState.current.idx) setDragIdx(touchState.current.idx);
+        break;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchState.current.moved && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+      const reordered = [...items];
+      const [moved] = reordered.splice(dragIdx, 1);
+      reordered.splice(overIdx, 0, moved);
+      setItems(reordered);
+      onReorder(reordered);
+    }
+    touchState.current = { idx: null, startY: 0, moved: false };
+    setDragIdx(null); setOverIdx(null);
+  };
+
+  return (
+    <div ref={listRef} className="space-y-2 mb-3 max-h-48 overflow-y-auto" onDragOver={(e) => e.preventDefault()}>
+      {items.map((subtask, idx) => (
+        <div
+          key={subtask.subtask_id}
+          draggable
+          onDragStart={(e) => handleDragStart(e, idx)}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
+          onTouchStart={(e) => handleTouchStart(e, idx)}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`
+            flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl group select-none transition-all duration-150
+            ${dragIdx === idx ? 'opacity-40 scale-95' : ''}
+            ${overIdx === idx && dragIdx !== null && dragIdx !== idx ? 'bg-yellow-50 border-yellow-300' : ''}
+          `}
+        >
+          {/* Drag Handle ⠿ */}
+          <div className="cursor-grab active:cursor-grabbing flex-shrink-0 text-gray-300 group-hover:text-gray-500 transition-colors select-none text-sm leading-none" style={{ touchAction: 'none' }}>
+            ⠿
+          </div>
+
+          {/* Checkbox */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggle(subtask); }}
+            disabled={saving}
+            className={`
+              flex-shrink-0 w-5 h-5 rounded-md border-2 
+              flex items-center justify-center transition-all
+              touch-manipulation active:scale-95
+              ${subtask.completed
+                ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500'
+                : 'bg-white border-gray-300 hover:border-blue-400'
+              }
+              disabled:opacity-50
+            `}
+          >
+            {subtask.completed && (
+              <Check className="w-3 h-3 text-white" strokeWidth={3} />
+            )}
+          </button>
+          
+          {/* Название */}
+          <span className={`flex-1 text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-[#1C1C1E]'}`}>
+            {subtask.title}
+          </span>
+          
+          {/* Кнопка удаления */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(subtask.subtask_id); }}
+            disabled={saving}
+            className="flex-shrink-0 p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50
+                     transition-colors touch-manipulation active:scale-95
+                     opacity-0 group-hover:opacity-100 disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+    </div>
   );
 };
 
