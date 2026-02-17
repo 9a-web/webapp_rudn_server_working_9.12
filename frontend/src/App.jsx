@@ -507,19 +507,19 @@ const Home = () => {
     
     // Загружаем конфиг модального окна для этой ссылки
     const modalShownKey = `adref_modal_shown_${code}`;
-    if (!localStorage.getItem(modalShownKey)) {
-      const BACKEND_URL = (import.meta.env?.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
-      fetch(`${BACKEND_URL}/api/referral-modal/${code}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.has_modal) {
+    const BACKEND_URL = (import.meta.env?.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
+    fetch(`${BACKEND_URL}/api/referral-modal/${code}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.has_modal) {
+          // Если always_show — показываем всегда, иначе проверяем localStorage
+          if (data.always_show || !localStorage.getItem(modalShownKey)) {
             console.log('🎯 Найдена модалка для реферальной ссылки:', code);
             setReferralModalConfig(data);
-            // Не показываем сразу — покажем после онбординга
           }
-        })
-        .catch(err => console.error('Ошибка загрузки modal config:', err));
-    }
+        }
+      })
+      .catch(err => console.error('Ошибка загрузки modal config:', err));
   }, [startParam]);
 
   // 🎯 Показываем модалку реферальной ссылки когда:
