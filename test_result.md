@@ -144,6 +144,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ ALL USER TYPE FILTERING TESTS PASSED SUCCESSFULLY: (1) ✅ Cleanup Test Users - Removed existing test data (2) ✅ Create Telegram User 1 - Created 'Иван' with ID 123456789 (3) ✅ Create Telegram User 2 - Created 'Мария' with ID 987654321 (4) ✅ Create Web User - Created web guest 'Пользователь' with ID 142191465619684 (5) ✅ Admin Users No Filter - Found 3 test users, all have user_type field (6) ✅ Admin Users Telegram Filter - Found 2 Telegram users with user_type='telegram' (7) ✅ Admin Users Web Filter - Found 1 web user with user_type='web' (8) ✅ Admin Stats User Types - Correct stats: telegram_users=2, web_guest_users=1, total_users=3 (9) ✅ Search with User Type Filter - Found 1 'Иван' user with telegram type filtering. Logic working correctly: telegram_id < 10B = 'telegram', >= 10B = 'web'. Note: Admin endpoints are network-protected and only accessible internally (security feature)."
+      - working: true
+        agent: "testing"  
+        comment: "✅ COMPREHENSIVE SEEDED DATA TESTING COMPLETE - All 5 test scenarios passed with pre-seeded database containing 5 Telegram users (IDs: 765963392, 1311283832, 523439151, 987654321, 111222333) and 3 web visitors (IDs: 10000000000001-3). RESULTS: (1) ✅ Telegram Filter - Found exactly 5 Telegram users with correct user_type='telegram' (2) ✅ Web Filter - Found exactly 3 web users with user_type='web' (3) ✅ No Filter - Found all 8 users with proper user_type classification (4) ✅ Admin Stats - Correct counts: telegram_users=5, web_guest_users=3, total_users=8 (5) ✅ Search with Filter - Found 'Олег Новиков' with combined telegram type + search functionality. User type classification logic (telegram_id < 10B = 'telegram', >= 10B = 'web') working perfectly. Admin endpoints confirmed network-protected (accessible only via localhost:8001)."
 
 frontend:
   - task: "Admin Panel Online Statistics History"
