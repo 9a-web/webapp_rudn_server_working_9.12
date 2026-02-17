@@ -2123,6 +2123,7 @@ const Home = () => {
           onTabChange={handleTabChange}
           hapticFeedback={hapticFeedback}
           isHidden={isAnyModalOpen}
+          onBackFromFriends={() => setActiveTab(prevTab || 'home')}
         />
       )}
 
