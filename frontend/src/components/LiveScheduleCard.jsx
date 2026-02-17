@@ -205,9 +205,9 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                     } : {}}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                   >
-                    {displayCurrentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
+                    {currentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
                   </motion.p>
-                  {displayCurrentClass && (
+                  {currentClass && (
                     <motion.p 
                       className="font-bold text-base md:text-lg lg:text-xl break-words" 
                       style={{ color: '#FFFFFF' }}
@@ -230,7 +230,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   exit={{ opacity: 0, x: 5 }}
                   transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                  {displayCurrentClass ? (
+                  {currentClass ? (
                     i18n.language === 'ru' 
                       ? `Осталось: ${displayMinutesLeft} ${pluralizeMinutes(displayMinutesLeft)}`
                       : `Time left: ${displayMinutesLeft} ${displayMinutesLeft === 1 ? 'minute' : 'minutes'}`
@@ -325,7 +325,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   strokeDasharray={2 * Math.PI * 40}
                   initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
                   animate={{ 
-                    strokeDashoffset: displayCurrentClass 
+                    strokeDashoffset: currentClass 
                       ? 2 * Math.PI * 40 * (1 - progressPercentage / 100)
                       : 0
                   }}
