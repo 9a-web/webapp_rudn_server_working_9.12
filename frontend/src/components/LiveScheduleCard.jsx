@@ -324,6 +324,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           </div>
         </motion.div>
       </motion.div>
+      </div>
       
       {/* Кнопка тестовой пары */}
       <div className="mt-12 flex flex-col items-center gap-3">
