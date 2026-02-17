@@ -62,7 +62,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
   }, [hapticFeedback, onTabChange]);
 
   const activeTabData = activeTab === 'friends' 
-    ? { id: 'friends', color: '#c084fc', gradient: 'from-purple-400 to-pink-400' }
+    ? { id: 'friends', color: '#ef4444', gradient: 'from-red-400 to-red-500' }
     : tabs.find(t => t.id === activeTab);
 
   return (
