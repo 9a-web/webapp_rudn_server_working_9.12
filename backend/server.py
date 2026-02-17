@@ -7371,6 +7371,16 @@ async def get_channel_stats(channel: str = "@rudngo"):
             count_data = count_resp.json()
             member_count = count_data.get("result", 0) if count_data.get("ok") else 0
 
+            # getFile — получаем URL аватарки канала
+            photo_url = None
+            photo_data = chat.get("photo")
+            if photo_data and photo_data.get("big_file_id"):
+                file_resp = await client.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": photo_data["big_file_id"]})
+                file_data = file_resp.json()
+                if file_data.get("ok"):
+                    file_path = file_data["result"].get("file_path", "")
+                    photo_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+
         return {
             "channel": channel,
             "title": chat.get("title", ""),
@@ -7379,6 +7389,7 @@ async def get_channel_stats(channel: str = "@rudngo"):
             "member_count": member_count,
             "type": chat.get("type", ""),
             "photo": chat.get("photo"),
+            "photo_url": photo_url,
             "invite_link": chat.get("invite_link", f"https://t.me/{chat.get('username', '')}"),
         }
     except HTTPException:
