@@ -580,60 +580,13 @@ export const EditTaskModal = ({
                     className="space-y-2 mb-3 max-h-48 overflow-y-auto"
                   >
                     {subtasks.map((subtask) => (
-                      <Reorder.Item
+                      <DraggableSubtaskItem
                         key={subtask.subtask_id}
-                        value={subtask}
-                        className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl group"
-                        whileDrag={{ scale: 1.02, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 50 }}
-                      >
-                        {/* Drag Handle */}
-                        <div className="cursor-grab active:cursor-grabbing touch-none flex-shrink-0">
-                          <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                        </div>
-
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => handleToggleSubtask(subtask)}
-                          disabled={saving}
-                          className={`
-                            flex-shrink-0 w-5 h-5 rounded-md border-2 
-                            flex items-center justify-center transition-all
-                            touch-manipulation active:scale-95
-                            ${subtask.completed
-                              ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500'
-                              : 'bg-white border-gray-300 hover:border-blue-400'
-                            }
-                            disabled:opacity-50
-                          `}
-                        >
-                          {subtask.completed && (
-                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                          )}
-                        </button>
-                        
-                        {/* Название */}
-                        <span className={`
-                          flex-1 text-sm
-                          ${subtask.completed 
-                            ? 'line-through text-gray-400' 
-                            : 'text-[#1C1C1E]'
-                          }
-                        `}>
-                          {subtask.title}
-                        </span>
-                        
-                        {/* Кнопка удаления */}
-                        <button
-                          onClick={() => handleDeleteSubtask(subtask.subtask_id)}
-                          disabled={saving}
-                          className="flex-shrink-0 p-1 rounded-md
-                                   text-gray-400 hover:text-red-500 hover:bg-red-50
-                                   transition-colors touch-manipulation active:scale-95
-                                   opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </Reorder.Item>
+                        subtask={subtask}
+                        onToggle={handleToggleSubtask}
+                        onDelete={handleDeleteSubtask}
+                        saving={saving}
+                      />
                     ))}
                   </Reorder.Group>
                 )}
