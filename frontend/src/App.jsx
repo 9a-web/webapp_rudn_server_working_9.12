@@ -277,6 +277,8 @@ const Home = () => {
     const savedTab = localStorage.getItem('activeTab');
     return savedTab || 'home';
   });
+  const [prevTab, setPrevTab] = useState('home');
+
   
   // Состояние для отслеживания модальных окон журнала
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
