@@ -712,22 +712,13 @@ export const EditTaskModal = ({
                 
                 {/* Список подзадач с drag & drop */}
                 {subtasks.length > 0 && (
-                  <Reorder.Group
-                    axis="y"
-                    values={subtasks}
+                  <ModalSubtaskDragList
+                    subtasks={subtasks}
                     onReorder={handleReorderSubtasks}
-                    className="space-y-2 mb-3 max-h-48 overflow-y-auto"
-                  >
-                    {subtasks.map((subtask) => (
-                      <DraggableSubtaskItem
-                        key={subtask.subtask_id}
-                        subtask={subtask}
-                        onToggle={handleToggleSubtask}
-                        onDelete={handleDeleteSubtask}
-                        saving={saving}
-                      />
-                    ))}
-                  </Reorder.Group>
+                    onToggle={handleToggleSubtask}
+                    onDelete={handleDeleteSubtask}
+                    saving={saving}
+                  />
                 )}
                 
                 {/* Поле добавления новой подзадачи */}
