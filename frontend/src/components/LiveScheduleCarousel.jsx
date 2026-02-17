@@ -470,10 +470,9 @@ export const LiveScheduleCarousel = ({
 
         {/* Вертикальная карусель справа - скрыта на десктопах (md и больше) */}
         <div 
-          className="flex flex-col items-center justify-center gap-3 md:hidden ml-[5px] pr-[10px]"
+          className="flex flex-col items-center justify-center gap-3 md:hidden ml-[5px] pr-[10px] mt-5"
           style={{
-            // Компенсируем paddingBottom карточек (38px / 2 = 19px) для центрирования по основной карточке
-            marginTop: currentCard.type === 'schedule' ? '0' : '-19px'
+            height: 'fit-content'
           }}
         >
           {/* Кнопка вверх */}
