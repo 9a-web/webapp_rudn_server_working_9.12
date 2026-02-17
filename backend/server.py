@@ -7342,6 +7342,50 @@ async def track_user_activity(telegram_id: int, section: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# ============ Telegram Channel Statistics ============
+
+@api_router.get("/admin/channel-stats")
+async def get_channel_stats(channel: str = "@rudngo"):
+    """Получить статистику Telegram-канала (подписчики, описание и т.д.)."""
+    try:
+        from config import get_telegram_bot_token
+        token = get_telegram_bot_token()
+        if not token:
+            raise HTTPException(status_code=500, detail="Bot token not configured")
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            # getChat — основная информация
+            chat_resp = await client.get(f"https://api.telegram.org/bot{token}/getChat", params={"chat_id": channel})
+            chat_data = chat_resp.json()
+            if not chat_data.get("ok"):
+                raise HTTPException(status_code=400, detail=chat_data.get("description", "Failed to get chat"))
+
+            chat = chat_data["result"]
+
+            # getChatMemberCount — количество подписчиков
+            count_resp = await client.get(f"https://api.telegram.org/bot{token}/getChatMemberCount", params={"chat_id": channel})
+            count_data = count_resp.json()
+            member_count = count_data.get("result", 0) if count_data.get("ok") else 0
+
+        return {
+            "channel": channel,
+            "title": chat.get("title", ""),
+            "username": chat.get("username", ""),
+            "description": chat.get("description", ""),
+            "member_count": member_count,
+            "type": chat.get("type", ""),
+            "photo": chat.get("photo"),
+            "invite_link": chat.get("invite_link", f"https://t.me/{chat.get('username', '')}"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting channel stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # ============ Server Load Statistics ============
 
 @api_router.get("/admin/server-stats")
