@@ -525,7 +525,7 @@ const Home = () => {
   // 🎯 Показываем модалку реферальной ссылки когда:
   // 1. Конфиг модалки загружен (referralModalConfig)
   // 2. Пользователь прошёл онбординг (userSettings есть, GroupSelector не показан)
-  // 3. Модалка ещё не показывалась (localStorage)
+  // 3. Модалка ещё не показывалась (localStorage) — или always_show включен
   useEffect(() => {
     if (!referralModalConfig || !referralModalConfig.has_modal) return;
     if (!userSettings) return; // Онбординг ещё не пройден
@@ -534,7 +534,9 @@ const Home = () => {
     
     const code = startParam?.replace('adref_', '') || '';
     const modalShownKey = `adref_modal_shown_${code}`;
-    if (localStorage.getItem(modalShownKey)) return; // Уже показывали
+    
+    // Если always_show — пропускаем проверку localStorage
+    if (!referralModalConfig.always_show && localStorage.getItem(modalShownKey)) return;
     
     localStorage.setItem(modalShownKey, Date.now().toString());
     console.log('🎯 Показываем модалку реферальной ссылки');
