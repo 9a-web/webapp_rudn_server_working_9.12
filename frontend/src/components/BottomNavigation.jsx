@@ -15,31 +15,28 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
 
   const containerRef = useRef(null);
   const tabRefs = useRef({});
-  const backBtnRef = useRef(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const measure = useCallback(() => {
     const container = containerRef.current;
-    const activeEl = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
+    const activeEl = tabRefs.current[activeTab];
     if (!container || !activeEl) return;
     const cRect = container.getBoundingClientRect();
     const tRect = activeEl.getBoundingClientRect();
     setPillStyle({ left: tRect.left - cRect.left, width: tRect.width });
   }, [activeTab]);
 
-  // Re-measure whenever activeTab changes AND continuously via ResizeObserver
   useLayoutEffect(() => {
     measure();
   }, [activeTab, measure]);
 
   useEffect(() => {
-    const el = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
+    const el = tabRefs.current[activeTab];
     if (!el) return;
 
     const ro = new ResizeObserver(() => measure());
     ro.observe(el);
 
-    // Also re-measure a few times during the text expand animation
     const t1 = setTimeout(measure, 50);
     const t2 = setTimeout(measure, 150);
     const t3 = setTimeout(measure, 300);
@@ -61,9 +58,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
     onTabChange?.(tabId);
   }, [hapticFeedback, onTabChange]);
 
-  const activeTabData = activeTab === 'friends' 
-    ? { id: 'friends', color: '#ef4444', gradient: 'from-red-400 to-red-500' }
-    : tabs.find(t => t.id === activeTab);
+  const activeTabData = tabs.find(t => t.id === activeTab);
+  const showBackButton = activeTab === 'friends' && onBackFromFriends;
 
   return (
     <motion.nav
@@ -73,107 +69,115 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       className="fixed bottom-4 z-50"
       style={{ left: '50%', overflow: 'visible' }}
     >
-      <div className="relative" style={{ height: '50px' }}>
-        {/* Glow */}
-        <motion.div
-          className="absolute pointer-events-none blur-2xl"
-          animate={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.width > 0 ? 0.3 : 0 }}
-          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-          style={{
-            top: 0, height: '100%', borderRadius: '9999px', zIndex: -1,
-            background: activeTabData ? `linear-gradient(135deg, ${activeTabData.color}, ${activeTabData.color}88)` : 'transparent',
-          }}
-        />
-
-        {/* Background */}
-        <div
-          className="absolute inset-0 border border-white/10"
-          style={{
-            borderRadius: '9999px', overflow: 'hidden',
-            backgroundColor: 'rgba(28, 28, 30, 0.7)',
-            backdropFilter: 'blur(40px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-          }}
-        />
-
-        {/* Content */}
-        <div ref={containerRef} className="relative h-full px-2 py-1">
-          {/* Sliding pill — follows measured left+width */}
+      <div className="flex items-center gap-3">
+        {/* Main nav bar */}
+        <div className="relative" style={{ height: '50px' }}>
+          {/* Glow */}
           <motion.div
-            className="absolute bg-white/[0.07] border border-white/[0.1]"
-            animate={{ left: pillStyle.left, width: pillStyle.width }}
+            className="absolute pointer-events-none blur-2xl"
+            animate={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.width > 0 ? 0.3 : 0 }}
             transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-            style={{ top: '4px', height: '42px', borderRadius: '9999px' }}
+            style={{
+              top: 0, height: '100%', borderRadius: '9999px', zIndex: -1,
+              background: activeTabData ? `linear-gradient(135deg, ${activeTabData.color}, ${activeTabData.color}88)` : 'transparent',
+            }}
           />
 
-          <div className="flex items-center justify-center gap-0 h-full">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
+          {/* Background */}
+          <div
+            className="absolute inset-0 border border-white/10"
+            style={{
+              borderRadius: '9999px', overflow: 'hidden',
+              backgroundColor: 'rgba(28, 28, 30, 0.7)',
+              backdropFilter: 'blur(40px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+            }}
+          />
 
-              return (
-                <button
-                  key={tab.id}
-                  ref={(el) => { tabRefs.current[tab.id] = el; }}
-                  onClick={() => handleTabClick(tab.id)}
-                  className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150"
-                  style={{
-                    height: '42px',
-                    paddingLeft: isActive ? '6px' : '8px',
-                    paddingRight: isActive ? '14px' : '8px',
-                    borderRadius: '9999px',
-                    minWidth: isActive ? '42px' : '38px',
-                  }}
-                >
-                  <div className="relative z-10 flex items-center gap-2">
-                    {isActive ? (
-                      <div className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}>
-                        <div className="bg-[#1C1C1E] rounded-xl p-1.5">
-                          <Icon className="w-5 h-5 text-white" strokeWidth={2.5} />
+          {/* Content */}
+          <div ref={containerRef} className="relative h-full px-2 py-1">
+            {/* Sliding pill */}
+            <motion.div
+              className="absolute bg-white/[0.07] border border-white/[0.1]"
+              animate={{ left: pillStyle.left, width: pillStyle.width }}
+              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              style={{ top: '4px', height: '42px', borderRadius: '9999px' }}
+            />
+
+            <div className="flex items-center justify-center gap-0 h-full">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+
+                return (
+                  <button
+                    key={tab.id}
+                    ref={(el) => { tabRefs.current[tab.id] = el; }}
+                    onClick={() => handleTabClick(tab.id)}
+                    className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150"
+                    style={{
+                      height: '42px',
+                      paddingLeft: isActive ? '6px' : '8px',
+                      paddingRight: isActive ? '14px' : '8px',
+                      borderRadius: '9999px',
+                      minWidth: isActive ? '42px' : '38px',
+                    }}
+                  >
+                    <div className="relative z-10 flex items-center gap-2">
+                      {isActive ? (
+                        <div className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}>
+                          <div className="bg-[#1C1C1E] rounded-xl p-1.5">
+                            <Icon className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="p-2">
-                        <Icon className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} />
-                      </div>
-                    )}
+                      ) : (
+                        <div className="p-2">
+                          <Icon className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} />
+                        </div>
+                      )}
 
-                    {isActive && (
-                      <span className="text-white text-[13px] font-semibold whitespace-nowrap">
-                        {tab.shortLabel}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Кнопка "Назад" из раздела Друзья */}
-            {activeTab === 'friends' && onBackFromFriends && (
-              <button
-                ref={backBtnRef}
-                onClick={() => {
-                  if (hapticFeedback?.impactOccurred) {
-                    try { hapticFeedback.impactOccurred('light'); } catch (e) {}
-                  }
-                  onBackFromFriends();
-                }}
-                className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150 ml-1"
-                style={{
-                  height: '42px',
-                  paddingLeft: '8px',
-                  paddingRight: '8px',
-                  borderRadius: '9999px',
-                  minWidth: '38px',
-                }}
-              >
-                <div className="p-2">
-                  <Undo2 className="w-5 h-5" style={{ color: '#ef4444' }} strokeWidth={2.5} />
-                </div>
-              </button>
-            )}
+                      {isActive && (
+                        <span className="text-white text-[13px] font-semibold whitespace-nowrap">
+                          {tab.shortLabel}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        {/* Отдельная круглая кнопка "Назад" из раздела Друзья */}
+        <AnimatePresence>
+          {showBackButton && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, x: -10 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.5, x: -10 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              onClick={() => {
+                if (hapticFeedback?.impactOccurred) {
+                  try { hapticFeedback.impactOccurred('light'); } catch (e) {}
+                }
+                onBackFromFriends();
+              }}
+              className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150 border border-white/10"
+              style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(28, 28, 30, 0.7)',
+                backdropFilter: 'blur(40px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                flexShrink: 0,
+              }}
+            >
+              <Undo2 className="w-5 h-5" style={{ color: '#ef4444' }} strokeWidth={2.5} />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </motion.nav>
   );
