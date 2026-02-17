@@ -554,7 +554,16 @@ const ChannelStatsCard = () => {
       </div>
 
       {/* Chart */}
-      {history.length > 1 && (
+      {history.length > 1 && (() => {
+        const counts = history.map(p => p.count);
+        const minVal = Math.min(...counts);
+        const maxVal = Math.max(...counts);
+        const isFlat = minVal === maxVal;
+        const yDomain = isFlat
+          ? [Math.max(0, minVal - Math.max(5, Math.round(minVal * 0.1))), maxVal + Math.max(5, Math.round(maxVal * 0.1))]
+          : [minVal - 2, maxVal + 2];
+
+        return (
         <div className="relative z-10" style={{ height: 160 }}>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={history} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -577,7 +586,7 @@ const ChannelStatsCard = () => {
                 tick={{ fill: '#555', fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
-                domain={['dataMin - 2', 'dataMax + 2']}
+                domain={yDomain}
                 allowDecimals={false}
               />
               <Tooltip
@@ -606,13 +615,19 @@ const ChannelStatsCard = () => {
                 stroke="#2AABEE"
                 strokeWidth={2}
                 fill="url(#channelGrad)"
-                dot={false}
+                dot={isFlat ? { r: 3, fill: '#2AABEE', stroke: 'rgba(42,171,238,0.3)', strokeWidth: 4 } : false}
                 activeDot={{ r: 4, fill: '#2AABEE', stroke: '#fff', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
+          {isFlat && (
+            <div className="absolute top-2 right-2 text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-md">
+              стабильно: {minVal}
+            </div>
+          )}
         </div>
-      )}
+        );
+      })()}
 
       {history.length <= 1 && !loading && (
         <div className="text-center text-gray-600 text-[11px] py-6 relative z-10">
