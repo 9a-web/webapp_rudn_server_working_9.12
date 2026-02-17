@@ -1838,6 +1838,7 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
                     setEditingText={setEditingText}
                     onToggle={toggleTask}
                     onToggleSubtask={handleToggleSubtask}
+                    onReorderSubtasks={handleReorderSubtasks}
                     onStartEdit={handleStartEdit}      // Inline редактирование по двойному клику
                     onEdit={handleOpenEditModal}        // Модальное окно для метаданных
                     onAddSubtask={handleOpenInlineSubtask}  // Открываем inline поле для добавления подзадачи
