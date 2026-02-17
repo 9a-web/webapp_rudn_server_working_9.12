@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { Home, ClipboardList, FileCheck, Music, Users } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false }) => {
@@ -11,30 +11,35 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       id: 'home',
       icon: Home,
       label: t('bottomNav.home', 'Главный экран'),
+      shortLabel: t('bottomNav.homeShort', 'Главная'),
       gradient: 'from-green-400 to-cyan-400'
     },
     {
       id: 'tasks',
       icon: ClipboardList,
       label: t('bottomNav.tasks', 'Список дел'),
+      shortLabel: t('bottomNav.tasksShort', 'Задачи'),
       gradient: 'from-yellow-400 to-orange-400'
     },
     {
       id: 'journal',
       icon: FileCheck,
       label: t('bottomNav.journal', 'Журнал'),
+      shortLabel: t('bottomNav.journalShort', 'Журнал'),
       gradient: 'from-indigo-400 to-blue-400'
     },
     {
       id: 'friends',
       icon: Users,
       label: t('bottomNav.friends', 'Друзья'),
+      shortLabel: t('bottomNav.friendsShort', 'Друзья'),
       gradient: 'from-purple-400 to-pink-400'
     },
     {
       id: 'music',
       icon: Music,
       label: t('bottomNav.music', 'Музыка'),
+      shortLabel: t('bottomNav.musicShort', 'Музыка'),
       gradient: 'from-pink-400 to-red-400'
     }
   ];
@@ -61,38 +66,26 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       transition={{ duration: 0.3, ease: 'easeInOut' }}
       className="fixed bottom-4 z-50"
       style={{ 
-        width: '340px', 
-        height: '50px',
         left: '50%',
         overflow: 'visible'
       }}
     >
       {/* Main navigation with rounded corners */}
-      <div className="relative h-full">
-        {/* Glow effects layer - rendered behind the background */}
+      <div className="relative" style={{ height: '50px' }}>
+        {/* Glow effects layer */}
         <div className="absolute inset-0 pointer-events-none" style={{ overflow: 'visible', zIndex: -1 }}>
-          <div className="relative h-full px-4 py-1">
-            <div className="flex items-center justify-around gap-2 h-full">
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <div
-                    key={`glow-${tab.id}`}
-                    className="flex-1 relative"
-                  >
-                    {isActive && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={`absolute inset-0 bg-gradient-to-br ${tab.gradient} blur-2xl`}
-                        style={{ borderRadius: '40px', opacity: 0.3 }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return isActive ? (
+              <motion.div
+                key={`glow-${tab.id}`}
+                layoutId="navGlow"
+                className={`absolute inset-0 bg-gradient-to-br ${tab.gradient} blur-2xl`}
+                style={{ borderRadius: '40px', opacity: 0.25 }}
+                transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+              />
+            ) : null;
+          })}
         </div>
 
         {/* Background with blur and border */}
@@ -108,8 +101,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
         />
         
         {/* Content container */}
-        <div className="relative h-full px-4 py-1">
-          <div className="flex items-center justify-around gap-2 h-full">
+        <div className="relative h-full px-2 py-1">
+          <div className="flex items-center justify-center gap-1 h-full">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -119,32 +112,40 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                     key={tab.id}
                     onClick={() => handleTabClick(tab.id)}
                     whileTap={{ scale: 0.92 }}
-                    className="relative flex-1 flex items-center justify-center px-3 transition-all duration-300 touch-manipulation"
+                    layout
+                    className="relative flex items-center justify-center transition-all duration-300 touch-manipulation"
                     style={{
-                      backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
-                      borderRadius: '40px'
+                      height: '42px',
+                      padding: isActive ? '0 14px' : '0 12px',
+                      borderRadius: '40px',
+                      minWidth: isActive ? 'auto' : '42px',
                     }}
+                    transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
                   >
-                    {/* Active indicator */}
+                    {/* Active pill background */}
                     {isActive && (
                       <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 bg-white/5 rounded-[40px]"
-                        transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                        layoutId="activeNavPill"
+                        className="absolute inset-0 bg-white/[0.07] border border-white/[0.1]"
+                        style={{ borderRadius: '40px' }}
+                        transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
                       />
                     )}
 
-                    {/* Icon with gradient */}
-                    <div className="relative">
+                    {/* Icon + Label */}
+                    <div className="relative z-10 flex items-center gap-2">
                       {isActive ? (
-                        <div className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}>
+                        <motion.div 
+                          className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}
+                          layout
+                        >
                           <div className="bg-[#1C1C1E] rounded-xl p-1.5">
                             <Icon 
-                              className="w-5 h-5 text-white relative z-10" 
+                              className="w-5 h-5 text-white" 
                               strokeWidth={2.5}
                             />
                           </div>
-                        </div>
+                        </motion.div>
                       ) : (
                         <div className="p-2">
                           <Icon 
@@ -153,6 +154,21 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                           />
                         </div>
                       )}
+
+                      <AnimatePresence mode="wait">
+                        {isActive && (
+                          <motion.span
+                            key={`label-${tab.id}`}
+                            initial={{ opacity: 0, width: 0 }}
+                            animate={{ opacity: 1, width: 'auto' }}
+                            exit={{ opacity: 0, width: 0 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            className="text-white text-[13px] font-semibold whitespace-nowrap overflow-hidden pr-1"
+                          >
+                            {tab.shortLabel}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </motion.button>
                 );
