@@ -2627,39 +2627,16 @@ const TodayTaskItem = ({
               </div>
             </div>
             
-            {/* Список существующих подзадач */}
+            {/* Список существующих подзадач с drag & drop */}
             {task.subtasks && task.subtasks.length > 0 && (
               <div className="mt-2 pt-2 border-t border-gray-100">
-                <div className="space-y-1">
-                  {task.subtasks.map((subtask) => (
-                    <div 
-                      key={subtask.subtask_id}
-                      className="flex items-center gap-2 pl-6"
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleSubtask(task.id, subtask.subtask_id, subtask.completed);
-                        }}
-                        className={`
-                          w-3 h-3 rounded flex-shrink-0 flex items-center justify-center
-                          cursor-pointer transition-all duration-200 touch-manipulation active:scale-90
-                          ${subtask.completed 
-                            ? 'bg-green-400' 
-                            : 'bg-white border border-gray-300 hover:border-green-400'
-                          }
-                        `}
-                      >
-                        {subtask.completed && (
-                          <Check className="w-2 h-2 text-white" strokeWidth={3} />
-                        )}
-                      </button>
-                      <span className={`text-xs ${subtask.completed ? 'text-gray-400 line-through' : 'text-gray-600'}`}>
-                        {subtask.title}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <SubtaskDragList
+                  taskId={task.id}
+                  subtasks={task.subtasks}
+                  onToggle={onToggleSubtask}
+                  onReorder={onReorderSubtasks}
+                  hapticFeedback={hapticFeedback}
+                />
               </div>
             )}
             
