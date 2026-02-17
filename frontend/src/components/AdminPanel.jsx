@@ -3036,6 +3036,7 @@ const ReferralLinksTab = () => {
                       {selectedLink.modal_config.title && <div>Заголовок: <span className="text-gray-300">{selectedLink.modal_config.title}</span></div>}
                       <div>Кнопка: <span className="text-gray-300">{selectedLink.modal_config.button_text || 'OK'}</span> → <span className="text-purple-400">{selectedLink.modal_config.button_action}</span></div>
                       {selectedLink.modal_config.button_action === 'reward' && <div>Баллы: <span className="text-amber-400">+{selectedLink.modal_config.reward_points}</span></div>}
+                      {selectedLink.modal_config.always_show && <div className="text-green-400">Показывается каждый раз</div>}
                     </div>
                   </div>
                 )}
