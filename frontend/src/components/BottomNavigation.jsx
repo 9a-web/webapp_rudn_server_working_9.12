@@ -144,6 +144,34 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                 </button>
               );
             })}
+
+            {/* Кнопка "Назад" из раздела Друзья */}
+            {activeTab === 'friends' && onBackFromFriends && (
+              <motion.button
+                key="back-from-friends"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                onClick={() => {
+                  if (hapticFeedback?.impactOccurred) {
+                    try { hapticFeedback.impactOccurred('light'); } catch (e) {}
+                  }
+                  onBackFromFriends();
+                }}
+                className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150 ml-1"
+                style={{
+                  height: '42px',
+                  paddingLeft: '8px',
+                  paddingRight: '8px',
+                  borderRadius: '9999px',
+                  minWidth: '38px',
+                }}
+              >
+                <div className="p-2">
+                  <Undo2 className="w-5 h-5 text-[#c084fc] transition-colors duration-300" strokeWidth={2} />
+                </div>
+              </motion.button>
+            )}
           </div>
         </div>
       </div>
