@@ -223,3 +223,11 @@ agent_communication:
     • All endpoints return correct data structure and user_type classification
     IMPORTANT NOTE: Admin endpoints are network-protected (internal-only access) - this is a security feature, not a bug.
     The user_type filtering system is production-ready with no issues found."
+  - agent: "main"
+    message: "FRONTEND CHANGE: Separated admin panel 'Студенты' tab into two separate tabs:
+    1. 'Пользователи' (id=users) — shows only Telegram users (user_type=telegram)
+    2. 'Посещения' (id=visits) — shows only web visitors (user_type=web)
+    Backend unchanged — already supports user_type filter.
+    TEST: Verify GET /api/admin/users?user_type=telegram returns only TG users,
+    GET /api/admin/users?user_type=web returns only web visitors.
+    Test data: 5 TG users + 3 web visitors seeded in test_database."
