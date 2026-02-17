@@ -245,30 +245,17 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               </AnimatePresence>
             </div>
 
-            {/* Right side - Progress ring (стиль как в WeekDateSelector) */}
+            {/* Right side - Progress ring (стиль WeekDateSelector) */}
             <motion.div 
               className="relative flex items-center justify-center flex-shrink-0 w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36"
-              style={{ overflow: 'visible' }}
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
             >
-              {/* Glowing background effect */}
-              <div
-                className="absolute w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full"
-                style={{
-                  background: themeStyles.circle.bgGradient,
-                  filter: isWinter ? 'blur(20px)' : 'blur(25px)',
-                  opacity: 0.6,
-                  animation: currentClass ? 'glowPulse 4s ease-in-out infinite' : 'none'
-                }}
-              />
-              
-              {/* SVG Ring — thin, clean like WeekDateSelector */}
+              {/* SVG Ring — чистое кольцо как в WeekDateSelector */}
               <svg 
-                className="absolute w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 -rotate-90"
-                viewBox="0 0 120 120"
-                style={{ overflow: 'visible' }}
+                className="absolute inset-0 w-full h-full -rotate-90"
+                viewBox="0 0 100 100"
               >
                 <defs>
                   <linearGradient id="progressGradientWinter" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -285,70 +272,53 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   </linearGradient>
                 </defs>
                 
-                {/* Background circle — тонкий, полупрозрачный */}
+                {/* Фоновый круг */}
                 <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  stroke={currentClass ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)'}
-                  strokeWidth="3.5"
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  stroke={displayCurrentClass ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)'}
+                  strokeWidth="6"
                   fill="none"
                 />
                 
-                {/* Progress circle — тонкий, с градиентом и закруглёнными концами */}
+                {/* Прогресс круг — с градиентом */}
                 <motion.circle
-                  cx="60"
-                  cy="60"
-                  r="52"
+                  cx="50"
+                  cy="50"
+                  r="40"
                   stroke={`url(#${themeStyles.circle.strokeId})`}
-                  strokeWidth="3.5"
+                  strokeWidth="6"
                   fill="none"
                   strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 52}
-                  initial={{ strokeDashoffset: 2 * Math.PI * 52 }}
+                  strokeDasharray={2 * Math.PI * 40}
+                  initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
                   animate={{ 
-                    strokeDashoffset: currentClass 
-                      ? 2 * Math.PI * 52 * (1 - progressPercentage / 100)
-                      : 2 * Math.PI * 52
+                    strokeDashoffset: displayCurrentClass 
+                      ? 2 * Math.PI * 40 * (1 - progressPercentage / 100)
+                      : 2 * Math.PI * 40
                   }}
-                  transition={{ duration: 0.8, ease: 'easeInOut' }}
-                  style={{
-                    filter: currentClass 
-                      ? `drop-shadow(0 0 6px ${isWinter ? 'rgba(56, 189, 248, 0.5)' : 'rgba(163, 247, 191, 0.5)'})`
-                      : 'none'
+                  transition={{ 
+                    duration: 0.5, 
+                    ease: 'easeInOut' 
                   }}
                 />
               </svg>
               
-              {/* Center content with time */}
-              <motion.div 
-                className={`relative w-20 h-20 md:w-22 md:h-22 lg:w-24 lg:h-24 rounded-full flex items-center justify-center z-10 border ${themeStyles.circle.centerBorder}`} 
-                style={{ 
-                  backgroundColor: themeStyles.circle.centerBg,
-                  backdropFilter: 'blur(30px) saturate(180%)',
-                  WebkitBackdropFilter: 'blur(30px) saturate(180%)'
-                }}
-                animate={{ 
-                  boxShadow: currentClass 
-                    ? themeStyles.circle.shadowActive
-                    : themeStyles.circle.shadowInactive
-                }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <AnimatePresence mode="wait">
-                  <motion.span 
-                    key={formatTime(time)}
-                    className="text-lg md:text-xl lg:text-2xl font-bold" 
-                    style={{ color: themeStyles.circle.timeColor }}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {formatTime(time)}
-                  </motion.span>
-                </AnimatePresence>
-              </motion.div>
+              {/* Время по центру */}
+              <AnimatePresence mode="wait">
+                <motion.span 
+                  key={formatTime(time)}
+                  className="relative z-10 text-lg md:text-xl lg:text-2xl font-bold" 
+                  style={{ color: themeStyles.circle.timeColor }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {formatTime(time)}
+                </motion.span>
+              </AnimatePresence>
             </motion.div>
           </div>
         </motion.div>
