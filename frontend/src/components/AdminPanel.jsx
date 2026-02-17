@@ -194,7 +194,8 @@ const AdminPanel = ({ isOpen, onClose }) => {
     { id: 'stats', icon: <BarChart3 className="w-4 h-4" />, label: 'Статистика', glow: 'purple' },
     { id: 'referrals', icon: <Share2 className="w-4 h-4" />, label: 'Рефералы', glow: 'pink' },
     { id: 'server', icon: <Server className="w-4 h-4" />, label: 'Сервер', glow: 'cyan' },
-    { id: 'users', icon: <Users className="w-4 h-4" />, label: 'Студенты', glow: 'blue' },
+    { id: 'users', icon: <Users className="w-4 h-4" />, label: 'Пользователи', glow: 'blue' },
+    { id: 'visits', icon: <Globe className="w-4 h-4" />, label: 'Посещения', glow: 'orange' },
     { id: 'classes', icon: <BookOpen className="w-4 h-4" />, label: 'Занятия', glow: 'orange' },
     { id: 'notifications', icon: <Bell className="w-4 h-4" />, label: 'Уведомления', glow: 'pink' },
   ];
