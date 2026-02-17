@@ -236,10 +236,10 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   exit={{ opacity: 0, x: 5 }}
                   transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
-                  {currentClass ? (
+                  {displayCurrentClass ? (
                     i18n.language === 'ru' 
-                      ? `Осталось: ${minutesLeft} ${pluralizeMinutes(minutesLeft)}`
-                      : `Time left: ${minutesLeft} ${minutesLeft === 1 ? 'minute' : 'minutes'}`
+                      ? `Осталось: ${displayMinutesLeft} ${pluralizeMinutes(displayMinutesLeft)}`
+                      : `Time left: ${displayMinutesLeft} ${displayMinutesLeft === 1 ? 'minute' : 'minutes'}`
                   ) : t('liveScheduleCard.relax')}
                 </motion.p>
               </AnimatePresence>
