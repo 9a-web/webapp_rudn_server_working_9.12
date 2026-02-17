@@ -638,10 +638,18 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
           <GlassStatCard
             icon={<Users className="w-5 h-5 text-white" />}
             title="Пользователи"
-            value={generalStats.total_users}
-            subtitle={`Telegram: ${formatNumber(generalStats.telegram_users || 0)} · Веб: ${formatNumber(generalStats.web_guest_users || 0)}`}
+            value={generalStats.telegram_users || 0}
+            subtitle={`Сегодня: +${formatNumber(generalStats.new_users_today || 0)}`}
             gradientFrom="from-purple-500" gradientTo="to-violet-600"
             delay={0}
+          />
+          <GlassStatCard
+            icon={<Globe className="w-5 h-5 text-white" />}
+            title="Веб-посетители"
+            value={generalStats.web_guest_users || 0}
+            subtitle={`Веб-сессий: ${formatNumber(generalStats.web_sessions_total || 0)}`}
+            gradientFrom="from-teal-500" gradientTo="to-cyan-600"
+            delay={1}
           />
           <GlassStatCard
             icon={<TrendingUp className="w-5 h-5 text-white" />}
@@ -649,7 +657,7 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
             value={generalStats.new_users_week}
             subtitle={`За месяц: ${formatNumber(generalStats.new_users_month || 0)}`}
             gradientFrom="from-pink-500" gradientTo="to-rose-600"
-            delay={1}
+            delay={2}
           />
           <GlassStatCard
             icon={<CheckSquare className="w-5 h-5 text-white" />}
@@ -657,7 +665,7 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
             value={generalStats.total_tasks}
             subtitle={`Выполнено: ${formatNumber(generalStats.total_completed_tasks)}`}
             gradientFrom="from-amber-500" gradientTo="to-orange-600"
-            delay={2}
+            delay={3}
           />
           <GlassStatCard
             icon={<Award className="w-5 h-5 text-white" />}
@@ -665,7 +673,7 @@ const StatsContent = ({ generalStats, usersActivity, hourlyActivity, weeklyActiv
             value={generalStats.total_achievements_earned}
             subtitle={`Комнат: ${formatNumber(generalStats.total_rooms)}`}
             gradientFrom="from-cyan-500" gradientTo="to-blue-600"
-            delay={3}
+            delay={4}
           />
         </div>
       )}
