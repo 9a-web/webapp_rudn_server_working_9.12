@@ -8,7 +8,7 @@ import { ProfileModal } from './ProfileModal';
 import { rainbowConfetti } from '../utils/confetti';
 import { botAPI } from '../services/api';
 
-export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false, onQRScanned }) => {
+export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false, onQRScanned, onFriendsClick }) => {
   const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
