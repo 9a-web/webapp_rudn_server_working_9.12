@@ -2885,26 +2885,28 @@ const ReferralLinksTab = () => {
               className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-t-2xl sm:rounded-2xl shadow-2xl"
             >
               {/* Detail Header */}
-              <div className="sticky top-0 z-10 bg-[#0f0f1e]/95 backdrop-blur-xl border-b border-white/[0.06] p-5">
+              <div className="sticky top-0 z-10 bg-[#0f0f1e]/95 backdrop-blur-xl border-b border-white/[0.06] p-4 sm:p-5">
+                {/* Drag handle on mobile */}
+                <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3 sm:hidden" />
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${selectedLink.is_active 
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-2 sm:p-2.5 rounded-xl flex-shrink-0 ${selectedLink.is_active 
                       ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20' 
                       : 'bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/20'
                     }`}>
-                      <Share2 className={`w-5 h-5 ${selectedLink.is_active ? 'text-emerald-400' : 'text-red-400'}`} />
+                      <Share2 className={`w-4 h-4 sm:w-5 sm:h-5 ${selectedLink.is_active ? 'text-emerald-400' : 'text-red-400'}`} />
                     </div>
-                    <div>
-                      <h3 className="text-base font-bold text-white">{selectedLink.name}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md">{selectedLink.code}</span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-white truncate">{selectedLink.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] sm:text-[11px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md">{selectedLink.code}</span>
                         {selectedLink.campaign && (
-                          <span className="text-[11px] text-gray-500">{selectedLink.campaign}</span>
+                          <span className="text-[10px] sm:text-[11px] text-gray-500">{selectedLink.campaign}</span>
                         )}
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setSelectedLink(null)} className="p-2 hover:bg-white/[0.05] rounded-xl transition-colors">
+                  <button onClick={() => setSelectedLink(null)} className="p-2 hover:bg-white/[0.05] rounded-xl transition-colors flex-shrink-0">
                     <X className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
