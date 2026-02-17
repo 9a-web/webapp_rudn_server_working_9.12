@@ -7635,6 +7635,28 @@ async def collect_server_metrics_loop():
             except Exception as oe:
                 logger.warning(f"⚠️ Error collecting online stats: {oe}")
 
+            # --- Сохраняем статистику Telegram-канала ---
+            try:
+                from config import get_telegram_bot_token
+                token = get_telegram_bot_token()
+                if token:
+                    async with httpx.AsyncClient(timeout=10) as hc:
+                        count_resp = await hc.get(
+                            f"https://api.telegram.org/bot{token}/getChatMemberCount",
+                            params={"chat_id": "@rudngo"}
+                        )
+                        count_data = count_resp.json()
+                        if count_data.get("ok"):
+                            channel_point = {
+                                "id": str(uuid.uuid4()),
+                                "timestamp": datetime.utcnow(),
+                                "channel": "@rudngo",
+                                "member_count": count_data["result"],
+                            }
+                            await db.channel_stats_history.insert_one(channel_point)
+            except Exception as ce:
+                logger.warning(f"⚠️ Error collecting channel stats: {ce}")
+
         except Exception as e:
             logger.warning(f"⚠️ Error collecting server metrics: {e}")
         
