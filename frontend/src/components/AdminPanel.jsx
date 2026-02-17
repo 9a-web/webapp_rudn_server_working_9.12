@@ -2597,14 +2597,15 @@ const ReferralLinksTab = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center sm:p-4"
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateForm(false)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-2xl p-5 sm:p-6 shadow-2xl"
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 100 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2.5">
