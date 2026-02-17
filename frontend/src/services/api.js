@@ -514,6 +514,15 @@ export const tasksAPI = {
       handleError(error);
     }
   },
+
+  reorderSubtasks: async (taskId, subtaskIds) => {
+    try {
+      const response = await api.put(`/tasks/${taskId}/subtasks-reorder`, { subtask_ids: subtaskIds });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
 };
 
 /**
