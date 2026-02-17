@@ -150,11 +150,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
 
             {/* Кнопка "Назад" из раздела Друзья */}
             {activeTab === 'friends' && onBackFromFriends && (
-              <motion.button
-                key="back-from-friends"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
+              <button
+                ref={backBtnRef}
                 onClick={() => {
                   if (hapticFeedback?.impactOccurred) {
                     try { hapticFeedback.impactOccurred('light'); } catch (e) {}
@@ -164,16 +161,23 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                 className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150 ml-1"
                 style={{
                   height: '42px',
-                  paddingLeft: '8px',
-                  paddingRight: '8px',
+                  paddingLeft: '6px',
+                  paddingRight: '14px',
                   borderRadius: '9999px',
-                  minWidth: '38px',
+                  minWidth: '42px',
                 }}
               >
-                <div className="p-2">
-                  <Undo2 className="w-5 h-5 text-[#c084fc] transition-colors duration-300" strokeWidth={2} />
+                <div className="relative z-10 flex items-center gap-2">
+                  <div className="bg-gradient-to-br from-purple-400 to-pink-400 p-0.5 rounded-xl">
+                    <div className="bg-[#1C1C1E] rounded-xl p-1.5">
+                      <Undo2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  <span className="text-white text-[13px] font-semibold whitespace-nowrap">
+                    Назад
+                  </span>
                 </div>
-              </motion.button>
+              </button>
             )}
           </div>
         </div>
