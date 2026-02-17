@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Compass, NotebookText, FileCheck, AudioLines, Users, Undo2 } from 'lucide-react';
+import { Compass, NotebookText, BookOpenCheck, AudioLines, Users, Undo2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
