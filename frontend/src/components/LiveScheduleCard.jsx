@@ -33,11 +33,16 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
 
   // Расчет прогресса для progress bar (предполагаем, что пара длится 90 минут)
   const progressPercentage = useMemo(() => {
+    if (testMode) return testProgress;
     if (!currentClass || !minutesLeft) return 0;
     const totalClassDuration = 90; // минут
     const elapsed = totalClassDuration - minutesLeft;
     return Math.max(0, Math.min(100, (elapsed / totalClassDuration) * 100));
-  }, [currentClass, minutesLeft]);
+  }, [currentClass, minutesLeft, testMode, testProgress]);
+
+  // Для тестового режима подставляем данные
+  const displayCurrentClass = testMode ? 'Тестовая пара' : currentClass;
+  const displayMinutesLeft = testMode ? Math.round(90 * (1 - testProgress / 100)) : minutesLeft;
 
   // Theme Styles Configuration
   const themeStyles = {
