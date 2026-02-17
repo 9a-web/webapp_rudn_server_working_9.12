@@ -7389,6 +7389,53 @@ async def get_channel_stats(channel: str = "@rudngo"):
 
 
 
+@api_router.get("/admin/channel-stats-history")
+async def get_channel_stats_history(hours: int = 168):
+    """
+    История подписчиков Telegram-канала.
+    hours: 24, 72, 168 (неделя), 720 (месяц), 0 = всё.
+    """
+    try:
+        if hours <= 0:
+            cutoff = datetime(2020, 1, 1)
+        else:
+            cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        cursor = db.channel_stats_history.find(
+            {"timestamp": {"$gte": cutoff}},
+            {"_id": 0, "timestamp": 1, "member_count": 1}
+        ).sort("timestamp", 1)
+
+        points = await cursor.to_list(length=None)
+
+        # Агрегируем: для больших периодов прореживаем точки
+        if len(points) > 300:
+            step = max(1, len(points) // 200)
+            points = [points[i] for i in range(0, len(points), step)]
+            if points[-1] != (await cursor.to_list(length=1)):
+                pass  # ensure last point
+
+        for p in points:
+            p["timestamp"] = p["timestamp"].isoformat()
+
+        # Дельта: разница между первым и последним значением
+        delta = 0
+        if len(points) >= 2:
+            delta = points[-1]["member_count"] - points[0]["member_count"]
+
+        return {
+            "period_hours": hours,
+            "total_points": len(points),
+            "delta": delta,
+            "history": points,
+        }
+    except Exception as e:
+        logger.error(f"Error getting channel stats history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
 # ============ Server Load Statistics ============
 
 @api_router.get("/admin/server-stats")
