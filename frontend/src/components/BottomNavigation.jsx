@@ -13,17 +13,19 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
     { id: 'music', icon: Music, shortLabel: t('bottomNav.musicShort', 'Музыка'), gradient: 'from-pink-400 to-red-400', color: '#f472b6' },
   ];
 
-  const containerRef = useRef(null);
+  const outerRef = useRef(null);
   const tabRefs = useRef({});
+  const backBtnRef = useRef(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const measure = useCallback(() => {
-    const container = containerRef.current;
-    const activeEl = tabRefs.current[activeTab];
-    if (!container || !activeEl) return;
-    const cRect = container.getBoundingClientRect();
-    const tRect = activeEl.getBoundingClientRect();
-    setPillStyle({ left: tRect.left - cRect.left, width: tRect.width });
+    const outer = outerRef.current;
+    if (!outer) return;
+    const targetEl = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
+    if (!targetEl) return;
+    const oRect = outer.getBoundingClientRect();
+    const tRect = targetEl.getBoundingClientRect();
+    setPillStyle({ left: tRect.left - oRect.left, width: tRect.width });
   }, [activeTab]);
 
   useLayoutEffect(() => {
@@ -31,11 +33,11 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
   }, [activeTab, measure]);
 
   useEffect(() => {
-    const el = tabRefs.current[activeTab];
-    if (!el) return;
+    const targetEl = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
+    if (!targetEl) return;
 
     const ro = new ResizeObserver(() => measure());
-    ro.observe(el);
+    ro.observe(targetEl);
 
     const t1 = setTimeout(measure, 50);
     const t2 = setTimeout(measure, 150);
@@ -58,7 +60,10 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
     onTabChange?.(tabId);
   }, [hapticFeedback, onTabChange]);
 
-  const activeTabData = tabs.find(t => t.id === activeTab);
+  const activeTabData = activeTab === 'friends'
+    ? { id: 'friends', color: '#ef4444' }
+    : tabs.find(t => t.id === activeTab);
+
   const showBackButton = activeTab === 'friends' && onBackFromFriends;
 
   return (
@@ -69,20 +74,30 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
       className="fixed bottom-4 z-50"
       style={{ left: '50%', overflow: 'visible' }}
     >
-      <div className="flex items-center gap-3">
+      {/* Outer wrapper — pill измеряется относительно него */}
+      <div ref={outerRef} className="relative flex items-center gap-1.5" style={{ height: '50px' }}>
+
+        {/* Glow за pill */}
+        <motion.div
+          className="absolute pointer-events-none blur-2xl"
+          animate={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.width > 0 ? 0.3 : 0 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          style={{
+            top: 0, height: '100%', borderRadius: '9999px', zIndex: 0,
+            background: activeTabData ? `linear-gradient(135deg, ${activeTabData.color}, ${activeTabData.color}88)` : 'transparent',
+          }}
+        />
+
+        {/* Sliding pill — перемещается между вкладками И кнопкой */}
+        <motion.div
+          className="absolute bg-white/[0.07] border border-white/[0.1] pointer-events-none"
+          animate={{ left: pillStyle.left, width: pillStyle.width }}
+          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          style={{ top: '4px', height: '42px', borderRadius: '9999px', zIndex: 2 }}
+        />
+
         {/* Main nav bar */}
         <div className="relative" style={{ height: '50px' }}>
-          {/* Glow */}
-          <motion.div
-            className="absolute pointer-events-none blur-2xl"
-            animate={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.width > 0 ? 0.3 : 0 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-            style={{
-              top: 0, height: '100%', borderRadius: '9999px', zIndex: -1,
-              background: activeTabData ? `linear-gradient(135deg, ${activeTabData.color}, ${activeTabData.color}88)` : 'transparent',
-            }}
-          />
-
           {/* Background */}
           <div
             className="absolute inset-0 border border-white/10"
@@ -94,16 +109,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
             }}
           />
 
-          {/* Content */}
-          <div ref={containerRef} className="relative h-full px-2 py-1">
-            {/* Sliding pill */}
-            <motion.div
-              className="absolute bg-white/[0.07] border border-white/[0.1]"
-              animate={{ left: pillStyle.left, width: pillStyle.width }}
-              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-              style={{ top: '4px', height: '42px', borderRadius: '9999px' }}
-            />
-
+          {/* Tabs */}
+          <div className="relative h-full px-2 py-1">
             <div className="flex items-center justify-center gap-0 h-full">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -149,14 +156,15 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
           </div>
         </div>
 
-        {/* Отдельная круглая кнопка "Назад" из раздела Друзья */}
+        {/* Круглая кнопка "Назад" — справа от навбара */}
         <AnimatePresence>
           {showBackButton && (
             <motion.button
-              initial={{ opacity: 0, scale: 0.5, x: -10 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.5, x: -10 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
+              ref={backBtnRef}
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               onClick={() => {
                 if (hapticFeedback?.impactOccurred) {
                   try { hapticFeedback.impactOccurred('light'); } catch (e) {}
@@ -172,6 +180,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                 backdropFilter: 'blur(40px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(40px) saturate(180%)',
                 flexShrink: 0,
+                zIndex: 3,
               }}
             >
               <Undo2 className="w-5 h-5" style={{ color: '#ef4444' }} strokeWidth={2.5} />
