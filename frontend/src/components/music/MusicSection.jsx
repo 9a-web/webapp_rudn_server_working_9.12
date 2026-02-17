@@ -499,7 +499,7 @@ export const MusicSection = ({ telegramId, onListeningRoomOpenChange, onSendTrac
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="music-welcome-card relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-2xl overflow-hidden"
+            className="music-welcome-card relative w-full md:max-w-2xl md:mx-auto lg:max-w-3xl rounded-[2rem] overflow-hidden"
             style={{ aspectRatio: 'auto', minHeight: '70vh', marginTop: '15px' }}
           >
             {/* Прелоадер пока изображение не загрузилось */}
