@@ -137,6 +137,75 @@ const TextWithVideoBadge = ({
   );
 };
 
+// Отдельный компонент для каждой перетаскиваемой подзадачи (нужен свой useDragControls)
+const DraggableSubtaskItem = ({ subtask, onToggle, onDelete, saving }) => {
+  const dragControls = useDragControls();
+  
+  return (
+    <Reorder.Item
+      value={subtask}
+      dragListener={false}
+      dragControls={dragControls}
+      className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl group select-none"
+      whileDrag={{ scale: 1.03, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', backgroundColor: '#ffffff', zIndex: 50 }}
+    >
+      {/* Drag Handle */}
+      <div
+        className="cursor-grab active:cursor-grabbing flex-shrink-0 p-1 -ml-1 rounded touch-none"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          dragControls.start(e);
+        }}
+      >
+        <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+      </div>
+
+      {/* Checkbox */}
+      <button
+        onClick={() => onToggle(subtask)}
+        disabled={saving}
+        className={`
+          flex-shrink-0 w-5 h-5 rounded-md border-2 
+          flex items-center justify-center transition-all
+          touch-manipulation active:scale-95
+          ${subtask.completed
+            ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500'
+            : 'bg-white border-gray-300 hover:border-blue-400'
+          }
+          disabled:opacity-50
+        `}
+      >
+        {subtask.completed && (
+          <Check className="w-3 h-3 text-white" strokeWidth={3} />
+        )}
+      </button>
+      
+      {/* Название */}
+      <span className={`
+        flex-1 text-sm
+        ${subtask.completed 
+          ? 'line-through text-gray-400' 
+          : 'text-[#1C1C1E]'
+        }
+      `}>
+        {subtask.title}
+      </span>
+      
+      {/* Кнопка удаления */}
+      <button
+        onClick={() => onDelete(subtask.subtask_id)}
+        disabled={saving}
+        className="flex-shrink-0 p-1 rounded-md
+                 text-gray-400 hover:text-red-500 hover:bg-red-50
+                 transition-colors touch-manipulation active:scale-95
+                 opacity-0 group-hover:opacity-100 disabled:opacity-50"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </Reorder.Item>
+  );
+};
+
 export const EditTaskModal = ({ 
   isOpen, 
   onClose, 
