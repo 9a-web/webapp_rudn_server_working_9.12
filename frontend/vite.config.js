@@ -18,12 +18,11 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'build',
       sourcemap: false,
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: true,
-          drop_debugger: true,
-        },
+      // esbuild вместо terser — в 10-50 раз меньше потребление памяти
+      minify: 'esbuild',
+      // drop console/debugger через esbuild (аналог terserOptions)
+      esbuild: {
+        drop: ['console', 'debugger'],
       },
       rollupOptions: {
         output: {
@@ -31,6 +30,14 @@ export default defineConfig(({ mode }) => {
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash].[ext]',
+          // Разделение на чанки — снижает пиковое потребление памяти
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-router': ['react-router-dom'],
+            'vendor-charts': ['recharts'],
+            'vendor-motion': ['framer-motion'],
+            'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          },
         },
       },
       chunkSizeWarningLimit: 1000,
