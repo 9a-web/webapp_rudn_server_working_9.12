@@ -2434,6 +2434,49 @@ async def delete_task_subtask(task_id: str, subtask_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+class SubtaskReorderRequest(BaseModel):
+    subtask_ids: list[str]
+
+@api_router.put("/tasks/{task_id}/subtasks-reorder", response_model=TaskResponse)
+async def reorder_task_subtasks(task_id: str, request: SubtaskReorderRequest):
+    """Изменить порядок подзадач в личной задаче"""
+    try:
+        task_doc = await db.tasks.find_one({"id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+
+        current_subtasks = task_doc.get("subtasks", [])
+        subtask_map = {s["subtask_id"]: s for s in current_subtasks}
+
+        # Пересобираем в новом порядке
+        reordered = []
+        for sid in request.subtask_ids:
+            if sid in subtask_map:
+                st = subtask_map.pop(sid)
+                st["order"] = len(reordered)
+                reordered.append(st)
+        # Добавляем оставшиеся (на случай рассинхрона)
+        for st in subtask_map.values():
+            st["order"] = len(reordered)
+            reordered.append(st)
+
+        await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": {"subtasks": reordered, "updated_at": datetime.utcnow()}}
+        )
+
+        updated_task = await db.tasks.find_one({"id": task_id})
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при изменении порядка подзадач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @api_router.get("/tasks/{telegram_id}/productivity-stats", response_model=TaskProductivityStats)
 async def get_productivity_stats(telegram_id: int):
     """Получить статистику продуктивности по задачам пользователя"""
