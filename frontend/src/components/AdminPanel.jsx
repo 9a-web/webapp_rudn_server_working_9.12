@@ -2405,6 +2405,7 @@ const ReferralLinksTab = () => {
       button_url: modalButtonUrl,
       button_navigate_to: modalNavigateTo,
       reward_points: modalRewardPoints,
+      always_show: modalAlwaysShow,
     };
   };
 
