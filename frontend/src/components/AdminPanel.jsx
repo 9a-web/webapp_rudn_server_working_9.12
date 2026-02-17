@@ -2390,6 +2390,7 @@ const ReferralLinksTab = () => {
     setModalNavigateTo('');
     setModalRewardPoints(0);
     setModalImageId('');
+    setModalAlwaysShow(false);
   };
   
   const getModalConfig = () => {
