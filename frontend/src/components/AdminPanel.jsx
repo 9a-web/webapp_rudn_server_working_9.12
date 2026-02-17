@@ -2874,14 +2874,15 @@ const ReferralLinksTab = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center sm:p-4"
           >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedLink(null)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-2xl shadow-2xl"
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 100 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-y-auto bg-[#0f0f1e] border border-white/[0.08] rounded-t-2xl sm:rounded-2xl shadow-2xl"
             >
               {/* Detail Header */}
               <div className="sticky top-0 z-10 bg-[#0f0f1e]/95 backdrop-blur-xl border-b border-white/[0.06] p-5">
