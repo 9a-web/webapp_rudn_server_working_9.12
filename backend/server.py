@@ -16596,6 +16596,7 @@ async def get_referral_modal_config(code: str):
             "button_url": modal_config.get("button_url", ""),
             "button_navigate_to": modal_config.get("button_navigate_to", ""),
             "reward_points": modal_config.get("reward_points", 0),
+            "always_show": modal_config.get("always_show", False),
         }
     except Exception as e:
         logger.error(f"Ошибка получения modal config: {e}")
