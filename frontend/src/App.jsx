@@ -1886,7 +1886,7 @@ const Home = () => {
           unreadNotificationsCount={unreadNotificationsCount}
           hasNewNotification={hasNewNotification}
           onQRScanned={handleQRScanned}
-          onFriendsClick={() => setActiveTab('friends')}
+          onFriendsClick={() => { setPrevTab(activeTab); setActiveTab('friends'); }}
         />
         
         {/* Условное отображение разделов в зависимости от активной вкладки */}
