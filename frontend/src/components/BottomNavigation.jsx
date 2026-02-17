@@ -33,7 +33,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
   }, [activeTab, measure]);
 
   useEffect(() => {
-    const el = tabRefs.current[activeTab];
+    const el = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
     if (!el) return;
 
     const ro = new ResizeObserver(() => measure());
