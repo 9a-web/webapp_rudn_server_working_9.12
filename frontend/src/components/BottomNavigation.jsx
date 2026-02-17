@@ -112,40 +112,41 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                     key={tab.id}
                     onClick={() => handleTabClick(tab.id)}
                     whileTap={{ scale: 0.92 }}
-                    layout
-                    className="relative flex items-center justify-center transition-all duration-300 touch-manipulation"
+                    className="relative flex items-center justify-center touch-manipulation"
                     style={{
                       height: '42px',
                       padding: isActive ? '0 14px' : '0 12px',
-                      borderRadius: '40px',
-                      minWidth: isActive ? 'auto' : '42px',
+                      borderRadius: '9999px',
+                      minWidth: '42px',
                     }}
-                    transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+                    animate={{ width: isActive ? 'auto' : '42px' }}
+                    transition={{ type: 'spring', bounce: 0.15, duration: 0.45 }}
                   >
-                    {/* Active pill background */}
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeNavPill"
-                        className="absolute inset-0 bg-white/[0.07] border border-white/[0.1]"
-                        style={{ borderRadius: '40px' }}
-                        transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
-                      />
-                    )}
+                    {/* Active pill background — no layoutId, just fade in place */}
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.85 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.85 }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="absolute inset-0 bg-white/[0.07] border border-white/[0.1]"
+                          style={{ borderRadius: '9999px' }}
+                        />
+                      )}
+                    </AnimatePresence>
 
                     {/* Icon + Label */}
                     <div className="relative z-10 flex items-center gap-2">
                       {isActive ? (
-                        <motion.div 
-                          className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}
-                          layout
-                        >
+                        <div className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}>
                           <div className="bg-[#1C1C1E] rounded-xl p-1.5">
                             <Icon 
                               className="w-5 h-5 text-white" 
                               strokeWidth={2.5}
                             />
                           </div>
-                        </motion.div>
+                        </div>
                       ) : (
                         <div className="p-2">
                           <Icon 
@@ -162,7 +163,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                             initial={{ opacity: 0, width: 0 }}
                             animate={{ opacity: 1, width: 'auto' }}
                             exit={{ opacity: 0, width: 0 }}
-                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
                             className="text-white text-[13px] font-semibold whitespace-nowrap overflow-hidden pr-1"
                           >
                             {tab.shortLabel}
