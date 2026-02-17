@@ -161,21 +161,14 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                 className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150 ml-1"
                 style={{
                   height: '42px',
-                  paddingLeft: '6px',
-                  paddingRight: '14px',
+                  paddingLeft: '8px',
+                  paddingRight: '8px',
                   borderRadius: '9999px',
-                  minWidth: '42px',
+                  minWidth: '38px',
                 }}
               >
-                <div className="relative z-10 flex items-center gap-2">
-                  <div className="bg-gradient-to-br from-purple-400 to-pink-400 p-0.5 rounded-xl">
-                    <div className="bg-[#1C1C1E] rounded-xl p-1.5">
-                      <Undo2 className="w-5 h-5 text-white" strokeWidth={2.5} />
-                    </div>
-                  </div>
-                  <span className="text-white text-[13px] font-semibold whitespace-nowrap">
-                    Назад
-                  </span>
+                <div className="p-2">
+                  <Undo2 className="w-5 h-5" style={{ color: '#ef4444' }} strokeWidth={2.5} />
                 </div>
               </button>
             )}
