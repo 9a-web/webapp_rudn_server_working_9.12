@@ -211,9 +211,9 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                     } : {}}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                   >
-                    {currentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
+                    {displayCurrentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
                   </motion.p>
-                  {currentClass && (
+                  {displayCurrentClass && (
                     <motion.p 
                       className="font-bold text-base md:text-lg lg:text-xl break-words" 
                       style={{ color: '#FFFFFF' }}
@@ -221,7 +221,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.15, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                     >
-                      {translateDiscipline(currentClass, i18n.language)}
+                      {testMode ? 'Тестовая пара' : translateDiscipline(currentClass, i18n.language)}
                     </motion.p>
                   )}
                 </motion.div>
