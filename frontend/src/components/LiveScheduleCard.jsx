@@ -355,49 +355,6 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
         </motion.div>
       </motion.div>
       </div>
-      
-      {/* Кнопка тестовой пары */}
-      <div className="mt-12 flex flex-col items-center gap-3">
-        <motion.button
-          onClick={() => {
-            setTestMode(prev => !prev);
-            if (!testMode) setTestProgress(65);
-          }}
-          whileTap={{ scale: 0.95 }}
-          className={`
-            px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-300
-            ${testMode 
-              ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-              : 'bg-white/10 text-white/70 border border-white/15 hover:bg-white/15'}
-          `}
-        >
-          {testMode ? '✕ Выключить тест' : '🧪 Создать тестовую пару'}
-        </motion.button>
-        
-        {testMode && (
-          <motion.div 
-            className="flex items-center gap-3 w-full max-w-[300px]"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <span className="text-xs text-white/50 whitespace-nowrap">0%</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={testProgress}
-              onChange={(e) => setTestProgress(Number(e.target.value))}
-              className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, #A3F7BF ${testProgress}%, rgba(255,255,255,0.15) ${testProgress}%)`,
-                accentColor: '#A3F7BF'
-              }}
-            />
-            <span className="text-xs text-white/50 whitespace-nowrap">{testProgress}%</span>
-          </motion.div>
-        )}
-      </div>
     </div>
   );
 });
