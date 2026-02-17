@@ -104,7 +104,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
             style={{ top: '4px', height: '42px', borderRadius: '9999px' }}
           />
 
-          <div className="flex items-center justify-center gap-1 h-full">
+          <div className="flex items-center justify-center gap-0 h-full">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -117,10 +117,10 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                   className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150"
                   style={{
                     height: '42px',
-                    paddingLeft: isActive ? '6px' : '12px',
-                    paddingRight: isActive ? '14px' : '12px',
+                    paddingLeft: isActive ? '6px' : '8px',
+                    paddingRight: isActive ? '14px' : '8px',
                     borderRadius: '9999px',
-                    minWidth: '42px',
+                    minWidth: isActive ? '42px' : '38px',
                   }}
                 >
                   <div className="relative z-10 flex items-center gap-2">
