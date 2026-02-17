@@ -15,11 +15,12 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
 
   const containerRef = useRef(null);
   const tabRefs = useRef({});
+  const backBtnRef = useRef(null);
   const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
 
   const measure = useCallback(() => {
     const container = containerRef.current;
-    const activeEl = tabRefs.current[activeTab];
+    const activeEl = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
     if (!container || !activeEl) return;
     const cRect = container.getBoundingClientRect();
     const tRect = activeEl.getBoundingClientRect();
