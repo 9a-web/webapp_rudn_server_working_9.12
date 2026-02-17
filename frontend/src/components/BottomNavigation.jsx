@@ -79,10 +79,11 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
             return isActive ? (
               <motion.div
                 key={`glow-${tab.id}`}
-                layoutId="navGlow"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.25 }}
+                exit={{ opacity: 0 }}
                 className={`absolute inset-0 bg-gradient-to-br ${tab.gradient} blur-2xl`}
-                style={{ borderRadius: '40px', opacity: 0.25 }}
-                transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+                style={{ borderRadius: '40px' }}
               />
             ) : null;
           })}
