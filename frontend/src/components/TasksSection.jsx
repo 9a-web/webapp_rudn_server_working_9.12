@@ -1240,6 +1240,18 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
     }
   };
 
+  // Перетаскивание подзадач (reorder)
+  const handleReorderSubtasks = async (taskId, newSubtasks) => {
+    // Оптимистичное обновление
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, subtasks: newSubtasks } : t));
+    try {
+      const subtaskIds = newSubtasks.map(s => s.subtask_id);
+      await tasksAPI.reorderSubtasks(taskId, subtaskIds);
+    } catch (error) {
+      console.error('Error reordering subtasks:', error);
+    }
+  };
+
   // Шаблоны быстрых задач
   const quickActionTemplates = [
     { 
