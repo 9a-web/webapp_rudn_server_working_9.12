@@ -173,19 +173,7 @@ const GoldBadge = ({ show }) => {
       transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.22 }}
       style={{ position: 'relative', zIndex: 20, width: BADGE_SIZE, height: BADGE_SIZE }}
     >
-      {/* ── Пульсирующее свечение (box-shadow — дёшево) ── */}
-      <motion.div
-        animate={{ opacity: [0.5, 1, 0.5] }}
-        transition={{ delay: 1.1, duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-        style={{
-          position: 'absolute', inset: -4,
-          borderRadius: 28,
-          boxShadow: '0 0 22px 6px rgba(247,200,60,0.42)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* ── Единый SVG: фигура + все слои + shimmer ── */}
+      {/* ── Единый SVG: фигура + все слои + shimmer + свечение ── */}
       <svg
         width={BADGE_SIZE}
         height={BADGE_SIZE}
@@ -201,7 +189,7 @@ const GoldBadge = ({ show }) => {
             <stop offset="100%" stopColor="#C27E08" />
           </linearGradient>
 
-          {/* Блик сверху (светлее к верху) */}
+          {/* Блик сверху */}
           <linearGradient id="sr-shine" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%"  stopColor="rgba(255,255,255,0.28)" />
             <stop offset="58%" stopColor="rgba(255,255,255,0)" />
@@ -214,19 +202,40 @@ const GoldBadge = ({ show }) => {
             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
 
-          {/* Клип-путь для shimmer — только внутри пятиугольника */}
+          {/* Клип-путь для shimmer */}
           <clipPath id="sr-clip">
             <path d={PENT} />
           </clipPath>
+
+          {/* Фильтр: тень + пульсирующее свечение по форме пятиугольника */}
+          <filter id="sr-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur" />
+            <feColorMatrix in="blur" type="matrix"
+              values="1 0.7 0 0 0  0.8 0.5 0 0 0  0 0.2 0 0 0  0 0 0 0.6 0"
+              result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
         {/* Мягкая тень-эллипс снизу */}
-        <ellipse cx="56" cy="108" rx="32" ry="7"
-          fill="rgba(140,80,0,0.22)" />
+        <ellipse cx="56" cy="110" rx="30" ry="6"
+          fill="rgba(140,80,0,0.20)" />
+
+        {/* Пульсирующее свечение — отдельный path той же формы, размытый */}
+        <motion.path
+          d={PENT}
+          fill="rgba(247,200,60,0.55)"
+          style={{ filter: 'blur(10px)' }}
+          animate={{ opacity: [0.4, 0.85, 0.4] }}
+          transition={{ delay: 1.0, duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        />
 
         {/* Основная фигура */}
         <path d={PENT} fill="url(#sr-gold)"
-          style={{ filter: 'drop-shadow(0 6px 10px rgba(150,90,0,0.35))' }} />
+          style={{ filter: 'drop-shadow(0 5px 8px rgba(150,90,0,0.32))' }} />
 
         {/* Блик */}
         <path d={PENT} fill="url(#sr-shine)" />
