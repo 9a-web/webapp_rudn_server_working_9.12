@@ -18,6 +18,7 @@ import FriendsSection from './components/FriendsSection';
 import GroupSelector from './components/GroupSelector';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusTester from './StatusTester';
+import { StreakRewardPreview } from './components/StreakRewardModal';
 import { TelegramProvider, useTelegram } from './contexts/TelegramContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Import ThemeProvider
 import { scheduleAPI, userAPI, achievementsAPI, tasksAPI, activityAPI, getBackendURL } from './services/api';
