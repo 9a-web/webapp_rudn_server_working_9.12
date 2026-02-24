@@ -351,7 +351,7 @@ const WeekTracker = ({ streakDays = 3, weekDays, show }) => {
             fontSize: 10,
             fontWeight: 500,
             color: '#AEAEB2',
-            fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+            fontFamily: FONT,
             letterSpacing: 0.3,
           }}>
             {day.label}
@@ -388,7 +388,7 @@ const WeekTracker = ({ streakDays = 3, weekDays, show }) => {
                 fontSize: 17,
                 fontWeight: 700,
                 color: '#1C1C1E',
-                fontFamily: '-apple-system, "SF Pro Display", Inter, sans-serif',
+                fontFamily: FONT,
               }}>
                 {day.dateNum}
               </span>
@@ -520,7 +520,7 @@ export const StreakRewardModal = ({
                       color: '#AEAEB2',
                       letterSpacing: 1.1,
                       textTransform: 'uppercase',
-                      fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+                      fontFamily: FONT,
                       margin: 0,
                     }}
                   >
@@ -559,7 +559,7 @@ export const StreakRewardModal = ({
                       fontSize: 32,
                       fontWeight: 800,
                       color: '#1C1C1E',
-                      fontFamily: '-apple-system, "SF Pro Display", Inter, sans-serif',
+                      fontFamily: FONT,
                       margin: 0,
                       letterSpacing: -0.5,
                       textAlign: 'center',
@@ -578,7 +578,7 @@ export const StreakRewardModal = ({
                       fontSize: 15,
                       fontWeight: 400,
                       color: '#8E8E93',
-                      fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+                      fontFamily: FONT,
                       margin: '0 0 16px',
                       textAlign: 'center',
                     }}
@@ -672,7 +672,7 @@ export const StreakRewardModal = ({
                         fontSize: 17,
                         fontWeight: 600,
                         color: '#FFFFFF',
-                        fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+                        fontFamily: FONT,
                       }}>
                         Получено!
                       </span>
@@ -687,7 +687,7 @@ export const StreakRewardModal = ({
                         fontSize: 17,
                         fontWeight: 600,
                         color: '#FFFFFF',
-                        fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+                        fontFamily: FONT,
                         letterSpacing: 0.2,
                       }}
                     >
@@ -717,7 +717,7 @@ export const StreakRewardModal = ({
                   fontSize: 14,
                   fontWeight: 500,
                   color: '#8E8E93',
-                  fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+                  fontFamily: FONT,
                 }}>
                   Не сейчас
                 </span>
@@ -744,7 +744,7 @@ export const StreakRewardPreview = () => {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: '-apple-system, "SF Pro Text", Inter, sans-serif',
+      fontFamily: FONT,
     }}>
       <p style={{ color: '#8E8E93', fontSize: 13, marginBottom: 16 }}>
         Нажми для демонстрации
