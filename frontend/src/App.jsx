@@ -2370,6 +2370,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/status-tester" element={<StatusTester />} />
+                  <Route path="/streak-demo" element={<StreakRewardPreview />} />
                 </Routes>
               </BrowserRouter>
             </PlayerProvider>
