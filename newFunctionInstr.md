@@ -524,8 +524,8 @@
 ## 🚀 ПЛАН ПО ФАЗАМ
 
 ### Фаза 1 — Быстрые победы (1-2 дня каждое)
-1. ✅ **StreakRewardModal** — UI компонент готов
-2. 🔵 **Streak бэкенд** — `POST /api/users/{id}/visit`, поля в `user_stats`
+1. ✅ **StreakRewardModal** — UI компонент готов (Poppins, SVG пятиугольник, shimmer, конфетти)
+2. 🔵 **Streak бэкенд** — `POST /api/users/{id}/visit`, новые поля в `user_stats`
 3. 🔵 **Авто-напоминания** — inactivity checker в `scheduler_v2.py`
 4. 🔵 **Совместное расписание** — переключатель на главном экране + алгоритм
 5. 🔵 **Admin: TG парсинг** — BeautifulSoup парсер + новая вкладка AdminPanel
