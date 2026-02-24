@@ -261,3 +261,62 @@ agent_communication:
     ✅ GET /api/admin/users?user_type=telegram&search=Оле → Returns 1 user (Олег Новиков) with combined filtering
     
     The user type classification logic (telegram_id < 10,000,000,000 = 'telegram', >= 10B = 'web') is working perfectly. Admin endpoints are network-protected and only accessible via localhost:8001 for security. The feature is production-ready with no issues found."
+  - agent: "testing"
+    message: "❌ STREAK DEMO PAGE TESTING FAILED - DEPLOYMENT BLOCKER FOUND
+    
+    ISSUE: Direct navigation to /streak-demo returns HTTP 404 from server
+    
+    ROOT CAUSE:
+    FastAPI backend lacks catch-all route configuration for Single Page Application (SPA).
+    When users navigate directly to client-side routes like /streak-demo, the backend
+    returns 404 instead of serving React's index.html with the router.
+    
+    EVIDENCE:
+    • Tested URL: https://lesson-progress-hub.preview.emergentagent.com/streak-demo
+    • Result: '404 - The requested path could not be found'
+    • Route EXISTS in code: /app/frontend/src/App.jsx line 2373
+    • Component EXISTS: /app/frontend/src/components/StreakRewardModal.jsx (693 lines, fully implemented)
+    
+    CODE REVIEW (Component is CORRECT):
+    ✅ StreakRewardPreview component exports correctly
+    ✅ Button: '🔥 Открыть Streak Reward' (line 679)
+    ✅ Gold pentagon badge with laurel wreath SVG (lines 143-216)  
+    ✅ Animated counter for streak days (lines 51-68)
+    ✅ Week tracker with 7 days display (lines 221-312)
+    ✅ 'Забрать награду' button (black, line 605)
+    ✅ Success state: '✓ Получено!' (line 588)
+    ✅ Particle confetti animations (lines 73-117)
+    ✅ Shimmer effects (lines 122-138)
+    ✅ All framer-motion animations configured
+    
+    REQUIRED FIX:
+    Backend /app/backend/server.py needs catch-all route at END of file:
+    
+    ```python
+    # Serve React app for client-side routes (must be LAST route)
+    @app.get('/{full_path:path}')
+    async def serve_react_app(full_path: str):
+        '''Catch-all route to serve React SPA for client-side routing'''
+        if full_path.startswith('api/'):
+            raise HTTPException(status_code=404, detail='API endpoint not found')
+        
+        # Serve index.html for all non-API routes
+        index_path = Path(__file__).parent.parent / 'frontend' / 'build' / 'index.html'
+        if index_path.exists():
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail='Frontend not built')
+    ```
+    
+    ALTERNATIVE (if using nginx/reverse proxy):
+    Configure nginx to try_files for React routes:
+    ```
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    ```
+    
+    TESTING STATUS:
+    ❌ Cannot test UI functionality until route configuration is fixed
+    ✅ Component code review passed - implementation is correct
+    
+    PRIORITY: HIGH - This blocks all client-side route testing in deployed environment"
