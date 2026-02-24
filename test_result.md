@@ -183,10 +183,8 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: 
-    - "Streak Reward Modal Demo Page"
-  stuck_tasks:
-    - "Streak Reward Modal Demo Page"
+  current_focus: []
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
