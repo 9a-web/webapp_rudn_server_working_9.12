@@ -1,6 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 
+/* Poppins — подключаем через Google Fonts (один раз) */
+if (typeof document !== 'undefined' && !document.getElementById('poppins-font')) {
+  const link = document.createElement('link');
+  link.id = 'poppins-font';
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap';
+  document.head.appendChild(link);
+}
+
+const FONT = "'Poppins', -apple-system, sans-serif";
+
 /* ─────────────────────────────────────────
    SVG: Лавровый венок (маленький / большой)
 ───────────────────────────────────────── */
