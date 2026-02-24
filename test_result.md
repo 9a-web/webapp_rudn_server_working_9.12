@@ -160,6 +160,18 @@ frontend:
       - working: "NA"
         agent: "testing"
         comment: "Frontend testing not performed as per system limitations - backend APIs are working correctly"
+  
+  - task: "Streak Reward Modal Demo Page"
+    implemented: true
+    working: false
+    file: "StreakRewardModal.jsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ CRITICAL: Route /streak-demo returns 404 error - SERVER CONFIGURATION ISSUE. The StreakRewardModal component is properly implemented with all required features (gold pentagon badge, laurel wreath, animations, claim button, success state). Route is defined in App.jsx line 2373: <Route path='/streak-demo' element={<StreakRewardPreview />} />. However, FastAPI backend is missing catch-all route to serve index.html for client-side routes. When navigating directly to https://lesson-progress-hub.preview.emergentagent.com/streak-demo, backend returns 404 instead of serving React app. This is a standard SPA deployment issue - backend needs configuration to serve frontend's index.html for all non-API routes. Code review shows component has: ✅ Button '🔥 Открыть Streak Reward' ✅ Gold pentagon badge with animations ✅ Laurel wreath SVG ✅ Week tracker with 7 days ✅ 'Забрать награду' claim button ✅ '✓ Получено!' success state ✅ Particle confetti animations ✅ All animations and delays implemented correctly. DEPLOYMENT BLOCKER: Cannot test UI until backend serves frontend for client-side routes."
 
 metadata:
   created_by: "testing_agent"
