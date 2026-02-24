@@ -130,160 +130,138 @@ const Particles = ({ active }) => {
 /* BadgeShimmer удалён — shimmer теперь внутри SVG */
 
 /* ─────────────────────────────────────────
-   SVG Пятиугольник со скруглёнными углами
-   Алгоритм: стандартные 5 вершин, затем
-   каждый угол скругляется через дуги
+   Скруглённый пятиугольник — путь захардкожен,
+   вычислен точно для viewBox 0 0 112 112,
+   cx=56 cy=56 R=51.52 r=14 (quadratic bezier).
+   Никаких runtime-вычислений — мгновенный рендер.
 ───────────────────────────────────────── */
-const RoundedPentagonPath = ({ size = 108, r = 14 }) => {
-  // Вершины правильного пятиугольника (центр = size/2, radius = size*0.46)
-  const cx = size / 2;
-  const cy = size / 2;
-  const R = size * 0.46; // радиус описанной окружности
-  const angleOffset = -Math.PI / 2; // вершина сверху
-
-  const pts = Array.from({ length: 5 }, (_, i) => {
-    const a = angleOffset + (2 * Math.PI * i) / 5;
-    return [cx + R * Math.cos(a), cy + R * Math.sin(a)];
-  });
-
-  // Строим path со скруглёнными углами через quadratic bezier
-  const segments = pts.map((pt, i) => {
-    const prev = pts[(i + 4) % 5];
-    const next = pts[(i + 1) % 5];
-
-    // Единичные векторы от текущей вершины к соседям
-    const d1x = prev[0] - pt[0]; const d1y = prev[1] - pt[1];
-    const d2x = next[0] - pt[0]; const d2y = next[1] - pt[1];
-    const len1 = Math.hypot(d1x, d1y);
-    const len2 = Math.hypot(d2x, d2y);
-
-    const clampedR = Math.min(r, len1 / 2, len2 / 2);
-
-    // Точки начала и конца скругления
-    const s1x = pt[0] + (d1x / len1) * clampedR;
-    const s1y = pt[1] + (d1y / len1) * clampedR;
-    const s2x = pt[0] + (d2x / len2) * clampedR;
-    const s2y = pt[1] + (d2y / len2) * clampedR;
-
-    return { pt, s1: [s1x, s1y], s2: [s2x, s2y] };
-  });
-
-  const d = segments.map(({ pt, s1, s2 }, i) => {
-    const move = i === 0 ? `M ${s1[0].toFixed(2)} ${s1[1].toFixed(2)}` : `L ${s1[0].toFixed(2)} ${s1[1].toFixed(2)}`;
-    return `${move} Q ${pt[0].toFixed(2)} ${pt[1].toFixed(2)} ${s2[0].toFixed(2)} ${s2[1].toFixed(2)}`;
-  }).join(' ') + ' Z';
-
-  return d;
-};
+const BADGE_SIZE = 112;
+const PENT = [
+  'M 44.7,12.7',
+  'Q 56,4.5   67.3,12.7',
+  'L 93.7,31.9',
+  'Q 105,40.1  100.7,53.4',
+  'L 90.6,84.4',
+  'Q 86.3,97.7 72.3,97.7',
+  'L 39.7,97.7',
+  'Q 25.7,97.7 21.4,84.4',
+  'L 11.3,53.4',
+  'Q 7,40.1   18.3,31.9',
+  'Z',
+].join(' ');
 
 /* ─────────────────────────────────────────
    Пятиугольный значок (Gold Pentagon Badge)
+   Всё — один SVG: градиент, тень, блик,
+   shimmer через SVG clipPath, иконка сверху.
 ───────────────────────────────────────── */
-const BADGE_SIZE = 112;
-const pentPath = RoundedPentagonPath({ size: BADGE_SIZE, r: 16 });
+const GoldBadge = ({ show }) => {
+  const [doShimmer, setDoShimmer] = useState(false);
 
-const GoldBadge = ({ show }) => (
-  <motion.div
-    initial={{ scale: 0, rotate: -20, y: 20 }}
-    animate={show ? { scale: 1, rotate: 0, y: 0 } : { scale: 0, rotate: -20, y: 20 }}
-    transition={{ type: 'spring', stiffness: 320, damping: 18, delay: 0.25 }}
-    style={{ position: 'relative', zIndex: 20, width: BADGE_SIZE, height: BADGE_SIZE }}
-  >
-    {/* Пульсирующее свечение */}
+  useEffect(() => {
+    if (show) {
+      const t = setTimeout(() => setDoShimmer(true), 200);
+      return () => clearTimeout(t);
+    }
+    setDoShimmer(false);
+  }, [show]);
+
+  return (
     <motion.div
-      animate={{
-        filter: [
-          'drop-shadow(0 0 0px rgba(247,208,96,0))',
-          'drop-shadow(0 0 14px rgba(247,208,96,0.7))',
-          'drop-shadow(0 0 0px rgba(247,208,96,0))',
-        ],
-      }}
-      transition={{ delay: 0.9, duration: 1.8, repeat: Infinity, repeatDelay: 1.8 }}
-      style={{ position: 'absolute', inset: 0 }}
+      initial={{ scale: 0, rotate: -18, y: 16 }}
+      animate={show ? { scale: 1, rotate: 0, y: 0 } : { scale: 0, rotate: -18, y: 16 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.22 }}
+      style={{ position: 'relative', zIndex: 20, width: BADGE_SIZE, height: BADGE_SIZE }}
     >
-      {/* SVG — основной пятиугольник */}
+      {/* ── Пульсирующее свечение (box-shadow — дёшево) ── */}
+      <motion.div
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{ delay: 1.1, duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute', inset: -4,
+          borderRadius: 28,
+          boxShadow: '0 0 22px 6px rgba(247,200,60,0.42)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* ── Единый SVG: фигура + все слои + shimmer ── */}
       <svg
         width={BADGE_SIZE}
         height={BADGE_SIZE}
         viewBox={`0 0 ${BADGE_SIZE} ${BADGE_SIZE}`}
-        style={{ display: 'block' }}
+        style={{ display: 'block', overflow: 'visible' }}
       >
         <defs>
-          <linearGradient id="goldGrad" x1="30%" y1="0%" x2="70%" y2="100%">
-            <stop offset="0%"   stopColor="#F9DF6D" />
-            <stop offset="40%"  stopColor="#E8A020" />
-            <stop offset="72%"  stopColor="#F5C842" />
-            <stop offset="100%" stopColor="#C8820A" />
+          {/* Золотой градиент */}
+          <linearGradient id="sr-gold" x1="25%" y1="0%" x2="75%" y2="100%">
+            <stop offset="0%"   stopColor="#FAE272" />
+            <stop offset="35%"  stopColor="#E9A422" />
+            <stop offset="68%"  stopColor="#F6CB44" />
+            <stop offset="100%" stopColor="#C27E08" />
           </linearGradient>
-          <linearGradient id="shineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"  stopColor="rgba(255,255,255,0.22)" />
-            <stop offset="55%" stopColor="rgba(255,255,255,0)" />
+
+          {/* Блик сверху (светлее к верху) */}
+          <linearGradient id="sr-shine" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"  stopColor="rgba(255,255,255,0.28)" />
+            <stop offset="58%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
-          {/* Фильтр тени */}
-          <filter id="badgeShadow" x="-20%" y="-10%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="rgba(160,100,0,0.40)" />
-            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="rgba(160,100,0,0.25)" />
-          </filter>
-          <clipPath id="pentClip">
-            <path d={pentPath} />
+
+          {/* Shimmer-полоса */}
+          <linearGradient id="sr-shimmer" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
+            <stop offset="50%"  stopColor="rgba(255,255,255,0.52)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </linearGradient>
+
+          {/* Клип-путь для shimmer — только внутри пятиугольника */}
+          <clipPath id="sr-clip">
+            <path d={PENT} />
           </clipPath>
         </defs>
 
-        {/* Заливка градиентом */}
-        <path d={pentPath} fill="url(#goldGrad)" filter="url(#badgeShadow)" />
+        {/* Мягкая тень-эллипс снизу */}
+        <ellipse cx="56" cy="108" rx="32" ry="7"
+          fill="rgba(140,80,0,0.22)" />
 
-        {/* Блик сверху */}
-        <path d={pentPath} fill="url(#shineGrad)" />
+        {/* Основная фигура */}
+        <path d={PENT} fill="url(#sr-gold)"
+          style={{ filter: 'drop-shadow(0 6px 10px rgba(150,90,0,0.35))' }} />
+
+        {/* Блик */}
+        <path d={PENT} fill="url(#sr-shine)" />
+
+        {/* Shimmer-полоса, строго внутри пятиугольника */}
+        {doShimmer && (
+          <g clipPath="url(#sr-clip)">
+            <motion.rect
+              x="-70" y="0"
+              width="70" height={BADGE_SIZE}
+              fill="url(#sr-shimmer)"
+              initial={{ x: -70 }}
+              animate={{ x: BADGE_SIZE + 30 }}
+              transition={{ delay: 0, duration: 0.55, ease: 'easeInOut' }}
+            />
+          </g>
+        )}
       </svg>
+
+      {/* ── Иконка лаврового венка поверх SVG ── */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.4 }}
+        animate={show ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.4 }}
+        transition={{ delay: 0.48, duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          paddingTop: 8, zIndex: 3,
+        }}
+      >
+        <LaurelWreathIcon size={46} color="#6B3A00" />
+      </motion.div>
     </motion.div>
-
-    {/* Shimmer полоса */}
-    <motion.div
-      initial={{ x: -BADGE_SIZE, opacity: 0 }}
-      animate={{ x: BADGE_SIZE * 1.2, opacity: [0, 0.65, 0] }}
-      transition={{ delay: 1.0, duration: 0.65, ease: 'easeInOut' }}
-      style={{
-        position: 'absolute',
-        top: 0, bottom: 0,
-        left: 0,
-        width: '36%',
-        background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.55) 50%, transparent 80%)',
-        clipPath: `path('${pentPath}')`,
-        pointerEvents: 'none',
-      }}
-    />
-
-    {/* Иконка венка поверх SVG */}
-    <motion.div
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={show ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
-      transition={{ delay: 0.55, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 6,
-        zIndex: 3,
-      }}
-    >
-      <LaurelWreathIcon size={46} color="#6B3A00" />
-    </motion.div>
-
-    {/* Тень-левитация */}
-    <div style={{
-      position: 'absolute',
-      bottom: -10,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      width: 64,
-      height: 14,
-      background: 'radial-gradient(ellipse, rgba(180,120,0,0.30) 0%, transparent 70%)',
-      borderRadius: '50%',
-    }} />
-  </motion.div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────
    Трекер недели (7 дней)
