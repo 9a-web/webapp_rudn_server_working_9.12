@@ -127,26 +127,7 @@ const Particles = ({ active }) => {
   );
 };
 
-/* ─────────────────────────────────────────
-   Shimmer-эффект на значке
-───────────────────────────────────────── */
-const BadgeShimmer = () => (
-  <motion.div
-    initial={{ x: -80, opacity: 0 }}
-    animate={{ x: 80, opacity: [0, 0.7, 0] }}
-    transition={{ delay: 0.9, duration: 0.7, ease: 'easeInOut' }}
-    style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: '40%',
-      height: '100%',
-      background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%)',
-      borderRadius: 'inherit',
-      pointerEvents: 'none',
-    }}
-  />
-);
+/* BadgeShimmer удалён — shimmer теперь внутри SVG */
 
 /* ─────────────────────────────────────────
    SVG Пятиугольник со скруглёнными углами
