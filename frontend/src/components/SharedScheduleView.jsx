@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 const DAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFeedback }) => {
+export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFeedback, onFriendPickerChange }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [sharedData, setSharedData] = useState(null);
