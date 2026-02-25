@@ -1993,6 +1993,7 @@ const Home = () => {
                 onAchievementsClick={user ? handleAchievementsClick : null}
                 onAnalyticsClick={schedule.length > 0 ? handleAnalyticsClick : null}
                 onCalendarClick={handleCalendarClick}
+                streakData={streakData}
               />
             </div>
           </>
