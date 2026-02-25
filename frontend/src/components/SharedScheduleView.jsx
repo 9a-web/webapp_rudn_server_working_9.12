@@ -676,12 +676,12 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
           </div>
           <div className="text-[#666] text-sm font-medium mb-1">
             {sharedData.participants?.length < 2
-              ? 'Добавьте друзей для сравнения'
+              ? 'Выберите друга, чтобы сверить расписания'
               : 'Нет пар в этот день'}
           </div>
           <div className="text-[#bbb] text-xs">
             {sharedData.participants?.length < 2
-              ? 'Нажмите "Добавить" выше'
+              ? 'Нажмите «Добавить» выше'
               : 'Выберите другой день недели'}
           </div>
         </div>
