@@ -152,6 +152,11 @@ const Home = () => {
   const [userStats, setUserStats] = useState(null);
   const [newAchievement, setNewAchievement] = useState(null); // Для показа уведомления
   
+  // Состояния для стрик-механики
+  const [streakData, setStreakData] = useState(null);
+  const [showStreakModal, setShowStreakModal] = useState(false);
+  const streakProcessedRef = useRef(false);
+  
   // Состояние для модального окна подтверждения добавления в друзья
   const [friendRequestModal, setFriendRequestModal] = useState({
     isOpen: false,
