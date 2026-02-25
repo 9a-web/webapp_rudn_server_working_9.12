@@ -357,17 +357,17 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-foreground">Добавить друга</h3>
+                <h3 className="text-lg font-semibold text-white">Добавить друга</h3>
                 <button 
                   onClick={() => setShowFriendPicker(false)}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-gray-400 hover:text-white"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               
               {availableFriends.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
+                <div className="text-center py-8 text-gray-400 text-sm">
                   {friends.length === 0 
                     ? 'У вас пока нет друзей'
                     : 'Все друзья уже добавлены'}
@@ -378,17 +378,17 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
                     <button
                       key={friend.telegram_id}
                       onClick={() => handleAddFriend(friend.telegram_id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+                      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/10 hover:bg-white/15 transition-colors text-left"
                     >
                       <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-medium">
                         {friend.first_name?.[0] || '?'}
                       </div>
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-foreground">
+                        <div className="text-sm font-medium text-white">
                           {friend.first_name} {friend.last_name || ''}
                         </div>
                         {friend.username && (
-                          <div className="text-xs text-muted-foreground">@{friend.username}</div>
+                          <div className="text-xs text-gray-400">@{friend.username}</div>
                         )}
                       </div>
                       <UserPlus className="w-4 h-4 text-indigo-400" />
