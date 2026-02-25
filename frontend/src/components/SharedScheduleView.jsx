@@ -282,7 +282,8 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
       hapticFeedback?.('success');
       await sharedScheduleAPI.addParticipant(sharedData.id, friendId);
       setShowFriendPicker(false);
-      await loadSharedSchedule();
+      // Мгновенно обновляем данные
+      await Promise.all([loadSharedSchedule(true), loadFriends()]);
     } catch (err) {
       console.error('Error adding participant:', err);
     }
@@ -293,7 +294,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     try {
       hapticFeedback?.('warning');
       await sharedScheduleAPI.removeParticipant(sharedData.id, participantId);
-      await loadSharedSchedule();
+      await loadSharedSchedule(true);
     } catch (err) {
       console.error('Error removing participant:', err);
     }
