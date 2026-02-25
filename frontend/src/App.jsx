@@ -423,6 +423,37 @@ const Home = () => {
     };
   }, [isReady, user?.id, syncedUser?.id, activeTab]);
 
+  // 🔥 Стрик-механика: записать визит при открытии приложения
+  useEffect(() => {
+    const recordStreak = async () => {
+      const currentUser = syncedUser || user;
+      if (!currentUser?.id || streakProcessedRef.current) return;
+      
+      streakProcessedRef.current = true;
+      
+      try {
+        const result = await streakAPI.recordVisit(currentUser.id);
+        if (result) {
+          setStreakData(result);
+          
+          // Показываем StreakRewardModal на милестонах (3, 7, 14, 30, 60, 100, 365)
+          if (result.milestone_reached && result.is_new_day) {
+            // Задержка для красивого появления
+            setTimeout(() => {
+              setShowStreakModal(true);
+            }, 2000);
+          }
+        }
+      } catch (err) {
+        console.debug('Streak record error:', err);
+      }
+    };
+    
+    if (isReady && (user || syncedUser)) {
+      recordStreak();
+    }
+  }, [isReady, user?.id, syncedUser?.id]);
+
   // Загрузка данных пользователя при монтировании
   // Сравниваем по ID вместо ссылки на объект, чтобы избежать лишних перезагрузок
   useEffect(() => {
