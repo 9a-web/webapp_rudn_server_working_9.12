@@ -13,7 +13,13 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
   const [loading, setLoading] = useState(true);
   const [sharedData, setSharedData] = useState(null);
   const [friends, setFriends] = useState([]);
-  const [showFriendPicker, setShowFriendPicker] = useState(false);
+  const [showFriendPicker, setShowFriendPickerRaw] = useState(false);
+
+  // Обёртка: уведомляем родителя для скрытия нижнего меню
+  const setShowFriendPicker = useCallback((value) => {
+    setShowFriendPickerRaw(value);
+    onFriendPickerChange?.(value);
+  }, [onFriendPickerChange]);
   const [expandedWindow, setExpandedWindow] = useState(null);
 
   // Определяем день из selectedDate родителя
