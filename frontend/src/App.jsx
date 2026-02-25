@@ -2118,6 +2118,21 @@ const Home = () => {
 
         {/* AchievementNotification теперь отображается через очередь выше */}
         
+        {/* 🔥 Streak Reward Modal */}
+        <StreakRewardModal
+          isOpen={showStreakModal}
+          onClose={() => setShowStreakModal(false)}
+          onClaim={async () => {
+            const currentUser = syncedUser || user;
+            if (currentUser?.id) {
+              await streakAPI.claimReward(currentUser.id);
+            }
+            setShowStreakModal(false);
+          }}
+          streakDays={streakData?.visit_streak_current || 0}
+          weekDays={streakData?.week_days || []}
+        />
+        
         {/* Swipe hint - показывается один раз, скрывается через 10 секунд или при первом свайпе */}
         {!showGroupSelector && schedule.length > 0 && (
           <SwipeHint onSwipe={true} />
