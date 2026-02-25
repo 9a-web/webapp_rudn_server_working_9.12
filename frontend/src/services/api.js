@@ -698,5 +698,144 @@ export const activityAPI = {
   },
 };
 
+/**
+ * API для стрик-механики (серия посещений)
+ */
+export const streakAPI = {
+  /**
+   * Записать визит пользователя
+   * @param {number} telegramId
+   */
+  recordVisit: async (telegramId) => {
+    try {
+      const response = await api.post(`/users/${telegramId}/visit`);
+      return response.data;
+    } catch (error) {
+      console.debug('Streak visit error:', error.message);
+      return null;
+    }
+  },
+
+  /**
+   * Забрать награду за стрик
+   * @param {number} telegramId
+   */
+  claimReward: async (telegramId) => {
+    try {
+      const response = await api.post(`/users/${telegramId}/streak-claim`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+};
+
+/**
+ * API для совместного расписания
+ */
+export const sharedScheduleAPI = {
+  /**
+   * Создать совместное расписание
+   */
+  create: async (ownerId, participantIds = []) => {
+    try {
+      const response = await api.post('/shared-schedule', {
+        owner_id: ownerId,
+        participant_ids: participantIds,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Получить совместное расписание
+   */
+  get: async (telegramId) => {
+    try {
+      const response = await api.get(`/shared-schedule/${telegramId}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Добавить участника
+   */
+  addParticipant: async (scheduleId, participantId) => {
+    try {
+      const response = await api.post(`/shared-schedule/${scheduleId}/add-participant`, {
+        participant_id: participantId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Удалить участника
+   */
+  removeParticipant: async (scheduleId, participantId) => {
+    try {
+      const response = await api.delete(`/shared-schedule/${scheduleId}/remove-participant/${participantId}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Удалить совместное расписание
+   */
+  delete: async (scheduleId) => {
+    try {
+      const response = await api.delete(`/shared-schedule/${scheduleId}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+};
+
+/**
+ * API для администратора: уведомления из TG постов
+ */
+export const adminNotificationsAPI = {
+  /**
+   * Парсить Telegram пост
+   */
+  parseTelegramPost: async (telegramUrl) => {
+    try {
+      const response = await api.post('/admin/notifications/parse-telegram', {
+        telegram_url: telegramUrl,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Отправить уведомление из поста
+   */
+  sendFromPost: async ({ title, description, imageUrl, recipients = 'all', recipientIds = [] }) => {
+    try {
+      const response = await api.post('/admin/notifications/send-from-post', {
+        title,
+        description,
+        image_url: imageUrl,
+        recipients,
+        recipient_ids: recipientIds,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+};
+
 export { getBackendURL } from '../utils/config';
 export default api;
