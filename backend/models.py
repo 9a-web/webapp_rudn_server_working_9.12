@@ -319,6 +319,13 @@ class UserStats(BaseModel):
     friends_faculties_count: int = 0  # Количество разных факультетов друзей
     users_invited: int = 0  # Количество приглашенных новых пользователей
     
+    # Streak-механика (серия посещений)
+    visit_streak_current: int = 0  # Текущая серия (дней)
+    visit_streak_max: int = 0  # Рекорд за всё время
+    last_visit_date: Optional[str] = None  # Дата последнего визита (YYYY-MM-DD)
+    freeze_shields: int = 0  # Кол-во щитов заморозки
+    streak_claimed_today: bool = False  # Уже показан попап сегодня
+    
     # Общая статистика
     total_points: int = 0  # Всего очков
     achievements_count: int = 0  # Количество достижений
