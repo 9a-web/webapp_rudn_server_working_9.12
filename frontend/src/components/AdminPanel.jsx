@@ -4179,7 +4179,7 @@ const TelegramPostNotifyTab = () => {
     setParsedData(null);
     setSendResult(null);
     try {
-      const res = await axios.post(`${API_BASE}/admin/notifications/parse-telegram`, {
+      const res = await axios.post(`${BACKEND_URL}/api/admin/notifications/parse-telegram`, {
         telegram_url: telegramUrl.trim()
       });
       setParsedData(res.data);
