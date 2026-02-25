@@ -16930,6 +16930,445 @@ async def websocket_session(websocket: WebSocket, session_token: str):
             del web_session_connections[session_token]
 
 
+# ============ Эндпоинты для совместного расписания ============
+
+PARTICIPANT_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+
+@api_router.post("/shared-schedule", response_model=SharedScheduleResponse)
+async def create_shared_schedule(data: SharedScheduleCreate):
+    """Создать совместное расписание"""
+    try:
+        schedule_id = str(uuid.uuid4())
+        
+        # Получаем данные владельца
+        owner_settings = await db.user_settings.find_one({"telegram_id": data.owner_id})
+        owner_name = "Вы"
+        if owner_settings:
+            owner_name = owner_settings.get("first_name", "Вы")
+        
+        participants = [{
+            "telegram_id": data.owner_id,
+            "first_name": owner_name,
+            "color": PARTICIPANT_COLORS[0]
+        }]
+        
+        # Добавляем друзей-участников
+        for idx, pid in enumerate(data.participant_ids[:7]):
+            p_settings = await db.user_settings.find_one({"telegram_id": pid})
+            p_name = str(pid)
+            if p_settings:
+                p_name = p_settings.get("first_name", str(pid))
+            participants.append({
+                "telegram_id": pid,
+                "first_name": p_name,
+                "color": PARTICIPANT_COLORS[(idx + 1) % len(PARTICIPANT_COLORS)]
+            })
+        
+        doc = {
+            "id": schedule_id,
+            "owner_id": data.owner_id,
+            "participants": participants,
+            "group_ids": [],
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        await db.shared_schedules.insert_one(doc)
+        
+        return SharedScheduleResponse(
+            id=schedule_id,
+            owner_id=data.owner_id,
+            participants=participants,
+            schedules={},
+            free_windows=[],
+            created_at=doc["created_at"]
+        )
+    except Exception as e:
+        logger.error(f"Ошибка создания совместного расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/shared-schedule/{telegram_id}")
+async def get_shared_schedule(telegram_id: int):
+    """Получить совместное расписание пользователя с расписаниями всех участников"""
+    try:
+        doc = await db.shared_schedules.find_one({
+            "$or": [
+                {"owner_id": telegram_id},
+                {"participants.telegram_id": telegram_id}
+            ]
+        }, sort=[("updated_at", -1)])
+        
+        if not doc:
+            return {"exists": False, "id": None, "participants": [], "schedules": {}, "free_windows": []}
+        
+        participants = doc.get("participants", [])
+        schedules = {}
+        
+        # Загружаем расписания всех участников
+        for p in participants:
+            p_id = p["telegram_id"]
+            p_settings = await db.user_settings.find_one({"telegram_id": p_id})
+            if p_settings and p_settings.get("group_id"):
+                group_id = p_settings["group_id"]
+                # Определяем текущую неделю
+                import pytz
+                moscow_tz = pytz.timezone('Europe/Moscow')
+                now = datetime.now(moscow_tz)
+                from utils_schedule import get_current_week_number
+                try:
+                    week_num = get_current_week_number()
+                except:
+                    week_num = 1
+                
+                # Ищем в кэше
+                cached = await db.schedule_cache.find_one({
+                    "group_id": group_id,
+                    "week_number": week_num
+                })
+                if cached and cached.get("events"):
+                    schedules[str(p_id)] = cached["events"]
+                else:
+                    # Пробуем загрузить из API РУДН
+                    try:
+                        from rudn_parser import get_schedule
+                        events = await get_schedule(
+                            p_settings.get("facultet_id", ""),
+                            p_settings.get("level_id", ""),
+                            p_settings.get("kurs", ""),
+                            p_settings.get("form_code", ""),
+                            group_id,
+                            week_num
+                        )
+                        schedules[str(p_id)] = [e.dict() if hasattr(e, 'dict') else e for e in events] if events else []
+                    except:
+                        schedules[str(p_id)] = []
+        
+        # Вычисляем свободные окна
+        free_windows = _compute_free_windows(schedules, participants)
+        
+        return {
+            "exists": True,
+            "id": doc.get("id"),
+            "owner_id": doc.get("owner_id"),
+            "participants": participants,
+            "schedules": schedules,
+            "free_windows": free_windows,
+            "created_at": doc.get("created_at")
+        }
+    except Exception as e:
+        logger.error(f"Ошибка получения совместного расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/shared-schedule/{schedule_id}/add-participant")
+async def add_shared_schedule_participant(schedule_id: str, data: SharedScheduleAddParticipant):
+    """Добавить участника в совместное расписание"""
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Совместное расписание не найдено")
+        
+        participants = doc.get("participants", [])
+        if any(p["telegram_id"] == data.participant_id for p in participants):
+            return SuccessResponse(success=True, message="Участник уже добавлен")
+        
+        p_settings = await db.user_settings.find_one({"telegram_id": data.participant_id})
+        p_name = str(data.participant_id)
+        if p_settings:
+            p_name = p_settings.get("first_name", str(data.participant_id))
+        
+        color_idx = len(participants) % len(PARTICIPANT_COLORS)
+        new_participant = {
+            "telegram_id": data.participant_id,
+            "first_name": p_name,
+            "color": PARTICIPANT_COLORS[color_idx]
+        }
+        
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {
+                "$push": {"participants": new_participant},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        return SuccessResponse(success=True, message=f"Участник {p_name} добавлен")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка добавления участника: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/shared-schedule/{schedule_id}/remove-participant/{participant_id}")
+async def remove_shared_schedule_participant(schedule_id: str, participant_id: int):
+    """Удалить участника из совместного расписания"""
+    try:
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {
+                "$pull": {"participants": {"telegram_id": participant_id}},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        return SuccessResponse(success=True, message="Участник удалён")
+    except Exception as e:
+        logger.error(f"Ошибка удаления участника: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/shared-schedule/{schedule_id}")
+async def delete_shared_schedule(schedule_id: str):
+    """Удалить совместное расписание"""
+    try:
+        await db.shared_schedules.delete_one({"id": schedule_id})
+        return SuccessResponse(success=True, message="Совместное расписание удалено")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _compute_free_windows(schedules: dict, participants: list) -> list:
+    """Вычислить общие свободные окна для всех участников"""
+    if not schedules or len(schedules) < 2:
+        return []
+    
+    days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+    free_windows = []
+    
+    # Пары обычно с 9:00 до 21:00, слоты по 30 минут
+    time_slots = []
+    for h in range(9, 21):
+        for m in [0, 30]:
+            time_slots.append(f"{h:02d}:{m:02d}")
+    
+    for day in days_ru:
+        # Собираем занятые слоты для каждого участника
+        all_busy = set()
+        
+        for p_id, events in schedules.items():
+            for event in events:
+                event_day = event.get("day", "")
+                if event_day.lower() != day.lower():
+                    continue
+                
+                time_str = event.get("time", "")
+                if " - " in time_str:
+                    start_time, end_time = time_str.split(" - ")
+                    try:
+                        sh, sm = map(int, start_time.strip().split(":"))
+                        eh, em = map(int, end_time.strip().split(":"))
+                        
+                        # Помечаем все 30-минутные слоты как занятые
+                        current = sh * 60 + sm
+                        end = eh * 60 + em
+                        while current < end:
+                            all_busy.add(current)
+                            current += 30
+                    except:
+                        pass
+        
+        # Находим свободные окна (минимум 1 час)
+        free_start = None
+        for slot in time_slots:
+            sh, sm = map(int, slot.split(":"))
+            minutes = sh * 60 + sm
+            
+            if minutes not in all_busy:
+                if free_start is None:
+                    free_start = slot
+            else:
+                if free_start is not None:
+                    duration = minutes - (int(free_start.split(":")[0]) * 60 + int(free_start.split(":")[1]))
+                    if duration >= 60:  # Минимум 1 час
+                        free_windows.append({
+                            "day": day,
+                            "start": free_start,
+                            "end": slot,
+                            "duration_minutes": duration
+                        })
+                    free_start = None
+        
+        # Последнее окно
+        if free_start is not None:
+            last_minutes = 21 * 60
+            start_minutes = int(free_start.split(":")[0]) * 60 + int(free_start.split(":")[1])
+            duration = last_minutes - start_minutes
+            if duration >= 60:
+                free_windows.append({
+                    "day": day,
+                    "start": free_start,
+                    "end": "21:00",
+                    "duration_minutes": duration
+                })
+    
+    return free_windows
+
+
+# ============ Эндпоинты для Admin: уведомления из Telegram постов ============
+
+@api_router.post("/admin/notifications/parse-telegram")
+async def parse_telegram_post(data: dict):
+    """Парсить публичный Telegram пост для извлечения контента"""
+    try:
+        telegram_url = data.get("telegram_url", "")
+        if not telegram_url:
+            raise HTTPException(status_code=400, detail="URL не указан")
+        
+        # Извлекаем channel и post_id из URL
+        # Форматы: https://t.me/channel/123, https://t.me/s/channel/123
+        import re
+        match = re.search(r't\.me/(?:s/)?([^/]+)/(\d+)', telegram_url)
+        if not match:
+            raise HTTPException(status_code=400, detail="Неверный формат ссылки на Telegram пост")
+        
+        channel = match.group(1)
+        post_id = match.group(2)
+        
+        # Загружаем публичный превью поста
+        preview_url = f"https://t.me/{channel}/{post_id}?embed=1&mode=tme"
+        
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(preview_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    raise HTTPException(status_code=400, detail="Не удалось загрузить пост")
+                html = await resp.text()
+        
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Извлекаем данные
+        title = ""
+        description = ""
+        image_url = ""
+        
+        # OG метатеги
+        og_title = soup.find('meta', property='og:title')
+        og_desc = soup.find('meta', property='og:description')
+        og_image = soup.find('meta', property='og:image')
+        
+        if og_title:
+            title = og_title.get('content', '')
+        if og_desc:
+            description = og_desc.get('content', '')
+        if og_image:
+            image_url = og_image.get('content', '')
+        
+        # Fallback: ищем в контенте поста
+        if not description:
+            msg_text = soup.find('div', class_='tgme_widget_message_text')
+            if msg_text:
+                description = msg_text.get_text(separator='\n').strip()
+        
+        if not title and description:
+            # Берем первую строку как заголовок
+            lines = description.split('\n')
+            title = lines[0][:100] if lines else ""
+        
+        if not image_url:
+            # Ищем изображение в посте
+            img_wrap = soup.find('a', class_='tgme_widget_message_photo_wrap')
+            if img_wrap:
+                style = img_wrap.get('style', '')
+                url_match = re.search(r"url\('([^']+)'\)", style)
+                if url_match:
+                    image_url = url_match.group(1)
+        
+        return {
+            "success": True,
+            "title": title,
+            "description": description,
+            "image_url": image_url,
+            "channel": channel,
+            "post_id": post_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка парсинга Telegram поста: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/notifications/send-from-post")
+async def send_notification_from_post(data: dict):
+    """Отправить уведомление всем пользователям на основе Telegram поста"""
+    try:
+        title = data.get("title", "")
+        description = data.get("description", "")
+        image_url = data.get("image_url", "")
+        recipients = data.get("recipients", "all")
+        
+        if not title and not description:
+            raise HTTPException(status_code=400, detail="Заголовок или описание обязательны")
+        
+        # Получаем список получателей
+        if recipients == "all":
+            users = await db.user_settings.find({}, {"telegram_id": 1}).to_list(None)
+            recipient_ids = [u["telegram_id"] for u in users]
+        else:
+            recipient_ids = data.get("recipient_ids", [])
+        
+        if not recipient_ids:
+            return {"success": False, "message": "Нет получателей", "sent": 0, "failed": 0}
+        
+        # Формируем текст сообщения
+        message_text = ""
+        if title:
+            message_text += f"<b>{title}</b>\n\n"
+        if description:
+            message_text += description
+        
+        notification_svc = get_notification_service()
+        sent = 0
+        failed = 0
+        
+        for uid in recipient_ids:
+            try:
+                if image_url:
+                    # Отправляем фото с подписью
+                    await notification_svc.bot.send_photo(
+                        chat_id=uid,
+                        photo=image_url,
+                        caption=message_text[:1024],
+                        parse_mode='HTML'
+                    )
+                else:
+                    await notification_svc.send_message(uid, message_text)
+                sent += 1
+            except Exception as e:
+                logger.warning(f"Не удалось отправить уведомление {uid}: {e}")
+                failed += 1
+            
+            # Задержка для избежания rate-limit
+            await asyncio.sleep(0.05)
+        
+        # Сохраняем в историю
+        await db.notification_history.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "admin_post",
+            "title": title,
+            "description": description[:500],
+            "image_url": image_url,
+            "recipients_count": len(recipient_ids),
+            "sent": sent,
+            "failed": failed,
+            "created_at": datetime.utcnow()
+        })
+        
+        return {
+            "success": True,
+            "message": f"Отправлено {sent} из {len(recipient_ids)}",
+            "sent": sent,
+            "failed": failed
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления из поста: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ Shutdown lifecycle ============
 
 
