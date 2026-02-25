@@ -1983,6 +1983,7 @@ const Home = () => {
                     onShareModalStateChange={setIsShareModalOpen}
                     user={user}
                     onAdminPanelOpen={() => setIsAdminPanelOpen(true)}
+                    onFriendPickerChange={setIsSharedScheduleFriendPickerOpen}
                   />
                 )}
               </div>
