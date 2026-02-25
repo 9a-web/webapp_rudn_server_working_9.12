@@ -23,7 +23,8 @@ export const LiveScheduleSection = ({
   telegramId, // Telegram ID для трекинга
   onShareModalStateChange, // Коллбек для уведомления родителя о состоянии ShareScheduleModal
   user, // User для проверки admin ID
-  onAdminPanelOpen // Функция открытия админ панели
+  onAdminPanelOpen, // Функция открытия админ панели
+  onFriendPickerChange // Callback для скрытия нижнего меню при открытии friend picker
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
