@@ -220,6 +220,25 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     loadFriends();
   }, [loadSharedSchedule, loadFriends]);
 
+  // ─── Polling: обновляем друзей и расписание каждые 15с ───
+  useEffect(() => {
+    if (!sharedData?.exists) return;
+    
+    const interval = setInterval(() => {
+      loadFriends();
+      loadSharedSchedule();
+    }, 15000);
+    
+    return () => clearInterval(interval);
+  }, [sharedData?.exists, loadFriends, loadSharedSchedule]);
+
+  // ─── При открытии friend picker — всегда обновляем список друзей ───
+  useEffect(() => {
+    if (showFriendPicker) {
+      loadFriends();
+    }
+  }, [showFriendPicker, loadFriends]);
+
   // ─── Auto-scroll to current time on mount ───
   useEffect(() => {
     if (!loading && timelineRef.current) {
