@@ -1,6 +1,6 @@
 import React from 'react';
 import { WeatherWidget } from './WeatherWidget';
-import { Trophy, TrendingUp, Calendar } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar, Flame, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export const DesktopSidebar = ({ 
@@ -10,7 +10,8 @@ export const DesktopSidebar = ({
   allAchievements,
   onAchievementsClick,
   onAnalyticsClick,
-  onCalendarClick 
+  onCalendarClick,
+  streakData
 }) => {
   const { t } = useTranslation();
 
@@ -18,6 +19,68 @@ export const DesktopSidebar = ({
     <div className="hidden md:block md:sticky md:top-6 space-y-6 h-fit">
       {/* Погодный виджет */}
       <WeatherWidget />
+      
+      {/* 🔥 Виджет стрика */}
+      {streakData && streakData.visit_streak_current > 0 && (
+        <div 
+          className="rounded-3xl p-6 shadow-card border border-orange-400/20"
+          style={{
+            backgroundColor: 'rgba(52, 52, 52, 0.7)',
+            backdropFilter: 'blur(40px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(180%)'
+          }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-foreground">
+              {t('streak.title', 'Серия')}
+            </h3>
+            <Flame className="w-5 h-5 text-orange-400" />
+          </div>
+          
+          <div className="text-center mb-4">
+            <div className="text-4xl font-bold text-orange-400">
+              {streakData.visit_streak_current}
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {streakData.visit_streak_current === 1 ? 'день' : 
+               streakData.visit_streak_current < 5 ? 'дня' : 'дней'} подряд
+            </div>
+          </div>
+          
+          {/* Трекер недели */}
+          {streakData.week_days && streakData.week_days.length > 0 && (
+            <div className="flex justify-between mb-4">
+              {streakData.week_days.map((day, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">{day.label}</span>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
+                    day.done 
+                      ? 'bg-orange-400/20 text-orange-400 border border-orange-400/40' 
+                      : 'bg-muted/30 text-muted-foreground'
+                  }`}>
+                    {day.done ? '✓' : day.dateNum}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Щиты заморозки */}
+          {streakData.freeze_shields > 0 && (
+            <div className="flex items-center gap-2 text-sm text-blue-400 bg-blue-400/10 rounded-xl px-3 py-2">
+              <Shield className="w-4 h-4" />
+              <span>{streakData.freeze_shields} щит{streakData.freeze_shields === 1 ? '' : streakData.freeze_shields < 5 ? 'а' : 'ов'}</span>
+            </div>
+          )}
+          
+          {/* Рекорд */}
+          {streakData.visit_streak_max > streakData.visit_streak_current && (
+            <div className="text-xs text-muted-foreground text-center mt-2">
+              Рекорд: {streakData.visit_streak_max} дней
+            </div>
+          )}
+        </div>
+      )}
       
       {/* Быстрая статистика достижений */}
       {user && userStats && (
