@@ -1,460 +1,382 @@
 #!/usr/bin/env python3
 """
-Backend Testing Script for Admin User Type Filtering
-Testing with seeded database containing:
-- 5 Telegram users (telegram_id < 10,000,000,000): IDs 765963392, 1311283832, 523439151, 987654321, 111222333
-- 3 Web visitors (telegram_id >= 10,000,000,000): IDs 10000000000001, 10000000000002, 10000000000003
+Backend API Testing Script for NEW Phase 1 Endpoints
+Tests the newly implemented streak, shared-schedule, and admin notification endpoints
 """
 
 import asyncio
-import httpx
-import os
-from typing import Dict, List, Any
+import aiohttp
 import json
+import sys
+from datetime import datetime
+import uuid
 
-# Use localhost for admin endpoints (they are network-protected)
-BACKEND_URL = "http://localhost:8001/api"
+# Backend URL from frontend .env
+BACKEND_URL = "https://lesson-progress-hub.preview.emergentagent.com/api"
 
-class AdminEndpointsTest:
+class BackendTester:
     def __init__(self):
-        self.base_url = BACKEND_URL
+        self.session = None
         self.results = []
+        self.test_data = {}
         
-    async def make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
-        """Make HTTP request and return response data"""
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            try:
-                url = f"{self.base_url}{endpoint}"
-                print(f"🔗 {method} {url}")
-                
-                if 'params' in kwargs:
-                    print(f"📋 Query params: {kwargs['params']}")
-                
-                response = await client.request(method, url, **kwargs)
-                
-                print(f"✅ Status: {response.status_code}")
-                
-                if response.status_code >= 400:
-                    error_text = response.text
-                    print(f"❌ Error response: {error_text}")
-                    return {
-                        "status_code": response.status_code,
-                        "error": error_text,
-                        "success": False
-                    }
-                
-                try:
-                    data = response.json()
-                    print(f"📄 Response keys: {list(data.keys()) if isinstance(data, dict) else f'Array length: {len(data)}' if isinstance(data, list) else 'Non-dict response'}")
-                    return {
-                        "status_code": response.status_code,
-                        "data": data,
-                        "success": True
-                    }
-                except Exception as e:
-                    print(f"❌ JSON parse error: {e}")
-                    return {
-                        "status_code": response.status_code,
-                        "error": f"JSON parse error: {e}",
-                        "success": False
-                    }
-                    
-            except Exception as e:
-                print(f"❌ Request failed: {e}")
-                return {
-                    "status_code": 0,
-                    "error": str(e),
-                    "success": False
-                }
-
-    def log_result(self, test_name: str, success: bool, message: str, details: Dict = None):
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+    
+    def log_result(self, test_name: str, success: bool, details: str):
         """Log test result"""
         status = "✅ PASS" if success else "❌ FAIL"
-        print(f"\n{status} {test_name}")
-        print(f"   {message}")
-        if details:
-            print(f"   Details: {details}")
-        
+        print(f"{status} {test_name}: {details}")
         self.results.append({
             "test": test_name,
             "success": success,
-            "message": message,
-            "details": details or {}
+            "details": details,
+            "timestamp": datetime.utcnow().isoformat()
         })
-
-    async def test_admin_users_telegram_filter(self):
-        """Test GET /api/admin/users?user_type=telegram → should return exactly 5 users"""
-        print(f"\n{'='*60}")
-        print("TEST 1: Admin Users - Telegram Filter")
-        print(f"{'='*60}")
+    
+    async def test_endpoint(self, method: str, path: str, data=None, expected_status=200, test_name=""):
+        """Generic endpoint tester"""
+        url = f"{BACKEND_URL}{path}"
+        try:
+            if method == "GET":
+                async with self.session.get(url) as resp:
+                    response_data = await resp.json()
+                    success = resp.status == expected_status
+                    return success, resp.status, response_data
+            elif method == "POST":
+                headers = {"Content-Type": "application/json"}
+                async with self.session.post(url, json=data, headers=headers) as resp:
+                    response_data = await resp.json()
+                    success = resp.status == expected_status
+                    return success, resp.status, response_data
+            elif method == "DELETE":
+                async with self.session.delete(url) as resp:
+                    response_data = await resp.json()
+                    success = resp.status == expected_status
+                    return success, resp.status, response_data
+        except Exception as e:
+            return False, 0, {"error": str(e)}
+    
+    async def test_streak_visit_recording(self):
+        """Test 1: POST /api/users/{telegram_id}/visit - Streak visit recording"""
+        test_user_id = 555555
         
-        response = await self.make_request("GET", "/admin/users", params={"user_type": "telegram"})
+        # First visit
+        success, status, data = await self.test_endpoint(
+            "POST", f"/users/{test_user_id}/visit", 
+            test_name="Streak Visit Recording"
+        )
         
-        if not response["success"]:
-            self.log_result("Admin Users Telegram Filter", False, f"API call failed: {response['error']}")
-            return False
-        
-        data = response["data"]
-        
-        # Check if response is a list
-        if not isinstance(data, list):
-            self.log_result("Admin Users Telegram Filter", False, f"Expected array, got {type(data)}")
-            return False
-        
-        # Check count
-        if len(data) != 5:
-            self.log_result("Admin Users Telegram Filter", False, 
-                          f"Expected 5 Telegram users, got {len(data)}", 
-                          {"actual_count": len(data), "users": [u.get('telegram_id') for u in data]})
-            return False
-        
-        # Check user_type field for each user
-        for user in data:
-            if user.get("user_type") != "telegram":
-                self.log_result("Admin Users Telegram Filter", False, 
-                              f"User {user.get('telegram_id')} has user_type='{user.get('user_type')}', expected 'telegram'")
-                return False
+        if success:
+            required_fields = ['visit_streak_current', 'visit_streak_max', 'freeze_shields', 
+                             'streak_continued', 'streak_reset', 'freeze_used', 
+                             'milestone_reached', 'is_new_day', 'week_days']
             
-            # Check telegram_id is < 10B
-            telegram_id = user.get("telegram_id", 0)
-            if telegram_id >= 10_000_000_000:
-                self.log_result("Admin Users Telegram Filter", False, 
-                              f"User {telegram_id} should have telegram_id < 10B for telegram type")
-                return False
+            missing_fields = [field for field in required_fields if field not in data]
+            if missing_fields:
+                self.log_result("Streak Visit - Response Fields", False, 
+                              f"Missing fields: {missing_fields}")
+            else:
+                self.log_result("Streak Visit - Response Fields", True, 
+                              f"All required fields present")
+                
+            # Verify week_days structure
+            week_days = data.get('week_days', [])
+            if len(week_days) == 7:
+                week_day_valid = True
+                for day in week_days:
+                    if not all(key in day for key in ['label', 'dateNum', 'done']):
+                        week_day_valid = False
+                        break
+                
+                if week_day_valid:
+                    self.log_result("Streak Visit - Week Days Structure", True, 
+                                  "Week days array has correct structure (7 items with label, dateNum, done)")
+                else:
+                    self.log_result("Streak Visit - Week Days Structure", False, 
+                                  "Week days items missing required fields")
+            else:
+                self.log_result("Streak Visit - Week Days Structure", False, 
+                              f"Expected 7 week days, got {len(week_days)}")
         
-        telegram_ids = [u.get('telegram_id') for u in data]
-        expected_ids = {765963392, 1311283832, 523439151, 987654321, 111222333}
-        actual_ids = set(telegram_ids)
+        self.log_result("Streak Visit Recording", success, 
+                      f"Status: {status}, Response keys: {list(data.keys()) if isinstance(data, dict) else 'Invalid'}")
         
-        if actual_ids != expected_ids:
-            self.log_result("Admin Users Telegram Filter", False, 
-                          f"Telegram user IDs don't match expected", 
-                          {"expected": sorted(expected_ids), "actual": sorted(actual_ids)})
-            return False
+        # Second visit (same day) - should NOT increment streak
+        success2, status2, data2 = await self.test_endpoint(
+            "POST", f"/users/{test_user_id}/visit", 
+            test_name="Same Day Visit"
+        )
         
-        self.log_result("Admin Users Telegram Filter", True, 
-                       f"Found exactly 5 Telegram users with correct user_type", 
-                       {"telegram_ids": sorted(telegram_ids)})
-        return True
-
-    async def test_admin_users_web_filter(self):
-        """Test GET /api/admin/users?user_type=web → should return exactly 3 users"""
-        print(f"\n{'='*60}")
-        print("TEST 2: Admin Users - Web Filter")
-        print(f"{'='*60}")
+        if success and success2:
+            streak_unchanged = (data.get('visit_streak_current') == data2.get('visit_streak_current'))
+            self.log_result("Same Day Visit - No Increment", streak_unchanged, 
+                          f"Streak remained same: {data2.get('visit_streak_current')}")
+        else:
+            self.log_result("Same Day Visit", False, f"Failed to test same day visit")
+    
+    async def test_streak_claim(self):
+        """Test 2: POST /api/users/{telegram_id}/streak-claim - Claim streak reward"""
+        test_user_id = 555555
         
-        response = await self.make_request("GET", "/admin/users", params={"user_type": "web"})
+        success, status, data = await self.test_endpoint(
+            "POST", f"/users/{test_user_id}/streak-claim", 
+            test_name="Streak Claim"
+        )
         
-        if not response["success"]:
-            self.log_result("Admin Users Web Filter", False, f"API call failed: {response['error']}")
-            return False
+        if success:
+            has_success = data.get('success') is True
+            has_message = 'message' in data
+            self.log_result("Streak Claim Response", has_success and has_message, 
+                          f"success={data.get('success')}, message='{data.get('message')}'")
         
-        data = response["data"]
+        self.log_result("Streak Claim", success, 
+                      f"Status: {status}, Response: {data}")
+    
+    async def test_shared_schedule_create(self):
+        """Test 3: POST /api/shared-schedule - Create shared schedule"""
+        payload = {
+            "owner_id": 555555,
+            "participant_ids": [666666]
+        }
         
-        # Check if response is a list
-        if not isinstance(data, list):
-            self.log_result("Admin Users Web Filter", False, f"Expected array, got {type(data)}")
-            return False
+        success, status, data = await self.test_endpoint(
+            "POST", "/shared-schedule", payload,
+            test_name="Create Shared Schedule"
+        )
         
-        # Check count
-        if len(data) != 3:
-            self.log_result("Admin Users Web Filter", False, 
-                          f"Expected 3 web users, got {len(data)}", 
-                          {"actual_count": len(data), "users": [u.get('telegram_id') for u in data]})
-            return False
-        
-        # Check user_type field for each user
-        for user in data:
-            if user.get("user_type") != "web":
-                self.log_result("Admin Users Web Filter", False, 
-                              f"User {user.get('telegram_id')} has user_type='{user.get('user_type')}', expected 'web'")
-                return False
+        if success:
+            required_fields = ['id', 'owner_id', 'participants', 'schedules', 'free_windows']
+            missing_fields = [field for field in required_fields if field not in data]
             
-            # Check telegram_id is >= 10B
-            telegram_id = user.get("telegram_id", 0)
-            if telegram_id < 10_000_000_000:
-                self.log_result("Admin Users Web Filter", False, 
-                              f"User {telegram_id} should have telegram_id >= 10B for web type")
-                return False
+            if missing_fields:
+                self.log_result("Shared Schedule Create - Fields", False, 
+                              f"Missing fields: {missing_fields}")
+            else:
+                # Store schedule ID for later tests
+                self.test_data['schedule_id'] = data.get('id')
+                
+                # Verify ID is UUID format
+                try:
+                    uuid.UUID(data.get('id'))
+                    self.log_result("Shared Schedule - UUID Format", True, 
+                                  f"Valid UUID: {data.get('id')}")
+                except:
+                    self.log_result("Shared Schedule - UUID Format", False, 
+                                  f"Invalid UUID: {data.get('id')}")
+                
+                # Check participants array
+                participants = data.get('participants', [])
+                expected_participants = 2  # owner + 1 participant
+                self.log_result("Shared Schedule - Participants", len(participants) == expected_participants,
+                              f"Expected {expected_participants}, got {len(participants)} participants")
         
-        telegram_ids = [u.get('telegram_id') for u in data]
-        expected_ids = {10000000000001, 10000000000002, 10000000000003}
-        actual_ids = set(telegram_ids)
+        self.log_result("Create Shared Schedule", success, 
+                      f"Status: {status}, Response keys: {list(data.keys()) if isinstance(data, dict) else 'Invalid'}")
+    
+    async def test_shared_schedule_get(self):
+        """Test 4: GET /api/shared-schedule/{telegram_id} - Get shared schedule"""
+        test_user_id = 555555
         
-        if actual_ids != expected_ids:
-            self.log_result("Admin Users Web Filter", False, 
-                          f"Web user IDs don't match expected", 
-                          {"expected": sorted(expected_ids), "actual": sorted(actual_ids)})
-            return False
+        success, status, data = await self.test_endpoint(
+            "GET", f"/shared-schedule/{test_user_id}",
+            test_name="Get Shared Schedule"
+        )
         
-        self.log_result("Admin Users Web Filter", True, 
-                       f"Found exactly 3 web users with correct user_type", 
-                       {"telegram_ids": sorted(telegram_ids)})
-        return True
-
-    async def test_admin_users_no_filter(self):
-        """Test GET /api/admin/users (no filter) → should return all 8 users"""
-        print(f"\n{'='*60}")
-        print("TEST 3: Admin Users - No Filter (All Users)")
-        print(f"{'='*60}")
-        
-        response = await self.make_request("GET", "/admin/users")
-        
-        if not response["success"]:
-            self.log_result("Admin Users No Filter", False, f"API call failed: {response['error']}")
-            return False
-        
-        data = response["data"]
-        
-        # Check if response is a list
-        if not isinstance(data, list):
-            self.log_result("Admin Users No Filter", False, f"Expected array, got {type(data)}")
-            return False
-        
-        # Check total count (should be at least 8, could be more if other users exist)
-        if len(data) < 8:
-            self.log_result("Admin Users No Filter", False, 
-                          f"Expected at least 8 users, got {len(data)}", 
-                          {"actual_count": len(data)})
-            return False
-        
-        # Check that all users have user_type field
-        users_without_type = []
-        telegram_count = 0
-        web_count = 0
-        
-        for user in data:
-            if "user_type" not in user:
-                users_without_type.append(user.get('telegram_id'))
-            elif user["user_type"] == "telegram":
-                telegram_count += 1
-            elif user["user_type"] == "web":
-                web_count += 1
-        
-        if users_without_type:
-            self.log_result("Admin Users No Filter", False, 
-                          f"Users without user_type field: {users_without_type}")
-            return False
-        
-        # Check that we have at least our expected users
-        telegram_ids = [u.get('telegram_id') for u in data if u.get('user_type') == 'telegram']
-        web_ids = [u.get('telegram_id') for u in data if u.get('user_type') == 'web']
-        
-        expected_telegram = {765963392, 1311283832, 523439151, 987654321, 111222333}
-        expected_web = {10000000000001, 10000000000002, 10000000000003}
-        
-        actual_telegram = set(telegram_ids)
-        actual_web = set(web_ids)
-        
-        missing_telegram = expected_telegram - actual_telegram
-        missing_web = expected_web - actual_web
-        
-        if missing_telegram or missing_web:
-            self.log_result("Admin Users No Filter", False, 
-                          f"Missing expected users", 
-                          {"missing_telegram": list(missing_telegram), "missing_web": list(missing_web)})
-            return False
-        
-        self.log_result("Admin Users No Filter", True, 
-                       f"Found all expected users among {len(data)} total users", 
-                       {"total_users": len(data), "telegram_users": telegram_count, "web_users": web_count})
-        return True
-
-    async def test_admin_stats(self):
-        """Test GET /api/admin/stats → should show telegram_users=5 and web_guest_users=3"""
-        print(f"\n{'='*60}")
-        print("TEST 4: Admin Stats - User Type Counts")
-        print(f"{'='*60}")
-        
-        response = await self.make_request("GET", "/admin/stats")
-        
-        if not response["success"]:
-            self.log_result("Admin Stats", False, f"API call failed: {response['error']}")
-            return False
-        
-        data = response["data"]
-        
-        # Check required fields exist
-        required_fields = ["telegram_users", "web_guest_users", "total_users"]
-        missing_fields = [f for f in required_fields if f not in data]
-        
-        if missing_fields:
-            self.log_result("Admin Stats", False, 
-                          f"Missing required fields: {missing_fields}")
-            return False
-        
-        # Check telegram_users count
-        telegram_users = data.get("telegram_users", 0)
-        if telegram_users < 5:
-            self.log_result("Admin Stats", False, 
-                          f"Expected at least 5 telegram_users, got {telegram_users}")
-            return False
-        
-        # Check web_guest_users count
-        web_guest_users = data.get("web_guest_users", 0)
-        if web_guest_users < 3:
-            self.log_result("Admin Stats", False, 
-                          f"Expected at least 3 web_guest_users, got {web_guest_users}")
-            return False
-        
-        # Check that total_users >= telegram_users + web_guest_users
-        total_users = data.get("total_users", 0)
-        expected_min_total = telegram_users + web_guest_users
-        
-        if total_users < expected_min_total:
-            self.log_result("Admin Stats", False, 
-                          f"total_users ({total_users}) < telegram_users ({telegram_users}) + web_guest_users ({web_guest_users})")
-            return False
-        
-        self.log_result("Admin Stats", True, 
-                       f"Correct user type statistics", 
-                       {"telegram_users": telegram_users, "web_guest_users": web_guest_users, "total_users": total_users})
-        return True
-
-    async def test_admin_users_search_with_filter(self):
-        """Test GET /api/admin/users?user_type=telegram&search=Алексей → should return 1 user (Алексей Иванов)"""
-        print(f"\n{'='*60}")
-        print("TEST 5: Admin Users - Search with Telegram Filter")
-        print(f"{'='*60}")
-        
-        # First, let's see what users we have to find one with Cyrillic name
-        response = await self.make_request("GET", "/admin/users", params={"user_type": "telegram"})
-        
-        if not response["success"]:
-            self.log_result("Admin Users Search with Filter", False, f"Failed to get telegram users: {response['error']}")
-            return False
-        
-        telegram_users = response["data"]
-        
-        # Find a user with a Russian name to search for
-        search_user = None
-        for user in telegram_users:
-            first_name = user.get('first_name', '')
-            if first_name and any(ord(char) > 127 for char in first_name):  # Contains non-ASCII (Cyrillic)
-                search_user = user
-                search_term = first_name[:3] if len(first_name) >= 3 else first_name  # Use first 3 chars
-                break
-        
-        if not search_user:
-            # Try to find any user with a first name
-            for user in telegram_users:
-                if user.get('first_name'):
-                    search_user = user
-                    search_term = user['first_name'][:3] if len(user['first_name']) >= 3 else user['first_name']
-                    break
-        
-        if not search_user:
-            self.log_result("Admin Users Search with Filter", False, 
-                          "No telegram users with searchable names found in test data")
-            return False
-        
-        print(f"🔍 Searching for: '{search_term}' in telegram users")
-        
-        # Perform the search
-        search_response = await self.make_request("GET", "/admin/users", 
-                                                params={"user_type": "telegram", "search": search_term})
-        
-        if not search_response["success"]:
-            self.log_result("Admin Users Search with Filter", False, 
-                          f"Search API call failed: {search_response['error']}")
-            return False
-        
-        search_data = search_response["data"]
-        
-        # Check if response is a list
-        if not isinstance(search_data, list):
-            self.log_result("Admin Users Search with Filter", False, f"Expected array, got {type(search_data)}")
-            return False
-        
-        # Check that we found at least one user
-        if len(search_data) == 0:
-            self.log_result("Admin Users Search with Filter", False, 
-                          f"No users found for search term '{search_term}'")
-            return False
-        
-        # Check that all returned users are telegram type
-        non_telegram_users = [u for u in search_data if u.get("user_type") != "telegram"]
-        if non_telegram_users:
-            self.log_result("Admin Users Search with Filter", False, 
-                          f"Search returned non-telegram users: {[u.get('telegram_id') for u in non_telegram_users]}")
-            return False
-        
-        # Check that the search term matches
-        found_matching = False
-        for user in search_data:
-            first_name = user.get('first_name', '').lower()
-            last_name = user.get('last_name', '').lower()
-            username = user.get('username', '').lower()
+        if success:
+            required_fields = ['exists', 'id', 'participants', 'schedules', 'free_windows']
+            missing_fields = [field for field in required_fields if field not in data]
             
-            if (search_term.lower() in first_name or 
-                search_term.lower() in last_name or 
-                search_term.lower() in username):
-                found_matching = True
-                break
+            if missing_fields:
+                self.log_result("Get Shared Schedule - Fields", False, 
+                              f"Missing fields: {missing_fields}")
+            else:
+                exists = data.get('exists', False)
+                self.log_result("Get Shared Schedule - Exists", exists, 
+                              f"Schedule exists: {exists}, ID: {data.get('id')}")
         
-        if not found_matching:
-            self.log_result("Admin Users Search with Filter", False, 
-                          f"Search results don't contain search term '{search_term}'")
-            return False
+        self.log_result("Get Shared Schedule", success, 
+                      f"Status: {status}, Response keys: {list(data.keys()) if isinstance(data, dict) else 'Invalid'}")
+    
+    async def test_shared_schedule_add_participant(self):
+        """Test 5: POST /api/shared-schedule/{id}/add-participant"""
+        if 'schedule_id' not in self.test_data:
+            self.log_result("Add Participant", False, "No schedule_id available from create test")
+            return
         
-        self.log_result("Admin Users Search with Filter", True, 
-                       f"Search with user_type filter working correctly", 
-                       {"search_term": search_term, "results_count": len(search_data), 
-                        "found_users": [f"{u.get('first_name', '')} {u.get('last_name', '')}" for u in search_data]})
-        return True
-
+        schedule_id = self.test_data['schedule_id']
+        payload = {"participant_id": 777777}
+        
+        success, status, data = await self.test_endpoint(
+            "POST", f"/shared-schedule/{schedule_id}/add-participant", payload,
+            test_name="Add Participant"
+        )
+        
+        if success:
+            has_success = data.get('success') is True
+            self.log_result("Add Participant Response", has_success, 
+                          f"success={data.get('success')}, message='{data.get('message', '')}'")
+        
+        self.log_result("Add Participant", success, 
+                      f"Status: {status}, Response: {data}")
+    
+    async def test_shared_schedule_remove_participant(self):
+        """Test 6: DELETE /api/shared-schedule/{id}/remove-participant/{pid}"""
+        if 'schedule_id' not in self.test_data:
+            self.log_result("Remove Participant", False, "No schedule_id available from create test")
+            return
+        
+        schedule_id = self.test_data['schedule_id']
+        participant_id = 777777
+        
+        success, status, data = await self.test_endpoint(
+            "DELETE", f"/shared-schedule/{schedule_id}/remove-participant/{participant_id}",
+            test_name="Remove Participant"
+        )
+        
+        if success:
+            has_success = data.get('success') is True
+            self.log_result("Remove Participant Response", has_success, 
+                          f"success={data.get('success')}, message='{data.get('message', '')}'")
+        
+        self.log_result("Remove Participant", success, 
+                      f"Status: {status}, Response: {data}")
+    
+    async def test_telegram_parse(self):
+        """Test 7: POST /api/admin/notifications/parse-telegram - Parse TG post"""
+        # Valid Telegram URL test
+        payload = {"telegram_url": "https://t.me/durov/342"}
+        
+        success, status, data = await self.test_endpoint(
+            "POST", "/admin/notifications/parse-telegram", payload,
+            test_name="Parse Telegram Post"
+        )
+        
+        if success:
+            required_fields = ['success', 'title', 'description', 'channel', 'post_id']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_result("Parse Telegram - Fields", False, 
+                              f"Missing fields: {missing_fields}")
+            else:
+                # Verify parsed data
+                channel = data.get('channel')
+                post_id = data.get('post_id')
+                
+                self.log_result("Parse Telegram - Channel", channel == "durov", 
+                              f"Expected 'durov', got '{channel}'")
+                self.log_result("Parse Telegram - Post ID", post_id == "342", 
+                              f"Expected '342', got '{post_id}'")
+        
+        self.log_result("Parse Telegram Post", success, 
+                      f"Status: {status}, Response keys: {list(data.keys()) if isinstance(data, dict) else 'Invalid'}")
+        
+        # Invalid URL test
+        invalid_payload = {"telegram_url": "https://invalid-url"}
+        success_invalid, status_invalid, data_invalid = await self.test_endpoint(
+            "POST", "/admin/notifications/parse-telegram", invalid_payload,
+            expected_status=400,
+            test_name="Parse Telegram Invalid URL"
+        )
+        
+        self.log_result("Parse Telegram - Invalid URL", success_invalid, 
+                      f"Correctly returned 400 for invalid URL")
+    
+    async def test_notification_send(self):
+        """Test 8: POST /api/admin/notifications/send-from-post - Send notification"""
+        payload = {
+            "title": "Test Notification",
+            "description": "Test notification from API testing",
+            "image_url": "",
+            "recipients": "all"
+        }
+        
+        success, status, data = await self.test_endpoint(
+            "POST", "/admin/notifications/send-from-post", payload,
+            test_name="Send Notification"
+        )
+        
+        if success:
+            has_success = 'success' in data
+            self.log_result("Send Notification Response", has_success, 
+                          f"Response contains success field: {data.get('success')}")
+        
+        self.log_result("Send Notification", success, 
+                      f"Status: {status}, Response: {data}")
+    
+    async def test_user_stats_streak_fields(self):
+        """Test 9: GET /api/user-stats/555555 - Verify stats include streak fields"""
+        test_user_id = 555555
+        
+        success, status, data = await self.test_endpoint(
+            "GET", f"/user-stats/{test_user_id}",
+            test_name="User Stats Streak Fields"
+        )
+        
+        if success:
+            streak_fields = ['visit_streak_current', 'visit_streak_max', 'last_visit_date', 
+                           'freeze_shields', 'streak_claimed_today']
+            missing_fields = [field for field in streak_fields if field not in data]
+            
+            if missing_fields:
+                self.log_result("User Stats - Streak Fields", False, 
+                              f"Missing streak fields: {missing_fields}")
+            else:
+                self.log_result("User Stats - Streak Fields", True, 
+                              "All streak fields present in user stats")
+        
+        self.log_result("User Stats Streak Fields", success, 
+                      f"Status: {status}, Response keys: {list(data.keys()) if isinstance(data, dict) else 'Invalid'}")
+    
     async def run_all_tests(self):
-        """Run all test scenarios"""
-        print(f"\n{'='*80}")
-        print("🧪 STARTING ADMIN USER TYPE FILTERING TESTS")
-        print(f"Backend URL: {self.base_url}")
-        print(f"{'='*80}")
+        """Run all test cases"""
+        print(f"🚀 Starting Backend API Tests for NEW Phase 1 Endpoints")
+        print(f"📡 Backend URL: {BACKEND_URL}")
+        print(f"⏰ Started at: {datetime.utcnow().isoformat()}")
+        print("=" * 80)
         
-        tests = [
-            self.test_admin_users_telegram_filter,
-            self.test_admin_users_web_filter, 
-            self.test_admin_users_no_filter,
-            self.test_admin_stats,
-            self.test_admin_users_search_with_filter
-        ]
+        # Test sequence
+        await self.test_streak_visit_recording()
+        await self.test_streak_claim()
+        await self.test_shared_schedule_create()
+        await self.test_shared_schedule_get()
+        await self.test_shared_schedule_add_participant()
+        await self.test_shared_schedule_remove_participant()
+        await self.test_telegram_parse()
+        await self.test_notification_send()
+        await self.test_user_stats_streak_fields()
         
-        passed = 0
-        total = len(tests)
+        # Summary
+        print("=" * 80)
+        total_tests = len(self.results)
+        passed_tests = sum(1 for r in self.results if r['success'])
+        failed_tests = total_tests - passed_tests
         
-        for test_func in tests:
-            try:
-                success = await test_func()
-                if success:
-                    passed += 1
-            except Exception as e:
-                print(f"❌ Test {test_func.__name__} crashed: {e}")
-                self.log_result(test_func.__name__, False, f"Test crashed: {e}")
+        print(f"📊 TEST SUMMARY:")
+        print(f"   Total Tests: {total_tests}")
+        print(f"   ✅ Passed: {passed_tests}")
+        print(f"   ❌ Failed: {failed_tests}")
+        print(f"   Success Rate: {(passed_tests/total_tests*100):.1f}%")
         
-        print(f"\n{'='*80}")
-        print(f"🏁 TEST SUMMARY: {passed}/{total} PASSED")
-        print(f"{'='*80}")
+        if failed_tests > 0:
+            print(f"\n❌ FAILED TESTS:")
+            for result in self.results:
+                if not result['success']:
+                    print(f"   • {result['test']}: {result['details']}")
         
-        # Print detailed results
-        for result in self.results:
-            status = "✅" if result["success"] else "❌"
-            print(f"{status} {result['test']}: {result['message']}")
-            
-        return passed, total, self.results
+        return failed_tests == 0
 
 async def main():
-    """Main test function"""
-    tester = AdminEndpointsTest()
-    passed, total, results = await tester.run_all_tests()
-    
-    print(f"\n📊 Final Results: {passed}/{total} tests passed")
-    
-    if passed == total:
-        print("🎉 All tests PASSED!")
-        return 0
-    else:
-        print("❌ Some tests FAILED!")
-        return 1
+    """Main test runner"""
+    async with BackendTester() as tester:
+        success = await tester.run_all_tests()
+        sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    exit(exit_code)
+    asyncio.run(main())
