@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { fadeInUp, listItemVariants, buttonVariants, staggerContainer } from '../utils/animations';
 import { translateDiscipline, translateLessonType } from '../i18n/subjects';
 import { ShareScheduleModal } from './ShareScheduleModal';
+import { SharedScheduleView } from './SharedScheduleView';
 import { achievementsAPI } from '../services/api';
 
 export const LiveScheduleSection = ({ 
@@ -28,6 +29,7 @@ export const LiveScheduleSection = ({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [swipeDirection, setSwipeDirection] = useState(0); // -1 left, 0 none, 1 right
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState('personal'); // 'personal' or 'shared'
   const { t, i18n } = useTranslation();
   
   // Debug: логируем user.id для проверки доступа к админ панели
