@@ -833,6 +833,155 @@ class NotificationSchedulerV2:
             logger.error(f"Error scheduling user notifications: {e}", exc_info=True)
             return {"created": 0, "scheduled": 0}
 
+    # ============================================================================
+    # АВТО-НАПОМИНАНИЯ О ВОЗВРАЩЕНИИ
+    # ============================================================================
+
+    async def check_inactive_users(self):
+        """
+        Проверить неактивных пользователей и отправить напоминания.
+        Типы напоминаний:
+        - 1 день: стрик под угрозой
+        - 2 дня: стрик сгорел
+        - 7 дней: мягкое напоминание
+        - 30 дней: персональное
+        """
+        try:
+            now = datetime.now(MOSCOW_TZ)
+            today_str = now.strftime('%Y-%m-%d')
+            
+            logger.info(f"👻 Starting inactivity check at {now.strftime('%H:%M')}")
+            
+            # Получаем всех пользователей с last_visit_date
+            users_with_streak = await self.db.user_stats.find(
+                {"last_visit_date": {"$ne": None}}
+            ).to_list(None)
+            
+            sent_count = 0
+            
+            for user_stats in users_with_streak:
+                try:
+                    telegram_id = user_stats.get("telegram_id")
+                    last_visit = user_stats.get("last_visit_date")
+                    streak = user_stats.get("visit_streak_current", 0)
+                    freeze_shields = user_stats.get("freeze_shields", 0)
+                    
+                    if not last_visit or not telegram_id:
+                        continue
+                    
+                    from datetime import date as date_type
+                    last_date = date_type.fromisoformat(last_visit)
+                    today_date = date_type.fromisoformat(today_str)
+                    days_inactive = (today_date - last_date).days
+                    
+                    # Получаем настройки пользователя
+                    user_settings = await self.db.user_settings.find_one({"telegram_id": telegram_id})
+                    
+                    # Проверяем: не отправляли ли уже напоминание
+                    already_sent = await self.db.sent_notifications.find_one({
+                        "telegram_id": telegram_id,
+                        "type": f"inactivity_{days_inactive}d",
+                        "date": today_str
+                    })
+                    
+                    if already_sent:
+                        continue
+                    
+                    message = None
+                    notif_type = None
+                    
+                    if days_inactive == 1 and streak >= 3:
+                        # Стрик под угрозой
+                        shield_text = f"\n🛡 У тебя есть {freeze_shields} щит(ов) заморозки" if freeze_shields > 0 else ""
+                        message = (
+                            f"🔥 <b>Эй! Твой стрик {streak} дней под угрозой!</b>\n"
+                            f"Зайди в приложение — сохрани свою серию{shield_text}"
+                        )
+                        notif_type = "inactivity_1d"
+                    
+                    elif days_inactive == 2 and streak >= 3:
+                        if freeze_shields > 0:
+                            message = (
+                                f"🛡 <b>Щит заморозки спас твой стрик!</b>\n"
+                                f"Но осталось щитов: {freeze_shields - 1}. Зайди сегодня!"
+                            )
+                        else:
+                            message = (
+                                f"😢 <b>Твой стрик {streak} дней сгорел...</b>\n"
+                                f"Но всё можно начать заново! Сегодня день 1 💪"
+                            )
+                        notif_type = "inactivity_2d"
+                    
+                    elif days_inactive == 7:
+                        first_name = ""
+                        if user_settings:
+                            first_name = user_settings.get("first_name", "")
+                        greeting = f", {first_name}" if first_name else ""
+                        message = (
+                            f"🌟 <b>Привет{greeting}! Давно не виделись.</b>\n"
+                            f"Загляни — проверь расписание и задачи 📅"
+                        )
+                        notif_type = "inactivity_7d"
+                    
+                    elif days_inactive == 30:
+                        first_name = ""
+                        if user_settings:
+                            first_name = user_settings.get("first_name", "")
+                        
+                        # Считаем друзей
+                        friends_count = await self.db.friends.count_documents({
+                            "$or": [
+                                {"user1_id": telegram_id},
+                                {"user2_id": telegram_id}
+                            ]
+                        })
+                        
+                        friends_text = f"\nТвои {friends_count} друзей уже ждут 👋" if friends_count > 0 else ""
+                        greeting = f", {first_name}" if first_name else ""
+                        message = (
+                            f"❓ <b>Всё в порядке{greeting}?</b>\n"
+                            f"Ты не заходил уже месяц.{friends_text}"
+                        )
+                        notif_type = "inactivity_30d"
+                    
+                    if message and notif_type:
+                        try:
+                            success = await self.notification_service.send_message(telegram_id, message)
+                            if success:
+                                sent_count += 1
+                                # Сохраняем что отправили
+                                await self.db.sent_notifications.insert_one({
+                                    "telegram_id": telegram_id,
+                                    "type": notif_type,
+                                    "date": today_str,
+                                    "created_at": datetime.now(MOSCOW_TZ)
+                                })
+                        except Exception as send_err:
+                            logger.warning(f"Failed to send inactivity notification to {telegram_id}: {send_err}")
+                        
+                        # Rate limiting
+                        await asyncio.sleep(0.1)
+                
+                except Exception as user_err:
+                    logger.warning(f"Error processing inactivity for user: {user_err}")
+                    continue
+            
+            logger.info(f"👻 Inactivity check complete: sent {sent_count} reminders")
+            
+        except Exception as e:
+            logger.error(f"Error in inactivity checker: {e}", exc_info=True)
+
+    async def reset_streak_claimed(self):
+        """Сбрасывать streak_claimed_today в полночь для всех пользователей"""
+        try:
+            result = await self.db.user_stats.update_many(
+                {"streak_claimed_today": True},
+                {"$set": {"streak_claimed_today": False}}
+            )
+            logger.info(f"🔄 Reset streak_claimed_today for {result.modified_count} users")
+        except Exception as e:
+            logger.error(f"Error resetting streak_claimed: {e}")
+
 
 # Глобальный экземпляр планировщика
 scheduler_v2_instance = None
