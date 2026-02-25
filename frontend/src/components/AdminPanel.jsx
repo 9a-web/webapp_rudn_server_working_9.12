@@ -4197,7 +4197,7 @@ const TelegramPostNotifyTab = () => {
     setSending(true);
     setSendResult(null);
     try {
-      const res = await axios.post(`${API_BASE}/admin/notifications/send-from-post`, {
+      const res = await axios.post(`${BACKEND_URL}/api/admin/notifications/send-from-post`, {
         title: editTitle,
         description: editDescription,
         image_url: parsedData?.image_url || '',
