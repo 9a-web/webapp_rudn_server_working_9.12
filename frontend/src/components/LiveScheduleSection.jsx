@@ -280,24 +280,42 @@ export const LiveScheduleSection = ({
           </div>
           
           {/* Date button - opens calendar */}
-          <button
-            onClick={() => {
-              if (hapticFeedback) hapticFeedback('impact', 'medium');
-              if (onCalendarClick) onCalendarClick();
-            }}
-            className="flex items-center gap-2 px-4 md:px-5 py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10"
-            style={{ 
-              backgroundColor: '#1c1c1c'
-            }}
-          >
-            <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white" />
-            <span 
-              className="text-sm md:text-base font-medium text-white"
-              style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+          <div className="flex items-center gap-2">
+            {/* Shared schedule toggle button */}
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                setScheduleMode(scheduleMode === 'shared' ? 'personal' : 'shared');
+              }}
+              className={`p-2.5 md:p-3 rounded-full transition-all duration-300 active:scale-95 border ${
+                scheduleMode === 'shared'
+                  ? 'bg-indigo-500 border-indigo-400/30 shadow-lg shadow-indigo-500/20'
+                  : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+              }`}
+              title="Совместное расписание"
             >
-              {dateButton}
-            </span>
-          </button>
+              <Users className={`w-4 h-4 md:w-5 md:h-5 ${scheduleMode === 'shared' ? 'text-white' : 'text-gray-600'}`} />
+            </button>
+            
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                if (onCalendarClick) onCalendarClick();
+              }}
+              className="flex items-center gap-2 px-4 md:px-5 py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10"
+              style={{ 
+                backgroundColor: '#1c1c1c'
+              }}
+            >
+              <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white" />
+              <span 
+                className="text-sm md:text-base font-medium text-white"
+                style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+              >
+                {dateButton}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Week selector */}
