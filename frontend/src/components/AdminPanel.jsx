@@ -331,6 +331,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
             {activeTab === 'notifications' && <NotificationsTab />}
             {activeTab === 'referrals' && <ReferralLinksTab />}
             {activeTab === 'server' && <ServerTab onlineData={onlineData} />}
+            {activeTab === 'tg-notify' && <TelegramPostNotifyTab />}
           </div>
         </motion.div>
       </div>
