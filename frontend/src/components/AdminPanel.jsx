@@ -198,6 +198,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
     { id: 'visits', icon: <Globe className="w-4 h-4" />, label: 'Посещения', glow: 'orange' },
     { id: 'classes', icon: <BookOpen className="w-4 h-4" />, label: 'Занятия', glow: 'orange' },
     { id: 'notifications', icon: <Bell className="w-4 h-4" />, label: 'Уведомления', glow: 'pink' },
+    { id: 'tg-notify', icon: <Bell className="w-4 h-4" />, label: 'TG Посты', glow: 'blue' },
   ];
 
   return (
