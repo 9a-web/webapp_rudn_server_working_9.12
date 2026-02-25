@@ -633,29 +633,85 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
               </div>
             )}
 
-            {/* ─── Free windows ─── */}
-            {dayFreeWindows.map((fw, idx) => (
-              <FreeWindowBlock key={`fw-${idx}`} window={fw} index={idx} />
-            ))}
+            {/* ─── Events container (positioned after time labels) ─── */}
+            <div
+              className="absolute"
+              style={{
+                top: 0,
+                bottom: 0,
+                left: `${TIME_LABEL_WIDTH + 4}px`,
+                right: '4px',
+              }}
+            >
+              {/* ─── Free windows ─── */}
+              {dayFreeWindows.map((fw, idx) => {
+                const fwStartMin = parseTime(fw.start);
+                const fwEndMin = parseTime(fw.end);
+                if (fwStartMin === null || fwEndMin === null) return null;
+                const fwTop = minToPx(fwStartMin);
+                const fwHeight = durationToPx(fwEndMin - fwStartMin);
+                const duration = fw.duration_minutes;
+                const hours = Math.floor(duration / 60);
+                const mins = duration % 60;
+                const durationText = hours > 0
+                  ? `${hours}ч${mins > 0 ? ` ${mins}м` : ''}`
+                  : `${mins}м`;
+                const isSmall = fwHeight < 50;
+                
+                return (
+                  <motion.div
+                    key={`fw-${idx}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.4, delay: 0.2 + idx * 0.05 }}
+                    className="absolute left-0 right-0 rounded-xl overflow-hidden"
+                    style={{
+                      top: `${fwTop}px`,
+                      height: `${fwHeight}px`,
+                      zIndex: 5,
+                    }}
+                  >
+                    <div 
+                      className="absolute inset-0 opacity-[0.07]"
+                      style={{
+                        background: `repeating-linear-gradient(-45deg, #10b981, #10b981 4px, transparent 4px, transparent 12px)`
+                      }}
+                    />
+                    <div className="relative h-full flex items-center justify-center gap-2 px-3">
+                      {!isSmall && <Coffee className="w-3.5 h-3.5 text-emerald-600" />}
+                      <div className={`font-medium text-emerald-700 ${isSmall ? 'text-[10px]' : 'text-xs'}`}>
+                        {isSmall ? durationText : `Свободны ${durationText}`}
+                      </div>
+                      {!isSmall && (
+                        <div className="text-[10px] text-emerald-600/70">
+                          {fw.start} – {fw.end}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute inset-0 rounded-xl border border-dashed border-emerald-300" />
+                  </motion.div>
+                );
+              })}
 
-            {/* ─── Events ─── */}
-            {activeParticipantIds.map((pId, colIdx) => {
-              const participant = getParticipant(pId);
-              const events = daySchedules[pId] || [];
-              if (!participant) return null;
+              {/* ─── Events ─── */}
+              {activeParticipantIds.map((pId, colIdx) => {
+                const participant = getParticipant(pId);
+                const events = daySchedules[pId] || [];
+                if (!participant) return null;
 
-              return events.map((event, eIdx) => (
-                <TimelineEvent
-                  key={`${pId}-${eIdx}`}
-                  event={event}
-                  color={participant.color}
-                  participantName={participant.first_name}
-                  columnIndex={colIdx}
-                  totalColumns={totalColumns}
-                  isOwner={participant.telegram_id === telegramId}
-                />
-              ));
-            })}
+                return events.map((event, eIdx) => (
+                  <TimelineEvent
+                    key={`${pId}-${eIdx}`}
+                    event={event}
+                    color={participant.color}
+                    participantName={participant.first_name}
+                    columnIndex={colIdx}
+                    totalColumns={totalColumns}
+                    isOwner={participant.telegram_id === telegramId}
+                  />
+                ));
+              })}
+            </div>
 
             {/* ─── Current time indicator ─── */}
             {isToday && <CurrentTimeLine />}
