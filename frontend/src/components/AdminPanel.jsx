@@ -4161,4 +4161,222 @@ const ServerHistorySection = () => {
   );
 };
 
+// ============ TelegramPostNotifyTab ============
+
+const TelegramPostNotifyTab = () => {
+  const [telegramUrl, setTelegramUrl] = useState('');
+  const [parsedData, setParsedData] = useState(null);
+  const [parsing, setParsing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [recipients, setRecipients] = useState('all');
+
+  const handleParse = async () => {
+    if (!telegramUrl.trim()) return;
+    setParsing(true);
+    setParsedData(null);
+    setSendResult(null);
+    try {
+      const res = await axios.post(`${API_BASE}/admin/notifications/parse-telegram`, {
+        telegram_url: telegramUrl.trim()
+      });
+      setParsedData(res.data);
+      setEditTitle(res.data.title || '');
+      setEditDescription(res.data.description || '');
+    } catch (err) {
+      console.error('Parse error:', err);
+      setParsedData({ error: err.response?.data?.detail || 'Ошибка парсинга' });
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleSend = async () => {
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await axios.post(`${API_BASE}/admin/notifications/send-from-post`, {
+        title: editTitle,
+        description: editDescription,
+        image_url: parsedData?.image_url || '',
+        recipients
+      });
+      setSendResult(res.data);
+    } catch (err) {
+      console.error('Send error:', err);
+      setSendResult({ success: false, message: err.response?.data?.detail || 'Ошибка отправки' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className={`${GLASS.card} rounded-2xl p-4`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-xl bg-blue-500/10">
+            <Send className="w-5 h-5 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white">Уведомление из Telegram поста</h3>
+            <p className="text-xs text-gray-500">Парсинг публичного поста → отправка всем</p>
+          </div>
+        </div>
+
+        {/* URL Input */}
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={telegramUrl}
+            onChange={(e) => setTelegramUrl(e.target.value)}
+            placeholder="https://t.me/channel/123"
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600 border border-white/10"
+            style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+            onKeyDown={(e) => e.key === 'Enter' && handleParse()}
+          />
+          <button
+            onClick={handleParse}
+            disabled={parsing || !telegramUrl.trim()}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-500 text-white disabled:opacity-50 hover:bg-blue-600 transition-colors flex items-center gap-2"
+          >
+            {parsing ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
+            Парсить
+          </button>
+        </div>
+      </div>
+
+      {/* Error */}
+      {parsedData?.error && (
+        <div className={`${GLASS.card} rounded-2xl p-4 border border-red-500/20`}>
+          <div className="flex items-center gap-2 text-red-400 text-sm">
+            <AlertCircle className="w-4 h-4" />
+            {parsedData.error}
+          </div>
+        </div>
+      )}
+
+      {/* Preview */}
+      {parsedData && !parsedData.error && (
+        <div className={`${GLASS.card} rounded-2xl p-4`}>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">Предпросмотр</h4>
+          
+          {/* Image */}
+          {parsedData.image_url && (
+            <div className="mb-3 rounded-xl overflow-hidden border border-white/5">
+              <img 
+                src={parsedData.image_url} 
+                alt="Post" 
+                className="w-full max-h-48 object-cover"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            </div>
+          )}
+
+          {/* Editable Title */}
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 mb-1 block">Заголовок</label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white border border-white/10"
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+              placeholder="Заголовок уведомления"
+            />
+          </div>
+
+          {/* Editable Description */}
+          <div className="mb-3">
+            <label className="text-xs text-gray-500 mb-1 block">Текст</label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 rounded-xl text-sm text-white border border-white/10 resize-none"
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+              placeholder="Текст уведомления"
+            />
+          </div>
+
+          {/* Recipients */}
+          <div className="mb-4">
+            <label className="text-xs text-gray-500 mb-2 block">Получатели</label>
+            <div className="flex gap-2">
+              {['all', 'group'].map(type => (
+                <button
+                  key={type}
+                  onClick={() => setRecipients(type)}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                    recipients === type 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-white/5 text-gray-400 border border-white/10'
+                  }`}
+                >
+                  {type === 'all' ? '● Все пользователи' : '○ Группа'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Send Button */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setParsedData(null);
+                setTelegramUrl('');
+                setSendResult(null);
+              }}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-gray-400 border border-white/10 hover:bg-white/5 transition-colors"
+            >
+              ❌ Отмена
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={sending || (!editTitle && !editDescription)}
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-500 text-white disabled:opacity-50 hover:shadow-lg hover:shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+            >
+              {sending ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              📤 Отправить уведомление
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Send Result */}
+      {sendResult && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`${GLASS.card} rounded-2xl p-4 border ${
+            sendResult.success ? 'border-green-500/20' : 'border-red-500/20'
+          }`}
+        >
+          <div className={`flex items-center gap-2 text-sm ${
+            sendResult.success ? 'text-green-400' : 'text-red-400'
+          }`}>
+            {sendResult.success ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+            <span className="font-medium">{sendResult.message}</span>
+          </div>
+          {sendResult.sent !== undefined && (
+            <div className="text-xs text-gray-500 mt-2">
+              Отправлено: {sendResult.sent} | Ошибки: {sendResult.failed || 0}
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
 export default AdminPanel;
