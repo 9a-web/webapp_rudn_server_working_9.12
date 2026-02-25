@@ -1434,6 +1434,11 @@ async def get_user_stats_endpoint(telegram_id: int):
             detailed_views=stats.detailed_views,
             night_usage_count=stats.night_usage_count,
             early_usage_count=stats.early_usage_count,
+            visit_streak_current=stats.visit_streak_current,
+            visit_streak_max=stats.visit_streak_max,
+            last_visit_date=stats.last_visit_date,
+            freeze_shields=stats.freeze_shields,
+            streak_claimed_today=stats.streak_claimed_today,
             total_points=stats.total_points,
             achievements_count=stats.achievements_count
         )
