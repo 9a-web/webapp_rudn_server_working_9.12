@@ -587,7 +587,6 @@ export const LiveScheduleSection = ({
           </div>
         )}
         </div>
-      </div>
 
       {/* Share Schedule Modal */}
       <ShareScheduleModal
@@ -599,6 +598,7 @@ export const LiveScheduleSection = ({
         hapticFeedback={hapticFeedback}
         telegramId={telegramId}
       />
+      </div>
     </div>
   );
 };
