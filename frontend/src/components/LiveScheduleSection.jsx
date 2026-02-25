@@ -367,7 +367,48 @@ export const LiveScheduleSection = ({
           </button>
         </div>
 
+        {/* 📅 Переключатель режима: Личное / Совместное */}
+        <div className="flex gap-1 p-1 rounded-2xl mb-4" style={{ backgroundColor: '#f3f4f6' }}>
+          <button
+            onClick={() => {
+              setScheduleMode('personal');
+              hapticFeedback?.('light');
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              scheduleMode === 'personal'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📋 Личное
+          </button>
+          <button
+            onClick={() => {
+              setScheduleMode('shared');
+              hapticFeedback?.('light');
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1.5 ${
+              scheduleMode === 'shared'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Совместное
+          </button>
+        </div>
+
+        {/* Совместное расписание */}
+        {scheduleMode === 'shared' && telegramId && (
+          <SharedScheduleView 
+            telegramId={telegramId}
+            onClose={() => setScheduleMode('personal')}
+            hapticFeedback={hapticFeedback}
+          />
+        )}
+
         {/* Schedule list with swipe container */}
+        {scheduleMode === 'personal' && (
         <div className="relative" ref={swipeContainerRef}>
           {/* Swipe indicators */}
           <AnimatePresence>
