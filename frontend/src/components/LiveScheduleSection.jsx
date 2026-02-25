@@ -392,6 +392,7 @@ export const LiveScheduleSection = ({
             selectedDate={selectedDate}
             onClose={() => setScheduleMode('personal')}
             hapticFeedback={hapticFeedback}
+            onFriendPickerChange={onFriendPickerChange}
           />
         )}
 
