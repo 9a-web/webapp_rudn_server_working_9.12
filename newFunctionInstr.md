@@ -141,10 +141,34 @@
 - **Щиты заморозки:** 1 щит за каждые 7 дней страйка
 
 ### 📁 Осталось реализовать
-- `backend/server.py` — endpoint `POST /api/users/{id}/visit` 🔵
-- `backend/models.py` — новые поля в `UserStats` 🔵
-- `frontend/src/App.jsx` — вызов endpoint при запуске + показ `StreakRewardModal` 🔵
-- `frontend/src/components/DesktopSidebar.jsx` — виджет стрика 🔵
+- `backend/server.py` — endpoint `POST /api/users/{id}/visit` ✅ **РЕАЛИЗОВАНО**
+- `backend/models.py` — новые поля в `UserStats` ✅ **РЕАЛИЗОВАНО**
+- `frontend/src/App.jsx` — вызов endpoint при запуске + показ `StreakRewardModal` ✅ **РЕАЛИЗОВАНО**
+- `frontend/src/components/DesktopSidebar.jsx` — виджет стрика ✅ **РЕАЛИЗОВАНО**
+
+### ✅ РЕАЛИЗОВАНО (Backend + Frontend интеграция)
+
+#### Backend
+- **`POST /api/users/{telegram_id}/visit`** — запись визита, расчёт стрика:
+  - Сегодня уже заходил → ничего не меняется
+  - Вчера заходил → `+1` стрик
+  - Пропуск 1 дня + щит → стрик сохранён, `freeze_shields -= 1`
+  - Пропуск >1 дня без щита → стрик обнуляется
+  - Каждые 7 дней стрика → `+1` щит заморозки
+  - Возвращает `week_days[]` (трекер недели, 7 дней)
+  - Милестоны: 3, 7, 14, 30, 60, 100, 365
+- **`POST /api/users/{telegram_id}/streak-claim`** — подтверждение получения награды
+- **Модель `VisitResponse`** — visit_streak_current, visit_streak_max, freeze_shields, streak_continued, streak_reset, freeze_used, milestone_reached, is_new_day, week_days
+- **Новые поля в `UserStats`:** visit_streak_current, visit_streak_max, last_visit_date, freeze_shields, streak_claimed_today
+- **`GET /api/user-stats/{telegram_id}`** — обновлён, включает все streak-поля
+
+#### Frontend
+- **App.jsx:** вызов `streakAPI.recordVisit()` при запуске, показ `StreakRewardModal` на милестонах с задержкой 2с
+- **DesktopSidebar.jsx:** виджет стрика — текущая серия, трекер недели (7 дней), щиты заморозки, рекорд
+- **api.js:** `streakAPI` (recordVisit, claimReward)
+
+#### Scheduler (scheduler_v2.py)
+- **`reset_streak_claimed`** — cron-задача в полночь, сбрасывает `streak_claimed_today` для всех
 
 ---
 
