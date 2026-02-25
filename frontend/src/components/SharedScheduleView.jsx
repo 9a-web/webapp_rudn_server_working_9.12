@@ -232,26 +232,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
         </div>
       </div>
 
-      {/* Выбор дня */}
-      <div className="flex gap-1 mb-4 px-3 overflow-x-auto">
-        {DAYS_ORDER.map((day, idx) => (
-          <button
-            key={day}
-            onClick={() => {
-              setSelectedDay(day);
-              hapticFeedback?.('light');
-            }}
-            className={`flex-1 min-w-[42px] py-2 rounded-xl text-xs font-medium transition-all duration-200 ${
-              selectedDay === day
-                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                : 'bg-muted/30 text-muted-foreground hover:bg-muted/50'
-            }`}
-          >
-            {DAYS_SHORT[idx]}
-          </button>
-        ))}
-      </div>
-
       {/* Расписание */}
       <div className="space-y-2 px-3">
         {/* Свободные окна */}
