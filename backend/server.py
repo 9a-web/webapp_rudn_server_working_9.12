@@ -258,6 +258,12 @@ from models import (
     AdminReferralTrackRequest,
     AdminReferralLinkResponse,
     ReferralLinksAnalytics,
+    # Модели для стрик-механики
+    VisitResponse,
+    # Модели для совместного расписания
+    SharedScheduleCreate,
+    SharedScheduleAddParticipant,
+    SharedScheduleResponse,
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
