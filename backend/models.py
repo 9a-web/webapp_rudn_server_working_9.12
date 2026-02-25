@@ -351,8 +351,50 @@ class UserStatsResponse(BaseModel):
     tasks_completed_on_time: int = 0
     task_streak_current: int = 0
     first_task_created: bool = False
+    # Streak fields
+    visit_streak_current: int = 0
+    visit_streak_max: int = 0
+    last_visit_date: Optional[str] = None
+    freeze_shields: int = 0
+    streak_claimed_today: bool = False
     total_points: int
     achievements_count: int
+
+
+# ============ Модели для стрик-механики ============
+
+class VisitResponse(BaseModel):
+    """Ответ на визит пользователя"""
+    visit_streak_current: int = 0
+    visit_streak_max: int = 0
+    freeze_shields: int = 0
+    streak_continued: bool = False  # Стрик продолжился
+    streak_reset: bool = False  # Стрик обнулился
+    freeze_used: bool = False  # Использован щит заморозки
+    milestone_reached: Optional[int] = None  # Достигнут милестон (3,7,14...)
+    is_new_day: bool = False  # Это первый визит сегодня
+    week_days: List[dict] = []  # Трекер недели [{label, dateNum, done}]
+
+
+# ============ Модели для совместного расписания ============
+
+class SharedScheduleCreate(BaseModel):
+    """Создание совместного расписания"""
+    owner_id: int  # telegram_id владельца
+    participant_ids: List[int] = []  # telegram_id участников (друзей)
+
+class SharedScheduleAddParticipant(BaseModel):
+    """Добавление участника"""
+    participant_id: int
+
+class SharedScheduleResponse(BaseModel):
+    """Ответ совместного расписания"""
+    id: str
+    owner_id: int
+    participants: List[dict] = []  # [{telegram_id, first_name, color}]
+    schedules: dict = {}  # {telegram_id: [events]}
+    free_windows: List[dict] = []  # [{day, start, end}]
+    created_at: Optional[datetime] = None
 
 
 class UserAchievementResponse(BaseModel):
