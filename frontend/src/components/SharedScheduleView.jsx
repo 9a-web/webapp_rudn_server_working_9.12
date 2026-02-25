@@ -239,9 +239,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     }
   }, [showFriendPicker, loadFriends]);
 
-  // ─── Auto-scroll to current time on mount ───
+  // ─── Auto-scroll to current time ТОЛЬКО при первом открытии ───
+  const hasScrolledRef = useRef(false);
   useEffect(() => {
-    if (!loading && timelineRef.current) {
+    if (!loading && timelineRef.current && !hasScrolledRef.current && sharedData?.exists) {
+      hasScrolledRef.current = true;
       const now = new Date();
       const currentMin = now.getHours() * 60 + now.getMinutes();
       if (currentMin >= TIMELINE_START_MIN && currentMin <= TIMELINE_END_MIN) {
@@ -249,7 +251,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
         timelineRef.current.scrollTop = Math.max(0, scrollTo);
       }
     }
-  }, [loading, sharedData]);
+  }, [loading, sharedData?.exists]);
 
   const handleCreateShared = async () => {
     try {
