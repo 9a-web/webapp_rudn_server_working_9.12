@@ -500,11 +500,13 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
       {hasAnyEvents ? (
         <div
           ref={timelineRef}
-          className="relative overflow-y-auto overflow-x-hidden mx-2 rounded-2xl"
+          className="relative overflow-y-auto overflow-x-hidden mx-2 rounded-2xl scrollbar-hide"
           style={{
             maxHeight: 'calc(100vh - 340px)',
             backgroundColor: '#fafafa',
             border: '1px solid #f0f0f0',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
           }}
         >
           <div className="relative" style={{ height: `${displayHeight}px`, minHeight: '200px' }}>
