@@ -567,6 +567,9 @@ export const LiveScheduleSection = ({
             })}
           </motion.div>
         )}
+        </div>
+        )}
+        {/* end of scheduleMode === 'personal' */}
         
         {/* Admin Panel Link - показывается только для admin IDs: 765963392, 1311283832 */}
         {user && (String(user.id) === '765963392' || String(user.id) === '1311283832') && (
