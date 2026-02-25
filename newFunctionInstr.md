@@ -215,9 +215,26 @@
 - **Частота:** Проверка каждые 6 часов через APScheduler
 
 ### 📁 Файлы для изменения
-- `backend/scheduler_v2.py` — новые задания inactivity check
-- `backend/notifications.py` — новые шаблоны текстов
-- `backend/server.py` — запуск inactivity checker при старте
+- `backend/scheduler_v2.py` — новые задания inactivity check ✅
+- `backend/notifications.py` — новые шаблоны текстов ✅ (inline в scheduler)
+- `backend/server.py` — запуск inactivity checker при старте ✅
+
+### ✅ РЕАЛИЗОВАНО
+
+#### Backend — `scheduler_v2.py`
+- **`check_inactive_users()`** — cron-задача каждые 6 часов (CronTrigger `*/6` часов):
+  - Обходит всех пользователей с `last_visit_date`
+  - Вычисляет `days_inactive = today - last_visit_date`
+  - **1 день + стрик ≥ 3:** «🔥 Твой стрик N дней под угрозой!» (+ инфо о щитах)
+  - **2 дня + стрик ≥ 3:** «😢 Стрик сгорел...» или «🛡 Щит спас стрик!»
+  - **7 дней:** «🌟 Привет, [Имя]! Давно не виделись.»
+  - **30 дней:** «❓ Всё в порядке, [Имя]? Ты не заходил уже месяц.» + кол-во друзей
+  - **Дедупликация:** проверяет коллекцию `sent_notifications` — не отправляет повторно
+  - **Rate limiting:** `asyncio.sleep(0.1)` между отправками
+- **`reset_streak_claimed()`** — cron-задача в 00:05 Москвы, сбрасывает флаг
+
+#### Коллекция MongoDB
+- `sent_notifications` — {telegram_id, type, date, created_at} — защита от повторных отправок
 
 ---
 
