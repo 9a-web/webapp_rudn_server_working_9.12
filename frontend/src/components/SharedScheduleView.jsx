@@ -8,22 +8,27 @@ import { useTranslation } from 'react-i18next';
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 const DAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-export const SharedScheduleView = ({ telegramId, onClose, hapticFeedback }) => {
+export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFeedback }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [sharedData, setSharedData] = useState(null);
   const [friends, setFriends] = useState([]);
   const [showFriendPicker, setShowFriendPicker] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(null);
   const [expandedWindow, setExpandedWindow] = useState(null);
 
-  // Определяем текущий день
-  useEffect(() => {
-    const now = new Date();
-    const dayIdx = now.getDay(); // 0=Sunday
-    const mappedIdx = dayIdx === 0 ? 5 : dayIdx - 1; // Map to 0=Monday
-    setSelectedDay(DAYS_ORDER[Math.min(mappedIdx, 5)]);
-  }, []);
+  // Определяем день из selectedDate родителя
+  const selectedDay = useMemo(() => {
+    if (!selectedDate) {
+      const now = new Date();
+      const dayIdx = now.getDay();
+      const mappedIdx = dayIdx === 0 ? 5 : dayIdx - 1;
+      return DAYS_ORDER[Math.min(mappedIdx, 5)];
+    }
+    const date = new Date(selectedDate);
+    const dayIdx = date.getDay();
+    const mappedIdx = dayIdx === 0 ? 5 : dayIdx - 1;
+    return DAYS_ORDER[Math.min(mappedIdx, 5)];
+  }, [selectedDate]);
 
   const loadSharedSchedule = useCallback(async () => {
     try {
