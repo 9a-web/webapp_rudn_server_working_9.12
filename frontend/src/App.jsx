@@ -342,6 +342,7 @@ const Home = () => {
     isMenuOpen ||
     isProfileOpen ||
     isShareModalOpen ||
+    isSharedScheduleFriendPickerOpen ||
     isAddTaskModalOpen || // from TasksSection's AddTaskModal
     isJournalModalOpen || // from JournalSection
     isFullscreenPlayerOpen || // fullscreen music player
