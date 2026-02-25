@@ -11,8 +11,8 @@ import sys
 from datetime import datetime
 import uuid
 
-# Backend URL from frontend .env
-BACKEND_URL = "https://lesson-progress-hub.preview.emergentagent.com/api"
+# Backend URL - using local port since external URL is not accessible
+BACKEND_URL = "http://localhost:8001/api"
 
 class BackendTester:
     def __init__(self):
