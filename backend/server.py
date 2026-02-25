@@ -16891,15 +16891,8 @@ async def get_shared_schedule(telegram_id: int):
             p_settings = await db.user_settings.find_one({"telegram_id": p_id})
             if p_settings and p_settings.get("group_id"):
                 group_id = p_settings["group_id"]
-                # Определяем текущую неделю
-                import pytz
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                now = datetime.now(moscow_tz)
-                from utils_schedule import get_current_week_number
-                try:
-                    week_num = get_current_week_number()
-                except:
-                    week_num = 1
+                # Определяем текущую неделю (1 = текущая)
+                week_num = 1
                 
                 # Ищем в кэше
                 cached = await db.schedule_cache.find_one({
@@ -16920,9 +16913,12 @@ async def get_shared_schedule(telegram_id: int):
                             group_id,
                             week_num
                         )
-                        schedules[str(p_id)] = [e.dict() if hasattr(e, 'dict') else e for e in events] if events else []
-                    except:
+                        schedules[str(p_id)] = [e if isinstance(e, dict) else (e.dict() if hasattr(e, 'dict') else {}) for e in events] if events else []
+                    except Exception as sched_err:
+                        logger.warning(f"Cannot load schedule for {p_id}: {sched_err}")
                         schedules[str(p_id)] = []
+            else:
+                schedules[str(p_id)] = []
         
         # Вычисляем свободные окна
         free_windows = _compute_free_windows(schedules, participants)
