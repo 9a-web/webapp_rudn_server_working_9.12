@@ -226,7 +226,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     
     const interval = setInterval(() => {
       loadFriends();
-      loadSharedSchedule();
+      loadSharedSchedule(true); // silent — без спиннера
     }, 15000);
     
     return () => clearInterval(interval);
