@@ -341,9 +341,35 @@
 - **Зависимости:** `beautifulsoup4` (уже в `requirements.txt`), `requests`
 
 ### 📁 Файлы для изменения
-- `frontend/src/components/AdminPanel.jsx` — новая вкладка "Уведомления из TG"
-- `backend/server.py` — два новых endpoint'а
-- `backend/notifications.py` — метод `send_photo_notification()`
+- `frontend/src/components/AdminPanel.jsx` — новая вкладка "Уведомления из TG" ✅
+- `backend/server.py` — два новых endpoint'а ✅
+- `backend/notifications.py` — метод `send_photo_notification()` ✅ (через NotificationService.bot.send_photo)
+
+### ✅ РЕАЛИЗОВАНО
+
+#### Backend
+- **`POST /api/admin/notifications/parse-telegram`** — парсит публичный TG пост:
+  - Извлекает channel + post_id из URL (поддержка `t.me/channel/id` и `t.me/s/channel/id`)
+  - Загружает embed-превью через `aiohttp`
+  - Парсит через `BeautifulSoup`: og:title, og:description, og:image
+  - Fallback: ищет `tgme_widget_message_text` и `tgme_widget_message_photo_wrap`
+  - Возвращает: `{success, title, description, image_url, channel, post_id}`
+- **`POST /api/admin/notifications/send-from-post`** — рассылка уведомления:
+  - Принимает `title`, `description`, `image_url`, `recipients` (all/group)
+  - Если есть `image_url` → `bot.send_photo()` с HTML caption
+  - Если нет → `notification_service.send_message()`
+  - Rate limiting: `asyncio.sleep(0.05)` между отправками
+  - Сохраняет историю в коллекцию `notification_history`
+  - Возвращает: `{success, message, sent, failed}`
+
+#### Frontend — AdminPanel.jsx
+- **Новая вкладка "TG Посты"** (id: 'tg-notify', иконка Bell, glow blue):
+  - Input для URL + кнопка "Парсить"
+  - Предпросмотр: изображение, редактируемые заголовок и текст
+  - Выбор получателей: «Все» / «Группа»
+  - Кнопки: «Отмена» / «📤 Отправить уведомление»
+  - Результат отправки: кол-во успешных / ошибок
+- **Компонент `TelegramPostNotifyTab`** — полностью автономный
 
 ---
 
