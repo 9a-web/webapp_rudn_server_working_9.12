@@ -53,11 +53,28 @@ export const SharedScheduleView = ({ telegramId, onClose, hapticFeedback }) => {
 
   const handleCreateShared = async () => {
     try {
+      setLoading(true);
       hapticFeedback?.('success');
-      await sharedScheduleAPI.create(telegramId, []);
-      await loadSharedSchedule();
+      const result = await sharedScheduleAPI.create(telegramId, []);
+      if (result && result.id) {
+        // Используем ответ create напрямую, добавляя exists
+        setSharedData({
+          exists: true,
+          id: result.id,
+          owner_id: result.owner_id,
+          participants: result.participants || [],
+          schedules: result.schedules || {},
+          free_windows: result.free_windows || [],
+          created_at: result.created_at,
+        });
+      } else {
+        // Fallback: загружаем через GET
+        await loadSharedSchedule();
+      }
     } catch (err) {
       console.error('Error creating shared schedule:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
