@@ -194,15 +194,15 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
   }, [selectedDate]);
 
   // ─── Data loading ───
-  const loadSharedSchedule = useCallback(async () => {
+  const loadSharedSchedule = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await sharedScheduleAPI.get(telegramId);
       setSharedData(data);
     } catch (err) {
       console.error('Error loading shared schedule:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [telegramId]);
 
