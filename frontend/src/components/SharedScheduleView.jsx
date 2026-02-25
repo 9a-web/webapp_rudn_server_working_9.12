@@ -58,28 +58,25 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
   
   const top = minToPx(startMin);
   const height = durationToPx(endMin - startMin);
-  const columnWidth = `calc((100% - ${TIME_LABEL_WIDTH}px - ${(totalColumns - 1) * EVENT_GAP}px) / ${totalColumns})`;
-  const left = `calc(${TIME_LABEL_WIDTH}px + ${columnIndex} * (calc((100% - ${TIME_LABEL_WIDTH}px) / ${totalColumns})))`;
-  
-  // Вычисляем реальные значения для позиционирования
-  const widthPercent = (100 - 0) / totalColumns; // % от доступной области
-  const leftPercent = widthPercent * columnIndex;
-  
-  const minHeight = 40;
+  const minHeight = 38;
   const displayHeight = Math.max(height, minHeight);
-  const isCompact = height < 65;
+  const isCompact = height < 60;
+
+  // Позиционирование: процент от ширины контейнера событий
+  const colWidthPct = 100 / totalColumns;
+  const leftPct = colWidthPct * columnIndex;
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: columnIndex * 0.05 }}
-      className="absolute rounded-xl overflow-hidden cursor-default"
+      transition={{ duration: 0.3, delay: columnIndex * 0.06 }}
+      className="absolute rounded-xl overflow-hidden"
       style={{
         top: `${top}px`,
         height: `${displayHeight}px`,
-        left: `calc(${TIME_LABEL_WIDTH + 4}px + ${leftPercent}% * ${(100 - TIME_LABEL_WIDTH * 100 / window.innerWidth)}/ 100)`,
-        width: `calc(${widthPercent}% - ${TIME_LABEL_WIDTH * widthPercent / 100 + EVENT_GAP}px)`,
+        left: `calc(${leftPct}% + ${EVENT_GAP / 2}px)`,
+        width: `calc(${colWidthPct}% - ${EVENT_GAP}px)`,
         backgroundColor: color + '14',
         borderLeft: `3.5px solid ${color}`,
         zIndex: 10,
@@ -87,7 +84,6 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
     >
       <div className="h-full px-2.5 py-1.5 flex flex-col justify-center">
         {isCompact ? (
-          // Компактный режим для коротких пар
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
             <span className="text-[11px] font-semibold text-[#1c1c1c] truncate leading-tight">
@@ -96,20 +92,15 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
           </div>
         ) : (
           <>
-            {/* Имя участника (маленький бейдж) */}
             <div className="flex items-center gap-1.5 mb-0.5">
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
               <span className="text-[10px] font-medium truncate" style={{ color: color }}>
                 {isOwner ? 'Вы' : participantName}
               </span>
             </div>
-            
-            {/* Название пары */}
             <div className="text-[12px] font-semibold text-[#1c1c1c] leading-tight line-clamp-2 mb-0.5">
               {event.discipline}
             </div>
-            
-            {/* Время + аудитория */}
             <div className="flex items-center gap-2 text-[10px] text-[#999]">
               <span>{startStr} – {endStr}</span>
               {event.auditory && (
