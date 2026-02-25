@@ -590,21 +590,23 @@
 
 ## 🚀 ПЛАН ПО ФАЗАМ
 
-### Фаза 1 — Быстрые победы (1-2 дня каждое)
+### Фаза 1 — Быстрые победы ✅ ЗАВЕРШЕНА
 1. ✅ **StreakRewardModal** — UI компонент готов (Poppins, SVG пятиугольник, shimmer, конфетти)
-2. 🔵 **Streak бэкенд** — `POST /api/users/{id}/visit`, новые поля в `user_stats`
-3. 🔵 **Авто-напоминания** — inactivity checker в `scheduler_v2.py`
-4. 🔵 **Совместное расписание** — переключатель на главном экране + алгоритм
-5. 🔵 **Admin: TG парсинг** — BeautifulSoup парсер + новая вкладка AdminPanel
+2. ✅ **Streak бэкенд** — `POST /api/users/{id}/visit`, новые поля в `user_stats`, интеграция в App.jsx, виджет в DesktopSidebar
+3. ✅ **Авто-напоминания** — inactivity checker в `scheduler_v2.py` (4 шаблона: 1д/2д/7д/30д)
+4. ✅ **Совместное расписание** — таймлайн-визуализация, кнопка-иконка рядом с датой, friend picker, 5 API endpoints
+5. ✅ **Admin: TG парсинг** — BeautifulSoup парсер + вкладка "TG Посты" в AdminPanel + рассылка
+
+**Тестирование Фазы 1:** 23/23 backend-тестов пройдено ✅
 
 ### Фаза 2 — Средняя сложность (2-3 дня каждое)
-- 🖼 Красивый шаринг расписания (расширить `ShareScheduleModal`)
-- 🏆 Шаринг статистики (`StatsShareModal` + `html2canvas`)
+- 🔵 🖼 Красивый шаринг расписания (расширить `ShareScheduleModal`)
+- 🔵 🏆 Шаринг статистики (`StatsShareModal` + `html2canvas`)
 
 ### Фаза 3 — Сложные, wow-эффект (3-5 дней каждое)
-- 👥 Анимация добавления в друзья (`FriendAcceptedAnimation`)
-- 📈 Трекер прогресса (полноценный CRUD + charts)
-- 💬 Общажный чат (Long Polling + модерация)
+- 🔵 👥 Анимация добавления в друзья (`FriendAcceptedAnimation`)
+- 🔵 📈 Трекер прогресса (полноценный CRUD + charts)
+- 🔵 💬 Общажный чат (Long Polling + модерация)
 
 ---
 
