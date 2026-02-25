@@ -1476,6 +1476,154 @@ async def mark_achievements_seen_endpoint(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Эндпоинты для стрик-механики ============
+
+STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 365]
+
+@api_router.post("/users/{telegram_id}/visit", response_model=VisitResponse)
+async def record_user_visit(telegram_id: int):
+    """
+    Записать визит пользователя и обновить стрик.
+    Вызывается при каждом открытии приложения.
+    """
+    try:
+        import pytz
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        now_moscow = datetime.now(moscow_tz)
+        today_str = now_moscow.strftime('%Y-%m-%d')
+        
+        # Получаем или создаём статистику
+        stats = await get_or_create_user_stats(db, telegram_id)
+        
+        last_visit = stats.last_visit_date
+        current_streak = stats.visit_streak_current
+        max_streak = stats.visit_streak_max
+        freeze_shields = stats.freeze_shields
+        
+        streak_continued = False
+        streak_reset = False
+        freeze_used = False
+        is_new_day = False
+        milestone_reached = None
+        
+        if last_visit == today_str:
+            # Сегодня уже заходил — ничего не меняем
+            pass
+        else:
+            is_new_day = True
+            
+            if last_visit:
+                from datetime import date as date_type
+                last_date = date_type.fromisoformat(last_visit)
+                today_date = date_type.fromisoformat(today_str)
+                days_diff = (today_date - last_date).days
+                
+                if days_diff == 1:
+                    # Вчера заходил → +1 стрик
+                    current_streak += 1
+                    streak_continued = True
+                elif days_diff == 2:
+                    # Пропуск 1 дня
+                    if freeze_shields > 0:
+                        # Щит есть → стрик сохраняется
+                        freeze_shields -= 1
+                        current_streak += 1
+                        freeze_used = True
+                        streak_continued = True
+                    else:
+                        # Щит нет → стрик обнуляется
+                        current_streak = 1
+                        streak_reset = True
+                else:
+                    # Пропуск больше 1 дня → стрик обнуляется
+                    current_streak = 1
+                    streak_reset = True
+            else:
+                # Первый визит
+                current_streak = 1
+                is_new_day = True
+            
+            # Обновляем рекорд
+            if current_streak > max_streak:
+                max_streak = current_streak
+            
+            # Начисляем щит заморозки за каждые 7 дней стрика
+            if current_streak > 0 and current_streak % 7 == 0 and streak_continued:
+                freeze_shields += 1
+            
+            # Проверяем милестоны
+            if current_streak in STREAK_MILESTONES:
+                milestone_reached = current_streak
+            
+            # Обновляем в БД
+            update_data = {
+                "$set": {
+                    "visit_streak_current": current_streak,
+                    "visit_streak_max": max_streak,
+                    "last_visit_date": today_str,
+                    "freeze_shields": freeze_shields,
+                    "streak_claimed_today": False,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+            
+            # Добавляем в active_days если нет
+            update_data["$addToSet"] = {"active_days": today_str}
+            
+            await db.user_stats.update_one(
+                {"telegram_id": telegram_id},
+                update_data
+            )
+        
+        # Генерируем трекер недели
+        week_days = []
+        today_weekday = now_moscow.weekday()  # 0=Пн, 6=Вс
+        day_labels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+        
+        # Собираем active_days из stats
+        active_days_set = set(stats.active_days or [])
+        if is_new_day:
+            active_days_set.add(today_str)
+        
+        for i in range(7):
+            day_date = now_moscow - timedelta(days=today_weekday - i)
+            day_str = day_date.strftime('%Y-%m-%d')
+            week_days.append({
+                "label": day_labels[i],
+                "dateNum": day_date.day,
+                "done": day_str in active_days_set
+            })
+        
+        return VisitResponse(
+            visit_streak_current=current_streak,
+            visit_streak_max=max_streak,
+            freeze_shields=freeze_shields,
+            streak_continued=streak_continued,
+            streak_reset=streak_reset,
+            freeze_used=freeze_used,
+            milestone_reached=milestone_reached,
+            is_new_day=is_new_day,
+            week_days=week_days
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при записи визита: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/users/{telegram_id}/streak-claim", response_model=SuccessResponse)
+async def claim_streak_reward(telegram_id: int):
+    """Отметить награду за стрик как полученную"""
+    try:
+        await db.user_stats.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"streak_claimed_today": True, "updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message="Награда за стрик получена")
+    except Exception as e:
+        logger.error(f"Ошибка при получении награды за стрик: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ Эндпоинты для погоды ============
 
 @api_router.get("/weather", response_model=WeatherResponse)
