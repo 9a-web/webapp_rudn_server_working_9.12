@@ -409,17 +409,17 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
             <Users className="w-10 h-10 text-indigo-400" />
           </div>
           <h3 className="text-xl font-bold text-[#1c1c1c] mb-2">
-            Совместное расписание
+            Сверить расписание
           </h3>
           <p className="text-[#888] text-sm mb-6">
-            Найдите общие свободные окна с друзьями для встреч и совместной учёбы
+            Сравните расписания с друзьями и найдите время для встречи
           </p>
           <button
             onClick={handleCreateShared}
             className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20"
           >
             <Users className="w-4 h-4 inline mr-2" />
-            Создать совместное расписание
+            Сверить с друзьями
           </button>
         </div>
       </motion.div>
