@@ -490,14 +490,9 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     return selectedDay === DAYS_ORDER[Math.min(todayMapped, 5)];
   }, [selectedDay]);
 
-  // ─── Проверяем является ли текущий пользователь владельцем ───
+  // ─── Проверяем является ли текущий пользователь владельцем документа ───
+  // (нужно только для кнопки удаления — у каждого своё расписание)
   const isOwner = sharedData?.owner_id === telegramId || sharedData?.owner_id === String(telegramId);
-
-  // Скрыто ли МОЁ расписание (пришёл по ссылке без автодобавления)
-  const myParticipantEntry = sharedData?.participants?.find(
-    p => String(p.telegram_id) === String(telegramId)
-  );
-  const myScheduleHidden = myParticipantEntry?.schedule_hidden === true;
 
   // ─── LOADING ───
   if (loading) {
