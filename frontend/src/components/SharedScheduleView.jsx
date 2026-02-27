@@ -382,6 +382,22 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   };
 
+  // Кнопка «Добавить своё расписание» — для участников с schedule_hidden=true
+  const handleAddMySchedule = async () => {
+    if (!sharedData?.id) return;
+    try {
+      setActionLoading(true);
+      hapticFeedback?.('success');
+      await sharedScheduleAPI.addMySchedule(sharedData.id, telegramId);
+      await loadSharedSchedule();
+    } catch (err) {
+      console.error('Error adding my schedule:', err);
+      setErrorMsg('Не удалось добавить расписание');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // БАГ-ФИХ: функция удаления всего расписания
   const handleDeleteSchedule = async () => {
     if (!sharedData?.id) return;
