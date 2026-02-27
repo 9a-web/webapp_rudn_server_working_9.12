@@ -389,7 +389,7 @@ export const LiveScheduleCarousel = ({
           </motion.button>
         </div>
 
-        {/* Desktop/tablet: no navigation, only dots on mobile */}
+        {/* Desktop: no navigation controls */}
       </div>
 
       {/* Modals */}
