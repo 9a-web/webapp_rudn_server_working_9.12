@@ -832,10 +832,19 @@ const Home = () => {
       try {
         // Получаем список участников из токена — никакого join!
         const tokenData = await sharedScheduleAPI.getTokenData(token);
-        if (!tokenData?.participant_ids) return;
+        console.log('📅 Token data:', tokenData);
+
+        if (!tokenData) {
+          showAlert('Ссылка не найдена или устарела');
+          return;
+        }
+
+        const participantIds = tokenData.participant_ids || [];
+        console.log('📅 Participant IDs from token:', participantIds);
 
         // Создаём/обновляем СВОЁ личное расписание с этими участниками
-        await sharedScheduleAPI.create(currentUser.id, tokenData.participant_ids);
+        const result = await sharedScheduleAPI.create(currentUser.id, participantIds);
+        console.log('📅 Created schedule:', result?.id);
 
         hapticFeedback('success');
         // Переходим на главную и открываем совместное расписание
