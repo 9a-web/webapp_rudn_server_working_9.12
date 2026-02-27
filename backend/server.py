@@ -16963,6 +16963,8 @@ async def add_shared_schedule_participant(schedule_id: str, data: SharedSchedule
             raise HTTPException(status_code=400, detail=f"Максимум {MAX_PARTICIPANTS} участников")
         if any(p["telegram_id"] == data.participant_id for p in participants):
             return SuccessResponse(success=True, message="Участник уже добавлен")
+        if data.participant_id == doc.get("owner_id"):
+            return SuccessResponse(success=True, message="Это вы — уже в расписании")
         p_settings = await db.user_settings.find_one({"telegram_id": data.participant_id})
         p_name = p_settings.get("first_name", str(data.participant_id)) if p_settings else str(data.participant_id)
         new_p = {"telegram_id": data.participant_id, "first_name": p_name,
