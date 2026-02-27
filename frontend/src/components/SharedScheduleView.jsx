@@ -1188,6 +1188,28 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                 </button>
               </div>
 
+              {/* Переключатель: добавлять расписание гостей или нет */}
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-200 mb-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800">Добавлять расписание гостей</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {inviteAutoAdd
+                      ? 'Расписание гостя будет видно всем участникам'
+                      : 'Гость сам решит, добавлять ли своё расписание'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setInviteAutoAdd(v => !v); setLinkCopied(false); }}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${
+                    inviteAutoAdd ? 'bg-indigo-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                    inviteAutoAdd ? 'translate-x-5' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+
               {/* Link box */}
               <div className="flex items-center gap-2 p-3 rounded-2xl bg-gray-50 border border-gray-200 mb-4">
                 <span className="flex-1 text-xs text-gray-500 truncate font-mono">{inviteLink}</span>
