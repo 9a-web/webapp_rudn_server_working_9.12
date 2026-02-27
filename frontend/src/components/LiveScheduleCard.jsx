@@ -164,7 +164,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
         >
           {/* Glow behind ring */}
           <motion.div
-            className="absolute w-24 h-24 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full"
+            className="absolute w-24 h-24 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full"
             style={{
               background: isWinter
                 ? 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)'
