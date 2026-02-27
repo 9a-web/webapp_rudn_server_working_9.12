@@ -751,10 +751,14 @@ export const sharedScheduleAPI = {
 
   /**
    * Получить совместное расписание
+   * @param {number} telegramId
+   * @param {number} week - 1 = текущая неделя, 2 = следующая (по умолчанию 1)
    */
-  get: async (telegramId) => {
+  get: async (telegramId, week = 1) => {
     try {
-      const response = await api.get(`/shared-schedule/${telegramId}`);
+      const response = await api.get(`/shared-schedule/${telegramId}`, {
+        params: { week }
+      });
       return response.data;
     } catch (error) {
       handleError(error);
