@@ -2103,6 +2103,20 @@ const Home = () => {
             <div className="md:grid md:grid-cols-2 md:gap-6 md:px-6 lg:grid-cols-2 xl:grid-cols-[1fr_380px]">
               {/* Main content column */}
               <div className="md:min-w-0 md:overflow-visible">
+                {/* TEST: Кнопка для тестирования LiveScheduleCards */}
+                <div className="px-6 pt-2 pb-1">
+                  <button
+                    onClick={toggleTestCurrentClass}
+                    className={`w-full py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
+                      testCurrentClass 
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}
+                  >
+                    {testCurrentClass ? '🛑 Убрать тестовые пары' : '🧪 Добавить тестовую пару (идёт сейчас)'}
+                  </button>
+                </div>
+
                 <LiveScheduleCarousel
                   currentClass={currentClass} 
                   minutesLeft={minutesLeft}
