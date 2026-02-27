@@ -983,7 +983,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       ctx.textAlign = 'center';
       ctx.fillStyle = '#bbbbbb';
       ctx.font = `${10 * dpr}px ${FBASE}`;
-      ctx.fillText('RUDN GO \u2022 Совместное расписание', W / 2, H - 10 * dpr);
+      ctx.fillText('Присоединяйся к своим друзьям в @rudn_mosbot', W / 2, H - 12 * dpr);
 
       canvas.toBlob((blob) => {
         if (!blob) return;
