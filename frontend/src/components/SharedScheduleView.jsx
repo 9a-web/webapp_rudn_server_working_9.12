@@ -422,10 +422,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const totalColumns = Math.max(1, activeParticipantIds.length);
 
-  // ─── Всегда показываем полный диапазон 0:00 – 23:00 ───
-  const actualStartHour = TIMELINE_START_HOUR;
-  const actualEndHour = TIMELINE_END_HOUR;
-
   // ─── Hour grid lines (полный диапазон 0:00 – 23:00) ───
   const hourLines = useMemo(() => {
     const lines = [];
