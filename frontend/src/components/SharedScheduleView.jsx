@@ -706,7 +706,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       </div>
 
       {/* ─── Legend ─── */}
-      {hasAnyEvents && (
+      {(hasAnyEvents || isToday) && (
         <div className="flex items-center gap-3 px-4 mb-3">
           {dayFreeWindows.length > 0 && (
             <div className="flex items-center gap-1.5">
@@ -725,198 +725,190 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         </div>
       )}
 
-      {/* ─── TIMELINE ─── */}
-      {hasAnyEvents ? (
-        <div
-          ref={timelineRef}
-          className="relative overflow-y-auto overflow-x-hidden mx-2 rounded-2xl scrollbar-hide"
-          style={{
-            maxHeight: 'calc(100vh - 360px)',
-            backgroundColor: '#fafafa',
-            border: '1px solid #f0f0f0',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
-        >
-          <div className="relative" style={{ height: `${displayHeight}px`, minHeight: '200px' }}>
-            
-            {/* ─── Hour grid lines ─── */}
-            {hourLines.map(({ hour, label, top, isMain }) => (
-              <div key={hour} className="absolute w-full" style={{ top: `${top}px` }}>
-                {/* Time label */}
-                <div
-                  className="absolute text-[10px] font-medium select-none"
-                  style={{
-                    left: '6px',
-                    top: '-7px',
-                    color: isMain ? '#999' : '#ccc',
-                    width: `${TIME_LABEL_WIDTH - 10}px`,
-                    textAlign: 'right',
-                  }}
-                >
-                  {label}
-                </div>
-                
-                {/* Grid line */}
+      {/* ─── TIMELINE (всегда отображается) ─── */}
+      <div
+        ref={timelineRef}
+        className="relative overflow-y-auto overflow-x-hidden mx-2 rounded-2xl scrollbar-hide"
+        style={{
+          maxHeight: 'calc(100vh - 360px)',
+          backgroundColor: '#fafafa',
+          border: '1px solid #f0f0f0',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+      >
+        <div className="relative" style={{ height: `${displayHeight}px`, minHeight: '200px' }}>
+          
+          {/* ─── Hour grid lines ─── */}
+          {hourLines.map(({ hour, label, top, isMain }) => (
+            <div key={hour} className="absolute w-full" style={{ top: `${top}px` }}>
+              {/* Time label */}
+              <div
+                className="absolute text-[10px] font-medium select-none"
+                style={{
+                  left: '6px',
+                  top: '-7px',
+                  color: isMain ? '#999' : '#ccc',
+                  width: `${TIME_LABEL_WIDTH - 10}px`,
+                  textAlign: 'right',
+                }}
+              >
+                {label}
+              </div>
+              
+              {/* Grid line */}
+              <div
+                className="absolute h-[1px]"
+                style={{
+                  left: `${TIME_LABEL_WIDTH}px`,
+                  right: '4px',
+                  backgroundColor: isMain ? '#e8e8e8' : '#f2f2f2',
+                }}
+              />
+              
+              {/* Half-hour line */}
+              {hour < TIMELINE_END_HOUR && (
                 <div
                   className="absolute h-[1px]"
                   style={{
+                    top: `${30 * PX_PER_MIN}px`,
                     left: `${TIME_LABEL_WIDTH}px`,
                     right: '4px',
-                    backgroundColor: isMain ? '#e8e8e8' : '#f2f2f2',
+                    backgroundColor: '#f5f5f5',
                   }}
                 />
-                
-                {/* Half-hour line */}
-                {hour < TIMELINE_END_HOUR && (
-                  <div
-                    className="absolute h-[1px]"
-                    style={{
-                      top: `${30 * PX_PER_MIN}px`,
-                      left: `${TIME_LABEL_WIDTH}px`,
-                      right: '4px',
-                      backgroundColor: '#f5f5f5',
-                    }}
-                  />
-                )}
-              </div>
-            ))}
+              )}
+            </div>
+          ))}
 
-            {/* ─── Column headers (participant names at top) ─── */}
-            {totalColumns > 1 && (
-              <div
-                className="sticky top-0 z-20 flex backdrop-blur-sm"
-                style={{
-                  paddingLeft: `${TIME_LABEL_WIDTH + 4}px`,
-                  paddingRight: '4px',
-                  backgroundColor: 'rgba(250, 250, 250, 0.9)',
-                  borderBottom: '1px solid #eee',
-                }}
-              >
-                {activeParticipantIds.map((pId, idx) => {
-                  const participant = getParticipant(pId);
-                  if (!participant) return null;
-                  return (
-                    <div
-                      key={pId}
-                      className="flex items-center justify-center gap-1.5 py-2 text-center"
-                      style={{ width: `${100 / totalColumns}%` }}
-                    >
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: participant.color }}
-                      />
-                      <span className="text-[10px] font-semibold" style={{ color: participant.color }}>
-                        {participant.telegram_id === telegramId ? 'Вы' : participant.first_name}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ─── Events container (positioned after time labels) ─── */}
+          {/* ─── Column headers (participant names at top) ─── */}
+          {totalColumns > 1 && (
             <div
-              className="absolute"
+              className="sticky top-0 z-20 flex backdrop-blur-sm"
               style={{
-                top: 0,
-                bottom: 0,
-                left: `${TIME_LABEL_WIDTH + 4}px`,
-                right: '4px',
+                paddingLeft: `${TIME_LABEL_WIDTH + 4}px`,
+                paddingRight: '4px',
+                backgroundColor: 'rgba(250, 250, 250, 0.9)',
+                borderBottom: '1px solid #eee',
               }}
             >
-              {/* ─── Free windows ─── */}
-              {dayFreeWindows.map((fw, idx) => {
-                const fwStartMin = parseTime(fw.start);
-                const fwEndMin = parseTime(fw.end);
-                if (fwStartMin === null || fwEndMin === null) return null;
-                const fwTop = minToPx(fwStartMin);
-                const fwHeight = durationToPx(fwEndMin - fwStartMin);
-                const duration = fw.duration_minutes;
-                const hours = Math.floor(duration / 60);
-                const mins = duration % 60;
-                const durationText = hours > 0
-                  ? `${hours}ч${mins > 0 ? ` ${mins}м` : ''}`
-                  : `${mins}м`;
-                const isSmall = fwHeight < 40;
-                
+              {activeParticipantIds.map((pId, idx) => {
+                const participant = getParticipant(pId);
+                if (!participant) return null;
                 return (
-                  <motion.div
-                    key={`fw-${idx}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.4, delay: 0.2 + idx * 0.05 }}
-                    className="absolute left-0 right-0 rounded-xl overflow-hidden"
-                    style={{
-                      top: `${fwTop}px`,
-                      height: `${Math.max(fwHeight, 24)}px`,
-                      zIndex: 5,
-                    }}
+                  <div
+                    key={pId}
+                    className="flex items-center justify-center gap-1.5 py-2 text-center"
+                    style={{ width: `${100 / totalColumns}%` }}
                   >
-                    <div 
-                      className="absolute inset-0 opacity-[0.07]"
-                      style={{
-                        background: `repeating-linear-gradient(-45deg, #10b981, #10b981 4px, transparent 4px, transparent 12px)`
-                      }}
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: participant.color }}
                     />
-                    <div className="relative h-full flex items-center justify-center gap-2 px-3">
-                      {!isSmall && <Coffee className="w-3.5 h-3.5 text-emerald-600" />}
-                      <div className={`font-medium text-emerald-700 ${isSmall ? 'text-[10px]' : 'text-xs'}`}>
-                        {isSmall ? durationText : `Свободны ${durationText}`}
-                      </div>
-                      {!isSmall && (
-                        <div className="text-[10px] text-emerald-600/70">
-                          {fw.start} – {fw.end}
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute inset-0 rounded-xl border border-dashed border-emerald-300" />
-                  </motion.div>
+                    <span className="text-[10px] font-semibold" style={{ color: participant.color }}>
+                      {participant.telegram_id === telegramId ? 'Вы' : participant.first_name}
+                    </span>
+                  </div>
                 );
               })}
-
-              {/* ─── Events ─── */}
-              {activeParticipantIds.map((pId, colIdx) => {
-                const participant = getParticipant(pId);
-                const events = daySchedules[pId] || [];
-                if (!participant) return null;
-
-                return events.map((event, eIdx) => (
-                  <TimelineEvent
-                    key={`${pId}-${eIdx}`}
-                    event={event}
-                    color={participant.color}
-                    participantName={participant.first_name}
-                    columnIndex={colIdx}
-                    totalColumns={totalColumns}
-                    isOwner={participant.telegram_id === telegramId}
-                  />
-                ));
-              })}
             </div>
+          )}
 
-            {/* ─── Current time indicator ─── */}
-            {isToday && <CurrentTimeLine />}
+          {/* ─── Events container (positioned after time labels) ─── */}
+          <div
+            className="absolute"
+            style={{
+              top: 0,
+              bottom: 0,
+              left: `${TIME_LABEL_WIDTH + 4}px`,
+              right: '4px',
+            }}
+          >
+            {/* ─── Free windows ─── */}
+            {dayFreeWindows.map((fw, idx) => {
+              const fwStartMin = parseTime(fw.start);
+              const fwEndMin = parseTime(fw.end);
+              if (fwStartMin === null || fwEndMin === null) return null;
+              const fwTop = minToPx(fwStartMin);
+              const fwHeight = durationToPx(fwEndMin - fwStartMin);
+              const duration = fw.duration_minutes;
+              const hours = Math.floor(duration / 60);
+              const mins = duration % 60;
+              const durationText = hours > 0
+                ? `${hours}ч${mins > 0 ? ` ${mins}м` : ''}`
+                : `${mins}м`;
+              const isSmall = fwHeight < 40;
+              
+              return (
+                <motion.div
+                  key={`fw-${idx}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.4, delay: 0.2 + idx * 0.05 }}
+                  className="absolute left-0 right-0 rounded-xl overflow-hidden"
+                  style={{
+                    top: `${fwTop}px`,
+                    height: `${Math.max(fwHeight, 24)}px`,
+                    zIndex: 5,
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 opacity-[0.07]"
+                    style={{
+                      background: `repeating-linear-gradient(-45deg, #10b981, #10b981 4px, transparent 4px, transparent 12px)`
+                    }}
+                  />
+                  <div className="relative h-full flex items-center justify-center gap-2 px-3">
+                    {!isSmall && <Coffee className="w-3.5 h-3.5 text-emerald-600" />}
+                    <div className={`font-medium text-emerald-700 ${isSmall ? 'text-[10px]' : 'text-xs'}`}>
+                      {isSmall ? durationText : `Свободны ${durationText}`}
+                    </div>
+                    {!isSmall && (
+                      <div className="text-[10px] text-emerald-600/70">
+                        {fw.start} – {fw.end}
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 rounded-xl border border-dashed border-emerald-300" />
+                </motion.div>
+              );
+            })}
+
+            {/* ─── Events ─── */}
+            {activeParticipantIds.map((pId, colIdx) => {
+              const participant = getParticipant(pId);
+              const events = daySchedules[pId] || [];
+              if (!participant) return null;
+
+              return events.map((event, eIdx) => (
+                <TimelineEvent
+                  key={`${pId}-${eIdx}`}
+                  event={event}
+                  color={participant.color}
+                  participantName={participant.first_name}
+                  columnIndex={colIdx}
+                  totalColumns={totalColumns}
+                  isOwner={participant.telegram_id === telegramId}
+                />
+              ));
+            })}
           </div>
+
+          {/* ─── Current time indicator ─── */}
+          {isToday && <CurrentTimeLine />}
+
+          {/* ─── Подсказка "нет пар" поверх таймлайна ─── */}
+          {!hasAnyEvents && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-center px-4 py-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 shadow-sm">
+                <div className="text-[#888] text-sm font-medium">
+                  Нет пар в {selectedDay || 'этот день'}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        /* ─── Empty state ─── */
-        <div className="text-center py-12 mx-4">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-            <Clock className="w-7 h-7 text-gray-400" />
-          </div>
-          <div className="text-[#666] text-sm font-medium mb-1">
-            {(sharedData.participants?.length || 0) < 2
-              ? 'Добавьте друга, чтобы сверить расписания'
-              : `Нет пар в ${selectedDay || 'этот день'}`}
-          </div>
-          <div className="text-[#bbb] text-xs">
-            {(sharedData.participants?.length || 0) < 2
-              ? 'Нажмите «Добавить» выше'
-              : 'Выберите другой день недели'}
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* ─── Friend Picker Modal ─── */}
       <AnimatePresence>
