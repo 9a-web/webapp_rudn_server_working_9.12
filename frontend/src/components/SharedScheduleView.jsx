@@ -796,10 +796,10 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const evW = tlW - TLW - 8 * dpr;
       const cols = totalColumns;
 
-      // ── Свободные окна ──
-      dayFreeWindows.forEach(fw => {
-        const fwS = parseTime(fw.start), fwE = parseTime(fw.end);
-        if (fwS === null || fwE === null) return;
+      // ── Свободные окна (только видимый диапазон) ──
+      imgVisibleFW.forEach(fw => {
+        const fwS = fw._sMin, fwE = fw._eMin;
+        if (fwS == null || fwE == null) return;
         const y1 = tlY + toY(fwS), y2 = tlY + toY(fwE);
         if (y2 < tlY || y1 > tlY + timelineH) return;
         const fh = Math.max(y2 - y1, 20 * dpr);
