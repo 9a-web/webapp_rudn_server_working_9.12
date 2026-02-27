@@ -301,6 +301,7 @@ const Home = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   // Состояние для модального окна добавления друга в совместное расписание
   const [isSharedScheduleFriendPickerOpen, setIsSharedScheduleFriendPickerOpen] = useState(false);
+  const [isSharedScheduleShareModalOpen, setIsSharedScheduleShareModalOpen] = useState(false);
   // Состояние для полноэкранного музыкального плеера
   const [isFullscreenPlayerOpen, setIsFullscreenPlayerOpen] = useState(false);
   // Состояние для карточки артиста
