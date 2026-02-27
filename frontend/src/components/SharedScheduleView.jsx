@@ -690,41 +690,36 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           <Users className="w-4 h-4 text-indigo-500" />
           <span className="text-sm font-medium text-[#1c1c1c]">Участники</span>
 
-          {/* Кнопка "Добавить" — только владелец */}
-          {isOwner && (
-            <button
-              onClick={() => setShowFriendPicker(true)}
-              disabled={actionLoading || (sharedData.participants?.length || 0) >= 8}
-              className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-              title={(sharedData.participants?.length || 0) >= 8 ? 'Максимум 8 участников' : 'Добавить друга'}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Добавить
-            </button>
-          )}
+          {/* Кнопка "Добавить" — у всех */}
+          <button
+            onClick={() => setShowFriendPicker(true)}
+            disabled={actionLoading || (sharedData.participants?.length || 0) >= 8}
+            className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            title={(sharedData.participants?.length || 0) >= 8 ? 'Максимум 8 участников' : 'Добавить'}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Добавить
+          </button>
 
-          {/* Кнопка "Поделиться" — все участники могут делиться */}
+          {/* Кнопка "Поделиться" — у всех */}
           <button
             onClick={handleShare}
             disabled={actionLoading}
-            className={`flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 ${isOwner ? '' : 'ml-auto'}`}
-            title="Поделиться ссылкой"
+            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100"
           >
             <Share2 className="w-3.5 h-3.5" />
             Поделиться
           </button>
 
-          {/* Удалить расписание — только владелец */}
-          {isOwner && (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={actionLoading}
-              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
-              title="Удалить расписание"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {/* Кнопка удалить расписание — у всех (личное расписание) */}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={actionLoading}
+            className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+            title="Удалить расписание"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Список участников */}
