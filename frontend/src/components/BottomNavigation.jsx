@@ -38,6 +38,54 @@ const AnimatedCompass = ({ className, strokeWidth = 2, isActive }) => {
   );
 };
 
+// ─── Animated AudioLines: визуализатор — палочки пульсируют ───
+const AnimatedAudioLines = ({ className, strokeWidth = 2, isActive }) => {
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setAnimKey(k => k + 1);
+  }, [isActive]);
+
+  const bars = [
+    { x: 2,  y1: 10, y2: 13, target: [7, 17]  },
+    { x: 6,  y1: 6,  y2: 17, target: [3, 20]  },
+    { x: 10, y1: 3,  y2: 21, target: [8, 16]  },
+    { x: 14, y1: 8,  y2: 15, target: [4, 19]  },
+    { x: 18, y1: 5,  y2: 18, target: [9, 14]  },
+    { x: 22, y1: 10, y2: 13, target: [6, 18]  },
+  ];
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {bars.map((bar, i) => (
+        <motion.line
+          key={`${animKey}-${i}`}
+          x1={bar.x}
+          x2={bar.x}
+          initial={{ y1: bar.y1, y2: bar.y2 }}
+          animate={isActive
+            ? { y1: [bar.y1, bar.target[0], bar.y1], y2: [bar.y2, bar.target[1], bar.y2] }
+            : { y1: bar.y1, y2: bar.y2 }
+          }
+          transition={isActive
+            ? { duration: 0.6, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }
+            : { duration: 0.3 }
+          }
+        />
+      ))}
+    </svg>
+  );
+};
+
 export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false, onBackFromFriends }) => {
   const { t } = useTranslation();
 
