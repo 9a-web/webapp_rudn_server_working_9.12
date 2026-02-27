@@ -115,44 +115,46 @@ class SharedScheduleTester:
         except Exception as e:
             self.log_test("Create Schedule", False, f"Exception: {e}")
     
-    async def test_2_week_parameter(self):
+    async def test_2_get_schedule_with_week(self):
         """
-        Test 2: Week parameter - GET /api/shared-schedule/{id}?week=1 should return {week: 1},
-        GET with week=2 should return {week: 2}
+        Critical Test 2: GET /api/shared-schedule/999001?week=1 
+        → should return exists=true, schedules, free_windows
         """
-        print("\n🧪 Test 2: Week Parameter Test")
+        print("\n🧪 Critical Test 2: Get Schedule with Week Parameter")
         
         try:
-            # Test week=1
-            async with self.session.get(f"{BASE_URL}/shared-schedule/555555?week=1") as resp1:
-                if resp1.status != 200:
-                    self.log_test("Week Parameter Test (week=1)", False, f"Request failed: {resp1.status}")
+            async with self.session.get(f"{BASE_URL}/shared-schedule/999001?week=1") as resp:
+                if resp.status != 200:
+                    self.log_test("Get Schedule Week=1", False, f"GET failed: HTTP {resp.status}")
                     return
                 
-                data1 = await resp1.json()
-                week1 = data1.get("week")
+                data = await resp.json()
+                exists = data.get("exists")
+                schedules = data.get("schedules", {})
+                free_windows = data.get("free_windows", [])
+                week = data.get("week")
                 
-                if week1 == 1:
-                    self.log_test("Week Parameter Test (week=1)", True, f"Returned week: {week1}")
-                else:
-                    self.log_test("Week Parameter Test (week=1)", False, f"Expected week=1, got: {week1}")
-            
-            # Test week=2
-            async with self.session.get(f"{BASE_URL}/shared-schedule/555555?week=2") as resp2:
-                if resp2.status != 200:
-                    self.log_test("Week Parameter Test (week=2)", False, f"Request failed: {resp2.status}")
+                if not exists:
+                    self.log_test("Get Schedule Week=1", False, f"exists=false, expected true")
                     return
                 
-                data2 = await resp2.json()
-                week2 = data2.get("week")
+                if week != 1:
+                    self.log_test("Get Schedule Week=1", False, f"week={week}, expected 1")
+                    return
                 
-                if week2 == 2:
-                    self.log_test("Week Parameter Test (week=2)", True, f"Returned week: {week2}")
-                else:
-                    self.log_test("Week Parameter Test (week=2)", False, f"Expected week=2, got: {week2}")
+                # Schedules should be a dict, free_windows should be a list
+                if not isinstance(schedules, dict):
+                    self.log_test("Get Schedule Week=1", False, f"schedules is not dict: {type(schedules)}")
+                    return
+                
+                if not isinstance(free_windows, list):
+                    self.log_test("Get Schedule Week=1", False, f"free_windows is not list: {type(free_windows)}")
+                    return
+                
+                self.log_test("Get Schedule Week=1", True, f"exists=true, week=1, schedules keys: {len(schedules)}, free_windows: {len(free_windows)}")
         
         except Exception as e:
-            self.log_test("Week Parameter Test", False, f"Exception: {e}")
+            self.log_test("Get Schedule Week=1", False, f"Exception: {e}")
     
     async def test_3_participant_limit(self):
         """
