@@ -322,6 +322,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                           <div className="bg-[#1C1C1E] rounded-xl p-1.5">
                             {tab.id === 'home' ? (
                               <AnimatedCompass className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
+                            ) : tab.id === 'tasks' ? (
+                              <AnimatedNotebook className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
                             ) : tab.id === 'music' ? (
                               <AnimatedAudioLines className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
                             ) : tab.id === 'journal' ? (
@@ -335,6 +337,8 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                         <div className="p-2">
                           {tab.id === 'home' ? (
                             <AnimatedCompass className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
+                          ) : tab.id === 'tasks' ? (
+                            <AnimatedNotebook className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
                           ) : tab.id === 'music' ? (
                             <AnimatedAudioLines className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
                           ) : tab.id === 'journal' ? (
