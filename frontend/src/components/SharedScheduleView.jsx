@@ -472,32 +472,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const totalColumns = Math.max(1, activeParticipantIds.length);
 
-  // ─── Hour grid lines (только видимый диапазон) ───
-  const hourLines = useMemo(() => {
-    const lines = [];
-    for (let h = visStartH; h <= visEndH; h++) {
-      lines.push({
-        hour: h,
-        label: `${h}:00`,
-        top: minToPx(h * 60) - visOffset,
-        isMain: h % 2 === 0,
-      });
-    }
-    return lines;
-  }, [visStartH, visEndH, visOffset]);
-
-  // ─── Диапазон для экспорта изображения (только от первой до последней пары + 1ч отступ) ───
-
-  // ─── Check if today ───
-  const isToday = useMemo(() => {
-    if (!selectedDay) return false;
-    const now = new Date();
-    const todayDayIdx = now.getDay();
-    if (todayDayIdx === 0) return false; // воскресенье — нет расписания
-    const todayMapped = todayDayIdx - 1;
-    return selectedDay === DAYS_ORDER[Math.min(todayMapped, 5)];
-  }, [selectedDay]);
-
   // ─── Dynamic visible timeline range (restrict to class hours ± 1h) ───
   const { visStartH, visEndH } = useMemo(() => {
     let minH = 9, maxH = 17; // defaults: 8:00-18:00
@@ -576,6 +550,30 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       visibleFreeWindows: visible,
     };
   }, [dayFreeWindows, visStartH, visEndH]);
+
+  // ─── Hour grid lines (только видимый диапазон) ───
+  const hourLines = useMemo(() => {
+    const lines = [];
+    for (let h = visStartH; h <= visEndH; h++) {
+      lines.push({
+        hour: h,
+        label: `${h}:00`,
+        top: minToPx(h * 60) - visOffset,
+        isMain: h % 2 === 0,
+      });
+    }
+    return lines;
+  }, [visStartH, visEndH, visOffset]);
+
+  // ─── Check if today ───
+  const isToday = useMemo(() => {
+    if (!selectedDay) return false;
+    const now = new Date();
+    const todayDayIdx = now.getDay();
+    if (todayDayIdx === 0) return false;
+    const todayMapped = todayDayIdx - 1;
+    return selectedDay === DAYS_ORDER[Math.min(todayMapped, 5)];
+  }, [selectedDay]);
 
   // ─── Проверяем является ли текущий пользователь владельцем документа ───
   // (нужно только для кнопки удаления — у каждого своё расписание)
