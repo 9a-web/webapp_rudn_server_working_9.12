@@ -823,17 +823,20 @@ const Home = () => {
       if (!startParam || sharedScheduleInviteProcessed || !currentUser) return;
       if (!startParam.startsWith('sschedule_')) return;
 
-      const scheduleId = startParam.replace('sschedule_', '');
+      const scheduleRaw = startParam.replace('sschedule_', '');
+      const isNoSchedule = scheduleRaw.endsWith('_noschedule');
+      const scheduleId = isNoSchedule ? scheduleRaw.replace('_noschedule', '') : scheduleRaw;
       if (!scheduleId) return;
 
-      console.log('📅 Обработка приглашения в совместное расписание:', scheduleId);
+      console.log('📅 Приглашение в расписание:', scheduleId, '| addToSchedule:', !isNoSchedule);
       setSharedScheduleInviteProcessed(true);
 
       try {
         const result = await sharedScheduleAPI.join(
           scheduleId,
           currentUser.id,
-          currentUser.first_name
+          currentUser.first_name,
+          !isNoSchedule   // addToSchedule
         );
 
         if (result?.success) {
@@ -843,8 +846,6 @@ const Home = () => {
           } else {
             showAlert('Вы добавлены в совместное расписание! 📅');
           }
-          // Переключаемся на главную вкладку (там живёт LiveScheduleSection)
-          // и открываем совместный режим расписания
           setActiveTab('home');
           setScheduleMode('shared');
         }
