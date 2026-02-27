@@ -729,7 +729,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       ctx.fillText('Совместное расписание', W / 2, PAD + 22 * dpr);
       ctx.fillStyle = '#888888';
       ctx.font = `${13 * dpr}px ${FBASE}`;
-      ctx.fillText(`${selectedDay || ''}, ${dateStr} \u2022 Неделя ${weekNumber}`, W / 2, PAD + 42 * dpr);
+      ctx.fillText(`${selectedDay || ''}, ${dateStr}`, W / 2, PAD + 42 * dpr);
 
       // ── Пилюли участников (все, не только active) ──
       const allParts = (sharedData?.participants || []);
