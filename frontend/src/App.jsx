@@ -2096,11 +2096,10 @@ const Home = () => {
         {activeTab === 'home' && (
           <>
             {/* Responsive layout: 
-                - Mobile (< 768px): single column
-                - Tablet (768px - 1279px): two columns equal width
-                - Desktop (>= 1280px): main content + sidebar (380px fixed)
+                - Mobile + Tablet (< 1024px): single column (mobile-like)
+                - Desktop (>= 1024px): main content + sidebar
             */}
-            <div className="md:grid md:grid-cols-2 md:gap-6 md:px-6 lg:grid-cols-2 xl:grid-cols-[1fr_380px]">
+            <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:px-6 xl:grid-cols-[1fr_380px]">
               {/* Main content column */}
               <div className="md:min-w-0 md:overflow-visible">
                 {/* TEST: Кнопка для тестирования LiveScheduleCards */}
