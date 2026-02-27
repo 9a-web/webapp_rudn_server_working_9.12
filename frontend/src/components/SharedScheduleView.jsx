@@ -193,6 +193,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     onFriendPickerChange?.(value);
   }, [onFriendPickerChange]);
 
+  const setShowShareModal = useCallback((value) => {
+    setShowShareModalRaw(value);
+    onShareModalChange?.(value);
+  }, [onShareModalChange]);
+
   // ─── БАГ-ФИХ: правильный маппинг дня из selectedDate (воскресенье → нет данных) ───
   const selectedDay = useMemo(() => {
     const date = selectedDate ? new Date(selectedDate) : new Date();
