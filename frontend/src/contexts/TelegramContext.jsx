@@ -287,82 +287,54 @@ export const TelegramProvider = ({ children }) => {
       if (savedTelegramUser) {
         try {
           const parsedUser = JSON.parse(savedTelegramUser);
-          console.log('📱 Найден сохранённый пользователь:', parsedUser.first_name);
-          
-          // Если есть session_token - проверяем сессию на сервере
+          console.log('📱 Найден сохранённый пользователь:', parsedUser.first_name, '| is_web_registered:', parsedUser.is_web_registered);
+
+          // Общий объект пользователя (используется в обоих ветках ниже)
+          const restoredUser = {
+            id: parsedUser.id,
+            first_name: parsedUser.first_name || 'Пользователь',
+            last_name: parsedUser.last_name || '',
+            username: parsedUser.username || '',
+            photo_url: parsedUser.photo_url,
+            device_id: parsedUser.device_id,
+            is_linked: parsedUser.is_linked || parsedUser.is_web_registered || false,
+            is_web_registered: parsedUser.is_web_registered || false,
+            // ФИКС: пользователь зарегистрировался через веб — он НЕ гость
+            is_guest: false,
+          };
+
+          // Если есть session_token — проверяем сессию на сервере
           if (savedSessionToken) {
-            // Проверяем валидность сессии на сервере
-            // Используем единую функцию getBackendURL из config
             const backendUrl = getBackendURL();
-            
             console.log('🔗 Checking session at:', `${backendUrl}/api/web-sessions/${savedSessionToken}/status`);
-            
+
             fetch(`${backendUrl}/api/web-sessions/${savedSessionToken}/status`)
               .then(response => {
-                if (response.ok) {
-                  return response.json();
-                }
+                if (response.ok) return response.json();
                 throw new Error('Session not found');
               })
               .then(sessionData => {
                 if (sessionData.status === 'linked' && sessionData.telegram_id === parsedUser.id) {
                   console.log('✅ Сессия валидна, загружаем пользователя');
-                  setUser({
-                    id: parsedUser.id,
-                    first_name: parsedUser.first_name || 'Пользователь',
-                    last_name: parsedUser.last_name || '',
-                    username: parsedUser.username || '',
-                    photo_url: parsedUser.photo_url,
-                    is_linked: true
-                  });
+                  setUser({ ...restoredUser, is_linked: true });
                 } else {
-                  // Сессия невалидна, но сохранённый пользователь есть - используем его
                   console.warn('⚠️ Сессия невалидна, но используем сохранённого пользователя');
-                  setUser({
-                    id: parsedUser.id,
-                    first_name: parsedUser.first_name || 'Пользователь',
-                    last_name: parsedUser.last_name || '',
-                    username: parsedUser.username || '',
-                    photo_url: parsedUser.photo_url,
-                    is_linked: true,
-                    session_expired: true
-                  });
+                  setUser({ ...restoredUser, session_expired: true });
                 }
                 setIsReady(true);
               })
               .catch(err => {
                 console.warn('⚠️ Ошибка проверки сессии:', err.message);
-                
-                // ВАЖНО: При любой ошибке (включая 404) - используем сохранённого пользователя
-                // Это предотвращает потерю данных при перезагрузке страницы
-                // Сессия может не существовать на сервере, но пользователь уже авторизован
                 console.log('🔄 Используем сохранённые данные пользователя (сессия возможно истекла)');
-                setUser({
-                  id: parsedUser.id,
-                  first_name: parsedUser.first_name || 'Пользователь',
-                  last_name: parsedUser.last_name || '',
-                  username: parsedUser.username || '',
-                  photo_url: parsedUser.photo_url,
-                  is_linked: true,
-                  session_expired: true // Флаг что сессия может быть истекшей
-                });
+                setUser({ ...restoredUser, session_expired: true });
                 setIsReady(true);
               });
-            
+
             return; // Ждём ответ от сервера
           } else {
-            // Нет session_token, но есть сохранённый пользователь - используем его
-            // Это может произойти если сессия была очищена, но telegram_user остался
+            // Нет session_token — используем сохранённого пользователя напрямую
             console.log('🔄 Используем сохранённого пользователя без проверки сессии');
-            setUser({
-              id: parsedUser.id,
-              first_name: parsedUser.first_name || 'Пользователь',
-              last_name: parsedUser.last_name || '',
-              username: parsedUser.username || '',
-              photo_url: parsedUser.photo_url,
-              is_linked: true,
-              session_expired: true
-            });
+            setUser({ ...restoredUser, session_expired: true });
             setIsReady(true);
             return;
           }
