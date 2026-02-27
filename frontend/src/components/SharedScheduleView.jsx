@@ -639,11 +639,43 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const toY = (min) => (min - offsetMin) * pxPerMin;
       const timelineH = toY(endH * 60) + 10 * dpr;
 
-      // ── Высота: header (с учётом пилюль) + timeline + footer ──
+      // ── Разделяем свободные окна на before/within/after ──
+      const imgVisStartMin = startH * 60;
+      const imgVisEndMin = endH * 60;
+      let imgBefore = null, imgAfter = null;
+      const imgVisibleFW = [];
+
+      dayFreeWindows.forEach(fw => {
+        const fwS = parseTime(fw.start);
+        let fwE = parseTime(fw.end);
+        if (fw.end === '24:00') fwE = 1440;
+        if (fwS === null || fwE === null) return;
+
+        if (fwS < imgVisStartMin) {
+          const effEnd = Math.min(fwE, imgVisStartMin);
+          if (!imgBefore || fwS < parseTime(imgBefore.start)) imgBefore = { start: fw.start, end: formatTime(effEnd), duration: effEnd - fwS };
+          else imgBefore.duration = Math.max(imgBefore.duration, effEnd - fwS);
+        }
+        if (fwE > imgVisEndMin) {
+          const effStart = Math.max(fwS, imgVisEndMin);
+          const effEnd = fwE;
+          if (!imgAfter || effStart < parseTime(imgAfter.start)) imgAfter = { start: formatTime(effStart), end: fwE >= 1440 ? '24:00' : formatTime(effEnd), duration: effEnd - effStart };
+          else imgAfter.duration = Math.max(imgAfter.duration, effEnd - effStart);
+        }
+        const clS = Math.max(fwS, imgVisStartMin), clE = Math.min(fwE, imgVisEndMin);
+        if (clE > clS) imgVisibleFW.push({ ...fw, start: formatTime(clS), end: formatTime(clE), duration_minutes: clE - clS, _sMin: clS, _eMin: clE });
+      });
+
+      const fmtDurImg = (d) => { const h = Math.floor(d / 60), m = d % 60; return h > 0 ? `${h}ч${m > 0 ? ` ${m}м` : ''}` : `${m}м`; };
+      const indicatorH = 36 * dpr;
+      const beforeH = imgBefore ? indicatorH : 0;
+      const afterH = imgAfter ? indicatorH : 0;
+
+      // ── Высота: header + before + timeline + after + empty + footer ──
       const headerH = 90 * dpr;
       const footerH = 30 * dpr;
       const emptyBannerH = !hasEvents ? 60 * dpr : 0;
-      const H = headerH + timelineH + emptyBannerH + footerH + PAD * 2;
+      const H = headerH + beforeH + timelineH + afterH + emptyBannerH + footerH + PAD * 2;
 
       const canvas = document.createElement('canvas');
       canvas.width = W;
