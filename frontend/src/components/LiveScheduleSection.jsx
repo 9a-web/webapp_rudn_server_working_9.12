@@ -380,12 +380,16 @@ export const LiveScheduleSection = ({
           <button
             onClick={() => {
               if (hapticFeedback) hapticFeedback('impact', 'medium');
-              setIsShareModalOpen(true);
+              if (scheduleMode === 'shared') {
+                setSharedShareTrigger(prev => prev + 1);
+              } else {
+                setIsShareModalOpen(true);
+              }
             }}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg transition-all"
           >
             <Share2 className="w-4 h-4" />
-            Поделиться
+            {scheduleMode === 'shared' ? 'Поделиться окнами' : 'Поделиться'}
           </button>
         </div>
 
