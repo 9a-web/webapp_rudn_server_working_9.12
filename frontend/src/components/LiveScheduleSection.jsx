@@ -306,14 +306,14 @@ export const LiveScheduleSection = ({
                 if (hapticFeedback) hapticFeedback('impact', 'medium');
                 if (onCalendarClick) onCalendarClick();
               }}
-              className="flex items-center gap-2 px-4 md:px-5 py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10"
+              className="flex items-center gap-1.5 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10 whitespace-nowrap"
               style={{ 
                 backgroundColor: '#1c1c1c'
               }}
             >
-              <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white" />
+              <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white flex-shrink-0" />
               <span 
-                className="text-sm md:text-base font-medium text-white"
+                className="text-xs sm:text-sm md:text-base font-medium text-white"
                 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
               >
                 {dateButton}
