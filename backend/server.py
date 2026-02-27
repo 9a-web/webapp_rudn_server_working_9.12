@@ -17035,10 +17035,10 @@ async def create_share_token(schedule_id: str):
         if doc["owner_id"] not in all_participant_ids:
             all_participant_ids = [doc["owner_id"]] + all_participant_ids
 
-        token = str(uuid.uuid4()).replace("-", "")[:16]  # короткий токен
+        token = str(uuid.uuid4()).replace("-", "")[:16]
         await db.schedule_share_tokens.insert_one({
             "token": token,
-            "participant_ids": participant_ids,
+            "participant_ids": all_participant_ids,
             "source_owner_id": doc["owner_id"],
             "created_at": datetime.utcnow(),
             "expires_at": datetime.utcnow() + timedelta(days=30),
@@ -17046,7 +17046,7 @@ async def create_share_token(schedule_id: str):
 
         bot_username = get_telegram_bot_username()
         invite_link = f"https://t.me/{bot_username}/app?startapp=sschedule_{token}"
-        return {"token": token, "invite_link": invite_link, "participant_ids": participant_ids}
+        return {"token": token, "invite_link": invite_link, "participant_ids": all_participant_ids}
     except HTTPException:
         raise
     except Exception as e:
