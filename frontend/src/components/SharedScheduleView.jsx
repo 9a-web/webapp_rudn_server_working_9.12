@@ -1016,6 +1016,15 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   ))}
                 </div>
               )}
+
+              {/* ─── Кнопка «Добавить друзей» — всегда видна ─── */}
+              <button
+                onClick={handleInviteFriends}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-semibold shadow-md hover:shadow-lg active:scale-[0.98] transition-all"
+              >
+                <Share2 className="w-4 h-4" />
+                Добавить друзей
+              </button>
             </motion.div>
           </motion.div>
         )}
