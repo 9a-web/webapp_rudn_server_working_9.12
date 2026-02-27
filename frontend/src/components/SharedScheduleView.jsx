@@ -88,6 +88,7 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
         width: `calc(${colWidthPct}% - ${EVENT_GAP}px)`,
         backgroundColor: color + '14',
         borderLeft: `3.5px solid ${color}`,
+        borderRadius: '12px',
         zIndex: 10,
       }}
     >
