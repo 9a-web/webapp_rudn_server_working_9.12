@@ -16884,6 +16884,36 @@ async def create_shared_schedule(data: SharedScheduleCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.post("/shared-schedule/{schedule_id}/add-my-schedule")
+async def add_my_schedule(schedule_id: str, data: dict):
+    """Гость добавляет своё расписание в общий вид (снимает флаг schedule_hidden)"""
+    try:
+        telegram_id = int(data.get("telegram_id", 0))
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_id обязателен")
+
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+
+        # Проверяем что участник есть в расписании
+        participants = doc.get("participants", [])
+        if not any(p["telegram_id"] == telegram_id for p in participants):
+            raise HTTPException(status_code=404, detail="Вы не являетесь участником этого расписания")
+
+        await db.shared_schedules.update_one(
+            {"id": schedule_id, "participants.telegram_id": telegram_id},
+            {"$set": {"participants.$.schedule_hidden": False, "updated_at": datetime.utcnow()}}
+        )
+
+        return SuccessResponse(success=True, message="Ваше расписание добавлено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка добавления расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/shared-schedule/{telegram_id}")
 async def get_shared_schedule(telegram_id: int, week: int = 1):
     """Получить совместное расписание пользователя с расписаниями всех участников.
