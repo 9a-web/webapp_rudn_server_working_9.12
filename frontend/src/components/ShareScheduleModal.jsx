@@ -435,6 +435,7 @@ export const ShareScheduleModal = ({
               selectedDate={selectedDate}
               groupName={groupName}
               formatDate={formatDate}
+              botUsername={botUsername}
             />
           </div>
         </>
