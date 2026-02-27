@@ -293,11 +293,12 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const now = new Date();
       const currentMin = now.getHours() * 60 + now.getMinutes();
       if (currentMin >= TIMELINE_START_MIN && currentMin <= TIMELINE_END_MIN) {
-        const scrollTo = minToPx(currentMin) - 100;
+        // Учитываем смещение видимого диапазона
+        const scrollTo = minToPx(currentMin) - visOffset - 100;
         timelineRef.current.scrollTop = Math.max(0, scrollTo);
       }
     }
-  }, [loading, sharedData?.exists]);
+  }, [loading, sharedData?.exists, visOffset]);
 
   const handleCreateShared = async () => {
     try {
