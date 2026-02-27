@@ -25,14 +25,15 @@ const AnimatedCompass = ({ className, strokeWidth = 2, isActive }) => {
       {/* Корпус компаса — статичный */}
       <circle cx="12" cy="12" r="10" />
       {/* Стрелка компаса — вращается */}
-      <motion.polygon
-        points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
+      <motion.g
         key={spinKey}
         initial={{ rotate: 0 }}
         animate={{ rotate: 360 }}
         transition={{ duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
-        style={{ originX: '12px', originY: '12px', transformBox: 'fill-box' }}
-      />
+        style={{ transformOrigin: '12px 12px' }}
+      >
+        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+      </motion.g>
     </svg>
   );
 };
