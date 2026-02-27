@@ -911,7 +911,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div className="text-center px-4 py-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 shadow-sm">
                 <div className="text-[#888] text-sm font-medium">
-                  Нет пар в {selectedDay || 'этот день'}
+                  Нет пар на {DAYS_ACCUSATIVE[selectedDay] || 'этот день'}
                 </div>
               </div>
             </div>
