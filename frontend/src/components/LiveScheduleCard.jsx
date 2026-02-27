@@ -74,7 +74,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
 
   return (
     <motion.div 
-      className={`relative rounded-3xl p-5 md:p-8 lg:p-10 shadow-card overflow-hidden border ${themeStyles.mainCard.border}`}
+      className={`relative rounded-3xl p-5 lg:p-8 xl:p-10 shadow-card overflow-hidden border ${themeStyles.mainCard.border}`}
       style={{ 
         background: themeStyles.mainCard.bg,
         backdropFilter: 'blur(40px) saturate(180%)',
