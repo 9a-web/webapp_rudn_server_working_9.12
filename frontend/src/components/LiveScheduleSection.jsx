@@ -403,6 +403,7 @@ export const LiveScheduleSection = ({
             hapticFeedback={hapticFeedback}
             onFriendPickerChange={onFriendPickerChange}
             onShareModalChange={onSharedScheduleShareModalChange}
+            externalShareTrigger={sharedShareTrigger}
           />
         )}
 
