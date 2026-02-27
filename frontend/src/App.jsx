@@ -987,6 +987,19 @@ const Home = () => {
     try {
       setLoading(true);
       
+      // Читаем кэш из localStorage ДО всех проверок (чтобы избежать TDZ)
+      const savedUserSettings = localStorage.getItem('user_settings');
+      let cachedSettings = null;
+      if (savedUserSettings) {
+        try {
+          cachedSettings = JSON.parse(savedUserSettings);
+          console.log('📦 Найдены сохранённые настройки в localStorage');
+        } catch (e) {
+          console.error('Ошибка парсинга сохранённых настроек:', e);
+          localStorage.removeItem('user_settings');
+        }
+      }
+
       // Проверяем, является ли пользователь связанным с Telegram (не гостевым)
       const isLinkedUser = currentUser.is_linked || (!currentUser.is_guest && !currentUser.device_id);
       
@@ -1019,19 +1032,6 @@ const Home = () => {
         setShowWelcomeScreen(true);
         setLoading(false);
         return;
-      }
-      
-      // Пробуем загрузить настройки из localStorage сначала (для быстрого восстановления)
-      const savedUserSettings = localStorage.getItem('user_settings');
-      let cachedSettings = null;
-      if (savedUserSettings) {
-        try {
-          cachedSettings = JSON.parse(savedUserSettings);
-          console.log('📦 Найдены сохранённые настройки в localStorage');
-        } catch (e) {
-          console.error('Ошибка парсинга сохранённых настроек:', e);
-          localStorage.removeItem('user_settings');
-        }
       }
       
       const settings = await userAPI.getUserSettings(currentUser.id);
