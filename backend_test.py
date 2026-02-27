@@ -240,49 +240,35 @@ class SharedScheduleTester:
         except Exception as e:
             self.log_test("Remove Participant", False, f"Exception: {e}")
     
-    async def test_5_authorization(self):
+    async def test_5_owner_protection(self):
         """
-        Test 5: Authorization - DELETE /api/shared-schedule/{id}?owner_id=WRONG_ID should return 403,
-        DELETE with correct owner_id should return 200
+        Critical Test 5: Owner protection: DELETE /api/shared-schedule/{id}/remove-participant/999001 
+        → should return 400 (can't remove owner)
         """
-        print("\n🧪 Test 5: Authorization Test")
+        print("\n🧪 Critical Test 5: Owner Protection Test")
         
         try:
-            # Create schedule for this test
-            owner_id = 111111
-            payload = {
-                "owner_id": owner_id,
-                "participant_ids": [200001]
-            }
+            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
+                self.log_test("Owner Protection", False, "No schedule ID available from previous test")
+                return
             
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
-                if resp.status != 200:
-                    self.log_test("Authorization Test", False, f"Schedule creation failed: {resp.status}")
-                    return
-                
-                data = await resp.json()
-                schedule_id = data.get("id")
-            
-            # Test 1: Wrong owner_id should return 403
-            wrong_owner_id = 999999
-            async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}?owner_id={wrong_owner_id}") as resp:
-                if resp.status == 403:
-                    self.log_test("Authorization Test (wrong owner)", True, f"Wrong owner correctly blocked with HTTP 403")
+            # Try to remove the owner (999001)
+            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/remove-participant/999001") as resp:
+                if resp.status == 400:
+                    response_text = await resp.text()
+                    # Check for owner protection message in English or Russian
+                    if ("owner" in response_text.lower() or 
+                        "владелец" in response_text.lower() or 
+                        "cannot remove" in response_text.lower() or
+                        "нельзя удалить" in response_text.lower()):
+                        self.log_test("Owner Protection", True, f"Owner removal correctly blocked with HTTP 400: {response_text}")
+                    else:
+                        self.log_test("Owner Protection", False, f"HTTP 400 but wrong message: {response_text}")
                 else:
-                    self.log_test("Authorization Test (wrong owner)", False, f"Expected HTTP 403, got {resp.status}")
-            
-            # Test 2: Correct owner_id should return 200
-            async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}?owner_id={owner_id}") as resp:
-                if resp.status == 200:
-                    self.log_test("Authorization Test (correct owner)", True, f"Correct owner deletion returned HTTP 200")
-                    # Remove from cleanup list since it's already deleted
-                    if schedule_id in self.created_schedules:
-                        self.created_schedules.remove(schedule_id)
-                else:
-                    self.log_test("Authorization Test (correct owner)", False, f"Expected HTTP 200, got {resp.status}")
+                    self.log_test("Owner Protection", False, f"Expected HTTP 400, got {resp.status}")
         
         except Exception as e:
-            self.log_test("Authorization Test", False, f"Exception: {e}")
+            self.log_test("Owner Protection", False, f"Exception: {e}")
     
     async def test_6_free_windows_single_participant(self):
         """
