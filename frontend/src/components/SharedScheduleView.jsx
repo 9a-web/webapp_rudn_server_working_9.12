@@ -782,6 +782,34 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
             </span>
           </div>
         )}
+
+        {/* Кнопка «Добавить своё» — для гостей с schedule_hidden=true */}
+        {myScheduleHidden && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mx-3 mt-2 p-3 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center gap-3"
+          >
+            <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <Plus className="w-4 h-4 text-indigo-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-indigo-700">Ваше расписание скрыто</div>
+              <div className="text-[11px] text-indigo-400 mt-0.5">Добавьте его, чтобы найти общие окна</div>
+            </div>
+            <button
+              onClick={handleAddMySchedule}
+              disabled={actionLoading}
+              className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-95 text-white text-xs font-semibold transition-all disabled:opacity-50"
+            >
+              {actionLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Добавить своё'
+              )}
+            </button>
+          </motion.div>
+        )}
       </div>
 
       {/* ─── Legend ─── */}
