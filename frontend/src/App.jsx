@@ -823,38 +823,28 @@ const Home = () => {
       if (!startParam || sharedScheduleInviteProcessed || !currentUser) return;
       if (!startParam.startsWith('sschedule_')) return;
 
-      const scheduleRaw = startParam.replace('sschedule_', '');
-      const isNoSchedule = scheduleRaw.endsWith('_noschedule');
-      const scheduleId = isNoSchedule ? scheduleRaw.replace('_noschedule', '') : scheduleRaw;
-      if (!scheduleId) return;
+      const token = startParam.replace('sschedule_', '');
+      if (!token) return;
 
-      console.log('📅 Приглашение в расписание:', scheduleId, '| addToSchedule:', !isNoSchedule);
+      console.log('📅 Открытие расписания по токену:', token);
       setSharedScheduleInviteProcessed(true);
 
       try {
-        const result = await sharedScheduleAPI.join(
-          scheduleId,
-          currentUser.id,
-          currentUser.first_name,
-          !isNoSchedule   // addToSchedule
-        );
+        // Получаем список участников из токена — никакого join!
+        const tokenData = await sharedScheduleAPI.getTokenData(token);
+        if (!tokenData?.participant_ids) return;
 
-        if (result?.success) {
-          hapticFeedback('success');
-          if (result.already_member) {
-            showAlert('Вы уже в этом совместном расписании 📅');
-          } else {
-            showAlert('Вы добавлены в совместное расписание! 📅');
-          }
-          setActiveTab('home');
-          setScheduleMode('shared');
-        }
+        // Создаём/обновляем СВОЁ личное расписание с этими участниками
+        await sharedScheduleAPI.create(currentUser.id, tokenData.participant_ids);
+
+        hapticFeedback('success');
+        // Переходим на главную и открываем совместное расписание
+        setActiveTab('home');
+        setScheduleMode('shared');
       } catch (error) {
-        console.error('❌ Ошибка присоединения к совместному расписанию:', error);
-        if (error?.response?.status === 404) {
-          showAlert('Расписание не найдено или ссылка устарела');
-        } else if (error?.response?.status === 400) {
-          showAlert(error?.response?.data?.detail || 'Не удалось присоединиться');
+        console.error('❌ Ошибка открытия расписания по ссылке:', error);
+        if (error?.response?.status === 404 || error?.response?.status === 410) {
+          showAlert('Ссылка не найдена или устарела');
         }
       }
     };
