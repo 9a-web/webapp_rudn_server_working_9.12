@@ -308,10 +308,10 @@ const NotificationsPanel = ({
           {/* Контент */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h4 className="font-medium text-white">{notification.title}</h4>
+              <h4 className="font-medium text-white">{cleanTgHtml(notification.title)}</h4>
               <span className="text-xs text-gray-500 flex-shrink-0">{notification.time_ago}</span>
             </div>
-            <p className="text-sm text-gray-400 mt-0.5">{notification.message}</p>
+            <p className="text-sm text-gray-400 mt-0.5">{cleanTgHtml(notification.message)}</p>
             
             {/* Действия */}
             {hasActions && (
