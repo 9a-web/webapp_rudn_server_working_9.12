@@ -843,8 +843,9 @@ const Home = () => {
           } else {
             showAlert('Вы добавлены в совместное расписание! 📅');
           }
-          // Переключаемся на вкладку расписания и открываем совместный режим
-          setActiveTab('schedule');
+          // Переключаемся на главную вкладку (там живёт LiveScheduleSection)
+          // и открываем совместный режим расписания
+          setActiveTab('home');
           setScheduleMode('shared');
         }
       } catch (error) {
