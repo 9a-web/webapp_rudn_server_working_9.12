@@ -397,6 +397,7 @@ export const LiveScheduleSection = ({
             onClose={() => onScheduleModeChange('personal')}
             hapticFeedback={hapticFeedback}
             onFriendPickerChange={onFriendPickerChange}
+            onShareModalChange={onSharedScheduleShareModalChange}
           />
         )}
 
