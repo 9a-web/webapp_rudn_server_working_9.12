@@ -874,18 +874,22 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           if (sMin === null || eMin === null || eMin <= sMin) return;
           const ey = tlY + toY(sMin);
           const eh = Math.max(toY(eMin) - toY(sMin), 34 * dpr);
+          const cardR = 10 * dpr;
 
-          // Фон события
+          // Фон события (закруглённый)
           ctx.fillStyle = participant.color + '18';
           ctx.beginPath();
-          ctx.roundRect(cx, ey, cw, eh, 10 * dpr);
+          ctx.roundRect(cx, ey, cw, eh, cardR);
           ctx.fill();
 
-          // Левая полоска (закруглённая)
-          ctx.fillStyle = participant.color;
+          // Левая полоска — обрезана по форме карточки (как в UI overflow:hidden)
+          ctx.save();
           ctx.beginPath();
-          ctx.roundRect(cx, ey + 4 * dpr, 3.5 * dpr, eh - 8 * dpr, 2 * dpr);
-          ctx.fill();
+          ctx.roundRect(cx, ey, cw, eh, cardR);
+          ctx.clip();
+          ctx.fillStyle = participant.color;
+          ctx.fillRect(cx, ey, 3.5 * dpr, eh);
+          ctx.restore();
 
           // Имя участника
           const pName = String(participant.telegram_id) === String(telegramId) ? 'Вы' : participant.first_name;
