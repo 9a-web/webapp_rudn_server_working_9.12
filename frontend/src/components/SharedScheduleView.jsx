@@ -772,7 +772,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                 />
                 
                 {/* Half-hour line */}
-                {hour < actualEndHour && (
+                {hour < TIMELINE_END_HOUR && (
                   <div
                     className="absolute h-[1px]"
                     style={{
