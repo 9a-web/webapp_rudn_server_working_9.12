@@ -199,6 +199,29 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     onShareModalChange?.(value);
   }, [onShareModalChange]);
 
+  // ─── Реферальная ссылка для приглашения друзей ───
+  const [referralLink, setReferralLink] = useState('');
+
+  useEffect(() => {
+    if (telegramId) {
+      getReferralCode(telegramId).then(data => {
+        setReferralLink(data?.referral_link_webapp || data?.referral_link || '');
+      }).catch(() => {});
+    }
+  }, [telegramId]);
+
+  const handleInviteFriends = useCallback(() => {
+    if (!referralLink) return;
+    const text = encodeURIComponent('Привет! Добавь меня в друзья в RUDN GO 🎓');
+    const url = encodeURIComponent(referralLink);
+    const shareUrl = `https://t.me/share/url?url=${url}&text=${text}`;
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(shareUrl);
+    } else {
+      window.open(shareUrl, '_blank');
+    }
+  }, [referralLink]);
+
   // ─── БАГ-ФИХ: правильный маппинг дня из selectedDate (воскресенье → нет данных) ───
   const selectedDay = useMemo(() => {
     const date = selectedDate ? new Date(selectedDate) : new Date();
