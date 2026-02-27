@@ -1558,6 +1558,10 @@ const Home = () => {
 
   const handleTabChange = (newTab) => {
     hapticFeedback('impact', 'light');
+    // При переходе с главной вкладки — сбрасываем режим расписания в personal
+    if (newTab !== 'home') {
+      setScheduleMode('personal');
+    }
     setActiveTab(newTab);
   };
 
