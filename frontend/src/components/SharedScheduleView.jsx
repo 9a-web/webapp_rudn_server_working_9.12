@@ -234,19 +234,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekNumber]);
 
-  // ─── Polling: обновляем расписание каждые 30с (не 15 — меньше нагрузки) ───
-  useEffect(() => {
-    if (!sharedData?.exists) return;
-    
-    const interval = setInterval(() => {
-      // БАГ-ФИХ: не поллим когда открыт friend picker
-      if (!showFriendPicker) {
-        loadSharedSchedule(true);
-      }
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [sharedData?.exists, loadSharedSchedule, showFriendPicker]);
+  // Polling отключён — у каждого своя копия, не синхронизируем в реальном времени
 
   // ─── При открытии friend picker — всегда обновляем список друзей ───
   useEffect(() => {
