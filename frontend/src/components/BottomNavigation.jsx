@@ -3,6 +3,40 @@ import { Compass, NotebookText, BookOpenCheck, AudioLines, Users, Undo2 } from '
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
+// ─── Animated Compass: стрелка плавно прокручивается ───
+const AnimatedCompass = ({ className, strokeWidth = 2, isActive }) => {
+  const [spinKey, setSpinKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setSpinKey(k => k + 1);
+  }, [isActive]);
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Корпус компаса — статичный */}
+      <circle cx="12" cy="12" r="10" />
+      {/* Стрелка компаса — вращается */}
+      <motion.polygon
+        points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
+        key={spinKey}
+        initial={{ rotate: 0 }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
+        style={{ originX: '12px', originY: '12px', transformBox: 'fill-box' }}
+      />
+    </svg>
+  );
+};
+
 export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false, onBackFromFriends }) => {
   const { t } = useTranslation();
 
