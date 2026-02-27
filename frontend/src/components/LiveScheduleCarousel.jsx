@@ -287,15 +287,15 @@ export const LiveScheduleCarousel = ({
 
   return (
     <>
-      <div className="relative mt-4 md:mt-0 md:flex md:gap-4 md:px-0 md:overflow-visible">
-        <div className="flex-1 relative md:overflow-visible pl-6 pr-[52px] md:pl-0 md:pr-0">
+      <div className="relative mt-4 lg:mt-0 lg:flex lg:gap-4 lg:px-0 lg:overflow-visible">
+        <div className="flex-1 relative lg:overflow-visible pl-6 pr-[52px] lg:pl-0 lg:pr-0">
           
           {/* 
             STACKED CARD CONTAINER
-            max-w constraints restore original desktop/tablet width
-            md:mx-auto centers the stack on tablet/desktop
+            max-w constraints for proper sizing
+            lg:mx-auto centers on desktop
           */}
-          <div className="relative mt-4 md:mt-0 max-w-[400px] md:max-w-[500px] lg:max-w-[560px] md:mx-auto" style={{ paddingBottom: '22px' }}>
+          <div className="relative mt-4 lg:mt-0 max-w-[400px] md:max-w-[400px] lg:max-w-[500px] xl:max-w-[560px] md:mx-auto" style={{ paddingBottom: '22px' }}>
             
             {/* 3rd background card (deepest) — dark solid, always visible */}
             <motion.div 
