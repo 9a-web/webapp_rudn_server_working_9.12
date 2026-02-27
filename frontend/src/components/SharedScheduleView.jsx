@@ -554,6 +554,14 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
               <Plus className="w-3.5 h-3.5" />
               Добавить
             </button>
+            <button
+              onClick={handleShare}
+              disabled={actionLoading}
+              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Поделиться
+            </button>
             {isOwner && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
