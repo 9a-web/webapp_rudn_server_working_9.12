@@ -636,6 +636,16 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
             <Plus className="w-3.5 h-3.5" />
             Добавить
           </button>
+          {/* Кнопка "Поделиться" — генерирует ссылку */}
+          <button
+            onClick={handleShare}
+            disabled={actionLoading}
+            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100"
+            title="Поделиться ссылкой"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Поделиться
+          </button>
           {/* БАГ-ФИХ: Кнопка удаления расписания — только для owner */}
           {isOwner && (
             <button
