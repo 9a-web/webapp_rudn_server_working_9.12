@@ -292,6 +292,38 @@ test_plan:
 
 agent_communication:
   - agent: "main"
+    message: "BUG FIXES for shared schedule image generation and backend logic.
+    
+    BACKEND CHANGES (server.py):
+    1. REMOVED ~90 lines of dead/duplicate code after get_shared_schedule_invite_link (orphaned create_shared_schedule + duplicate delete_shared_schedule that were never reachable)
+    2. IMPROVED _compute_free_windows granularity from 30min to 15min slots — now correctly handles classes starting at non-standard times (e.g. 9:15, 10:45). Rounds slot start DOWN and fills until end time.
+    
+    FRONTEND CHANGES (SharedScheduleView.jsx - Canvas image generation):
+    3. FIXED crash when no events on selected day (minH=23 > maxH=0 caused negative canvas height). Now defaults to 8:00-18:00 range.
+    4. ADDED 'Нет пар' banner in generated image for empty days.
+    5. ADDED roundRect polyfill for old WebView compatibility.
+    6. FIXED pill overflow: limits visible pills, shows '+N' for remaining participants.
+    7. ADDED date display in header (e.g. 'Понедельник, 3 марта • Неделя 1').
+    8. FIXED long discipline text: truncates with '…' when text exceeds block bounds.
+    9. FIXED time/auditory line clipping for narrow columns.
+    10. Replaced unstable getParticipant function with stable participantMap built from sharedData.
+    11. Updated useCallback dependencies to use sharedData instead of getParticipant.
+    
+    FRONTEND CHANGES (ShareScheduleModal.jsx):
+    12. FIXED botUsername scope: added botUsername prop to ScheduleImageCard (was undefined — referenced parent's useState from separate component).
+    13. REMOVED unused getClassTypeEmoji function.
+    14. Footer now shows '@bot' fallback instead of '@undefined'.
+    
+    TEST PLAN:
+    - POST /api/shared-schedule with owner_id → creates schedule
+    - GET /api/shared-schedule/{id} → returns schedule with free_windows
+    - GET /api/shared-schedule/{id}?week=1 → returns data
+    - POST /api/shared-schedule/{id}/add-participant → adds participant
+    - DELETE /api/shared-schedule/{id}/remove-participant/{pid} → removes
+    - DELETE /api/shared-schedule/{id} → deletes
+    - Verify _compute_free_windows with 15-min granularity
+    - Verify no duplicate endpoints (only one delete_shared_schedule)"
+  - agent: "main"
     message: "Added user_type filtering to admin endpoints to distinguish Telegram vs Web/Guest users.
     KEY CHANGES:
     1. GET /api/admin/users - NEW param: user_type (telegram|web|null for all). Returns user_type field per user.
