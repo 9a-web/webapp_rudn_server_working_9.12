@@ -182,7 +182,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   const [friends, setFriends] = useState([]);
   const [showFriendPicker, setShowFriendPickerRaw] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
+  const [showShareModal, setShowShareModalRaw] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
