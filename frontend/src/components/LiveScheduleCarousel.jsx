@@ -13,13 +13,15 @@ import {
   formatHours,
 } from '../utils/analytics';
 
-// ──────────────────────────────────────────────
-// MIN-HEIGHT for consistent stacked card peek
-// All card types must have at least this height
-// so the 2nd/3rd background cards are always visible
-// ──────────────────────────────────────────────
-const CARD_MIN_HEIGHT = '130px';
-const CARD_MIN_HEIGHT_MD = '150px';
+// ─── Stack animation config ───────────────────
+// These define how each "layer" in the stack looks
+const STACK = [
+  { y: 0,  scale: 1,    opacity: 1,    zIndex: 30 }, // pos 0 — front
+  { y: 10, scale: 0.96, opacity: 0.60, zIndex: 20 }, // pos 1 — middle
+  { y: 20, scale: 0.92, opacity: 0.30, zIndex: 10 }, // pos 2 — back
+];
+
+const SPRING = { type: 'spring', stiffness: 320, damping: 28, mass: 0.8 };
 
 export const LiveScheduleCarousel = ({ 
   currentClass, 
@@ -36,46 +38,60 @@ export const LiveScheduleCarousel = ({
   setIsAnalyticsOpen
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(1); // 1=forward, -1=backward
 
-  // Schedule stats (memoized)
+  // Schedule stats
   const stats = useMemo(() => {
     if (!schedule || schedule.length === 0) return null;
     const basicStats = calculateScheduleStats(schedule);
-    const busiestDay = findBusiestDay(basicStats.classesByDay);
-    const lightestDay = findLightestDay(basicStats.classesByDay);
-    const weekChart = getWeekLoadChart(basicStats.classesByDay);
-    return { ...basicStats, busiestDay, lightestDay, weekChart };
+    return {
+      ...basicStats,
+      busiestDay: findBusiestDay(basicStats.classesByDay),
+      lightestDay: findLightestDay(basicStats.classesByDay),
+      weekChart: getWeekLoadChart(basicStats.classesByDay),
+    };
   }, [schedule]);
 
-  const cards = [
-    { id: 0, type: 'schedule' },
-    { id: 1, type: 'weather' },
-    { id: 2, type: 'achievements' },
-    { id: 3, type: 'stats' }
-  ];
+  const cards = useMemo(() => [
+    { id: 'schedule',     type: 'schedule' },
+    { id: 'weather',      type: 'weather' },
+    { id: 'achievements', type: 'achievements' },
+    { id: 'stats',        type: 'stats' },
+  ], []);
 
+  // ─── Navigation ────────────────────────────
   const handlePrevious = useCallback((e) => {
     e.stopPropagation();
-    hapticFeedback && hapticFeedback('impact', 'light');
+    hapticFeedback?.('impact', 'light');
+    setDirection(-1);
     setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
   }, [hapticFeedback, cards.length]);
 
   const handleNext = useCallback((e) => {
     e.stopPropagation();
-    hapticFeedback && hapticFeedback('impact', 'light');
+    hapticFeedback?.('impact', 'light');
+    setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % cards.length);
   }, [hapticFeedback, cards.length]);
 
   const goToCard = useCallback((index, e) => {
     e.stopPropagation();
-    hapticFeedback && hapticFeedback('impact', 'light');
+    hapticFeedback?.('impact', 'light');
+    setDirection(index > currentIndex ? 1 : -1);
     setCurrentIndex(index);
-  }, [hapticFeedback]);
+  }, [hapticFeedback, currentIndex]);
 
-  const currentCard = cards[currentIndex];
+  // ─── 3 visible cards in stack order ────────
+  const stackCards = useMemo(() => {
+    return [0, 1, 2].map(offset => {
+      const idx = (currentIndex + offset) % cards.length;
+      return { ...cards[idx], stackPos: offset };
+    });
+  }, [currentIndex, cards]);
+
   const maxClasses = stats ? Math.max(...stats.weekChart.map(d => d.classes), 1) : 1;
 
-  // Shared card wrapper styles for consistency
+  // ─── Shared styles ─────────────────────────
   const sharedCardStyle = {
     backgroundColor: 'rgba(52, 52, 52, 0.7)',
     backdropFilter: 'blur(40px) saturate(180%)',
@@ -83,306 +99,283 @@ export const LiveScheduleCarousel = ({
     width: '100%',
   };
 
+  // ─── Card content renderer ─────────────────
+  const renderCardContent = useCallback((type, isActive) => {
+    switch (type) {
+      case 'schedule':
+        return (
+          <LiveScheduleCard 
+            currentClass={currentClass} 
+            minutesLeft={minutesLeft}
+          />
+        );
+
+      case 'weather':
+        return (
+          <div 
+            className="relative rounded-3xl overflow-hidden border border-white/10"
+            style={{ ...sharedCardStyle, minHeight: '130px' }}
+          >
+            <div className="p-4">
+              <WeatherWidget hapticFeedback={hapticFeedback} />
+            </div>
+          </div>
+        );
+
+      case 'achievements':
+        return (
+          <div 
+            className="relative rounded-3xl p-5 overflow-hidden border border-white/10 cursor-pointer"
+            style={{ ...sharedCardStyle, minHeight: '130px' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (user) setIsAchievementsOpen(true);
+            }}
+          >
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-br from-[#FFE66D]/20 to-transparent"
+              animate={{ opacity: [0.3, 0.5, 0.3] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <div className="relative">
+              {user ? (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🏆</span>
+                      <h3 className="text-lg font-bold text-white">Достижения</h3>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-[#FFE66D]">{userStats?.total_points || 0}</div>
+                      <div className="text-[10px] text-gray-400">очков</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold text-white mb-0.5">
+                        {userStats?.achievements_count || 0}/{allAchievements?.length || 0}
+                      </div>
+                      <div className="text-xs text-gray-400">Получено</div>
+                    </div>
+                    <div className="flex gap-2">
+                      {(userAchievements || []).slice(0, 3).map((ua, idx) => (
+                        <span key={idx} className="text-2xl">{ua.achievement?.emoji || '🎯'}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-center text-xs text-[#A3F7BF]">Нажмите, чтобы открыть</div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-4 text-center">
+                  <span className="text-3xl mb-2">🏆</span>
+                  <h3 className="text-lg font-bold text-gray-400 mb-1">Достижения</h3>
+                  <p className="text-xs text-gray-500">Войдите для просмотра</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'stats':
+        if (!stats) {
+          return (
+            <div className="relative rounded-3xl p-5 overflow-hidden border border-white/10"
+              style={{ ...sharedCardStyle, minHeight: '130px' }}>
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <BarChart3 className="w-10 h-10 text-gray-600 mb-2" />
+                <h3 className="text-base font-bold text-gray-400 mb-0.5">Статистика</h3>
+                <p className="text-xs text-gray-500">Выберите группу для<br/>просмотра аналитики</p>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div 
+            className="relative rounded-3xl p-4 overflow-hidden border border-white/10 cursor-pointer"
+            style={{ ...sharedCardStyle, minHeight: '130px' }}
+            onClick={(e) => {
+              e.stopPropagation();
+              hapticFeedback?.('impact', 'medium');
+              setIsAnalyticsOpen(true);
+            }}
+          >
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-br from-[#80E8FF]/15 via-[#A3F7BF]/10 to-[#C4A3FF]/15"
+              animate={{ opacity: [0.3, 0.5, 0.3] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#80E8FF]/30 to-[#A3F7BF]/30 flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4 text-[#80E8FF]" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">Статистика</h3>
+                </div>
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#A3F7BF]/10 border border-[#A3F7BF]/20">
+                  <TrendingUp className="w-3 h-3 text-[#A3F7BF]" />
+                  <span className="text-[10px] font-medium text-[#A3F7BF]">неделя</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                <div className="bg-gradient-to-br from-[#A3F7BF]/10 to-transparent rounded-xl p-2 border border-[#A3F7BF]/10">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <Calendar className="w-3 h-3 text-[#A3F7BF]" />
+                    <span className="text-[9px] text-gray-400 uppercase tracking-wide">Пар</span>
+                  </div>
+                  <div className="text-lg font-bold text-white">{stats.totalClasses}</div>
+                </div>
+                <div className="bg-gradient-to-br from-[#FFE66D]/10 to-transparent rounded-xl p-2 border border-[#FFE66D]/10">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <Clock className="w-3 h-3 text-[#FFE66D]" />
+                    <span className="text-[9px] text-gray-400 uppercase tracking-wide">Часов</span>
+                  </div>
+                  <div className="text-lg font-bold text-white">{formatHours(stats.totalHours)}</div>
+                </div>
+                <div className="bg-gradient-to-br from-[#FFB4D1]/10 to-transparent rounded-xl p-2 border border-[#FFB4D1]/10">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <Flame className="w-3 h-3 text-[#FFB4D1]" />
+                    <span className="text-[9px] text-gray-400 uppercase tracking-wide">Макс</span>
+                  </div>
+                  <div className="text-xs font-bold text-white truncate">
+                    {stats.busiestDay?.day?.slice(0, 2) || '—'}
+                    <span className="text-[10px] text-[#FFB4D1] ml-1">{stats.busiestDay?.classCount || 0} пар</span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-[#C4A3FF]/10 to-transparent rounded-xl p-2 border border-[#C4A3FF]/10">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <TrendingUp className="w-3 h-3 text-[#C4A3FF]" />
+                    <span className="text-[9px] text-gray-400 uppercase tracking-wide">В день</span>
+                  </div>
+                  <div className="text-lg font-bold text-white">{stats.averageClassesPerDay}</div>
+                </div>
+              </div>
+              <div className="bg-[#1F1F1F]/50 rounded-xl p-2.5 border border-gray-700/30">
+                <div className="flex items-end justify-between gap-1 h-8">
+                  {stats.weekChart.map((dayData, index) => (
+                    <div key={dayData.day} className="flex-1 flex flex-col items-center gap-0.5">
+                      <motion.div 
+                        className="w-full rounded-sm"
+                        style={{
+                          background: dayData.classes > 0 ? 'linear-gradient(180deg, #A3F7BF, #80E8FF)' : 'rgba(75, 75, 75, 0.5)',
+                          minHeight: '3px'
+                        }}
+                        initial={{ height: 0 }}
+                        animate={{ height: dayData.classes > 0 ? `${Math.max(20, (dayData.classes / maxClasses) * 100)}%` : '3px' }}
+                        transition={{ duration: 0.4, delay: index * 0.04 }}
+                      />
+                      <span className="text-[8px] text-gray-500 font-medium">{dayData.shortDay}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-2 text-center">
+                <span className="text-[10px] text-[#80E8FF]/80">Нажмите для подробной аналитики →</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  }, [currentClass, minutesLeft, hapticFeedback, user, userStats, allAchievements, userAchievements, stats, maxClasses, setIsAchievementsOpen, setIsAnalyticsOpen, sharedCardStyle]);
+
+  // ─── Exit/enter variants (direction-aware) ─
+  const cardVariants = {
+    enter: (dir) => ({
+      y: dir >= 0 ? STACK[2].y + 10 : -70,
+      scale: dir >= 0 ? STACK[2].scale - 0.04 : 0.96,
+      opacity: 0,
+      zIndex: dir >= 0 ? 5 : 40,
+    }),
+    exit: (dir) => ({
+      y: dir >= 0 ? -70 : STACK[2].y + 10,
+      scale: dir >= 0 ? 0.96 : STACK[2].scale - 0.04,
+      opacity: 0,
+      zIndex: dir >= 0 ? 40 : 5,
+    }),
+  };
+
   return (
     <>
       <div className="relative mt-4 md:mt-0 md:flex md:gap-4 md:px-0 md:overflow-visible">
-        {/* Card area with stacked visual */}
+        {/* Card stack area */}
         <div className="flex-1 relative md:overflow-visible pl-6 pr-[52px] md:pl-0 md:pr-0">
-          
-          {/* 
-            STACKED CARD CONTAINER
+          <div className="relative mt-4 md:mt-0" style={{ paddingBottom: '22px' }}>
             
-            BUG FIX: Background cards now use top:0 + bottom:Npx positioning.
-            This makes them STRETCH with the main card — they always peek
-            a CONSISTENT amount below the main card, regardless of its height.
-            
-            paddingBottom: 25px = total peek space below main card
-            2nd card: bottom: 13px → peeks 12px below main card
-            3rd card: bottom: 0   → peeks 25px below main card (13px below 2nd)
-          */}
-          <div className="relative mt-4 md:mt-0" style={{ paddingBottom: '25px' }}>
-            
-            {/* 3rd card (deepest background) — always visible, peeks 25px below main */}
-            <motion.div 
-              className="absolute rounded-3xl left-0 right-0 mx-auto border border-white/5"
-              style={{ 
-                backgroundColor: 'rgba(33, 33, 33, 0.6)',
-                backdropFilter: 'blur(20px) saturate(150%)',
-                WebkitBackdropFilter: 'blur(20px) saturate(150%)',
-                width: '84%',
-                top: '12px',
-                bottom: 0,
-                zIndex: 1,
-              }}
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-            />
-            
-            {/* 2nd card (middle background) — always visible, peeks 12px below main */}
-            <motion.div 
-              className="absolute rounded-3xl left-0 right-0 mx-auto border border-white/5"
-              style={{ 
-                backgroundColor: 'rgba(44, 44, 44, 0.65)',
-                backdropFilter: 'blur(30px) saturate(160%)',
-                WebkitBackdropFilter: 'blur(30px) saturate(160%)',
-                width: '92%',
-                top: '6px',
-                bottom: '13px',
-                zIndex: 2,
-              }}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.45 }}
-            />
+            {/* 
+              ═══════════════════════════════════════════
+              CARD STACK — 3 visible cards at once
+              
+              The front card (stackPos 0) is position:relative 
+              → it sets the container height.
+              
+              Cards at stackPos 1 & 2 are position:absolute
+              → they float behind, slightly offset & scaled.
+              
+              AnimatePresence + popLayout handles exit:
+              the old front card is removed from flow and 
+              plays its exit animation on top.
+              ═══════════════════════════════════════════
+            */}
+            <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+              {stackCards.map(({ id, type, stackPos }) => {
+                const pos = STACK[stackPos];
+                const isActive = stackPos === 0;
 
-            {/* Main card (z-index 3) — switches via AnimatePresence */}
-            <div className="relative" style={{ zIndex: 3 }}>
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={currentCard.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                >
-                  {/* ── SCHEDULE CARD ── */}
-                  {currentCard.type === 'schedule' && (
-                    <LiveScheduleCard 
-                      currentClass={currentClass} 
-                      minutesLeft={minutesLeft}
-                    />
-                  )}
-
-                  {/* ── WEATHER CARD ── */}
-                  {currentCard.type === 'weather' && (
-                    <div 
-                      className="relative rounded-3xl overflow-hidden border border-white/10"
-                      style={{ ...sharedCardStyle, minHeight: CARD_MIN_HEIGHT }}
-                    >
-                      <div className="p-4">
-                        <WeatherWidget hapticFeedback={hapticFeedback} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── ACHIEVEMENTS CARD ── */}
-                  {currentCard.type === 'achievements' && (
-                    <div 
-                      className="relative rounded-3xl p-5 overflow-hidden border border-white/10 cursor-pointer"
-                      style={{ ...sharedCardStyle, minHeight: CARD_MIN_HEIGHT }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (user) setIsAchievementsOpen(true);
-                      }}
-                    >
-                      <motion.div 
-                        className="absolute inset-0 bg-gradient-to-br from-[#FFE66D]/20 to-transparent"
-                        animate={{ opacity: [0.3, 0.5, 0.3] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                      />
-                      
-                      <div className="relative">
-                        {user ? (
-                          <>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-2xl">🏆</span>
-                                <h3 className="text-lg font-bold text-white">Достижения</h3>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-[#FFE66D]">
-                                  {userStats?.total_points || 0}
-                                </div>
-                                <div className="text-[10px] text-gray-400">очков</div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-2xl font-bold text-white mb-0.5">
-                                  {userStats?.achievements_count || 0}/{allAchievements?.length || 0}
-                                </div>
-                                <div className="text-xs text-gray-400">Получено</div>
-                              </div>
-                              <div className="flex gap-2">
-                                {(userAchievements || []).slice(0, 3).map((ua, idx) => (
-                                  <motion.div
-                                    key={idx}
-                                    className="text-2xl"
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ delay: 0.2 + idx * 0.08 }}
-                                  >
-                                    {ua.achievement?.emoji || '🎯'}
-                                  </motion.div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="mt-3 text-center text-xs text-[#A3F7BF]">
-                              Нажмите, чтобы открыть
-                            </div>
-                          </>
-                        ) : (
-                          /* BUG FIX: Placeholder when user is not loaded */
-                          <div className="flex flex-col items-center justify-center py-4 text-center">
-                            <span className="text-3xl mb-2">🏆</span>
-                            <h3 className="text-lg font-bold text-gray-400 mb-1">Достижения</h3>
-                            <p className="text-xs text-gray-500">Войдите для просмотра</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── STATS CARD ── */}
-                  {currentCard.type === 'stats' && stats && (
-                    <div 
-                      className="relative rounded-3xl p-4 overflow-hidden border border-white/10 cursor-pointer"
-                      style={{ ...sharedCardStyle, minHeight: CARD_MIN_HEIGHT }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        hapticFeedback && hapticFeedback('impact', 'medium');
-                        setIsAnalyticsOpen(true);
-                      }}
-                    >
-                      <motion.div 
-                        className="absolute inset-0 bg-gradient-to-br from-[#80E8FF]/15 via-[#A3F7BF]/10 to-[#C4A3FF]/15"
-                        animate={{ opacity: [0.3, 0.5, 0.3] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                      />
-                      
-                      <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#80E8FF]/30 to-[#A3F7BF]/30 flex items-center justify-center">
-                              <BarChart3 className="w-4 h-4 text-[#80E8FF]" />
-                            </div>
-                            <h3 className="text-base font-bold text-white">Статистика</h3>
-                          </div>
-                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#A3F7BF]/10 border border-[#A3F7BF]/20">
-                            <TrendingUp className="w-3 h-3 text-[#A3F7BF]" />
-                            <span className="text-[10px] font-medium text-[#A3F7BF]">неделя</span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-1.5 mb-3">
-                          <div className="bg-gradient-to-br from-[#A3F7BF]/10 to-transparent rounded-xl p-2 border border-[#A3F7BF]/10">
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <Calendar className="w-3 h-3 text-[#A3F7BF]" />
-                              <span className="text-[9px] text-gray-400 uppercase tracking-wide">Пар</span>
-                            </div>
-                            <div className="text-lg font-bold text-white">{stats.totalClasses}</div>
-                          </div>
-                          
-                          <div className="bg-gradient-to-br from-[#FFE66D]/10 to-transparent rounded-xl p-2 border border-[#FFE66D]/10">
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <Clock className="w-3 h-3 text-[#FFE66D]" />
-                              <span className="text-[9px] text-gray-400 uppercase tracking-wide">Часов</span>
-                            </div>
-                            <div className="text-lg font-bold text-white">{formatHours(stats.totalHours)}</div>
-                          </div>
-                          
-                          <div className="bg-gradient-to-br from-[#FFB4D1]/10 to-transparent rounded-xl p-2 border border-[#FFB4D1]/10">
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <Flame className="w-3 h-3 text-[#FFB4D1]" />
-                              <span className="text-[9px] text-gray-400 uppercase tracking-wide">Макс</span>
-                            </div>
-                            <div className="text-xs font-bold text-white truncate">
-                              {stats.busiestDay?.day?.slice(0, 2) || '—'}
-                              <span className="text-[10px] text-[#FFB4D1] ml-1">
-                                {stats.busiestDay?.classCount || 0} пар
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="bg-gradient-to-br from-[#C4A3FF]/10 to-transparent rounded-xl p-2 border border-[#C4A3FF]/10">
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <TrendingUp className="w-3 h-3 text-[#C4A3FF]" />
-                              <span className="text-[9px] text-gray-400 uppercase tracking-wide">В день</span>
-                            </div>
-                            <div className="text-lg font-bold text-white">{stats.averageClassesPerDay}</div>
-                          </div>
-                        </div>
-
-                        <div className="bg-[#1F1F1F]/50 rounded-xl p-2.5 border border-gray-700/30">
-                          <div className="flex items-end justify-between gap-1 h-8">
-                            {stats.weekChart.map((dayData, index) => (
-                              <div key={dayData.day} className="flex-1 flex flex-col items-center gap-0.5">
-                                <motion.div 
-                                  className="w-full rounded-sm"
-                                  style={{
-                                    background: dayData.classes > 0 
-                                      ? 'linear-gradient(180deg, #A3F7BF, #80E8FF)'
-                                      : 'rgba(75, 75, 75, 0.5)',
-                                    minHeight: '3px'
-                                  }}
-                                  initial={{ height: 0 }}
-                                  animate={{ 
-                                    height: dayData.classes > 0 
-                                      ? `${Math.max(20, (dayData.classes / maxClasses) * 100)}%`
-                                      : '3px'
-                                  }}
-                                  transition={{ duration: 0.4, delay: index * 0.04 }}
-                                />
-                                <span className="text-[8px] text-gray-500 font-medium">
-                                  {dayData.shortDay}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="mt-2 text-center">
-                          <span className="text-[10px] text-[#80E8FF]/80">
-                            Нажмите для подробной аналитики →
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Stats placeholder when no schedule */}
-                  {currentCard.type === 'stats' && !stats && (
-                    <div 
-                      className="relative rounded-3xl p-5 overflow-hidden border border-white/10"
-                      style={{ ...sharedCardStyle, minHeight: CARD_MIN_HEIGHT }}
-                    >
-                      <div className="flex flex-col items-center justify-center py-4 text-center">
-                        <BarChart3 className="w-10 h-10 text-gray-600 mb-2" />
-                        <h3 className="text-base font-bold text-gray-400 mb-0.5">Статистика</h3>
-                        <p className="text-xs text-gray-500">
-                          Выберите группу для<br/>просмотра аналитики
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
+                return (
+                  <motion.div
+                    key={id}
+                    custom={direction}
+                    variants={cardVariants}
+                    initial="enter"
+                    animate={{
+                      y: pos.y,
+                      scale: pos.scale,
+                      opacity: pos.opacity,
+                      zIndex: pos.zIndex,
+                    }}
+                    exit="exit"
+                    transition={{
+                      ...SPRING,
+                      opacity: { duration: 0.2, ease: 'easeOut' },
+                    }}
+                    className="origin-top"
+                    style={{
+                      position: isActive ? 'relative' : 'absolute',
+                      top: isActive ? undefined : 0,
+                      left: isActive ? undefined : 0,
+                      right: isActive ? undefined : 0,
+                      pointerEvents: isActive ? 'auto' : 'none',
+                      transformOrigin: 'top center',
+                    }}
+                  >
+                    {/* Render actual card content for all visible cards */}
+                    {renderCardContent(type, isActive)}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* ── NAVIGATION BUTTONS (mobile only) ── */}
-        {/* BUG FIX: Absolute positioned — completely independent of card height */}
-        <div 
-          className="absolute right-[6px] top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2.5 md:hidden z-10"
-        >
+        {/* ── NAVIGATION (mobile only) ── */}
+        <div className="absolute right-[6px] top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2.5 md:hidden z-[50]">
           <motion.button
             onClick={handlePrevious}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/80 hover:bg-gray-700/80 transition-colors"
-            whileTap={{ scale: 0.9 }}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/80 active:bg-gray-600/80 transition-colors"
+            whileTap={{ scale: 0.88 }}
           >
             <ChevronUp className="w-4 h-4 text-white" />
           </motion.button>
 
-          {/* BUG FIX: Indicator dots — use explicit sizing, no conflicting classes */}
           <div className="flex flex-col items-center gap-1.5">
             {cards.map((card, index) => (
               <motion.button
                 key={card.id}
                 onClick={(e) => goToCard(index, e)}
-                className="rounded-full transition-colors"
+                className="rounded-full"
                 animate={{
                   width: 8,
                   height: index === currentIndex ? 20 : 8,
@@ -395,8 +388,8 @@ export const LiveScheduleCarousel = ({
 
           <motion.button
             onClick={handleNext}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/80 hover:bg-gray-700/80 transition-colors"
-            whileTap={{ scale: 0.9 }}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/80 active:bg-gray-600/80 transition-colors"
+            whileTap={{ scale: 0.88 }}
           >
             <ChevronDown className="w-4 h-4 text-white" />
           </motion.button>
@@ -414,7 +407,6 @@ export const LiveScheduleCarousel = ({
           hapticFeedback={hapticFeedback}
         />
       )}
-
       <AnalyticsModal
         isOpen={isAnalyticsOpen}
         onClose={() => setIsAnalyticsOpen(false)}
