@@ -990,9 +990,32 @@ const Home = () => {
       // Проверяем, является ли пользователь связанным с Telegram (не гостевым)
       const isLinkedUser = currentUser.is_linked || (!currentUser.is_guest && !currentUser.device_id);
       
-      // Гостевые пользователи (device_id) — сразу показываем Welcome Screen, не дёргаем API
+      // Гостевые пользователи (device_id) — проверяем наличие данных перед WelcomeScreen
       if (currentUser.is_guest) {
-        console.log('👤 Гостевой пользователь — показываем Welcome Screen');
+        // Сначала пробуем кэш из localStorage
+        if (cachedSettings && cachedSettings.group_id && cachedSettings.facultet_id) {
+          console.log('📦 Гостевой пользователь — восстанавливаем из localStorage');
+          setUserSettings(cachedSettings);
+          setLoading(false);
+          return;
+        }
+
+        // Пробуем загрузить из API (device_id-based user мог уже зарегистрироваться)
+        try {
+          const settings = await userAPI.getUserSettings(currentUser.id);
+          if (settings && settings.group_id && settings.facultet_id) {
+            console.log('✅ Гостевой пользователь найден в БД — восстанавливаем данные');
+            setUserSettings(settings);
+            localStorage.setItem('user_settings', JSON.stringify(settings));
+            setLoading(false);
+            return;
+          }
+        } catch (guestErr) {
+          console.warn('⚠️ Не удалось загрузить настройки гостевого пользователя:', guestErr);
+        }
+
+        // Данных нет — новый пользователь, показываем WelcomeScreen
+        console.log('👤 Новый гостевой пользователь — показываем Welcome Screen');
         setShowWelcomeScreen(true);
         setLoading(false);
         return;
