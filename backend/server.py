@@ -17070,6 +17070,96 @@ async def remove_shared_schedule_participant(schedule_id: str, participant_id: i
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/shared-schedule/{schedule_id}/invite-link")
+async def get_shared_schedule_invite_link(schedule_id: str):
+    """Получить Telegram deep link для приглашения в совместное расписание"""
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+
+        bot_username = get_telegram_bot_username()
+        invite_link = f"https://t.me/{bot_username}/app?startapp=sschedule_{schedule_id}"
+
+        return {
+            "invite_link": invite_link,
+            "schedule_id": schedule_id,
+            "owner_id": doc.get("owner_id"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка генерации ссылки: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/shared-schedule/join/{schedule_id}")
+async def join_shared_schedule(schedule_id: str, data: dict):
+    """Присоединиться к совместному расписанию по ссылке-приглашению"""
+    try:
+        telegram_id = data.get("telegram_id")
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_id обязателен")
+        telegram_id = int(telegram_id)
+
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено или ссылка устарела")
+
+        participants = doc.get("participants", [])
+
+        # Уже участник — просто возвращаем данные
+        if any(p["telegram_id"] == telegram_id for p in participants):
+            return {
+                "success": True,
+                "already_member": True,
+                "message": "Вы уже в этом расписании",
+                "schedule_id": schedule_id,
+                "owner_id": doc.get("owner_id"),
+            }
+
+        # Проверяем лимит
+        if len(participants) >= MAX_PARTICIPANTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Расписание заполнено (максимум {MAX_PARTICIPANTS} участников)"
+            )
+
+        # Получаем имя нового участника
+        p_settings = await db.user_settings.find_one({"telegram_id": telegram_id})
+        p_name = data.get("first_name") or str(telegram_id)
+        if p_settings:
+            p_name = p_settings.get("first_name", p_name)
+
+        color_idx = len(participants) % len(PARTICIPANT_COLORS)
+        new_participant = {
+            "telegram_id": telegram_id,
+            "first_name": p_name,
+            "color": PARTICIPANT_COLORS[color_idx],
+        }
+
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {
+                "$push": {"participants": new_participant},
+                "$set": {"updated_at": datetime.utcnow()},
+            },
+        )
+
+        return {
+            "success": True,
+            "already_member": False,
+            "message": f"Вы добавлены в расписание",
+            "schedule_id": schedule_id,
+            "owner_id": doc.get("owner_id"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка присоединения к расписанию: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.delete("/shared-schedule/{schedule_id}")
 async def delete_shared_schedule(schedule_id: str, owner_id: Optional[int] = None):
     """Удалить совместное расписание (только владелец)"""
