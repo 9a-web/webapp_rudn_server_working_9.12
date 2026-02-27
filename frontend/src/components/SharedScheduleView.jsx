@@ -711,9 +711,10 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
       // ── Высота: header + before + timeline + after + empty + footer ──
       const headerH = 90 * dpr;
-      const footerH = 30 * dpr;
+      const footerH = 36 * dpr;
       const emptyBannerH = !hasEvents ? 60 * dpr : 0;
-      const H = headerH + beforeH + timelineH + afterH + emptyBannerH + footerH + PAD * 2;
+      const rawH = headerH + beforeH + timelineH + afterH + emptyBannerH + footerH + PAD * 2;
+      const H = Math.max(rawH, 400 * dpr); // минимальная высота изображения
 
       const canvas = document.createElement('canvas');
       canvas.width = W;
