@@ -285,21 +285,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   }, [showFriendPicker, loadFriends]);
 
-  // ─── Auto-scroll to current time ТОЛЬКО при первом открытии ───
-  const hasScrolledRef = useRef(false);
-  useEffect(() => {
-    if (!loading && timelineRef.current && !hasScrolledRef.current && sharedData?.exists) {
-      hasScrolledRef.current = true;
-      const now = new Date();
-      const currentMin = now.getHours() * 60 + now.getMinutes();
-      if (currentMin >= TIMELINE_START_MIN && currentMin <= TIMELINE_END_MIN) {
-        // Учитываем смещение видимого диапазона
-        const scrollTo = minToPx(currentMin) - visOffset - 100;
-        timelineRef.current.scrollTop = Math.max(0, scrollTo);
-      }
-    }
-  }, [loading, sharedData?.exists, visOffset]);
-
   const handleCreateShared = async () => {
     try {
       setLoading(true);
