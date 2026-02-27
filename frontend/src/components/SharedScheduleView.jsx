@@ -198,13 +198,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     onShareModalChange?.(value);
   }, [onShareModalChange]);
 
-  // ─── Открытие шаринга по внешнему триггеру ───
-  useEffect(() => {
-    if (externalShareTrigger) {
-      handleShare();
-    }
-  }, [externalShareTrigger]);
-
   // ─── Ссылка на добавление в друзья (friend_{telegram_id}) ───
   const [friendInviteLink, setFriendInviteLink] = useState('');
 
