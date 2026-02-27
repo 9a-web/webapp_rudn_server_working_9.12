@@ -86,6 +86,55 @@ const AnimatedAudioLines = ({ className, strokeWidth = 2, isActive }) => {
   );
 };
 
+// ─── Animated NotebookText: карандаш пишет строки ───
+const AnimatedNotebook = ({ className, strokeWidth = 2, isActive }) => {
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setAnimKey(k => k + 1);
+  }, [isActive]);
+
+  const lines = [
+    { d: 'M9.5 8h5',   delay: 0 },
+    { d: 'M9.5 12H16', delay: 0.15 },
+    { d: 'M9.5 16H14', delay: 0.3 },
+  ];
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Блокнот */}
+      <rect width="16" height="20" x="4" y="2" rx="2" />
+      {/* Кольца */}
+      <path d="M2 6h4" />
+      <path d="M2 10h4" />
+      <path d="M2 14h4" />
+      <path d="M2 18h4" />
+      {/* Строки — рисуются одна за другой */}
+      {lines.map((line, i) => (
+        <motion.path
+          key={`${animKey}-${i}`}
+          d={line.d}
+          initial={isActive ? { pathLength: 0 } : false}
+          animate={{ pathLength: 1 }}
+          transition={isActive
+            ? { duration: 0.3, delay: line.delay, ease: [0.4, 0, 0.2, 1] }
+            : { duration: 0 }
+          }
+        />
+      ))}
+    </svg>
+  );
+};
+
 // ─── Animated BookOpenCheck: страница перелистывается, затем галочка ───
 const AnimatedBookCheck = ({ className, strokeWidth = 2, isActive }) => {
   const [animKey, setAnimKey] = useState(0);
