@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Users, Plus, X, Clock, UserPlus, Coffee, Trash2, AlertCircle, Share2, Copy, Check } from 'lucide-react';
+import { Users, Plus, X, Clock, UserPlus, Coffee, Trash2, AlertCircle, Share2, Copy, Check, Download, Image } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sharedScheduleAPI } from '../services/api';
 import { friendsAPI } from '../services/friendsAPI';
 import { useTranslation } from 'react-i18next';
+import { toPng } from 'html-to-image';
 
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
