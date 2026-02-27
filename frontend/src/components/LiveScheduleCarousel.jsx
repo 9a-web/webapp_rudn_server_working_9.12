@@ -14,13 +14,6 @@ import {
 } from '../utils/analytics';
 
 // ─── Stack animation config ───────────────────
-// These define how each "layer" in the stack looks
-const STACK = [
-  { y: 0,  scale: 1,    opacity: 1,    zIndex: 30 }, // pos 0 — front
-  { y: 10, scale: 0.96, opacity: 0.60, zIndex: 20 }, // pos 1 — middle
-  { y: 20, scale: 0.92, opacity: 0.30, zIndex: 10 }, // pos 2 — back
-];
-
 const SPRING = { type: 'spring', stiffness: 320, damping: 28, mass: 0.8 };
 
 export const LiveScheduleCarousel = ({ 
@@ -38,9 +31,8 @@ export const LiveScheduleCarousel = ({
   setIsAnalyticsOpen
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(1); // 1=forward, -1=backward
+  const [direction, setDirection] = useState(1);
 
-  // Schedule stats
   const stats = useMemo(() => {
     if (!schedule || schedule.length === 0) return null;
     const basicStats = calculateScheduleStats(schedule);
@@ -59,7 +51,6 @@ export const LiveScheduleCarousel = ({
     { id: 'stats',        type: 'stats' },
   ], []);
 
-  // ─── Navigation ────────────────────────────
   const handlePrevious = useCallback((e) => {
     e.stopPropagation();
     hapticFeedback?.('impact', 'light');
@@ -81,17 +72,9 @@ export const LiveScheduleCarousel = ({
     setCurrentIndex(index);
   }, [hapticFeedback, currentIndex]);
 
-  // ─── 3 visible cards in stack order ────────
-  const stackCards = useMemo(() => {
-    return [0, 1, 2].map(offset => {
-      const idx = (currentIndex + offset) % cards.length;
-      return { ...cards[idx], stackPos: offset };
-    });
-  }, [currentIndex, cards]);
-
+  const currentCard = cards[currentIndex];
   const maxClasses = stats ? Math.max(...stats.weekChart.map(d => d.classes), 1) : 1;
 
-  // ─── Shared styles ─────────────────────────
   const sharedCardStyle = useMemo(() => ({
     backgroundColor: 'rgba(52, 52, 52, 0.7)',
     backdropFilter: 'blur(40px) saturate(180%)',
@@ -99,8 +82,29 @@ export const LiveScheduleCarousel = ({
     width: '100%',
   }), []);
 
+  // ─── Direction-aware variants for front card ─
+  const frontCardVariants = {
+    enter: (dir) => ({
+      y: dir >= 0 ? 30 : -70,
+      scale: dir >= 0 ? 0.92 : 0.96,
+      opacity: 0,
+    }),
+    center: {
+      y: 0,
+      scale: 1,
+      opacity: 1,
+      zIndex: 30,
+    },
+    exit: (dir) => ({
+      y: dir >= 0 ? -70 : 30,
+      scale: dir >= 0 ? 0.96 : 0.92,
+      opacity: 0,
+      zIndex: 40,
+    }),
+  };
+
   // ─── Card content renderer ─────────────────
-  const renderCardContent = useCallback((type, isActive) => {
+  const renderCardContent = (type) => {
     switch (type) {
       case 'schedule':
         return (
@@ -279,84 +283,78 @@ export const LiveScheduleCarousel = ({
       default:
         return null;
     }
-  }, [currentClass, minutesLeft, hapticFeedback, user, userStats, allAchievements, userAchievements, stats, maxClasses, setIsAchievementsOpen, setIsAnalyticsOpen, sharedCardStyle]);
-
-  // ─── Exit/enter variants (direction-aware) ─
-  const cardVariants = {
-    enter: (dir) => ({
-      y: dir >= 0 ? STACK[2].y + 10 : -70,
-      scale: dir >= 0 ? STACK[2].scale - 0.04 : 0.96,
-      opacity: 0,
-      zIndex: dir >= 0 ? 5 : 40,
-    }),
-    exit: (dir) => ({
-      y: dir >= 0 ? -70 : STACK[2].y + 10,
-      scale: dir >= 0 ? 0.96 : STACK[2].scale - 0.04,
-      opacity: 0,
-      zIndex: dir >= 0 ? 40 : 5,
-    }),
   };
 
   return (
     <>
       <div className="relative mt-4 md:mt-0 md:flex md:gap-4 md:px-0 md:overflow-visible">
-        {/* Card stack area */}
         <div className="flex-1 relative md:overflow-visible pl-6 pr-[52px] md:pl-0 md:pr-0">
+          
+          {/* 
+            STACKED CARD CONTAINER
+            Background cards: dark solid placeholders (no content)
+            Front card: actual content, switches via AnimatePresence
+            
+            paddingBottom: 22px for peek space
+            2nd card: top:6px, bottom:10px → peeks 12px below front
+            3rd card: top:12px, bottom:0   → peeks 22px below front (10px below 2nd)
+          */}
           <div className="relative mt-4 md:mt-0" style={{ paddingBottom: '22px' }}>
             
-            {/* 
-              ═══════════════════════════════════════════
-              CARD STACK — 3 visible cards at once
-              
-              The front card (stackPos 0) is position:relative 
-              → it sets the container height.
-              
-              Cards at stackPos 1 & 2 are position:absolute
-              → they float behind, slightly offset & scaled.
-              
-              AnimatePresence + popLayout handles exit:
-              the old front card is removed from flow and 
-              plays its exit animation on top.
-              ═══════════════════════════════════════════
-            */}
-            <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-              {stackCards.map(({ id, type, stackPos }) => {
-                const pos = STACK[stackPos];
-                const isActive = stackPos === 0;
+            {/* 3rd background card (deepest) — dark solid, always visible */}
+            <motion.div 
+              className="absolute rounded-3xl left-0 right-0 mx-auto border border-white/5"
+              style={{ 
+                backgroundColor: 'rgba(33, 33, 33, 0.6)',
+                backdropFilter: 'blur(20px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+                width: '84%',
+                top: '12px',
+                bottom: 0,
+                zIndex: 1,
+              }}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.15, duration: 0.5 }}
+            />
+            
+            {/* 2nd background card (middle) — dark solid, always visible */}
+            <motion.div 
+              className="absolute rounded-3xl left-0 right-0 mx-auto border border-white/5"
+              style={{ 
+                backgroundColor: 'rgba(44, 44, 44, 0.65)',
+                backdropFilter: 'blur(30px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(160%)',
+                width: '92%',
+                top: '6px',
+                bottom: '10px',
+                zIndex: 2,
+              }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1, duration: 0.45 }}
+            />
 
-                return (
-                  <motion.div
-                    key={id}
-                    custom={direction}
-                    variants={cardVariants}
-                    initial="enter"
-                    animate={{
-                      y: pos.y,
-                      scale: pos.scale,
-                      opacity: pos.opacity,
-                      zIndex: pos.zIndex,
-                    }}
-                    exit="exit"
-                    transition={{
-                      ...SPRING,
-                      opacity: { duration: 0.2, ease: 'easeOut' },
-                    }}
-                    className="origin-top"
-                    style={{
-                      position: isActive ? 'relative' : 'absolute',
-                      top: isActive ? undefined : 0,
-                      left: isActive ? undefined : 0,
-                      right: isActive ? undefined : 0,
-                      pointerEvents: isActive ? 'auto' : 'none',
-                      transformOrigin: 'top center',
-                    }}
-                  >
-                    {/* Render actual card content for all visible cards */}
-                    {renderCardContent(type, isActive)}
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+            {/* Front card — actual content, direction-aware animation */}
+            <div className="relative" style={{ zIndex: 3 }}>
+              <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+                <motion.div
+                  key={currentCard.id}
+                  custom={direction}
+                  variants={frontCardVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    ...SPRING,
+                    opacity: { duration: 0.2, ease: 'easeOut' },
+                  }}
+                  style={{ transformOrigin: 'top center' }}
+                >
+                  {renderCardContent(currentCard.type)}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
