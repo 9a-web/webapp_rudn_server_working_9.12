@@ -112,6 +112,60 @@ const Home = () => {
        showAlert("Test class removed.");
     }
   };
+
+  // TEST: Тестовая пара которая идёт СЕЙЧАС (для проверки LiveScheduleCards)
+  const [testCurrentClass, setTestCurrentClass] = useState(false);
+  
+  const toggleTestCurrentClass = () => {
+    setTestCurrentClass(prev => !prev);
+    if (!testCurrentClass) {
+       const now = new Date();
+       // Пара начинается 15 мин назад, заканчивается через 75 мин
+       const start = new Date(now.getTime() - 15 * 60000);
+       const end = new Date(now.getTime() + 75 * 60000);
+       
+       const timeStr = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')} - ${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+       
+       const currentDayName = now.toLocaleDateString('ru-RU', { weekday: 'long' });
+       const formattedDayName = currentDayName.charAt(0).toUpperCase() + currentDayName.slice(1);
+
+       const fakeClasses = [
+         {
+           discipline: "Информационные технологии и программирование (Длинное название для теста)",
+           time: timeStr,
+           day: formattedDayName,
+           auditory: "Аудитория 315, Корпус 2",
+           teacher: "Иванов И.И.",
+           lessonType: "Лекция"
+         },
+         {
+           discipline: "Математический анализ",
+           time: `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')} - ${(end.getHours() + 1).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
+           day: formattedDayName,
+           auditory: "Аудитория 201",
+           teacher: "Петров П.П.",
+           lessonType: "Семинар"
+         },
+         {
+           discipline: "Физика",
+           time: `${(end.getHours() + 1).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')} - ${(end.getHours() + 2).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
+           day: formattedDayName,
+           auditory: "Аудитория 405",
+           teacher: "Сидоров С.С.",
+           lessonType: "Лабораторная"
+         }
+       ];
+       
+       setSchedule(prev => [...prev, ...fakeClasses]);
+       // Сразу обновляем currentClass
+       setCurrentClass(fakeClasses[0].discipline);
+       setMinutesLeft(75);
+    } else {
+       setCurrentClass(null);
+       setMinutesLeft(0);
+       setSchedule([]);
+    }
+  };
   
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
