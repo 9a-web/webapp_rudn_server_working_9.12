@@ -306,7 +306,7 @@ export const LiveScheduleSection = ({
                 if (hapticFeedback) hapticFeedback('impact', 'medium');
                 if (onCalendarClick) onCalendarClick();
               }}
-              className="flex items-center gap-1.5 px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10 whitespace-nowrap"
+              className="flex items-center gap-1.5 min-[425px]:gap-2 px-3 min-[425px]:px-4 md:px-5 py-2 min-[425px]:py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10 whitespace-nowrap"
               style={{ 
                 backgroundColor: '#1c1c1c'
               }}
