@@ -634,27 +634,32 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         <div className="flex items-center gap-2 mb-2.5 px-3">
           <Users className="w-4 h-4 text-indigo-500" />
           <span className="text-sm font-medium text-[#1c1c1c]">Участники</span>
-          {/* Кнопка добавить */}
-          <button
-            onClick={() => setShowFriendPicker(true)}
-            disabled={actionLoading || (sharedData.participants?.length || 0) >= 8}
-            className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-            title={(sharedData.participants?.length || 0) >= 8 ? 'Максимум 8 участников' : 'Добавить друга'}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Добавить
-          </button>
-          {/* Кнопка "Поделиться" — генерирует ссылку */}
+
+          {/* Кнопка "Добавить" — только владелец */}
+          {isOwner && (
+            <button
+              onClick={() => setShowFriendPicker(true)}
+              disabled={actionLoading || (sharedData.participants?.length || 0) >= 8}
+              className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              title={(sharedData.participants?.length || 0) >= 8 ? 'Максимум 8 участников' : 'Добавить друга'}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Добавить
+            </button>
+          )}
+
+          {/* Кнопка "Поделиться" — все участники могут делиться */}
           <button
             onClick={handleShare}
             disabled={actionLoading}
-            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100"
+            className={`flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 ${isOwner ? '' : 'ml-auto'}`}
             title="Поделиться ссылкой"
           >
             <Share2 className="w-3.5 h-3.5" />
             Поделиться
           </button>
-          {/* БАГ-ФИХ: Кнопка удаления расписания — только для owner */}
+
+          {/* Удалить расписание — только владелец */}
           {isOwner && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
@@ -667,40 +672,52 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           )}
         </div>
 
-        {/* БАГ-ФИХ: loading state для участников */}
+        {/* Список участников */}
         <div className="flex flex-wrap gap-2 px-3">
-          {sharedData.participants?.map((p, idx) => (
-            <motion.div
-              key={p.telegram_id}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: idx * 0.04 }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm"
-              style={{
-                borderColor: p.color + '40',
-                backgroundColor: p.color + '12',
-              }}
-            >
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-              <span className="text-[#1c1c1c] font-medium text-xs">
-                {p.telegram_id === telegramId ? 'Вы' : p.first_name}
-              </span>
-              {/* Удалять можно только других участников, не себя */}
-              {p.telegram_id !== telegramId && isOwner && (
-                <button
-                  onClick={() => handleRemoveParticipant(p.telegram_id)}
-                  disabled={actionLoading}
-                  className="text-[#ccc] hover:text-red-400 transition-colors -mr-1 disabled:opacity-30"
-                >
-                  {actionLoading ? (
-                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <X className="w-3 h-3" />
+          {sharedData.participants?.map((p, idx) => {
+            const isMe = String(p.telegram_id) === String(telegramId);
+            const isParticipantOwner = String(p.telegram_id) === String(sharedData.owner_id);
+            // Показываем X если:
+            // - это я сам (любой участник может покинуть расписание, кроме owner)
+            // - или я owner и это не я (кикнуть другого)
+            const canRemove = (!isParticipantOwner && isMe) || (isOwner && !isMe);
+
+            return (
+              <motion.div
+                key={p.telegram_id}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.04 }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm"
+                style={{
+                  borderColor: p.color + '40',
+                  backgroundColor: p.color + '12',
+                }}
+              >
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                <span className="text-[#1c1c1c] font-medium text-xs">
+                  {isMe ? 'Вы' : p.first_name}
+                  {isParticipantOwner && !isMe && (
+                    <span className="text-[9px] text-gray-400 ml-1">автор</span>
                   )}
-                </button>
-              )}
-            </motion.div>
-          ))}
+                </span>
+                {canRemove && (
+                  <button
+                    onClick={() => handleRemoveParticipant(p.telegram_id)}
+                    disabled={actionLoading}
+                    className="text-[#ccc] hover:text-red-400 transition-colors -mr-1 disabled:opacity-30"
+                    title={isMe ? 'Покинуть расписание' : 'Удалить участника'}
+                  >
+                    {actionLoading ? (
+                      <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <X className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Подсказка при 1 участнике */}
@@ -708,7 +725,9 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           <div className="mx-3 mt-2 p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center gap-2">
             <UserPlus className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
             <span className="text-xs text-indigo-500">
-              Добавьте друга, чтобы увидеть общие свободные окна
+              {isOwner
+                ? 'Добавьте друга, чтобы увидеть общие свободные окна'
+                : 'Поделитесь ссылкой, чтобы добавить других'}
             </span>
           </div>
         )}
