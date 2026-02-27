@@ -347,13 +347,20 @@ const Home = () => {
     isProfileOpen ||
     isShareModalOpen ||
     isSharedScheduleFriendPickerOpen ||
-    isAddTaskModalOpen || // from TasksSection's AddTaskModal
-    isJournalModalOpen || // from JournalSection
-    isFullscreenPlayerOpen || // fullscreen music player
-    isFriendProfileOpen || // friend profile modal
-    isChatOpen || // chat with friend
-    isListeningRoomOpen || // listening room modal
-    isSendTrackModalOpen; // send track to friend modal
+    isAddTaskModalOpen ||
+    isJournalModalOpen ||
+    isFullscreenPlayerOpen ||
+    isFriendProfileOpen ||
+    isChatOpen ||
+    isListeningRoomOpen ||
+    isSendTrackModalOpen ||
+    isAdminPanelOpen ||
+    showStreakModal ||
+    showReferralModal ||
+    isArtistCardOpen ||
+    showTelegramLinkConfirm ||
+    friendRequestModal.isOpen ||
+    listenRoomJoinModal.isOpen;
 
   // Ref для отслеживания предыдущего счётчика уведомлений
   const prevUnreadCountRef = React.useRef(0);
