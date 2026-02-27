@@ -792,11 +792,11 @@ export const sharedScheduleAPI = {
   },
 
   /**
-   * Получить ссылку-приглашение
+   * Создать share-токен (ссылка «открыть с этими участниками»)
    */
   getInviteLink: async (scheduleId) => {
     try {
-      const response = await api.get(`/shared-schedule/${scheduleId}/invite-link`);
+      const response = await api.post(`/shared-schedule/${scheduleId}/share-token`);
       return response.data;
     } catch (error) {
       handleError(error);
@@ -804,33 +804,11 @@ export const sharedScheduleAPI = {
   },
 
   /**
-   * Присоединиться к расписанию по ссылке
-   * @param {string} scheduleId
-   * @param {number} telegramId
-   * @param {string} firstName
-   * @param {boolean} addToSchedule - добавить своё расписание автоматически
+   * Получить данные токена (список participant_ids)
    */
-  join: async (scheduleId, telegramId, firstName, addToSchedule = true) => {
+  getTokenData: async (token) => {
     try {
-      const response = await api.post(`/shared-schedule/join/${scheduleId}`, {
-        telegram_id: telegramId,
-        first_name: firstName,
-        add_to_schedule: addToSchedule,
-      });
-      return response.data;
-    } catch (error) {
-      handleError(error);
-    }
-  },
-
-  /**
-   * Добавить своё расписание (снять флаг schedule_hidden)
-   */
-  addMySchedule: async (scheduleId, telegramId) => {
-    try {
-      const response = await api.post(`/shared-schedule/${scheduleId}/add-my-schedule`, {
-        telegram_id: telegramId,
-      });
+      const response = await api.get(`/shared-schedule/token/${token}`);
       return response.data;
     } catch (error) {
       handleError(error);
