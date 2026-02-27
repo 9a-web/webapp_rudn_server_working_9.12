@@ -287,7 +287,7 @@ export const LiveScheduleSection = ({
             <button
               onClick={() => {
                 if (hapticFeedback) hapticFeedback('impact', 'medium');
-                setScheduleMode(scheduleMode === 'shared' ? 'personal' : 'shared');
+                onScheduleModeChange(scheduleMode === 'shared' ? 'personal' : 'shared');
               }}
               className={`p-2.5 md:p-3 rounded-full transition-all duration-300 active:scale-95 border ${
                 scheduleMode === 'shared'
