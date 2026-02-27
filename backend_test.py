@@ -10,8 +10,8 @@ import json
 import uuid
 from datetime import datetime
 
-# Base URL from frontend/.env
-BASE_URL = "https://rudn-server.preview.emergentagent.com/api"
+# Base URL - backend running locally
+BASE_URL = "http://localhost:8001/api"
 
 class SharedScheduleTester:
     def __init__(self):
