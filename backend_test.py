@@ -312,24 +312,71 @@ class SharedScheduleTester:
         except Exception as e:
             self.log_test("Delete Schedule", False, f"Exception: {e}")
     
-    async def test_7_existing_functionality(self):
+    async def test_7_deduplication(self):
         """
-        Test 7: Existing schedule tests - All basic operations should still work
+        Critical Test 7: Deduplication: POST /api/shared-schedule twice with same owner_id=999001 
+        → should return SAME schedule ID
         """
-        print("\n🧪 Test 7: Existing Functionality Test")
+        print("\n🧪 Critical Test 7: Deduplication Test")
         
         try:
-            owner_id = 444444
+            # First POST
+            payload1 = {
+                "owner_id": 999001,
+                "participant_ids": [888001]
+            }
             
-            # Test 1: POST /api/shared-schedule creates schedule
+            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload1) as resp1:
+                if resp1.status != 200:
+                    self.log_test("Deduplication Test", False, f"First POST failed: {resp1.status}")
+                    return
+                
+                data1 = await resp1.json()
+                schedule_id_1 = data1.get("id")
+                
+                if schedule_id_1:
+                    self.created_schedules.append(schedule_id_1)
+            
+            # Second POST with same owner_id but different participants
+            payload2 = {
+                "owner_id": 999001,
+                "participant_ids": [888002]  # Different participants
+            }
+            
+            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload2) as resp2:
+                if resp2.status != 200:
+                    self.log_test("Deduplication Test", False, f"Second POST failed: {resp2.status}")
+                    return
+                
+                data2 = await resp2.json()
+                schedule_id_2 = data2.get("id")
+            
+            # Check if IDs are the same (deduplication working)
+            if schedule_id_1 and schedule_id_2 and schedule_id_1 == schedule_id_2:
+                self.log_test("Deduplication Test", True, f"SAME ID returned both times: {schedule_id_1}")
+                self.dedup_schedule_id = schedule_id_1
+            else:
+                self.log_test("Deduplication Test", False, f"Different IDs returned: {schedule_id_1} vs {schedule_id_2}")
+        
+        except Exception as e:
+            self.log_test("Deduplication Test", False, f"Exception: {e}")
+    
+    async def test_8_participant_limit(self):
+        """
+        Critical Test 8: Participant limit: add 7 participants, then 8th should fail with 400
+        """
+        print("\n🧪 Critical Test 8: Participant Limit Test")
+        
+        try:
+            # Create new schedule for this test
             payload = {
-                "owner_id": owner_id,
-                "participant_ids": [500001]
+                "owner_id": 777001,
+                "participant_ids": []
             }
             
             async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
                 if resp.status != 200:
-                    self.log_test("Existing Functionality (CREATE)", False, f"Creation failed: {resp.status}")
+                    self.log_test("Participant Limit Test", False, f"Schedule creation failed: {resp.status}")
                     return
                 
                 data = await resp.json()
@@ -337,43 +384,38 @@ class SharedScheduleTester:
                 
                 if schedule_id:
                     self.created_schedules.append(schedule_id)
-                    self.log_test("Existing Functionality (CREATE)", True, f"Schedule created: {schedule_id}")
-                else:
-                    self.log_test("Existing Functionality (CREATE)", False, "No schedule ID returned")
-                    return
             
-            # Test 2: GET /api/shared-schedule/{telegram_id} returns exists=true
-            async with self.session.get(f"{BASE_URL}/shared-schedule/{owner_id}") as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    exists = data.get("exists", False)
-                    
-                    if exists and data.get("id") == schedule_id:
-                        self.log_test("Existing Functionality (GET)", True, "Schedule retrieved successfully")
+            # Add 7 participants (owner counts as 1, so we can add 7 more for total of 8)
+            success_count = 0
+            for i in range(1, 8):  # 777101 to 777107 (7 participants)
+                participant_id = 777100 + i
+                add_payload = {"participant_id": participant_id}
+                
+                async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as add_resp:
+                    if add_resp.status == 200:
+                        success_count += 1
+                        print(f"    ✅ Added participant {participant_id} (#{success_count})")
                     else:
-                        self.log_test("Existing Functionality (GET)", False, f"exists={exists}, id mismatch")
-                else:
-                    self.log_test("Existing Functionality (GET)", False, f"GET failed: {resp.status}")
+                        print(f"    ❌ Failed to add participant {participant_id}: {add_resp.status}")
+                        break
             
-            # Test 3: POST add-participant
-            new_participant = 500002
-            add_payload = {"participant_id": new_participant}
+            if success_count != 7:
+                self.log_test("Participant Limit Test", False, f"Could not add 7 participants, only added {success_count}")
+                return
             
-            async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as resp:
-                if resp.status == 200:
-                    self.log_test("Existing Functionality (ADD)", True, f"Participant {new_participant} added")
-                else:
-                    self.log_test("Existing Functionality (ADD)", False, f"Add participant failed: {resp.status}")
+            # Try to add 8th participant (should fail with 400)
+            participant_8 = 777108
+            add_payload = {"participant_id": participant_8}
             
-            # Test 4: DELETE remove-participant (non-owner)
-            async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}/remove-participant/{new_participant}") as resp:
-                if resp.status == 200:
-                    self.log_test("Existing Functionality (REMOVE)", True, f"Participant {new_participant} removed")
+            async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as add_resp:
+                if add_resp.status == 400:
+                    response_text = await add_resp.text()
+                    self.log_test("Participant Limit Test", True, f"8th participant correctly rejected with HTTP 400: {response_text}")
                 else:
-                    self.log_test("Existing Functionality (REMOVE)", False, f"Remove participant failed: {resp.status}")
+                    self.log_test("Participant Limit Test", False, f"8th participant returned HTTP {add_resp.status}, expected 400")
         
         except Exception as e:
-            self.log_test("Existing Functionality", False, f"Exception: {e}")
+            self.log_test("Participant Limit Test", False, f"Exception: {e}")
     
     async def run_all_tests(self):
         """Run all test scenarios in sequence"""
