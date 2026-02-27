@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sharedScheduleAPI } from '../services/api';
 import { friendsAPI } from '../services/friendsAPI';
 import { useTranslation } from 'react-i18next';
-import { toPng } from 'html-to-image';
 
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
