@@ -18,19 +18,20 @@ export const LiveScheduleSection = ({
   groupName,
   onChangeGroup,
   hapticFeedback,
-  onDateSelect, // Добавляем коллбек для изменения даты
-  onCalendarClick, // Коллбек для открытия календаря
-  telegramId, // Telegram ID для трекинга
-  onShareModalStateChange, // Коллбек для уведомления родителя о состоянии ShareScheduleModal
-  user, // User для проверки admin ID
-  onAdminPanelOpen, // Функция открытия админ панели
-  onFriendPickerChange // Callback для скрытия нижнего меню при открытии friend picker
+  onDateSelect,
+  onCalendarClick,
+  telegramId,
+  onShareModalStateChange,
+  user,
+  onAdminPanelOpen,
+  onFriendPickerChange,
+  scheduleMode = 'personal',       // управляется из App.jsx
+  onScheduleModeChange,             // сеттер из App.jsx
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [swipeDirection, setSwipeDirection] = useState(0); // -1 left, 0 none, 1 right
+  const [swipeDirection, setSwipeDirection] = useState(0);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [scheduleMode, setScheduleMode] = useState('personal'); // 'personal' or 'shared'
   const { t, i18n } = useTranslation();
   
   // Debug: логируем user.id для проверки доступа к админ панели
