@@ -29,13 +29,18 @@ class SharedScheduleTester:
         print("\n🧹 Cleaning up test data...")
         
         # Clean up created schedules
+        cleanup_owners = [999001, 777001]  # Known test owner IDs
         for schedule_id in self.created_schedules:
-            try:
-                async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}?owner_id=555555") as resp:
-                    if resp.status in [200, 404]:
-                        print(f"✅ Cleaned up schedule {schedule_id}")
-            except Exception as e:
-                print(f"⚠️ Failed to cleanup schedule {schedule_id}: {e}")
+            for owner_id in cleanup_owners:
+                try:
+                    async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}?owner_id={owner_id}") as resp:
+                        if resp.status in [200, 404]:
+                            print(f"✅ Cleaned up schedule {schedule_id} with owner {owner_id}")
+                            break
+                except Exception as e:
+                    continue
+            else:
+                print(f"⚠️ Could not cleanup schedule {schedule_id}")
         
         if self.session:
             await self.session.close()
