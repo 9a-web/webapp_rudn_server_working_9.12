@@ -175,7 +175,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
-  const [inviteAutoAdd, setInviteAutoAdd] = useState(true);   // добавлять ли расписание гостей
   const [linkCopied, setLinkCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const timelineRef = useRef(null);
