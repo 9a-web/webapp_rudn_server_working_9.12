@@ -213,7 +213,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const handleInviteFriends = useCallback(() => {
     if (!friendInviteLink) return;
-    const text = encodeURIComponent('Добавляй меня в друзья в RUDN Go!\nТам можно удобно смотреть расписание и отслеживать окна между нашими парами');
+    const text = encodeURIComponent('Добавляй меня в друзья в RUDN Go! 📱\nТам можно удобно смотреть расписание и отслеживать окна между нашими парами 🔥');
     const url = encodeURIComponent(friendInviteLink);
     const shareUrl = `https://t.me/share/url?url=${url}&text=${text}`;
     if (window.Telegram?.WebApp?.openTelegramLink) {
