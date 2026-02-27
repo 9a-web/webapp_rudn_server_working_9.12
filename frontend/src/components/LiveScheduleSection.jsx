@@ -393,7 +393,7 @@ export const LiveScheduleSection = ({
             telegramId={telegramId}
             selectedDate={selectedDate}
             weekNumber={weekNumber}
-            onClose={() => setScheduleMode('personal')}
+            onClose={() => onScheduleModeChange('personal')}
             hapticFeedback={hapticFeedback}
             onFriendPickerChange={onFriendPickerChange}
           />
