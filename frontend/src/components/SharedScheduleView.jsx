@@ -368,6 +368,13 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   };
 
+  // ─── Открытие шаринга по внешнему триггеру (из родительской кнопки) ───
+  useEffect(() => {
+    if (externalShareTrigger) {
+      handleShare();
+    }
+  }, [externalShareTrigger]);
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(inviteLink);
