@@ -17125,21 +17125,23 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
     Логика: находим временные слоты, когда НИ У ОДНОГО участника нет пар.
     Диапазон — полные сутки (0:00–24:00).
     Минимальная длительность свободного окна — 30 минут.
+    Гранулярность — 15 минут (точнее учитывает нестандартное время начала пар).
     """
     if not schedules:
         return []
     
+    SLOT_STEP = 15  # гранулярность 15 минут вместо 30
+
     days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
     free_windows = []
     
     def normalize_day(day_str: str) -> str:
         return day_str.strip().lower() if day_str else ""
 
-    # Слоты на весь день: 0:00 – 23:30 (48 слотов по 30 мин)
+    # Слоты на весь день: 0:00 – 23:45 (96 слотов по 15 мин)
     time_slots = []
-    for h in range(0, 24):
-        for m in [0, 30]:
-            time_slots.append(h * 60 + m)
+    for total_min in range(0, 24 * 60, SLOT_STEP):
+        time_slots.append(total_min)
 
     for day in days_ru:
         day_norm = normalize_day(day)
@@ -17162,9 +17164,11 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
                         
                         current = sh * 60 + sm
                         end_min = eh * 60 + em
-                        while current < end_min:
-                            all_busy.add(current)
-                            current += 30
+                        # Округляем начало вниз до ближайшего слота, конец вверх
+                        slot_start = (current // SLOT_STEP) * SLOT_STEP
+                        while slot_start < end_min:
+                            all_busy.add(slot_start)
+                            slot_start += SLOT_STEP
                     except (ValueError, AttributeError):
                         pass
         
