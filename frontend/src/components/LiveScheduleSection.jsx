@@ -33,6 +33,7 @@ export const LiveScheduleSection = ({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [swipeDirection, setSwipeDirection] = useState(0);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [sharedShareTrigger, setSharedShareTrigger] = useState(0);
   const { t, i18n } = useTranslation();
   
   // Debug: логируем user.id для проверки доступа к админ панели
