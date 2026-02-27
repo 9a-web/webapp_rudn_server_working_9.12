@@ -497,11 +497,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const now = new Date();
       const currentMin = now.getHours() * 60 + now.getMinutes();
       if (currentMin >= TIMELINE_START_MIN && currentMin <= TIMELINE_END_MIN) {
-        const scrollTo = minToPx(currentMin) - visOffset - 100;
+        const scrollTo = minToPx(currentMin) - 100;
         timelineRef.current.scrollTop = Math.max(0, scrollTo);
       }
     }
-  }, [loading, sharedData?.exists, visOffset]);
+  }, [loading, sharedData?.exists]);
 
   // ─── Split free windows: before first class / within / after last class ───
   const { beforeSummary, afterSummary, visibleFreeWindows } = useMemo(() => {
