@@ -1369,6 +1369,25 @@ const Home = () => {
       
       setUserSettings(settings);
       setShowGroupSelector(false);
+
+      // ФИКС: сохраняем настройки в localStorage, чтобы при перезагрузке
+      // пользователь не попадал снова на WelcomeScreen
+      localStorage.setItem('user_settings', JSON.stringify(settings));
+
+      // Для гостевого (веб) пользователя сохраняем его как "зарегистрированного",
+      // чтобы TelegramContext не создавал новую гостевую сессию при перезагрузке
+      if (currentUser?.is_guest && currentUser?.device_id) {
+        const webUserData = {
+          id: currentUser.id,
+          first_name: currentUser.first_name || groupData.first_name || 'Пользователь',
+          last_name: currentUser.last_name || '',
+          username: currentUser.username || `user_${currentUser.device_id.substring(0, 8)}`,
+          device_id: currentUser.device_id,
+          is_web_registered: true, // флаг: прошёл онбординг в веб-версии
+        };
+        localStorage.setItem('telegram_user', JSON.stringify(webUserData));
+      }
+
       showAlert(t('common.groupSelected', { groupName: groupData.group_name }));
 
       // Отслеживаем выбор группы для достижений
