@@ -16820,8 +16820,294 @@ PARTICIPANT_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#e
 MAX_PARTICIPANTS = 8  # максимум 8 участников (включая владельца)
 
 
+# ─── Создать/обновить личное совместное расписание ───────────────────────────
 @api_router.post("/shared-schedule", response_model=SharedScheduleResponse)
 async def create_shared_schedule(data: SharedScheduleCreate):
+    """
+    Создать или обновить ЛИЧНОЕ совместное расписание пользователя.
+    Если расписание уже есть — добавляет новых участников, не заменяет существующих.
+    Каждый пользователь имеет своё собственное расписание — никакого «владельца».
+    """
+    try:
+        existing = await db.shared_schedules.find_one({"owner_id": data.owner_id})
+
+        if existing:
+            # Расписание уже есть — добавляем только новых участников
+            existing_ids = {p["telegram_id"] for p in existing.get("participants", [])}
+            new_additions = []
+            for pid in data.participant_ids:
+                if pid not in existing_ids and len(existing.get("participants", [])) + len(new_additions) < MAX_PARTICIPANTS:
+                    p_settings = await db.user_settings.find_one({"telegram_id": pid})
+                    p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
+                    color_idx = (len(existing["participants"]) + len(new_additions)) % len(PARTICIPANT_COLORS)
+                    new_additions.append({
+                        "telegram_id": pid,
+                        "first_name": p_name,
+                        "color": PARTICIPANT_COLORS[color_idx],
+                    })
+            if new_additions:
+                await db.shared_schedules.update_one(
+                    {"owner_id": data.owner_id},
+                    {"$push": {"participants": {"$each": new_additions}},
+                     "$set": {"updated_at": datetime.utcnow()}}
+                )
+            updated = await db.shared_schedules.find_one({"owner_id": data.owner_id})
+            return SharedScheduleResponse(
+                id=updated["id"], owner_id=updated["owner_id"],
+                participants=updated.get("participants", []),
+                schedules={}, free_windows=[], created_at=updated.get("created_at")
+            )
+
+        # Создаём новое личное расписание
+        schedule_id = str(uuid.uuid4())
+        owner_settings = await db.user_settings.find_one({"telegram_id": data.owner_id})
+        owner_name = owner_settings.get("first_name", "Я") if owner_settings else "Я"
+
+        participants = [{"telegram_id": data.owner_id, "first_name": owner_name, "color": PARTICIPANT_COLORS[0]}]
+        for idx, pid in enumerate(data.participant_ids[:(MAX_PARTICIPANTS - 1)]):
+            p_settings = await db.user_settings.find_one({"telegram_id": pid})
+            p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
+            participants.append({
+                "telegram_id": pid, "first_name": p_name,
+                "color": PARTICIPANT_COLORS[(idx + 1) % len(PARTICIPANT_COLORS)]
+            })
+
+        doc = {"id": schedule_id, "owner_id": data.owner_id, "participants": participants,
+               "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()}
+        await db.shared_schedules.insert_one(doc)
+
+        return SharedScheduleResponse(
+            id=schedule_id, owner_id=data.owner_id, participants=participants,
+            schedules={}, free_windows=[], created_at=doc["created_at"]
+        )
+    except Exception as e:
+        logger.error(f"Ошибка создания совместного расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Получить личное совместное расписание ───────────────────────────────────
+@api_router.get("/shared-schedule/{telegram_id}")
+async def get_shared_schedule(telegram_id: int, week: int = 1):
+    """Получить личное совместное расписание с расписаниями всех участников."""
+    try:
+        doc = await db.shared_schedules.find_one({"owner_id": telegram_id})
+        if not doc:
+            return {"exists": False, "id": None, "participants": [], "schedules": {}, "free_windows": []}
+
+        participants = doc.get("participants", [])
+        schedules = {}
+        week_num = max(1, min(2, week))
+
+        for p in participants:
+            p_id = p["telegram_id"]
+            if p.get("schedule_hidden", False):
+                continue
+            p_settings = await db.user_settings.find_one({"telegram_id": p_id})
+            if p_settings and p_settings.get("group_id"):
+                group_id = p_settings["group_id"]
+                cached = await db.schedule_cache.find_one({"group_id": group_id, "week_number": week_num})
+                cache_valid = (cached and cached.get("events") and cached.get("expires_at")
+                               and cached["expires_at"] > datetime.utcnow())
+                if cache_valid:
+                    schedules[str(p_id)] = cached["events"]
+                else:
+                    try:
+                        from rudn_parser import get_schedule
+                        events = await get_schedule(
+                            p_settings.get("facultet_id", ""), p_settings.get("level_id", ""),
+                            p_settings.get("kurs", ""), p_settings.get("form_code", ""),
+                            group_id, week_num
+                        )
+                        loaded = [e if isinstance(e, dict) else (e.dict() if hasattr(e, 'dict') else {}) for e in events] if events else []
+                        schedules[str(p_id)] = loaded
+                        if loaded:
+                            await db.schedule_cache.update_one(
+                                {"group_id": group_id, "week_number": week_num},
+                                {"$set": {"group_id": group_id, "week_number": week_num, "events": loaded,
+                                          "cached_at": datetime.utcnow(),
+                                          "expires_at": datetime.utcnow() + timedelta(hours=6)}},
+                                upsert=True
+                            )
+                    except Exception as sched_err:
+                        logger.warning(f"Cannot load schedule for {p_id}: {sched_err}")
+                        schedules[str(p_id)] = cached["events"] if (cached and cached.get("events")) else []
+            else:
+                schedules[str(p_id)] = []
+
+        free_windows = _compute_free_windows(schedules, participants)
+        return {
+            "exists": True, "id": doc.get("id"), "owner_id": doc.get("owner_id"),
+            "participants": participants, "schedules": schedules,
+            "free_windows": free_windows,
+            "created_at": doc.get("created_at"), "updated_at": doc.get("updated_at"),
+            "week": week_num
+        }
+    except Exception as e:
+        logger.error(f"Ошибка получения совместного расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Добавить участника в личное расписание ──────────────────────────────────
+@api_router.post("/shared-schedule/{schedule_id}/add-participant")
+async def add_shared_schedule_participant(schedule_id: str, data: SharedScheduleAddParticipant):
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        participants = doc.get("participants", [])
+        if len(participants) >= MAX_PARTICIPANTS:
+            raise HTTPException(status_code=400, detail=f"Максимум {MAX_PARTICIPANTS} участников")
+        if any(p["telegram_id"] == data.participant_id for p in participants):
+            return SuccessResponse(success=True, message="Участник уже добавлен")
+        p_settings = await db.user_settings.find_one({"telegram_id": data.participant_id})
+        p_name = p_settings.get("first_name", str(data.participant_id)) if p_settings else str(data.participant_id)
+        new_p = {"telegram_id": data.participant_id, "first_name": p_name,
+                 "color": PARTICIPANT_COLORS[len(participants) % len(PARTICIPANT_COLORS)]}
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {"$push": {"participants": new_p}, "$set": {"updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message=f"Участник {p_name} добавлен")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Удалить участника из личного расписания ─────────────────────────────────
+@api_router.delete("/shared-schedule/{schedule_id}/remove-participant/{participant_id}")
+async def remove_shared_schedule_participant(schedule_id: str, participant_id: int):
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        # Нельзя удалить себя (владельца документа) — можно только удалить весь документ
+        if doc.get("owner_id") == participant_id:
+            raise HTTPException(status_code=400, detail="Нельзя удалить себя. Удалите расписание целиком.")
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {"$pull": {"participants": {"telegram_id": participant_id}},
+             "$set": {"updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message="Участник удалён")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Удалить личное расписание ───────────────────────────────────────────────
+@api_router.delete("/shared-schedule/{schedule_id}")
+async def delete_shared_schedule(schedule_id: str, owner_id: Optional[int] = None):
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        if owner_id is not None and doc.get("owner_id") != owner_id:
+            raise HTTPException(status_code=403, detail="Нет прав")
+        await db.shared_schedules.delete_one({"id": schedule_id})
+        return SuccessResponse(success=True, message="Расписание удалено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Создать share-токен (ссылка «открыть с участниками») ────────────────────
+@api_router.post("/shared-schedule/{schedule_id}/share-token")
+async def create_share_token(schedule_id: str):
+    """
+    Создаёт одноразовый токен, кодирующий список участников.
+    Ссылка открывает у получателя ЕГО СОБСТВЕННОЕ расписание с теми же участниками.
+    Никакого «подключения» — только передача параметров.
+    """
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+
+        # Список участников (кроме самого владельца — у получателя будет свой)
+        participant_ids = [
+            p["telegram_id"] for p in doc.get("participants", [])
+            if p["telegram_id"] != doc["owner_id"]
+        ]
+
+        token = str(uuid.uuid4()).replace("-", "")[:16]  # короткий токен
+        await db.schedule_share_tokens.insert_one({
+            "token": token,
+            "participant_ids": participant_ids,
+            "source_owner_id": doc["owner_id"],
+            "created_at": datetime.utcnow(),
+            "expires_at": datetime.utcnow() + timedelta(days=30),
+        })
+
+        bot_username = get_telegram_bot_username()
+        invite_link = f"https://t.me/{bot_username}/app?startapp=sschedule_{token}"
+        return {"token": token, "invite_link": invite_link, "participant_ids": participant_ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка создания share-токена: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Получить данные share-токена ────────────────────────────────────────────
+@api_router.get("/shared-schedule/token/{token}")
+async def get_share_token(token: str):
+    """Вернуть список participant_ids из токена (без join-логики)."""
+    try:
+        doc = await db.schedule_share_tokens.find_one({"token": token})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Ссылка не найдена или устарела")
+        if doc.get("expires_at") and doc["expires_at"] < datetime.utcnow():
+            raise HTTPException(status_code=410, detail="Ссылка истекла")
+        return {
+            "token": token,
+            "participant_ids": doc.get("participant_ids", []),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Добавить своё расписание (снять schedule_hidden) ────────────────────────
+@api_router.post("/shared-schedule/{schedule_id}/add-my-schedule")
+async def add_my_schedule(schedule_id: str, data: dict):
+    try:
+        telegram_id = int(data.get("telegram_id", 0))
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_id обязателен")
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        if not any(p["telegram_id"] == telegram_id for p in doc.get("participants", [])):
+            raise HTTPException(status_code=404, detail="Вы не участник этого расписания")
+        await db.shared_schedules.update_one(
+            {"id": schedule_id, "participants.telegram_id": telegram_id},
+            {"$set": {"participants.$.schedule_hidden": False, "updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message="Ваше расписание добавлено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Получить invite-link (старый метод, оставляем для совместимости) ─────────
+@api_router.get("/shared-schedule/{schedule_id}/invite-link")
+async def get_shared_schedule_invite_link(schedule_id: str):
+    """Переадресует на share-token endpoint."""
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        result = await create_share_token(schedule_id)
+        return {"invite_link": result["invite_link"], "schedule_id": schedule_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     """Создать совместное расписание (или вернуть существующее для данного владельца)"""
     try:
         # БАГ-ФИХ: Проверяем — есть ли уже расписание у этого owner
