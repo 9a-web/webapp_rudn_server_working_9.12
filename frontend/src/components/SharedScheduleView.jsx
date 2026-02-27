@@ -80,19 +80,23 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, delay: columnIndex * 0.06 }}
-      className="absolute rounded-xl"
+      className="absolute overflow-hidden"
       style={{
         top: `${top}px`,
         minHeight: `${displayHeight}px`,
         left: `calc(${leftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${colWidthPct}% - ${EVENT_GAP}px)`,
         backgroundColor: color + '14',
-        borderLeft: `3.5px solid ${color}`,
         borderRadius: '12px',
         zIndex: 10,
       }}
     >
-      <div className="h-full px-2 py-1.5 flex flex-col justify-center">
+      {/* Закруглённая цветная полоска слева */}
+      <div
+        className="absolute left-0 top-1 bottom-1 w-[3.5px] rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <div className="h-full px-2 py-1.5 pl-2.5 flex flex-col justify-center">
         {isCompact ? (
           <div className="flex items-start gap-1">
             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
