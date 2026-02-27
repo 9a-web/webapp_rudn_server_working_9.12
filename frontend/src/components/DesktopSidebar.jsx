@@ -16,7 +16,7 @@ export const DesktopSidebar = ({
   const { t } = useTranslation();
 
   return (
-    <div className="hidden md:block md:sticky md:top-6 space-y-6 h-fit">
+    <div className="hidden lg:block lg:sticky lg:top-6 space-y-6 h-fit">
       {/* Погодный виджет */}
       <WeatherWidget />
       
