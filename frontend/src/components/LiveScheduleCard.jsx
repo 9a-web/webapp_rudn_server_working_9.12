@@ -233,7 +233,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           <AnimatePresence mode="wait">
             <motion.span 
               key={formatTime(time)}
-              className="relative z-10 text-base md:text-xl lg:text-2xl font-bold" 
+              className="relative z-10 text-lg md:text-2xl lg:text-3xl font-bold" 
               style={{ color: themeStyles.circle.timeColor }}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
