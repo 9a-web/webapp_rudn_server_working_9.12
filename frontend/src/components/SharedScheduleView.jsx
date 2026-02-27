@@ -351,6 +351,16 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   };
 
+  // Пересчитываем ссылку при изменении переключателя автодобавления
+  useEffect(() => {
+    if (!showShareModal || !inviteLink) return;
+    // Убираем старый суффикс и добавляем новый
+    const baseLink = inviteLink.replace('_noschedule', '');
+    setInviteLink(inviteAutoAdd ? baseLink : baseLink + '_noschedule');
+    setLinkCopied(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteAutoAdd]);
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(inviteLink);
