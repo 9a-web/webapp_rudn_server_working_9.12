@@ -7,6 +7,15 @@ import { useTranslation } from 'react-i18next';
 
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
+const DAYS_ACCUSATIVE = {
+  'Понедельник': 'понедельник',
+  'Вторник': 'вторник',
+  'Среда': 'среду',
+  'Четверг': 'четверг',
+  'Пятница': 'пятницу',
+  'Суббота': 'субботу',
+};
+
 // ─── Timeline constants ───
 const TIMELINE_START_HOUR = 0;
 const TIMELINE_END_HOUR = 23;
