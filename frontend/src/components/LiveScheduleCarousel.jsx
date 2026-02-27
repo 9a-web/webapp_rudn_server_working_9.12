@@ -79,9 +79,9 @@ export const LiveScheduleCarousel = ({
         {/* Основная карточка - меняется в зависимости от currentIndex */}
         <div className="flex-1 relative md:overflow-visible pl-6 pr-[52px] md:pl-0 md:pr-0">
           {/* Контейнер со стопкой карточек */}
-          <div className="relative" style={{ paddingBottom: '38px' }}>
-            {/* 3-я карточка (фон) - СТАТИЧНАЯ, всегда видна */}
-            <div 
+          <div className="relative mt-4 md:mt-0" style={{ paddingBottom: '38px' }}>
+            {/* 3-я карточка (фон) - всегда видна */}
+            <motion.div 
               className="absolute rounded-3xl mx-auto left-0 right-0 border border-white/5"
               style={{ 
                 backgroundColor: 'rgba(33, 33, 33, 0.6)',
@@ -92,9 +92,12 @@ export const LiveScheduleCarousel = ({
                 top: '38px',
                 zIndex: 1
               }}
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.1, duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
             />
-            {/* 2-я карточка (средняя) - СТАТИЧНАЯ, всегда видна */}
-            <div 
+            {/* 2-я карточка (средняя) - всегда видна */}
+            <motion.div 
               className="absolute rounded-3xl mx-auto left-0 right-0 border border-white/5"
               style={{ 
                 backgroundColor: 'rgba(44, 44, 44, 0.65)',
@@ -105,6 +108,9 @@ export const LiveScheduleCarousel = ({
                 top: '13px',
                 zIndex: 2
               }}
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.15, duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
             />
 
             {/* 1-я карточка (главная) - переключается через карусель */}
