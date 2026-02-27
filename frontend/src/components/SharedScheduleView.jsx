@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Users, Plus, X, Clock, UserPlus, Coffee, Trash2, AlertCircle } from 'lucide-react';
+import { Users, Plus, X, Clock, UserPlus, Coffee, Trash2, AlertCircle, Share2, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sharedScheduleAPI } from '../services/api';
 import { friendsAPI } from '../services/friendsAPI';
