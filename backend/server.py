@@ -17119,29 +17119,6 @@ async def get_shared_schedule_invite_link(schedule_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
-
-@api_router.delete("/shared-schedule/{schedule_id}")
-async def delete_shared_schedule(schedule_id: str, owner_id: Optional[int] = None):
-    """Удалить совместное расписание (только владелец)"""
-    try:
-        doc = await db.shared_schedules.find_one({"id": schedule_id})
-        if not doc:
-            raise HTTPException(status_code=404, detail="Расписание не найдено")
-
-        # БАГ-ФИХ: проверяем права — только owner может удалить
-        if owner_id is not None and doc.get("owner_id") != owner_id:
-            raise HTTPException(status_code=403, detail="Только владелец может удалить расписание")
-
-        await db.shared_schedules.delete_one({"id": schedule_id})
-        return SuccessResponse(success=True, message="Совместное расписание удалено")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 def _compute_free_windows(schedules: dict, participants: list) -> list:
     """Вычислить общие свободные окна для всех участников.
     
