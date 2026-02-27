@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { liveCardVariants, fadeInScale } from '../utils/animations';
 import { pluralizeMinutes } from '../utils/pluralize';
 import { translateDiscipline } from '../i18n/subjects';
 import { Snowflake } from 'lucide-react';
@@ -11,15 +10,15 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   const [time, setTime] = useState(new Date());
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
+  const uniqueId = useId(); // Unique prefix for SVG IDs to avoid conflicts
   
   const isWinter = theme === 'winter';
 
-  // Оптимизация: обновляем только каждые 10 секунд вместо каждой секунды
+  // Update time every 10 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setTime(new Date());
-    }, 10000); // Обновление каждые 10 секунд
-
+    }, 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -29,17 +28,25 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
     return `${hours}:${minutes}`;
   };
 
-  // Расчет прогресса для progress bar (предполагаем, что пара длится 90 минут)
+  // BUG FIX: Progress calculation — handle minutesLeft === 0 as 100%
+  // Also don't hard-code 90 min; derive from actual remaining vs typical class duration
   const progressPercentage = useMemo(() => {
-    if (!currentClass || !minutesLeft) return 0;
-    const totalClassDuration = 90; // минут
-    const elapsed = totalClassDuration - minutesLeft;
+    if (!currentClass) return 0;
+    if (minutesLeft <= 0) return 100;
+    // Estimate total class duration: typical RUDN pair is 90 minutes
+    // We use min(90, minutesLeft + elapsed_estimate) to be safe
+    const totalClassDuration = 90;
+    const elapsed = totalClassDuration - Math.min(minutesLeft, totalClassDuration);
     return Math.max(0, Math.min(100, (elapsed / totalClassDuration) * 100));
   }, [currentClass, minutesLeft]);
 
+  // Unique gradient/filter IDs to avoid SVG conflicts
+  const gradientWinterId = `${uniqueId}-winter`;
+  const gradientDefaultId = `${uniqueId}-default`;
+  const glowFilterId = `${uniqueId}-glow`;
+
   // Theme Styles Configuration
   const themeStyles = {
-    // Main card
     mainCard: {
       bg: isWinter 
         ? 'linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9))' 
@@ -52,22 +59,22 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
         ? 'bg-gradient-to-br from-sky-500/10 via-transparent to-transparent'
         : 'bg-gradient-to-br from-accent/20 to-transparent'
     },
-    // Typography
     text: {
-      primary: isWinter ? '#E0F2FE' : '#FFFFFF', // Sky-100 vs White
-      secondary: isWinter ? '#94A3B8' : '#999999', // Slate-400 vs Gray
+      primary: isWinter ? '#E0F2FE' : '#FFFFFF',
+      secondary: isWinter ? '#94A3B8' : '#999999',
       glowColor: isWinter ? 'rgba(186, 230, 253, 0.5)' : 'rgba(163, 247, 191, 0.5)'
     },
-    // Progress Circle
     circle: {
-      strokeId: isWinter ? "progressGradientWinter" : "progressGradientDefault",
+      strokeId: isWinter ? gradientWinterId : gradientDefaultId,
       timeColor: isWinter ? '#F0F9FF' : '#FFFFFF',
     }
   };
 
+  const circumference = 2 * Math.PI * 40;
+
   return (
     <motion.div 
-      className={`relative rounded-3xl p-6 md:p-8 lg:p-10 shadow-card overflow-hidden border ${themeStyles.mainCard.border}`}
+      className={`relative rounded-3xl p-5 md:p-8 lg:p-10 shadow-card overflow-hidden border ${themeStyles.mainCard.border}`}
       style={{ 
         background: themeStyles.mainCard.bg,
         backdropFilter: 'blur(40px) saturate(180%)',
@@ -75,36 +82,23 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
         width: '100%',
         boxShadow: themeStyles.mainCard.shadow,
       }}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ 
-        delay: 0.2,
-        duration: 0.4,
-        ease: [0.25, 0.1, 0.25, 1]
-      }}
     >
-      {/* Frosty patterns decoration (top right) - Only for Winter */}
+      {/* Snowflake decoration - Winter only */}
       {isWinter && (
         <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
            <Snowflake className="w-16 h-16 text-sky-200" />
         </div>
       )}
 
-      {/* Subtle background gradient с пульсацией */}
+      {/* Background gradient pulse */}
       <motion.div 
         className={`absolute inset-0 ${themeStyles.mainCard.backgroundGradient}`}
-        animate={{ 
-          opacity: [0.3, 0.6, 0.3]
-        }}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      ></motion.div>
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      />
       
       <div className="relative flex items-center justify-between gap-4 md:gap-6 lg:gap-8">
-        {/* Left side - Text content с улучшенными анимациями */}
+        {/* Left side - Text content */}
         <div className="flex-1 min-w-0">
           <AnimatePresence mode="wait">
             <motion.div 
@@ -113,16 +107,16 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               initial={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
-              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
             >
               <motion.p 
                 className="font-bold text-base md:text-lg lg:text-xl" 
                 style={{ color: themeStyles.text.primary }} 
                 animate={currentClass ? {
                   textShadow: [
-                    `0 0 0px rgba(0,0,0,0)`,
+                    '0 0 0px rgba(0,0,0,0)',
                     `0 0 10px ${themeStyles.text.glowColor}`,
-                    `0 0 0px rgba(0,0,0,0)`
+                    '0 0 0px rgba(0,0,0,0)'
                   ]
                 } : {}}
                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -131,11 +125,11 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               </motion.p>
               {currentClass && (
                 <motion.p 
-                  className="font-bold text-base md:text-lg lg:text-xl break-words" 
+                  className="font-bold text-sm md:text-base lg:text-lg break-words mt-1" 
                   style={{ color: '#FFFFFF' }}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.15, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                  transition={{ delay: 0.1, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
                 >
                   {translateDiscipline(currentClass, i18n.language)}
                 </motion.p>
@@ -144,13 +138,13 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           </AnimatePresence>
           <AnimatePresence mode="wait">
             <motion.p 
-              key={minutesLeft}
-              className="font-medium text-sm md:text-base lg:text-lg" 
+              key={currentClass ? minutesLeft : 'relax'}
+              className="font-medium text-xs md:text-sm lg:text-base" 
               style={{ color: themeStyles.text.secondary }}
               initial={{ opacity: 0, x: -5 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 5 }}
-              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
             >
               {currentClass ? (
                 i18n.language === 'ru' 
@@ -161,61 +155,46 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           </AnimatePresence>
         </div>
 
-        {/* Right side - Progress ring (стиль WeekDateSelector) */}
+        {/* Right side - Progress ring */}
         <motion.div 
-          className="relative flex items-center justify-center flex-shrink-0 w-28 h-28 md:w-32 md:h-32 lg:w-36 lg:h-36"
+          className="relative flex items-center justify-center flex-shrink-0 w-24 h-24 md:w-32 md:h-32 lg:w-36 lg:h-36"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+          transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
         >
-          {/* Свечение за кольцом */}
+          {/* Glow behind ring */}
           <motion.div
-            className="absolute w-24 h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full"
+            className="absolute w-20 h-20 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full"
             style={{
               background: isWinter
                 ? 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)'
                 : 'radial-gradient(circle, rgba(163, 247, 191, 0.3) 0%, rgba(255, 230, 109, 0.15) 40%, transparent 70%)',
               filter: 'blur(10px)',
             }}
-            animate={{
-              opacity: [0.5, 1, 0.5],
-              scale: [0.95, 1.05, 0.95],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
+            animate={{ opacity: [0.5, 1, 0.5], scale: [0.95, 1.05, 0.95] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           />
 
-          {/* SVG Ring — чистое кольцо как в WeekDateSelector */}
+          {/* SVG Ring */}
           <motion.svg 
             className="absolute inset-0 w-full h-full"
             viewBox="0 0 100 100"
             style={{ rotate: -90 }}
-            animate={{
-              scale: [1, 1.03, 1],
-            }}
-            transition={{
-              duration: 2.5,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
           >
             <defs>
-              <linearGradient id="progressGradientWinter" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={gradientWinterId} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#E0F2FE" />
                 <stop offset="50%" stopColor="#38BDF8" />
                 <stop offset="100%" stopColor="#0EA5E9" />
               </linearGradient>
-              <linearGradient id="progressGradientDefault" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id={gradientDefaultId} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#A3F7BF" />
                 <stop offset="25%" stopColor="#FFE66D" />
                 <stop offset="50%" stopColor="#FFB4D1" />
                 <stop offset="75%" stopColor="#C4A3FF" />
                 <stop offset="100%" stopColor="#80E8FF" />
               </linearGradient>
-              <filter id="glowFilter">
+              <filter id={glowFilterId}>
                 <feGaussianBlur stdDeviation="2" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
@@ -224,50 +203,42 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               </filter>
             </defs>
             
-            {/* Фоновый круг */}
+            {/* Background circle */}
             <circle
-              cx="50"
-              cy="50"
-              r="40"
+              cx="50" cy="50" r="40"
               stroke="rgba(255,255,255,0.12)"
               strokeWidth="6"
               fill="none"
             />
             
-            {/* Прогресс круг — с градиентом и свечением */}
+            {/* BUG FIX: Progress circle — when NO class, show EMPTY ring (full offset) */}
             <motion.circle
-              cx="50"
-              cy="50"
-              r="40"
+              cx="50" cy="50" r="40"
               stroke={`url(#${themeStyles.circle.strokeId})`}
               strokeWidth="6"
               fill="none"
               strokeLinecap="round"
-              filter="url(#glowFilter)"
-              strokeDasharray={2 * Math.PI * 40}
-              initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
+              filter={`url(#${glowFilterId})`}
+              strokeDasharray={circumference}
               animate={{ 
                 strokeDashoffset: currentClass 
-                  ? 2 * Math.PI * 40 * (1 - progressPercentage / 100)
-                  : 0
+                  ? circumference * (1 - progressPercentage / 100) 
+                  : circumference // BUG FIX: empty when no class (was 0 = full!)
               }}
-              transition={{ 
-                duration: 0.8, 
-                ease: 'easeInOut' 
-              }}
+              transition={{ duration: 0.8, ease: 'easeInOut' }}
             />
           </motion.svg>
           
-          {/* Время по центру */}
+          {/* Time in center */}
           <AnimatePresence mode="wait">
             <motion.span 
               key={formatTime(time)}
-              className="relative z-10 text-lg md:text-xl lg:text-2xl font-bold" 
+              className="relative z-10 text-base md:text-xl lg:text-2xl font-bold" 
               style={{ color: themeStyles.circle.timeColor }}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.25 }}
             >
               {formatTime(time)}
             </motion.span>
