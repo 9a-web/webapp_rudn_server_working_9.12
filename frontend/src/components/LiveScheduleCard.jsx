@@ -153,7 +153,6 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
             zIndex: 3,
             boxShadow: themeStyles.mainCard.shadow,
             minHeight: '140px',
-            maxHeight: '160px',
           }}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
