@@ -25,6 +25,7 @@ export const LiveScheduleSection = ({
   user,
   onAdminPanelOpen,
   onFriendPickerChange,
+  onSharedScheduleShareModalChange,
   scheduleMode = 'personal',       // управляется из App.jsx
   onScheduleModeChange,             // сеттер из App.jsx
 }) => {
