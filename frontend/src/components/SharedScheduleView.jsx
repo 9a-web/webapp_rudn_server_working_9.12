@@ -903,6 +903,25 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         });
       });
 
+      // ── After indicator (свободное время после видимого диапазона) ──
+      if (imgAfter) {
+        const aiY = tlY + timelineH + 4 * dpr;
+        const aiW = W - PAD * 2;
+        ctx.setLineDash([6 * dpr, 4 * dpr]);
+        ctx.strokeStyle = '#6ee7b7';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.fillStyle = '#ecfdf520';
+        ctx.beginPath();
+        ctx.roundRect(PAD, aiY, aiW, indicatorH - 4 * dpr, 10 * dpr);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#059669';
+        ctx.font = `500 ${10 * dpr}px ${FBASE}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`☕ Свободны ${fmtDurImg(imgAfter.duration)} (${imgAfter.start} – ${imgAfter.end})`, W / 2, aiY + indicatorH / 2);
+      }
+
       // ── Баннер «Нет пар» если пустой день ──
       if (!hasEvents) {
         const bannerY = tlY + timelineH / 2 - 20 * dpr;
