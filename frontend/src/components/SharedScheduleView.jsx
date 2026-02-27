@@ -457,20 +457,27 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const totalColumns = Math.max(1, activeParticipantIds.length);
 
-  // ─── Dynamic visible timeline range (restrict to class hours ± 1h) ───
-  const { visStartH, visEndH } = useMemo(() => {
-    let minH = 9, maxH = 17; // defaults: 8:00-18:00
+  // ─── Dynamic visible timeline range = от первой до последней пары ───
+  const { visStartH, visEndH, firstClassMin, lastClassMin } = useMemo(() => {
+    let minMin = null, maxMin = null; // точное время в минутах
     Object.values(daySchedules).forEach(events => {
       events.forEach(e => {
         const [s, en] = (e.time || '').split(' - ').map(t => t?.trim());
         const sM = parseTime(s), eM = parseTime(en);
-        if (sM !== null) minH = Math.min(minH, Math.floor(sM / 60));
-        if (eM !== null) maxH = Math.max(maxH, Math.ceil(eM / 60));
+        if (sM !== null && (minMin === null || sM < minMin)) minMin = sM;
+        if (eM !== null && (maxMin === null || eM > maxMin)) maxMin = eM;
       });
     });
+    if (minMin === null || maxMin === null) {
+      return { visStartH: 8, visEndH: 18, firstClassMin: 480, lastClassMin: 1080 };
+    }
+    const sH = Math.floor(minMin / 60);
+    const eH = Math.ceil(maxMin / 60);
     return {
-      visStartH: Math.max(0, Math.min(8, minH - 1)),
-      visEndH: Math.min(23, Math.max(18, maxH + 1)),
+      visStartH: Math.max(0, sH),
+      visEndH: Math.min(24, eH),
+      firstClassMin: minMin,
+      lastClassMin: maxMin,
     };
   }, [daySchedules]);
 
