@@ -97,7 +97,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
       
-      <div className="relative flex items-center justify-between gap-4 md:gap-6 lg:gap-8">
+      <div className="relative flex items-center justify-between gap-4 lg:gap-6 xl:gap-8">
         {/* Left side - Text content */}
         <div className="flex-1 min-w-0">
           <AnimatePresence mode="wait">
