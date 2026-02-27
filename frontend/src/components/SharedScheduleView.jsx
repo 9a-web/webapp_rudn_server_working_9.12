@@ -8,12 +8,12 @@ import { useTranslation } from 'react-i18next';
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
 // ─── Timeline constants ───
-const TIMELINE_START_HOUR = 8;
-const TIMELINE_END_HOUR = 21;
+const TIMELINE_START_HOUR = 0;
+const TIMELINE_END_HOUR = 23;
 const TIMELINE_START_MIN = TIMELINE_START_HOUR * 60;
 const TIMELINE_END_MIN = TIMELINE_END_HOUR * 60;
-const TIMELINE_TOTAL_MIN = TIMELINE_END_MIN - TIMELINE_START_MIN; // 780 min
-const PX_PER_MIN = 1.3; // ~1014px total height
+const TIMELINE_TOTAL_MIN = TIMELINE_END_MIN - TIMELINE_START_MIN; // 1380 min
+const PX_PER_MIN = 0.85; // ~1173px total height (compact enough for 23h)
 const TIMELINE_HEIGHT = TIMELINE_TOTAL_MIN * PX_PER_MIN;
 const TIME_LABEL_WIDTH = 44;
 const EVENT_GAP = 3; // gap between side-by-side events
