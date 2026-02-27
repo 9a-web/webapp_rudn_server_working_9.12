@@ -157,14 +157,14 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
 
         {/* Right side - Progress ring */}
         <motion.div 
-          className="relative flex items-center justify-center flex-shrink-0 w-24 h-24 md:w-32 md:h-32 lg:w-36 lg:h-36"
+          className="relative flex items-center justify-center flex-shrink-0 w-28 h-28 md:w-36 md:h-36 lg:w-40 lg:h-40"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
         >
           {/* Glow behind ring */}
           <motion.div
-            className="absolute w-20 h-20 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full"
+            className="absolute w-24 h-24 md:w-32 md:h-32 lg:w-36 lg:h-36 rounded-full"
             style={{
               background: isWinter
                 ? 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 70%)'
