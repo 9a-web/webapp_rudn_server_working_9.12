@@ -348,6 +348,7 @@ const Home = () => {
     isProfileOpen ||
     isShareModalOpen ||
     isSharedScheduleFriendPickerOpen ||
+    isSharedScheduleShareModalOpen ||
     isAddTaskModalOpen ||
     isJournalModalOpen ||
     isFullscreenPlayerOpen ||
