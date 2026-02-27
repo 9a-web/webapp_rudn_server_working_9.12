@@ -184,7 +184,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           
           <div className="relative flex items-center justify-between gap-4 md:gap-6 lg:gap-8">
             {/* Left side - Text content с улучшенными анимациями */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               <AnimatePresence mode="wait">
                 <motion.div 
                   key={currentClass || 'no-class'}
