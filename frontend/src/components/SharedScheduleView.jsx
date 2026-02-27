@@ -173,6 +173,9 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   const [friends, setFriends] = useState([]);
   const [showFriendPicker, setShowFriendPickerRaw] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // БАГ-ФИХ: подтверждение удаления
+  const [showShareModal, setShowShareModal] = useState(false);       // Модал шеринга
+  const [inviteLink, setInviteLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null); // БАГ-ФИХ: отображение ошибок
   const timelineRef = useRef(null);
 
