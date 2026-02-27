@@ -331,7 +331,7 @@ export const LiveScheduleSection = ({
                 onWeekChange(1);
               }}
               disabled={selectedWeekNumber === null}
-              className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-1 py-2 px-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                 selectedWeekNumber === 1
                   ? 'bg-black text-white' 
                   : selectedWeekNumber === null
@@ -347,7 +347,7 @@ export const LiveScheduleSection = ({
                 onWeekChange(2);
               }}
               disabled={selectedWeekNumber === null}
-              className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-1 py-2 px-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                 selectedWeekNumber === 2
                   ? 'bg-black text-white' 
                   : selectedWeekNumber === null
@@ -369,9 +369,9 @@ export const LiveScheduleSection = ({
                 if (hapticFeedback) hapticFeedback('impact', 'medium');
                 onChangeGroup();
               }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-4 h-4 flex-shrink-0" />
               {t('liveScheduleSection.changeGroup')}
             </button>
           )}
@@ -386,9 +386,9 @@ export const LiveScheduleSection = ({
                 setIsShareModalOpen(true);
               }
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg transition-all"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg transition-all"
           >
-            <Share2 className="w-4 h-4" />
+            <Share2 className="w-4 h-4 flex-shrink-0" />
             {scheduleMode === 'shared' ? 'Поделиться окнами' : 'Поделиться'}
           </button>
         </div>
