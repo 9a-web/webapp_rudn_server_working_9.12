@@ -285,6 +285,10 @@ const Home = () => {
   });
   const [prevTab, setPrevTab] = useState('home');
 
+  // Режим расписания: 'personal' | 'shared' — поднят из LiveScheduleSection,
+  // чтобы App.jsx мог переключать в 'shared' при открытии ссылки-приглашения
+  const [scheduleMode, setScheduleMode] = useState('personal');
+
   
   // Состояние для отслеживания модальных окон журнала
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
