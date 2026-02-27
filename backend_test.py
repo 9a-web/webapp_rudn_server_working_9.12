@@ -54,53 +54,66 @@ class SharedScheduleTester:
             "details": details
         })
     
-    async def test_1_deduplication(self):
+    async def test_1_create_schedule(self):
         """
-        Test 1: Deduplication - POST /api/shared-schedule twice with same owner_id 
-        should return the SAME id both times
+        Critical Test 1: POST /api/shared-schedule with body {"owner_id": 999001, "participant_ids": [999002]} 
+        → should create schedule with valid UUID, return participants array
         """
-        print("\n🧪 Test 1: Deduplication Test")
+        print("\n🧪 Critical Test 1: Create Shared Schedule")
         
         try:
-            # First POST
-            payload1 = {
-                "owner_id": 555555,
-                "participant_ids": [666666]
+            payload = {
+                "owner_id": 999001,
+                "participant_ids": [999002]
             }
             
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload1) as resp1:
-                if resp1.status != 200:
-                    self.log_test("Deduplication Test", False, f"First POST failed: {resp1.status}")
+            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
+                if resp.status != 200:
+                    self.log_test("Create Schedule", False, f"POST failed: HTTP {resp.status}")
                     return
                 
-                data1 = await resp1.json()
-                schedule_id_1 = data1.get("id")
+                data = await resp.json()
+                schedule_id = data.get("id")
+                owner_id = data.get("owner_id")
+                participants = data.get("participants", [])
                 
-                if schedule_id_1:
-                    self.created_schedules.append(schedule_id_1)
-            
-            # Second POST with same owner_id
-            payload2 = {
-                "owner_id": 555555,
-                "participant_ids": [777777]  # Different participants
-            }
-            
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload2) as resp2:
-                if resp2.status != 200:
-                    self.log_test("Deduplication Test", False, f"Second POST failed: {resp2.status}")
+                # Validation checks
+                if not schedule_id:
+                    self.log_test("Create Schedule", False, "No schedule ID returned")
                     return
                 
-                data2 = await resp2.json()
-                schedule_id_2 = data2.get("id")
-            
-            # Check if IDs are the same
-            if schedule_id_1 and schedule_id_2 and schedule_id_1 == schedule_id_2:
-                self.log_test("Deduplication Test", True, f"Same ID returned: {schedule_id_1}")
-            else:
-                self.log_test("Deduplication Test", False, f"Different IDs: {schedule_id_1} vs {schedule_id_2}")
+                # Check UUID format
+                try:
+                    uuid.UUID(schedule_id)
+                    uuid_valid = True
+                except ValueError:
+                    uuid_valid = False
+                
+                if not uuid_valid:
+                    self.log_test("Create Schedule", False, f"Invalid UUID format: {schedule_id}")
+                    return
+                
+                if owner_id != 999001:
+                    self.log_test("Create Schedule", False, f"Wrong owner_id: {owner_id}")
+                    return
+                
+                if len(participants) != 2:  # Owner + 1 participant
+                    self.log_test("Create Schedule", False, f"Wrong participant count: {len(participants)}")
+                    return
+                
+                # Check if participants array contains both users
+                participant_ids = [p["telegram_id"] for p in participants]
+                if 999001 not in participant_ids or 999002 not in participant_ids:
+                    self.log_test("Create Schedule", False, f"Missing participants: {participant_ids}")
+                    return
+                
+                self.created_schedules.append(schedule_id)
+                self.test_schedule_id = schedule_id  # Store for other tests
+                
+                self.log_test("Create Schedule", True, f"Schedule created with valid UUID: {schedule_id}, participants: {len(participants)}")
         
         except Exception as e:
-            self.log_test("Deduplication Test", False, f"Exception: {e}")
+            self.log_test("Create Schedule", False, f"Exception: {e}")
     
     async def test_2_week_parameter(self):
         """
