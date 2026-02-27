@@ -75,9 +75,9 @@ export const LiveScheduleCarousel = ({
   return (
     <>
       {/* Вертикальная карусель справа от основной карточки - для ВСЕХ устройств */}
-      <div className="flex gap-0 md:gap-4 mt-4 md:mt-0 items-center pl-6 pr-15 md:px-0 md:overflow-visible">
-        {/* Основная карточка слева - меняется в зависимости от currentIndex */}
-        <div className="flex-1 relative md:overflow-visible">
+      <div className="relative mt-4 md:mt-0 md:flex md:gap-4 md:px-0 md:overflow-visible">
+        {/* Основная карточка - меняется в зависимости от currentIndex */}
+        <div className="flex-1 relative md:overflow-visible pl-6 pr-[52px] md:pl-0 md:pr-0">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentCard.id}
