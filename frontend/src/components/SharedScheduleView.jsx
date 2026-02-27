@@ -3,6 +3,7 @@ import { Users, Plus, X, Clock, UserPlus, Coffee, Trash2, AlertCircle, Share2, C
 import { motion, AnimatePresence } from 'framer-motion';
 import { sharedScheduleAPI } from '../services/api';
 import { friendsAPI } from '../services/friendsAPI';
+import { getReferralCode } from '../services/referralAPI';
 import { useTranslation } from 'react-i18next';
 
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
