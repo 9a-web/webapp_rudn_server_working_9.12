@@ -572,19 +572,19 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     };
   }, [dayFreeWindows, visStartH, visEndH, firstClassMin, lastClassMin]);
 
-  // ─── Hour grid lines (только видимый диапазон) ───
+  // ─── Hour grid lines (полный диапазон 0:00 – 23:00) ───
   const hourLines = useMemo(() => {
     const lines = [];
-    for (let h = visStartH; h <= visEndH; h++) {
+    for (let h = TIMELINE_START_HOUR; h <= TIMELINE_END_HOUR; h++) {
       lines.push({
         hour: h,
         label: `${h}:00`,
-        top: minToPx(h * 60) - visOffset,
+        top: minToPx(h * 60),
         isMain: h % 2 === 0,
       });
     }
     return lines;
-  }, [visStartH, visEndH, visOffset]);
+  }, []);
 
   // ─── Check if today ───
   const isToday = useMemo(() => {
