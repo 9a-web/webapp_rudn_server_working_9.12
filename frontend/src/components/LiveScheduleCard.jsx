@@ -125,7 +125,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               </motion.p>
               {currentClass && (
                 <motion.p 
-                  className="font-bold text-sm md:text-base lg:text-lg break-words mt-1" 
+                  className="font-bold text-sm lg:text-base xl:text-lg break-words mt-1" 
                   style={{ color: '#FFFFFF' }}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
