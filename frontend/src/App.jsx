@@ -2077,6 +2077,8 @@ const Home = () => {
                     user={user}
                     onAdminPanelOpen={() => setIsAdminPanelOpen(true)}
                     onFriendPickerChange={setIsSharedScheduleFriendPickerOpen}
+                    scheduleMode={scheduleMode}
+                    onScheduleModeChange={setScheduleMode}
                   />
                 )}
               </div>
