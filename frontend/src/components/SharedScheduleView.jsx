@@ -422,26 +422,9 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const totalColumns = Math.max(1, activeParticipantIds.length);
 
-  // ─── Compute actual time range ───
-  const { actualStartHour, actualEndHour } = useMemo(() => {
-    let minHour = TIMELINE_END_HOUR;
-    let maxHour = TIMELINE_START_HOUR;
-    
-    Object.values(daySchedules).forEach(events => {
-      events.forEach(e => {
-        const [startStr, endStr] = (e.time || '').split(' - ').map(s => s?.trim());
-        const startMin = parseTime(startStr);
-        const endMin = parseTime(endStr);
-        if (startMin !== null) minHour = Math.min(minHour, Math.floor(startMin / 60));
-        if (endMin !== null) maxHour = Math.max(maxHour, Math.ceil(endMin / 60));
-      });
-    });
-    
-    return {
-      actualStartHour: Math.max(TIMELINE_START_HOUR, minHour - 1),
-      actualEndHour: Math.min(TIMELINE_END_HOUR, maxHour + 1)
-    };
-  }, [daySchedules]);
+  // ─── Всегда показываем полный диапазон 0:00 – 23:00 ───
+  const actualStartHour = TIMELINE_START_HOUR;
+  const actualEndHour = TIMELINE_END_HOUR;
 
   // ─── Hour grid lines ───
   const hourLines = useMemo(() => {
