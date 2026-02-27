@@ -1050,6 +1050,86 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ─── Share Modal ─── */}
+      <AnimatePresence>
+        {showShareModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center"
+            onClick={() => setShowShareModal(false)}
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Handle bar */}
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <Share2 className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Поделиться расписанием</h3>
+                  <p className="text-xs text-gray-500">Друг откроет ссылку и автоматически присоединится</p>
+                </div>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="ml-auto text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Link box */}
+              <div className="flex items-center gap-2 p-3 rounded-2xl bg-gray-50 border border-gray-200 mb-4">
+                <span className="flex-1 text-xs text-gray-500 truncate font-mono">{inviteLink}</span>
+                <button
+                  onClick={handleCopyLink}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 flex-shrink-0 ${
+                    linkCopied
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {linkCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Скопировано
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Копировать
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Telegram share button */}
+              <button
+                onClick={handleTelegramShare}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-[#2AABEE] hover:bg-[#1e9bd6] active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-blue-400/20"
+              >
+                {/* Telegram icon */}
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
+                </svg>
+                Отправить в Telegram
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
