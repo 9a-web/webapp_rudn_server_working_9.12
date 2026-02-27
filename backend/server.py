@@ -598,6 +598,10 @@ async def create_indexes():
         await safe_create_index(db.referral_link_events, [("event_type", 1)])
         await safe_create_index(db.referral_link_events, [("timestamp", -1)])
         await safe_create_index(db.referral_link_events, [("telegram_id", 1)])
+
+        # Share tokens для совместного расписания
+        await safe_create_index(db.schedule_share_tokens, "token", unique=True)
+        await safe_create_index(db.schedule_share_tokens, [("expires_at", 1)])
         
         # Channel Stats History
         await safe_create_index(db.channel_stats_history, [("timestamp", 1)])
