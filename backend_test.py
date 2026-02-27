@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 # Base URL - from environment configuration
-BASE_URL = "https://shared-timetable.preview.emergentagent.com/api"
+BASE_URL = "https://webapp-preview-5.preview.emergentagent.com/api"
 
 class SharedScheduleTester:
     def __init__(self):
