@@ -313,7 +313,7 @@ export const LiveScheduleSection = ({
             >
               <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white flex-shrink-0" />
               <span 
-                className="text-xs sm:text-sm md:text-base font-medium text-white"
+                className="text-xs min-[425px]:text-sm md:text-base font-medium text-white"
                 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
               >
                 {dateButton}
