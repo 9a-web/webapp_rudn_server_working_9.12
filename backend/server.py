@@ -16865,6 +16865,8 @@ async def create_shared_schedule(data: SharedScheduleCreate):
 
         participants = [{"telegram_id": data.owner_id, "first_name": owner_name, "color": PARTICIPANT_COLORS[0]}]
         for idx, pid in enumerate(data.participant_ids[:(MAX_PARTICIPANTS - 1)]):
+            if pid == data.owner_id:
+                continue  # пропускаем себя — уже добавлены как owner
             p_settings = await db.user_settings.find_one({"telegram_id": pid})
             p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
             participants.append({
