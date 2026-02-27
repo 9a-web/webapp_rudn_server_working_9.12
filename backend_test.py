@@ -10,8 +10,8 @@ import json
 import uuid
 from datetime import datetime
 
-# Base URL - backend running locally
-BASE_URL = "http://localhost:8001/api"
+# Base URL - from environment configuration
+BASE_URL = "https://shared-timetable.preview.emergentagent.com/api"
 
 class SharedScheduleTester:
     def __init__(self):
