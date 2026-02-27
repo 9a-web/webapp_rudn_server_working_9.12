@@ -196,7 +196,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 >
                   <motion.p 
-                    className="font-bold text-base md:text-lg lg:text-xl break-words" 
+                    className="font-bold text-base md:text-lg lg:text-xl truncate" 
                     style={{ color: themeStyles.text.primary }} 
                     animate={currentClass ? {
                       textShadow: [
@@ -211,7 +211,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
                   </motion.p>
                   {currentClass && (
                     <motion.p 
-                      className="font-bold text-base md:text-lg lg:text-xl break-words" 
+                      className="font-bold text-base md:text-lg lg:text-xl line-clamp-1" 
                       style={{ color: '#FFFFFF' }}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -225,7 +225,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               <AnimatePresence mode="wait">
                 <motion.p 
                   key={minutesLeft}
-                  className="font-medium text-sm md:text-base lg:text-lg break-words" 
+                  className="font-medium text-sm md:text-base lg:text-lg truncate" 
                   style={{ color: themeStyles.text.secondary }}
                   initial={{ opacity: 0, x: -5 }}
                   animate={{ opacity: 1, x: 0 }}
