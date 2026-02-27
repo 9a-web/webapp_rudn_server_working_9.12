@@ -389,23 +389,7 @@ export const LiveScheduleCarousel = ({
           </motion.button>
         </div>
 
-        {/* ── NAVIGATION: Tablet/Desktop (horizontal dots below card) ── */}
-        <div className="hidden md:flex items-center justify-center gap-2 mt-3 max-w-[500px] lg:max-w-[560px] mx-auto">
-          {cards.map((card, index) => (
-            <motion.button
-              key={card.id}
-              onClick={(e) => goToCard(index, e)}
-              className="rounded-full cursor-pointer"
-              animate={{
-                width: index === currentIndex ? 24 : 8,
-                height: 8,
-                backgroundColor: index === currentIndex ? '#A3F7BF' : 'rgb(75, 85, 99)',
-              }}
-              whileHover={{ scale: 1.2 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            />
-          ))}
-        </div>
+        {/* Desktop/tablet: no navigation, only dots on mobile */}
       </div>
 
       {/* Modals */}
