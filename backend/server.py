@@ -16836,6 +16836,8 @@ async def create_shared_schedule(data: SharedScheduleCreate):
             existing_ids = {p["telegram_id"] for p in existing.get("participants", [])}
             new_additions = []
             for pid in data.participant_ids:
+                if pid == data.owner_id:
+                    continue  # себя не добавляем дважды
                 if pid not in existing_ids and len(existing.get("participants", [])) + len(new_additions) < MAX_PARTICIPANTS:
                     p_settings = await db.user_settings.find_one({"telegram_id": pid})
                     p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
