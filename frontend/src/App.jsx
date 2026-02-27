@@ -811,6 +811,52 @@ const Home = () => {
     }
   }, [isReady, user?.id, syncedUser?.id, startParam, friendInviteProcessed]);
 
+  // ─── Обработка приглашения в совместное расписание (startapp=sschedule_{schedule_id}) ───
+  const [sharedScheduleInviteProcessed, setSharedScheduleInviteProcessed] = useState(false);
+  useEffect(() => {
+    const processSharedScheduleInvite = async () => {
+      const currentUser = syncedUser || user;
+      if (!startParam || sharedScheduleInviteProcessed || !currentUser) return;
+      if (!startParam.startsWith('sschedule_')) return;
+
+      const scheduleId = startParam.replace('sschedule_', '');
+      if (!scheduleId) return;
+
+      console.log('📅 Обработка приглашения в совместное расписание:', scheduleId);
+      setSharedScheduleInviteProcessed(true);
+
+      try {
+        const result = await sharedScheduleAPI.join(
+          scheduleId,
+          currentUser.id,
+          currentUser.first_name
+        );
+
+        if (result?.success) {
+          hapticFeedback('success');
+          if (result.already_member) {
+            showAlert('Вы уже в этом совместном расписании 📅');
+          } else {
+            showAlert('Вы добавлены в совместное расписание! 📅');
+          }
+          // Переключаемся на расписание и открываем совместный режим
+          setActiveTab('schedule');
+        }
+      } catch (error) {
+        console.error('❌ Ошибка присоединения к совместному расписанию:', error);
+        if (error?.response?.status === 404) {
+          showAlert('Расписание не найдено или ссылка устарела');
+        } else if (error?.response?.status === 400) {
+          showAlert(error?.response?.data?.detail || 'Не удалось присоединиться');
+        }
+      }
+    };
+
+    if (isReady && (user || syncedUser) && startParam) {
+      processSharedScheduleInvite();
+    }
+  }, [isReady, user?.id, syncedUser?.id, startParam, sharedScheduleInviteProcessed]);
+
   // Обработка связки Telegram профиля (startapp=link_{token})
   const [linkInviteProcessed, setLinkInviteProcessed] = useState(false);
   useEffect(() => {
