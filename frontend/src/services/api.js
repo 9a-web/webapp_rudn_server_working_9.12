@@ -792,6 +792,33 @@ export const sharedScheduleAPI = {
   },
 
   /**
+   * Получить ссылку-приглашение
+   */
+  getInviteLink: async (scheduleId) => {
+    try {
+      const response = await api.get(`/shared-schedule/${scheduleId}/invite-link`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Присоединиться к расписанию по ссылке
+   */
+  join: async (scheduleId, telegramId, firstName) => {
+    try {
+      const response = await api.post(`/shared-schedule/join/${scheduleId}`, {
+        telegram_id: telegramId,
+        first_name: firstName,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
    * Удалить совместное расписание
    */
   delete: async (scheduleId) => {
