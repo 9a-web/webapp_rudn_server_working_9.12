@@ -498,10 +498,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   }, [loading, sharedData?.exists, visOffset]);
 
-  // ─── Split free windows: before / within / after visible range ───
+  // ─── Split free windows: before first class / within / after last class ───
   const { beforeSummary, afterSummary, visibleFreeWindows } = useMemo(() => {
     const visStartMin = visStartH * 60;
     const visEndMin = visEndH * 60;
+    // Собираем ВСЁ свободное время до первой пары и после последней
     let bStart = null, bEnd = null;
     let aStart = null, aEnd = null;
     const visible = [];
@@ -512,21 +513,30 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       if (fw.end === '24:00') fwE = 1440;
       if (fwS === null || fwE === null) return;
 
-      // Part before visible range
-      if (fwS < visStartMin) {
-        const effEnd = Math.min(fwE, visStartMin);
+      // Целиком до первой пары → в before
+      if (fwE <= firstClassMin) {
         if (bStart === null || fwS < bStart) bStart = fwS;
-        if (bEnd === null || effEnd > bEnd) bEnd = effEnd;
+        if (bEnd === null || fwE > bEnd) bEnd = fwE;
+        return;
       }
-      // Part after visible range
-      if (fwE > visEndMin) {
-        const effStart = Math.max(fwS, visEndMin);
-        if (aStart === null || effStart < aStart) aStart = effStart;
+      // Целиком после последней пары → в after
+      if (fwS >= lastClassMin) {
+        if (aStart === null || fwS < aStart) aStart = fwS;
+        if (aEnd === null || fwE > aEnd) aEnd = fwE;
+        return;
+      }
+      // Перекрывает границу — разделяем
+      if (fwS < firstClassMin) {
+        if (bStart === null || fwS < bStart) bStart = fwS;
+        if (bEnd === null || firstClassMin > bEnd) bEnd = firstClassMin;
+      }
+      if (fwE > lastClassMin) {
+        if (aStart === null || lastClassMin < aStart) aStart = lastClassMin;
         if (aEnd === null || fwE > aEnd) aEnd = fwE;
       }
-      // Part within visible range → clip to bounds
-      const clippedS = Math.max(fwS, visStartMin);
-      const clippedE = Math.min(fwE, visEndMin);
+      // Видимая часть — только между первой и последней парой
+      const clippedS = Math.max(fwS, firstClassMin);
+      const clippedE = Math.min(fwE, lastClassMin);
       if (clippedE > clippedS) {
         const dur = clippedE - clippedS;
         visible.push({
@@ -555,7 +565,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       } : null,
       visibleFreeWindows: visible,
     };
-  }, [dayFreeWindows, visStartH, visEndH]);
+  }, [dayFreeWindows, visStartH, visEndH, firstClassMin, lastClassMin]);
 
   // ─── Hour grid lines (только видимый диапазон) ───
   const hourLines = useMemo(() => {
