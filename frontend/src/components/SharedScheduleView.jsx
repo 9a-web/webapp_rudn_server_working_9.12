@@ -747,7 +747,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
       // ── Timeline контейнер ──
       const tlX = PAD;
-      const tlY = headerH + PAD;
+      const tlY = headerH + PAD + beforeH;
       const tlW = W - PAD * 2;
 
       ctx.fillStyle = '#fafafa';
