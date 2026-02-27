@@ -1168,11 +1168,59 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           msOverflowStyle: 'none',
         }}
       >
-        <div className="relative" style={{ height: `${displayHeight}px`, minHeight: '200px' }}>
-          
+        {/* ─── Before indicator: свободное время ДО видимого диапазона ─── */}
+        {beforeSummary && (
+          <div className="relative mx-2 mt-2 mb-1 px-3 py-2.5 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 flex items-center gap-2 justify-center">
+            <Coffee className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="text-xs font-medium text-emerald-700">
+              Свободны {beforeSummary.durationText}
+            </span>
+            <span className="text-[10px] text-emerald-600/70">
+              {beforeSummary.start} – {beforeSummary.end}
+            </span>
+          </div>
+        )}
+
+        {/* ─── Column headers (participant names) ─── */}
+        {totalColumns > 1 && (
+          <div
+            className="sticky top-0 z-20 flex backdrop-blur-sm"
+            style={{
+              paddingLeft: `${TIME_LABEL_WIDTH + 4}px`,
+              paddingRight: '4px',
+              backgroundColor: 'rgba(250, 250, 250, 0.9)',
+              borderBottom: '1px solid #eee',
+            }}
+          >
+            {activeParticipantIds.map((pId, idx) => {
+              const participant = getParticipant(pId);
+              if (!participant) return null;
+              return (
+                <div
+                  key={pId}
+                  className="flex items-center justify-center gap-1.5 py-2 text-center"
+                  style={{ width: `${100 / totalColumns}%` }}
+                >
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: participant.color }}
+                  />
+                  <span className="text-[10px] font-semibold" style={{ color: participant.color }}>
+                    {participant.telegram_id === telegramId ? 'Вы' : participant.first_name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ─── Clipped timeline area ─── */}
+        <div className="relative overflow-hidden" style={{ height: `${displayHeight}px`, minHeight: '200px' }}>
+          <div className="relative" style={{ height: `${TIMELINE_HEIGHT + 20}px`, transform: `translateY(-${visOffset}px)` }}>
+
           {/* ─── Hour grid lines ─── */}
           {hourLines.map(({ hour, label, top, isMain }) => (
-            <div key={hour} className="absolute w-full" style={{ top: `${top}px` }}>
+            <div key={hour} className="absolute w-full" style={{ top: `${top + visOffset}px` }}>
               {/* Time label */}
               <div
                 className="absolute text-[10px] font-medium select-none"
@@ -1198,7 +1246,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
               />
               
               {/* Half-hour line */}
-              {hour < TIMELINE_END_HOUR && (
+              {hour < visEndH && (
                 <div
                   className="absolute h-[1px]"
                   style={{
@@ -1212,39 +1260,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
             </div>
           ))}
 
-          {/* ─── Column headers (participant names at top) ─── */}
-          {totalColumns > 1 && (
-            <div
-              className="sticky top-0 z-20 flex backdrop-blur-sm"
-              style={{
-                paddingLeft: `${TIME_LABEL_WIDTH + 4}px`,
-                paddingRight: '4px',
-                backgroundColor: 'rgba(250, 250, 250, 0.9)',
-                borderBottom: '1px solid #eee',
-              }}
-            >
-              {activeParticipantIds.map((pId, idx) => {
-                const participant = getParticipant(pId);
-                if (!participant) return null;
-                return (
-                  <div
-                    key={pId}
-                    className="flex items-center justify-center gap-1.5 py-2 text-center"
-                    style={{ width: `${100 / totalColumns}%` }}
-                  >
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: participant.color }}
-                    />
-                    <span className="text-[10px] font-semibold" style={{ color: participant.color }}>
-                      {participant.telegram_id === telegramId ? 'Вы' : participant.first_name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
           {/* ─── Events container (positioned after time labels) ─── */}
           <div
             className="absolute"
@@ -1255,11 +1270,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
               right: '4px',
             }}
           >
-            {/* ─── Free windows ─── */}
-            {dayFreeWindows.map((fw, idx) => {
-              const fwStartMin = parseTime(fw.start);
-              const fwEndMin = parseTime(fw.end);
-              if (fwStartMin === null || fwEndMin === null) return null;
+            {/* ─── Free windows (только видимый диапазон) ─── */}
+            {visibleFreeWindows.map((fw, idx) => {
+              const fwStartMin = fw._startMin;
+              const fwEndMin = fw._endMin;
+              if (fwStartMin == null || fwEndMin == null) return null;
               const fwTop = minToPx(fwStartMin);
               const fwHeight = durationToPx(fwEndMin - fwStartMin);
               const duration = fw.duration_minutes;
@@ -1338,7 +1353,22 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
               </div>
             </div>
           )}
+
+          </div>
         </div>
+
+        {/* ─── After indicator: свободное время ПОСЛЕ видимого диапазона ─── */}
+        {afterSummary && (
+          <div className="relative mx-2 mt-1 mb-2 px-3 py-2.5 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 flex items-center gap-2 justify-center">
+            <Coffee className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="text-xs font-medium text-emerald-700">
+              Свободны {afterSummary.durationText}
+            </span>
+            <span className="text-[10px] text-emerald-600/70">
+              {afterSummary.start} – {afterSummary.end}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ─── Friend Picker Modal ─── */}
