@@ -292,14 +292,10 @@ export const LiveScheduleCarousel = ({
           
           {/* 
             STACKED CARD CONTAINER
-            Background cards: dark solid placeholders (no content)
-            Front card: actual content, switches via AnimatePresence
-            
-            paddingBottom: 22px for peek space
-            2nd card: top:6px, bottom:10px → peeks 12px below front
-            3rd card: top:12px, bottom:0   → peeks 22px below front (10px below 2nd)
+            max-w constraints restore original desktop/tablet width
+            md:mx-auto centers the stack on tablet/desktop
           */}
-          <div className="relative mt-4 md:mt-0" style={{ paddingBottom: '22px' }}>
+          <div className="relative mt-4 md:mt-0 max-w-[400px] md:max-w-[500px] lg:max-w-[560px] md:mx-auto" style={{ paddingBottom: '22px' }}>
             
             {/* 3rd background card (deepest) — dark solid, always visible */}
             <motion.div 
