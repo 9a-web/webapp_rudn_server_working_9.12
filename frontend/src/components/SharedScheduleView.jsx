@@ -546,18 +546,20 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           <div className="flex items-center gap-2 mb-2.5 px-3">
             <Users className="w-4 h-4 text-indigo-500" />
             <span className="text-sm font-medium text-[#1c1c1c]">Участники</span>
-            <button
-              onClick={() => setShowFriendPicker(true)}
-              disabled={actionLoading}
-              className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-50"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Добавить
-            </button>
+            {isOwner && (
+              <button
+                onClick={() => setShowFriendPicker(true)}
+                disabled={actionLoading}
+                className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-50"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Добавить
+              </button>
+            )}
             <button
               onClick={handleShare}
               disabled={actionLoading}
-              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40"
+              className={`flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 ${isOwner ? '' : 'ml-auto'}`}
             >
               <Share2 className="w-3.5 h-3.5" />
               Поделиться
@@ -574,18 +576,33 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
             )}
           </div>
           <div className="flex flex-wrap gap-2 px-3">
-            {sharedData.participants?.map((p, idx) => (
-              <div
-                key={p.telegram_id}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm"
-                style={{ borderColor: p.color + '40', backgroundColor: p.color + '12' }}
-              >
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                <span className="text-[#1c1c1c] font-medium text-xs">
-                  {p.telegram_id === telegramId ? 'Вы' : p.first_name}
-                </span>
-              </div>
-            ))}
+            {sharedData.participants?.map((p, idx) => {
+              const isMe = String(p.telegram_id) === String(telegramId);
+              const isParticipantOwner = String(p.telegram_id) === String(sharedData.owner_id);
+              const canRemove = (!isParticipantOwner && isMe) || (isOwner && !isMe);
+              return (
+                <div
+                  key={p.telegram_id}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm"
+                  style={{ borderColor: p.color + '40', backgroundColor: p.color + '12' }}
+                >
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                  <span className="text-[#1c1c1c] font-medium text-xs">
+                    {isMe ? 'Вы' : p.first_name}
+                  </span>
+                  {canRemove && (
+                    <button
+                      onClick={() => handleRemoveParticipant(p.telegram_id)}
+                      disabled={actionLoading}
+                      className="text-[#ccc] hover:text-red-400 transition-colors -mr-1 disabled:opacity-30"
+                      title={isMe ? 'Покинуть расписание' : 'Удалить участника'}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="text-center py-12 mx-4">
