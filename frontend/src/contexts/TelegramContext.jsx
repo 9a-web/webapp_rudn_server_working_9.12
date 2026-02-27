@@ -217,32 +217,36 @@ export const TelegramProvider = ({ children }) => {
         const savedTelegramUser = localStorage.getItem('telegram_user');
         
         if (savedTelegramUser) {
-          try {
-            const parsedUser = JSON.parse(savedTelegramUser);
-            console.log('📱 Загружен связанный Telegram пользователь:', parsedUser.first_name);
-            setUser({
-              id: parsedUser.id,
-              first_name: parsedUser.first_name || 'Пользователь',
-              last_name: parsedUser.last_name || '',
-              username: parsedUser.username || '',
-              photo_url: parsedUser.photo_url,
-              is_linked: true // Флаг что это связанный пользователь
-            });
-          } catch (e) {
-            console.error('Ошибка парсинга сохраненного пользователя:', e);
-            localStorage.removeItem('telegram_user');
-            // Fallback на Device ID
-            console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
-            const { deviceId, numericId } = getOrCreateDeviceId();
-            setUser({
-              id: numericId,
-              first_name: 'Пользователь',
-              last_name: '',
-              username: `user_${deviceId.substring(0, 8)}`,
-              device_id: deviceId,
-              is_guest: true
-            });
-          }
+        try {
+          const parsedUser = JSON.parse(savedTelegramUser);
+          console.log('📱 Загружен связанный Telegram пользователь:', parsedUser.first_name);
+          setUser({
+            id: parsedUser.id,
+            first_name: parsedUser.first_name || 'Пользователь',
+            last_name: parsedUser.last_name || '',
+            username: parsedUser.username || '',
+            photo_url: parsedUser.photo_url,
+            device_id: parsedUser.device_id,
+            // is_web_registered: пользователь зарегистрировался в веб-версии без Telegram
+            // В этом случае is_guest=false, чтобы loadUserData не показал WelcomeScreen
+            is_linked: parsedUser.is_linked || false,
+            is_guest: parsedUser.is_web_registered ? false : false, // зарегистрированный — не гость
+          });
+        } catch (e) {
+          console.error('Ошибка парсинга сохраненного пользователя:', e);
+          localStorage.removeItem('telegram_user');
+          // Fallback на Device ID
+          console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
+          const { deviceId, numericId } = getOrCreateDeviceId();
+          setUser({
+            id: numericId,
+            first_name: 'Пользователь',
+            last_name: '',
+            username: `user_${deviceId.substring(0, 8)}`,
+            device_id: deviceId,
+            is_guest: true
+          });
+        }
         } else {
           console.warn('⚠️ Telegram user не найден. Используем уникальный Device ID.');
           // Генерируем уникальный ID для этого браузера
