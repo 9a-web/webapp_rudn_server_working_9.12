@@ -2101,7 +2101,7 @@ const Home = () => {
             */}
             <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:px-6 xl:grid-cols-[1fr_380px]">
               {/* Main content column */}
-              <div className="md:min-w-0 md:overflow-visible">
+              <div className="lg:min-w-0 lg:overflow-visible">
                 {/* TEST: Кнопка для тестирования LiveScheduleCards */}
                 <div className="px-6 pt-2 pb-1">
                   <button
