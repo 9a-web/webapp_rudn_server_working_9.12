@@ -592,9 +592,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   // ─── Check if has any events ───
   const hasAnyEvents = Object.values(daySchedules).some(events => events.length > 0);
-  const displayHeight = hasAnyEvents
-    ? minToPx(actualEndHour * 60) + 20
-    : 200;
+  const displayHeight = TIMELINE_HEIGHT + 20; // полный диапазон 0:00–23:00
 
   return (
     <motion.div
