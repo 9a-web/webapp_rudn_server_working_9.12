@@ -211,7 +211,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               fill="none"
             />
             
-            {/* BUG FIX: Progress circle — when NO class, show EMPTY ring (full offset) */}
+            {/* Progress circle — 100% filled by default, shows actual progress during class */}
             <motion.circle
               cx="50" cy="50" r="40"
               stroke={`url(#${themeStyles.circle.strokeId})`}
@@ -223,7 +223,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               animate={{ 
                 strokeDashoffset: currentClass 
                   ? circumference * (1 - progressPercentage / 100) 
-                  : circumference // BUG FIX: empty when no class (was 0 = full!)
+                  : 0 // Full ring when no class
               }}
               transition={{ duration: 0.8, ease: 'easeInOut' }}
             />
