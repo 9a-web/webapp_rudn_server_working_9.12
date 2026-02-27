@@ -17026,11 +17026,14 @@ async def create_share_token(schedule_id: str):
         if not doc:
             raise HTTPException(status_code=404, detail="Расписание не найдено")
 
-        # Список участников (кроме самого владельца — у получателя будет свой)
-        participant_ids = [
-            p["telegram_id"] for p in doc.get("participants", [])
-            if p["telegram_id"] != doc["owner_id"]
-        ]
+        # Список участников для передачи получателю:
+        # Включаем ВСЕХ из расписания владельца (включая его самого).
+        # Получатель создаст СВОЁ расписание с этими людьми — его там не будет,
+        # он будет добавлен автоматически как owner своей копии.
+        all_participant_ids = [p["telegram_id"] for p in doc.get("participants", [])]
+        # Если вдруг owner не в списке — добавляем
+        if doc["owner_id"] not in all_participant_ids:
+            all_participant_ids = [doc["owner_id"]] + all_participant_ids
 
         token = str(uuid.uuid4()).replace("-", "")[:16]  # короткий токен
         await db.schedule_share_tokens.insert_one({
