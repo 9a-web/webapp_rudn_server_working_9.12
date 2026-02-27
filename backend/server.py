@@ -17212,7 +17212,7 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
     """Вычислить общие свободные окна для всех участников.
     
     Логика: находим временные слоты, когда НИ У ОДНОГО участника нет пар.
-    Диапазон определяется от первой до последней пары за день.
+    Диапазон — полные сутки (0:00–24:00).
     Минимальная длительность свободного окна — 30 минут.
     """
     if not schedules:
@@ -17224,11 +17224,16 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
     def normalize_day(day_str: str) -> str:
         return day_str.strip().lower() if day_str else ""
 
+    # Слоты на весь день: 0:00 – 23:30 (48 слотов по 30 мин)
+    time_slots = []
+    for h in range(0, 24):
+        for m in [0, 30]:
+            time_slots.append(h * 60 + m)
+
     for day in days_ru:
         day_norm = normalize_day(day)
         all_busy = set()
-        day_min_start = 24 * 60
-        day_max_end = 0
+        has_any_events_today = False
         
         for p_id, events in schedules.items():
             for event in events:
@@ -17236,6 +17241,7 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
                 if event_day != day_norm:
                     continue
                 
+                has_any_events_today = True
                 time_str = event.get("time", "")
                 if " - " in time_str:
                     start_time, end_time = time_str.split(" - ", 1)
@@ -17243,28 +17249,16 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
                         sh, sm = map(int, start_time.strip().split(":"))
                         eh, em = map(int, end_time.strip().split(":"))
                         
-                        start_min = sh * 60 + sm
+                        current = sh * 60 + sm
                         end_min = eh * 60 + em
-                        
-                        day_min_start = min(day_min_start, start_min)
-                        day_max_end = max(day_max_end, end_min)
-                        
-                        current = start_min
                         while current < end_min:
                             all_busy.add(current)
                             current += 30
                     except (ValueError, AttributeError):
                         pass
         
-        if day_min_start >= day_max_end:
+        if not has_any_events_today:
             continue
-        
-        # Генерируем слоты только от первой до последней пары
-        time_slots = []
-        t = day_min_start
-        while t < day_max_end:
-            time_slots.append(t)
-            t += 30
         
         free_start = None
         for slot_min in time_slots:
@@ -17283,14 +17277,14 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
                         })
                     free_start = None
         
-        # Последнее окно до конца последней пары
+        # Последнее окно до конца суток
         if free_start is not None:
-            duration = day_max_end - free_start
+            duration = 24 * 60 - free_start
             if duration >= 30:
                 free_windows.append({
                     "day": day,
                     "start": f"{free_start // 60:02d}:{free_start % 60:02d}",
-                    "end": f"{day_max_end // 60:02d}:{day_max_end % 60:02d}",
+                    "end": "24:00",
                     "duration_minutes": duration
                 })
     
