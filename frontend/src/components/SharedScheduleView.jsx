@@ -320,6 +320,56 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   };
 
+  // Поделиться ссылкой на совместное расписание
+  const handleShare = async () => {
+    if (!sharedData?.id) return;
+    try {
+      setActionLoading(true);
+      hapticFeedback?.('impact', 'light');
+      const data = await sharedScheduleAPI.getInviteLink(sharedData.id);
+      if (data?.invite_link) {
+        setInviteLink(data.invite_link);
+        setShowShareModal(true);
+      }
+    } catch (err) {
+      console.error('Error getting invite link:', err);
+      setErrorMsg('Не удалось создать ссылку');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setLinkCopied(true);
+      hapticFeedback?.('success');
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      // fallback для среды без clipboard API
+      const el = document.createElement('textarea');
+      el.value = inviteLink;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setLinkCopied(true);
+      hapticFeedback?.('success');
+      setTimeout(() => setLinkCopied(false), 2500);
+    }
+  };
+
+  const handleTelegramShare = () => {
+    const text = encodeURIComponent('Сверим расписание? Открой, чтобы увидеть наши свободные окна 📅');
+    const url = encodeURIComponent(inviteLink);
+    const shareUrl = `https://t.me/share/url?url=${url}&text=${text}`;
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(shareUrl);
+    } else {
+      window.open(shareUrl, '_blank');
+    }
+  };
+
   // БАГ-ФИХ: функция удаления всего расписания
   const handleDeleteSchedule = async () => {
     if (!sharedData?.id) return;
