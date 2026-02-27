@@ -471,19 +471,19 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const totalColumns = Math.max(1, activeParticipantIds.length);
 
-  // ─── Hour grid lines (полный диапазон 0:00 – 23:00) ───
+  // ─── Hour grid lines (только видимый диапазон) ───
   const hourLines = useMemo(() => {
     const lines = [];
-    for (let h = TIMELINE_START_HOUR; h <= TIMELINE_END_HOUR; h++) {
+    for (let h = visStartH; h <= visEndH; h++) {
       lines.push({
         hour: h,
         label: `${h}:00`,
-        top: minToPx(h * 60),
+        top: minToPx(h * 60) - visOffset,
         isMain: h % 2 === 0,
       });
     }
     return lines;
-  }, []);
+  }, [visStartH, visEndH, visOffset]);
 
   // ─── Диапазон для экспорта изображения (только от первой до последней пары + 1ч отступ) ───
 
