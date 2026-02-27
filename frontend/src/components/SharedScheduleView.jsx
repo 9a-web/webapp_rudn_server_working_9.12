@@ -235,39 +235,215 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     return DAYS_ORDER[Math.min(mappedIdx, 5)];
   }, [selectedDate]);
 
-  // ─── Генерация изображения расписания ───
-  const exportRef = useRef(null);
+  // ─── Генерация изображения расписания (Canvas API) ───
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const handleGenerateImage = useCallback(async () => {
-    if (!exportRef.current) return;
     setIsGeneratingImage(true);
     try {
-      const el = exportRef.current;
-      el.style.display = 'block';
-      await new Promise(r => setTimeout(r, 100));
+      const dpr = 2;
+      const W = 420 * dpr;
+      const PAD = 20 * dpr;
+      const TLW = TIME_LABEL_WIDTH * dpr;
+      const FBASE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
-      const dataUrl = await toPng(el, {
-        backgroundColor: '#ffffff',
-        pixelRatio: 2,
-        quality: 0.95,
+      // Диапазон часов
+      let minH = 23, maxH = 0;
+      Object.values(daySchedules).forEach(events => {
+        events.forEach(e => {
+          const [s, en] = (e.time || '').split(' - ').map(t => t?.trim());
+          const sM = parseTime(s), eM = parseTime(en);
+          if (sM !== null) minH = Math.min(minH, Math.floor(sM / 60));
+          if (eM !== null) maxH = Math.max(maxH, Math.ceil(eM / 60));
+        });
+      });
+      const startH = Math.max(0, minH - 1);
+      const endH = Math.min(23, maxH + 1);
+      const pxPerMin = PX_PER_MIN * dpr;
+      const offsetMin = startH * 60;
+      const toY = (min) => (min - offsetMin) * pxPerMin;
+      const timelineH = toY(endH * 60) + 10 * dpr;
+
+      const headerH = 80 * dpr;
+      const footerH = 30 * dpr;
+      const H = headerH + timelineH + footerH + PAD * 2;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // Фон
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+
+      // Заголовок
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#1c1c1c';
+      ctx.font = `bold ${18 * dpr}px ${FBASE}`;
+      ctx.fillText('Совместное расписание', W / 2, PAD + 22 * dpr);
+      ctx.fillStyle = '#888888';
+      ctx.font = `${13 * dpr}px ${FBASE}`;
+      ctx.fillText(`${selectedDay || ''} \u2022 Неделя ${weekNumber}`, W / 2, PAD + 42 * dpr);
+
+      // Участники
+      const parts = activeParticipantIds.map(pId => getParticipant(pId)).filter(Boolean);
+      ctx.font = `600 ${10 * dpr}px ${FBASE}`;
+      let totalPW = 0;
+      const pillData = parts.map(p => {
+        const name = String(p.telegram_id) === String(telegramId) ? 'Вы' : (p.first_name || '?');
+        const tw = ctx.measureText(name).width + 28 * dpr;
+        totalPW += tw + 8 * dpr;
+        return { name, tw, color: p.color };
+      });
+      let px = (W - totalPW) / 2;
+      pillData.forEach(({ name, tw, color }) => {
+        ctx.fillStyle = color + '22';
+        ctx.beginPath();
+        ctx.roundRect(px, PAD + 52 * dpr, tw, 20 * dpr, 10 * dpr);
+        ctx.fill();
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px + 10 * dpr, PAD + 62 * dpr, 3.5 * dpr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.textAlign = 'left';
+        ctx.fillText(name, px + 18 * dpr, PAD + 66 * dpr);
+        px += tw + 8 * dpr;
       });
 
-      el.style.display = 'none';
+      // Таймлайн
+      const tlX = PAD;
+      const tlY = headerH + PAD;
+      const tlW = W - PAD * 2;
 
-      const link = document.createElement('a');
-      link.download = `расписание_${selectedDay || 'день'}.png`;
-      link.href = dataUrl;
-      link.click();
+      ctx.fillStyle = '#fafafa';
+      ctx.beginPath();
+      ctx.roundRect(tlX, tlY, tlW, timelineH, 12 * dpr);
+      ctx.fill();
+      ctx.strokeStyle = '#f0f0f0';
+      ctx.lineWidth = dpr;
+      ctx.stroke();
+
+      // Часовая сетка
+      for (let h = startH; h <= endH; h++) {
+        const y = tlY + toY(h * 60);
+        ctx.strokeStyle = (h % 2 === 0) ? '#e8e8e8' : '#f2f2f2';
+        ctx.lineWidth = dpr;
+        ctx.beginPath();
+        ctx.moveTo(tlX + TLW, y);
+        ctx.lineTo(tlX + tlW - 4 * dpr, y);
+        ctx.stroke();
+        ctx.fillStyle = (h % 2 === 0) ? '#999' : '#ccc';
+        ctx.font = `500 ${10 * dpr}px ${FBASE}`;
+        ctx.textAlign = 'right';
+        ctx.fillText(`${h}:00`, tlX + TLW - 6 * dpr, y + 4 * dpr);
+      }
+
+      const evX = tlX + TLW + 4 * dpr;
+      const evW = tlW - TLW - 8 * dpr;
+      const cols = totalColumns;
+
+      // Свободные окна
+      dayFreeWindows.forEach(fw => {
+        const fwS = parseTime(fw.start), fwE = parseTime(fw.end);
+        if (fwS === null || fwE === null) return;
+        const y1 = tlY + toY(fwS), y2 = tlY + toY(fwE);
+        if (y2 < tlY || y1 > tlY + timelineH) return;
+        const fh = Math.max(y2 - y1, 20 * dpr);
+        ctx.setLineDash([4 * dpr, 4 * dpr]);
+        ctx.strokeStyle = '#6ee7b7';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.beginPath();
+        ctx.roundRect(evX, y1, evW, fh, 10 * dpr);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const dur = fw.duration_minutes;
+        const hrs = Math.floor(dur / 60), mins = dur % 60;
+        const durTxt = hrs > 0 ? `${hrs}\u0447${mins > 0 ? ` ${mins}\u043C` : ''}` : `${mins}\u043C`;
+        ctx.fillStyle = '#059669';
+        ctx.font = `500 ${10 * dpr}px ${FBASE}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`\u2615 \u0421\u0432\u043E\u0431\u043E\u0434\u043D\u044B ${durTxt} (${fw.start} \u2013 ${fw.end})`, evX + evW / 2, y1 + fh / 2 + 4 * dpr);
+      });
+
+      // События
+      ctx.textAlign = 'left';
+      activeParticipantIds.forEach((pId, colIdx) => {
+        const participant = getParticipant(pId);
+        const events = daySchedules[pId] || [];
+        if (!participant) return;
+        const colW = evW / cols;
+        const cx = evX + colW * colIdx + 2 * dpr;
+        const cw = colW - 4 * dpr;
+
+        events.forEach(event => {
+          const [sStr, eStr] = (event.time || '').split(' - ').map(s => s?.trim());
+          const sMin = parseTime(sStr), eMin = parseTime(eStr);
+          if (sMin === null || eMin === null || eMin <= sMin) return;
+          const ey = tlY + toY(sMin);
+          const eh = Math.max(toY(eMin) - toY(sMin), 34 * dpr);
+
+          ctx.fillStyle = participant.color + '18';
+          ctx.beginPath();
+          ctx.roundRect(cx, ey, cw, eh, 10 * dpr);
+          ctx.fill();
+
+          ctx.fillStyle = participant.color;
+          ctx.fillRect(cx, ey + 4 * dpr, 3.5 * dpr, eh - 8 * dpr);
+
+          const pName = String(participant.telegram_id) === String(telegramId) ? 'Вы' : participant.first_name;
+          ctx.fillStyle = participant.color;
+          ctx.font = `500 ${9 * dpr}px ${FBASE}`;
+          ctx.fillText(pName, cx + 10 * dpr, ey + 14 * dpr);
+
+          ctx.fillStyle = '#1c1c1c';
+          ctx.font = `600 ${11 * dpr}px ${FBASE}`;
+          const maxTW = cw - 16 * dpr;
+          const words = (event.discipline || '').split(' ');
+          let line = '', ly = ey + 28 * dpr;
+          words.forEach(word => {
+            const test = line ? `${line} ${word}` : word;
+            if (ctx.measureText(test).width > maxTW && line) {
+              ctx.fillText(line, cx + 10 * dpr, ly);
+              ly += 14 * dpr;
+              line = word;
+            } else {
+              line = test;
+            }
+          });
+          if (line) ctx.fillText(line, cx + 10 * dpr, ly);
+
+          ctx.fillStyle = '#999';
+          ctx.font = `${9 * dpr}px ${FBASE}`;
+          const timeText = `${sStr} \u2013 ${eStr}${event.auditory ? ` \u00B7 ${event.auditory}` : ''}`;
+          ctx.fillText(timeText, cx + 10 * dpr, ly + 14 * dpr);
+        });
+      });
+
+      // Футер
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#bbbbbb';
+      ctx.font = `${10 * dpr}px ${FBASE}`;
+      ctx.fillText('RUDN GO \u2022 \u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u043E\u0435 \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435', W / 2, H - 10 * dpr);
+
+      // Скачивание
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.download = `\u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435_${selectedDay || '\u0434\u0435\u043D\u044C'}.png`;
+        a.href = url;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
 
       hapticFeedback?.('success');
     } catch (err) {
       console.error('Ошибка генерации изображения:', err);
-      if (exportRef.current) exportRef.current.style.display = 'none';
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [selectedDay, hapticFeedback]);
+  }, [selectedDay, weekNumber, hapticFeedback, daySchedules, dayFreeWindows, activeParticipantIds, totalColumns, telegramId]);
 
   // ─── Data loading ───
   const loadSharedSchedule = useCallback(async (silent = false) => {
