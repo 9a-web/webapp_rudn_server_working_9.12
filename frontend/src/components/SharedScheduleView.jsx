@@ -655,8 +655,10 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
       const pxPerMin = PX_PER_MIN * dpr;
       const offsetMin = startH * 60;
-      const toY = (min) => (min - offsetMin) * pxPerMin;
-      const timelineH = toY(endH * 60) + 10 * dpr;
+      const tlPadTop = 14 * dpr;   // отступ сверху тайм-лайна (чтобы время не обрезалось)
+      const tlPadBot = 14 * dpr;   // отступ снизу тайм-лайна
+      const toY = (min) => tlPadTop + (min - offsetMin) * pxPerMin;
+      const timelineH = toY(endH * 60) + tlPadBot;
 
       // ── Разделяем свободные окна: before (до первой пары) / within / after (после последней) ──
       let imgBefore = null, imgAfter = null;
