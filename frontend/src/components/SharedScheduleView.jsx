@@ -80,10 +80,10 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, delay: columnIndex * 0.06 }}
-      className="absolute rounded-xl overflow-hidden"
+      className="absolute rounded-xl"
       style={{
         top: `${top}px`,
-        height: `${displayHeight}px`,
+        minHeight: `${displayHeight}px`,
         left: `calc(${leftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${colWidthPct}% - ${EVENT_GAP}px)`,
         backgroundColor: color + '14',
@@ -91,31 +91,31 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
         zIndex: 10,
       }}
     >
-      <div className="h-full px-2.5 py-1.5 flex flex-col justify-center">
+      <div className="h-full px-2 py-1.5 flex flex-col justify-center">
         {isCompact ? (
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-            <span className="text-[11px] font-semibold text-[#1c1c1c] truncate leading-tight">
+          <div className="flex items-start gap-1">
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
+            <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight break-words" style={{ wordBreak: 'break-word' }}>
               {event.discipline}
             </span>
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-1.5 mb-0.5">
+            <div className="flex items-center gap-1 mb-0.5">
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-              <span className="text-[10px] font-medium truncate" style={{ color: color }}>
+              <span className="text-[9px] font-medium" style={{ color: color }}>
                 {isOwner ? 'Вы' : participantName}
               </span>
             </div>
-            <div className="text-[12px] font-semibold text-[#1c1c1c] leading-tight line-clamp-2 mb-0.5">
+            <div className="text-[11px] font-semibold text-[#1c1c1c] leading-tight mb-0.5 break-words" style={{ wordBreak: 'break-word' }}>
               {event.discipline}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-[#999]">
+            <div className="flex items-center gap-1.5 text-[9px] text-[#999] flex-wrap">
               <span>{startStr} – {endStr}</span>
               {event.auditory && (
                 <>
                   <span>·</span>
-                  <span className="truncate">{event.auditory}</span>
+                  <span className="break-words" style={{ wordBreak: 'break-word' }}>{event.auditory}</span>
                 </>
               )}
             </div>
