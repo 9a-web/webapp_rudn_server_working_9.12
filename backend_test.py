@@ -418,29 +418,30 @@ class SharedScheduleTester:
             self.log_test("Participant Limit Test", False, f"Exception: {e}")
     
     async def run_all_tests(self):
-        """Run all test scenarios in sequence"""
-        print("🚀 Starting Shared Schedule Backend API Tests")
+        """Run all critical test scenarios in sequence"""
+        print("🚀 Starting Shared Schedule Backend API Critical Tests")
         print(f"📡 Base URL: {BASE_URL}")
         
         await self.setup()
         
         try:
-            # Run tests in sequence
-            await self.test_1_deduplication()
-            await self.test_2_week_parameter()
-            await self.test_3_participant_limit()
-            await self.test_4_owner_protection()
-            await self.test_5_authorization()
-            await self.test_6_free_windows_single_participant()
-            await self.test_7_existing_functionality()
+            # Run critical tests in sequence (as requested in review)
+            await self.test_1_create_schedule()
+            await self.test_2_get_schedule_with_week()
+            await self.test_3_add_participant() 
+            await self.test_4_remove_participant()
+            await self.test_5_owner_protection()
+            await self.test_6_delete_schedule()
+            await self.test_7_deduplication()
+            await self.test_8_participant_limit()
             
         finally:
             await self.teardown()
         
         # Summary
-        print("\n" + "="*60)
-        print("📊 TEST SUMMARY")
-        print("="*60)
+        print("\n" + "="*70)
+        print("📊 CRITICAL TESTS SUMMARY")
+        print("="*70)
         
         passed = sum(1 for result in self.test_results if result["passed"])
         total = len(self.test_results)
@@ -449,12 +450,12 @@ class SharedScheduleTester:
             status = "✅" if result["passed"] else "❌"
             print(f"{status} {result['test']}")
         
-        print(f"\n🎯 RESULTS: {passed}/{total} tests passed")
+        print(f"\n🎯 RESULTS: {passed}/{total} critical tests passed")
         
         if passed == total:
-            print("🎉 ALL TESTS PASSED!")
+            print("🎉 ALL CRITICAL TESTS PASSED! Shared schedule endpoints working correctly.")
         else:
-            print("⚠️  Some tests failed. Check details above.")
+            print("⚠️  Some critical tests failed. Check details above.")
         
         return passed == total
 
