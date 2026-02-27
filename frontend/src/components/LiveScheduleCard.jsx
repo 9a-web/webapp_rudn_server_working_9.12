@@ -110,7 +110,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
             >
               <motion.p 
-                className="font-bold text-base md:text-lg lg:text-xl" 
+                className="font-bold text-base lg:text-lg xl:text-xl" 
                 style={{ color: themeStyles.text.primary }} 
                 animate={currentClass ? {
                   textShadow: [
