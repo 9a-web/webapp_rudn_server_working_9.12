@@ -222,6 +222,9 @@ backend:
       - working: true
         agent: "main"
         comment: "✅ BUG FIXES APPLIED - All critical bugs fixed. See detailed changes in agent_communication section below."
+      - working: true
+        agent: "testing"
+        comment: "✅ COMPREHENSIVE SHARED SCHEDULE BUG FIXES VERIFICATION COMPLETE - All 7 critical bug scenarios tested and working perfectly: (1) ✅ Deduplication Test - POST /api/shared-schedule twice with same owner_id=555555 returns SAME ID both times (no duplicate documents) (2) ✅ Week Parameter Test - GET /api/shared-schedule/555555?week=1 returns {week: 1}, GET with week=2 returns {week: 2} (3) ✅ Participant Limit Test - Successfully added 7 participants (200001-200007), 8th participant correctly rejected with HTTP 400 'max participants' error (4) ✅ Owner Protection Test - DELETE /api/shared-schedule/{id}/remove-participant/{owner_id} correctly returns HTTP 400 'Нельзя удалить владельца расписания' (5) ✅ Authorization Test - DELETE /api/shared-schedule/{id}?owner_id=WRONG_ID returns HTTP 403, DELETE with correct owner_id returns 200 (6) ✅ Free Windows Single Participant - Schedule with only 1 participant does not crash, _compute_free_windows returns empty array correctly (7) ✅ Existing Schedule Tests - All basic CRUD operations still working: POST creates schedule, GET returns exists=true with data, POST add-participant works, DELETE remove-participant works for non-owners. All bug fixes are production-ready with proper error handling and validation."
 
   - task: "Telegram Post Parsing (POST /api/admin/notifications/parse-telegram)"
     implemented: true
