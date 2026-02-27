@@ -86,7 +86,7 @@ const AnimatedAudioLines = ({ className, strokeWidth = 2, isActive }) => {
   );
 };
 
-// ─── Animated BookOpenCheck: книга + галочка рисуется ───
+// ─── Animated BookOpenCheck: страница перелистывается, затем галочка ───
 const AnimatedBookCheck = ({ className, strokeWidth = 2, isActive }) => {
   const [animKey, setAnimKey] = useState(0);
 
@@ -105,25 +105,34 @@ const AnimatedBookCheck = ({ className, strokeWidth = 2, isActive }) => {
       strokeLinejoin="round"
       className={className}
     >
-      {/* Книга — раскрывается */}
-      <motion.path
-        d="M22 6V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4 4 4 0 0 0-4-4H3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6a1 1 0 0 0 1-1v-1.3"
-        key={`book-${animKey}`}
-        initial={isActive ? { opacity: 0.5, scale: 0.92 } : false}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
-        style={{ transformOrigin: '12px 12px' }}
-      />
+      {/* Книга */}
+      <path d="M22 6V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4 4 4 0 0 0-4-4H3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6a1 1 0 0 0 1-1v-1.3" />
       {/* Корешок */}
       <path d="M12 21V7" />
-      {/* Галочка — рисуется */}
+
+      {/* Страница — перелистывается справа налево */}
+      {isActive && (
+        <motion.path
+          key={`page-${animKey}`}
+          d="M13 6 h7 v10 h-7"
+          fill="currentColor"
+          fillOpacity={0.12}
+          stroke="none"
+          initial={{ scaleX: 1, opacity: 0.7 }}
+          animate={{ scaleX: [-1, -0.3, 0], opacity: [0.7, 0.5, 0] }}
+          transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+          style={{ transformOrigin: '12px 11px' }}
+        />
+      )}
+
+      {/* Галочка — рисуется после перелистывания */}
       <motion.path
         d="m16 12 2 2 4-4"
         key={`check-${animKey}`}
         initial={isActive ? { pathLength: 0, opacity: 0 } : false}
         animate={{ pathLength: 1, opacity: 1 }}
         transition={isActive
-          ? { pathLength: { duration: 0.4, delay: 0.25, ease: [0.65, 0, 0.35, 1] }, opacity: { duration: 0.15, delay: 0.25 } }
+          ? { pathLength: { duration: 0.35, delay: 0.4, ease: [0.65, 0, 0.35, 1] }, opacity: { duration: 0.1, delay: 0.4 } }
           : { duration: 0 }
         }
       />
