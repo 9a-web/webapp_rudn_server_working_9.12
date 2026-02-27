@@ -731,11 +731,8 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         <div className="flex flex-wrap gap-2 px-3">
           {sharedData.participants?.map((p, idx) => {
             const isMe = String(p.telegram_id) === String(telegramId);
-            const isParticipantOwner = String(p.telegram_id) === String(sharedData.owner_id);
-            // Показываем X если:
-            // - это я сам (любой участник может покинуть расписание, кроме owner)
-            // - или я owner и это не я (кикнуть другого)
-            const canRemove = (!isParticipantOwner && isMe) || (isOwner && !isMe);
+            // Можно удалить любого КРОМЕ себя (себя нельзя — удали расписание целиком)
+            const canRemove = !isMe;
 
             return (
               <motion.div
@@ -744,24 +741,18 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: idx * 0.04 }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm"
-                style={{
-                  borderColor: p.color + '40',
-                  backgroundColor: p.color + '12',
-                }}
+                style={{ borderColor: p.color + '40', backgroundColor: p.color + '12' }}
               >
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
                 <span className="text-[#1c1c1c] font-medium text-xs">
                   {isMe ? 'Вы' : p.first_name}
-                  {isParticipantOwner && !isMe && (
-                    <span className="text-[9px] text-gray-400 ml-1">автор</span>
-                  )}
                 </span>
                 {canRemove && (
                   <button
                     onClick={() => handleRemoveParticipant(p.telegram_id)}
                     disabled={actionLoading}
                     className="text-[#ccc] hover:text-red-400 transition-colors -mr-1 disabled:opacity-30"
-                    title={isMe ? 'Покинуть расписание' : 'Удалить участника'}
+                    title="Убрать из расписания"
                   >
                     {actionLoading ? (
                       <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
