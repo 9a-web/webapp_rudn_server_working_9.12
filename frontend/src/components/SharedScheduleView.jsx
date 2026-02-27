@@ -1291,11 +1291,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
             </div>
           </div>
 
-          {/* Таймлайн — полный */}
+          {/* Таймлайн — обрезанный до пар */}
           <div style={{ position: 'relative', backgroundColor: '#fafafa', borderRadius: '16px', border: '1px solid #f0f0f0', padding: '0' }}>
-            <div style={{ position: 'relative', height: `${displayHeight}px` }}>
+            <div style={{ position: 'relative', height: `${exportHeight}px` }}>
               {/* Часовая сетка */}
-              {hourLines.map(({ hour, label, top, isMain }) => (
+              {exportHourLines.map(({ hour, label, top, isMain }) => (
                 <div key={`exp-h-${hour}`} style={{ position: 'absolute', width: '100%', top: `${top}px` }}>
                   <div style={{
                     position: 'absolute', left: '6px', top: '-7px', fontSize: '10px', fontWeight: '500',
@@ -1317,8 +1317,9 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   const fwStartMin = parseTime(fw.start);
                   const fwEndMin = parseTime(fw.end);
                   if (fwStartMin === null || fwEndMin === null) return null;
-                  const fwTop = minToPx(fwStartMin);
+                  const fwTop = minToPx(fwStartMin) - exportOffset;
                   const fwHeight = durationToPx(fwEndMin - fwStartMin);
+                  if (fwTop + fwHeight < 0 || fwTop > exportHeight) return null;
                   const duration = fw.duration_minutes;
                   const hours = Math.floor(duration / 60);
                   const mins = duration % 60;
@@ -1348,7 +1349,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                     const sMin = parseTime(sStr);
                     const eMin = parseTime(eStr);
                     if (sMin === null || eMin === null || eMin <= sMin) return null;
-                    const evTop = minToPx(sMin);
+                    const evTop = minToPx(sMin) - exportOffset;
                     const evH = Math.max(durationToPx(eMin - sMin), 38);
                     return (
                       <div key={`exp-ev-${pId}-${eIdx}`} style={{
