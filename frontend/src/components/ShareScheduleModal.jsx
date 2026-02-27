@@ -446,21 +446,10 @@ export const ShareScheduleModal = ({
 /**
  * Компонент карточки расписания для генерации изображения
  */
-const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName, formatDate }, ref) => {
+const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName, formatDate, botUsername }, ref) => {
   const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
   const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
   const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
-  
-  // Определяем эмодзи для типа занятия
-  const getClassTypeEmoji = (discipline) => {
-    const lower = discipline.toLowerCase();
-    if (lower.includes('лекция') || lower.includes('лекц')) return '📚';
-    if (lower.includes('практи') || lower.includes('практ')) return '✏️';
-    if (lower.includes('лаборат') || lower.includes('лабор')) return '🔬';
-    if (lower.includes('семинар')) return '💬';
-    if (lower.includes('физ') || lower.includes('спорт')) return '⚽';
-    return '📖';
-  };
 
   return (
     <div 
@@ -544,7 +533,7 @@ const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName,
         <p className="text-sm text-[#1C1C1E] font-semibold">
           RUDN Schedule
         </p>
-        <p className="text-xs text-gray-500 mt-1">@{botUsername} • Telegram WebApp</p>
+        <p className="text-xs text-gray-500 mt-1">@{botUsername || 'bot'} • Telegram WebApp</p>
       </div>
     </div>
   );
