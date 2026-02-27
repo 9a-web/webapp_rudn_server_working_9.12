@@ -270,49 +270,47 @@ class SharedScheduleTester:
         except Exception as e:
             self.log_test("Owner Protection", False, f"Exception: {e}")
     
-    async def test_6_free_windows_single_participant(self):
+    async def test_6_delete_schedule(self):
         """
-        Test 6: Free windows with 1 participant - Schedule with only 1 participant should not crash,
-        _compute_free_windows should return []
+        Critical Test 6: DELETE /api/shared-schedule/{id} → should delete schedule
         """
-        print("\n🧪 Test 6: Free Windows Single Participant Test")
+        print("\n🧪 Critical Test 6: Delete Schedule")
         
         try:
-            # Create schedule with only owner (no participants)
-            owner_id = 333333
-            payload = {
-                "owner_id": owner_id,
-                "participant_ids": []  # No additional participants
-            }
+            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
+                self.log_test("Delete Schedule", False, "No schedule ID available from previous test")
+                return
             
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
+            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}?owner_id=999001") as resp:
                 if resp.status != 200:
-                    self.log_test("Free Windows Single Participant", False, f"Schedule creation failed: {resp.status}")
+                    self.log_test("Delete Schedule", False, f"DELETE failed: HTTP {resp.status}")
                     return
                 
                 data = await resp.json()
-                schedule_id = data.get("id")
+                success = data.get("success")
                 
-                if schedule_id:
-                    self.created_schedules.append(schedule_id)
-            
-            # Get the schedule (should not crash)
-            async with self.session.get(f"{BASE_URL}/shared-schedule/{owner_id}") as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    participants = data.get("participants", [])
-                    free_windows = data.get("free_windows", [])
-                    
-                    # Should have only 1 participant (the owner)
-                    if len(participants) == 1:
-                        self.log_test("Free Windows Single Participant", True, f"Single participant schedule works, free_windows: {len(free_windows)} items")
+                if not success:
+                    self.log_test("Delete Schedule", False, f"success=false in response")
+                    return
+                
+                # Verify schedule was deleted by trying to get it
+                async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
+                    if get_resp.status == 200:
+                        get_data = await get_resp.json()
+                        exists = get_data.get("exists")
+                        
+                        if not exists:
+                            self.log_test("Delete Schedule", True, f"Schedule successfully deleted. exists=false")
+                            # Remove from cleanup list since it's already deleted
+                            if self.test_schedule_id in self.created_schedules:
+                                self.created_schedules.remove(self.test_schedule_id)
+                        else:
+                            self.log_test("Delete Schedule", False, f"Schedule still exists after deletion")
                     else:
-                        self.log_test("Free Windows Single Participant", False, f"Expected 1 participant, got {len(participants)}")
-                else:
-                    self.log_test("Free Windows Single Participant", False, f"GET request failed: {resp.status}")
+                        self.log_test("Delete Schedule", False, f"Could not verify deletion: GET failed {get_resp.status}")
         
         except Exception as e:
-            self.log_test("Free Windows Single Participant", False, f"Exception: {e}")
+            self.log_test("Delete Schedule", False, f"Exception: {e}")
     
     async def test_7_existing_functionality(self):
         """
