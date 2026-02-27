@@ -8,18 +8,18 @@ import {
   X, Bell, Check, CheckCheck, Settings, Trash2,
   Users, Calendar, Home, Trophy, MessageSquare, AlertCircle,
   ChevronRight, RefreshCw, UserPlus, UserCheck, Clock,
-
-// Очистка Telegram HTML-тегов (tg-emoji, tg-spoiler и др.), оставляя только содержимое
-const cleanTgHtml = (text) => {
-  if (!text) return '';
-  return text.replace(/<tg-[^>]*>(.*?)<\/tg-[^>]*>/g, '$1');
-};
   ListTodo, ClipboardCheck, Award, Star, Megaphone, Send,
   BookOpen, GraduationCap, Sparkles, Gift, Zap, Info
 } from 'lucide-react';
 import { notificationsAPI } from '../services/notificationsAPI';
 import { friendsAPI } from '../services/friendsAPI';
 import NotificationSettingsPanel from './NotificationSettingsPanel';
+
+// Очистка Telegram HTML-тегов (tg-emoji, tg-spoiler и др.), оставляя только содержимое
+const cleanTgHtml = (text) => {
+  if (!text) return '';
+  return text.replace(/<tg-[^>]*>(.*?)<\/tg-[^>]*>/g, '$1');
+};
 
 // Конфиг категорий
 const CATEGORY_CONFIG = {
