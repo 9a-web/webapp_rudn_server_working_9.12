@@ -139,7 +139,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           <AnimatePresence mode="wait">
             <motion.p 
               key={currentClass ? minutesLeft : 'relax'}
-              className="font-medium text-xs md:text-sm lg:text-base" 
+              className="font-medium text-xs lg:text-sm xl:text-base" 
               style={{ color: themeStyles.text.secondary }}
               initial={{ opacity: 0, x: -5 }}
               animate={{ opacity: 1, x: 0 }}
