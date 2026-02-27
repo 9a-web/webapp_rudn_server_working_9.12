@@ -224,6 +224,44 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     }
   }, [friendInviteLink]);
 
+  // ─── Генерация изображения расписания ───
+  const exportRef = useRef(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
+  const handleGenerateImage = useCallback(async () => {
+    if (!exportRef.current) return;
+    setIsGeneratingImage(true);
+    try {
+      // Временно показываем скрытый контейнер для рендера
+      const el = exportRef.current;
+      el.style.display = 'block';
+      // Ждём один кадр для рендера
+      await new Promise(r => setTimeout(r, 100));
+
+      const dataUrl = await toPng(el, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        quality: 0.95,
+      });
+
+      el.style.display = 'none';
+
+      // Скачивание файла
+      const link = document.createElement('a');
+      link.download = `расписание_${selectedDay || 'день'}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      hapticFeedback?.('success');
+    } catch (err) {
+      console.error('Ошибка генерации изображения:', err);
+      // Fallback: попробуем с таймлайна напрямую
+      if (exportRef.current) exportRef.current.style.display = 'none';
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [selectedDay, hapticFeedback]);
+
   // ─── БАГ-ФИХ: правильный маппинг дня из selectedDate (воскресенье → нет данных) ───
   const selectedDay = useMemo(() => {
     const date = selectedDate ? new Date(selectedDate) : new Date();
