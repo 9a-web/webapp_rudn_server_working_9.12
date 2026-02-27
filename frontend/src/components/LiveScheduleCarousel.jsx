@@ -354,8 +354,8 @@ export const LiveScheduleCarousel = ({
           </div>
         </div>
 
-        {/* ── NAVIGATION: Mobile (vertical, right side) ── */}
-        <div className="absolute right-[6px] top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2.5 md:hidden z-[50]">
+        {/* ── NAVIGATION: Mobile + Tablet (vertical, right side) ── */}
+        <div className="absolute right-[6px] top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2.5 lg:hidden z-[50]">
           <motion.button
             onClick={handlePrevious}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/80 active:bg-gray-600/80 transition-colors"
