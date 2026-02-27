@@ -334,16 +334,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       hapticFeedback?.('impact', 'light');
       const data = await sharedScheduleAPI.getInviteLink(sharedData.id);
       if (data?.invite_link) {
-        // Если автодобавление выключено — добавляем суффикс _noschedule
-        const finalLink = inviteAutoAdd
-          ? data.invite_link
-          : data.invite_link + '_noschedule';
-        setInviteLink(finalLink);
+        setInviteLink(data.invite_link);
         setShowShareModal(true);
         setLinkCopied(false);
       }
     } catch (err) {
-      console.error('Error getting invite link:', err);
       setErrorMsg('Не удалось создать ссылку');
     } finally {
       setActionLoading(false);
