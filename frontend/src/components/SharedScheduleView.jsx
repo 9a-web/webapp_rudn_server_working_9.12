@@ -174,7 +174,7 @@ const CurrentTimeLine = () => {
 // ───────────────────────────────────────────
 // MAIN: SharedScheduleView
 // ───────────────────────────────────────────
-export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, onClose, hapticFeedback, onFriendPickerChange, onShareModalChange }) => {
+export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, onClose, hapticFeedback, onFriendPickerChange, onShareModalChange, externalShareTrigger }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false); // БАГ-ФИХ: loading для действий
