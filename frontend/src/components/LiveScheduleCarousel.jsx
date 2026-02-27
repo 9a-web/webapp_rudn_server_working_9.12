@@ -470,7 +470,7 @@ export const LiveScheduleCarousel = ({
 
         {/* Вертикальная карусель справа - скрыта на десктопах (md и больше) */}
         <div 
-          className="flex flex-col items-center justify-center gap-3 md:hidden ml-[5px] pr-[10px] mt-5"
+          className="flex flex-col items-center justify-center gap-3 md:hidden ml-[5px] pr-[10px]"
           style={{
             height: 'fit-content'
           }}
