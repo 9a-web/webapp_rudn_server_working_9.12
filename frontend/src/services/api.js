@@ -805,12 +805,31 @@ export const sharedScheduleAPI = {
 
   /**
    * Присоединиться к расписанию по ссылке
+   * @param {string} scheduleId
+   * @param {number} telegramId
+   * @param {string} firstName
+   * @param {boolean} addToSchedule - добавить своё расписание автоматически
    */
-  join: async (scheduleId, telegramId, firstName) => {
+  join: async (scheduleId, telegramId, firstName, addToSchedule = true) => {
     try {
       const response = await api.post(`/shared-schedule/join/${scheduleId}`, {
         telegram_id: telegramId,
         first_name: firstName,
+        add_to_schedule: addToSchedule,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
+   * Добавить своё расписание (снять флаг schedule_hidden)
+   */
+  addMySchedule: async (scheduleId, telegramId) => {
+    try {
+      const response = await api.post(`/shared-schedule/${scheduleId}/add-my-schedule`, {
+        telegram_id: telegramId,
       });
       return response.data;
     } catch (error) {
