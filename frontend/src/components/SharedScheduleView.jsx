@@ -307,11 +307,17 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const handleRemoveParticipant = async (participantId) => {
     if (!sharedData?.id) return;
+    const isLeavingMyself = String(participantId) === String(telegramId);
     try {
-      setActionLoading(true); // БАГ-ФИХ: показываем загрузку
+      setActionLoading(true);
       hapticFeedback?.('warning');
       await sharedScheduleAPI.removeParticipant(sharedData.id, participantId);
-      await loadSharedSchedule();
+      if (isLeavingMyself) {
+        // Пользователь покинул расписание — очищаем данные
+        setSharedData(null);
+      } else {
+        await loadSharedSchedule();
+      }
     } catch (err) {
       console.error('Error removing participant:', err);
       setErrorMsg('Не удалось удалить участника');
