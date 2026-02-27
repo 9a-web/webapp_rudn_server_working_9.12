@@ -745,6 +745,25 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         px += tw + pillGap;
       });
 
+      // ── Before indicator (свободное время до видимого диапазона) ──
+      if (imgBefore) {
+        const biY = headerH + PAD;
+        const biW = W - PAD * 2;
+        ctx.setLineDash([6 * dpr, 4 * dpr]);
+        ctx.strokeStyle = '#6ee7b7';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.fillStyle = '#ecfdf520';
+        ctx.beginPath();
+        ctx.roundRect(PAD, biY, biW, indicatorH - 4 * dpr, 10 * dpr);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#059669';
+        ctx.font = `500 ${10 * dpr}px ${FBASE}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`☕ Свободны ${fmtDurImg(imgBefore.duration)} (${imgBefore.start} – ${imgBefore.end})`, W / 2, biY + indicatorH / 2);
+      }
+
       // ── Timeline контейнер ──
       const tlX = PAD;
       const tlY = headerH + PAD + beforeH;
