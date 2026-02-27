@@ -861,9 +861,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           ctx.roundRect(cx, ey, cw, eh, 10 * dpr);
           ctx.fill();
 
-          // Левая полоска
+          // Левая полоска (закруглённая)
           ctx.fillStyle = participant.color;
-          ctx.fillRect(cx, ey + 4 * dpr, 3.5 * dpr, eh - 8 * dpr);
+          ctx.beginPath();
+          ctx.roundRect(cx, ey + 4 * dpr, 3.5 * dpr, eh - 8 * dpr, 2 * dpr);
+          ctx.fill();
 
           // Имя участника
           const pName = String(participant.telegram_id) === String(telegramId) ? 'Вы' : participant.first_name;
