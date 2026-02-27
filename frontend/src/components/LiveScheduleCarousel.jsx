@@ -92,12 +92,12 @@ export const LiveScheduleCarousel = ({
   const maxClasses = stats ? Math.max(...stats.weekChart.map(d => d.classes), 1) : 1;
 
   // ─── Shared styles ─────────────────────────
-  const sharedCardStyle = {
+  const sharedCardStyle = useMemo(() => ({
     backgroundColor: 'rgba(52, 52, 52, 0.7)',
     backdropFilter: 'blur(40px) saturate(180%)',
     WebkitBackdropFilter: 'blur(40px) saturate(180%)',
     width: '100%',
-  };
+  }), []);
 
   // ─── Card content renderer ─────────────────
   const renderCardContent = useCallback((type, isActive) => {
