@@ -103,7 +103,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
           <AnimatePresence mode="wait">
             <motion.div 
               key={currentClass || 'no-class'}
-              className="mb-2 md:mb-3"
+              className="mb-2 lg:mb-3"
               initial={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
