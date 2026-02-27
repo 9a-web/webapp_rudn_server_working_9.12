@@ -391,6 +391,7 @@ export const LiveScheduleSection = ({
           <SharedScheduleView 
             telegramId={telegramId}
             selectedDate={selectedDate}
+            weekNumber={weekNumber}
             onClose={() => setScheduleMode('personal')}
             hapticFeedback={hapticFeedback}
             onFriendPickerChange={onFriendPickerChange}
