@@ -199,49 +199,46 @@ class SharedScheduleTester:
         except Exception as e:
             self.log_test("Add Participant", False, f"Exception: {e}")
     
-    async def test_4_owner_protection(self):
+    async def test_4_remove_participant(self):
         """
-        Test 4: Owner protection - DELETE /api/shared-schedule/{id}/remove-participant/{owner_id}
-        should return HTTP 400 "cannot remove owner"
+        Critical Test 4: DELETE /api/shared-schedule/{id}/remove-participant/999003 
+        → should remove participant
         """
-        print("\n🧪 Test 4: Owner Protection Test")
+        print("\n🧪 Critical Test 4: Remove Participant")
         
         try:
-            # Use existing schedule or create one
-            owner_id = 999999
-            payload = {
-                "owner_id": owner_id,
-                "participant_ids": [200001]
-            }
+            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
+                self.log_test("Remove Participant", False, "No schedule ID available from previous test")
+                return
             
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
+            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/remove-participant/999003") as resp:
                 if resp.status != 200:
-                    self.log_test("Owner Protection Test", False, f"Schedule creation failed: {resp.status}")
+                    self.log_test("Remove Participant", False, f"DELETE failed: HTTP {resp.status}")
                     return
                 
                 data = await resp.json()
-                schedule_id = data.get("id")
+                success = data.get("success")
                 
-                if schedule_id:
-                    self.created_schedules.append(schedule_id)
-            
-            # Try to remove the owner
-            async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}/remove-participant/{owner_id}") as resp:
-                if resp.status == 400:
-                    response_text = await resp.text()
-                    # Check for owner protection message in English or Russian
-                    if ("owner" in response_text.lower() or 
-                        "владелец" in response_text.lower() or 
-                        "cannot remove" in response_text.lower() or
-                        "нельзя удалить" in response_text.lower()):
-                        self.log_test("Owner Protection Test", True, f"Owner removal correctly blocked with HTTP 400: {response_text}")
+                if not success:
+                    self.log_test("Remove Participant", False, f"success=false in response")
+                    return
+                
+                # Verify participant was removed by getting the schedule
+                async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
+                    if get_resp.status == 200:
+                        get_data = await get_resp.json()
+                        participants = get_data.get("participants", [])
+                        participant_ids = [p["telegram_id"] for p in participants]
+                        
+                        if 999003 not in participant_ids:
+                            self.log_test("Remove Participant", True, f"Participant 999003 successfully removed. Remaining participants: {len(participants)}")
+                        else:
+                            self.log_test("Remove Participant", False, f"Participant 999003 still found in participants: {participant_ids}")
                     else:
-                        self.log_test("Owner Protection Test", False, f"HTTP 400 but wrong message: {response_text}")
-                else:
-                    self.log_test("Owner Protection Test", False, f"Expected HTTP 400, got {resp.status}")
+                        self.log_test("Remove Participant", False, f"Could not verify participant removal: GET failed {get_resp.status}")
         
         except Exception as e:
-            self.log_test("Owner Protection Test", False, f"Exception: {e}")
+            self.log_test("Remove Participant", False, f"Exception: {e}")
     
     async def test_5_authorization(self):
         """
