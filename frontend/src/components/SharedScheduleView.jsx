@@ -172,11 +172,12 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   const [sharedData, setSharedData] = useState(null);
   const [friends, setFriends] = useState([]);
   const [showFriendPicker, setShowFriendPickerRaw] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // БАГ-ФИХ: подтверждение удаления
-  const [showShareModal, setShowShareModal] = useState(false);       // Модал шеринга
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [inviteAutoAdd, setInviteAutoAdd] = useState(true);   // добавлять ли расписание гостей
   const [linkCopied, setLinkCopied] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null); // БАГ-ФИХ: отображение ошибок
+  const [errorMsg, setErrorMsg] = useState(null);
   const timelineRef = useRef(null);
 
   const setShowFriendPicker = useCallback((value) => {
