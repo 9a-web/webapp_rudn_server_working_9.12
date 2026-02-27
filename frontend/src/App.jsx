@@ -2074,7 +2074,7 @@ const Home = () => {
       </AnimatePresence>
       
       {/* Adaptive container with responsive max-width */}
-      <div className="relative mx-auto max-w-[430px] md:max-w-3xl lg:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
+      <div className="relative mx-auto max-w-[430px] md:max-w-[500px] lg:max-w-3xl xl:max-w-7xl 2xl:max-w-8xl px-0 pb-24" style={{ zIndex: 10 }}>
         {/* Header - full width */}
         <Header 
           user={effectiveUser}
