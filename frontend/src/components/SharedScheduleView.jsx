@@ -686,37 +686,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   }, []);
 
   // ─── Диапазон для экспорта изображения (только от первой до последней пары + 1ч отступ) ───
-  const exportRange = useMemo(() => {
-    let minH = 23, maxH = 0;
-    Object.values(daySchedules).forEach(events => {
-      events.forEach(e => {
-        const [s, en] = (e.time || '').split(' - ').map(t => t?.trim());
-        const sMin = parseTime(s);
-        const eMin = parseTime(en);
-        if (sMin !== null) minH = Math.min(minH, Math.floor(sMin / 60));
-        if (eMin !== null) maxH = Math.max(maxH, Math.ceil(eMin / 60));
-      });
-    });
-    const startH = Math.max(0, minH - 1);
-    const endH = Math.min(23, maxH + 1);
-    return { startH, endH };
-  }, [daySchedules]);
-
-  const exportHourLines = useMemo(() => {
-    const lines = [];
-    for (let h = exportRange.startH; h <= exportRange.endH; h++) {
-      lines.push({
-        hour: h,
-        label: `${h}:00`,
-        top: minToPx(h * 60) - minToPx(exportRange.startH * 60),
-        isMain: h % 2 === 0,
-      });
-    }
-    return lines;
-  }, [exportRange]);
-
-  const exportHeight = minToPx(exportRange.endH * 60) - minToPx(exportRange.startH * 60) + 20;
-  const exportOffset = minToPx(exportRange.startH * 60);
 
   // ─── Check if today ───
   const isToday = useMemo(() => {
