@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Users, Plus, X, Clock, UserPlus, Coffee } from 'lucide-react';
+import { Users, Plus, X, Clock, UserPlus, Coffee, Trash2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sharedScheduleAPI } from '../services/api';
 import { friendsAPI } from '../services/friendsAPI';
@@ -29,7 +29,7 @@ const parseTime = (timeStr) => {
   return h * 60 + m;
 };
 
-// ─── Helper: minutes → "HH:MM" ───
+// ─── Helper: minutes → "H:MM" ───
 const formatTime = (minutes) => {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -54,7 +54,7 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
   const startMin = parseTime(startStr);
   const endMin = parseTime(endStr);
   
-  if (startMin === null || endMin === null) return null;
+  if (startMin === null || endMin === null || endMin <= startMin) return null;
   
   const top = minToPx(startMin);
   const height = durationToPx(endMin - startMin);
@@ -141,11 +141,10 @@ const CurrentTimeLine = () => {
     >
       {/* Time label */}
       <div 
-        className="absolute text-[10px] font-bold text-red-500 bg-red-500 text-white px-1 py-0.5 rounded"
+        className="absolute text-[9px] font-bold text-white bg-red-500 px-1 py-0.5 rounded"
         style={{ 
-          left: '0', 
+          left: '2px', 
           top: '-8px',
-          fontSize: '9px',
           lineHeight: '1',
         }}
       >
@@ -166,12 +165,15 @@ const CurrentTimeLine = () => {
 // ───────────────────────────────────────────
 // MAIN: SharedScheduleView
 // ───────────────────────────────────────────
-export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFeedback, onFriendPickerChange }) => {
+export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, onClose, hapticFeedback, onFriendPickerChange }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false); // БАГ-ФИХ: loading для действий
   const [sharedData, setSharedData] = useState(null);
   const [friends, setFriends] = useState([]);
   const [showFriendPicker, setShowFriendPickerRaw] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // БАГ-ФИХ: подтверждение удаления
+  const [errorMsg, setErrorMsg] = useState(null); // БАГ-ФИХ: отображение ошибок
   const timelineRef = useRef(null);
 
   const setShowFriendPicker = useCallback((value) => {
@@ -179,17 +181,15 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     onFriendPickerChange?.(value);
   }, [onFriendPickerChange]);
 
-  // ─── День из selectedDate ───
+  // ─── БАГ-ФИХ: правильный маппинг дня из selectedDate (воскресенье → нет данных) ───
   const selectedDay = useMemo(() => {
-    if (!selectedDate) {
-      const now = new Date();
-      const dayIdx = now.getDay();
-      const mappedIdx = dayIdx === 0 ? 5 : dayIdx - 1;
-      return DAYS_ORDER[Math.min(mappedIdx, 5)];
-    }
-    const date = new Date(selectedDate);
-    const dayIdx = date.getDay();
-    const mappedIdx = dayIdx === 0 ? 5 : dayIdx - 1;
+    const date = selectedDate ? new Date(selectedDate) : new Date();
+    const dayIdx = date.getDay(); // 0=вс, 1=пн, ..., 6=сб
+    
+    // БАГ-ФИХ: воскресенье (0) → null (нет расписания), не подменяем субботой
+    if (dayIdx === 0) return null;
+    
+    const mappedIdx = dayIdx - 1; // 1→0=пн, 2→1=вт, ..., 6→5=сб
     return DAYS_ORDER[Math.min(mappedIdx, 5)];
   }, [selectedDate]);
 
@@ -197,14 +197,17 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
   const loadSharedSchedule = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const data = await sharedScheduleAPI.get(telegramId);
+      setErrorMsg(null);
+      // БАГ-ФИХ: передаём текущую неделю
+      const data = await sharedScheduleAPI.get(telegramId, weekNumber);
       setSharedData(data);
     } catch (err) {
       console.error('Error loading shared schedule:', err);
+      if (!silent) setErrorMsg('Не удалось загрузить расписание');
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [telegramId]);
+  }, [telegramId, weekNumber]);
 
   const loadFriends = useCallback(async () => {
     try {
@@ -220,17 +223,27 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     loadFriends();
   }, [loadSharedSchedule, loadFriends]);
 
-  // ─── Polling: обновляем друзей и расписание каждые 15с ───
+  // БАГ-ФИХ: перезагружаем при смене недели
+  useEffect(() => {
+    if (sharedData?.exists) {
+      loadSharedSchedule(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekNumber]);
+
+  // ─── Polling: обновляем расписание каждые 30с (не 15 — меньше нагрузки) ───
   useEffect(() => {
     if (!sharedData?.exists) return;
     
     const interval = setInterval(() => {
-      loadFriends();
-      loadSharedSchedule(true); // silent — без спиннера
-    }, 15000);
+      // БАГ-ФИХ: не поллим когда открыт friend picker
+      if (!showFriendPicker) {
+        loadSharedSchedule(true);
+      }
+    }, 30000);
     
     return () => clearInterval(interval);
-  }, [sharedData?.exists, loadFriends, loadSharedSchedule]);
+  }, [sharedData?.exists, loadSharedSchedule, showFriendPicker]);
 
   // ─── При открытии friend picker — всегда обновляем список друзей ───
   useEffect(() => {
@@ -259,20 +272,14 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
       hapticFeedback?.('success');
       const result = await sharedScheduleAPI.create(telegramId, []);
       if (result && result.id) {
-        setSharedData({
-          exists: true,
-          id: result.id,
-          owner_id: result.owner_id,
-          participants: result.participants || [],
-          schedules: result.schedules || {},
-          free_windows: result.free_windows || [],
-          created_at: result.created_at,
-        });
+        // Загружаем полные данные с расписаниями
+        await loadSharedSchedule();
       } else {
         await loadSharedSchedule();
       }
     } catch (err) {
       console.error('Error creating shared schedule:', err);
+      setErrorMsg('Не удалось создать расписание');
     } finally {
       setLoading(false);
     }
@@ -281,24 +288,50 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
   const handleAddFriend = async (friendId) => {
     if (!sharedData?.id) return;
     try {
+      setActionLoading(true); // БАГ-ФИХ: показываем загрузку
       hapticFeedback?.('success');
       await sharedScheduleAPI.addParticipant(sharedData.id, friendId);
       setShowFriendPicker(false);
       // Мгновенно обновляем данные
-      await Promise.all([loadSharedSchedule(true), loadFriends()]);
+      await loadSharedSchedule();
     } catch (err) {
       console.error('Error adding participant:', err);
+      setErrorMsg('Не удалось добавить участника');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleRemoveParticipant = async (participantId) => {
     if (!sharedData?.id) return;
     try {
+      setActionLoading(true); // БАГ-ФИХ: показываем загрузку
       hapticFeedback?.('warning');
       await sharedScheduleAPI.removeParticipant(sharedData.id, participantId);
-      await loadSharedSchedule(true);
+      await loadSharedSchedule();
     } catch (err) {
       console.error('Error removing participant:', err);
+      setErrorMsg('Не удалось удалить участника');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // БАГ-ФИХ: функция удаления всего расписания
+  const handleDeleteSchedule = async () => {
+    if (!sharedData?.id) return;
+    try {
+      setActionLoading(true);
+      hapticFeedback?.('warning');
+      await sharedScheduleAPI.delete(sharedData.id);
+      setSharedData(null);
+      setShowDeleteConfirm(false);
+      hapticFeedback?.('success');
+    } catch (err) {
+      console.error('Error deleting schedule:', err);
+      setErrorMsg('Не удалось удалить расписание');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -383,11 +416,16 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
 
   // ─── Check if today ───
   const isToday = useMemo(() => {
+    if (!selectedDay) return false;
     const now = new Date();
     const todayDayIdx = now.getDay();
-    const todayMapped = todayDayIdx === 0 ? 5 : todayDayIdx - 1;
+    if (todayDayIdx === 0) return false; // воскресенье — нет расписания
+    const todayMapped = todayDayIdx - 1;
     return selectedDay === DAYS_ORDER[Math.min(todayMapped, 5)];
   }, [selectedDay]);
+
+  // ─── Проверяем является ли текущий пользователь владельцем ───
+  const isOwner = sharedData?.owner_id === telegramId || sharedData?.owner_id === String(telegramId);
 
   // ─── LOADING ───
   if (loading) {
@@ -398,6 +436,22 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
     );
   }
 
+  // ─── Уведомление об ошибке ───
+  const ErrorBanner = errorMsg ? (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="mx-4 mb-3 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2"
+    >
+      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+      <span className="text-sm text-red-600">{errorMsg}</span>
+      <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">
+        <X className="w-4 h-4" />
+      </button>
+    </motion.div>
+  ) : null;
+
   // ─── CREATE SCREEN ───
   if (!sharedData?.exists) {
     return (
@@ -406,6 +460,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
         animate={{ opacity: 1, y: 0 }}
         className="px-4 py-8"
       >
+        <AnimatePresence>{ErrorBanner}</AnimatePresence>
         <div className="text-center">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-indigo-500/10 flex items-center justify-center">
             <Users className="w-10 h-10 text-indigo-400" />
@@ -418,11 +473,66 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
           </p>
           <button
             onClick={handleCreateShared}
-            className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20"
+            disabled={actionLoading}
+            className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-2xl font-medium transition-all duration-200 shadow-lg shadow-indigo-500/20"
           >
             <Users className="w-4 h-4 inline mr-2" />
             Сверить с друзьями
           </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ─── Воскресенье — нет расписания ───
+  if (selectedDay === null) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-1">
+        {/* Participants bar */}
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-2.5 px-3">
+            <Users className="w-4 h-4 text-indigo-500" />
+            <span className="text-sm font-medium text-[#1c1c1c]">Участники</span>
+            <button
+              onClick={() => setShowFriendPicker(true)}
+              disabled={actionLoading}
+              className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-50"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Добавить
+            </button>
+            {isOwner && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={actionLoading}
+                className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                title="Удалить расписание"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 px-3">
+            {sharedData.participants?.map((p, idx) => (
+              <div
+                key={p.telegram_id}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm"
+                style={{ borderColor: p.color + '40', backgroundColor: p.color + '12' }}
+              >
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                <span className="text-[#1c1c1c] font-medium text-xs">
+                  {p.telegram_id === telegramId ? 'Вы' : p.first_name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="text-center py-12 mx-4">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+            <Clock className="w-7 h-7 text-gray-400" />
+          </div>
+          <div className="text-[#666] text-sm font-medium mb-1">В воскресенье занятий нет</div>
+          <div className="text-[#bbb] text-xs">Выберите рабочий день недели</div>
         </div>
       </motion.div>
     );
@@ -440,20 +550,53 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
       animate={{ opacity: 1 }}
       className="px-1"
     >
+      {/* Ошибка */}
+      <AnimatePresence>
+        {errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mx-3 mb-3 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2"
+          >
+            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <span className="text-sm text-red-600">{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ─── Participants bar ─── */}
       <div className="mb-3">
         <div className="flex items-center gap-2 mb-2.5 px-3">
           <Users className="w-4 h-4 text-indigo-500" />
           <span className="text-sm font-medium text-[#1c1c1c]">Участники</span>
+          {/* Кнопка добавить */}
           <button
             onClick={() => setShowFriendPicker(true)}
-            className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium"
+            disabled={actionLoading || (sharedData.participants?.length || 0) >= 8}
+            className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-600 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            title={(sharedData.participants?.length || 0) >= 8 ? 'Максимум 8 участников' : 'Добавить друга'}
           >
             <Plus className="w-3.5 h-3.5" />
             Добавить
           </button>
+          {/* БАГ-ФИХ: Кнопка удаления расписания — только для owner */}
+          {isOwner && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={actionLoading}
+              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+              title="Удалить расписание"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
+        {/* БАГ-ФИХ: loading state для участников */}
         <div className="flex flex-wrap gap-2 px-3">
           {sharedData.participants?.map((p, idx) => (
             <motion.div
@@ -471,30 +614,52 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
               <span className="text-[#1c1c1c] font-medium text-xs">
                 {p.telegram_id === telegramId ? 'Вы' : p.first_name}
               </span>
-              {p.telegram_id !== telegramId && (
+              {/* Удалять можно только других участников, не себя */}
+              {p.telegram_id !== telegramId && isOwner && (
                 <button
                   onClick={() => handleRemoveParticipant(p.telegram_id)}
-                  className="text-[#ccc] hover:text-red-400 transition-colors -mr-1"
+                  disabled={actionLoading}
+                  className="text-[#ccc] hover:text-red-400 transition-colors -mr-1 disabled:opacity-30"
                 >
-                  <X className="w-3 h-3" />
+                  {actionLoading ? (
+                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <X className="w-3 h-3" />
+                  )}
                 </button>
               )}
             </motion.div>
           ))}
         </div>
+
+        {/* Подсказка при 1 участнике */}
+        {(sharedData.participants?.length || 0) < 2 && (
+          <div className="mx-3 mt-2 p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center gap-2">
+            <UserPlus className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+            <span className="text-xs text-indigo-500">
+              Добавьте друга, чтобы увидеть общие свободные окна
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ─── Legend ─── */}
-      {hasAnyEvents && dayFreeWindows.length > 0 && (
+      {hasAnyEvents && (
         <div className="flex items-center gap-3 px-4 mb-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded border border-dashed border-emerald-300 bg-emerald-50" />
-            <span className="text-[10px] text-[#999]">Свободны оба</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 bg-red-500 rounded" />
-            <span className="text-[10px] text-[#999]">Сейчас</span>
-          </div>
+          {dayFreeWindows.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded border border-dashed border-emerald-300 bg-emerald-50" />
+              <span className="text-[10px] text-[#999]">
+                {(sharedData.participants?.length || 0) >= 2 ? 'Свободны все' : 'Свободное время'}
+              </span>
+            </div>
+          )}
+          {isToday && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-0.5 bg-red-500 rounded" />
+              <span className="text-[10px] text-[#999]">Сейчас</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -504,7 +669,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
           ref={timelineRef}
           className="relative overflow-y-auto overflow-x-hidden mx-2 rounded-2xl scrollbar-hide"
           style={{
-            maxHeight: 'calc(100vh - 340px)',
+            maxHeight: 'calc(100vh - 360px)',
             backgroundColor: '#fafafa',
             border: '1px solid #f0f0f0',
             scrollbarWidth: 'none',
@@ -611,7 +776,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
                 const durationText = hours > 0
                   ? `${hours}ч${mins > 0 ? ` ${mins}м` : ''}`
                   : `${mins}м`;
-                const isSmall = fwHeight < 50;
+                const isSmall = fwHeight < 40;
                 
                 return (
                   <motion.div
@@ -622,7 +787,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
                     className="absolute left-0 right-0 rounded-xl overflow-hidden"
                     style={{
                       top: `${fwTop}px`,
-                      height: `${fwHeight}px`,
+                      height: `${Math.max(fwHeight, 24)}px`,
                       zIndex: 5,
                     }}
                   >
@@ -679,12 +844,12 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
             <Clock className="w-7 h-7 text-gray-400" />
           </div>
           <div className="text-[#666] text-sm font-medium mb-1">
-            {sharedData.participants?.length < 2
-              ? 'Выберите друга, чтобы сверить расписания'
-              : 'Нет пар в этот день'}
+            {(sharedData.participants?.length || 0) < 2
+              ? 'Добавьте друга, чтобы сверить расписания'
+              : `Нет пар в ${selectedDay || 'этот день'}`}
           </div>
           <div className="text-[#bbb] text-xs">
-            {sharedData.participants?.length < 2
+            {(sharedData.participants?.length || 0) < 2
               ? 'Нажмите «Добавить» выше'
               : 'Выберите другой день недели'}
           </div>
@@ -701,31 +866,35 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
             className="fixed inset-0 z-50 flex items-end justify-center"
             onClick={() => setShowFriendPicker(false)}
           >
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-lg rounded-t-3xl p-6 max-h-[60vh] overflow-y-auto"
+              className="relative w-full max-w-lg rounded-t-3xl p-6 max-h-[65vh] overflow-y-auto"
               style={{
-                backgroundColor: 'var(--tg-theme-bg-color, #1a1a2e)',
-                borderTop: '1px solid rgba(255,255,255,0.1)',
+                backgroundColor: '#ffffff', /* БАГ-ФИХ: светлый фон вместо тёмного */
+                borderTop: '1px solid #e5e7eb',
               }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Добавить друга</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Добавить друга</h3>
                 <button
                   onClick={() => setShowFriendPicker(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-400 hover:text-gray-700 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {availableFriends.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">
+              {actionLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full" />
+                </div>
+              ) : availableFriends.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 text-sm">
                   {friends.length === 0
                     ? 'У вас пока нет друзей'
                     : 'Все друзья уже добавлены'}
@@ -736,24 +905,76 @@ export const SharedScheduleView = ({ telegramId, selectedDate, onClose, hapticFe
                     <button
                       key={friend.telegram_id}
                       onClick={() => handleAddFriend(friend.telegram_id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/10 hover:bg-white/15 transition-colors text-left"
+                      disabled={actionLoading}
+                      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 transition-colors text-left disabled:opacity-50"
                     >
-                      <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-medium">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-sm">
                         {friend.first_name?.[0] || '?'}
                       </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-white">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
                           {friend.first_name} {friend.last_name || ''}
                         </div>
                         {friend.username && (
-                          <div className="text-xs text-gray-400">@{friend.username}</div>
+                          <div className="text-xs text-gray-400 truncate">@{friend.username}</div>
                         )}
                       </div>
-                      <UserPlus className="w-4 h-4 text-indigo-400" />
+                      <UserPlus className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                     </button>
                   ))}
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Delete Confirmation Modal ─── */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-5">
+                <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="w-7 h-7 text-red-500" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Удалить расписание?</h3>
+                <p className="text-sm text-gray-500">
+                  Все участники будут удалены из совместного расписания
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 rounded-2xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleDeleteSchedule}
+                  disabled={actionLoading}
+                  className="flex-1 py-3 rounded-2xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                >
+                  {actionLoading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+                  ) : (
+                    'Удалить'
+                  )}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
