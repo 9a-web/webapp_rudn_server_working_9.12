@@ -426,10 +426,10 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   const actualStartHour = TIMELINE_START_HOUR;
   const actualEndHour = TIMELINE_END_HOUR;
 
-  // ─── Hour grid lines ───
+  // ─── Hour grid lines (полный диапазон 0:00 – 23:00) ───
   const hourLines = useMemo(() => {
     const lines = [];
-    for (let h = actualStartHour; h <= actualEndHour; h++) {
+    for (let h = TIMELINE_START_HOUR; h <= TIMELINE_END_HOUR; h++) {
       lines.push({
         hour: h,
         label: `${h}:00`,
@@ -438,7 +438,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       });
     }
     return lines;
-  }, [actualStartHour, actualEndHour]);
+  }, []);
 
   // ─── Check if today ───
   const isToday = useMemo(() => {
