@@ -17105,6 +17105,9 @@ async def join_shared_schedule(schedule_id: str, data: dict):
             raise HTTPException(status_code=400, detail="telegram_id обязателен")
         telegram_id = int(telegram_id)
 
+        # add_to_schedule=False → участник добавляется, но его расписание не показывается
+        add_to_schedule = bool(data.get("add_to_schedule", True))
+
         doc = await db.shared_schedules.find_one({"id": schedule_id})
         if not doc:
             raise HTTPException(status_code=404, detail="Расписание не найдено или ссылка устарела")
@@ -17112,10 +17115,12 @@ async def join_shared_schedule(schedule_id: str, data: dict):
         participants = doc.get("participants", [])
 
         # Уже участник — просто возвращаем данные
-        if any(p["telegram_id"] == telegram_id for p in participants):
+        existing = next((p for p in participants if p["telegram_id"] == telegram_id), None)
+        if existing:
             return {
                 "success": True,
                 "already_member": True,
+                "schedule_hidden": existing.get("schedule_hidden", False),
                 "message": "Вы уже в этом расписании",
                 "schedule_id": schedule_id,
                 "owner_id": doc.get("owner_id"),
@@ -17139,6 +17144,7 @@ async def join_shared_schedule(schedule_id: str, data: dict):
             "telegram_id": telegram_id,
             "first_name": p_name,
             "color": PARTICIPANT_COLORS[color_idx],
+            "schedule_hidden": not add_to_schedule,  # скрываем расписание если add_to_schedule=False
         }
 
         await db.shared_schedules.update_one(
@@ -17152,7 +17158,8 @@ async def join_shared_schedule(schedule_id: str, data: dict):
         return {
             "success": True,
             "already_member": False,
-            "message": f"Вы добавлены в расписание",
+            "schedule_hidden": not add_to_schedule,
+            "message": "Вы добавлены в расписание",
             "schedule_id": schedule_id,
             "owner_id": doc.get("owner_id"),
         }
