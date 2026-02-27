@@ -16813,11 +16813,27 @@ async def claim_referral_reward(data: dict = Body(...)):
 # ============ Эндпоинты для совместного расписания ============
 
 PARTICIPANT_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+MAX_PARTICIPANTS = 8  # максимум 8 участников (включая владельца)
+
 
 @api_router.post("/shared-schedule", response_model=SharedScheduleResponse)
 async def create_shared_schedule(data: SharedScheduleCreate):
-    """Создать совместное расписание"""
+    """Создать совместное расписание (или вернуть существующее для данного владельца)"""
     try:
+        # БАГ-ФИХ: Проверяем — есть ли уже расписание у этого owner
+        existing = await db.shared_schedules.find_one({"owner_id": data.owner_id})
+        if existing:
+            # Возвращаем существующее расписание без создания дубля
+            participants = existing.get("participants", [])
+            return SharedScheduleResponse(
+                id=existing["id"],
+                owner_id=existing["owner_id"],
+                participants=participants,
+                schedules={},
+                free_windows=[],
+                created_at=existing.get("created_at")
+            )
+
         schedule_id = str(uuid.uuid4())
         
         # Получаем данные владельца
@@ -16832,8 +16848,8 @@ async def create_shared_schedule(data: SharedScheduleCreate):
             "color": PARTICIPANT_COLORS[0]
         }]
         
-        # Добавляем друзей-участников
-        for idx, pid in enumerate(data.participant_ids[:7]):
+        # Добавляем друзей-участников (максимум MAX_PARTICIPANTS - 1)
+        for idx, pid in enumerate(data.participant_ids[:(MAX_PARTICIPANTS - 1)]):
             p_settings = await db.user_settings.find_one({"telegram_id": pid})
             p_name = str(pid)
             if p_settings:
@@ -16869,8 +16885,12 @@ async def create_shared_schedule(data: SharedScheduleCreate):
 
 
 @api_router.get("/shared-schedule/{telegram_id}")
-async def get_shared_schedule(telegram_id: int):
-    """Получить совместное расписание пользователя с расписаниями всех участников"""
+async def get_shared_schedule(telegram_id: int, week: int = 1):
+    """Получить совместное расписание пользователя с расписаниями всех участников.
+    
+    Параметры:
+    - week: 1 = текущая неделя, 2 = следующая неделя (по умолчанию 1)
+    """
     try:
         doc = await db.shared_schedules.find_one({
             "$or": [
@@ -16885,21 +16905,30 @@ async def get_shared_schedule(telegram_id: int):
         participants = doc.get("participants", [])
         schedules = {}
         
+        # БАГ-ФИХ: используем переданный week, а не захардкоженную 1
+        week_num = max(1, min(2, week))
+        
         # Загружаем расписания всех участников
         for p in participants:
             p_id = p["telegram_id"]
             p_settings = await db.user_settings.find_one({"telegram_id": p_id})
             if p_settings and p_settings.get("group_id"):
                 group_id = p_settings["group_id"]
-                # Определяем текущую неделю (1 = текущая)
-                week_num = 1
                 
-                # Ищем в кэше
+                # БАГ-ФИХ: проверяем срок действия кэша
                 cached = await db.schedule_cache.find_one({
                     "group_id": group_id,
                     "week_number": week_num
                 })
-                if cached and cached.get("events"):
+                
+                cache_valid = (
+                    cached
+                    and cached.get("events")
+                    and cached.get("expires_at")
+                    and cached["expires_at"] > datetime.utcnow()
+                )
+                
+                if cache_valid:
                     schedules[str(p_id)] = cached["events"]
                 else:
                     # Пробуем загрузить из API РУДН
@@ -16913,10 +16942,29 @@ async def get_shared_schedule(telegram_id: int):
                             group_id,
                             week_num
                         )
-                        schedules[str(p_id)] = [e if isinstance(e, dict) else (e.dict() if hasattr(e, 'dict') else {}) for e in events] if events else []
+                        loaded = [e if isinstance(e, dict) else (e.dict() if hasattr(e, 'dict') else {}) for e in events] if events else []
+                        schedules[str(p_id)] = loaded
+                        
+                        # Сохраняем в кэш
+                        if loaded:
+                            await db.schedule_cache.update_one(
+                                {"group_id": group_id, "week_number": week_num},
+                                {"$set": {
+                                    "group_id": group_id,
+                                    "week_number": week_num,
+                                    "events": loaded,
+                                    "cached_at": datetime.utcnow(),
+                                    "expires_at": datetime.utcnow() + timedelta(hours=6)
+                                }},
+                                upsert=True
+                            )
                     except Exception as sched_err:
                         logger.warning(f"Cannot load schedule for {p_id}: {sched_err}")
-                        schedules[str(p_id)] = []
+                        # Используем устаревший кэш если есть
+                        if cached and cached.get("events"):
+                            schedules[str(p_id)] = cached["events"]
+                        else:
+                            schedules[str(p_id)] = []
             else:
                 schedules[str(p_id)] = []
         
@@ -16930,7 +16978,9 @@ async def get_shared_schedule(telegram_id: int):
             "participants": participants,
             "schedules": schedules,
             "free_windows": free_windows,
-            "created_at": doc.get("created_at")
+            "created_at": doc.get("created_at"),
+            "updated_at": doc.get("updated_at"),
+            "week": week_num
         }
     except Exception as e:
         logger.error(f"Ошибка получения совместного расписания: {e}")
@@ -16946,6 +16996,14 @@ async def add_shared_schedule_participant(schedule_id: str, data: SharedSchedule
             raise HTTPException(status_code=404, detail="Совместное расписание не найдено")
         
         participants = doc.get("participants", [])
+        
+        # БАГ-ФИХ: проверяем лимит участников
+        if len(participants) >= MAX_PARTICIPANTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Максимальное количество участников — {MAX_PARTICIPANTS}"
+            )
+        
         if any(p["telegram_id"] == data.participant_id for p in participants):
             return SuccessResponse(success=True, message="Участник уже добавлен")
         
@@ -16981,6 +17039,22 @@ async def add_shared_schedule_participant(schedule_id: str, data: SharedSchedule
 async def remove_shared_schedule_participant(schedule_id: str, participant_id: int):
     """Удалить участника из совместного расписания"""
     try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Совместное расписание не найдено")
+
+        # БАГ-ФИХ: нельзя удалить владельца расписания
+        if doc.get("owner_id") == participant_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя удалить владельца расписания"
+            )
+
+        # Проверяем что участник вообще есть
+        participants = doc.get("participants", [])
+        if not any(p["telegram_id"] == participant_id for p in participants):
+            return SuccessResponse(success=False, message="Участник не найден")
+
         await db.shared_schedules.update_one(
             {"id": schedule_id},
             {
@@ -16989,62 +17063,90 @@ async def remove_shared_schedule_participant(schedule_id: str, participant_id: i
             }
         )
         return SuccessResponse(success=True, message="Участник удалён")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка удаления участника: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.delete("/shared-schedule/{schedule_id}")
-async def delete_shared_schedule(schedule_id: str):
-    """Удалить совместное расписание"""
+async def delete_shared_schedule(schedule_id: str, owner_id: Optional[int] = None):
+    """Удалить совместное расписание (только владелец)"""
     try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+
+        # БАГ-ФИХ: проверяем права — только owner может удалить
+        if owner_id is not None and doc.get("owner_id") != owner_id:
+            raise HTTPException(status_code=403, detail="Только владелец может удалить расписание")
+
         await db.shared_schedules.delete_one({"id": schedule_id})
         return SuccessResponse(success=True, message="Совместное расписание удалено")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 def _compute_free_windows(schedules: dict, participants: list) -> list:
-    """Вычислить общие свободные окна для всех участников"""
-    if not schedules or len(schedules) < 2:
+    """Вычислить общие свободные окна для всех участников.
+    
+    Логика: находим временные слоты, когда НИ У ОДНОГО участника нет пар.
+    Минимальная длительность свободного окна — 30 минут.
+    """
+    # БАГ-ФИХ: возвращаем окна даже при 1 участнике (показываем его свободное время)
+    if not schedules:
         return []
     
-    days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+    days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
     free_windows = []
     
-    # Пары обычно с 9:00 до 21:00, слоты по 30 минут
+    # Пары обычно с 8:00 до 21:00, слоты по 30 минут
     time_slots = []
-    for h in range(9, 21):
+    for h in range(8, 21):
         for m in [0, 30]:
             time_slots.append(f"{h:02d}:{m:02d}")
     
+    # Нормализуем дни в данных для сравнения (приводим к нижнему регистру, убираем пробелы)
+    def normalize_day(day_str: str) -> str:
+        return day_str.strip().lower() if day_str else ""
+
     for day in days_ru:
-        # Собираем занятые слоты для каждого участника
+        day_norm = normalize_day(day)
+        # Собираем занятые слоты для ВСЕХ участников (объединение)
         all_busy = set()
+        has_any_events_today = False
         
         for p_id, events in schedules.items():
             for event in events:
-                event_day = event.get("day", "")
-                if event_day.lower() != day.lower():
+                event_day = normalize_day(event.get("day", ""))
+                if event_day != day_norm:
                     continue
                 
+                has_any_events_today = True
                 time_str = event.get("time", "")
                 if " - " in time_str:
-                    start_time, end_time = time_str.split(" - ")
+                    start_time, end_time = time_str.split(" - ", 1)
                     try:
                         sh, sm = map(int, start_time.strip().split(":"))
                         eh, em = map(int, end_time.strip().split(":"))
                         
                         # Помечаем все 30-минутные слоты как занятые
                         current = sh * 60 + sm
-                        end = eh * 60 + em
-                        while current < end:
+                        end_slot = eh * 60 + em
+                        while current < end_slot:
                             all_busy.add(current)
                             current += 30
-                    except:
+                    except (ValueError, AttributeError):
                         pass
         
-        # Находим свободные окна (минимум 1 час)
+        # Пропускаем дни без занятий — нечего сравнивать
+        if not has_any_events_today:
+            continue
+        
+        # Находим свободные окна (минимум 30 минут — БАГ-ФИХ: было 60)
         free_start = None
         for slot in time_slots:
             sh, sm = map(int, slot.split(":"))
@@ -17055,8 +17157,9 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
                     free_start = slot
             else:
                 if free_start is not None:
-                    duration = minutes - (int(free_start.split(":")[0]) * 60 + int(free_start.split(":")[1]))
-                    if duration >= 60:  # Минимум 1 час
+                    start_minutes = int(free_start.split(":")[0]) * 60 + int(free_start.split(":")[1])
+                    duration = minutes - start_minutes
+                    if duration >= 30:  # БАГ-ФИХ: минимум 30 минут вместо 60
                         free_windows.append({
                             "day": day,
                             "start": free_start,
@@ -17065,12 +17168,12 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
                         })
                     free_start = None
         
-        # Последнее окно
+        # Последнее окно (до конца дня)
         if free_start is not None:
             last_minutes = 21 * 60
             start_minutes = int(free_start.split(":")[0]) * 60 + int(free_start.split(":")[1])
             duration = last_minutes - start_minutes
-            if duration >= 60:
+            if duration >= 30:
                 free_windows.append({
                     "day": day,
                     "start": free_start,
