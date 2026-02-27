@@ -631,26 +631,26 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const dateObj = selectedDate ? new Date(selectedDate) : new Date();
       const dateStr = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 
-      // ── Определяем диапазон часов ──
+      // ── Определяем точный диапазон первой и последней пары ──
       let hasEvents = false;
-      let minH = 23, maxH = 0;
+      let imgFirstMin = null, imgLastMin = null;
       Object.values(daySchedules).forEach(events => {
         events.forEach(e => {
           const [s, en] = (e.time || '').split(' - ').map(t => t?.trim());
           const sM = parseTime(s), eM = parseTime(en);
-          if (sM !== null) { minH = Math.min(minH, Math.floor(sM / 60)); hasEvents = true; }
-          if (eM !== null) { maxH = Math.max(maxH, Math.ceil(eM / 60)); hasEvents = true; }
+          if (sM !== null) { imgFirstMin = imgFirstMin === null ? sM : Math.min(imgFirstMin, sM); hasEvents = true; }
+          if (eM !== null) { imgLastMin = imgLastMin === null ? eM : Math.max(imgLastMin, eM); hasEvents = true; }
         });
       });
 
-      // ── Защита от пустого расписания: startH всегда < endH ──
+      // Тайм-лайн изображения: от часа первой пары до часа последней пары
       let startH, endH;
-      if (!hasEvents || minH > maxH) {
-        startH = 8;
-        endH = 18;
+      if (!hasEvents || imgFirstMin === null || imgLastMin === null) {
+        startH = 8; endH = 18;
       } else {
-        startH = Math.max(0, minH - 1);
-        endH = Math.min(23, maxH + 1);
+        startH = Math.floor(imgFirstMin / 60);
+        endH = Math.ceil(imgLastMin / 60);
+        if (startH >= endH) endH = startH + 1;
       }
 
       const pxPerMin = PX_PER_MIN * dpr;
@@ -658,11 +658,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const toY = (min) => (min - offsetMin) * pxPerMin;
       const timelineH = toY(endH * 60) + 10 * dpr;
 
-      // ── Разделяем свободные окна на before/within/after ──
-      const imgVisStartMin = startH * 60;
-      const imgVisEndMin = endH * 60;
+      // ── Разделяем свободные окна: before (до первой пары) / within / after (после последней) ──
       let imgBefore = null, imgAfter = null;
       const imgVisibleFW = [];
+      const fcMin = imgFirstMin ?? startH * 60;
+      const lcMin = imgLastMin ?? endH * 60;
 
       dayFreeWindows.forEach(fw => {
         const fwS = parseTime(fw.start);
@@ -670,20 +670,37 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         if (fw.end === '24:00') fwE = 1440;
         if (fwS === null || fwE === null) return;
 
-        if (fwS < imgVisStartMin) {
-          const effEnd = Math.min(fwE, imgVisStartMin);
-          if (!imgBefore || fwS < parseTime(imgBefore.start)) imgBefore = { start: fw.start, end: formatTime(effEnd), duration: effEnd - fwS };
-          else imgBefore.duration = Math.max(imgBefore.duration, effEnd - fwS);
+        // Целиком до первой пары → before
+        if (fwE <= fcMin) {
+          if (!imgBefore) imgBefore = { start: fw.start, end: fw.end, duration: fwE - fwS };
+          else { imgBefore.start = fwS < parseTime(imgBefore.start) ? fw.start : imgBefore.start; imgBefore.end = fwE > parseTime(imgBefore.end) ? (fwE >= 1440 ? '24:00' : formatTime(fwE)) : imgBefore.end; imgBefore.duration += fwE - fwS; }
+          return;
         }
-        if (fwE > imgVisEndMin) {
-          const effStart = Math.max(fwS, imgVisEndMin);
-          const effEnd = fwE;
-          if (!imgAfter || effStart < parseTime(imgAfter.start)) imgAfter = { start: formatTime(effStart), end: fwE >= 1440 ? '24:00' : formatTime(effEnd), duration: effEnd - effStart };
-          else imgAfter.duration = Math.max(imgAfter.duration, effEnd - effStart);
+        // Целиком после последней пары → after
+        if (fwS >= lcMin) {
+          if (!imgAfter) imgAfter = { start: fw.start, end: fw.end === '24:00' ? '24:00' : fw.end, duration: fwE - fwS };
+          else { imgAfter.end = fwE > parseTime(imgAfter.end) ? (fwE >= 1440 ? '24:00' : formatTime(fwE)) : imgAfter.end; imgAfter.duration += fwE - fwS; }
+          return;
         }
-        const clS = Math.max(fwS, imgVisStartMin), clE = Math.min(fwE, imgVisEndMin);
+        // Перекрывает границу — разделяем
+        if (fwS < fcMin) {
+          const bDur = fcMin - fwS;
+          if (!imgBefore) imgBefore = { start: fw.start, end: formatTime(fcMin), duration: bDur };
+          else imgBefore.duration += bDur;
+        }
+        if (fwE > lcMin) {
+          const aDur = fwE - lcMin;
+          if (!imgAfter) imgAfter = { start: formatTime(lcMin), end: fwE >= 1440 ? '24:00' : formatTime(fwE), duration: aDur };
+          else imgAfter.duration += aDur;
+        }
+        // Видимая часть — только между первой и последней парой
+        const clS = Math.max(fwS, fcMin), clE = Math.min(fwE, lcMin);
         if (clE > clS) imgVisibleFW.push({ ...fw, start: formatTime(clS), end: formatTime(clE), duration_minutes: clE - clS, _sMin: clS, _eMin: clE });
       });
+
+      // Пересчитываем before/after суммарные диапазоны
+      if (imgBefore) { imgBefore.start = imgBefore.start || '0:00'; imgBefore.end = imgBefore.end || formatTime(fcMin); }
+      if (imgAfter) { imgAfter.start = imgAfter.start || formatTime(lcMin); imgAfter.end = imgAfter.end || '24:00'; }
 
       const fmtDurImg = (d) => { const h = Math.floor(d / 60), m = d % 60; return h > 0 ? `${h}ч${m > 0 ? ` ${m}м` : ''}` : `${m}м`; };
       const indicatorH = 36 * dpr;
