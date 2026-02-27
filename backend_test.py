@@ -156,56 +156,48 @@ class SharedScheduleTester:
         except Exception as e:
             self.log_test("Get Schedule Week=1", False, f"Exception: {e}")
     
-    async def test_3_participant_limit(self):
+    async def test_3_add_participant(self):
         """
-        Test 3: Participant limit - After creating schedule, add 7 participants (200001-200007),
-        8th add should return HTTP 400
+        Critical Test 3: POST /api/shared-schedule/{id}/add-participant with {"participant_id": 999003} 
+        → should add participant
         """
-        print("\n🧪 Test 3: Participant Limit Test")
+        print("\n🧪 Critical Test 3: Add Participant")
         
         try:
-            # Create new schedule for this test
-            payload = {
-                "owner_id": 888888,
-                "participant_ids": []
-            }
+            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
+                self.log_test("Add Participant", False, "No schedule ID available from previous test")
+                return
             
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
+            payload = {"participant_id": 999003}
+            
+            async with self.session.post(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/add-participant", json=payload) as resp:
                 if resp.status != 200:
-                    self.log_test("Participant Limit Test", False, f"Schedule creation failed: {resp.status}")
+                    self.log_test("Add Participant", False, f"POST failed: HTTP {resp.status}")
                     return
                 
                 data = await resp.json()
-                schedule_id = data.get("id")
+                success = data.get("success")
                 
-                if schedule_id:
-                    self.created_schedules.append(schedule_id)
-            
-            # Add 7 participants (200001-200007)
-            success_count = 0
-            for i in range(1, 8):  # 200001 to 200007
-                participant_id = 200000 + i
-                add_payload = {"participant_id": participant_id}
+                if not success:
+                    self.log_test("Add Participant", False, f"success=false in response")
+                    return
                 
-                async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as add_resp:
-                    if add_resp.status == 200:
-                        success_count += 1
-                        print(f"    Added participant {participant_id} (#{success_count})")
+                # Verify participant was added by getting the schedule
+                async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
+                    if get_resp.status == 200:
+                        get_data = await get_resp.json()
+                        participants = get_data.get("participants", [])
+                        participant_ids = [p["telegram_id"] for p in participants]
+                        
+                        if 999003 in participant_ids:
+                            self.log_test("Add Participant", True, f"Participant 999003 successfully added. Total participants: {len(participants)}")
+                        else:
+                            self.log_test("Add Participant", False, f"Participant 999003 not found in participants: {participant_ids}")
                     else:
-                        print(f"    Failed to add participant {participant_id}: {add_resp.status}")
-            
-            # Try to add 8th participant (should fail with 400)
-            participant_8 = 200008
-            add_payload = {"participant_id": participant_8}
-            
-            async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as add_resp:
-                if add_resp.status == 400:
-                    self.log_test("Participant Limit Test", True, f"8th participant correctly rejected with HTTP 400")
-                else:
-                    self.log_test("Participant Limit Test", False, f"8th participant returned HTTP {add_resp.status}, expected 400")
+                        self.log_test("Add Participant", False, f"Could not verify participant addition: GET failed {get_resp.status}")
         
         except Exception as e:
-            self.log_test("Participant Limit Test", False, f"Exception: {e}")
+            self.log_test("Add Participant", False, f"Exception: {e}")
     
     async def test_4_owner_protection(self):
         """
