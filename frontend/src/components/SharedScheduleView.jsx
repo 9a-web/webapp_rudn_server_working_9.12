@@ -198,28 +198,30 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     onShareModalChange?.(value);
   }, [onShareModalChange]);
 
-  // ─── Реферальная ссылка для приглашения друзей ───
-  const [referralLink, setReferralLink] = useState('');
+  // ─── Ссылка на добавление в друзья (friend_{telegram_id}) ───
+  const [friendInviteLink, setFriendInviteLink] = useState('');
 
   useEffect(() => {
     if (telegramId) {
-      getReferralCode(telegramId).then(data => {
-        setReferralLink(data?.referral_link_webapp || data?.referral_link || '');
-      }).catch(() => {});
+      const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '';
+      fetch(`${backendUrl}/api/profile/${telegramId}/qr`)
+        .then(r => r.json())
+        .then(data => setFriendInviteLink(data?.qr_data || ''))
+        .catch(() => {});
     }
   }, [telegramId]);
 
   const handleInviteFriends = useCallback(() => {
-    if (!referralLink) return;
+    if (!friendInviteLink) return;
     const text = encodeURIComponent('Привет! Добавь меня в друзья в RUDN GO 🎓');
-    const url = encodeURIComponent(referralLink);
+    const url = encodeURIComponent(friendInviteLink);
     const shareUrl = `https://t.me/share/url?url=${url}&text=${text}`;
     if (window.Telegram?.WebApp?.openTelegramLink) {
       window.Telegram.WebApp.openTelegramLink(shareUrl);
     } else {
       window.open(shareUrl, '_blank');
     }
-  }, [referralLink]);
+  }, [friendInviteLink]);
 
   // ─── БАГ-ФИХ: правильный маппинг дня из selectedDate (воскресенье → нет данных) ───
   const selectedDay = useMemo(() => {
