@@ -497,6 +497,85 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     return selectedDay === DAYS_ORDER[Math.min(todayMapped, 5)];
   }, [selectedDay]);
 
+  // ─── Dynamic visible timeline range (restrict to class hours ± 1h) ───
+  const { visStartH, visEndH } = useMemo(() => {
+    let minH = 9, maxH = 17; // defaults: 8:00-18:00
+    Object.values(daySchedules).forEach(events => {
+      events.forEach(e => {
+        const [s, en] = (e.time || '').split(' - ').map(t => t?.trim());
+        const sM = parseTime(s), eM = parseTime(en);
+        if (sM !== null) minH = Math.min(minH, Math.floor(sM / 60));
+        if (eM !== null) maxH = Math.max(maxH, Math.ceil(eM / 60));
+      });
+    });
+    return {
+      visStartH: Math.max(0, Math.min(8, minH - 1)),
+      visEndH: Math.min(23, Math.max(18, maxH + 1)),
+    };
+  }, [daySchedules]);
+
+  const visOffset = minToPx(visStartH * 60);
+  const visHeight = minToPx(visEndH * 60) - visOffset + 20;
+
+  // ─── Split free windows: before / within / after visible range ───
+  const { beforeSummary, afterSummary, visibleFreeWindows } = useMemo(() => {
+    const visStartMin = visStartH * 60;
+    const visEndMin = visEndH * 60;
+    let bStart = null, bEnd = null;
+    let aStart = null, aEnd = null;
+    const visible = [];
+
+    dayFreeWindows.forEach(fw => {
+      const fwS = parseTime(fw.start);
+      let fwE = parseTime(fw.end);
+      if (fw.end === '24:00') fwE = 1440;
+      if (fwS === null || fwE === null) return;
+
+      // Part before visible range
+      if (fwS < visStartMin) {
+        const effEnd = Math.min(fwE, visStartMin);
+        if (bStart === null || fwS < bStart) bStart = fwS;
+        if (bEnd === null || effEnd > bEnd) bEnd = effEnd;
+      }
+      // Part after visible range
+      if (fwE > visEndMin) {
+        const effStart = Math.max(fwS, visEndMin);
+        if (aStart === null || effStart < aStart) aStart = effStart;
+        if (aEnd === null || fwE > aEnd) aEnd = fwE;
+      }
+      // Part within visible range → clip to bounds
+      const clippedS = Math.max(fwS, visStartMin);
+      const clippedE = Math.min(fwE, visEndMin);
+      if (clippedE > clippedS) {
+        const dur = clippedE - clippedS;
+        visible.push({
+          ...fw,
+          start: formatTime(clippedS),
+          end: clippedE >= 1440 ? '24:00' : formatTime(clippedE),
+          duration_minutes: dur,
+          _startMin: clippedS,
+          _endMin: clippedE,
+        });
+      }
+    });
+
+    const fmtDur = (d) => {
+      const hrs = Math.floor(d / 60), mins = d % 60;
+      return hrs > 0 ? `${hrs}ч${mins > 0 ? ` ${mins}м` : ''}` : `${mins}м`;
+    };
+    const fmtT = (m) => m >= 1440 ? '24:00' : formatTime(m);
+
+    return {
+      beforeSummary: bStart !== null && bEnd !== null && bEnd > bStart ? {
+        start: fmtT(bStart), end: fmtT(bEnd), duration: bEnd - bStart, durationText: fmtDur(bEnd - bStart),
+      } : null,
+      afterSummary: aStart !== null && aEnd !== null && aEnd > aStart ? {
+        start: fmtT(aStart), end: fmtT(aEnd), duration: aEnd - aStart, durationText: fmtDur(aEnd - aStart),
+      } : null,
+      visibleFreeWindows: visible,
+    };
+  }, [dayFreeWindows, visStartH, visEndH]);
+
   // ─── Проверяем является ли текущий пользователь владельцем документа ───
   // (нужно только для кнопки удаления — у каждого своё расписание)
   const isOwner = sharedData?.owner_id === telegramId || sharedData?.owner_id === String(telegramId);
