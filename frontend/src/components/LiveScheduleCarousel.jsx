@@ -354,7 +354,7 @@ export const LiveScheduleCarousel = ({
           </div>
         </div>
 
-        {/* ── NAVIGATION (mobile only) ── */}
+        {/* ── NAVIGATION: Mobile (vertical, right side) ── */}
         <div className="absolute right-[6px] top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2.5 md:hidden z-[50]">
           <motion.button
             onClick={handlePrevious}
@@ -386,6 +386,44 @@ export const LiveScheduleCarousel = ({
             whileTap={{ scale: 0.88 }}
           >
             <ChevronDown className="w-4 h-4 text-white" />
+          </motion.button>
+        </div>
+
+        {/* ── NAVIGATION: Tablet/Desktop (horizontal, below card) ── */}
+        <div className="hidden md:flex items-center justify-center gap-3 mt-3 max-w-[500px] lg:max-w-[560px] mx-auto">
+          <motion.button
+            onClick={handlePrevious}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/60 hover:bg-gray-700/80 transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            <ChevronUp className="w-4 h-4 text-white rotate-[-90deg]" />
+          </motion.button>
+
+          <div className="flex items-center gap-2">
+            {cards.map((card, index) => (
+              <motion.button
+                key={card.id}
+                onClick={(e) => goToCard(index, e)}
+                className="rounded-full cursor-pointer"
+                animate={{
+                  width: index === currentIndex ? 24 : 8,
+                  height: 8,
+                  backgroundColor: index === currentIndex ? '#A3F7BF' : 'rgb(75, 85, 99)',
+                }}
+                whileHover={{ scale: 1.2 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              />
+            ))}
+          </div>
+
+          <motion.button
+            onClick={handleNext}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800/60 hover:bg-gray-700/80 transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            <ChevronDown className="w-4 h-4 text-white rotate-[-90deg]" />
           </motion.button>
         </div>
       </div>
