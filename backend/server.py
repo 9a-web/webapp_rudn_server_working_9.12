@@ -16908,9 +16908,12 @@ async def get_shared_schedule(telegram_id: int, week: int = 1):
         # БАГ-ФИХ: используем переданный week, а не захардкоженную 1
         week_num = max(1, min(2, week))
         
-        # Загружаем расписания всех участников
+        # Загружаем расписания всех участников (пропускаем тех, у кого schedule_hidden=True)
         for p in participants:
             p_id = p["telegram_id"]
+            # Если участник скрыл своё расписание — не загружаем
+            if p.get("schedule_hidden", False):
+                continue
             p_settings = await db.user_settings.find_one({"telegram_id": p_id})
             if p_settings and p_settings.get("group_id"):
                 group_id = p_settings["group_id"]
