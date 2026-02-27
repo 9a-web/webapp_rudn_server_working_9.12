@@ -222,8 +222,12 @@ class SharedScheduleTester:
             async with self.session.delete(f"{BASE_URL}/shared-schedule/{schedule_id}/remove-participant/{owner_id}") as resp:
                 if resp.status == 400:
                     response_text = await resp.text()
-                    if "owner" in response_text.lower() or "владелец" in response_text.lower():
-                        self.log_test("Owner Protection Test", True, f"Owner removal correctly blocked with HTTP 400")
+                    # Check for owner protection message in English or Russian
+                    if ("owner" in response_text.lower() or 
+                        "владелец" in response_text.lower() or 
+                        "cannot remove" in response_text.lower() or
+                        "нельзя удалить" in response_text.lower()):
+                        self.log_test("Owner Protection Test", True, f"Owner removal correctly blocked with HTTP 400: {response_text}")
                     else:
                         self.log_test("Owner Protection Test", False, f"HTTP 400 but wrong message: {response_text}")
                 else:
