@@ -1781,7 +1781,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           </div>
 
           {/* ─── Current time indicator ─── */}
-          {isToday && <CurrentTimeLine />}
+          {isToday && <CurrentTimeLine pxPerMin={pxPerMin} />}
 
           {/* ─── Подсказка "нет пар" поверх таймлайна ─── */}
           {!hasAnyEvents && (
