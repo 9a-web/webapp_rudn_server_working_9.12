@@ -173,6 +173,7 @@ export const LiveScheduleSection = ({
     
     const isExpanding = expandedIndex !== index;
     setExpandedIndex(expandedIndex === index ? null : index);
+    if (!isExpanding) setTeacherPickerOpen(null); // закрываем picker при сворачивании
     
     // 🔍 ТРЕКИНГ ДЕТАЛЬНОГО ПРОСМОТРА
     // Считаем только когда карточка разворачивается (не сворачивается)
