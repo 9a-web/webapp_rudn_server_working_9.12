@@ -16971,9 +16971,15 @@ async def add_shared_schedule_participant(schedule_id: str, data: SharedSchedule
             return SuccessResponse(success=True, message="Участник уже добавлен")
         if data.participant_id == doc.get("owner_id"):
             return SuccessResponse(success=True, message="Это вы — уже в расписании")
+        # БАГ-ФИХ: проверяем, что добавляемый пользователь — друг владельца
+        owner_id = doc.get("owner_id")
+        is_friend = await are_friends(owner_id, data.participant_id)
+        if not is_friend:
+            raise HTTPException(status_code=403, detail="Можно добавить только друзей")
         p_settings = await db.user_settings.find_one({"telegram_id": data.participant_id})
         p_name = p_settings.get("first_name", str(data.participant_id)) if p_settings else str(data.participant_id)
-        new_p = {"telegram_id": data.participant_id, "first_name": p_name,
+        p_group = p_settings.get("group_name", "") if p_settings else ""
+        new_p = {"telegram_id": data.participant_id, "first_name": p_name, "group_name": p_group,
                  "color": PARTICIPANT_COLORS[len(participants) % len(PARTICIPANT_COLORS)]}
         await db.shared_schedules.update_one(
             {"id": schedule_id},
