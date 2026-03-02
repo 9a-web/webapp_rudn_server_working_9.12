@@ -89,9 +89,9 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
   
   const top = minToPx(startMin);
   const height = durationToPx(endMin - startMin);
-  const minHeight = 38;
-  const displayHeight = Math.max(height, minHeight);
+  const displayHeight = Math.max(height, 18); // минимум 18px чтобы была видна
   const isCompact = height < 60;
+  const isUltraCompact = height < 32;
 
   const variants = event.teacherVariants || [];
   const hasVariants = variants.length > 1;
