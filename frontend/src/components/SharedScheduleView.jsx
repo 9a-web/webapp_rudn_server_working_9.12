@@ -22,8 +22,8 @@ const TIMELINE_END_HOUR = 23;
 const TIMELINE_START_MIN = TIMELINE_START_HOUR * 60;
 const TIMELINE_END_MIN = TIMELINE_END_HOUR * 60;
 const TIMELINE_TOTAL_MIN = TIMELINE_END_MIN - TIMELINE_START_MIN; // 1380 min
-const PX_PER_MIN = 0.85; // ~1173px total height (compact enough for 23h)
-const TIMELINE_HEIGHT = TIMELINE_TOTAL_MIN * PX_PER_MIN;
+const BASE_PX_PER_MIN = 0.85;
+const MIN_CARD_CONTENT_HEIGHT = 68; // минимальная высота для полного содержимого карточки
 const TIME_LABEL_WIDTH = 44;
 const EVENT_GAP = 1; // gap between side-by-side events (minimal for max width)
 
@@ -45,14 +45,13 @@ const formatTime = (minutes) => {
   return `${h}:${String(m).padStart(2, '0')}`;
 };
 
-// ─── Helper: minutes → px offset from top ───
-const minToPx = (minutes) => {
-  return Math.max(0, (minutes - TIMELINE_START_MIN) * PX_PER_MIN);
+// ─── Helpers с динамическим масштабом ───
+const makeMinToPx = (pxPerMin) => (minutes) => {
+  return Math.max(0, (minutes - TIMELINE_START_MIN) * pxPerMin);
 };
 
-// ─── Helper: duration minutes → px height ───
-const durationToPx = (durationMin) => {
-  return Math.max(0, durationMin * PX_PER_MIN);
+const makeDurationToPx = (pxPerMin) => (durationMin) => {
+  return Math.max(0, durationMin * pxPerMin);
 };
 
 // ─── Helper: группировка событий по discipline+time (разные преподаватели → варианты) ───
