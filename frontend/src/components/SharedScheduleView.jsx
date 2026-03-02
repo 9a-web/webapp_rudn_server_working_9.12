@@ -1681,7 +1681,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                 <div
                   className="absolute h-[1px]"
                   style={{
-                    top: `${30 * PX_PER_MIN}px`,
+                    top: `${30 * pxPerMin}px`,
                     left: `${TIME_LABEL_WIDTH}px`,
                     right: '4px',
                     backgroundColor: '#f5f5f5',
