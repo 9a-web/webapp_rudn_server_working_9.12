@@ -179,7 +179,7 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
                 >
                   {isOwner ? 'Вы' : participantName}
                   {hasVariants && (
-                    <span className="ml-0.5 opacity-60">▾</span>
+                    <ChevronDown className="inline w-2.5 h-2.5 ml-0.5 opacity-60" />
                   )}
                 </span>
               </div>
