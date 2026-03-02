@@ -114,9 +114,12 @@ export const LiveScheduleSection = ({
   const dayNumber = selectedDate.getDate();
   const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
   
-  // Format date for the button (e.g., "Oct. 12")
-  const monthShort = selectedDate.toLocaleDateString('ru-RU', { month: 'short' });
-  const dateButton = `${dayNumber} ${monthShort}`;
+  // Format date for the button (e.g., "2 марта")
+  const monthGenitive = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+  ][selectedDate.getMonth()];
+  const dateButton = `${dayNumber} ${monthGenitive}`;
 
   // Function to determine class status
   const getClassStatus = (classItem) => {
