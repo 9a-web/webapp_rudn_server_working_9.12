@@ -17443,12 +17443,26 @@ async def send_schedule_image(
         image_io.name = "schedule.png"
 
         bot = Bot(token=bot_token)
-        await bot.send_photo(
-            chat_id=telegram_id,
-            photo=image_io,
-            caption=caption,
-            parse_mode="HTML"
-        )
+        
+        # Telegram photo caption лимит — 1024 символа
+        if len(caption) <= 1024:
+            await bot.send_photo(
+                chat_id=telegram_id,
+                photo=image_io,
+                caption=caption,
+                parse_mode="HTML"
+            )
+        else:
+            # Если caption слишком длинный — отправляем фото без подписи + текст отдельно
+            await bot.send_photo(
+                chat_id=telegram_id,
+                photo=image_io
+            )
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=caption,
+                parse_mode="HTML"
+            )
 
         # Отправляем текстовую версию отдельным сообщением, если передана
         if text_message:

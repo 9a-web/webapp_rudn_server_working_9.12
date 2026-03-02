@@ -427,6 +427,40 @@ export const ShareScheduleModal = ({
     }
   };
 
+  // ─── Генерация HTML caption для Telegram ───
+  const generateHtmlCaption = () => {
+    const dateStr = selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    const dayLower = formattedDayName.toLowerCase();
+
+    let caption = `<tg-emoji emoji-id="5197350061012436657">📅</tg-emoji> <b>Расписание на ${dayLower}, ${dateStr}</b>\n`;
+    if (groupName) {
+      caption += `<tg-emoji emoji-id="5451821087979498800">👥</tg-emoji>  <b>Группа:</b> ${groupName}\n`;
+    }
+
+    if (todaySchedule.length === 0) {
+      caption += `\n✨ Пар нет! Свободный день! 🎉`;
+    } else {
+      todaySchedule.forEach((classItem, index) => {
+        caption += `\n${index + 1}. <b>${classItem.discipline}</b>\n`;
+        caption += `   <tg-emoji emoji-id="5300922106433789293">⏰</tg-emoji> ${classItem.time}\n`;
+
+        if (classItem.subItems) {
+          classItem.subItems.forEach((subItem) => {
+            if (subItem.auditory) {
+              caption += `   <tg-emoji emoji-id="5391032818111363540">📍</tg-emoji> ${subItem.auditory}\n`;
+            }
+            if (subItem.teacher) {
+              caption += `   <tg-emoji emoji-id="5373039692574893940">👨‍🏫</tg-emoji> ${subItem.teacher}\n`;
+            }
+          });
+        }
+      });
+    }
+
+    caption += `\n<tg-emoji emoji-id="5407025283456835913">📱</tg-emoji> <i>RUDN Schedule – Telegram WebApp</i>`;
+    return caption;
+  };
+
   // ─── Прислать в ЛС бота ───
   const handleSendToBot = async () => {
     if (!telegramId) return;
@@ -437,13 +471,9 @@ export const ShareScheduleModal = ({
       if (!canvas) return;
 
       const base64 = canvas.toDataURL('image/png');
-      const dateStr = selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-      const caption = `<tg-emoji emoji-id="5307850030416156311">📅</tg-emoji> <b>Расписание</b>\n<tg-emoji emoji-id="5312474198365462799">📆</tg-emoji> ${formattedDayName}, ${dateStr}${groupName ? `\n👥 ${groupName}` : ''}`;
+      const caption = generateHtmlCaption();
 
-      // Текстовая версия расписания
-      const textMessage = generateScheduleText();
-
-      await botAPI.sendScheduleImage(telegramId, base64, caption, textMessage);
+      await botAPI.sendScheduleImage(telegramId, base64, caption);
       hapticFeedback?.('success');
       setImageSentToBot(true);
       setTimeout(() => setImageSentToBot(false), 3000);
