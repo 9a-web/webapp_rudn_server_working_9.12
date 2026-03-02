@@ -1,36 +1,31 @@
 # Test Result
 
 ## User Problem Statement
-Добавить когда идёт 2 разные пары в одно время — 2 стрелки (вверх/вниз) у названия предмета чтобы перелистывать. Также нужно запоминать условие на будущее (если ситуация повториться — приложение вспомнит выбор пользователя)
+Анализ и исправление багов в функции "Совместное расписание" (SharedScheduleView)
 
 ## Changes Made
+### Backend (server.py):
+- `create_shared_schedule`: fixed color counter (separate counter instead of enumerate idx), added group_name to participant data
+- `add_shared_schedule_participant`: added friend validation via are_friends(), added group_name
+- `delete_shared_schedule`: made owner_id mandatory (returns 403 if missing)
 
-### 1. App.jsx — updateCurrentClass
-- Теперь собирает ВСЕ пары в текущем временном слоте в массив `concurrentClasses` (раньше брал только первую)
-- Проверяет localStorage на сохранённый выбор пользователя и восстанавливает его
-- Передаёт `concurrentClasses` и `onSelectConcurrentClass` callback в LiveScheduleCarousel
-
-### 2. LiveScheduleCarousel.jsx
-- Прокидывает `concurrentClasses` и `onSelectConcurrentClass` в LiveScheduleCard
-
-### 3. LiveScheduleCard.jsx
-- Принимает `concurrentClasses` и `onSelectConcurrentClass` props
-- При наличии >1 одновременных пар показывает стрелки ChevronUp/ChevronDown слева от названия предмета
-- Индикатор позиции (1/2, 2/2) между стрелками
-- Анимация смены названия предмета (вертикальный slide с blur)
-- При нажатии стрелки: вызывает callback → родитель обновляет currentClass + сохраняет в localStorage
-
-### 4. Test data (App.jsx toggleTestCurrentClass)
-- Добавлена вторая тестовая пара с одинаковым timeStr для проверки одновременных пар
+### Frontend:
+- SharedScheduleView.jsx: Fixed CurrentTimeLine pxPerMin prop, fixed canRemove logic consistency, fixed externalShareTrigger useEffect stale closure, added group_name display in participant pills
+- api.js: Added owner_id param to sharedScheduleAPI.delete()
 
 ## Testing Protocol
 
 ### Backend Testing
-No backend changes were made.
+Test all shared schedule API endpoints:
+1. POST /api/shared-schedule — create shared schedule with owner_id
+2. GET /api/shared-schedule/{telegram_id} — get schedule data
+3. POST /api/shared-schedule/{id}/add-participant — add participant
+4. DELETE /api/shared-schedule/{id}/remove-participant/{pid} — remove participant
+5. DELETE /api/shared-schedule/{id}?owner_id=X — delete with owner_id (should succeed)
+6. DELETE /api/shared-schedule/{id} — delete WITHOUT owner_id (should return 403)
+7. POST /api/shared-schedule/{id}/share-token — create share token
+8. GET /api/shared-schedule/token/{token} — get token data
 
-### Frontend Testing
-1. Open the app in Telegram WebApp context
-2. Click test button to add concurrent test classes
-3. Verify arrows appear with position indicator
-4. Click arrows to switch between classes
-5. Reload → verify choice persisted
+### Incorporate User Feedback
+- Testing agent should not make changes to existing code
+- Testing agent should only report test results
