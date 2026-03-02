@@ -141,29 +141,36 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, delay: columnIndex * 0.06 + scIdx * 0.03 }}
-      className="absolute overflow-visible"
+      className="absolute"
       style={{
         top: `${top}px`,
-        minHeight: `${displayHeight}px`,
+        height: `${displayHeight}px`,
         left: `calc(${subLeftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${subWidthPct}% - ${EVENT_GAP}px)`,
         zIndex: pickerOpen ? 50 : 10 + scIdx,
+        overflow: pickerOpen ? 'visible' : 'hidden',
       }}
     >
       <div
-        className="h-full rounded-xl overflow-hidden"
-        style={{ backgroundColor: color + '14' }}
+        className="rounded-xl overflow-hidden"
+        style={{ backgroundColor: color + '14', height: '100%' }}
       >
         {/* Закруглённая цветная полоска слева */}
         <div
-          className="absolute left-0 top-1 bottom-1 w-[3.5px] rounded-full"
+          className="absolute left-0 top-0.5 bottom-0.5 w-[3px] rounded-full"
           style={{ backgroundColor: color }}
         />
-        <div className="h-full px-2 py-1.5 pl-2.5 flex flex-col justify-center">
-          {isCompact ? (
+        <div className="h-full px-1.5 py-0.5 pl-2 flex flex-col justify-center overflow-hidden">
+          {isUltraCompact ? (
+            /* Ultra-compact: только цветная точка + название в одну строку */
+            <div className="flex items-center gap-1">
+              <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+              <span className="text-[8px] font-semibold text-[#1c1c1c] truncate">{event.discipline}</span>
+            </div>
+          ) : isCompact ? (
             <div className="flex items-start gap-1">
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
-              <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight break-words" style={{ wordBreak: 'break-word' }}>
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: color }} />
+              <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight break-words line-clamp-2" style={{ wordBreak: 'break-word' }}>
                 {event.discipline}
               </span>
             </div>
