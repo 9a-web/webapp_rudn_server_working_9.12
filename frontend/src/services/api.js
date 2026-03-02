@@ -379,6 +379,26 @@ export const botAPI = {
       return null;
     }
   },
+
+  /**
+   * Отправить изображение расписания в ЛС бота
+   * @param {number} telegramId - Telegram ID пользователя
+   * @param {string} imageBase64 - Base64 строка изображения
+   * @param {string} caption - Подпись к изображению
+   */
+  sendScheduleImage: async (telegramId, imageBase64, caption = '📅 Совместное расписание') => {
+    try {
+      const response = await api.post('/send-schedule-image', {
+        telegram_id: telegramId,
+        image_base64: imageBase64,
+        caption
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending schedule image to bot:', error);
+      throw error;
+    }
+  },
 };
 
 /**
