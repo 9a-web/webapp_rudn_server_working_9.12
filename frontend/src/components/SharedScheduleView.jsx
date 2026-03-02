@@ -25,7 +25,7 @@ const TIMELINE_TOTAL_MIN = TIMELINE_END_MIN - TIMELINE_START_MIN; // 1380 min
 const PX_PER_MIN = 0.85; // ~1173px total height (compact enough for 23h)
 const TIMELINE_HEIGHT = TIMELINE_TOTAL_MIN * PX_PER_MIN;
 const TIME_LABEL_WIDTH = 44;
-const EVENT_GAP = 3; // gap between side-by-side events
+const EVENT_GAP = 1; // gap between side-by-side events (minimal for max width)
 
 // ─── Helper: parse "HH:MM" → minutes from midnight ───
 const parseTime = (timeStr) => {
