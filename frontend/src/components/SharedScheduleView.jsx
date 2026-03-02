@@ -991,6 +991,19 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       ctx.font = `${10 * dpr}px ${FBASE}`;
       ctx.fillText('Присоединяйся к своим друзьям в @rudn_mosbot', W / 2, H - 12 * dpr);
 
+      return canvas;
+    } catch (err) {
+      console.error('Ошибка генерации изображения:', err);
+      return null;
+    }
+  }, [selectedDay, selectedDate, weekNumber, hapticFeedback, daySchedules, dayFreeWindows, activeParticipantIds, totalColumns, telegramId, sharedData]);
+
+  // Обёртка для скачивания (обратная совместимость)
+  const handleGenerateImage = useCallback(async () => {
+    setIsGeneratingImage(true);
+    try {
+      const canvas = await generateCanvas();
+      if (!canvas) return;
       canvas.toBlob((blob) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
@@ -1000,14 +1013,83 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         a.click();
         URL.revokeObjectURL(url);
       }, 'image/png');
-
       hapticFeedback?.('success');
     } catch (err) {
-      console.error('Ошибка генерации изображения:', err);
+      console.error('Ошибка генерации:', err);
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [selectedDay, selectedDate, weekNumber, hapticFeedback, daySchedules, dayFreeWindows, activeParticipantIds, totalColumns, telegramId, sharedData]);
+  }, [generateCanvas, selectedDay, hapticFeedback]);
+
+  // ── Сохранить в галерею (Web Share API → fallback download) ──
+  const handleSaveToGallery = useCallback(async () => {
+    setIsGeneratingImage(true);
+    try {
+      const canvas = await generateCanvas();
+      if (!canvas) return;
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) return;
+
+      const fileName = `расписание_${selectedDay || 'день'}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      // Web Share API — на мобильных позволяет сохранить в галерею
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Совместное расписание',
+            text: `Расписание на ${selectedDay || 'день'}`
+          });
+          hapticFeedback?.('success');
+          return;
+        } catch (shareErr) {
+          if (shareErr.name === 'AbortError') return;
+        }
+      }
+
+      // Fallback: обычное скачивание
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = fileName;
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+      hapticFeedback?.('success');
+    } catch (err) {
+      console.error('Ошибка сохранения:', err);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [generateCanvas, selectedDay, hapticFeedback]);
+
+  // ── Отправить изображение в ЛС бота ──
+  const handleSendToBot = useCallback(async () => {
+    if (!telegramId) return;
+    setIsSendingToBot(true);
+    setImageSentToBot(false);
+    try {
+      const canvas = await generateCanvas();
+      if (!canvas) return;
+
+      const base64 = canvas.toDataURL('image/png');
+      const dateStr = selectedDate
+        ? new Date(selectedDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+        : '';
+      const caption = `📅 <b>Совместное расписание</b>\n${selectedDay ? selectedDay + ', ' : ''}${dateStr}`;
+
+      await botAPI.sendScheduleImage(telegramId, base64, caption);
+      hapticFeedback?.('success');
+      setImageSentToBot(true);
+      setTimeout(() => setImageSentToBot(false), 3000);
+    } catch (err) {
+      console.error('Ошибка отправки в бот:', err);
+      hapticFeedback?.('error');
+    } finally {
+      setIsSendingToBot(false);
+    }
+  }, [generateCanvas, telegramId, selectedDate, selectedDay, hapticFeedback]);
 
   // ─── LOADING ───
   if (loading) {
