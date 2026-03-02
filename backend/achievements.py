@@ -32,7 +32,7 @@ ACHIEVEMENTS = [
         "name": "Социальная бабочка",
         "description": "5+ приглашенных друзей",
         "emoji": "🦋",
-        "points": 20,
+        "points": 60,
         "type": "social_butterfly",
         "requirement": 5
     },
