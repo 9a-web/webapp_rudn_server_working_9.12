@@ -621,7 +621,8 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     try {
       setActionLoading(true);
       hapticFeedback?.('warning');
-      await sharedScheduleAPI.delete(sharedData.id);
+      // БАГ-ФИХ: передаём telegramId как owner_id для проверки прав на бэкенде
+      await sharedScheduleAPI.delete(sharedData.id, telegramId);
       setSharedData(null);
       setShowDeleteConfirm(false);
       hapticFeedback?.('success');
