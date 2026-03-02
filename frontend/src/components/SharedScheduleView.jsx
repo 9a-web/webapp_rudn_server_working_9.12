@@ -178,9 +178,6 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
                   onClick={hasVariants ? handlePickerToggle : undefined}
                 >
                   {isOwner ? 'Вы' : participantName}
-                  {hasVariants && (
-                    <ChevronDown className="inline w-2.5 h-2.5 ml-0.5 opacity-60" />
-                  )}
                 </span>
               </div>
               <div className="text-[11px] font-semibold text-[#1c1c1c] leading-tight mb-0.5 break-words" style={{ wordBreak: 'break-word' }}>
