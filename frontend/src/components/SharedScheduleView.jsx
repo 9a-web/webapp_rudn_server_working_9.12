@@ -602,9 +602,8 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   // (нужно только для кнопки удаления — у каждого своё расписание)
   const isOwner = sharedData?.owner_id === telegramId || sharedData?.owner_id === String(telegramId);
 
-  // ─── Генерация изображения расписания (Canvas API) ───
-  const handleGenerateImage = useCallback(async () => {
-    setIsGeneratingImage(true);
+  // ─── Генерация canvas изображения расписания ───
+  const generateCanvas = useCallback(async () => {
     try {
       // roundRect polyfill для старых WebView
       if (!CanvasRenderingContext2D.prototype.roundRect) {
