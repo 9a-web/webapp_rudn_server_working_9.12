@@ -138,105 +138,96 @@ export const LiveScheduleCard = React.memo(({
       <div className="relative flex items-center justify-between gap-4 lg:gap-6 xl:gap-8">
         {/* Left side - Text content */}
         <div className="flex-1 min-w-0">
-          <AnimatePresence mode="wait">
-            <motion.div 
-              key={currentClass || 'no-class'}
-              className="mb-2 lg:mb-3"
-              initial={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
-              transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-            >
-              <motion.p 
-                className="font-bold text-base lg:text-lg xl:text-xl" 
-                style={{ color: themeStyles.text.primary }} 
-                animate={currentClass ? {
-                  textShadow: [
-                    '0 0 0px rgba(0,0,0,0)',
-                    `0 0 10px ${themeStyles.text.glowColor}`,
-                    '0 0 0px rgba(0,0,0,0)'
-                  ]
-                } : {}}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          {/* Заголовок "Сейчас идёт" / "Пар нет" — анимируется ТОЛЬКО при смене состояния есть/нет пары */}
+          <div className="mb-2 lg:mb-3">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={currentClass ? 'has-class' : 'no-class'}
+                className="font-bold text-base lg:text-lg xl:text-xl"
+                style={{ color: themeStyles.text.primary }}
+                initial={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+                transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
               >
                 {currentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
               </motion.p>
+            </AnimatePresence>
 
-              {/* === Название предмета + стрелки переключения === */}
-              {currentClass && (
-                <div className="flex items-start gap-1.5 mt-1">
-                  {/* Стрелки переключения одновременных пар */}
-                  {hasConcurrent && (
-                    <div className="flex flex-col items-center flex-shrink-0 mt-0.5 -ml-0.5">
-                      <motion.button
-                        onClick={handlePrev}
-                        className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
-                        style={{ 
-                          backgroundColor: 'rgba(255,255,255,0.12)',
-                        }}
-                        whileTap={{ scale: 0.85 }}
-                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
-                        aria-label="Previous class"
-                      >
-                        <ChevronUp className="w-3.5 h-3.5 text-white" />
-                      </motion.button>
+            {/* === Название предмета + стрелки переключения === */}
+            {currentClass && (
+              <div className="flex items-start gap-1.5 mt-1">
+                {/* Стрелки переключения одновременных пар */}
+                {hasConcurrent && (
+                  <div className="flex flex-col items-center flex-shrink-0 mt-0.5 -ml-0.5">
+                    <motion.button
+                      onClick={handlePrev}
+                      className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
+                      style={{ 
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                      }}
+                      whileTap={{ scale: 0.85 }}
+                      whileHover={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
+                      aria-label="Previous class"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5 text-white" />
+                    </motion.button>
 
-                      {/* Индикатор позиции */}
-                      <span 
-                        className="text-[9px] font-semibold leading-none my-0.5 select-none"
-                        style={{ color: 'rgba(255,255,255,0.5)' }}
-                      >
-                        {selectedIndex + 1}/{concurrentClasses.length}
-                      </span>
+                    {/* Индикатор позиции */}
+                    <span 
+                      className="text-[9px] font-semibold leading-none my-0.5 select-none"
+                      style={{ color: 'rgba(255,255,255,0.5)' }}
+                    >
+                      {selectedIndex + 1}/{concurrentClasses.length}
+                    </span>
 
-                      <motion.button
-                        onClick={handleNext}
-                        className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
-                        style={{ 
-                          backgroundColor: 'rgba(255,255,255,0.12)',
-                        }}
-                        whileTap={{ scale: 0.85 }}
-                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
-                        aria-label="Next class"
-                      >
-                        <ChevronDown className="w-3.5 h-3.5 text-white" />
-                      </motion.button>
-                    </div>
-                  )}
-
-                  {/* Название предмета с анимацией смены */}
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <AnimatePresence mode="wait" custom={slideDirection}>
-                      <motion.p
-                        key={currentClass}
-                        custom={slideDirection}
-                        initial={{ 
-                          opacity: 0, 
-                          y: slideDirection >= 0 ? 12 : -12,
-                          filter: 'blur(2px)' 
-                        }}
-                        animate={{ 
-                          opacity: 1, 
-                          y: 0,
-                          filter: 'blur(0px)' 
-                        }}
-                        exit={{ 
-                          opacity: 0, 
-                          y: slideDirection >= 0 ? -12 : 12,
-                          filter: 'blur(2px)' 
-                        }}
-                        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-                        className="font-bold text-sm lg:text-base xl:text-lg break-words" 
-                        style={{ color: '#FFFFFF' }}
-                      >
-                        {translateDiscipline(currentClass, i18n.language)}
-                      </motion.p>
-                    </AnimatePresence>
+                    <motion.button
+                      onClick={handleNext}
+                      className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
+                      style={{ 
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                      }}
+                      whileTap={{ scale: 0.85 }}
+                      whileHover={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
+                      aria-label="Next class"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 text-white" />
+                    </motion.button>
                   </div>
+                )}
+
+                {/* Название предмета с анимацией смены — анимируется только текст дисциплины */}
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <AnimatePresence mode="wait" custom={slideDirection}>
+                    <motion.p
+                      key={currentClass}
+                      custom={slideDirection}
+                      initial={{ 
+                        opacity: 0, 
+                        y: slideDirection >= 0 ? 12 : -12,
+                        filter: 'blur(2px)' 
+                      }}
+                      animate={{ 
+                        opacity: 1, 
+                        y: 0,
+                        filter: 'blur(0px)' 
+                      }}
+                      exit={{ 
+                        opacity: 0, 
+                        y: slideDirection >= 0 ? -12 : 12,
+                        filter: 'blur(2px)' 
+                      }}
+                      transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="font-bold text-sm lg:text-base xl:text-lg break-words" 
+                      style={{ color: '#FFFFFF' }}
+                    >
+                      {translateDiscipline(currentClass, i18n.language)}
+                    </motion.p>
+                  </AnimatePresence>
                 </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+              </div>
+            )}
+          </div>
           <AnimatePresence mode="wait">
             <motion.p 
               key={currentClass ? minutesLeft : 'relax'}
