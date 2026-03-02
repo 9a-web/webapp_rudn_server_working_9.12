@@ -1592,7 +1592,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           msOverflowStyle: 'none',
         }}
       >
-        <div className="relative" style={{ height: `${displayHeight}px`, minHeight: '200px' }}>
+        <div className="relative" style={{ height: `${displayHeight}px`, minHeight: '200px', minWidth: `${Math.max(320, totalColumns * 140 + TIME_LABEL_WIDTH + 10)}px` }}>
 
           {/* ─── Column headers (participant names at top) ─── */}
           {totalColumns > 1 && (
