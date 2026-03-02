@@ -1577,15 +1577,20 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
               const events = daySchedules[pId] || [];
               if (!participant) return null;
 
-              return events.map((event, eIdx) => (
+              // Вычисляем layout для перекрывающихся событий
+              const layout = computeOverlapLayout(events);
+
+              return layout.map((item) => (
                 <TimelineEvent
-                  key={`${pId}-${eIdx}`}
-                  event={event}
+                  key={`${pId}-${item.idx}`}
+                  event={item.event}
                   color={participant.color}
                   participantName={participant.first_name}
                   columnIndex={colIdx}
                   totalColumns={totalColumns}
                   isOwner={participant.telegram_id === telegramId}
+                  subCol={item.subCol}
+                  subColTotal={item.subColTotal}
                 />
               ));
             })}
