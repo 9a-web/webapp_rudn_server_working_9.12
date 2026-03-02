@@ -26,7 +26,7 @@ const BASE_PX_PER_MIN = 0.85;
 const MIN_CARD_CONTENT_HEIGHT = 68; // минимальная высота для полного содержимого карточки
 const TIME_LABEL_WIDTH = 44;
 const EVENT_GAP = 1; // gap between side-by-side events (minimal for max width)
-const MIN_COLUMN_WIDTH = 200; // минимальная ширина колонки участника (px) — обеспечивает видимость контента
+const MIN_COLUMN_WIDTH = 280; // минимальная ширина колонки участника (px) — обеспечивает видимость контента без вертикального переполнения
 
 // ─── Helper: parse "HH:MM" → minutes from midnight ───
 const parseTime = (timeStr) => {
