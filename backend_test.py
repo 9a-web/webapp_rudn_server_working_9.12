@@ -63,20 +63,20 @@ class SharedScheduleTester:
     
     async def test_1_create_schedule(self):
         """
-        Critical Test 1: POST /api/shared-schedule with body {"owner_id": 999001, "participant_ids": [999002]} 
-        → should create schedule with valid UUID, return participants array
+        Test 1: POST /api/shared-schedule with body {"owner_id": 999001, "participant_ids": []}
+        Expected: 200 with id, owner_id, participants (owner should be first participant with color and group_name fields)
         """
-        print("\n🧪 Critical Test 1: Create Shared Schedule")
+        print("\n🧪 Test 1: Create Shared Schedule")
         
         try:
             payload = {
                 "owner_id": 999001,
-                "participant_ids": [999002]
+                "participant_ids": []
             }
             
             async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
                 if resp.status != 200:
-                    self.log_test("Create Schedule", False, f"POST failed: HTTP {resp.status}")
+                    self.log_test("Create Schedule", False, f"POST failed: HTTP {resp.status}, response: {await resp.text()}")
                     return
                 
                 data = await resp.json()
@@ -104,41 +104,54 @@ class SharedScheduleTester:
                     self.log_test("Create Schedule", False, f"Wrong owner_id: {owner_id}")
                     return
                 
-                if len(participants) != 2:  # Owner + 1 participant
-                    self.log_test("Create Schedule", False, f"Wrong participant count: {len(participants)}")
+                if len(participants) != 1:  # Only owner should be in participants
+                    self.log_test("Create Schedule", False, f"Wrong participant count: {len(participants)}, expected 1")
                     return
                 
-                # Check if participants array contains both users
-                participant_ids = [p["telegram_id"] for p in participants]
-                if 999001 not in participant_ids or 999002 not in participant_ids:
-                    self.log_test("Create Schedule", False, f"Missing participants: {participant_ids}")
+                # Check if owner is first participant and has required fields
+                owner_participant = participants[0]
+                if owner_participant.get("telegram_id") != 999001:
+                    self.log_test("Create Schedule", False, f"Owner not first participant: {owner_participant}")
+                    return
+                
+                # Check required fields
+                required_fields = ["telegram_id", "first_name", "group_name", "color"]
+                for field in required_fields:
+                    if field not in owner_participant:
+                        self.log_test("Create Schedule", False, f"Missing field '{field}' in participant: {owner_participant}")
+                        return
+                
+                # Check color is from PARTICIPANT_COLORS list
+                expected_colors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+                if owner_participant["color"] not in expected_colors:
+                    self.log_test("Create Schedule", False, f"Invalid color: {owner_participant['color']}")
                     return
                 
                 self.created_schedules.append(schedule_id)
                 self.test_schedule_id = schedule_id  # Store for other tests
                 
-                self.log_test("Create Schedule", True, f"Schedule created with valid UUID: {schedule_id}, participants: {len(participants)}")
+                self.log_test("Create Schedule", True, f"Schedule created with UUID: {schedule_id}, owner as first participant with all fields")
         
         except Exception as e:
             self.log_test("Create Schedule", False, f"Exception: {e}")
     
     async def test_2_get_schedule_with_week(self):
         """
-        Critical Test 2: GET /api/shared-schedule/999001?week=1 
-        → should return exists=true, schedules, free_windows
+        Test 2: GET /api/shared-schedule/999001?week=1
+        Expected: 200 with exists=true, participants, schedules dict
         """
-        print("\n🧪 Critical Test 2: Get Schedule with Week Parameter")
+        print("\n🧪 Test 2: Get Shared Schedule with Week Parameter")
         
         try:
             async with self.session.get(f"{BASE_URL}/shared-schedule/999001?week=1") as resp:
                 if resp.status != 200:
-                    self.log_test("Get Schedule Week=1", False, f"GET failed: HTTP {resp.status}")
+                    self.log_test("Get Schedule Week=1", False, f"GET failed: HTTP {resp.status}, response: {await resp.text()}")
                     return
                 
                 data = await resp.json()
                 exists = data.get("exists")
+                participants = data.get("participants", [])
                 schedules = data.get("schedules", {})
-                free_windows = data.get("free_windows", [])
                 week = data.get("week")
                 
                 if not exists:
@@ -149,280 +162,251 @@ class SharedScheduleTester:
                     self.log_test("Get Schedule Week=1", False, f"week={week}, expected 1")
                     return
                 
-                # Schedules should be a dict, free_windows should be a list
+                # Participants should contain the owner
+                if not participants or len(participants) == 0:
+                    self.log_test("Get Schedule Week=1", False, f"No participants found")
+                    return
+                
+                # Schedules should be a dict
                 if not isinstance(schedules, dict):
                     self.log_test("Get Schedule Week=1", False, f"schedules is not dict: {type(schedules)}")
                     return
                 
-                if not isinstance(free_windows, list):
-                    self.log_test("Get Schedule Week=1", False, f"free_windows is not list: {type(free_windows)}")
-                    return
-                
-                self.log_test("Get Schedule Week=1", True, f"exists=true, week=1, schedules keys: {len(schedules)}, free_windows: {len(free_windows)}")
+                self.log_test("Get Schedule Week=1", True, f"exists=true, week=1, participants: {len(participants)}, schedules keys: {len(schedules)}")
         
         except Exception as e:
             self.log_test("Get Schedule Week=1", False, f"Exception: {e}")
     
-    async def test_3_add_participant(self):
+    async def test_3_add_non_friend_participant(self):
         """
-        Critical Test 3: POST /api/shared-schedule/{id}/add-participant with {"participant_id": 999003} 
-        → should add participant
+        Test 3: POST /api/shared-schedule/{id}/add-participant with {"participant_id": 999002}
+        Note: This may return 403 "Можно добавить только друзей" since 999002 is not a friend. 
+        VERIFY this 403 response — this is the CORRECT behavior (friend validation bug fix).
         """
-        print("\n🧪 Critical Test 3: Add Participant")
+        print("\n🧪 Test 3: Add Non-Friend Participant (Should Return 403)")
         
         try:
-            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
-                self.log_test("Add Participant", False, "No schedule ID available from previous test")
+            if not self.test_schedule_id:
+                self.log_test("Add Non-Friend Participant", False, "No schedule ID available from previous test")
                 return
             
-            payload = {"participant_id": 999003}
+            payload = {"participant_id": 999002}
             
             async with self.session.post(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/add-participant", json=payload) as resp:
-                if resp.status != 200:
-                    self.log_test("Add Participant", False, f"POST failed: HTTP {resp.status}")
-                    return
+                response_text = await resp.text()
                 
-                data = await resp.json()
-                success = data.get("success")
-                
-                if not success:
-                    self.log_test("Add Participant", False, f"success=false in response")
-                    return
-                
-                # Verify participant was added by getting the schedule
-                async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
-                    if get_resp.status == 200:
-                        get_data = await get_resp.json()
-                        participants = get_data.get("participants", [])
-                        participant_ids = [p["telegram_id"] for p in participants]
-                        
-                        if 999003 in participant_ids:
-                            self.log_test("Add Participant", True, f"Participant 999003 successfully added. Total participants: {len(participants)}")
-                        else:
-                            self.log_test("Add Participant", False, f"Participant 999003 not found in participants: {participant_ids}")
+                if resp.status == 403:
+                    # Check for expected Russian message
+                    if "Можно добавить только друзей" in response_text:
+                        self.log_test("Add Non-Friend Participant", True, f"Correctly returned 403 with friend validation: {response_text}")
                     else:
-                        self.log_test("Add Participant", False, f"Could not verify participant addition: GET failed {get_resp.status}")
-        
-        except Exception as e:
-            self.log_test("Add Participant", False, f"Exception: {e}")
-    
-    async def test_4_remove_participant(self):
-        """
-        Critical Test 4: DELETE /api/shared-schedule/{id}/remove-participant/999003 
-        → should remove participant
-        """
-        print("\n🧪 Critical Test 4: Remove Participant")
-        
-        try:
-            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
-                self.log_test("Remove Participant", False, "No schedule ID available from previous test")
-                return
-            
-            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/remove-participant/999003") as resp:
-                if resp.status != 200:
-                    self.log_test("Remove Participant", False, f"DELETE failed: HTTP {resp.status}")
-                    return
-                
-                data = await resp.json()
-                success = data.get("success")
-                
-                if not success:
-                    self.log_test("Remove Participant", False, f"success=false in response")
-                    return
-                
-                # Verify participant was removed by getting the schedule
-                async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
-                    if get_resp.status == 200:
-                        get_data = await get_resp.json()
-                        participants = get_data.get("participants", [])
-                        participant_ids = [p["telegram_id"] for p in participants]
-                        
-                        if 999003 not in participant_ids:
-                            self.log_test("Remove Participant", True, f"Participant 999003 successfully removed. Remaining participants: {len(participants)}")
-                        else:
-                            self.log_test("Remove Participant", False, f"Participant 999003 still found in participants: {participant_ids}")
-                    else:
-                        self.log_test("Remove Participant", False, f"Could not verify participant removal: GET failed {get_resp.status}")
-        
-        except Exception as e:
-            self.log_test("Remove Participant", False, f"Exception: {e}")
-    
-    async def test_5_owner_protection(self):
-        """
-        Critical Test 5: Owner protection: DELETE /api/shared-schedule/{id}/remove-participant/999001 
-        → should return 400 (can't remove owner)
-        """
-        print("\n🧪 Critical Test 5: Owner Protection Test")
-        
-        try:
-            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
-                self.log_test("Owner Protection", False, "No schedule ID available from previous test")
-                return
-            
-            # Try to remove the owner (999001)
-            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/remove-participant/999001") as resp:
-                if resp.status == 400:
-                    response_text = await resp.text()
-                    # Check for owner protection message in English or Russian
-                    if ("owner" in response_text.lower() or 
-                        "владелец" in response_text.lower() or 
-                        "cannot remove" in response_text.lower() or
-                        "нельзя удалить" in response_text.lower()):
-                        self.log_test("Owner Protection", True, f"Owner removal correctly blocked with HTTP 400: {response_text}")
-                    else:
-                        self.log_test("Owner Protection", False, f"HTTP 400 but wrong message: {response_text}")
+                        self.log_test("Add Non-Friend Participant", False, f"403 but wrong message: {response_text}")
                 else:
-                    self.log_test("Owner Protection", False, f"Expected HTTP 400, got {resp.status}")
+                    self.log_test("Add Non-Friend Participant", False, f"Expected HTTP 403 for non-friend, got {resp.status}: {response_text}")
         
         except Exception as e:
-            self.log_test("Owner Protection", False, f"Exception: {e}")
+            self.log_test("Add Non-Friend Participant", False, f"Exception: {e}")
     
-    async def test_6_delete_schedule(self):
+    async def test_4_delete_without_owner_id(self):
         """
-        Critical Test 6: DELETE /api/shared-schedule/{id} → should delete schedule
+        Test 4: DELETE /api/shared-schedule/{id} (without owner_id parameter)
+        Expected: 403 with message "Необходимо указать owner_id" — this is the bug fix we implemented
         """
-        print("\n🧪 Critical Test 6: Delete Schedule")
+        print("\n🧪 Test 4: Delete Schedule Without owner_id (Security Fix - Should Return 403)")
         
         try:
-            if not hasattr(self, 'test_schedule_id') or not self.test_schedule_id:
-                self.log_test("Delete Schedule", False, "No schedule ID available from previous test")
+            if not self.test_schedule_id:
+                self.log_test("Delete Without owner_id", False, "No schedule ID available from previous test")
+                return
+            
+            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}") as resp:
+                response_text = await resp.text()
+                
+                if resp.status == 403:
+                    # Check for expected Russian message
+                    if "Необходимо указать owner_id" in response_text:
+                        self.log_test("Delete Without owner_id", True, f"CRITICAL: Security fix working - 403 with correct message: {response_text}")
+                    else:
+                        self.log_test("Delete Without owner_id", False, f"403 but wrong message: {response_text}")
+                else:
+                    self.log_test("Delete Without owner_id", False, f"CRITICAL: Expected HTTP 403 for missing owner_id, got {resp.status}: {response_text}")
+        
+        except Exception as e:
+            self.log_test("Delete Without owner_id", False, f"Exception: {e}")
+    
+    async def test_5_delete_with_correct_owner_id(self):
+        """
+        Test 5: DELETE /api/shared-schedule/{id}?owner_id=999001
+        Expected: 200 success
+        """
+        print("\n🧪 Test 5: Delete Schedule With Correct owner_id")
+        
+        try:
+            if not self.test_schedule_id:
+                self.log_test("Delete With Correct owner_id", False, "No schedule ID available from previous test")
                 return
             
             async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}?owner_id=999001") as resp:
-                if resp.status != 200:
-                    self.log_test("Delete Schedule", False, f"DELETE failed: HTTP {resp.status}")
-                    return
+                response_text = await resp.text()
                 
-                data = await resp.json()
-                success = data.get("success")
-                
-                if not success:
-                    self.log_test("Delete Schedule", False, f"success=false in response")
-                    return
-                
-                # Verify schedule was deleted by trying to get it
-                async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
-                    if get_resp.status == 200:
-                        get_data = await get_resp.json()
-                        exists = get_data.get("exists")
-                        
-                        if not exists:
-                            self.log_test("Delete Schedule", True, f"Schedule successfully deleted. exists=false")
-                            # Remove from cleanup list since it's already deleted
-                            if self.test_schedule_id in self.created_schedules:
-                                self.created_schedules.remove(self.test_schedule_id)
+                if resp.status == 200:
+                    # Verify schedule was deleted by checking if it still exists
+                    async with self.session.get(f"{BASE_URL}/shared-schedule/999001") as get_resp:
+                        if get_resp.status == 200:
+                            get_data = await get_resp.json()
+                            exists = get_data.get("exists", False)
+                            
+                            if not exists:
+                                self.log_test("Delete With Correct owner_id", True, f"Schedule successfully deleted with correct owner_id")
+                                # Remove from cleanup list since it's already deleted
+                                if self.test_schedule_id in self.created_schedules:
+                                    self.created_schedules.remove(self.test_schedule_id)
+                            else:
+                                self.log_test("Delete With Correct owner_id", False, f"Schedule still exists after deletion")
                         else:
-                            self.log_test("Delete Schedule", False, f"Schedule still exists after deletion")
-                    else:
-                        self.log_test("Delete Schedule", False, f"Could not verify deletion: GET failed {get_resp.status}")
+                            self.log_test("Delete With Correct owner_id", False, f"Could not verify deletion: GET failed {get_resp.status}")
+                else:
+                    self.log_test("Delete With Correct owner_id", False, f"Expected HTTP 200, got {resp.status}: {response_text}")
         
         except Exception as e:
-            self.log_test("Delete Schedule", False, f"Exception: {e}")
+            self.log_test("Delete With Correct owner_id", False, f"Exception: {e}")
     
-    async def test_7_deduplication(self):
+    async def test_6_create_another_schedule_for_token(self):
         """
-        Critical Test 7: Deduplication: POST /api/shared-schedule twice with same owner_id=999001 
-        → should return SAME schedule ID
+        Test 6: Create another schedule for token testing
+        POST /api/shared-schedule with body {"owner_id": 999001, "participant_ids": []}
         """
-        print("\n🧪 Critical Test 7: Deduplication Test")
+        print("\n🧪 Test 6: Create Another Schedule for Token Testing")
         
         try:
-            # First POST
-            payload1 = {
-                "owner_id": 999001,
-                "participant_ids": [888001]
-            }
-            
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload1) as resp1:
-                if resp1.status != 200:
-                    self.log_test("Deduplication Test", False, f"First POST failed: {resp1.status}")
-                    return
-                
-                data1 = await resp1.json()
-                schedule_id_1 = data1.get("id")
-                
-                if schedule_id_1:
-                    self.created_schedules.append(schedule_id_1)
-            
-            # Second POST with same owner_id but different participants
-            payload2 = {
-                "owner_id": 999001,
-                "participant_ids": [888002]  # Different participants
-            }
-            
-            async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload2) as resp2:
-                if resp2.status != 200:
-                    self.log_test("Deduplication Test", False, f"Second POST failed: {resp2.status}")
-                    return
-                
-                data2 = await resp2.json()
-                schedule_id_2 = data2.get("id")
-            
-            # Check if IDs are the same (deduplication working)
-            if schedule_id_1 and schedule_id_2 and schedule_id_1 == schedule_id_2:
-                self.log_test("Deduplication Test", True, f"SAME ID returned both times: {schedule_id_1}")
-                self.dedup_schedule_id = schedule_id_1
-            else:
-                self.log_test("Deduplication Test", False, f"Different IDs returned: {schedule_id_1} vs {schedule_id_2}")
-        
-        except Exception as e:
-            self.log_test("Deduplication Test", False, f"Exception: {e}")
-    
-    async def test_8_participant_limit(self):
-        """
-        Critical Test 8: Participant limit: add 7 participants, then 8th should fail with 400
-        """
-        print("\n🧪 Critical Test 8: Participant Limit Test")
-        
-        try:
-            # Create new schedule for this test
             payload = {
-                "owner_id": 777001,
+                "owner_id": 999001,
                 "participant_ids": []
             }
             
             async with self.session.post(f"{BASE_URL}/shared-schedule", json=payload) as resp:
                 if resp.status != 200:
-                    self.log_test("Participant Limit Test", False, f"Schedule creation failed: {resp.status}")
+                    self.log_test("Create Schedule for Token", False, f"POST failed: HTTP {resp.status}, response: {await resp.text()}")
                     return
                 
                 data = await resp.json()
                 schedule_id = data.get("id")
                 
-                if schedule_id:
-                    self.created_schedules.append(schedule_id)
-            
-            # Add 7 participants (owner counts as 1, so we can add 7 more for total of 8)
-            success_count = 0
-            for i in range(1, 8):  # 777101 to 777107 (7 participants)
-                participant_id = 777100 + i
-                add_payload = {"participant_id": participant_id}
+                if not schedule_id:
+                    self.log_test("Create Schedule for Token", False, "No schedule ID returned")
+                    return
                 
-                async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as add_resp:
-                    if add_resp.status == 200:
-                        success_count += 1
-                        print(f"    ✅ Added participant {participant_id} (#{success_count})")
-                    else:
-                        print(f"    ❌ Failed to add participant {participant_id}: {add_resp.status}")
-                        break
-            
-            if success_count != 7:
-                self.log_test("Participant Limit Test", False, f"Could not add 7 participants, only added {success_count}")
-                return
-            
-            # Try to add 8th participant (should fail with 400)
-            participant_8 = 777108
-            add_payload = {"participant_id": participant_8}
-            
-            async with self.session.post(f"{BASE_URL}/shared-schedule/{schedule_id}/add-participant", json=add_payload) as add_resp:
-                if add_resp.status == 400:
-                    response_text = await add_resp.text()
-                    self.log_test("Participant Limit Test", True, f"8th participant correctly rejected with HTTP 400: {response_text}")
-                else:
-                    self.log_test("Participant Limit Test", False, f"8th participant returned HTTP {add_resp.status}, expected 400")
+                self.created_schedules.append(schedule_id)
+                self.test_schedule_id = schedule_id  # Update for token tests
+                
+                self.log_test("Create Schedule for Token", True, f"Schedule created for token testing: {schedule_id}")
         
         except Exception as e:
-            self.log_test("Participant Limit Test", False, f"Exception: {e}")
+            self.log_test("Create Schedule for Token", False, f"Exception: {e}")
+    
+    async def test_7_create_share_token(self):
+        """
+        Test 7: POST /api/shared-schedule/{id}/share-token
+        Expected: 200 with token and invite_link
+        """
+        print("\n🧪 Test 7: Create Share Token")
+        
+        try:
+            if not self.test_schedule_id:
+                self.log_test("Create Share Token", False, "No schedule ID available from previous test")
+                return
+            
+            async with self.session.post(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}/share-token") as resp:
+                if resp.status != 200:
+                    self.log_test("Create Share Token", False, f"POST failed: HTTP {resp.status}, response: {await resp.text()}")
+                    return
+                
+                data = await resp.json()
+                token = data.get("token")
+                invite_link = data.get("invite_link")
+                participant_ids = data.get("participant_ids")
+                
+                # Validation checks
+                if not token:
+                    self.log_test("Create Share Token", False, "No token returned")
+                    return
+                
+                if not invite_link or "t.me" not in invite_link:
+                    self.log_test("Create Share Token", False, f"Invalid invite_link: {invite_link}")
+                    return
+                
+                if not isinstance(participant_ids, list):
+                    self.log_test("Create Share Token", False, f"participant_ids should be list: {type(participant_ids)}")
+                    return
+                
+                self.test_token = token  # Store for next test
+                
+                self.log_test("Create Share Token", True, f"Share token created: {token}, invite_link: {invite_link}")
+        
+        except Exception as e:
+            self.log_test("Create Share Token", False, f"Exception: {e}")
+    
+    async def test_8_get_token_data(self):
+        """
+        Test 8: GET /api/shared-schedule/token/{token}
+        Expected: 200 with participant_ids list
+        """
+        print("\n🧪 Test 8: Get Token Data")
+        
+        try:
+            if not self.test_token:
+                self.log_test("Get Token Data", False, "No token available from previous test")
+                return
+            
+            async with self.session.get(f"{BASE_URL}/shared-schedule/token/{self.test_token}") as resp:
+                if resp.status != 200:
+                    self.log_test("Get Token Data", False, f"GET failed: HTTP {resp.status}, response: {await resp.text()}")
+                    return
+                
+                data = await resp.json()
+                token = data.get("token")
+                participant_ids = data.get("participant_ids")
+                
+                # Validation checks
+                if token != self.test_token:
+                    self.log_test("Get Token Data", False, f"Token mismatch: {token} vs {self.test_token}")
+                    return
+                
+                if not isinstance(participant_ids, list):
+                    self.log_test("Get Token Data", False, f"participant_ids should be list: {type(participant_ids)}")
+                    return
+                
+                if 999001 not in participant_ids:
+                    self.log_test("Get Token Data", False, f"Owner 999001 not in participant_ids: {participant_ids}")
+                    return
+                
+                self.log_test("Get Token Data", True, f"Token data retrieved: participant_ids={participant_ids}")
+        
+        except Exception as e:
+            self.log_test("Get Token Data", False, f"Exception: {e}")
+    
+    async def test_9_cleanup_final_schedule(self):
+        """
+        Test 9: Final cleanup - DELETE /api/shared-schedule/{id}?owner_id=999001
+        """
+        print("\n🧪 Test 9: Final Cleanup")
+        
+        try:
+            if not self.test_schedule_id:
+                self.log_test("Final Cleanup", True, "No schedule to cleanup")
+                return
+            
+            async with self.session.delete(f"{BASE_URL}/shared-schedule/{self.test_schedule_id}?owner_id=999001") as resp:
+                if resp.status in [200, 404]:  # 404 is OK if already deleted
+                    self.log_test("Final Cleanup", True, f"Schedule cleaned up successfully")
+                    # Remove from cleanup list
+                    if self.test_schedule_id in self.created_schedules:
+                        self.created_schedules.remove(self.test_schedule_id)
+                else:
+                    self.log_test("Final Cleanup", False, f"Cleanup failed: HTTP {resp.status}")
+        
+        except Exception as e:
+            self.log_test("Final Cleanup", False, f"Exception: {e}")
     
     async def run_all_tests(self):
         """Run all critical test scenarios in sequence"""
