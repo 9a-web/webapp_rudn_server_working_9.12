@@ -30,6 +30,33 @@ export const LiveScheduleSection = ({
   onScheduleModeChange,             // сеттер из App.jsx
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
+  
+  // Запоминаем выбор преподавателя для сгруппированных пар (discipline+time → subItem index)
+  const [selectedSubItemMap, setSelectedSubItemMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem('schedule_teacher_choices');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
+  const getSelectedSubIndex = useCallback((classItem) => {
+    if (!classItem.subItems || classItem.subItems.length <= 1) return 0;
+    const key = `${classItem.discipline?.trim()}-${classItem.time?.trim()}`;
+    const savedIdx = selectedSubItemMap[key];
+    if (savedIdx !== undefined && savedIdx < classItem.subItems.length) return savedIdx;
+    return 0;
+  }, [selectedSubItemMap]);
+
+  const selectSubItem = useCallback((classItem, subIndex, e) => {
+    if (e) e.stopPropagation();
+    const key = `${classItem.discipline?.trim()}-${classItem.time?.trim()}`;
+    setSelectedSubItemMap(prev => {
+      const next = { ...prev, [key]: subIndex };
+      try { localStorage.setItem('schedule_teacher_choices', JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (hapticFeedback) hapticFeedback('selection');
+  }, [hapticFeedback]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [swipeDirection, setSwipeDirection] = useState(0);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
