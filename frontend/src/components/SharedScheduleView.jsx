@@ -932,10 +932,22 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         const events = daySchedules[pId] || [];
         if (!participant) return;
         const colW = evW / cols;
-        const cx = evX + colW * colIdx + 2 * dpr;
-        const cw = colW - 4 * dpr;
+        const baseCx = evX + colW * colIdx + 2 * dpr;
+        const baseCw = colW - 4 * dpr;
 
-        events.forEach(event => {
+        // Вычисляем layout для перекрывающихся событий
+        const layout = computeOverlapLayout(events);
+
+        layout.forEach(item => {
+          const event = item.event;
+          const scTotal = item.subColTotal || 1;
+          const scIdx = item.subCol || 0;
+
+          // Sub-column позиционирование
+          const subColW = baseCw / scTotal;
+          const cx = baseCx + subColW * scIdx;
+          const cw = subColW - (scTotal > 1 ? 2 * dpr : 0);
+
           const [sStr, eStr] = (event.time || '').split(' - ').map(s => s?.trim());
           const sMin = parseTime(sStr), eMin = parseTime(eStr);
           if (sMin === null || eMin === null || eMin <= sMin) return;
