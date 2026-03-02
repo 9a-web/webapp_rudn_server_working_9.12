@@ -549,35 +549,92 @@ export const LiveScheduleSection = ({
                         )}
                       </div>
 
-                      {/* Expanded details */}
-                      {isExpanded && (
+                      {/* Выбранный преподаватель и аудитория (всегда видны) */}
+                      {classItem.subItems && classItem.subItems.length > 0 && (() => {
+                        const selIdx = getSelectedSubIndex(classItem);
+                        const selected = classItem.subItems[selIdx] || classItem.subItems[0];
+                        const hasMultiple = classItem.subItems.length > 1;
+                        return (
+                          <div className="mt-2">
+                            {selected.auditory && (
+                              <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                                {t('classDetails.auditory')} <span style={{ color: '#3B3B3B' }}>{selected.auditory}</span>
+                              </p>
+                            )}
+                            {selected.teacher && (
+                              <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                                {t('classDetails.teacher')} <span style={{ color: '#3B3B3B' }}>{selected.teacher}</span>
+                                {hasMultiple && (
+                                  <span 
+                                    className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium"
+                                    style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#6366f1' }}
+                                  >
+                                    {classItem.subItems.length} вар.
+                                  </span>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Expanded: выпадающий список преподавателей */}
+                      {isExpanded && classItem.subItems && classItem.subItems.length > 1 && (
+                        <div className="mt-3 animate-in fade-in duration-200">
+                          <p className="text-[11px] font-semibold mb-1.5" style={{ color: '#888', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Выберите преподавателя
+                          </p>
+                          <div className="space-y-1.5">
+                            {classItem.subItems.map((subItem, subIndex) => {
+                              const isSelected = getSelectedSubIndex(classItem) === subIndex;
+                              return (
+                                <div
+                                  key={subIndex}
+                                  onClick={(e) => selectSubItem(classItem, subIndex, e)}
+                                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer active:scale-[0.98]"
+                                  style={{
+                                    backgroundColor: isSelected ? 'rgba(99,102,241,0.08)' : 'rgba(0,0,0,0.02)',
+                                    border: isSelected ? '1.5px solid rgba(99,102,241,0.3)' : '1.5px solid transparent',
+                                  }}
+                                >
+                                  <div 
+                                    className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                                    style={{ borderColor: isSelected ? '#6366f1' : '#ccc' }}
+                                  >
+                                    {isSelected && (
+                                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366f1' }} />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[13px] font-medium truncate" style={{ color: isSelected ? '#4338ca' : '#3B3B3B' }}>
+                                      {subItem.teacher || 'Не указан'}
+                                    </p>
+                                    {subItem.auditory && (
+                                      <p className="text-[11px] truncate" style={{ color: '#999' }}>
+                                        {subItem.auditory}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Expanded details для одиночных subItems (без выбора) */}
+                      {isExpanded && classItem.subItems && classItem.subItems.length === 1 && (
                         <div className="mt-3 space-y-2 animate-in fade-in duration-200">
-                          {classItem.subItems && classItem.subItems.map((subItem, subIndex) => (
-                            <div key={subIndex} className={subIndex > 0 ? "pt-2 mt-2 border-t border-black/5" : ""}>
-                              {subItem.auditory && (
-                                <p 
-                                  style={{ 
-                                    fontSize: '13px',
-                                    color: '#999999',
-                                    fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
-                                  }}
-                                >
-                                  {t('classDetails.auditory')} <span style={{ color: '#3B3B3B' }}>{subItem.auditory}</span>
-                                </p>
-                              )}
-                              {subItem.teacher && (
-                                <p 
-                                  style={{ 
-                                    fontSize: '13px',
-                                    color: '#999999',
-                                    fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
-                                  }}
-                                >
-                                  {t('classDetails.teacher')} <span style={{ color: '#3B3B3B' }}>{subItem.teacher}</span>
-                                </p>
-                              )}
-                            </div>
-                          ))}
+                          {classItem.subItems[0].auditory && (
+                            <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                              {t('classDetails.auditory')} <span style={{ color: '#3B3B3B' }}>{classItem.subItems[0].auditory}</span>
+                            </p>
+                          )}
+                          {classItem.subItems[0].teacher && (
+                            <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                              {t('classDetails.teacher')} <span style={{ color: '#3B3B3B' }}>{classItem.subItems[0].teacher}</span>
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
