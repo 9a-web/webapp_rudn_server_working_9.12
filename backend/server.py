@@ -17021,7 +17021,10 @@ async def delete_shared_schedule(schedule_id: str, owner_id: Optional[int] = Non
         doc = await db.shared_schedules.find_one({"id": schedule_id})
         if not doc:
             raise HTTPException(status_code=404, detail="Расписание не найдено")
-        if owner_id is not None and doc.get("owner_id") != owner_id:
+        # БАГ-ФИХ: owner_id обязателен для проверки прав; без него — 403
+        if owner_id is None:
+            raise HTTPException(status_code=403, detail="Необходимо указать owner_id")
+        if doc.get("owner_id") != owner_id:
             raise HTTPException(status_code=403, detail="Нет прав")
         await db.shared_schedules.delete_one({"id": schedule_id})
         return SuccessResponse(success=True, message="Расписание удалено")
