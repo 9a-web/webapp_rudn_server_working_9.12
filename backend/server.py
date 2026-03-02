@@ -17370,8 +17370,47 @@ async def send_notification_from_post(data: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Отправка изображения расписания в ЛС бота ============
 
-app.include_router(api_router)
+@api_router.post("/send-schedule-image")
+async def send_schedule_image(
+    telegram_id: int = Body(...),
+    image_base64: str = Body(...),
+    caption: str = Body("📅 Совместное расписание")
+):
+    """Отправить сгенерированное изображение расписания в ЛС бота"""
+    try:
+        import base64
+        import io
+        from telegram import Bot
+
+        bot_token = get_telegram_bot_token()
+        if not bot_token:
+            raise HTTPException(status_code=500, detail="Bot token not configured")
+
+        # Декодируем base64 изображение
+        # Убираем data:image/png;base64, префикс если есть
+        if "," in image_base64:
+            image_base64 = image_base64.split(",", 1)[1]
+
+        image_bytes = base64.b64decode(image_base64)
+        image_io = io.BytesIO(image_bytes)
+        image_io.name = "schedule.png"
+
+        bot = Bot(token=bot_token)
+        await bot.send_photo(
+            chat_id=telegram_id,
+            photo=image_io,
+            caption=caption,
+            parse_mode="HTML"
+        )
+
+        logger.info(f"✅ Schedule image sent to user {telegram_id}")
+        return {"success": True, "message": "Image sent to bot DM"}
+
+    except Exception as e:
+        logger.error(f"❌ Error sending schedule image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Mount static files for modal images
 app.mount("/api/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
