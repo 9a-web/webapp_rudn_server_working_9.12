@@ -17421,20 +17421,21 @@ async def send_schedule_image(
     telegram_id: int = Body(...),
     image_base64: str = Body(...),
     caption: str = Body("📅 Совместное расписание"),
-    text_message: str = Body(None)
+    text_message: str = Body(None),
+    share_text: str = Body(None)
 ):
     """Отправить сгенерированное изображение расписания в ЛС бота"""
     try:
         import base64
         import io
-        from telegram import Bot
+        from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+        import urllib.parse
 
         bot_token = get_telegram_bot_token()
         if not bot_token:
             raise HTTPException(status_code=500, detail="Bot token not configured")
 
         # Декодируем base64 изображение
-        # Убираем data:image/png;base64, префикс если есть
         if "," in image_base64:
             image_base64 = image_base64.split(",", 1)[1]
 
@@ -17443,34 +17444,30 @@ async def send_schedule_image(
         image_io.name = "schedule.png"
 
         bot = Bot(token=bot_token)
-        
-        # Telegram photo caption лимит — 1024 символа
-        if len(caption) <= 1024:
-            await bot.send_photo(
-                chat_id=telegram_id,
-                photo=image_io,
-                caption=caption,
-                parse_mode="HTML"
-            )
-        else:
-            # Если caption слишком длинный — отправляем фото без подписи + текст отдельно
-            await bot.send_photo(
-                chat_id=telegram_id,
-                photo=image_io
-            )
-            await bot.send_message(
-                chat_id=telegram_id,
-                text=caption,
-                parse_mode="HTML"
-            )
+        bot_info = await bot.get_me()
+        bot_username = bot_info.username or "bot"
 
-        # Отправляем текстовую версию отдельным сообщением, если передана
-        if text_message:
-            await bot.send_message(
-                chat_id=telegram_id,
-                text=text_message,
-                parse_mode=None
-            )
+        # Inline-кнопка «Поделиться»
+        share_content = share_text or caption
+        bot_url = urllib.parse.quote(f"https://t.me/{bot_username}")
+        share_encoded = urllib.parse.quote(share_content[:512])
+        share_url = f"https://t.me/share/url?url={bot_url}&text={share_encoded}"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 Поделиться", url=share_url)]
+        ])
+
+        # Обрезаем caption до 1024 символов (лимит Telegram)
+        final_caption = caption
+        if len(final_caption) > 1024:
+            final_caption = final_caption[:1021] + "..."
+
+        await bot.send_photo(
+            chat_id=telegram_id,
+            photo=image_io,
+            caption=final_caption,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
 
         logger.info(f"✅ Schedule image sent to user {telegram_id}")
         return {"success": True, "message": "Image sent to bot DM"}

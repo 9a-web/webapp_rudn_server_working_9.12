@@ -473,7 +473,10 @@ export const ShareScheduleModal = ({
       const base64 = canvas.toDataURL('image/png');
       const caption = generateHtmlCaption();
 
-      await botAPI.sendScheduleImage(telegramId, base64, caption);
+      // Чистый текст для inline-кнопки «Поделиться»
+      const shareText = generateScheduleText();
+
+      await botAPI.sendScheduleImage(telegramId, base64, caption, shareText);
       hapticFeedback?.('success');
       setImageSentToBot(true);
       setTimeout(() => setImageSentToBot(false), 3000);
