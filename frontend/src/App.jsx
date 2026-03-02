@@ -1427,6 +1427,10 @@ const Home = () => {
 
     const todayClasses = schedule.filter(event => event.day === dayName);
 
+    // Собираем ВСЕ пары, идущие прямо сейчас (одновременные)
+    const concurrent = [];
+    let sharedMinutesLeft = 0;
+
     for (const classItem of todayClasses) {
       const timeRange = classItem.time.split('-');
       if (timeRange.length !== 2) continue;
@@ -1437,14 +1441,29 @@ const Home = () => {
       const endTime = endHour * 60 + endMin;
 
       if (currentTime >= startTime && currentTime < endTime) {
-        setCurrentClass(classItem.discipline);
-        setMinutesLeft(endTime - currentTime);
-        return;
+        concurrent.push(classItem);
+        sharedMinutesLeft = endTime - currentTime;
       }
     }
 
-    setCurrentClass(null);
-    setMinutesLeft(0);
+    if (concurrent.length > 0) {
+      setConcurrentClasses(concurrent);
+
+      // Проверяем сохранённый выбор пользователя в localStorage
+      const timeSlot = concurrent[0].time;
+      const storageKey = `concurrent_class_${dayName}_${timeSlot}`;
+      const savedChoice = localStorage.getItem(storageKey);
+      const savedClass = savedChoice 
+        ? concurrent.find(c => c.discipline === savedChoice) 
+        : null;
+
+      setCurrentClass(savedClass ? savedClass.discipline : concurrent[0].discipline);
+      setMinutesLeft(sharedMinutesLeft);
+    } else {
+      setConcurrentClasses([]);
+      setCurrentClass(null);
+      setMinutesLeft(0);
+    }
   }, [schedule]);
 
   const handleGroupSelected = async (groupData) => {
