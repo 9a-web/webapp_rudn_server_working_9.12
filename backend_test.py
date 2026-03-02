@@ -18,6 +18,8 @@ class SharedScheduleTester:
         self.session = None
         self.test_results = []
         self.created_schedules = []  # Track for cleanup
+        self.test_schedule_id = None  # Store schedule ID for tests
+        self.test_token = None  # Store share token for tests
     
     async def setup(self):
         """Setup HTTP session"""
