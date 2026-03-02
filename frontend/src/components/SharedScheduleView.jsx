@@ -1583,7 +1583,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       {/* ─── TIMELINE (всегда отображается) ─── */}
       <div
         ref={timelineRef}
-        className="relative overflow-y-auto overflow-x-hidden mx-2 rounded-2xl scrollbar-hide"
+        className="relative overflow-y-auto overflow-x-auto mx-2 rounded-2xl scrollbar-hide"
         style={{
           maxHeight: 'calc(100vh - 360px)',
           backgroundColor: '#fafafa',
