@@ -549,8 +549,8 @@ export const LiveScheduleSection = ({
                         )}
                       </div>
 
-                      {/* Выбранный преподаватель и аудитория (всегда видны) */}
-                      {classItem.subItems && classItem.subItems.length > 0 && (() => {
+                      {/* Выбранный преподаватель и аудитория (только при раскрытии) */}
+                      {isExpanded && classItem.subItems && classItem.subItems.length > 0 && (() => {
                         const selIdx = getSelectedSubIndex(classItem);
                         const selected = classItem.subItems[selIdx] || classItem.subItems[0];
                         const hasMultiple = classItem.subItems.length > 1;
