@@ -837,10 +837,14 @@ export const sharedScheduleAPI = {
 
   /**
    * Удалить совместное расписание
+   * @param {string} scheduleId
+   * @param {number} ownerId — БАГ-ФИХ: обязательный параметр для проверки прав
    */
-  delete: async (scheduleId) => {
+  delete: async (scheduleId, ownerId) => {
     try {
-      const response = await api.delete(`/shared-schedule/${scheduleId}`);
+      const response = await api.delete(`/shared-schedule/${scheduleId}`, {
+        params: { owner_id: ownerId }
+      });
       return response.data;
     } catch (error) {
       handleError(error);
