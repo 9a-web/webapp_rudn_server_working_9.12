@@ -55,8 +55,30 @@ const durationToPx = (durationMin) => {
   return Math.max(0, durationMin * PX_PER_MIN);
 };
 
+// ─── Helper: группировка событий по discipline+time (разные преподаватели → варианты) ───
+const groupParticipantEvents = (events) => {
+  const groups = {};
+  events.forEach(event => {
+    const key = `${(event.discipline || '').trim()}-${(event.time || '').trim()}`;
+    if (!groups[key]) {
+      groups[key] = { ...event, teacherVariants: [] };
+    }
+    // Не добавляем дубликаты преподавателей
+    const exists = groups[key].teacherVariants.some(
+      v => v.teacher === event.teacher && v.auditory === event.auditory
+    );
+    if (!exists) {
+      groups[key].teacherVariants.push({
+        teacher: event.teacher,
+        auditory: event.auditory,
+      });
+    }
+  });
+  return Object.values(groups);
+};
+
 // ───────────────────────────────────────────
-// TimelineEvent — одна пара на таймлайне
+// TimelineEvent — одна пара на таймлайне (с поддержкой вариантов преподавателей)
 // ───────────────────────────────────────────
 const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumns, isOwner, subCol, subColTotal }) => {
   const [startStr, endStr] = (event.time || '').split(' - ').map(s => s?.trim());
@@ -71,6 +93,27 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
   const displayHeight = Math.max(height, minHeight);
   const isCompact = height < 60;
 
+  const variants = event.teacherVariants || [];
+  const hasVariants = variants.length > 1;
+
+  // Выбранный вариант преподавателя (из localStorage)
+  const storageKey = `shared_teacher_${(event.discipline || '').trim()}_${(event.time || '').trim()}`;
+  const [selectedVariantIdx, setSelectedVariantIdx] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved !== null) {
+        const idx = parseInt(saved, 10);
+        return idx >= 0 && idx < variants.length ? idx : 0;
+      }
+    } catch {}
+    return 0;
+  });
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+
+  const selectedVariant = variants[selectedVariantIdx] || variants[0] || { teacher: event.teacher, auditory: event.auditory };
+  const displayTeacher = selectedVariant.teacher || event.teacher;
+  const displayAuditory = selectedVariant.auditory || event.auditory;
+
   // Позиционирование: процент от ширины контейнера событий
   const colWidthPct = 100 / totalColumns;
   const leftPct = colWidthPct * columnIndex;
@@ -81,58 +124,153 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
   const subWidthPct = colWidthPct / scTotal;
   const subLeftPct = leftPct + subWidthPct * scIdx;
 
+  const handlePickerToggle = (e) => {
+    e.stopPropagation();
+    setPickerOpen(prev => !prev);
+  };
+
+  const handleSelectVariant = (e, idx) => {
+    e.stopPropagation();
+    setSelectedVariantIdx(idx);
+    try { localStorage.setItem(storageKey, String(idx)); } catch {}
+    setPickerOpen(false);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, delay: columnIndex * 0.06 + scIdx * 0.03 }}
-      className="absolute overflow-hidden"
+      className="absolute overflow-visible"
       style={{
         top: `${top}px`,
         minHeight: `${displayHeight}px`,
         left: `calc(${subLeftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${subWidthPct}% - ${EVENT_GAP}px)`,
-        backgroundColor: color + '14',
-        borderRadius: '12px',
-        zIndex: 10 + scIdx,
+        zIndex: pickerOpen ? 50 : 10 + scIdx,
       }}
     >
-      {/* Закруглённая цветная полоска слева */}
       <div
-        className="absolute left-0 top-1 bottom-1 w-[3.5px] rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      <div className="h-full px-2 py-1.5 pl-2.5 flex flex-col justify-center">
-        {isCompact ? (
-          <div className="flex items-start gap-1">
-            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
-            <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight break-words" style={{ wordBreak: 'break-word' }}>
-              {event.discipline}
-            </span>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-1 mb-0.5">
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-              <span className="text-[9px] font-medium" style={{ color: color }}>
-                {isOwner ? 'Вы' : participantName}
+        className="h-full rounded-xl overflow-hidden"
+        style={{ backgroundColor: color + '14' }}
+      >
+        {/* Закруглённая цветная полоска слева */}
+        <div
+          className="absolute left-0 top-1 bottom-1 w-[3.5px] rounded-full"
+          style={{ backgroundColor: color }}
+        />
+        <div className="h-full px-2 py-1.5 pl-2.5 flex flex-col justify-center">
+          {isCompact ? (
+            <div className="flex items-start gap-1">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: color }} />
+              <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight break-words" style={{ wordBreak: 'break-word' }}>
+                {event.discipline}
               </span>
             </div>
-            <div className="text-[11px] font-semibold text-[#1c1c1c] leading-tight mb-0.5 break-words" style={{ wordBreak: 'break-word' }}>
-              {event.discipline}
-            </div>
-            <div className="flex items-center gap-1.5 text-[9px] text-[#999] flex-wrap">
-              <span>{startStr} – {endStr}</span>
-              {event.auditory && (
-                <>
-                  <span>·</span>
-                  <span className="break-words" style={{ wordBreak: 'break-word' }}>{event.auditory}</span>
-                </>
+          ) : (
+            <>
+              {/* Имя участника — кликабельное если есть варианты */}
+              <div className="flex items-center gap-1 mb-0.5">
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                <span
+                  className={`text-[9px] font-medium ${hasVariants ? 'cursor-pointer' : ''}`}
+                  style={{ color: color }}
+                  onClick={hasVariants ? handlePickerToggle : undefined}
+                >
+                  {isOwner ? 'Вы' : participantName}
+                  {hasVariants && (
+                    <span className="ml-0.5 opacity-60">▾</span>
+                  )}
+                </span>
+              </div>
+              <div className="text-[11px] font-semibold text-[#1c1c1c] leading-tight mb-0.5 break-words" style={{ wordBreak: 'break-word' }}>
+                {event.discipline}
+              </div>
+              <div className="flex items-center gap-1.5 text-[9px] text-[#999] flex-wrap">
+                <span>{startStr} – {endStr}</span>
+                {displayAuditory && (
+                  <>
+                    <span>·</span>
+                    <span className="break-words" style={{ wordBreak: 'break-word' }}>{displayAuditory}</span>
+                  </>
+                )}
+              </div>
+              {/* Строка преподавателя — кликабельная */}
+              {displayTeacher && (
+                <div
+                  className={`flex items-center gap-1 mt-0.5 ${hasVariants ? 'cursor-pointer' : ''}`}
+                  onClick={hasVariants ? handlePickerToggle : undefined}
+                >
+                  <span className="text-[9px] text-[#999] truncate">
+                    {displayTeacher}
+                  </span>
+                  {hasVariants && (
+                    <span
+                      className="flex-shrink-0 inline-flex items-center px-1 py-px rounded text-[8px] font-semibold"
+                      style={{ backgroundColor: color + '20', color: color }}
+                    >
+                      {variants.length}
+                    </span>
+                  )}
+                </div>
               )}
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Выпадающий список преподавателей */}
+      {pickerOpen && hasVariants && (
+        <div
+          className="absolute left-0 right-0 rounded-xl shadow-lg border border-gray-200/80 overflow-hidden"
+          style={{
+            top: `${displayHeight + 2}px`,
+            backgroundColor: '#fff',
+            zIndex: 100,
+            minWidth: '120px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {variants.map((v, vIdx) => {
+            const isSelected = vIdx === selectedVariantIdx;
+            return (
+              <div
+                key={vIdx}
+                onClick={(e) => handleSelectVariant(e, vIdx)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 cursor-pointer transition-colors"
+                style={{
+                  backgroundColor: isSelected ? color + '12' : 'transparent',
+                }}
+              >
+                <div
+                  className="w-3 h-3 rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0"
+                  style={{ borderColor: isSelected ? color : '#ccc' }}
+                >
+                  {isSelected && (
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-medium truncate" style={{ color: isSelected ? '#1c1c1c' : '#555' }}>
+                    {v.teacher || 'Не указан'}
+                  </p>
+                  {v.auditory && (
+                    <p className="text-[8px] truncate" style={{ color: '#999' }}>{v.auditory}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Overlay для закрытия picker */}
+      {pickerOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={(e) => { e.stopPropagation(); setPickerOpen(false); }}
+        />
+      )}
     </motion.div>
   );
 };
