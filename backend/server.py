@@ -16864,17 +16864,21 @@ async def create_shared_schedule(data: SharedScheduleCreate):
         schedule_id = str(uuid.uuid4())
         owner_settings = await db.user_settings.find_one({"telegram_id": data.owner_id})
         owner_name = owner_settings.get("first_name", "Я") if owner_settings else "Я"
+        owner_group = owner_settings.get("group_name", "") if owner_settings else ""
 
-        participants = [{"telegram_id": data.owner_id, "first_name": owner_name, "color": PARTICIPANT_COLORS[0]}]
-        for idx, pid in enumerate(data.participant_ids[:(MAX_PARTICIPANTS - 1)]):
+        participants = [{"telegram_id": data.owner_id, "first_name": owner_name, "group_name": owner_group, "color": PARTICIPANT_COLORS[0]}]
+        color_counter = 1  # БАГ-ФИХ: отдельный счётчик цветов, не зависит от enumerate idx
+        for pid in data.participant_ids[:(MAX_PARTICIPANTS - 1)]:
             if pid == data.owner_id:
                 continue  # пропускаем себя — уже добавлены как owner
             p_settings = await db.user_settings.find_one({"telegram_id": pid})
             p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
+            p_group = p_settings.get("group_name", "") if p_settings else ""
             participants.append({
-                "telegram_id": pid, "first_name": p_name,
-                "color": PARTICIPANT_COLORS[(idx + 1) % len(PARTICIPANT_COLORS)]
+                "telegram_id": pid, "first_name": p_name, "group_name": p_group,
+                "color": PARTICIPANT_COLORS[color_counter % len(PARTICIPANT_COLORS)]
             })
+            color_counter += 1
 
         doc = {"id": schedule_id, "owner_id": data.owner_id, "participants": participants,
                "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()}
