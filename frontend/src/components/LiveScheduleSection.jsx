@@ -30,6 +30,7 @@ export const LiveScheduleSection = ({
   onScheduleModeChange,             // сеттер из App.jsx
 }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
+  const [teacherPickerOpen, setTeacherPickerOpen] = useState(null); // index карточки, где открыт список преподов
   
   // Запоминаем выбор преподавателя для сгруппированных пар (discipline+time → subItem index)
   const [selectedSubItemMap, setSelectedSubItemMap] = useState(() => {
