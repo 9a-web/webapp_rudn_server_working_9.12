@@ -79,7 +79,9 @@ const groupParticipantEvents = (events) => {
 // ───────────────────────────────────────────
 // TimelineEvent — одна пара на таймлайне (с поддержкой вариантов преподавателей)
 // ───────────────────────────────────────────
-const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumns, isOwner, subCol, subColTotal }) => {
+const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumns, isOwner, subCol, subColTotal, pxPerMin }) => {
+  const minToPx = makeMinToPx(pxPerMin);
+  const durationToPx = makeDurationToPx(pxPerMin);
   const [startStr, endStr] = (event.time || '').split(' - ').map(s => s?.trim());
   const startMin = parseTime(startStr);
   const endMin = parseTime(endStr);
