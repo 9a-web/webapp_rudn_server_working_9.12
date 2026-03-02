@@ -590,11 +590,23 @@ async def track_user_action(db, telegram_id: int, action_type: str, metadata: di
         current_hour = metadata.get("hour", 12)  # Час выполнения (0-23)
         was_on_time = metadata.get("on_time", False)  # Выполнена в срок?
         
+        # БАГ-ФИХ: автосброс tasks_completed_today при смене дня
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        last_reset = stats.last_daily_reset
+        if last_reset != today:
+            # Новый день — сбрасываем счётчик и ставим новый 1
+            update_data["$set"]["tasks_completed_today"] = 1
+            update_data["$set"]["last_daily_reset"] = today
+        else:
+            # Тот же день — инкрементируем
+            if "$inc" not in update_data:
+                update_data["$inc"] = {}
+            update_data["$inc"]["tasks_completed_today"] = 1
+        
         # Обновляем общий счетчик
         if "$inc" not in update_data:
             update_data["$inc"] = {}
         update_data["$inc"]["tasks_completed_total"] = 1
-        update_data["$inc"]["tasks_completed_today"] = 1
         
         # Проверяем выполнение до 9:00
         if current_hour < 9:
@@ -605,7 +617,6 @@ async def track_user_action(db, telegram_id: int, action_type: str, metadata: di
             update_data["$inc"]["tasks_completed_on_time"] = 1
         
         # Обновляем streak (серию дней)
-        today = datetime.utcnow().strftime("%Y-%m-%d")
         last_completion = stats.last_task_completion_date
         
         if last_completion is None:
