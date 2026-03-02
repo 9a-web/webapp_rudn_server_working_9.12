@@ -201,6 +201,9 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
                   className={`flex items-center gap-1 mt-0.5 ${hasVariants ? 'cursor-pointer' : ''}`}
                   onClick={hasVariants ? handlePickerToggle : undefined}
                 >
+                  {hasVariants && (
+                    <ChevronRight className="w-2.5 h-2.5 flex-shrink-0 text-[#999]" />
+                  )}
                   <span className="text-[9px] text-[#999] truncate">
                     {displayTeacher}
                   </span>
