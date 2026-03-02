@@ -1772,6 +1772,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   isOwner={participant.telegram_id === telegramId}
                   subCol={item.subCol}
                   subColTotal={item.subColTotal}
+                  pxPerMin={pxPerMin}
                 />
               ));
             })}
