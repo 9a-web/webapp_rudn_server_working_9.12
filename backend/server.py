@@ -17420,7 +17420,8 @@ async def send_notification_from_post(data: dict):
 async def send_schedule_image(
     telegram_id: int = Body(...),
     image_base64: str = Body(...),
-    caption: str = Body("📅 Совместное расписание")
+    caption: str = Body("📅 Совместное расписание"),
+    text_message: str = Body(None)
 ):
     """Отправить сгенерированное изображение расписания в ЛС бота"""
     try:
@@ -17448,6 +17449,14 @@ async def send_schedule_image(
             caption=caption,
             parse_mode="HTML"
         )
+
+        # Отправляем текстовую версию отдельным сообщением, если передана
+        if text_message:
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=text_message,
+                parse_mode=None
+            )
 
         logger.info(f"✅ Schedule image sent to user {telegram_id}")
         return {"success": True, "message": "Image sent to bot DM"}

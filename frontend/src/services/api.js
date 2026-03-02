@@ -386,13 +386,17 @@ export const botAPI = {
    * @param {string} imageBase64 - Base64 строка изображения
    * @param {string} caption - Подпись к изображению
    */
-  sendScheduleImage: async (telegramId, imageBase64, caption = '📅 Совместное расписание') => {
+  sendScheduleImage: async (telegramId, imageBase64, caption = '📅 Совместное расписание', textMessage = null) => {
     try {
-      const response = await api.post('/send-schedule-image', {
+      const payload = {
         telegram_id: telegramId,
         image_base64: imageBase64,
         caption
-      });
+      };
+      if (textMessage) {
+        payload.text_message = textMessage;
+      }
+      const response = await api.post('/send-schedule-image', payload);
       return response.data;
     } catch (error) {
       console.error('Error sending schedule image to bot:', error);

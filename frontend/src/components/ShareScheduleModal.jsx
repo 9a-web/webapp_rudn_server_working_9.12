@@ -440,7 +440,10 @@ export const ShareScheduleModal = ({
       const dateStr = selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
       const caption = `<tg-emoji emoji-id="5307850030416156311">📅</tg-emoji> <b>Расписание</b>\n<tg-emoji emoji-id="5312474198365462799">📆</tg-emoji> ${formattedDayName}, ${dateStr}${groupName ? `\n👥 ${groupName}` : ''}`;
 
-      await botAPI.sendScheduleImage(telegramId, base64, caption);
+      // Текстовая версия расписания
+      const textMessage = generateScheduleText();
+
+      await botAPI.sendScheduleImage(telegramId, base64, caption, textMessage);
       hapticFeedback?.('success');
       setImageSentToBot(true);
       setTimeout(() => setImageSentToBot(false), 3000);
