@@ -17450,7 +17450,7 @@ async def send_schedule_image(
         # Inline-кнопка «Поделиться»
         share_content = share_text or caption
         bot_url = urllib.parse.quote(f"https://t.me/{bot_username}")
-        share_encoded = urllib.parse.quote(share_content[:512])
+        share_encoded = urllib.parse.quote(share_content)
         share_url = f"https://t.me/share/url?url={bot_url}&text={share_encoded}"
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📤 Поделиться", url=share_url)]
