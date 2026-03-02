@@ -242,6 +242,8 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   // ─── Генерация изображения: state (callback ниже, после зависимостей) ───
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isSendingToBot, setIsSendingToBot] = useState(false);
+  const [imageSentToBot, setImageSentToBot] = useState(false);
 
   // ─── Data loading ───
   const loadSharedSchedule = useCallback(async (silent = false) => {
