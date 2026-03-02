@@ -343,6 +343,14 @@ class UserStatsResponse(BaseModel):
     detailed_views: int
     night_usage_count: int
     early_usage_count: int
+    # БАГ-ФИХ: добавлены недостающие поля для прогресс-баров
+    unique_groups: List[str] = []
+    analytics_views: int = 0
+    calendar_opens: int = 0
+    notifications_configured: bool = False
+    schedule_shares: int = 0
+    menu_items_visited: List[str] = []
+    active_days: List[str] = []
     # Task-related fields for new achievements
     tasks_created_total: int = 0
     tasks_completed_total: int = 0
@@ -351,6 +359,10 @@ class UserStatsResponse(BaseModel):
     tasks_completed_on_time: int = 0
     task_streak_current: int = 0
     first_task_created: bool = False
+    # Friends-related fields
+    friends_count: int = 0
+    friends_faculties_count: int = 0
+    users_invited: int = 0
     # Streak fields
     visit_streak_current: int = 0
     visit_streak_max: int = 0
