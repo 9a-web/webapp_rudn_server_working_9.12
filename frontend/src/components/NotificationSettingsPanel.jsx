@@ -67,7 +67,7 @@ const CATEGORIES = [
     icon: Trophy,
     color: 'yellow',
     title: 'Достижения',
-    description: 'Новые достижения и очки',
+    description: 'Новые достижения и $RDN',
     settings: [
       { key: 'achievements_enabled', label: 'Включить' },
       { key: 'achievements_push', label: 'Push в Telegram' }

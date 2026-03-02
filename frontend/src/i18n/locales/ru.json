@@ -83,11 +83,11 @@
   },
   "achievements": {
     "title": "Достижения",
-    "totalPoints": "Всего очков",
+    "totalPoints": "Всего $RDN",
     "progress": "Прогресс",
     "viewAll": "Посмотреть все",
     "recent": "Последние достижения",
-    "points": "очков"
+    "points": "$RDN"
   },
   "sidebar": {
     "quickActions": "Быстрые действия"

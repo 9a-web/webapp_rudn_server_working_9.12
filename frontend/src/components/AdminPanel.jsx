@@ -2824,7 +2824,7 @@ const ReferralLinksTab = () => {
                       
                       {modalButtonAction === 'reward' && (
                         <div>
-                          <label className="text-[11px] text-gray-500 mb-1 block">Количество баллов</label>
+                          <label className="text-[11px] text-gray-500 mb-1 block">Количество $RDN</label>
                           <input
                             type="number" min="0"
                             value={modalRewardPoints} onChange={(e) => setModalRewardPoints(parseInt(e.target.value) || 0)}

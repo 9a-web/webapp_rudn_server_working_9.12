@@ -100,10 +100,10 @@ export const DesktopSidebar = ({
           </div>
           
           <div className="space-y-4">
-            {/* Общие очки */}
+            {/* $RDN */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">
-                {t('achievements.totalPoints', 'Всего очков')}
+                {t('achievements.totalPoints', 'Всего $RDN')}
               </span>
               <span className="text-2xl font-bold text-yellow-400">
                 {userStats.total_points || 0}
@@ -218,7 +218,7 @@ export const DesktopSidebar = ({
                     {userAch.achievement.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    +{userAch.achievement.points} {t('achievements.points', 'очков')}
+                    +{userAch.achievement.points} {t('achievements.points', '$RDN')}
                   </p>
                 </div>
               </div>

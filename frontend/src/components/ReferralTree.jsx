@@ -60,7 +60,7 @@ export const ReferralTree = ({ tree, level = 1 }) => {
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1">
             <TrendingUp className={`w-3 h-3 ${colors.icon}`} />
-            <span className="text-gray-300">{tree.total_points || 0} баллов</span>
+            <span className="text-gray-300">{tree.total_points || 0} $RDN</span>
           </div>
           {hasChildren && (
             <div className="flex items-center gap-1">

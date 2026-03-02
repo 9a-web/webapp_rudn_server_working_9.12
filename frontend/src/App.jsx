@@ -2621,7 +2621,7 @@ const Home = () => {
               });
               const data = await res.json();
               if (data.success) {
-                showAlert(`🎁 Вы получили ${points} баллов!`);
+                showAlert(`🎁 Вы получили ${points} $RDN!`);
               } else {
                 showAlert(data.message || 'Награда уже получена');
               }

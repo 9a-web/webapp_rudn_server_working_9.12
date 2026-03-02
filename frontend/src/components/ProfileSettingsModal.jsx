@@ -161,7 +161,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, telegramId, hapticFeedback, onT
       key: 'show_achievements',
       icon: Trophy,
       title: 'Достижения',
-      description: 'Показывать достижения и очки'
+      description: 'Показывать достижения и $RDN'
     },
     {
       key: 'show_schedule',

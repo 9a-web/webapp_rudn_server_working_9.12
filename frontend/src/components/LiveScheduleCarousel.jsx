@@ -156,7 +156,7 @@ export const LiveScheduleCarousel = ({
                     </div>
                     <div className="text-right">
                       <div className="text-xl font-bold text-[#FFE66D]">{userStats?.total_points || 0}</div>
-                      <div className="text-[10px] text-gray-400">очков</div>
+                      <div className="text-[10px] text-gray-400">$RDN</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">

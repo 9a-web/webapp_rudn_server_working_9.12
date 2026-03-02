@@ -83,11 +83,11 @@
   },
   "achievements": {
     "title": "Achievements",
-    "totalPoints": "Total Points",
+    "totalPoints": "Total $RDN",
     "progress": "Progress",
     "viewAll": "View All",
     "recent": "Recent Achievements",
-    "points": "points"
+    "points": "$RDN"
   },
   "sidebar": {
     "quickActions": "Quick Actions"

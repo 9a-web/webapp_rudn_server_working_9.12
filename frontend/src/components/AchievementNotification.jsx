@@ -122,7 +122,7 @@ export const AchievementNotificationContent = ({ achievement, onClose, hapticFee
 
                 <div className="flex items-center gap-1 text-xs font-semibold text-[#FFE66D]">
                   <Star className="w-3 h-3 flex-shrink-0" />
-                  <span>+{achievement.points} очков</span>
+                  <span>+{achievement.points} $RDN</span>
                 </div>
               </div>
 

@@ -116,7 +116,7 @@ const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
                       <div className="flex justify-center">
                         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 backdrop-blur-sm border border-amber-500/30">
                           <Gift className="w-4 h-4 text-amber-400" />
-                          <span className="text-sm font-semibold text-amber-300">+{config.reward_points} баллов</span>
+                          <span className="text-sm font-semibold text-amber-300">+{config.reward_points} $RDN</span>
                         </div>
                       </div>
                     )}
@@ -152,7 +152,7 @@ const ReferralModal = ({ isOpen, config, onClose, onNavigate, onReward }) => {
                   <div className="flex justify-center">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/15 border border-amber-500/20">
                       <Gift className="w-4 h-4 text-amber-400" />
-                      <span className="text-sm font-semibold text-amber-400">+{config.reward_points} баллов</span>
+                      <span className="text-sm font-semibold text-amber-400">+{config.reward_points} $RDN</span>
                     </div>
                   </div>
                 )}

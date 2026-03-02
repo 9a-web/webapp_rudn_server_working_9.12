@@ -266,7 +266,7 @@ export const AchievementsModal = ({
                               isEarned ? 'text-[#FFE66D]' : 'text-gray-600'
                             }`}>
                               <Star className="w-4 h-4" />
-                              <span>{achievement.points} очков</span>
+                              <span>{achievement.points} $RDN</span>
                             </div>
 
                             {isEarned && earned.earned_at && (
