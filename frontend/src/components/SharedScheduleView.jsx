@@ -345,7 +345,7 @@ const computeOverlapLayout = (events) => {
 // ───────────────────────────────────────────
 // CurrentTimeLine — красная линия текущего времени
 // ───────────────────────────────────────────
-const CurrentTimeLine = () => {
+const CurrentTimeLine = ({ pxPerMin }) => {
   const [now, setNow] = useState(new Date());
   
   useEffect(() => {
@@ -357,7 +357,9 @@ const CurrentTimeLine = () => {
   
   if (currentMin < TIMELINE_START_MIN || currentMin > TIMELINE_END_MIN) return null;
   
-  const top = minToPx(currentMin);
+  // БАГ-ФИХ: используем makeMinToPx с переданным pxPerMin вместо несуществующей minToPx
+  const localMinToPx = makeMinToPx(pxPerMin);
+  const top = localMinToPx(currentMin);
   
   return (
     <div 
