@@ -13852,6 +13852,13 @@ async def update_friends_stats(telegram_id: int):
         },
         upsert=True
     )
+    
+    # БАГ-ФИХ: проверяем и выдаём достижения за друзей сразу после обновления статистики
+    try:
+        updated_stats = await get_or_create_user_stats(db, telegram_id)
+        await check_and_award_achievements(db, telegram_id, updated_stats)
+    except Exception as e:
+        logger.warning(f"Failed to check achievements after friends stats update: {e}")
 
 
 # API Endpoints для друзей
