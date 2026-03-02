@@ -629,13 +629,15 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     if (!sharedData?.schedules || !selectedDay) return {};
     const result = {};
     for (const [pId, events] of Object.entries(sharedData.schedules)) {
-      result[pId] = (events || []).filter(e =>
+      const filtered = (events || []).filter(e =>
         e.day?.toLowerCase() === selectedDay.toLowerCase()
       ).sort((a, b) => {
         const timeA = a.time?.split(' - ')[0] || '';
         const timeB = b.time?.split(' - ')[0] || '';
         return timeA.localeCompare(timeB);
       });
+      // Группируем одноимённые пары с одинаковым временем (разные преподы → варианты)
+      result[pId] = groupParticipantEvents(filtered);
     }
     return result;
   }, [sharedData, selectedDay]);
