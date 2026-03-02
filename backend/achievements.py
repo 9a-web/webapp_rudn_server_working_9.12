@@ -233,7 +233,7 @@ ACHIEVEMENTS = [
         "name": "Первый друг",
         "description": "Добавил первого друга",
         "emoji": "🤝",
-        "points": 10,
+        "points": 50,
         "type": "first_friend",
         "requirement": 1
     },
@@ -242,7 +242,7 @@ ACHIEVEMENTS = [
         "name": "Общительный",
         "description": "5 друзей в приложении",
         "emoji": "👋",
-        "points": 15,
+        "points": 55,
         "type": "friendly",
         "requirement": 5
     },
@@ -251,7 +251,7 @@ ACHIEVEMENTS = [
         "name": "Дружелюбный",
         "description": "15 друзей в приложении",
         "emoji": "🎉",
-        "points": 20,
+        "points": 60,
         "type": "friendly",
         "requirement": 15
     },
@@ -260,7 +260,7 @@ ACHIEVEMENTS = [
         "name": "Популярный",
         "description": "25 друзей в приложении",
         "emoji": "⭐",
-        "points": 25,
+        "points": 65,
         "type": "friendly",
         "requirement": 25
     },
@@ -269,7 +269,7 @@ ACHIEVEMENTS = [
         "name": "Душа компании",
         "description": "50 друзей в приложении",
         "emoji": "👑",
-        "points": 40,
+        "points": 80,
         "type": "friendly",
         "requirement": 50
     },
@@ -278,7 +278,7 @@ ACHIEVEMENTS = [
         "name": "Межфакультетский",
         "description": "Друзья с 3+ разных факультетов",
         "emoji": "🌐",
-        "points": 25,
+        "points": 65,
         "type": "interfaculty",
         "requirement": 3
     },
@@ -287,7 +287,7 @@ ACHIEVEMENTS = [
         "name": "Нетворкер",
         "description": "Друзья с 5+ разных факультетов",
         "emoji": "🔗",
-        "points": 35,
+        "points": 75,
         "type": "networker",
         "requirement": 5
     },
@@ -296,7 +296,7 @@ ACHIEVEMENTS = [
         "name": "Рекрутер",
         "description": "Пригласил 3 новых пользователей",
         "emoji": "📢",
-        "points": 20,
+        "points": 60,
         "type": "recruiter",
         "requirement": 3
     },
@@ -305,7 +305,7 @@ ACHIEVEMENTS = [
         "name": "Инфлюенсер",
         "description": "Пригласил 10 новых пользователей",
         "emoji": "🚀",
-        "points": 40,
+        "points": 80,
         "type": "influencer",
         "requirement": 10
     }
