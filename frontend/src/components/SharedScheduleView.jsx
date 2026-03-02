@@ -144,23 +144,22 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       className="absolute"
       style={{
         top: `${top}px`,
-        height: `${displayHeight}px`,
+        minHeight: `${displayHeight}px`,
         left: `calc(${subLeftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${subWidthPct}% - ${EVENT_GAP}px)`,
         zIndex: pickerOpen ? 50 : 10 + scIdx,
-        overflow: pickerOpen ? 'visible' : 'hidden',
       }}
     >
       <div
-        className="rounded-xl overflow-hidden"
-        style={{ backgroundColor: color + '14', height: '100%' }}
+        className="rounded-xl"
+        style={{ backgroundColor: color + '14', minHeight: `${displayHeight}px` }}
       >
         {/* Закруглённая цветная полоска слева */}
         <div
           className="absolute left-0 top-0.5 bottom-0.5 w-[3px] rounded-full"
           style={{ backgroundColor: color }}
         />
-        <div className="h-full px-1.5 py-0.5 pl-2 flex flex-col justify-center overflow-hidden">
+        <div className="px-1.5 py-1 pl-2 flex flex-col justify-center">
           {isUltraCompact ? (
             /* Ultra-compact: только цветная точка + название в одну строку */
             <div className="flex items-center gap-1">
