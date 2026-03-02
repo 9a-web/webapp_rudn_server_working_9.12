@@ -1438,6 +1438,27 @@ async def get_user_stats_endpoint(telegram_id: int):
             detailed_views=stats.detailed_views,
             night_usage_count=stats.night_usage_count,
             early_usage_count=stats.early_usage_count,
+            # БАГ-ФИХ: возвращаем все поля для прогресс-баров
+            unique_groups=stats.unique_groups,
+            analytics_views=stats.analytics_views,
+            calendar_opens=stats.calendar_opens,
+            notifications_configured=stats.notifications_configured,
+            schedule_shares=stats.schedule_shares,
+            menu_items_visited=stats.menu_items_visited,
+            active_days=stats.active_days,
+            # Task-related
+            tasks_created_total=stats.tasks_created_total,
+            tasks_completed_total=stats.tasks_completed_total,
+            tasks_completed_today=stats.tasks_completed_today,
+            tasks_completed_early=stats.tasks_completed_early,
+            tasks_completed_on_time=stats.tasks_completed_on_time,
+            task_streak_current=stats.task_streak_current,
+            first_task_created=stats.first_task_created,
+            # Friends-related
+            friends_count=stats.friends_count,
+            friends_faculties_count=stats.friends_faculties_count,
+            users_invited=stats.users_invited,
+            # Streak
             visit_streak_current=stats.visit_streak_current,
             visit_streak_max=stats.visit_streak_max,
             last_visit_date=stats.last_visit_date,
