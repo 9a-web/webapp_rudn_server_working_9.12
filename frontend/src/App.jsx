@@ -1541,6 +1541,8 @@ const Home = () => {
     if (effectiveUser) {
       try {
         const result = await achievementsAPI.trackAction(effectiveUser.id, 'open_calendar');
+        // БАГ-ФИХ: трекаем visit_menu_item для "Исследователь" (было пропущено)
+        await achievementsAPI.trackAction(effectiveUser.id, 'visit_menu_item', { menu_item: 'calendar' });
         if (result.new_achievements && result.new_achievements.length > 0) {
           showAchievementInQueue(result.new_achievements[0]);
           loadAchievementsData();
