@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Backend API Testing Script for Shared Schedule Feature
-Tests the specific bugs mentioned in the review request.
+Tests the specific endpoints and bug fixes mentioned in the review request.
 """
 
 import asyncio
@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 # Base URL - from environment configuration
-BASE_URL = "https://webapp-preview-5.preview.emergentagent.com/api"
+BASE_URL = "https://live-cards.preview.emergentagent.com/api"
 
 class SharedScheduleTester:
     def __init__(self):
