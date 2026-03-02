@@ -139,6 +139,14 @@ const Home = () => {
            lessonType: "Лекция"
          },
          {
+           discipline: "Физическая культура и спорт",
+           time: timeStr,
+           day: formattedDayName,
+           auditory: "Спортзал, Корпус 5",
+           teacher: "Кузнецов А.В.",
+           lessonType: "Практика"
+         },
+         {
            discipline: "Математический анализ",
            time: `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')} - ${(end.getHours() + 1).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
            day: formattedDayName,
@@ -157,12 +165,14 @@ const Home = () => {
        ];
        
        setSchedule(prev => [...prev, ...fakeClasses]);
-       // Сразу обновляем currentClass
+       // Сразу обновляем — первые 2 пары идут ОДНОВРЕМЕННО
+       setConcurrentClasses([fakeClasses[0], fakeClasses[1]]);
        setCurrentClass(fakeClasses[0].discipline);
        setMinutesLeft(75);
     } else {
        setCurrentClass(null);
        setMinutesLeft(0);
+       setConcurrentClasses([]);
        setSchedule([]);
     }
   };
