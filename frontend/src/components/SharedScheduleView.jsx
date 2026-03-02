@@ -58,7 +58,7 @@ const durationToPx = (durationMin) => {
 // ───────────────────────────────────────────
 // TimelineEvent — одна пара на таймлайне
 // ───────────────────────────────────────────
-const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumns, isOwner }) => {
+const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumns, isOwner, subCol, subColTotal }) => {
   const [startStr, endStr] = (event.time || '').split(' - ').map(s => s?.trim());
   const startMin = parseTime(startStr);
   const endMin = parseTime(endStr);
@@ -75,20 +75,26 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
   const colWidthPct = 100 / totalColumns;
   const leftPct = colWidthPct * columnIndex;
 
+  // Sub-column для перекрывающихся событий одного участника
+  const scTotal = subColTotal || 1;
+  const scIdx = subCol || 0;
+  const subWidthPct = colWidthPct / scTotal;
+  const subLeftPct = leftPct + subWidthPct * scIdx;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: columnIndex * 0.06 }}
+      transition={{ duration: 0.3, delay: columnIndex * 0.06 + scIdx * 0.03 }}
       className="absolute overflow-hidden"
       style={{
         top: `${top}px`,
         minHeight: `${displayHeight}px`,
-        left: `calc(${leftPct}% + ${EVENT_GAP / 2}px)`,
-        width: `calc(${colWidthPct}% - ${EVENT_GAP}px)`,
+        left: `calc(${subLeftPct}% + ${EVENT_GAP / 2}px)`,
+        width: `calc(${subWidthPct}% - ${EVENT_GAP}px)`,
         backgroundColor: color + '14',
         borderRadius: '12px',
-        zIndex: 10,
+        zIndex: 10 + scIdx,
       }}
     >
       {/* Закруглённая цветная полоска слева */}
@@ -129,6 +135,66 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       </div>
     </motion.div>
   );
+};
+
+// ─── Helper: вычислить sub-columns для перекрывающихся событий ───
+const computeOverlapLayout = (events) => {
+  if (!events || events.length === 0) return [];
+  
+  // Парсим время каждого события
+  const parsed = events.map((event, idx) => {
+    const [startStr, endStr] = (event.time || '').split(' - ').map(s => s?.trim());
+    return {
+      idx,
+      event,
+      start: parseTime(startStr) || 0,
+      end: parseTime(endStr) || 0,
+    };
+  }).filter(p => p.end > p.start);
+
+  // Сортируем по началу, затем по длительности (длинные первые)
+  parsed.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+  // Для каждого события определяем sub-column
+  const result = [];
+  
+  for (let i = 0; i < parsed.length; i++) {
+    const cur = parsed[i];
+    
+    // Найти все события, пересекающиеся с текущим
+    const overlapping = parsed.filter(other => 
+      other.start < cur.end && other.end > cur.start
+    );
+    
+    // Какие sub-columns уже заняты overlapping событиями, у которых уже есть sub-column
+    const usedCols = new Set();
+    for (const ov of overlapping) {
+      const existing = result.find(r => r.idx === ov.idx);
+      if (existing !== undefined) {
+        usedCols.add(existing.subCol);
+      }
+    }
+    
+    // Найти первую свободную sub-column
+    let subCol = 0;
+    while (usedCols.has(subCol)) subCol++;
+    
+    result.push({ idx: cur.idx, event: cur.event, subCol, overlapGroup: overlapping.length });
+  }
+
+  // Для каждого события определяем максимальное количество sub-columns в его группе пересечений
+  for (let i = 0; i < result.length; i++) {
+    const cur = parsed[i];
+    // Все результаты, пересекающиеся с текущим
+    const overlappingResults = result.filter((r, rIdx) => {
+      const p = parsed.find(pp => pp.idx === r.idx) || parsed[rIdx];
+      return p && p.start < cur.end && p.end > cur.start;
+    });
+    const maxSubCol = Math.max(...overlappingResults.map(r => r.subCol)) + 1;
+    result[i].subColTotal = maxSubCol;
+  }
+
+  return result;
 };
 
 // ───────────────────────────────────────────
