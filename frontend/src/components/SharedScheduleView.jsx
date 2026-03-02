@@ -556,7 +556,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   };
 
   // Поделиться ссылкой на совместное расписание
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     if (!sharedData?.id) return;
     try {
       setActionLoading(true);
@@ -572,7 +572,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
     } finally {
       setActionLoading(false);
     }
-  };
+  }, [sharedData?.id, hapticFeedback, setShowShareModal]);
 
   // ─── Открытие шаринга по внешнему триггеру (из родительской кнопки) ───
   // БАГ-ФИХ: используем ref для отслеживания предыдущего значения, 
