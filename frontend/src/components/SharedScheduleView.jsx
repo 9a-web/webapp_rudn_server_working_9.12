@@ -1750,11 +1750,35 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                 Отправить в Telegram
               </button>
 
-              {/* Сохранить изображение */}
+              {/* Отправить в ЛС бота */}
               <button
-                onClick={handleGenerateImage}
+                onClick={handleSendToBot}
+                disabled={isSendingToBot}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-purple-400/20 disabled:opacity-60 mb-3"
+              >
+                {isSendingToBot ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Отправка...
+                  </>
+                ) : imageSentToBot ? (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Отправлено в ЛС!
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    Прислать в ЛС бота
+                  </>
+                )}
+              </button>
+
+              {/* Сохранить в галерею / скачать */}
+              <button
+                onClick={handleSaveToGallery}
                 disabled={isGeneratingImage}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-purple-400/20 disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-emerald-400/20 disabled:opacity-60"
               >
                 {isGeneratingImage ? (
                   <>
@@ -1763,10 +1787,11 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   </>
                 ) : (
                   <>
-                    <Image className="w-5 h-5" />
-                    Сохранить изображение
+                    <Smartphone className="w-5 h-5" />
+                    Сохранить в галерею
                   </>
                 )}
+              </button>
               </button>
             </motion.div>
           </motion.div>
