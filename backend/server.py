@@ -17412,6 +17412,8 @@ async def send_schedule_image(
         logger.error(f"❌ Error sending schedule image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+app.include_router(api_router)
+
 # Mount static files for modal images
 app.mount("/api/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
