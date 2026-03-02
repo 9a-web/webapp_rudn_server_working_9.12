@@ -113,6 +113,9 @@ export const LiveScheduleCarousel = ({
           <LiveScheduleCard 
             currentClass={currentClass} 
             minutesLeft={minutesLeft}
+            concurrentClasses={concurrentClasses}
+            onSelectConcurrentClass={onSelectConcurrentClass}
+            hapticFeedback={hapticFeedback}
           />
         );
 
