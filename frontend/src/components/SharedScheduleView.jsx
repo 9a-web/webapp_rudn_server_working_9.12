@@ -1454,6 +1454,10 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   <span className="text-[#1c1c1c] font-medium text-xs">
                     {isMe ? 'Вы' : p.first_name}
                   </span>
+                  {/* БАГ-ФИХ: показываем группу участника если есть */}
+                  {p.group_name && (
+                    <span className="text-[10px] text-[#aaa] -ml-1">{p.group_name}</span>
+                  )}
                   {canRemove && (
                     <button
                       onClick={() => handleRemoveParticipant(p.telegram_id)}
