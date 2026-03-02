@@ -24,3 +24,5 @@ frontend/.env
 
 # Logs
 *.log
+frontend/.env
+.env
