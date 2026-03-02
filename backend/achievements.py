@@ -114,7 +114,7 @@ ACHIEVEMENTS = [
         "name": "Делишься знаниями",
         "description": "Поделился расписанием",
         "emoji": "🔗",
-        "points": 15,
+        "points": 55,
         "type": "knowledge_sharer",
         "requirement": 1
     },
@@ -123,7 +123,7 @@ ACHIEVEMENTS = [
         "name": "Амбассадор",
         "description": "Поделился расписанием 5 раз",
         "emoji": "🎤",
-        "points": 25,
+        "points": 65,
         "type": "ambassador",
         "requirement": 5
     },
