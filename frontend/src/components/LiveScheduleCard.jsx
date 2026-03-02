@@ -1,18 +1,44 @@
-import React, { useState, useEffect, useMemo, useId } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { pluralizeMinutes } from '../utils/pluralize';
 import { translateDiscipline } from '../i18n/subjects';
-import { Snowflake } from 'lucide-react';
+import { Snowflake, ChevronUp, ChevronDown } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
-export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
+export const LiveScheduleCard = React.memo(({ 
+  currentClass, 
+  minutesLeft, 
+  concurrentClasses = [],
+  onSelectConcurrentClass,
+  hapticFeedback 
+}) => {
   const [time, setTime] = useState(new Date());
   const { t, i18n } = useTranslation();
   const { theme } = useTheme();
-  const uniqueId = useId(); // Unique prefix for SVG IDs to avoid conflicts
+  const uniqueId = useId();
   
   const isWinter = theme === 'winter';
+
+  // Индекс выбранной пары среди одновременных
+  const selectedIndex = useMemo(() => {
+    if (concurrentClasses.length <= 1) return 0;
+    const idx = concurrentClasses.findIndex(c => c.discipline === currentClass);
+    return idx >= 0 ? idx : 0;
+  }, [concurrentClasses, currentClass]);
+
+  const hasConcurrent = concurrentClasses.length > 1;
+
+  // Переключение между одновременными парами
+  const switchClass = useCallback((direction) => {
+    if (!hasConcurrent || !onSelectConcurrentClass) return;
+    const newIndex = (selectedIndex + direction + concurrentClasses.length) % concurrentClasses.length;
+    const newClass = concurrentClasses[newIndex];
+    if (newClass) {
+      onSelectConcurrentClass(newClass.discipline);
+      if (hapticFeedback) hapticFeedback('impact', 'light');
+    }
+  }, [hasConcurrent, selectedIndex, concurrentClasses, onSelectConcurrentClass, hapticFeedback]);
 
   // Update time every 10 seconds
   useEffect(() => {
@@ -28,13 +54,10 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
     return `${hours}:${minutes}`;
   };
 
-  // BUG FIX: Progress calculation — handle minutesLeft === 0 as 100%
-  // Also don't hard-code 90 min; derive from actual remaining vs typical class duration
+  // Progress calculation
   const progressPercentage = useMemo(() => {
     if (!currentClass) return 0;
     if (minutesLeft <= 0) return 100;
-    // Estimate total class duration: typical RUDN pair is 90 minutes
-    // We use min(90, minutesLeft + elapsed_estimate) to be safe
     const totalClassDuration = 90;
     const elapsed = totalClassDuration - Math.min(minutesLeft, totalClassDuration);
     return Math.max(0, Math.min(100, (elapsed / totalClassDuration) * 100));
@@ -71,6 +94,21 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
   };
 
   const circumference = 2 * Math.PI * 40;
+
+  // Направление анимации при переключении пар (вверх/вниз)
+  const [slideDirection, setSlideDirection] = useState(0);
+
+  const handlePrev = useCallback((e) => {
+    e.stopPropagation();
+    setSlideDirection(-1);
+    switchClass(-1);
+  }, [switchClass]);
+
+  const handleNext = useCallback((e) => {
+    e.stopPropagation();
+    setSlideDirection(1);
+    switchClass(1);
+  }, [switchClass]);
 
   return (
     <motion.div 
@@ -123,16 +161,79 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               >
                 {currentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
               </motion.p>
+
+              {/* === Название предмета + стрелки переключения === */}
               {currentClass && (
-                <motion.p 
-                  className="font-bold text-sm lg:text-base xl:text-lg break-words mt-1" 
-                  style={{ color: '#FFFFFF' }}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-                >
-                  {translateDiscipline(currentClass, i18n.language)}
-                </motion.p>
+                <div className="flex items-start gap-1.5 mt-1">
+                  {/* Стрелки переключения одновременных пар */}
+                  {hasConcurrent && (
+                    <div className="flex flex-col items-center flex-shrink-0 mt-0.5 -ml-0.5">
+                      <motion.button
+                        onClick={handlePrev}
+                        className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
+                        style={{ 
+                          backgroundColor: 'rgba(255,255,255,0.12)',
+                        }}
+                        whileTap={{ scale: 0.85 }}
+                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
+                        aria-label="Previous class"
+                      >
+                        <ChevronUp className="w-3.5 h-3.5 text-white" />
+                      </motion.button>
+
+                      {/* Индикатор позиции */}
+                      <span 
+                        className="text-[9px] font-semibold leading-none my-0.5 select-none"
+                        style={{ color: 'rgba(255,255,255,0.5)' }}
+                      >
+                        {selectedIndex + 1}/{concurrentClasses.length}
+                      </span>
+
+                      <motion.button
+                        onClick={handleNext}
+                        className="flex items-center justify-center w-6 h-6 rounded-full transition-colors"
+                        style={{ 
+                          backgroundColor: 'rgba(255,255,255,0.12)',
+                        }}
+                        whileTap={{ scale: 0.85 }}
+                        whileHover={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
+                        aria-label="Next class"
+                      >
+                        <ChevronDown className="w-3.5 h-3.5 text-white" />
+                      </motion.button>
+                    </div>
+                  )}
+
+                  {/* Название предмета с анимацией смены */}
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <AnimatePresence mode="wait" custom={slideDirection}>
+                      <motion.p
+                        key={currentClass}
+                        custom={slideDirection}
+                        initial={{ 
+                          opacity: 0, 
+                          y: slideDirection >= 0 ? 12 : -12,
+                          filter: 'blur(2px)' 
+                        }}
+                        animate={{ 
+                          opacity: 1, 
+                          y: 0,
+                          filter: 'blur(0px)' 
+                        }}
+                        exit={{ 
+                          opacity: 0, 
+                          y: slideDirection >= 0 ? -12 : 12,
+                          filter: 'blur(2px)' 
+                        }}
+                        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                        className="font-bold text-sm lg:text-base xl:text-lg break-words" 
+                        style={{ color: '#FFFFFF' }}
+                      >
+                        {translateDiscipline(currentClass, i18n.language)}
+                      </motion.p>
+                    </AnimatePresence>
+                  </div>
+                </div>
               )}
             </motion.div>
           </AnimatePresence>
@@ -211,7 +312,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               fill="none"
             />
             
-            {/* Progress circle — 100% filled by default, shows actual progress during class */}
+            {/* Progress circle */}
             <motion.circle
               cx="50" cy="50" r="40"
               stroke={`url(#${themeStyles.circle.strokeId})`}
@@ -223,7 +324,7 @@ export const LiveScheduleCard = React.memo(({ currentClass, minutesLeft }) => {
               animate={{ 
                 strokeDashoffset: currentClass 
                   ? circumference * (1 - progressPercentage / 100) 
-                  : 0 // Full ring when no class
+                  : 0
               }}
               transition={{ duration: 0.8, ease: 'easeInOut' }}
             />
