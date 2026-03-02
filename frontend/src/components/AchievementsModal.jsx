@@ -78,6 +78,25 @@ export const AchievementsModal = ({
       case 'perfectionist':
         current = userStats.achievements_count || 0;
         break;
+      // БАГ-ФИХ: добавлены прогресс-бары для достижений за друзей
+      case 'friendly':
+        current = userStats.friends_count || 0;
+        break;
+      case 'first_friend':
+        current = userStats.friends_count || 0;
+        break;
+      case 'interfaculty':
+        current = userStats.friends_faculties_count || 0;
+        break;
+      case 'networker':
+        current = userStats.friends_faculties_count || 0;
+        break;
+      case 'recruiter':
+        current = userStats.users_invited || 0;
+        break;
+      case 'influencer':
+        current = userStats.users_invited || 0;
+        break;
       default:
         return null;
     }
