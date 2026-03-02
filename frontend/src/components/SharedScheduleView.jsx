@@ -677,6 +677,28 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
 
   const totalColumns = Math.max(1, activeParticipantIds.length);
 
+  // ─── Динамический масштаб: pxPerMin подстраивается под самую короткую пару ───
+  const pxPerMin = useMemo(() => {
+    let shortestDuration = Infinity;
+    Object.values(daySchedules).forEach(events => {
+      events.forEach(e => {
+        const [s, en] = (e.time || '').split(' - ').map(t => t?.trim());
+        const sM = parseTime(s), eM = parseTime(en);
+        if (sM !== null && eM !== null && eM > sM) {
+          shortestDuration = Math.min(shortestDuration, eM - sM);
+        }
+      });
+    });
+    if (shortestDuration === Infinity) return BASE_PX_PER_MIN;
+    // Масштаб: чтобы самая короткая пара вмещала MIN_CARD_CONTENT_HEIGHT
+    const needed = MIN_CARD_CONTENT_HEIGHT / shortestDuration;
+    return Math.max(BASE_PX_PER_MIN, needed);
+  }, [daySchedules]);
+
+  const minToPx = useMemo(() => makeMinToPx(pxPerMin), [pxPerMin]);
+  const durationToPx = useMemo(() => makeDurationToPx(pxPerMin), [pxPerMin]);
+  const timelineHeight = TIMELINE_TOTAL_MIN * pxPerMin;
+
   // ─── Dynamic visible timeline range = от первой до последней пары ───
   const { visStartH, visEndH, firstClassMin, lastClassMin } = useMemo(() => {
     let minMin = null, maxMin = null; // точное время в минутах
