@@ -146,22 +146,22 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       className="absolute"
       style={{
         top: `${top}px`,
-        minHeight: `${displayHeight}px`,
+        height: `${displayHeight}px`,
         left: `calc(${subLeftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${subWidthPct}% - ${EVENT_GAP}px)`,
         zIndex: pickerOpen ? 50 : 10 + scIdx,
       }}
     >
       <div
-        className="rounded-xl"
-        style={{ backgroundColor: color + '14', minHeight: `${displayHeight}px` }}
+        className="rounded-xl overflow-hidden relative"
+        style={{ backgroundColor: color + '14', height: '100%' }}
       >
         {/* Закруглённая цветная полоска слева */}
         <div
           className="absolute left-0 top-0.5 bottom-0.5 w-[3px] rounded-full"
           style={{ backgroundColor: color }}
         />
-        <div className="px-1.5 py-1 pl-2 flex flex-col justify-center">
+        <div className="px-1.5 py-1 pl-2 flex flex-col justify-center h-full overflow-hidden">
           {isUltraCompact ? (
             /* Ultra-compact: только цветная точка + название в одну строку */
             <div className="flex items-center gap-1">
@@ -171,39 +171,41 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
           ) : isCompact ? (
             <div className="flex items-start gap-1">
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: color }} />
-              <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight break-words line-clamp-2" style={{ wordBreak: 'break-word' }}>
+              <span className="text-[10px] font-semibold text-[#1c1c1c] leading-tight truncate">
                 {event.discipline}
               </span>
             </div>
           ) : (
             <>
-              {/* Имя участника — кликабельное если есть варианты */}
-              <div className="flex items-center gap-1 mb-0.5">
+              {/* Имя участника */}
+              <div className="flex items-center gap-1 mb-0.5 flex-shrink-0">
                 <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                 <span
-                  className={`text-[9px] font-medium ${hasVariants ? 'cursor-pointer' : ''}`}
+                  className={`text-[9px] font-medium truncate ${hasVariants ? 'cursor-pointer' : ''}`}
                   style={{ color: color }}
                   onClick={hasVariants ? handlePickerToggle : undefined}
                 >
                   {isOwner ? 'Вы' : participantName}
                 </span>
               </div>
-              <div className="text-[11px] font-semibold text-[#1c1c1c] leading-tight mb-0.5 break-words" style={{ wordBreak: 'break-word' }}>
+              {/* Дисциплина — max 2 строки */}
+              <div className="text-[11px] font-semibold text-[#1c1c1c] leading-tight mb-0.5 line-clamp-2 flex-shrink-0">
                 {event.discipline}
               </div>
-              <div className="flex items-center gap-1.5 text-[9px] text-[#999] flex-wrap">
-                <span>{startStr} – {endStr}</span>
+              {/* Время + аудитория — 1 строка */}
+              <div className="flex items-center gap-1.5 text-[9px] text-[#999] flex-shrink-0 truncate">
+                <span className="flex-shrink-0">{startStr} – {endStr}</span>
                 {displayAuditory && (
                   <>
-                    <span>·</span>
-                    <span className="break-words" style={{ wordBreak: 'break-word' }}>{displayAuditory}</span>
+                    <span className="flex-shrink-0">·</span>
+                    <span className="truncate">{displayAuditory}</span>
                   </>
                 )}
               </div>
-              {/* Строка преподавателя — кликабельная */}
+              {/* Преподаватель — 1 строка */}
               {displayTeacher && (
                 <div
-                  className={`flex items-center gap-1 mt-0.5 ${hasVariants ? 'cursor-pointer' : ''}`}
+                  className={`flex items-center gap-1 mt-0.5 flex-shrink-0 ${hasVariants ? 'cursor-pointer' : ''}`}
                   onClick={hasVariants ? handlePickerToggle : undefined}
                 >
                   {hasVariants && (
