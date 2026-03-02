@@ -214,8 +214,16 @@ export const ShareScheduleModal = ({
       // Генерируем изображение с высоким качеством
       const dataUrl = await toPng(scheduleImageRef.current, {
         cacheBust: true,
-        pixelRatio: 2, // Увеличиваем разрешение для лучшего качества
+        pixelRatio: 2,
         backgroundColor: '#ffffff',
+        skipFonts: true,
+        filter: (node) => {
+          // Пропускаем внешние link-стили (Google Fonts и т.д.) чтобы избежать CORS-ошибок
+          if (node.tagName === 'LINK' && node.getAttribute && node.getAttribute('rel') === 'stylesheet') {
+            return false;
+          }
+          return true;
+        },
       });
       
       // Создаем ссылку для скачивания
@@ -446,80 +454,233 @@ export const ShareScheduleModal = ({
 
 /**
  * Компонент карточки расписания для генерации изображения
+ * Используем inline-стили вместо Tailwind для совместимости с html-to-image (избегаем CORS-ошибок)
  */
 const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName, formatDate, botUsername }, ref) => {
   const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
   const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
   const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
 
+  const styles = {
+    container: {
+      width: 600,
+      backgroundColor: '#2B2B3A',
+      padding: 32,
+      borderRadius: 24,
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+    },
+    headerCard: {
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      padding: 24,
+      marginBottom: 24,
+      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    },
+    headerRow: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    headerTitle: {
+      fontSize: 30,
+      fontWeight: 700,
+      color: '#1C1C1E',
+      margin: 0,
+    },
+    headerRight: {
+      textAlign: 'right',
+    },
+    headerBrand: {
+      fontSize: 14,
+      color: '#4B5563',
+      fontWeight: 600,
+      margin: 0,
+    },
+    headerSub: {
+      fontSize: 12,
+      color: '#9CA3AF',
+      margin: 0,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: '#E5E7EB',
+      marginBottom: 12,
+      border: 'none',
+    },
+    dateText: {
+      fontSize: 18,
+      fontWeight: 600,
+      color: '#1C1C1E',
+      margin: 0,
+    },
+    groupText: {
+      fontSize: 14,
+      color: '#4B5563',
+      marginTop: 4,
+      margin: '4px 0 0',
+    },
+    freeDayCard: {
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      padding: 32,
+      textAlign: 'center',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    },
+    freeDayEmoji: {
+      fontSize: 60,
+      marginBottom: 16,
+    },
+    freeDayTitle: {
+      fontSize: 24,
+      fontWeight: 700,
+      color: '#1C1C1E',
+      marginBottom: 8,
+      margin: '0 0 8px',
+    },
+    freeDaySubtitle: {
+      color: '#4B5563',
+      margin: 0,
+    },
+    classCard: {
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      padding: 20,
+      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+      marginBottom: 12,
+    },
+    classRow: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 16,
+    },
+    classNumber: {
+      flexShrink: 0,
+      width: 48,
+      height: 48,
+      backgroundColor: '#1C1C1E',
+      borderRadius: 12,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#ffffff',
+      fontWeight: 700,
+      fontSize: 20,
+    },
+    classInfo: {
+      flex: 1,
+      minWidth: 0,
+    },
+    className: {
+      fontSize: 18,
+      fontWeight: 700,
+      color: '#1C1C1E',
+      lineHeight: 1.3,
+      marginBottom: 8,
+      margin: '0 0 8px',
+    },
+    classTime: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      color: '#374151',
+      fontWeight: 600,
+      marginBottom: 4,
+    },
+    classDetail: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      color: '#4B5563',
+      fontSize: 14,
+      marginBottom: 2,
+    },
+    subItemDivider: {
+      marginTop: 8,
+      paddingTop: 8,
+      borderTop: '1px solid #F3F4F6',
+    },
+    footer: {
+      marginTop: 24,
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      padding: 16,
+      textAlign: 'center',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    },
+    footerTitle: {
+      fontSize: 14,
+      color: '#1C1C1E',
+      fontWeight: 600,
+      margin: 0,
+    },
+    footerSub: {
+      fontSize: 12,
+      color: '#6B7280',
+      marginTop: 4,
+      margin: '4px 0 0',
+    },
+  };
+
   return (
-    <div 
-      ref={ref}
-      className="w-[600px] bg-[#2B2B3A] p-8 rounded-3xl"
-      style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
-    >
+    <div ref={ref} style={styles.container}>
       {/* Header */}
-      <div className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-3xl font-bold text-[#1C1C1E]">
-            Расписание
-          </h1>
-          <div className="text-right">
-            <p className="text-sm text-gray-600 font-semibold">RUDN Schedule</p>
-            <p className="text-xs text-gray-400">Telegram WebApp</p>
+      <div style={styles.headerCard}>
+        <div style={styles.headerRow}>
+          <h1 style={styles.headerTitle}>Расписание</h1>
+          <div style={styles.headerRight}>
+            <p style={styles.headerBrand}>RUDN Schedule</p>
+            <p style={styles.headerSub}>Telegram WebApp</p>
           </div>
         </div>
-        <div className="h-px bg-gray-200 mb-3"></div>
-        <p className="text-lg font-semibold text-[#1C1C1E]">{formatDate(selectedDate)}</p>
+        <hr style={styles.divider} />
+        <p style={styles.dateText}>{formatDate(selectedDate)}</p>
         {groupName && (
-          <p className="text-sm text-gray-600 mt-1">Группа: {groupName}</p>
+          <p style={styles.groupText}>Группа: {groupName}</p>
         )}
       </div>
 
       {/* Schedule Content */}
       {todaySchedule.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-          <div className="text-6xl mb-4">🎉</div>
-          <p className="text-2xl font-bold text-[#1C1C1E] mb-2">Свободный день!</p>
-          <p className="text-gray-600">Пар нет</p>
+        <div style={styles.freeDayCard}>
+          <div style={styles.freeDayEmoji}>🎉</div>
+          <p style={styles.freeDayTitle}>Свободный день!</p>
+          <p style={styles.freeDaySubtitle}>Пар нет</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div>
           {todaySchedule.map((classItem, index) => (
-            <div 
-              key={index}
-              className="bg-white rounded-2xl p-5 shadow-sm"
-            >
-              <div className="flex items-start gap-4">
+            <div key={index} style={styles.classCard}>
+              <div style={styles.classRow}>
                 {/* Номер пары */}
-                <div className="flex-shrink-0 w-12 h-12 bg-[#1C1C1E] rounded-xl flex items-center justify-center text-white font-bold text-xl">
+                <div style={styles.classNumber}>
                   {index + 1}
                 </div>
                 
                 {/* Информация о паре */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-[#1C1C1E] leading-tight mb-2">
+                <div style={styles.classInfo}>
+                  <h3 style={styles.className}>
                     {classItem.discipline}
                   </h3>
                   
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <span className="font-semibold">{classItem.time}</span>
+                  <div>
+                    <div style={styles.classTime}>
+                      <span>{classItem.time}</span>
                     </div>
                     
                     {classItem.subItems && classItem.subItems.map((subItem, idx) => (
-                        <div key={idx} className={idx > 0 ? "mt-2 pt-2 border-t border-gray-100" : ""}>
-                            {subItem.auditory && (
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <span className="text-sm">{subItem.auditory}</span>
-                              </div>
-                            )}
-                            {subItem.teacher && (
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <span className="text-sm">{subItem.teacher}</span>
-                              </div>
-                            )}
-                        </div>
+                      <div key={idx} style={idx > 0 ? styles.subItemDivider : {}}>
+                        {subItem.auditory && (
+                          <div style={styles.classDetail}>
+                            <span>{subItem.auditory}</span>
+                          </div>
+                        )}
+                        {subItem.teacher && (
+                          <div style={styles.classDetail}>
+                            <span>{subItem.teacher}</span>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -530,11 +691,9 @@ const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName,
       )}
 
       {/* Footer */}
-      <div className="mt-6 bg-white rounded-2xl p-4 text-center shadow-sm">
-        <p className="text-sm text-[#1C1C1E] font-semibold">
-          RUDN Schedule
-        </p>
-        <p className="text-xs text-gray-500 mt-1">@{botUsername || 'bot'} • Telegram WebApp</p>
+      <div style={styles.footer}>
+        <p style={styles.footerTitle}>RUDN Schedule</p>
+        <p style={styles.footerSub}>@{botUsername || 'bot'} • Telegram WebApp</p>
       </div>
     </div>
   );
