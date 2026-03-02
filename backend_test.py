@@ -409,44 +409,59 @@ class SharedScheduleTester:
             self.log_test("Final Cleanup", False, f"Exception: {e}")
     
     async def run_all_tests(self):
-        """Run all critical test scenarios in sequence"""
-        print("🚀 Starting Shared Schedule Backend API Critical Tests")
+        """Run all test scenarios as specified in the review request"""
+        print("🚀 Starting Shared Schedule Backend API Tests")
         print(f"📡 Base URL: {BASE_URL}")
+        print("📝 Testing specific endpoints and bug fixes from review request")
         
         await self.setup()
         
         try:
-            # Run critical tests in sequence (as requested in review)
+            # Run tests in the order specified in review request
             await self.test_1_create_schedule()
             await self.test_2_get_schedule_with_week()
-            await self.test_3_add_participant() 
-            await self.test_4_remove_participant()
-            await self.test_5_owner_protection()
-            await self.test_6_delete_schedule()
-            await self.test_7_deduplication()
-            await self.test_8_participant_limit()
+            await self.test_3_add_non_friend_participant()
+            await self.test_4_delete_without_owner_id()
+            await self.test_5_delete_with_correct_owner_id()
+            await self.test_6_create_another_schedule_for_token()
+            await self.test_7_create_share_token()
+            await self.test_8_get_token_data()
+            await self.test_9_cleanup_final_schedule()
             
         finally:
             await self.teardown()
         
         # Summary
-        print("\n" + "="*70)
-        print("📊 CRITICAL TESTS SUMMARY")
-        print("="*70)
+        print("\n" + "="*80)
+        print("📊 SHARED SCHEDULE API TESTS SUMMARY")
+        print("="*80)
         
         passed = sum(1 for result in self.test_results if result["passed"])
         total = len(self.test_results)
         
+        # Show results with emphasis on critical security fixes
         for result in self.test_results:
             status = "✅" if result["passed"] else "❌"
-            print(f"{status} {result['test']}")
+            marker = "🔐" if "Delete Without owner_id" in result["test"] or "Add Non-Friend Participant" in result["test"] else ""
+            print(f"{status} {marker} {result['test']}")
+            if result["details"] and ("CRITICAL" in result["details"] or "403" in result["details"]):
+                print(f"    🔴 {result['details']}")
         
-        print(f"\n🎯 RESULTS: {passed}/{total} critical tests passed")
+        print(f"\n🎯 RESULTS: {passed}/{total} tests passed")
+        
+        # Check critical security fixes
+        security_tests = [r for r in self.test_results if "Delete Without owner_id" in r["test"] or "Add Non-Friend Participant" in r["test"]]
+        security_passed = sum(1 for r in security_tests if r["passed"])
+        
+        if security_passed == len(security_tests):
+            print("🔒 SECURITY FIXES: All security bug fixes are working correctly!")
+        else:
+            print(f"⚠️  SECURITY ISSUES: {len(security_tests) - security_passed} security fixes failed!")
         
         if passed == total:
-            print("🎉 ALL CRITICAL TESTS PASSED! Shared schedule endpoints working correctly.")
+            print("🎉 ALL TESTS PASSED! Shared schedule API is working correctly.")
         else:
-            print("⚠️  Some critical tests failed. Check details above.")
+            print("⚠️  Some tests failed. Review details above.")
         
         return passed == total
 
