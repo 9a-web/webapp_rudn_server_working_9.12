@@ -16841,10 +16841,12 @@ async def create_shared_schedule(data: SharedScheduleCreate):
                 if pid not in existing_ids and len(existing.get("participants", [])) + len(new_additions) < MAX_PARTICIPANTS:
                     p_settings = await db.user_settings.find_one({"telegram_id": pid})
                     p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
+                    p_group = p_settings.get("group_name", "") if p_settings else ""
                     color_idx = (len(existing["participants"]) + len(new_additions)) % len(PARTICIPANT_COLORS)
                     new_additions.append({
                         "telegram_id": pid,
                         "first_name": p_name,
+                        "group_name": p_group,
                         "color": PARTICIPANT_COLORS[color_idx],
                     })
             if new_additions:
