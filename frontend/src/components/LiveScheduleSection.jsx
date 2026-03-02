@@ -42,16 +42,20 @@ export const LiveScheduleSection = ({
   const getSelectedSubIndex = useCallback((classItem) => {
     if (!classItem.subItems || classItem.subItems.length <= 1) return 0;
     const key = `${classItem.discipline?.trim()}-${classItem.time?.trim()}`;
-    const savedIdx = selectedSubItemMap[key];
-    if (savedIdx !== undefined && savedIdx < classItem.subItems.length) return savedIdx;
+    const savedTeacher = selectedSubItemMap[key];
+    if (savedTeacher) {
+      const idx = classItem.subItems.findIndex(s => s.teacher === savedTeacher);
+      if (idx >= 0) return idx;
+    }
     return 0;
   }, [selectedSubItemMap]);
 
   const selectSubItem = useCallback((classItem, subIndex, e) => {
     if (e) e.stopPropagation();
     const key = `${classItem.discipline?.trim()}-${classItem.time?.trim()}`;
+    const teacherName = classItem.subItems?.[subIndex]?.teacher || '';
     setSelectedSubItemMap(prev => {
-      const next = { ...prev, [key]: subIndex };
+      const next = { ...prev, [key]: teacherName };
       try { localStorage.setItem('schedule_teacher_choices', JSON.stringify(next)); } catch {}
       return next;
     });
