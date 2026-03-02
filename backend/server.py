@@ -17421,7 +17421,7 @@ async def send_schedule_image(
     telegram_id: int = Body(...),
     image_base64: str = Body(...),
     caption: str = Body("📅 Совместное расписание"),
-    text_message: str = Body(None),
+    short_caption: str = Body(None),
     share_text: str = Body(None)
 ):
     """Отправить сгенерированное изображение расписания в ЛС бота"""
@@ -17456,18 +17456,31 @@ async def send_schedule_image(
             [InlineKeyboardButton("📤 Поделиться", url=share_url)]
         ])
 
-        # Обрезаем caption до 1024 символов (лимит Telegram)
-        final_caption = caption
-        if len(final_caption) > 1024:
-            final_caption = final_caption[:1021] + "..."
-
-        await bot.send_photo(
-            chat_id=telegram_id,
-            photo=image_io,
-            caption=final_caption,
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
+        # Если caption помещается в лимит (1024) — отправляем всё в описании фото
+        if len(caption) <= 1024:
+            await bot.send_photo(
+                chat_id=telegram_id,
+                photo=image_io,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+        else:
+            # Caption слишком длинный — фото с коротким заголовком,
+            # полное расписание отдельным сообщением с inline-кнопкой
+            photo_caption = short_caption or ""
+            await bot.send_photo(
+                chat_id=telegram_id,
+                photo=image_io,
+                caption=photo_caption if photo_caption else None,
+                parse_mode="HTML" if photo_caption else None
+            )
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=caption,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
 
         logger.info(f"✅ Schedule image sent to user {telegram_id}")
         return {"success": True, "message": "Image sent to bot DM"}

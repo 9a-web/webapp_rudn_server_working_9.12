@@ -386,16 +386,15 @@ export const botAPI = {
    * @param {string} imageBase64 - Base64 строка изображения
    * @param {string} caption - Подпись к изображению
    */
-  sendScheduleImage: async (telegramId, imageBase64, caption = '📅 Совместное расписание', shareText = null) => {
+  sendScheduleImage: async (telegramId, imageBase64, caption = '📅 Совместное расписание', { shareText, shortCaption } = {}) => {
     try {
       const payload = {
         telegram_id: telegramId,
         image_base64: imageBase64,
         caption
       };
-      if (shareText) {
-        payload.share_text = shareText;
-      }
+      if (shareText) payload.share_text = shareText;
+      if (shortCaption) payload.short_caption = shortCaption;
       const response = await api.post('/send-schedule-image', payload);
       return response.data;
     } catch (error) {

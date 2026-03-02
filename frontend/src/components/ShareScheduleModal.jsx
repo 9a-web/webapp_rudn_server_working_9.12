@@ -472,11 +472,16 @@ export const ShareScheduleModal = ({
 
       const base64 = canvas.toDataURL('image/png');
       const caption = generateHtmlCaption();
+      const dateStr = selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+      const dayLower = formattedDayName.toLowerCase();
+
+      // Короткий заголовок для фото (если полный caption не влезет)
+      const shortCaption = `<tg-emoji emoji-id="5197350061012436657">📅</tg-emoji> <b>Расписание на ${dayLower}, ${dateStr}</b>${groupName ? `\n<tg-emoji emoji-id="5451821087979498800">👥</tg-emoji>  <b>Группа:</b> ${groupName}` : ''}`;
 
       // Чистый текст для inline-кнопки «Поделиться»
       const shareText = generateScheduleText();
 
-      await botAPI.sendScheduleImage(telegramId, base64, caption, shareText);
+      await botAPI.sendScheduleImage(telegramId, base64, caption, { shareText, shortCaption });
       hapticFeedback?.('success');
       setImageSentToBot(true);
       setTimeout(() => setImageSentToBot(false), 3000);
