@@ -575,11 +575,15 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
   };
 
   // ─── Открытие шаринга по внешнему триггеру (из родительской кнопки) ───
+  // БАГ-ФИХ: используем ref для отслеживания предыдущего значения, 
+  // чтобы избежать stale closure и срабатывания при каждом ре-рендере
+  const prevShareTriggerRef = useRef(externalShareTrigger);
   useEffect(() => {
-    if (externalShareTrigger) {
+    if (externalShareTrigger && externalShareTrigger !== prevShareTriggerRef.current) {
+      prevShareTriggerRef.current = externalShareTrigger;
       handleShare();
     }
-  }, [externalShareTrigger]);
+  }, [externalShareTrigger, handleShare]);
 
   const handleCopyLink = async () => {
     try {
