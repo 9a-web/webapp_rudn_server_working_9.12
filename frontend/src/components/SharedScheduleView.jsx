@@ -1792,7 +1792,6 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   </>
                 )}
               </button>
-              </button>
             </motion.div>
           </motion.div>
         )}
