@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Share2, Copy, Check, MessageCircle, Image as ImageIcon, X, Download } from 'lucide-react';
-import { toPng } from 'html-to-image';
-import { botAPI } from '../services/api';
-import { achievementsAPI } from '../services/api';
+import { Share2, Copy, Check, X, Send, Smartphone } from 'lucide-react';
+import { botAPI, achievementsAPI } from '../services/api';
 import { groupScheduleItems } from '../utils/scheduleUtils';
 import { fetchBotInfo as fetchBotInfoUtil } from '../utils/botInfo';
 
 /**
- * Компонент для шаринга расписания
+ * Компонент для шаринга обычного расписания
+ * UI и функционал идентичен модалке "Поделиться окнами" из SharedScheduleView
  */
 export const ShareScheduleModal = ({ 
   isOpen, 
@@ -21,25 +20,16 @@ export const ShareScheduleModal = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [botUsername, setBotUsername] = useState('bot');
-  const [webAppUrl, setWebAppUrl] = useState('');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const scheduleImageRef = useRef(null);
+  const [isSendingToBot, setIsSendingToBot] = useState(false);
+  const [imageSentToBot, setImageSentToBot] = useState(false);
 
   // Получаем информацию о боте при монтировании
   useEffect(() => {
     fetchBotInfoUtil().then(info => {
       if (info.username) setBotUsername(info.username);
     });
-
-    // Определяем URL WebApp
-    if (window.Telegram?.WebApp?.initDataUnsafe?.start_param) {
-      // Если открыто через Telegram WebApp
-      setWebAppUrl(`https://t.me/${botUsername}`);
-    } else {
-      // Используем текущий URL
-      setWebAppUrl(window.location.origin);
-    }
-  }, [botUsername]);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -52,13 +42,13 @@ export const ShareScheduleModal = ({
     });
   };
 
+  const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
+  const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+  const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
+
   // Генерация текста расписания
   const generateScheduleText = () => {
     const dateStr = formatDate(selectedDate);
-    const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
-    const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-    
-    const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
 
     if (todaySchedule.length === 0) {
       return `📅 Расписание на ${dateStr}\n${groupName ? `Группа: ${groupName}\n` : ''}\n✨ Пар нет! Свободный день! 🎉`;
@@ -88,118 +78,385 @@ export const ShareScheduleModal = ({
       text += `\n`;
     });
 
-    text += `\n📱 RUDN Schedule – Telegram WebApp`;
+    text += `📱 RUDN Schedule – Telegram WebApp`;
     
     return text;
   };
 
-  // Генерация красивого текста для Telegram
-  const generateTelegramText = () => {
-    const dateStr = formatDate(selectedDate);
-    const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
-    const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-    
-    const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
-
-    if (todaySchedule.length === 0) {
-      return `📅 *Расписание на ${dateStr}*\n${groupName ? `Группа: _${groupName}_\n` : ''}\n✨ Пар нет! Свободный день! 🎉`;
-    }
-
-    let text = `📅 *Расписание на ${dateStr}*\n`;
-    if (groupName) {
-      text += `👥 Группа: _${groupName}_\n`;
-    }
-    text += `\n`;
-
-    todaySchedule.forEach((classItem, index) => {
-      text += `*${index + 1}. ${classItem.discipline}*\n`;
-      text += `⏰ \`${classItem.time}\`\n`;
-      
-      if (classItem.subItems) {
-        classItem.subItems.forEach((subItem) => {
-          if (subItem.auditory) {
-            text += `📍 ${subItem.auditory}\n`;
-          }
-          if (subItem.teacher) {
-            text += `👨‍🏫 ${subItem.teacher}\n`;
-          }
-        });
-      }
-      
-      text += `\n`;
-    });
-
-    text += `📱 _RUDN Schedule – Telegram WebApp_`;
-    
-    return text;
-  };
-
-  // Копирование в буфер обмена
-  const handleCopyToClipboard = async () => {
+  // ─── Canvas генерация изображения (как в SharedScheduleView) ───
+  const generateCanvas = async () => {
     try {
-      const text = generateScheduleText();
+      // roundRect polyfill для старых WebView
+      if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, radii) {
+          const r = typeof radii === 'number' ? radii : (Array.isArray(radii) ? radii[0] : 0);
+          this.moveTo(x + r, y);
+          this.arcTo(x + w, y, x + w, y + h, r);
+          this.arcTo(x + w, y + h, x, y + h, r);
+          this.arcTo(x, y + h, x, y, r);
+          this.arcTo(x, y, x + w, y, r);
+          this.closePath();
+        };
+      }
+
+      const dpr = 2;
+      const W = 420 * dpr;
+      const PAD = 20 * dpr;
+      const FBASE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+      const dateStr = selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+      // ── Определяем диапазон часов ──
+      let hasEvents = false;
+      let firstMin = null, lastMin = null;
+
+      const parseTime = (str) => {
+        if (!str) return null;
+        const parts = str.trim().split(':');
+        if (parts.length !== 2) return null;
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
+      };
+
+      todaySchedule.forEach(item => {
+        const [s, e] = (item.time || '').split(' - ').map(t => t?.trim());
+        const sM = parseTime(s), eM = parseTime(e);
+        if (sM !== null) { firstMin = firstMin === null ? sM : Math.min(firstMin, sM); hasEvents = true; }
+        if (eM !== null) { lastMin = lastMin === null ? eM : Math.max(lastMin, eM); hasEvents = true; }
+      });
+
+      let startH, endH;
+      if (!hasEvents || firstMin === null || lastMin === null) {
+        startH = 8; endH = 18;
+      } else {
+        startH = Math.floor(firstMin / 60);
+        endH = Math.ceil(lastMin / 60);
+        if (startH >= endH) endH = startH + 1;
+      }
+
+      const pxPerMin = 1.2 * dpr;
+      const TLW = 48 * dpr; // ширина колонки со временем
+      const tlPadTop = 14 * dpr;
+      const tlPadBot = 14 * dpr;
+      const offsetMin = startH * 60;
+      const toY = (min) => tlPadTop + (min - offsetMin) * pxPerMin;
+      const timelineH = toY(endH * 60) + tlPadBot;
+
+      // ── Высота: header + timeline + empty + footer ──
+      const headerH = 70 * dpr;
+      const footerH = 36 * dpr;
+      const emptyBannerH = !hasEvents ? 80 * dpr : 0;
+      const rawH = headerH + timelineH + emptyBannerH + footerH + PAD * 2;
+      const H = Math.max(rawH, 400 * dpr);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // ── Фон ──
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+
+      // ── Заголовок ──
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#1c1c1c';
+      ctx.font = `bold ${18 * dpr}px ${FBASE}`;
+      ctx.fillText('Расписание', W / 2, PAD + 22 * dpr);
+      ctx.fillStyle = '#888888';
+      ctx.font = `${13 * dpr}px ${FBASE}`;
+      const subtitle = groupName 
+        ? `${formattedDayName}, ${dateStr} · ${groupName}`
+        : `${formattedDayName}, ${dateStr}`;
+      ctx.fillText(subtitle, W / 2, PAD + 42 * dpr);
+
+      // ── Timeline контейнер ──
+      const tlX = PAD;
+      const tlY = headerH + PAD;
+      const tlW = W - PAD * 2;
+
+      ctx.fillStyle = '#fafafa';
+      ctx.beginPath();
+      ctx.roundRect(tlX, tlY, tlW, timelineH, 12 * dpr);
+      ctx.fill();
+      ctx.strokeStyle = '#f0f0f0';
+      ctx.lineWidth = dpr;
+      ctx.stroke();
+
+      // ── Часовая сетка ──
+      for (let h = startH; h <= endH; h++) {
+        const y = tlY + toY(h * 60);
+        ctx.strokeStyle = (h % 2 === 0) ? '#e8e8e8' : '#f2f2f2';
+        ctx.lineWidth = dpr;
+        ctx.beginPath();
+        ctx.moveTo(tlX + TLW, y);
+        ctx.lineTo(tlX + tlW - 4 * dpr, y);
+        ctx.stroke();
+        ctx.fillStyle = (h % 2 === 0) ? '#999' : '#ccc';
+        ctx.font = `500 ${10 * dpr}px ${FBASE}`;
+        ctx.textAlign = 'right';
+        ctx.fillText(`${h}:00`, tlX + TLW - 6 * dpr, y + 4 * dpr);
+      }
+
+      // ── События (пары) ──
+      const evX = tlX + TLW + 4 * dpr;
+      const evW = tlW - TLW - 8 * dpr;
+      const eventColor = '#6366f1'; // indigo цвет для карточек
+
+      ctx.textAlign = 'left';
+
+      // Собираем все пары в плоский список с реальным временем
+      const flatEvents = [];
+      todaySchedule.forEach(classItem => {
+        const [sStr, eStr] = (classItem.time || '').split(' - ').map(s => s?.trim());
+        const sMin = parseTime(sStr), eMin = parseTime(eStr);
+        if (sMin === null || eMin === null || eMin <= sMin) return;
+        
+        // Собираем аудиторию и преподавателя из subItems
+        let auditory = '';
+        let teacher = '';
+        if (classItem.subItems && classItem.subItems.length > 0) {
+          auditory = classItem.subItems[0].auditory || '';
+          teacher = classItem.subItems[0].teacher || '';
+        }
+
+        flatEvents.push({
+          discipline: classItem.discipline || '',
+          time: classItem.time,
+          sStr, eStr, sMin, eMin,
+          auditory,
+          teacher,
+          lessonType: classItem.lessonType || '',
+        });
+      });
+
+      // Вычисление перекрытий (простой алгоритм)
+      const computeOverlapLayout = (events) => {
+        const sorted = [...events].sort((a, b) => a.sMin - b.sMin);
+        const result = [];
+        const active = [];
+
+        sorted.forEach(ev => {
+          // Убираем завершившиеся
+          while (active.length > 0 && active[0].eMin <= ev.sMin) {
+            active.shift();
+          }
+          active.push(ev);
+          active.sort((a, b) => a.sMin - b.sMin);
+          
+          const subCol = active.indexOf(ev);
+          const subColTotal = active.length;
+          
+          result.push({ event: ev, subCol, subColTotal: Math.max(subColTotal, 1) });
+        });
+
+        // Второй проход — выравниваем subColTotal для перекрывающихся групп
+        for (let i = 0; i < result.length; i++) {
+          let maxCols = result[i].subColTotal;
+          for (let j = 0; j < result.length; j++) {
+            if (i === j) continue;
+            const a = result[i].event, b = result[j].event;
+            if (a.sMin < b.eMin && a.eMin > b.sMin) {
+              maxCols = Math.max(maxCols, result[j].subColTotal);
+            }
+          }
+          result[i].subColTotal = maxCols;
+        }
+
+        return result;
+      };
+
+      const layout = computeOverlapLayout(flatEvents);
+
+      layout.forEach(item => {
+        const event = item.event;
+        const scTotal = item.subColTotal || 1;
+        const scIdx = item.subCol || 0;
+
+        const subColW = evW / scTotal;
+        const cx = evX + subColW * scIdx;
+        const cw = subColW - (scTotal > 1 ? 2 * dpr : 0);
+
+        const ey = tlY + toY(event.sMin);
+        const eh = Math.max(toY(event.eMin) - toY(event.sMin), 34 * dpr);
+        const cardR = 10 * dpr;
+
+        // Фон события
+        ctx.fillStyle = eventColor + '18';
+        ctx.beginPath();
+        ctx.roundRect(cx, ey, cw, eh, cardR);
+        ctx.fill();
+
+        // Левая полоска
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(cx, ey, cw, eh, cardR);
+        ctx.clip();
+        ctx.fillStyle = eventColor;
+        ctx.fillRect(cx, ey, 3.5 * dpr, eh);
+        ctx.restore();
+
+        // Тип пары (маленький лейбл)
+        if (event.lessonType) {
+          ctx.fillStyle = eventColor;
+          ctx.font = `500 ${9 * dpr}px ${FBASE}`;
+          ctx.fillText(event.lessonType, cx + 10 * dpr, ey + 14 * dpr);
+        }
+
+        // Название дисциплины (с переносом строк)
+        ctx.fillStyle = '#1c1c1c';
+        ctx.font = `600 ${11 * dpr}px ${FBASE}`;
+        const maxTW = cw - 16 * dpr;
+        const maxTextY = ey + eh - 18 * dpr;
+        const discipline = event.discipline;
+        const words = discipline.split(' ');
+        let line = '', ly = ey + (event.lessonType ? 28 : 18) * dpr;
+        let truncated = false;
+        for (const word of words) {
+          if (truncated) break;
+          let w = word;
+          if (ctx.measureText(w).width > maxTW) {
+            while (ctx.measureText(w + '…').width > maxTW && w.length > 1) {
+              w = w.slice(0, -1);
+            }
+            w += '…';
+          }
+          const test = line ? `${line} ${w}` : w;
+          if (ctx.measureText(test).width > maxTW && line) {
+            if (ly + 14 * dpr > maxTextY) { truncated = true; line = line + '…'; break; }
+            ctx.fillText(line, cx + 10 * dpr, ly);
+            ly += 14 * dpr;
+            line = w;
+          } else {
+            line = test;
+          }
+        }
+        if (line && ly <= maxTextY) {
+          ctx.fillText(line, cx + 10 * dpr, ly);
+        }
+
+        // Время и аудитория
+        ctx.fillStyle = '#999';
+        ctx.font = `${9 * dpr}px ${FBASE}`;
+        const timeText = `${event.sStr} – ${event.eStr}${event.auditory ? ` · ${event.auditory}` : ''}`;
+        let timeLine = timeText;
+        if (ctx.measureText(timeLine).width > maxTW) {
+          while (ctx.measureText(timeLine + '…').width > maxTW && timeLine.length > 5) {
+            timeLine = timeLine.slice(0, -1);
+          }
+          timeLine += '…';
+        }
+        ctx.fillText(timeLine, cx + 10 * dpr, ly + 14 * dpr);
+      });
+
+      // ── Баннер «Нет пар» если пустой день ──
+      if (!hasEvents) {
+        const bannerY = tlY + timelineH / 2 - 20 * dpr;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(W / 2 - 100 * dpr, bannerY, 200 * dpr, 40 * dpr, 12 * dpr);
+        ctx.fill();
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = dpr;
+        ctx.stroke();
+        ctx.fillStyle = '#888';
+        ctx.font = `500 ${13 * dpr}px ${FBASE}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`Нет пар на ${formattedDayName.toLowerCase()}`, W / 2, bannerY + 24 * dpr);
+      }
+
+      // ── Футер ──
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#bbbbbb';
+      ctx.font = `${10 * dpr}px ${FBASE}`;
+      ctx.fillText(`@${botUsername || 'bot'} · RUDN Schedule`, W / 2, H - 12 * dpr);
+
+      return canvas;
+    } catch (err) {
+      console.error('Ошибка генерации изображения:', err);
+      return null;
+    }
+  };
+
+  // ─── Копирование текста ───
+  const handleCopyText = async () => {
+    const text = generateScheduleText();
+    try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      if (hapticFeedback) hapticFeedback('notification', 'success');
-      
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+      hapticFeedback?.('success');
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      hapticFeedback?.('success');
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
-  // Шаринг через Telegram Web App API
-  const handleShareToTelegram = async () => {
-    if (hapticFeedback) hapticFeedback('impact', 'medium');
-    
-    // Отслеживаем действие поделиться расписанием
+  // ─── Отправить в Telegram ───
+  const handleTelegramShare = async () => {
+    hapticFeedback?.('impact', 'medium');
+
+    // Трекинг достижения
     if (telegramId) {
       try {
-        const result = await achievementsAPI.trackAction(telegramId, 'share_schedule', {
+        await achievementsAPI.trackAction(telegramId, 'share_schedule', {
           source: 'share_modal',
           date: new Date().toISOString()
         });
-        
-        // Если есть новые достижения, можно показать уведомление (опционально)
-        if (result.new_achievements && result.new_achievements.length > 0) {
-          console.log('New achievement earned:', result.new_achievements[0]);
-        }
       } catch (error) {
         console.error('Failed to track share_schedule action:', error);
       }
     }
-    
-    const text = generateTelegramText();
-    
-    // Проверяем доступность Telegram Web App API
-    if (window.Telegram?.WebApp) {
-      // Используем Telegram.WebApp.switchInlineQuery для шаринга
-      // Или открываем диалог выбора чата
-      const encodedText = encodeURIComponent(text);
-      const botUrl = `https://t.me/${botUsername}`;
-      const url = `https://t.me/share/url?url=${botUrl}&text=${encodedText}`;
-      window.open(url, '_blank');
+
+    const text = encodeURIComponent(generateScheduleText());
+    const botUrl = encodeURIComponent(`https://t.me/${botUsername}`);
+    const shareUrl = `https://t.me/share/url?url=${botUrl}&text=${text}`;
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(shareUrl);
     } else {
-      // Fallback: копируем в буфер
-      handleCopyToClipboard();
+      window.open(shareUrl, '_blank');
     }
   };
 
-  // Шаринг как изображение (screenshot)
-  const handleShareAsImage = async () => {
-    if (hapticFeedback) hapticFeedback('impact', 'medium');
-    
-    if (!scheduleImageRef.current) {
-      console.error('Schedule image ref not found');
-      return;
-    }
-    
-    setIsGeneratingImage(true);
-    
+  // ─── Прислать в ЛС бота ───
+  const handleSendToBot = async () => {
+    if (!telegramId) return;
+    setIsSendingToBot(true);
+    setImageSentToBot(false);
     try {
-      // Отслеживаем действие сохранения как картинку
+      const canvas = await generateCanvas();
+      if (!canvas) return;
+
+      const base64 = canvas.toDataURL('image/png');
+      const dateStr = selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+      const caption = `<tg-emoji emoji-id="5307850030416156311">📅</tg-emoji> <b>Расписание</b>\n<tg-emoji emoji-id="5312474198365462799">📆</tg-emoji> ${formattedDayName}, ${dateStr}${groupName ? `\n👥 ${groupName}` : ''}`;
+
+      await botAPI.sendScheduleImage(telegramId, base64, caption);
+      hapticFeedback?.('success');
+      setImageSentToBot(true);
+      setTimeout(() => setImageSentToBot(false), 3000);
+    } catch (err) {
+      console.error('Ошибка отправки в бот:', err);
+      hapticFeedback?.('error');
+    } finally {
+      setIsSendingToBot(false);
+    }
+  };
+
+  // ─── Сохранить в галерею ───
+  const handleSaveToGallery = async () => {
+    setIsGeneratingImage(true);
+    try {
+      // Трекинг достижения
       if (telegramId) {
         try {
           await achievementsAPI.trackAction(telegramId, 'share_schedule', {
@@ -210,491 +467,177 @@ export const ShareScheduleModal = ({
           console.error('Failed to track share action:', error);
         }
       }
-      
-      // Генерируем изображение с высоким качеством
-      const dataUrl = await toPng(scheduleImageRef.current, {
-        cacheBust: true,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        skipFonts: true,
-        filter: (node) => {
-          // Пропускаем внешние link-стили (Google Fonts и т.д.) чтобы избежать CORS-ошибок
-          if (node.tagName === 'LINK' && node.getAttribute && node.getAttribute('rel') === 'stylesheet') {
-            return false;
-          }
-          return true;
-        },
-      });
-      
-      // Создаем ссылку для скачивания
-      const link = document.createElement('a');
+
+      const canvas = await generateCanvas();
+      if (!canvas) return;
+
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) return;
+
       const dateStr = selectedDate.toLocaleDateString('ru-RU', { 
-        day: '2-digit', 
-        month: '2-digit',
-        year: 'numeric'
+        day: '2-digit', month: '2-digit', year: 'numeric'
       }).replace(/\./g, '-');
-      link.download = `raspisanie-${dateStr}.png`;
-      link.href = dataUrl;
-      link.click();
-      
-      if (hapticFeedback) hapticFeedback('notification', 'success');
-      
-      // Опционально: отправляем изображение через Telegram Web App API
-      if (window.Telegram?.WebApp) {
-        // Пытаемся открыть изображение в новом окне для возможности поделиться
-        const blob = await (await fetch(dataUrl)).blob();
-        const file = new File([blob], `raspisanie-${dateStr}.png`, { type: 'image/png' });
-        
-        // Если доступен API для шаринга файлов
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'Расписание RUDN',
-              text: `Расписание на ${formatDate(selectedDate)}`
-            });
-          } catch (err) {
-            console.log('Share cancelled or failed:', err);
-          }
+      const fileName = `raspisanie-${dateStr}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      // Web Share API — на мобильных позволяет сохранить в галерею
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Расписание RUDN',
+            text: `Расписание на ${formatDate(selectedDate)}`
+          });
+          hapticFeedback?.('success');
+          return;
+        } catch (shareErr) {
+          if (shareErr.name === 'AbortError') return;
         }
       }
-      
+
+      // Fallback: обычное скачивание
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = fileName;
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+      hapticFeedback?.('success');
     } catch (err) {
-      console.error('Failed to generate image:', err);
-      if (hapticFeedback) hapticFeedback('notification', 'error');
-      alert('Не удалось создать изображение. Попробуйте ещё раз.');
+      console.error('Ошибка сохранения:', err);
+      hapticFeedback?.('error');
     } finally {
       setIsGeneratingImage(false);
     }
   };
 
-  // Создание приглашения в группу
-  const handleInviteFriends = async () => {
-    if (hapticFeedback) hapticFeedback('impact', 'medium');
-    
-    // Трекинг действия приглашения друга
-    if (telegramId) {
-      try {
-        await achievementsAPI.trackAction(telegramId, 'invite_friend', {
-          source: 'share_modal',
-          date: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error('Failed to track invite_friend action:', error);
-      }
-    }
-    
-    const inviteText = `🎓 Привет! Я использую RUDN Schedule для просмотра расписания.\n\nПрисоединяйся! 👇`;
-    const encodedText = encodeURIComponent(inviteText);
-    const botUrl = `https://t.me/${botUsername}`;
-    const url = `https://t.me/share/url?url=${botUrl}&text=${encodedText}`;
-    window.open(url, '_blank');
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[150] flex items-end justify-center"
+          onClick={onClose}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150]"
-          />
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle bar */}
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
 
-          {/* Modal Container - адаптивное позиционирование */}
-          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 sm:p-6 md:p-8">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="w-full max-w-[95vw] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto"
-            >
-              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-2xl">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 leading-tight pr-2">
-                    Поделиться расписанием
-                  </h2>
-                  <button
-                    onClick={() => {
-                      if (hapticFeedback) hapticFeedback('impact', 'light');
-                      onClose();
-                    }}
-                    className="w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 active:bg-gray-300 transition-colors"
-                  >
-                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                  </button>
-                </div>
-
-                {/* Info */}
-                <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl sm:rounded-2xl">
-                  <p className="text-xs sm:text-sm text-gray-600 text-center">
-                    📅 {formatDate(selectedDate)}
-                  </p>
-                  {groupName && (
-                    <p className="text-xs text-gray-500 text-center mt-1">
-                      Группа: {groupName}
-                    </p>
-                  )}
-                </div>
-
-                {/* Share Options */}
-                <div className="space-y-2 sm:space-y-3">
-                  {/* Поделиться в Telegram */}
-                  <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleShareToTelegram}
-                    className="w-full flex items-center gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg active:shadow-md transition-shadow"
-                  >
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/20">
-                      <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-semibold text-sm sm:text-base truncate">Отправить в чат</p>
-                      <p className="text-xs text-white/80 hidden sm:block">Поделиться через Telegram</p>
-                    </div>
-                    <Share2 className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                  </motion.button>
-
-                  {/* Копировать текст */}
-                  <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleCopyToClipboard}
-                    className="w-full flex items-center gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg active:shadow-md transition-shadow"
-                  >
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/20">
-                      {copied ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Copy className="w-4 h-4 sm:w-5 sm:h-5" />}
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-semibold text-sm sm:text-base truncate">
-                        {copied ? 'Скопировано!' : 'Копировать текст'}
-                      </p>
-                      <p className="text-xs text-white/80 hidden sm:block">
-                        {copied ? 'Текст в буфере обмена' : 'Скопировать расписание'}
-                      </p>
-                    </div>
-                  </motion.button>
-
-                  {/* Поделиться как изображение */}
-                  <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleShareAsImage}
-                    disabled={isGeneratingImage}
-                    className={`w-full flex items-center gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-gradient-to-r from-green-500 to-teal-500 text-white hover:shadow-lg active:shadow-md transition-shadow ${isGeneratingImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/20">
-                      {isGeneratingImage ? (
-                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                      )}
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-semibold text-sm sm:text-base truncate">
-                        {isGeneratingImage ? 'Создаём картинку...' : 'Сохранить как картинку'}
-                      </p>
-                      <p className="text-xs text-white/80 hidden sm:block">
-                        {isGeneratingImage ? 'Пожалуйста, подождите' : 'Скачать изображение расписания'}
-                      </p>
-                    </div>
-                    {!isGeneratingImage && <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />}
-                  </motion.button>
-
-                  {/* Пригласить друзей */}
-                  <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleInviteFriends}
-                    className="w-full flex items-center gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 transition-colors"
-                  >
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white">
-                      <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-semibold text-sm sm:text-base truncate">Пригласить друзей</p>
-                      <p className="text-xs text-gray-500 hidden sm:block">Рассказать о приложении</p>
-                    </div>
-                  </motion.button>
-                </div>
-
-                {/* Preview */}
-                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg sm:rounded-xl max-h-32 sm:max-h-40 md:max-h-48 overflow-y-auto">
-                  <p className="text-xs text-gray-500 mb-2">Предпросмотр:</p>
-                  <pre className="text-[10px] sm:text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
-                    {generateScheduleText()}
-                  </pre>
-                </div>
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <Share2 className="w-5 h-5 text-indigo-600" />
               </div>
-            </motion.div>
-          </div>
-          
-          {/* Скрытый компонент для генерации изображения */}
-          <div className="fixed -left-[9999px] -top-[9999px]">
-            <ScheduleImageCard
-              ref={scheduleImageRef}
-              schedule={schedule}
-              selectedDate={selectedDate}
-              groupName={groupName}
-              formatDate={formatDate}
-              botUsername={botUsername}
-            />
-          </div>
-        </>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Поделиться расписанием</h3>
+                <p className="text-xs text-gray-500">
+                  📅 {formatDate(selectedDate)}{groupName ? ` · ${groupName}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="ml-auto text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Текст для копирования */}
+            <div className="flex items-center gap-2 p-3 rounded-2xl bg-gray-50 border border-gray-200 mb-4">
+              <span className="flex-1 text-xs text-gray-500 truncate font-mono">
+                {todaySchedule.length > 0 
+                  ? `${todaySchedule.length} пар · ${formattedDayName}`
+                  : `Нет пар · ${formattedDayName}`
+                }
+              </span>
+              <button
+                onClick={handleCopyText}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 flex-shrink-0 ${
+                  copied
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    Скопировано
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Копировать
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Отправить в Telegram */}
+            <button
+              onClick={handleTelegramShare}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-[#2AABEE] hover:bg-[#1e9bd6] active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-blue-400/20 mb-3"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
+              </svg>
+              Отправить в Telegram
+            </button>
+
+            {/* Прислать в ЛС бота */}
+            <button
+              onClick={handleSendToBot}
+              disabled={isSendingToBot}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-purple-400/20 disabled:opacity-60 mb-3"
+            >
+              {isSendingToBot ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Отправка...
+                </>
+              ) : imageSentToBot ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  Отправлено в ЛС!
+                </>
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  Прислать в ЛС бота
+                </>
+              )}
+            </button>
+
+            {/* Сохранить в галерею */}
+            <button
+              onClick={handleSaveToGallery}
+              disabled={isGeneratingImage}
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.98] transition-all text-white font-semibold text-sm shadow-lg shadow-emerald-400/20 disabled:opacity-60"
+            >
+              {isGeneratingImage ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Генерация...
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-5 h-5" />
+                  Сохранить в галерею
+                </>
+              )}
+            </button>
+          </motion.div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
 };
-
-/**
- * Компонент карточки расписания для генерации изображения
- * Используем inline-стили вместо Tailwind для совместимости с html-to-image (избегаем CORS-ошибок)
- */
-const ScheduleImageCard = React.forwardRef(({ schedule, selectedDate, groupName, formatDate, botUsername }, ref) => {
-  const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
-  const formattedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-  const todaySchedule = groupScheduleItems(schedule.filter(item => item.day === formattedDayName));
-
-  const styles = {
-    container: {
-      width: 600,
-      backgroundColor: '#2B2B3A',
-      padding: 32,
-      borderRadius: 24,
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    },
-    headerCard: {
-      backgroundColor: '#ffffff',
-      borderRadius: 16,
-      padding: 24,
-      marginBottom: 24,
-      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-    },
-    headerRow: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    headerTitle: {
-      fontSize: 30,
-      fontWeight: 700,
-      color: '#1C1C1E',
-      margin: 0,
-    },
-    headerRight: {
-      textAlign: 'right',
-    },
-    headerBrand: {
-      fontSize: 14,
-      color: '#4B5563',
-      fontWeight: 600,
-      margin: 0,
-    },
-    headerSub: {
-      fontSize: 12,
-      color: '#9CA3AF',
-      margin: 0,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: '#E5E7EB',
-      marginBottom: 12,
-      border: 'none',
-    },
-    dateText: {
-      fontSize: 18,
-      fontWeight: 600,
-      color: '#1C1C1E',
-      margin: 0,
-    },
-    groupText: {
-      fontSize: 14,
-      color: '#4B5563',
-      marginTop: 4,
-      margin: '4px 0 0',
-    },
-    freeDayCard: {
-      backgroundColor: '#ffffff',
-      borderRadius: 16,
-      padding: 32,
-      textAlign: 'center',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-    },
-    freeDayEmoji: {
-      fontSize: 60,
-      marginBottom: 16,
-    },
-    freeDayTitle: {
-      fontSize: 24,
-      fontWeight: 700,
-      color: '#1C1C1E',
-      marginBottom: 8,
-      margin: '0 0 8px',
-    },
-    freeDaySubtitle: {
-      color: '#4B5563',
-      margin: 0,
-    },
-    classCard: {
-      backgroundColor: '#ffffff',
-      borderRadius: 16,
-      padding: 20,
-      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-      marginBottom: 12,
-    },
-    classRow: {
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: 16,
-    },
-    classNumber: {
-      flexShrink: 0,
-      width: 48,
-      height: 48,
-      backgroundColor: '#1C1C1E',
-      borderRadius: 12,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: '#ffffff',
-      fontWeight: 700,
-      fontSize: 20,
-    },
-    classInfo: {
-      flex: 1,
-      minWidth: 0,
-    },
-    className: {
-      fontSize: 18,
-      fontWeight: 700,
-      color: '#1C1C1E',
-      lineHeight: 1.3,
-      marginBottom: 8,
-      margin: '0 0 8px',
-    },
-    classTime: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      color: '#374151',
-      fontWeight: 600,
-      marginBottom: 4,
-    },
-    classDetail: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      color: '#4B5563',
-      fontSize: 14,
-      marginBottom: 2,
-    },
-    subItemDivider: {
-      marginTop: 8,
-      paddingTop: 8,
-      borderTop: '1px solid #F3F4F6',
-    },
-    footer: {
-      marginTop: 24,
-      backgroundColor: '#ffffff',
-      borderRadius: 16,
-      padding: 16,
-      textAlign: 'center',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-    },
-    footerTitle: {
-      fontSize: 14,
-      color: '#1C1C1E',
-      fontWeight: 600,
-      margin: 0,
-    },
-    footerSub: {
-      fontSize: 12,
-      color: '#6B7280',
-      marginTop: 4,
-      margin: '4px 0 0',
-    },
-  };
-
-  return (
-    <div ref={ref} style={styles.container}>
-      {/* Header */}
-      <div style={styles.headerCard}>
-        <div style={styles.headerRow}>
-          <h1 style={styles.headerTitle}>Расписание</h1>
-          <div style={styles.headerRight}>
-            <p style={styles.headerBrand}>RUDN Schedule</p>
-            <p style={styles.headerSub}>Telegram WebApp</p>
-          </div>
-        </div>
-        <hr style={styles.divider} />
-        <p style={styles.dateText}>{formatDate(selectedDate)}</p>
-        {groupName && (
-          <p style={styles.groupText}>Группа: {groupName}</p>
-        )}
-      </div>
-
-      {/* Schedule Content */}
-      {todaySchedule.length === 0 ? (
-        <div style={styles.freeDayCard}>
-          <div style={styles.freeDayEmoji}>🎉</div>
-          <p style={styles.freeDayTitle}>Свободный день!</p>
-          <p style={styles.freeDaySubtitle}>Пар нет</p>
-        </div>
-      ) : (
-        <div>
-          {todaySchedule.map((classItem, index) => (
-            <div key={index} style={styles.classCard}>
-              <div style={styles.classRow}>
-                {/* Номер пары */}
-                <div style={styles.classNumber}>
-                  {index + 1}
-                </div>
-                
-                {/* Информация о паре */}
-                <div style={styles.classInfo}>
-                  <h3 style={styles.className}>
-                    {classItem.discipline}
-                  </h3>
-                  
-                  <div>
-                    <div style={styles.classTime}>
-                      <span>{classItem.time}</span>
-                    </div>
-                    
-                    {classItem.subItems && classItem.subItems.map((subItem, idx) => (
-                      <div key={idx} style={idx > 0 ? styles.subItemDivider : {}}>
-                        {subItem.auditory && (
-                          <div style={styles.classDetail}>
-                            <span>{subItem.auditory}</span>
-                          </div>
-                        )}
-                        {subItem.teacher && (
-                          <div style={styles.classDetail}>
-                            <span>{subItem.teacher}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={styles.footer}>
-        <p style={styles.footerTitle}>RUDN Schedule</p>
-        <p style={styles.footerSub}>@{botUsername || 'bot'} • Telegram WebApp</p>
-      </div>
-    </div>
-  );
-});
