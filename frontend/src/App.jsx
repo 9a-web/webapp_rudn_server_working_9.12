@@ -2139,6 +2139,18 @@ const Home = () => {
                 <LiveScheduleCarousel
                   currentClass={currentClass} 
                   minutesLeft={minutesLeft}
+                  concurrentClasses={concurrentClasses}
+                  onSelectConcurrentClass={(discipline) => {
+                    setCurrentClass(discipline);
+                    // Сохраняем выбор в localStorage
+                    if (concurrentClasses.length > 0) {
+                      const now = new Date();
+                      const dayName = now.toLocaleDateString('ru-RU', { weekday: 'long' });
+                      const formattedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                      const timeSlot = concurrentClasses[0].time;
+                      localStorage.setItem(`concurrent_class_${formattedDay}_${timeSlot}`, discipline);
+                    }
+                  }}
                   hapticFeedback={hapticFeedback}
                   allAchievements={allAchievements}
                   userAchievements={userAchievements}
