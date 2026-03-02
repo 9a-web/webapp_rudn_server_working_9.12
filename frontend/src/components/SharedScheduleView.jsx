@@ -1333,7 +1333,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       const dateStr = selectedDate
         ? new Date(selectedDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
         : '';
-      const caption = `📅 <b>Совместное расписание</b>\n${selectedDay ? selectedDay + ', ' : ''}${dateStr}`;
+      const caption = `<emoji id="5307850030416156311">📅</emoji> <b>Совместное расписание</b>\n<emoji id="5312474198365462799">📆</emoji> ${selectedDay ? selectedDay + ', ' : ''}${dateStr}`;
 
       await botAPI.sendScheduleImage(telegramId, base64, caption);
       hapticFeedback?.('success');
