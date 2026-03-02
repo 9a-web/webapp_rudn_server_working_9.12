@@ -1438,8 +1438,8 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
           <div className="flex flex-wrap gap-2 px-3">
             {sharedData.participants?.map((p, idx) => {
               const isMe = String(p.telegram_id) === String(telegramId);
-              const isParticipantOwner = String(p.telegram_id) === String(sharedData.owner_id);
-              const canRemove = (!isParticipantOwner && isMe) || (isOwner && !isMe);
+              // БАГ-ФИХ: единая логика canRemove — можно удалить любого кроме себя (себя — через удаление расписания)
+              const canRemove = !isMe;
               return (
                 <div
                   key={p.telegram_id}
@@ -1455,7 +1455,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                       onClick={() => handleRemoveParticipant(p.telegram_id)}
                       disabled={actionLoading}
                       className="text-[#ccc] hover:text-red-400 transition-colors -mr-1 disabled:opacity-30"
-                      title={isMe ? 'Покинуть расписание' : 'Удалить участника'}
+                      title="Убрать из расписания"
                     >
                       <X className="w-3 h-3" />
                     </button>
