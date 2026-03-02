@@ -821,7 +821,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
       });
     }
     return lines;
-  }, []);
+  }, [minToPx]);
 
   // ─── Check if today ───
   const isToday = useMemo(() => {
