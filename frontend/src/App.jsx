@@ -181,6 +181,7 @@ const Home = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentClass, setCurrentClass] = useState(null);
   const [minutesLeft, setMinutesLeft] = useState(0);
+  const [concurrentClasses, setConcurrentClasses] = useState([]);
   
   // Состояния для расписания
   const [schedule, setSchedule] = useState([]);
