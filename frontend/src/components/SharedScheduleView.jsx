@@ -889,7 +889,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
         if (startH >= endH) endH = startH + 1;
       }
 
-      const pxPerMin = PX_PER_MIN * dpr;
+      const canvasPxPerMin = pxPerMin * dpr;
       const offsetMin = startH * 60;
       const tlPadTop = 14 * dpr;   // отступ сверху тайм-лайна (чтобы время не обрезалось)
       const tlPadBot = 14 * dpr;   // отступ снизу тайм-лайна
