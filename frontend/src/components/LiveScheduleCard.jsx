@@ -10,6 +10,8 @@ export const LiveScheduleCard = React.memo(({
   currentClass, 
   minutesLeft, 
   concurrentClasses = [],
+  scheduleStatus = 'no_classes',
+  nextClassInfo = null,
   onSelectConcurrentClass,
   hapticFeedback 
 }) => {
@@ -138,11 +140,11 @@ export const LiveScheduleCard = React.memo(({
       <div className="relative flex items-center justify-between gap-4 lg:gap-6 xl:gap-8">
         {/* Left side - Text content */}
         <div className="flex-1 min-w-0">
-          {/* Заголовок "Сейчас идёт" / "Пар нет" — анимируется ТОЛЬКО при смене состояния есть/нет пары */}
+          {/* Заголовок — зависит от статуса расписания */}
           <div className="mb-2 lg:mb-3">
             <AnimatePresence mode="wait">
               <motion.p
-                key={currentClass ? 'has-class' : 'no-class'}
+                key={currentClass ? 'has-class' : scheduleStatus}
                 className="font-bold text-base lg:text-lg xl:text-xl"
                 style={{ color: themeStyles.text.primary }}
                 initial={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
@@ -150,7 +152,16 @@ export const LiveScheduleCard = React.memo(({
                 exit={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
                 transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
               >
-                {currentClass ? t('liveScheduleCard.currentClass') : t('liveScheduleCard.noClass')}
+                {currentClass 
+                  ? t('liveScheduleCard.currentClass')
+                  : scheduleStatus === 'day_ended'
+                    ? 'Учебный день подошёл к концу! 🎉'
+                    : scheduleStatus === 'before_first'
+                      ? 'Учебный день ещё не начался!'
+                      : scheduleStatus === 'break' && nextClassInfo
+                        ? `Сейчас перерыв! Следующая пара: ${translateDiscipline(nextClassInfo.name, i18n.language)}`
+                        : t('liveScheduleCard.noClass')
+                }
               </motion.p>
             </AnimatePresence>
 
@@ -230,7 +241,7 @@ export const LiveScheduleCard = React.memo(({
           </div>
           <AnimatePresence mode="wait">
             <motion.p 
-              key={currentClass ? minutesLeft : 'relax'}
+              key={currentClass ? minutesLeft : scheduleStatus}
               className="font-medium text-xs lg:text-sm xl:text-base" 
               style={{ color: themeStyles.text.secondary }}
               initial={{ opacity: 0, x: -5 }}
@@ -242,7 +253,14 @@ export const LiveScheduleCard = React.memo(({
                 i18n.language === 'ru' 
                   ? `Осталось: ${minutesLeft} ${pluralizeMinutes(minutesLeft)}`
                   : `Time left: ${minutesLeft} ${minutesLeft === 1 ? 'minute' : 'minutes'}`
-              ) : t('liveScheduleCard.relax')}
+              ) : scheduleStatus === 'before_first' && nextClassInfo
+                ? `Готовься к ${translateDiscipline(nextClassInfo.name, i18n.language)}`
+                : scheduleStatus === 'break' && nextClassInfo
+                  ? `Начнётся через ${nextClassInfo.minutesUntil} ${pluralizeMinutes(nextClassInfo.minutesUntil)}`
+                  : scheduleStatus === 'day_ended'
+                    ? ''
+                    : t('liveScheduleCard.relax')
+              }
             </motion.p>
           </AnimatePresence>
         </div>

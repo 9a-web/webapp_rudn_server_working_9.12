@@ -192,6 +192,8 @@ const Home = () => {
   const [currentClass, setCurrentClass] = useState(null);
   const [minutesLeft, setMinutesLeft] = useState(0);
   const [concurrentClasses, setConcurrentClasses] = useState([]);
+  const [scheduleStatus, setScheduleStatus] = useState('no_classes'); // 'active' | 'before_first' | 'break' | 'day_ended' | 'no_classes'
+  const [nextClassInfo, setNextClassInfo] = useState(null); // { name, minutesUntil }
   
   // Состояния для расписания
   const [schedule, setSchedule] = useState([]);
@@ -1441,18 +1443,19 @@ const Home = () => {
     const concurrent = [];
     let sharedMinutesLeft = 0;
 
-    for (const classItem of todayClasses) {
+    // Парсим все пары с временами
+    const parsedClasses = todayClasses.map(classItem => {
       const timeRange = classItem.time.split('-');
-      if (timeRange.length !== 2) continue;
-      
+      if (timeRange.length !== 2) return null;
       const [startHour, startMin] = timeRange[0].trim().split(':').map(Number);
       const [endHour, endMin] = timeRange[1].trim().split(':').map(Number);
-      const startTime = startHour * 60 + startMin;
-      const endTime = endHour * 60 + endMin;
+      return { ...classItem, startTime: startHour * 60 + startMin, endTime: endHour * 60 + endMin };
+    }).filter(Boolean).sort((a, b) => a.startTime - b.startTime);
 
-      if (currentTime >= startTime && currentTime < endTime) {
+    for (const classItem of parsedClasses) {
+      if (currentTime >= classItem.startTime && currentTime < classItem.endTime) {
         concurrent.push(classItem);
-        sharedMinutesLeft = endTime - currentTime;
+        sharedMinutesLeft = classItem.endTime - currentTime;
       }
     }
 
@@ -1469,10 +1472,41 @@ const Home = () => {
 
       setCurrentClass(savedClass ? savedClass.discipline : concurrent[0].discipline);
       setMinutesLeft(sharedMinutesLeft);
+      setScheduleStatus('active');
+      setNextClassInfo(null);
     } else {
       setConcurrentClasses([]);
       setCurrentClass(null);
       setMinutesLeft(0);
+
+      // Определяем статус: до начала / перерыв / день закончился / нет пар
+      if (parsedClasses.length === 0) {
+        setScheduleStatus('no_classes');
+        setNextClassInfo(null);
+      } else {
+        const firstStart = parsedClasses[0].startTime;
+        const lastEnd = parsedClasses[parsedClasses.length - 1].endTime;
+
+        if (currentTime < firstStart) {
+          // Пары ещё не начались
+          setScheduleStatus('before_first');
+          setNextClassInfo({ name: parsedClasses[0].discipline, minutesUntil: firstStart - currentTime });
+        } else if (currentTime >= lastEnd) {
+          // Все пары закончились
+          setScheduleStatus('day_ended');
+          setNextClassInfo(null);
+        } else {
+          // Перерыв между парами — ищем следующую пару
+          const nextClass = parsedClasses.find(c => c.startTime > currentTime);
+          if (nextClass) {
+            setScheduleStatus('break');
+            setNextClassInfo({ name: nextClass.discipline, minutesUntil: nextClass.startTime - currentTime });
+          } else {
+            setScheduleStatus('day_ended');
+            setNextClassInfo(null);
+          }
+        }
+      }
     }
   }, [schedule]);
 
@@ -2152,6 +2186,8 @@ const Home = () => {
                   currentClass={currentClass} 
                   minutesLeft={minutesLeft}
                   concurrentClasses={concurrentClasses}
+                  scheduleStatus={scheduleStatus}
+                  nextClassInfo={nextClassInfo}
                   onSelectConcurrentClass={(discipline) => {
                     setCurrentClass(discipline);
                     // Сохраняем выбор в localStorage

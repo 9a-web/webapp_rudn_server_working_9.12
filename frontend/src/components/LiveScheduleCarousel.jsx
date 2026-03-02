@@ -20,6 +20,8 @@ export const LiveScheduleCarousel = ({
   currentClass, 
   minutesLeft, 
   concurrentClasses,
+  scheduleStatus,
+  nextClassInfo,
   onSelectConcurrentClass,
   hapticFeedback,
   allAchievements,
@@ -114,6 +116,8 @@ export const LiveScheduleCarousel = ({
             currentClass={currentClass} 
             minutesLeft={minutesLeft}
             concurrentClasses={concurrentClasses}
+            scheduleStatus={scheduleStatus}
+            nextClassInfo={nextClassInfo}
             onSelectConcurrentClass={onSelectConcurrentClass}
             hapticFeedback={hapticFeedback}
           />
