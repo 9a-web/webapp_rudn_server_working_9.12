@@ -114,7 +114,7 @@ ACHIEVEMENTS = [
         "name": "Делишься знаниями",
         "description": "Поделился расписанием",
         "emoji": "🔗",
-        "points": 55,
+        "points": 30,
         "type": "knowledge_sharer",
         "requirement": 1
     },
@@ -123,7 +123,7 @@ ACHIEVEMENTS = [
         "name": "Амбассадор",
         "description": "Поделился расписанием 5 раз",
         "emoji": "🎤",
-        "points": 65,
+        "points": 35,
         "type": "ambassador",
         "requirement": 5
     },
@@ -233,7 +233,7 @@ ACHIEVEMENTS = [
         "name": "Первый друг",
         "description": "Добавил первого друга",
         "emoji": "🤝",
-        "points": 50,
+        "points": 20,
         "type": "first_friend",
         "requirement": 1
     },
@@ -242,7 +242,7 @@ ACHIEVEMENTS = [
         "name": "Общительный",
         "description": "5 друзей в приложении",
         "emoji": "👋",
-        "points": 55,
+        "points": 30,
         "type": "friendly",
         "requirement": 5
     },
@@ -260,7 +260,7 @@ ACHIEVEMENTS = [
         "name": "Популярный",
         "description": "25 друзей в приложении",
         "emoji": "⭐",
-        "points": 65,
+        "points": 90,
         "type": "friendly",
         "requirement": 25
     },
@@ -269,7 +269,7 @@ ACHIEVEMENTS = [
         "name": "Душа компании",
         "description": "50 друзей в приложении",
         "emoji": "👑",
-        "points": 80,
+        "points": 150,
         "type": "friendly",
         "requirement": 50
     },
@@ -278,7 +278,7 @@ ACHIEVEMENTS = [
         "name": "Межфакультетский",
         "description": "Друзья с 3+ разных факультетов",
         "emoji": "🌐",
-        "points": 65,
+        "points": 35,
         "type": "interfaculty",
         "requirement": 3
     },
@@ -287,7 +287,7 @@ ACHIEVEMENTS = [
         "name": "Нетворкер",
         "description": "Друзья с 5+ разных факультетов",
         "emoji": "🔗",
-        "points": 75,
+        "points": 45,
         "type": "networker",
         "requirement": 5
     },
