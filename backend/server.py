@@ -274,7 +274,8 @@ from achievements import (
     get_user_achievements,
     track_user_action,
     get_or_create_user_stats,
-    mark_achievements_as_seen
+    mark_achievements_as_seen,
+    check_and_award_achievements
 )
 from weather import get_moscow_weather
 from config import get_telegram_bot_token, get_telegram_bot_username, is_test_environment, ENV
