@@ -146,15 +146,15 @@ const TimelineEvent = ({ event, color, participantName, columnIndex, totalColumn
       className="absolute"
       style={{
         top: `${top}px`,
-        height: `${displayHeight}px`,
+        minHeight: `${displayHeight}px`,
         left: `calc(${subLeftPct}% + ${EVENT_GAP / 2}px)`,
         width: `calc(${subWidthPct}% - ${EVENT_GAP}px)`,
         zIndex: pickerOpen ? 50 : 10 + scIdx,
       }}
     >
       <div
-        className="rounded-xl overflow-hidden"
-        style={{ backgroundColor: color + '14', height: `${displayHeight}px` }}
+        className="rounded-xl"
+        style={{ backgroundColor: color + '14', minHeight: `${displayHeight}px` }}
       >
         {/* Закруглённая цветная полоска слева */}
         <div
