@@ -73,110 +73,6 @@ const Home = () => {
           setTestGreetingHour(null);
       }, 7000);
   };
-  // TEST: Добавляем тестовое состояние для проверки уведомления
-  const [testNotification, setTestNotification] = useState(false);
-  
-  // Функция для включения теста
-  const toggleTestNotification = () => {
-    setTestNotification(prev => !prev);
-    if (!testNotification) {
-       // Добавляем фейковое занятие через 10 минут
-       const now = new Date();
-       const future = new Date(now.getTime() + 10 * 60000); // +10 min
-       
-       const startHour = future.getHours();
-       const startMin = future.getMinutes();
-       const endHour = startHour + 1;
-       
-       const timeStr = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')} - ${endHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;
-       
-       const currentDayName = now.toLocaleDateString('ru-RU', { weekday: 'long' });
-       const formattedDayName = currentDayName.charAt(0).toUpperCase() + currentDayName.slice(1);
-
-       const fakeClass = {
-           discipline: "TEST SUBJECT (Testing Notification)",
-           time: timeStr,
-           day: formattedDayName,
-           auditory: "Room 101",
-           teacher: "Test Teacher",
-           lessonType: "Seminar"
-       };
-       
-       setSchedule(prev => [...prev, fakeClass]);
-       hapticFeedback('success');
-       showAlert("Test class added! Notification should appear.");
-    } else {
-       // Reload schedule to remove fake
-       loadSchedule();
-       hapticFeedback('warning');
-       showAlert("Test class removed.");
-    }
-  };
-
-  // TEST: Тестовая пара которая идёт СЕЙЧАС (для проверки LiveScheduleCards)
-  const [testCurrentClass, setTestCurrentClass] = useState(false);
-  
-  const toggleTestCurrentClass = () => {
-    setTestCurrentClass(prev => !prev);
-    if (!testCurrentClass) {
-       const now = new Date();
-       // Пара начинается 15 мин назад, заканчивается через 75 мин
-       const start = new Date(now.getTime() - 15 * 60000);
-       const end = new Date(now.getTime() + 75 * 60000);
-       
-       const timeStr = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')} - ${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
-       
-       const currentDayName = now.toLocaleDateString('ru-RU', { weekday: 'long' });
-       const formattedDayName = currentDayName.charAt(0).toUpperCase() + currentDayName.slice(1);
-
-       const fakeClasses = [
-         {
-           discipline: "Информационные технологии и программирование (Длинное название для теста)",
-           time: timeStr,
-           day: formattedDayName,
-           auditory: "Аудитория 315, Корпус 2",
-           teacher: "Иванов И.И.",
-           lessonType: "Лекция"
-         },
-         {
-           discipline: "Физическая культура и спорт",
-           time: timeStr,
-           day: formattedDayName,
-           auditory: "Спортзал, Корпус 5",
-           teacher: "Кузнецов А.В.",
-           lessonType: "Практика"
-         },
-         {
-           discipline: "Математический анализ",
-           time: `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')} - ${(end.getHours() + 1).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
-           day: formattedDayName,
-           auditory: "Аудитория 201",
-           teacher: "Петров П.П.",
-           lessonType: "Семинар"
-         },
-         {
-           discipline: "Физика",
-           time: `${(end.getHours() + 1).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')} - ${(end.getHours() + 2).toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
-           day: formattedDayName,
-           auditory: "Аудитория 405",
-           teacher: "Сидоров С.С.",
-           lessonType: "Лабораторная"
-         }
-       ];
-       
-       setSchedule(prev => [...prev, ...fakeClasses]);
-       // Сразу обновляем — первые 2 пары идут ОДНОВРЕМЕННО
-       setConcurrentClasses([fakeClasses[0], fakeClasses[1]]);
-       setCurrentClass(fakeClasses[0].discipline);
-       setMinutesLeft(75);
-    } else {
-       setCurrentClass(null);
-       setMinutesLeft(0);
-       setConcurrentClasses([]);
-       setSchedule([]);
-    }
-  };
-  
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
@@ -2168,20 +2064,6 @@ const Home = () => {
             <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:px-6 xl:grid-cols-[1fr_380px]">
               {/* Main content column */}
               <div className="lg:min-w-0 lg:overflow-visible">
-                {/* TEST: Кнопка для тестирования LiveScheduleCards */}
-                <div className="px-6 pt-2 pb-1">
-                  <button
-                    onClick={toggleTestCurrentClass}
-                    className={`w-full py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
-                      testCurrentClass 
-                        ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    }`}
-                  >
-                    {testCurrentClass ? '🛑 Убрать тестовые пары' : '🧪 Добавить тестовую пару (идёт сейчас)'}
-                  </button>
-                </div>
-
                 <LiveScheduleCarousel
                   currentClass={currentClass} 
                   minutesLeft={minutesLeft}
