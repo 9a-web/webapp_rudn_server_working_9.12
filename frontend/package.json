@@ -21,7 +21,7 @@
     "signal-exit": "^4.1.0"
   },
   "scripts": {
-    "start": "serve build -l 3000 -s --no-clipboard",
+    "start": "vite --mode test --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "preview": "vite preview",
     "test": "echo 'Tests not configured yet' && exit 0"
