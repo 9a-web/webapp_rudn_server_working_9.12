@@ -415,8 +415,8 @@ const Home = () => {
         if (result) {
           setStreakData(result);
           
-          // Показываем StreakRewardModal каждый новый день при стрике >= 2
-          if (result.is_new_day && !result.streak_claimed_today && result.visit_streak_current >= 2) {
+          // Показываем StreakRewardModal каждый новый день при стрике >= 1
+          if (result.is_new_day && !result.streak_claimed_today && result.visit_streak_current >= 1) {
             // Задержка для красивого появления
             setTimeout(() => {
               setShowStreakModal(true);
