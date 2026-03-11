@@ -388,9 +388,9 @@ export const StreakRewardModal = ({
   onClose,
   onClaim,
   streakDays = 3,
-  habitName = 'Здоровые привычки',
+  habitName = 'Заходи каждый день!\nЧтобы получать награды!',
   weekDays,
-  subtitle = 'Заходи каждый день!\nЧтобы получать награды!',
+  subtitle = 'Ты на правильном пути',
   freezeShields = 0,
   maxStreak = 0,
   isMilestone = false,
@@ -497,6 +497,7 @@ export const StreakRewardModal = ({
                       textTransform: 'uppercase',
                       fontFamily: FONT,
                       margin: 0,
+                      whiteSpace: 'pre-line',
                     }}
                   >
                     {habitName}
@@ -556,7 +557,6 @@ export const StreakRewardModal = ({
                       fontFamily: FONT,
                       margin: '0 0 16px',
                       textAlign: 'center',
-                      whiteSpace: 'pre-line',
                     }}
                   >
                     {isMilestone ? '🎉 Новое достижение!' : subtitle}
@@ -833,8 +833,8 @@ export const StreakRewardPreview = () => {
         onClose={() => setOpen(false)}
         onClaim={() => console.log('Claimed!')}
         streakDays={3}
-        habitName="Здоровые привычки"
-        subtitle={"Заходи каждый день!\nЧтобы получать награды!"}
+        habitName={"Заходи каждый день!\nЧтобы получать награды!"}
+        subtitle="Ты на правильном пути"
         freezeShields={2}
         maxStreak={14}
       />
