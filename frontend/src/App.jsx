@@ -53,7 +53,6 @@ import TelegramLinkConfirmModal from './components/TelegramLinkConfirmModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useFaviconBadge } from './hooks/useFaviconBadge';
 import ReferralModal from './components/ReferralModal';
-import { initDevConsole } from './utils/devConsole';
 
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
@@ -121,13 +120,16 @@ const Home = () => {
   const [showStreakModal, setShowStreakModal] = useState(false);
   const streakProcessedRef = useRef(false);
   
-  // 🛠 Dev Console — инициализация
+  // 🛠 Dev Console — привязка React state
   useEffect(() => {
-    initDevConsole({
-      getUser: () => syncedUser || user,
-      setShowStreakModal,
-      setStreakData,
-    });
+    if (window.dev && window.dev._bind) {
+      window.dev._bind({
+        getUser: () => syncedUser || user,
+        setShowStreakModal,
+        setStreakData,
+        apiBase: getBackendURL(),
+      });
+    }
   }, [user, syncedUser]);
   
   // Состояние для модального окна подтверждения добавления в друзья
