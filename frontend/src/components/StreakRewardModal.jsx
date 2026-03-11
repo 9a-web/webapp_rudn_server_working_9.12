@@ -379,6 +379,8 @@ const WeekTracker = ({ weekDays, show }) => {
      habitName     - string: название привычки (default "Здоровые привычки")
      weekDays      - array: данные недели (опционально)
      subtitle      - string: подзаголовок
+     freezeShields - number: количество щитов заморозки
+     maxStreak     - number: рекорд серии за всё время
 ═══════════════════════════════════════════════ */
 export const StreakRewardModal = ({
   isOpen = false,
@@ -388,6 +390,8 @@ export const StreakRewardModal = ({
   habitName = 'Здоровые привычки',
   weekDays,
   subtitle = 'Ты на правильном пути',
+  freezeShields = 0,
+  maxStreak = 0,
 }) => {
   const [showParticles, setShowParticles] = useState(false);
   const [claimed, setClaimed] = useState(false);
@@ -573,6 +577,91 @@ export const StreakRewardModal = ({
                     weekDays={weekDays}
                     show={isOpen}
                   />
+
+                  {/* Щиты заморозки и рекорд */}
+                  {(freezeShields > 0 || maxStreak > streakDays) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.9, duration: 0.4 }}
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        width: '100%',
+                        marginTop: 16,
+                      }}
+                    >
+                      {/* Щиты заморозки */}
+                      {freezeShields > 0 && (
+                        <div style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '10px 14px',
+                          borderRadius: 14,
+                          backgroundColor: '#EFF6FF',
+                          border: '1px solid #DBEAFE',
+                        }}>
+                          <span style={{ fontSize: 18 }}>🛡</span>
+                          <div>
+                            <div style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: '#1E40AF',
+                              fontFamily: FONT,
+                              lineHeight: 1.2,
+                            }}>
+                              {freezeShields}
+                            </div>
+                            <div style={{
+                              fontSize: 10,
+                              color: '#6B7280',
+                              fontFamily: FONT,
+                              lineHeight: 1.2,
+                            }}>
+                              {pluralize(freezeShields, 'щит', 'щита', 'щитов')}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Рекорд */}
+                      {maxStreak > streakDays && (
+                        <div style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '10px 14px',
+                          borderRadius: 14,
+                          backgroundColor: '#FFF7ED',
+                          border: '1px solid #FED7AA',
+                        }}>
+                          <span style={{ fontSize: 18 }}>🏆</span>
+                          <div>
+                            <div style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: '#C2410C',
+                              fontFamily: FONT,
+                              lineHeight: 1.2,
+                            }}>
+                              {maxStreak}
+                            </div>
+                            <div style={{
+                              fontSize: 10,
+                              color: '#6B7280',
+                              fontFamily: FONT,
+                              lineHeight: 1.2,
+                            }}>
+                              рекорд
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
 
@@ -743,6 +832,8 @@ export const StreakRewardPreview = () => {
         streakDays={3}
         habitName="Здоровые привычки"
         subtitle="Ты на правильном пути"
+        freezeShields={2}
+        maxStreak={14}
       />
     </div>
   );

@@ -2281,6 +2281,8 @@ const Home = () => {
           }}
           streakDays={streakData?.visit_streak_current || 0}
           weekDays={streakData?.week_days || []}
+          freezeShields={streakData?.freeze_shields || 0}
+          maxStreak={streakData?.visit_streak_max || 0}
         />
         
         {/* Swipe hint - показывается один раз, скрывается через 10 секунд или при первом свайпе */}
