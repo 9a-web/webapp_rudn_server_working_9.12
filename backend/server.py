@@ -1649,12 +1649,14 @@ async def record_user_visit(telegram_id: int):
 async def claim_streak_reward(telegram_id: int):
     """Отметить награду за стрик как полученную (с защитой от дублей)"""
     try:
-        # Атомарное обновление: только если streak_claimed_today ещё False
+        # Атомарное обновление: только если streak_claimed_today ещё не True
         result = await db.user_stats.update_one(
             {"telegram_id": telegram_id, "streak_claimed_today": {"$ne": True}},
             {"$set": {"streak_claimed_today": True, "updated_at": datetime.utcnow()}}
         )
-        if result.modified_count == 0:
+        # matched_count == 0 означает что фильтр не нашёл документ с streak_claimed_today != True
+        # то есть награда уже была получена
+        if result.matched_count == 0:
             return SuccessResponse(success=True, message="Награда уже была получена")
         return SuccessResponse(success=True, message="Награда за стрик получена")
     except Exception as e:
