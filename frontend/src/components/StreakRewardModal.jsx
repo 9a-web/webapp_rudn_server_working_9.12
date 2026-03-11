@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
+import { pluralize } from '../utils/pluralize';
 
 /* Poppins — подключаем через Google Fonts (один раз) */
 if (typeof document !== 'undefined' && !document.getElementById('poppins-font')) {
@@ -275,7 +276,7 @@ const GoldBadge = ({ show }) => {
 /* ─────────────────────────────────────────
    Трекер недели (7 дней)
 ───────────────────────────────────────── */
-const WeekTracker = ({ streakDays = 3, weekDays, show }) => {
+const WeekTracker = ({ weekDays, show }) => {
   // weekDays: массив объектов { label: 'Mon', dateNum: 3, done: true }
   const days = weekDays || [
     { label: 'Mon', dateNum: 3,  done: true  },
@@ -335,11 +336,11 @@ const WeekTracker = ({ streakDays = 3, weekDays, show }) => {
                 width: 36,
                 height: 36,
                 borderRadius: '50%',
-                backgroundColor: '#E5E5EA',
+                backgroundColor: '#1C1C1E',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
               }}
             >
               <LaurelWreathSmall size={18} />
@@ -534,7 +535,7 @@ export const StreakRewardModal = ({
                     }}
                   >
                     <AnimatedCounter target={streakDays} duration={0.8} delay={0.55} />{' '}
-                    {streakDays === 1 ? 'День!' : streakDays < 5 ? 'Дня!' : 'Дней!'}
+                    {pluralize(streakDays, 'День!', 'Дня!', 'Дней!')}
                   </motion.h1>
 
                   {/* Подзаголовок */}
@@ -569,7 +570,6 @@ export const StreakRewardModal = ({
 
                   {/* Трекер недели */}
                   <WeekTracker
-                    streakDays={streakDays}
                     weekDays={weekDays}
                     show={isOpen}
                   />

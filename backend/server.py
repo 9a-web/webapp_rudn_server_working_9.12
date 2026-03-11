@@ -1600,6 +1600,15 @@ async def record_user_visit(telegram_id: int):
                 {"telegram_id": telegram_id},
                 update_data
             )
+            
+            # Ограничиваем active_days до последних 400 записей для производительности
+            stats_doc = await db.user_stats.find_one({"telegram_id": telegram_id})
+            if stats_doc and len(stats_doc.get("active_days", [])) > 400:
+                trimmed_days = sorted(stats_doc["active_days"])[-365:]
+                await db.user_stats.update_one(
+                    {"telegram_id": telegram_id},
+                    {"$set": {"active_days": trimmed_days}}
+                )
         
         # Генерируем трекер недели
         week_days = []
@@ -1638,12 +1647,15 @@ async def record_user_visit(telegram_id: int):
 
 @api_router.post("/users/{telegram_id}/streak-claim", response_model=SuccessResponse)
 async def claim_streak_reward(telegram_id: int):
-    """Отметить награду за стрик как полученную"""
+    """Отметить награду за стрик как полученную (с защитой от дублей)"""
     try:
-        await db.user_stats.update_one(
-            {"telegram_id": telegram_id},
+        # Атомарное обновление: только если streak_claimed_today ещё False
+        result = await db.user_stats.update_one(
+            {"telegram_id": telegram_id, "streak_claimed_today": {"$ne": True}},
             {"$set": {"streak_claimed_today": True, "updated_at": datetime.utcnow()}}
         )
+        if result.modified_count == 0:
+            return SuccessResponse(success=True, message="Награда уже была получена")
         return SuccessResponse(success=True, message="Награда за стрик получена")
     except Exception as e:
         logger.error(f"Ошибка при получении награды за стрик: {e}")
@@ -10895,17 +10907,29 @@ async def get_student_stats_by_id(journal_id: str, student_id: str, telegram_id:
         sorted_sessions = sorted(sessions, key=lambda x: x["date"])
         for s in sorted_sessions:
             record = records_map.get(s["session_id"])
-            if record and record["status"] in ["present", "late"]:
+            status = record["status"] if record else "unmarked"
+            
+            # Пропускаем неотмеченные занятия (будущие)
+            if status == "unmarked":
+                continue
+            
+            if status in ["present", "late"]:
                 temp_streak += 1
                 if temp_streak > best_streak:
                     best_streak = temp_streak
             else:
                 temp_streak = 0
         
-        # Подсчёт текущего стрика с конца
+        # Подсчёт текущего стрика с конца (пропуская unmarked)
         for s in reversed(sorted_sessions):
             record = records_map.get(s["session_id"])
-            if record and record["status"] in ["present", "late"]:
+            status = record["status"] if record else "unmarked"
+            
+            # Пропускаем неотмеченные занятия (будущие)
+            if status == "unmarked":
+                continue
+            
+            if status in ["present", "late"]:
                 current_streak += 1
             else:
                 break

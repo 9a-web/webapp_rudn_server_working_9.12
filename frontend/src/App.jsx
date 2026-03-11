@@ -416,7 +416,7 @@ const Home = () => {
           setStreakData(result);
           
           // Показываем StreakRewardModal на милестонах (3, 7, 14, 30, 60, 100, 365)
-          if (result.milestone_reached && result.is_new_day) {
+          if (result.milestone_reached && result.is_new_day && !result.streak_claimed_today) {
             // Задержка для красивого появления
             setTimeout(() => {
               setShowStreakModal(true);
@@ -424,6 +424,8 @@ const Home = () => {
           }
         }
       } catch (err) {
+        // Сбрасываем флаг чтобы можно было повторить при следующем рендере
+        streakProcessedRef.current = false;
         console.debug('Streak record error:', err);
       }
     };
@@ -2269,9 +2271,13 @@ const Home = () => {
           onClaim={async () => {
             const currentUser = syncedUser || user;
             if (currentUser?.id) {
-              await streakAPI.claimReward(currentUser.id);
+              try {
+                await streakAPI.claimReward(currentUser.id);
+              } catch (err) {
+                console.debug('Streak claim error:', err);
+              }
             }
-            setShowStreakModal(false);
+            // Не закрываем модалку здесь — StreakRewardModal сам вызовет onClose
           }}
           streakDays={streakData?.visit_streak_current || 0}
           weekDays={streakData?.week_days || []}

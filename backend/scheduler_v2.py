@@ -47,9 +47,14 @@ class NotificationSchedulerV2:
         self.scheduler = AsyncIOScheduler(timezone=MOSCOW_TZ)
         self.notification_service = get_notification_service()
         self.scheduled_jobs = {}  # Храним созданные задачи для управления
+        self._started = False  # Флаг предотвращения повторного запуска
     
     def start(self):
-        """Запустить планировщик"""
+        """Запустить планировщик (с защитой от дублирования)"""
+        if self._started:
+            logger.warning("⚠️ Scheduler already started, skipping duplicate start()")
+            return
+        self._started = True
         
         # === УРОВЕНЬ 1: Daily Planner ===
         # Подготовка расписания уведомлений на день (каждый день в 06:00)
@@ -100,12 +105,13 @@ class NotificationSchedulerV2:
         )
         
         # === INACTIVITY CHECKER (Авто-напоминания о возвращении) ===
-        # Проверка неактивных пользователей каждые 6 часов
+        # Проверка неактивных пользователей 1 раз в день в 10:00 по МСК
+        # (не ночью, чтобы не будить пользователей)
         self.scheduler.add_job(
             self.check_inactive_users,
-            trigger=CronTrigger(hour='*/6', minute=30, timezone=MOSCOW_TZ),
+            trigger=CronTrigger(hour=10, minute=0, timezone=MOSCOW_TZ),
             id='inactivity_checker',
-            name='Check inactive users and send reminders',
+            name='Check inactive users and send reminders (daily)',
             replace_existing=True
         )
         
@@ -122,7 +128,7 @@ class NotificationSchedulerV2:
         logger.info("✅ Notification Scheduler V2 started successfully")
         logger.info("📅 Daily planner will run at 06:00 Moscow time")
         logger.info("🔄 Retry handler checks every 2 minutes")
-        logger.info("👻 Inactivity checker runs every 6 hours")
+        logger.info("👻 Inactivity checker runs daily at 10:00 Moscow time")
     
     def stop(self):
         """Остановить планировщик"""
@@ -840,11 +846,16 @@ class NotificationSchedulerV2:
     async def check_inactive_users(self):
         """
         Проверить неактивных пользователей и отправить напоминания.
+        Запускается 1 раз в день в 10:00 по Москве.
+        
         Типы напоминаний:
-        - 1 день: стрик под угрозой
-        - 2 дня: стрик сгорел
+        - 1 день: стрик под угрозой (если стрик >= 3)
+        - 2 дня: стрик сгорел / щит спас (если стрик >= 3)
         - 7 дней: мягкое напоминание
         - 30 дней: персональное
+        
+        Дедупликация: атомарный upsert в sent_notifications предотвращает
+        дублирование даже при нескольких воркерах.
         """
         try:
             now = datetime.now(MOSCOW_TZ)
@@ -858,6 +869,7 @@ class NotificationSchedulerV2:
             ).to_list(None)
             
             sent_count = 0
+            skipped_dedup = 0
             
             for user_stats in users_with_streak:
                 try:
@@ -874,17 +886,8 @@ class NotificationSchedulerV2:
                     today_date = date_type.fromisoformat(today_str)
                     days_inactive = (today_date - last_date).days
                     
-                    # Получаем настройки пользователя
-                    user_settings = await self.db.user_settings.find_one({"telegram_id": telegram_id})
-                    
-                    # Проверяем: не отправляли ли уже напоминание
-                    already_sent = await self.db.sent_notifications.find_one({
-                        "telegram_id": telegram_id,
-                        "type": f"inactivity_{days_inactive}d",
-                        "date": today_str
-                    })
-                    
-                    if already_sent:
+                    # Пропускаем активных пользователей
+                    if days_inactive <= 0:
                         continue
                     
                     message = None
@@ -892,27 +895,33 @@ class NotificationSchedulerV2:
                     
                     if days_inactive == 1 and streak >= 3:
                         # Стрик под угрозой
-                        shield_text = f"\n🛡 У тебя есть {freeze_shields} щит(ов) заморозки" if freeze_shields > 0 else ""
+                        if freeze_shields > 0:
+                            shield_text = f"\n🛡 У тебя есть {freeze_shields} щит заморозки — он сработает автоматически!"
+                        else:
+                            shield_text = ""
                         message = (
-                            f"🔥 <b>Эй! Твой стрик {streak} дней под угрозой!</b>\n"
-                            f"Зайди в приложение — сохрани свою серию{shield_text}"
+                            f"🔥 <b>Твой стрик {streak} дней под угрозой!</b>\n"
+                            f"Зайди в приложение сегодня — сохрани свою серию{shield_text}"
                         )
                         notif_type = "inactivity_1d"
                     
                     elif days_inactive == 2 and streak >= 3:
+                        # Если есть щит — он спасёт стрик при следующем визите
                         if freeze_shields > 0:
                             message = (
-                                f"🛡 <b>Щит заморозки спас твой стрик!</b>\n"
-                                f"Но осталось щитов: {freeze_shields - 1}. Зайди сегодня!"
+                                f"🛡 <b>Твой щит заморозки готов спасти стрик {streak} дней!</b>\n"
+                                f"Зайди сегодня — щит сработает автоматически.\n"
+                                f"Осталось щитов: {freeze_shields}"
                             )
                         else:
                             message = (
                                 f"😢 <b>Твой стрик {streak} дней сгорел...</b>\n"
-                                f"Но всё можно начать заново! Сегодня день 1 💪"
+                                f"Но всё можно начать заново! Зайди сегодня 💪"
                             )
                         notif_type = "inactivity_2d"
                     
                     elif days_inactive == 7:
+                        user_settings = await self.db.user_settings.find_one({"telegram_id": telegram_id})
                         first_name = ""
                         if user_settings:
                             first_name = user_settings.get("first_name", "")
@@ -924,6 +933,7 @@ class NotificationSchedulerV2:
                         notif_type = "inactivity_7d"
                     
                     elif days_inactive == 30:
+                        user_settings = await self.db.user_settings.find_one({"telegram_id": telegram_id})
                         first_name = ""
                         if user_settings:
                             first_name = user_settings.get("first_name", "")
@@ -945,19 +955,52 @@ class NotificationSchedulerV2:
                         notif_type = "inactivity_30d"
                     
                     if message and notif_type:
-                        try:
-                            success = await self.notification_service.send_message(telegram_id, message)
-                            if success:
-                                sent_count += 1
-                                # Сохраняем что отправили
-                                await self.db.sent_notifications.insert_one({
+                        # Атомарная дедупликация: upsert гарантирует что только один воркер
+                        # отправит уведомление, даже при нескольких процессах
+                        dedup_filter = {
+                            "telegram_id": telegram_id,
+                            "type": notif_type,
+                            "date": today_str
+                        }
+                        dedup_result = await self.db.sent_notifications.update_one(
+                            dedup_filter,
+                            {
+                                "$setOnInsert": {
                                     "telegram_id": telegram_id,
                                     "type": notif_type,
                                     "date": today_str,
-                                    "created_at": datetime.now(MOSCOW_TZ)
-                                })
-                        except Exception as send_err:
-                            logger.warning(f"Failed to send inactivity notification to {telegram_id}: {send_err}")
+                                    "created_at": datetime.now(MOSCOW_TZ),
+                                    "sent": False  # Помечаем как ещё не отправленное
+                                }
+                            },
+                            upsert=True
+                        )
+                        
+                        # Только если мы СОЗДАЛИ новую запись (upserted_id != None),
+                        # значит мы первый воркер — отправляем уведомление
+                        if dedup_result.upserted_id is not None:
+                            try:
+                                success = await self.notification_service.send_message(telegram_id, message)
+                                if success:
+                                    sent_count += 1
+                                    # Помечаем как успешно отправленное
+                                    await self.db.sent_notifications.update_one(
+                                        {"_id": dedup_result.upserted_id},
+                                        {"$set": {"sent": True}}
+                                    )
+                                else:
+                                    # Отправка не удалась — удаляем запись чтобы повторить позже
+                                    await self.db.sent_notifications.delete_one(
+                                        {"_id": dedup_result.upserted_id}
+                                    )
+                            except Exception as send_err:
+                                logger.warning(f"Failed to send inactivity notification to {telegram_id}: {send_err}")
+                                # Удаляем запись чтобы можно было повторить
+                                await self.db.sent_notifications.delete_one(
+                                    {"_id": dedup_result.upserted_id}
+                                )
+                        else:
+                            skipped_dedup += 1
                         
                         # Rate limiting
                         await asyncio.sleep(0.1)
@@ -966,7 +1009,7 @@ class NotificationSchedulerV2:
                     logger.warning(f"Error processing inactivity for user: {user_err}")
                     continue
             
-            logger.info(f"👻 Inactivity check complete: sent {sent_count} reminders")
+            logger.info(f"👻 Inactivity check complete: sent {sent_count} reminders, skipped (dedup) {skipped_dedup}")
             
         except Exception as e:
             logger.error(f"Error in inactivity checker: {e}", exc_info=True)

@@ -6,6 +6,10 @@ from datetime import datetime
 from typing import List, Optional
 from models import Achievement, UserAchievement, UserStats, NewAchievementsResponse
 import uuid
+import pytz
+
+# Московское время для единообразия со streak-механикой
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 # Определение всех достижений
 ACHIEVEMENTS = [
@@ -568,8 +572,8 @@ async def track_user_action(db, telegram_id: int, action_type: str, metadata: di
             update_data["$push"]["menu_items_visited"] = menu_item
     
     elif action_type == "daily_activity":
-        # Отслеживаем активность по дням
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        # Отслеживаем активность по дням (по московскому времени)
+        today = datetime.now(MOSCOW_TZ).strftime("%Y-%m-%d")
         if today not in stats.active_days:
             if "$push" not in update_data:
                 update_data["$push"] = {}
@@ -589,7 +593,7 @@ async def track_user_action(db, telegram_id: int, action_type: str, metadata: di
         was_on_time = metadata.get("on_time", False)  # Выполнена в срок?
         
         # БАГ-ФИХ: автосброс tasks_completed_today при смене дня
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = datetime.now(MOSCOW_TZ).strftime("%Y-%m-%d")
         last_reset = stats.last_daily_reset
         if last_reset != today:
             # Новый день — сбрасываем счётчик и ставим новый 1
@@ -640,6 +644,7 @@ async def track_user_action(db, telegram_id: int, action_type: str, metadata: di
             else:
                 # Пропущены дни - сброс серии
                 update_data["$set"]["task_streak_current"] = 1
+                update_data["$set"]["task_streak_days"] = max(stats.task_streak_days, stats.task_streak_current)
                 update_data["$set"]["last_task_completion_date"] = today
     
     elif action_type == "reset_daily_tasks":

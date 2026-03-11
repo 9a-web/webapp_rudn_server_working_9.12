@@ -2,6 +2,7 @@ import React from 'react';
 import { WeatherWidget } from './WeatherWidget';
 import { Trophy, TrendingUp, Calendar, Flame, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { pluralize } from '../utils/pluralize';
 
 export const DesktopSidebar = ({ 
   user,
@@ -42,8 +43,7 @@ export const DesktopSidebar = ({
               {streakData.visit_streak_current}
             </div>
             <div className="text-sm text-muted-foreground mt-1">
-              {streakData.visit_streak_current === 1 ? 'день' : 
-               streakData.visit_streak_current < 5 ? 'дня' : 'дней'} подряд
+              {pluralize(streakData.visit_streak_current, 'день', 'дня', 'дней')} подряд
             </div>
           </div>
           
@@ -69,7 +69,7 @@ export const DesktopSidebar = ({
           {streakData.freeze_shields > 0 && (
             <div className="flex items-center gap-2 text-sm text-blue-400 bg-blue-400/10 rounded-xl px-3 py-2">
               <Shield className="w-4 h-4" />
-              <span>{streakData.freeze_shields} щит{streakData.freeze_shields === 1 ? '' : streakData.freeze_shields < 5 ? 'а' : 'ов'}</span>
+              <span>{streakData.freeze_shields} {pluralize(streakData.freeze_shields, 'щит', 'щита', 'щитов')}</span>
             </div>
           )}
           
