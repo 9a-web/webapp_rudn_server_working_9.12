@@ -896,12 +896,12 @@ class NotificationSchedulerV2:
                     if days_inactive == 1 and streak >= 3:
                         # Стрик под угрозой
                         if freeze_shields > 0:
-                            shield_text = f"\n🛡 У тебя есть {freeze_shields} щит заморозки — он сработает автоматически!"
+                            shield_text = f'\n<tg-emoji emoji-id="5465154440287757794">🛡</tg-emoji> У тебя есть {freeze_shields} щит заморозки — он сработает автоматически!'
                         else:
-                            shield_text = ""
+                            shield_text = '\n<tg-emoji emoji-id="5465154440287757794">🛡</tg-emoji>'
                         message = (
-                            f"🔥 <b>Твой стрик {streak} дней под угрозой!</b>\n"
-                            f"Зайди в приложение сегодня — сохрани свою серию{shield_text}"
+                            f'<tg-emoji emoji-id="5976355994911905333">🔥</tg-emoji> <b>Твой стрик {streak} дней под угрозой!</b>\n'
+                            f'Зайди в приложение сегодня — сохрани свою серию{shield_text}'
                         )
                         notif_type = "inactivity_1d"
                     
@@ -915,8 +915,8 @@ class NotificationSchedulerV2:
                             )
                         else:
                             message = (
-                                f"😢 <b>Твой стрик {streak} дней сгорел...</b>\n"
-                                f"Но всё можно начать заново! Зайди сегодня 💪"
+                                f'<tg-emoji emoji-id="5391055925035415864">😢</tg-emoji> <b>Твой стрик {streak} дней сгорел...</b>\n'
+                                f'Но всё можно начать заново! Зайди сегодня <tg-emoji emoji-id="5427342093674630148">💪</tg-emoji>'
                             )
                         notif_type = "inactivity_2d"
                     
@@ -927,8 +927,8 @@ class NotificationSchedulerV2:
                             first_name = user_settings.get("first_name", "")
                         greeting = f", {first_name}" if first_name else ""
                         message = (
-                            f"🌟 <b>Привет{greeting}! Давно не виделись.</b>\n"
-                            f"Загляни — проверь расписание и задачи 📅"
+                            f'<tg-emoji emoji-id="5354903467318061957">🌟</tg-emoji> <b>Привет{greeting}! Давно не виделись.</b>\n'
+                            f'Загляни — проверь расписание и задачи <tg-emoji emoji-id="5316996360841474316">📅</tg-emoji>'
                         )
                         notif_type = "inactivity_7d"
                     
@@ -946,11 +946,11 @@ class NotificationSchedulerV2:
                             ]
                         })
                         
-                        friends_text = f"\nТвои {friends_count} друзей уже ждут 👋" if friends_count > 0 else ""
+                        friends_text = f'\nТвои {friends_count} друзей уже ждут <tg-emoji emoji-id="5343984088493599366">👋</tg-emoji>' if friends_count > 0 else ""
                         greeting = f", {first_name}" if first_name else ""
                         message = (
-                            f"❓ <b>Всё в порядке{greeting}?</b>\n"
-                            f"Ты не заходил уже месяц.{friends_text}"
+                            f'<tg-emoji emoji-id="5235711188481883685">❓</tg-emoji> <b>Всё в порядке{greeting}?</b>\n'
+                            f'Ты не заходил уже месяц.{friends_text}'
                         )
                         notif_type = "inactivity_30d"
                     
