@@ -379,8 +379,9 @@ const WeekTracker = ({ weekDays, show }) => {
      habitName     - string: название привычки (default "Здоровые привычки")
      weekDays      - array: данные недели (опционально)
      subtitle      - string: подзаголовок
-     freezeShields - number: количество щитов заморозки
+     freezeShields     - number: количество щитов заморозки
      maxStreak     - number: рекорд серии за всё время
+     isMilestone   - boolean: достигнут ли милестон (3,7,14,30...)
 ═══════════════════════════════════════════════ */
 export const StreakRewardModal = ({
   isOpen = false,
@@ -392,6 +393,7 @@ export const StreakRewardModal = ({
   subtitle = 'Ты на правильном пути',
   freezeShields = 0,
   maxStreak = 0,
+  isMilestone = false,
 }) => {
   const [showParticles, setShowParticles] = useState(false);
   const [claimed, setClaimed] = useState(false);
@@ -556,7 +558,7 @@ export const StreakRewardModal = ({
                       textAlign: 'center',
                     }}
                   >
-                    {subtitle}
+                    {isMilestone ? '🎉 Новое достижение!' : subtitle}
                   </motion.p>
 
                   {/* Тонкий разделитель */}

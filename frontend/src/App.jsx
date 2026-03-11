@@ -415,8 +415,8 @@ const Home = () => {
         if (result) {
           setStreakData(result);
           
-          // Показываем StreakRewardModal на милестонах (3, 7, 14, 30, 60, 100, 365)
-          if (result.milestone_reached && result.is_new_day && !result.streak_claimed_today) {
+          // Показываем StreakRewardModal каждый новый день при стрике >= 2
+          if (result.is_new_day && !result.streak_claimed_today && result.visit_streak_current >= 2) {
             // Задержка для красивого появления
             setTimeout(() => {
               setShowStreakModal(true);
@@ -2283,6 +2283,7 @@ const Home = () => {
           weekDays={streakData?.week_days || []}
           freezeShields={streakData?.freeze_shields || 0}
           maxStreak={streakData?.visit_streak_max || 0}
+          isMilestone={!!streakData?.milestone_reached}
         />
         
         {/* Swipe hint - показывается один раз, скрывается через 10 секунд или при первом свайпе */}
