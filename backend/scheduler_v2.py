@@ -105,24 +105,23 @@ class NotificationSchedulerV2:
         )
         
         # === INACTIVITY CHECKER (Авто-напоминания о возвращении) ===
-        # Проверка неактивных пользователей 1 раз в день в 10:00 по МСК
-        # (не ночью, чтобы не будить пользователей)
-        self.scheduler.add_job(
-            self.check_inactive_users,
-            trigger=CronTrigger(hour=10, minute=0, timezone=MOSCOW_TZ),
-            id='inactivity_checker',
-            name='Check inactive users and send reminders (daily)',
-            replace_existing=True
-        )
+        # ВРЕМЕННО ОТКЛЮЧЕНО
+        # self.scheduler.add_job(
+        #     self.check_inactive_users,
+        #     trigger=CronTrigger(hour=10, minute=0, timezone=MOSCOW_TZ),
+        #     id='inactivity_checker',
+        #     name='Check inactive users and send reminders (daily)',
+        #     replace_existing=True
+        # )
         
-        # Сброс streak_claimed_today в полночь
-        self.scheduler.add_job(
-            self.reset_streak_claimed,
-            trigger=CronTrigger(hour=0, minute=5, timezone=MOSCOW_TZ),
-            id='reset_streak_claimed',
-            name='Reset streak claimed today flag',
-            replace_existing=True
-        )
+        # Сброс streak_claimed_today в полночь — ВРЕМЕННО ОТКЛЮЧЕНО
+        # self.scheduler.add_job(
+        #     self.reset_streak_claimed,
+        #     trigger=CronTrigger(hour=0, minute=5, timezone=MOSCOW_TZ),
+        #     id='reset_streak_claimed',
+        #     name='Reset streak claimed today flag',
+        #     replace_existing=True
+        # )
         
         self.scheduler.start()
         logger.info("✅ Notification Scheduler V2 started successfully")

@@ -402,38 +402,38 @@ const Home = () => {
     };
   }, [isReady, user?.id, syncedUser?.id, activeTab]);
 
-  // 🔥 Стрик-механика: записать визит при открытии приложения
-  useEffect(() => {
-    const recordStreak = async () => {
-      const currentUser = syncedUser || user;
-      if (!currentUser?.id || streakProcessedRef.current) return;
-      
-      streakProcessedRef.current = true;
-      
-      try {
-        const result = await streakAPI.recordVisit(currentUser.id);
-        if (result) {
-          setStreakData(result);
-          
-          // Показываем StreakRewardModal каждый новый день при стрике >= 1
-          if (result.is_new_day && !result.streak_claimed_today && result.visit_streak_current >= 1) {
-            // Задержка для красивого появления
-            setTimeout(() => {
-              setShowStreakModal(true);
-            }, 2000);
-          }
-        }
-      } catch (err) {
-        // Сбрасываем флаг чтобы можно было повторить при следующем рендере
-        streakProcessedRef.current = false;
-        console.debug('Streak record error:', err);
-      }
-    };
-    
-    if (isReady && (user || syncedUser)) {
-      recordStreak();
-    }
-  }, [isReady, user?.id, syncedUser?.id]);
+  // 🔥 Стрик-механика: ВРЕМЕННО ОТКЛЮЧЕНО
+  // useEffect(() => {
+  //   const recordStreak = async () => {
+  //     const currentUser = syncedUser || user;
+  //     if (!currentUser?.id || streakProcessedRef.current) return;
+  //     
+  //     streakProcessedRef.current = true;
+  //     
+  //     try {
+  //       const result = await streakAPI.recordVisit(currentUser.id);
+  //       if (result) {
+  //         setStreakData(result);
+  //         
+  //         // Показываем StreakRewardModal каждый новый день при стрике >= 1
+  //         if (result.is_new_day && !result.streak_claimed_today && result.visit_streak_current >= 1) {
+  //           // Задержка для красивого появления
+  //           setTimeout(() => {
+  //             setShowStreakModal(true);
+  //           }, 2000);
+  //         }
+  //       }
+  //     } catch (err) {
+  //       // Сбрасываем флаг чтобы можно было повторить при следующем рендере
+  //       streakProcessedRef.current = false;
+  //       console.debug('Streak record error:', err);
+  //     }
+  //   };
+  //   
+  //   if (isReady && (user || syncedUser)) {
+  //     recordStreak();
+  //   }
+  // }, [isReady, user?.id, syncedUser?.id]);
 
   // Загрузка данных пользователя при монтировании
   // Сравниваем по ID вместо ссылки на объект, чтобы избежать лишних перезагрузок
