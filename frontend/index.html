@@ -25,13 +25,33 @@
         <!-- Telegram WebApp SDK -->
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         
+        <!-- 🔇 Подавление console для пользователей (dev.* команды используют __console) -->
+        <script>
+          (function() {
+            if (typeof window === 'undefined') return;
+            // Сохраняем оригинальные методы
+            window.__console = {
+              log: console.log.bind(console),
+              debug: console.debug.bind(console),
+              warn: console.warn.bind(console),
+              info: console.info.bind(console),
+              error: console.error.bind(console),
+            };
+            // Подавляем все кроме error
+            var noop = function() {};
+            console.log = noop;
+            console.debug = noop;
+            console.warn = noop;
+            console.info = noop;
+            // console.error остаётся — ошибки важны
+          })();
+        </script>
+
         <!-- 🛑 Блокируем Vite HMR full-reload в Telegram WebView -->
         <script>
           (function() {
-            // Перехватываем событие vite:beforeFullReload чтобы предотвратить перезагрузку
             if (typeof window !== 'undefined') {
               window.addEventListener('vite:beforeFullReload', function(e) {
-                console.log('🛑 Заблокирован vite:beforeFullReload');
                 e.preventDefault();
               });
             }
@@ -81,35 +101,17 @@
         <!-- 🛠 Dev Console -->
         <script>
         (function() {
-          // Определяем API_BASE из .env через meta-tag или fallback
-          function getApiBase() {
-            // Vite inject: import.meta.env не доступен тут, берём из window
-            // Используем тот же REACT_APP_BACKEND_URL что и фронтенд
-            var scripts = document.querySelectorAll('script[src*="index.jsx"]');
-            // Fallback - берём из текущего origin или из localStorage
-            try {
-              var saved = localStorage.getItem('dev_api_base');
-              if (saved) return saved;
-            } catch(e) {}
-            return '';
-          }
-
+          var C = window.__console || console;
           var _apiBase = '';
           var _getUser = function() {
-            try {
-              var saved = localStorage.getItem('telegram_user');
-              if (saved) return JSON.parse(saved);
-            } catch(e) {}
+            try { var s = localStorage.getItem('telegram_user'); if (s) return JSON.parse(s); } catch(e) {}
             return null;
           };
           var _setShowStreakModal = null;
           var _setStreakData = null;
 
           function api(method, path, body) {
-            if (!_apiBase) {
-              console.error('❌ API не настроен. Вызовите dev.setApi("https://your-backend.com")');
-              return Promise.reject('API not configured');
-            }
+            if (!_apiBase) { C.error('❌ API не настроен. Вызовите dev.setApi("https://...")'); return Promise.reject('no api'); }
             var url = _apiBase + '/api' + (path.charAt(0) === '/' ? path : '/' + path);
             var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
@@ -118,15 +120,15 @@
 
           function uid() {
             var u = _getUser();
-            if (!u || !u.id) { console.error('❌ Пользователь не найден.'); return null; }
+            if (!u || !u.id) { C.error('❌ Пользователь не найден.'); return null; }
             return u.id;
           }
 
-          function log(e, m, d) { d !== undefined ? console.log(e + ' ' + m, d) : console.log(e + ' ' + m); }
+          function log(e, m, d) { d !== undefined ? C.log(e + ' ' + m, d) : C.log(e + ' ' + m); }
 
           window.dev = {
             help: function() {
-              console.log(
+              C.log(
                 '%c🛠 Dev Console%c\n\n' +
                 'dev.setApi(url)                    — задать backend URL\n' +
                 'dev.getUser()                      — текущий пользователь\n' +
@@ -143,88 +145,94 @@
                 'dev.hideStreakModal()              — скрыть модалку\n' +
                 'dev.recordVisit()                  — записать визит\n\n' +
                 'dev.clearUserData()                — удалить данные юзера\n' +
-                'dev.apiCall("GET", "/admin/stats") — произвольный вызов',
+                'dev.apiCall("GET", "/admin/stats") — произвольный вызов\n\n' +
+                'dev.enableLogs()                   — включить все console.log\n' +
+                'dev.disableLogs()                  — выключить обратно',
                 'font-size:14px;font-weight:bold;color:#F7D060', ''
               );
+            },
+
+            enableLogs: function() {
+              console.log = C.log; console.debug = C.debug; console.warn = C.warn; console.info = C.info;
+              C.log('✅ Логи включены');
+            },
+
+            disableLogs: function() {
+              var noop = function(){};
+              console.log = noop; console.debug = noop; console.warn = noop; console.info = noop;
+              C.log('🔇 Логи выключены');
             },
 
             setApi: function(url) {
               _apiBase = url.replace(/\/+$/, '');
               try { localStorage.setItem('dev_api_base', _apiBase); } catch(e) {}
-              log('✅', 'API установлен: ' + _apiBase);
+              log('✅', 'API: ' + _apiBase);
             },
 
-            getUser: function() {
-              var u = _getUser();
-              log('👤', 'Пользователь:', u);
-              return u;
-            },
+            getUser: function() { var u = _getUser(); log('👤', 'Пользователь:', u); return u; },
 
             getUserSettings: function() {
               var id = uid(); if (!id) return;
-              return api('GET', '/user-settings/' + id).then(function(d) { log('⚙️', 'Настройки:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('GET', '/user-settings/' + id).then(function(d) { log('⚙️', 'Настройки:', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             createUser: function(telegramId, firstName) {
               return api('POST', '/user-settings', {
                 telegram_id: telegramId, first_name: firstName || 'Тест', last_name: 'Dev', username: 'dev_user_' + telegramId
-              }).then(function(d) { log('✅', 'Пользователь создан:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              }).then(function(d) { log('✅', 'Создан:', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             createFriend: function(targetId) {
               var myId = uid(); if (!myId) return;
-              if (!targetId) { console.error('❌ Укажите targetId: dev.createFriend(222222)'); return; }
-              // Создаём target → отправляем запрос → принимаем
+              if (!targetId) { C.error('❌ dev.createFriend(222222)'); return; }
               return api('POST', '/user-settings', {
                 telegram_id: targetId, first_name: 'Друг_' + targetId, last_name: 'Тестовый', username: 'friend_' + targetId
               }).catch(function(){}).then(function() {
-                log('📨', 'Отправляем запрос ' + myId + ' → ' + targetId + '...');
+                log('📨', myId + ' → ' + targetId);
                 return api('POST', '/friends/request/' + targetId, { telegram_id: myId });
               }).then(function(r) {
-                log('📨', 'Запрос:', r);
                 if (r && r.request_id) {
-                  log('✅', 'Принимаем запрос...');
                   return api('POST', '/friends/accept/' + r.request_id, { telegram_id: targetId });
                 }
                 return r;
-              }).then(function(r) { log('🤝', 'Друг добавлен!', r); return r; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              }).then(function(r) { log('🤝', 'Друг добавлен!', r); return r; }).catch(function(e) { log('❌', '', e); });
             },
 
             listFriends: function() {
               var id = uid(); if (!id) return;
-              return api('GET', '/friends/' + id).then(function(d) { log('👥', 'Друзья (' + (d.friends ? d.friends.length : 0) + '):', d.friends); return d.friends; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('GET', '/friends/' + id).then(function(d) { log('👥', '(' + (d.friends ? d.friends.length : 0) + '):', d.friends); return d.friends; }).catch(function(e) { log('❌', '', e); });
             },
 
             removeFriend: function(targetId) {
               var id = uid(); if (!id) return;
-              return fetch(_apiBase + '/api/friends/' + targetId, { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({telegram_id: id}) })
-                .then(function(r){return r.json();}).then(function(d) { log('🗑', 'Удалён:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return fetch(_apiBase + '/api/friends/' + targetId, { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({telegram_id:id}) })
+                .then(function(r){return r.json();}).then(function(d) { log('🗑', 'Удалён:', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             sendFriendRequest: function(targetId) {
               var id = uid(); if (!id) return;
-              return api('POST', '/friends/request/' + targetId, { telegram_id: id }).then(function(d) { log('📨', 'Запрос:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('POST', '/friends/request/' + targetId, { telegram_id: id }).then(function(d) { log('📨', '', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             listRequests: function() {
               var id = uid(); if (!id) return;
-              return api('GET', '/friends/' + id + '/requests').then(function(d) { log('📬', 'Запросы:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('GET', '/friends/' + id + '/requests').then(function(d) { log('📬', '', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             addTask: function(text, opts) {
               var id = uid(); if (!id) return;
               var body = Object.assign({ telegram_id: id, text: text || 'Тестовая задача' }, opts || {});
-              return api('POST', '/tasks', body).then(function(d) { log('✅', 'Задача:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('POST', '/tasks', body).then(function(d) { log('✅', 'Задача:', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             listTasks: function() {
               var id = uid(); if (!id) return;
-              return api('GET', '/tasks/' + id).then(function(d) { log('📋', 'Задачи (' + d.length + '):', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('GET', '/tasks/' + id).then(function(d) { log('📋', '(' + d.length + '):', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             deleteTask: function(taskId) {
-              if (!taskId) { console.error('❌ Укажите taskId'); return; }
-              return fetch(_apiBase + '/api/tasks/' + taskId, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d) { log('🗑', 'Удалена:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              if (!taskId) { C.error('❌ dev.deleteTask("id")'); return; }
+              return fetch(_apiBase + '/api/tasks/' + taskId, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d) { log('🗑', '', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             showStreakModal: function() {
@@ -239,29 +247,28 @@
                 _setShowStreakModal(true);
                 log('🔥', 'Модалка показана');
               } else {
-                log('⚠️', 'Пройдите Welcome Screen для привязки React');
+                log('⚠️', 'Пройдите Welcome Screen');
               }
             },
 
             hideStreakModal: function() {
-              if (_setShowStreakModal) { _setShowStreakModal(false); log('🔥', 'Модалка скрыта'); }
+              if (_setShowStreakModal) { _setShowStreakModal(false); log('🔥', 'Скрыта'); }
             },
 
             recordVisit: function() {
               var id = uid(); if (!id) return;
-              return api('POST', '/users/' + id + '/visit').then(function(d) { log('🔥', 'Визит:', d); if (_setStreakData) _setStreakData(d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api('POST', '/users/' + id + '/visit').then(function(d) { log('🔥', 'Визит:', d); if (_setStreakData) _setStreakData(d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             clearUserData: function() {
               var id = uid(); if (!id) return;
-              return fetch(_apiBase + '/api/user-settings/' + id, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d) { log('🗑', 'Удалено:', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return fetch(_apiBase + '/api/user-settings/' + id, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d) { log('🗑', '', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
             apiCall: function(method, path, body) {
-              return api(method || 'GET', path || '/', body).then(function(d) { log('📡', (method||'GET') + ' ' + path + ':', d); return d; }).catch(function(e) { log('❌', 'Ошибка:', e); });
+              return api(method || 'GET', path || '/', body).then(function(d) { log('📡', (method||'GET') + ' ' + path + ':', d); return d; }).catch(function(e) { log('❌', '', e); });
             },
 
-            // Внутренний метод — вызывается из App.jsx
             _bind: function(refs) {
               if (refs.getUser) _getUser = refs.getUser;
               if (refs.setShowStreakModal) _setShowStreakModal = refs.setShowStreakModal;
@@ -270,17 +277,7 @@
             }
           };
 
-          // Авто-восстановление API из localStorage
-          try {
-            var saved = localStorage.getItem('dev_api_base');
-            if (saved) _apiBase = saved;
-          } catch(e) {}
-
-          console.log(
-            '%c🛠 Dev Console активна %c— введите dev.help()',
-            'background:#1C1C1E;color:#F7D060;padding:4px 8px;border-radius:4px;font-weight:bold',
-            'color:#8E8E93'
-          );
+          try { var s = localStorage.getItem('dev_api_base'); if (s) _apiBase = s; } catch(e) {}
         })();
         </script>
         <script>
