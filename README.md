@@ -1,8 +1,8 @@
-# RUDN Schedule - Telegram Web App
+# RUDN Schedule — Telegram Web App
 
 ## 📱 О проекте
 
-**RUDN Schedule** — Telegram Web App для студентов РУДН, объединяющий расписание пар, задачи, журнал посещений, VK Music и социальные функции в одном приложении.
+**RUDN Schedule** — Telegram Web App для студентов РУДН, объединяющий расписание пар, задачи, журнал посещений, VK Music, систему сообщений и социальные функции в одном приложении.
 
 ### 🌟 Основные возможности
 
@@ -10,15 +10,20 @@
 - **✅ Задачи** — личные и групповые задачи с категориями, приоритетами, дедлайнами и подзадачами
 - **🎯 Планировщик** — синхронизация событий с расписанием, timeline визуализация
 - **📓 Журнал посещений** — для преподавателей: учёт студентов, занятий, статистика
-- **🎵 VK Music** — авторизация VK, стриминг треков, плейлисты, комнаты совместного прослушивания
+- **🎵 VK Music** — авторизация VK (логин + OAuth), стриминг треков, плейлисты, комнаты совместного прослушивания
 - **👥 Друзья** — социальная система с запросами, блокировками, QR-кодами
+- **💬 Сообщения** — чаты между друзьями с реакциями, пересылкой, отправкой музыки и расписания
+- **📤 Совместное расписание** — шаринг и наложение расписаний с друзьями
 - **🏆 Достижения** — 24 ачивки с геймификацией и конфетти
+- **🔥 Streak-система** — ежедневные серии посещений с наградами
 - **🔔 Уведомления V2** — точные уведомления о парах (±10 сек)
 - **📊 Аналитика** — статистика расписания, графики нагрузки
 - **🌤 Погода** — виджет погоды в Москве
-- **🔗 Реферальная система** — 3-уровневая система приглашений
+- **🔗 Реферальная система** — 3-уровневая система приглашений + админ-ссылки
 - **📱 Web Sessions** — авторизация на других устройствах через QR-код
 - **🔒 Приватность** — настройки видимости профиля
+- **🖥 Desktop Sidebar** — адаптивный интерфейс для десктопа
+- **🛡 Админ-панель** — расширенная панель с мониторингом, рассылками и статистикой
 
 ---
 
@@ -27,11 +32,14 @@
 ### Backend
 - **FastAPI** 0.110.1 — веб-фреймворк
 - **Python** 3.10+ — язык
-- **MongoDB** — база данных (pymongo 4.5.0)
+- **MongoDB** — база данных (pymongo 4.5.0, motor 3.3.1)
 - **APScheduler** — планировщик задач
 - **python-telegram-bot** 20.7+ — Telegram Bot API
 - **vkpymusic** — VK Music API
 - **BeautifulSoup** — парсинг HTML
+- **Pydantic** v2.6+ — валидация данных (230 моделей)
+- **httpx** — async HTTP клиент
+- **psutil** — мониторинг системы
 
 ### Frontend
 - **React** 19.0.0 — UI библиотека
@@ -42,6 +50,8 @@
 - **axios** — HTTP клиент
 - **i18next** — локализация (RU/EN)
 - **recharts** — графики
+- **html-to-image** — скриншоты для шаринга
+- **react-router-dom** — маршрутизация
 
 ### Infrastructure
 - **Kubernetes** — оркестрация
@@ -54,11 +64,14 @@
 
 | Метрика | Значение |
 |---------|----------|
-| Backend Python файлов | **24** |
-| Backend LOC | **~25,000** |
-| Frontend компонентов | **105** |
-| API endpoints | **200** |
-| MongoDB коллекций | **33** |
+| Backend Python файлов | **15** |
+| Backend LOC | **~26,300** |
+| Pydantic моделей | **230** |
+| Frontend компонентов | **109** |
+| Frontend LOC | **~64,000** |
+| API endpoints | **268** |
+| MongoDB коллекций | **46** |
+| Services (API клиенты) | **11** |
 | Языков (i18n) | 2 |
 
 ---
@@ -110,14 +123,15 @@ yarn add PACKAGE_NAME
 
 ```
 /app/
-├── backend/                    # FastAPI backend
-│   ├── server.py              # Главный сервер (200 endpoints)
-│   ├── models.py              # Pydantic схемы
-│   ├── achievements.py        # Система достижений
+├── backend/                    # FastAPI backend (~26,300 LOC)
+│   ├── server.py              # Главный сервер (268 endpoints)
+│   ├── models.py              # Pydantic схемы (230 моделей)
+│   ├── achievements.py        # Система достижений (24 ачивки)
 │   ├── scheduler_v2.py        # Уведомления V2
 │   ├── telegram_bot.py        # Telegram bot
 │   ├── music_service.py       # VK Music сервис
-│   ├── vk_auth_service.py     # VK авторизация
+│   ├── vk_auth_service.py     # VK авторизация + OAuth
+│   ├── cover_service.py       # Обложки треков
 │   ├── rudn_parser.py         # Парсер API РУДН
 │   ├── lk_parser.py           # Парсер ЛК РУДН
 │   ├── weather.py             # Погода
@@ -126,19 +140,20 @@ yarn add PACKAGE_NAME
 │   ├── config.py              # Конфигурация
 │   └── requirements.txt       # Python зависимости
 │
-├── frontend/                   # React frontend
+├── frontend/                   # React frontend (~64,000 LOC)
 │   ├── src/
-│   │   ├── App.jsx            # Главный компонент
-│   │   ├── components/        # 72 основных компонента
-│   │   │   ├── journal/       # 15 компонентов журнала
-│   │   │   └── music/         # 12 компонентов музыки
-│   │   ├── services/          # 10 API клиентов
+│   │   ├── App.jsx            # Главный компонент (2,600 LOC)
+│   │   ├── components/        # 109 компонентов
+│   │   │   ├── journal/       # 17 компонентов журнала
+│   │   │   ├── music/         # 13 компонентов музыки
+│   │   │   └── icons/         # Иконки
+│   │   ├── services/          # 11 API клиентов
 │   │   ├── contexts/          # React контексты
-│   │   ├── utils/             # 8 утилит
-│   │   ├── hooks/             # Кастомные хуки
-│   │   ├── i18n/              # Локализация
+│   │   ├── utils/             # 10 утилит
+│   │   ├── hooks/             # 3 кастомных хука
+│   │   ├── i18n/              # Локализация (RU/EN)
 │   │   └── constants/         # Константы
-│   ├── package.json           # npm зависимости
+│   ├── package.json           # Зависимости
 │   └── vite.config.js         # Конфигурация Vite
 │
 ├── AI_CONTEXT.md              # Контекст для ИИ (быстрый обзор)
@@ -164,16 +179,29 @@ ENV="test"  # или "production"
 TELEGRAM_BOT_TOKEN=...
 TEST_TELEGRAM_BOT_TOKEN=...
 
+# VK Music
+VK_MUSIC_TOKEN=...
+VK_USER_ID=...
+
+# VK OAuth
+VK_APP_ID=...
+VK_CLIENT_SECRET=...
+VK_REDIRECT_URI=...
+
+# Безопасность
+DB_CLEAR_PASSWORD=...
+LK_ENCRYPTION_KEY=...
+
 # API ключи
 WEATHER_API_KEY=...
-VK_SERVICE_TOKEN=...  # опционально
 ```
 
 **Frontend (.env):**
 ```env
 VITE_ENABLE_VISUAL_EDITS=false
 ENABLE_HEALTH_CHECK=false
-# REACT_APP_BACKEND_URL определяется автоматически
+REACT_APP_BACKEND_URL=...  # Определяется автоматически
+VITE_ENV=test
 ```
 
 ### Порты
@@ -194,6 +222,8 @@ ENABLE_HEALTH_CHECK=false
 | [VK_MUSIC_INTEGRATION_PLAN.md](/app/VK_MUSIC_INTEGRATION_PLAN.md) | VK Music интеграция |
 | [ROOMS_DOCUMENTATION_INDEX.md](/app/ROOMS_DOCUMENTATION_INDEX.md) | Документация комнат |
 | [BACKUP_GUIDE.md](/app/BACKUP_GUIDE.md) | Руководство по бэкапам |
+| [TASKS_FEATURES.md](/app/TASKS_FEATURES.md) | Описание задач |
+| [TASKS_ROADMAP.md](/app/TASKS_ROADMAP.md) | Дорожная карта |
 
 ---
 
@@ -239,34 +269,47 @@ grep -c "@api_router\." /app/backend/server.py
 # MongoDB коллекции
 grep -oP 'db\.\K[a-zA-Z_]+' /app/backend/server.py | sort -u
 
+# Pydantic модели
+grep -c "^class " /app/backend/models.py
+
 # Компоненты frontend
-ls /app/frontend/src/components/
+find /app/frontend/src/components -name "*.jsx" | wc -l
+
+# Services
+ls /app/frontend/src/services/
 ```
 
 ---
 
-## 📦 Новые функции (2025)
+## 📦 Модули и API endpoints
 
-### Web Sessions (QR-авторизация)
-Авторизация на других устройствах через QR-код:
-- `POST /api/web-sessions` - создать сессию
-- `GET /api/web-sessions/{token}/status` - статус сессии
-- `POST /api/web-sessions/{token}/link` - привязать устройство
-- `GET /api/web-sessions/user/{id}/devices` - список устройств
+### По количеству endpoints
 
-### Privacy Settings
-Настройки приватности профиля:
-- `GET /api/profile/{id}/privacy` - получить настройки
-- `PUT /api/profile/{id}/privacy` - обновить настройки
-- Поля: `show_online_status`, `show_in_search`, `show_friends_list`, `show_achievements`, `show_schedule`
-
-### Listening Rooms
-Комнаты совместного прослушивания музыки:
-- `POST /api/music/rooms` - создать комнату
-- `GET /api/music/rooms/{id}` - информация о комнате
-- `POST /api/music/rooms/join/{code}` - присоединиться
-- `POST /api/music/rooms/{id}/sync` - синхронизация воспроизведения
+| Модуль | Endpoints | Описание |
+|--------|-----------|----------|
+| Журнал посещений | **37** | Управление журналами, студентами, предметами, занятиями |
+| VK Music | **35** | Поиск, стриминг, плейлисты, комнаты прослушивания, OAuth |
+| Админ-панель | **31** | Статистика, мониторинг, рефералы, рассылки |
+| Групповые задачи | **19** | CRUD, подзадачи, комментарии, приглашения |
+| Сообщения | **18** | Чаты, реакции, пересылка, типинг |
+| Комнаты | **17** | CRUD, приглашения, участники, роли |
+| Друзья | **15** | Запросы, блокировки, поиск, QR |
+| Пользователи | **11** | Настройки, тема, уведомления |
+| Уведомления | **11** | CRUD, настройки |
+| Личные задачи | **10** | CRUD, подзадачи, продуктивность |
+| Web Sessions | **10** | QR-авторизация |
+| Совместное расписание | **9** | Шаринг, участники, токены |
+| Другое | **9** | Погода, YouTube, VK Video, бот |
+| Реферальная система | **7** | Коды, статистика, дерево |
+| Планировщик | **5** | Синхронизация, события |
+| Профиль | **5** | QR, расписание, приватность |
+| Достижения | **5** | Список, трекинг |
+| Расписание РУДН | **4** | Факультеты, фильтры, расписание |
+| ЛК РУДН | **4** | Подключение, данные |
+| Бэкапы | **3** | Экспорт |
+| **ИТОГО** | **268** | |
 
 ---
 
-**Последнее обновление:** 2025-07-16
+**Последнее обновление:** 2025-07-17  
+**Метод обновления:** Автоматический аудит кода (grep, wc, find)
