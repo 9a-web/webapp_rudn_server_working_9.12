@@ -331,7 +331,7 @@ export const AttendanceModal = ({
                           <input
                             ref={customInputRef}
                             type="number"
-                            inputMode="numeric"
+                            inputMode="decimal"
                             value={customGradeInput[student.student_id] || ''}
                             onChange={e => setCustomGradeInput(prev => ({ ...prev, [student.student_id]: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') confirmCustomGrade(student.student_id); }}
