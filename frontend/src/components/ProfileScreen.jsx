@@ -48,7 +48,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               stiffness: 260,
               delay: 0.08,
             }}
-            style={{ marginTop: '87px' }}
+            style={{ marginTop: '67px' }}
           >
             <div
               className="overflow-hidden relative"
