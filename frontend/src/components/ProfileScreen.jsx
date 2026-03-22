@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Trophy } from 'lucide-react';
+import { ChevronLeft, Trophy } from 'lucide-react';
 
 const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -34,7 +34,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
             }}
           >
-            <ArrowLeft className="w-6 h-6 text-white/70" />
+            <ChevronLeft className="w-6 h-6 text-white/70" />
           </motion.button>
 
           {/* Аватар — 87px от верха */}
