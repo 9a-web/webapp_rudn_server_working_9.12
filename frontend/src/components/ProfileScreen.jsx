@@ -90,8 +90,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.25 }}
-            className="flex items-center gap-2"
-            style={{ marginTop: '12px' }}
+            className="flex items-center"
+            style={{ marginTop: '12px', gap: '16px' }}
           >
             {/* Online/Offline */}
             <div
