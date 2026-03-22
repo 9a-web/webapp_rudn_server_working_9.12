@@ -327,6 +327,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 height: '257px',
                 background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.15) 100%)',
                 pointerEvents: 'none',
+                zIndex: 0,
               }}
             />
             {/* Сам прямоугольник */}
@@ -336,6 +337,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 height: '430px',
                 borderRadius: '32px 32px 0 0',
                 background: 'linear-gradient(180deg, #1E1D1A 0%, #1C1C1C 100%)',
+                position: 'relative',
+                zIndex: 1,
               }}
             />
           </motion.div>
