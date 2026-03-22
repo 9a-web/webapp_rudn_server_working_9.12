@@ -180,7 +180,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               {userSettings.group_name}
             </motion.div>
           )}
-          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
