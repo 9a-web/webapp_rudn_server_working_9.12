@@ -17,7 +17,7 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
+          className="fixed inset-0 z-[200] flex flex-col items-center"
           style={{ backgroundColor: '#000000' }}
         >
           {/* Кнопка назад */}
@@ -37,7 +37,7 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
             <ArrowLeft className="w-6 h-6 text-white/70" />
           </motion.button>
 
-          {/* Аватар по центру */}
+          {/* Аватар — 87px от верха */}
           <motion.div
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -48,11 +48,14 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
               stiffness: 260,
               delay: 0.08,
             }}
-            className="relative"
+            style={{ marginTop: '87px' }}
           >
             <div
-              className="w-28 h-28 rounded-full overflow-hidden relative"
+              className="overflow-hidden relative"
               style={{
+                width: '110px',
+                height: '110px',
+                borderRadius: '38px',
                 border: '3px solid rgba(255, 255, 255, 0.12)',
                 boxShadow: '0 0 60px rgba(255, 255, 255, 0.06)',
               }}
