@@ -196,44 +196,73 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </motion.div>
           )}
 
-          {/* Количество друзей */}
+          {/* Друзья и $RDN */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.3 }}
-            className="flex flex-col items-center"
-            style={{ marginTop: '24px' }}
+            className="flex items-start justify-center"
+            style={{ marginTop: '24px', gap: '40px' }}
           >
-            <span
-              style={{
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: '28px',
-                color: '#FFBE4E',
-                lineHeight: 1.2,
-              }}
-            >
-              {user.friends_count || 0}
-            </span>
-            <span
-              style={{
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 500,
-                fontSize: '16px',
-                color: '#FFFFFF',
-                marginTop: '2px',
-              }}
-            >
-              {(() => {
-                const n = user.friends_count || 0;
-                const mod10 = n % 10;
-                const mod100 = n % 100;
-                if (mod100 >= 11 && mod100 <= 19) return 'Друзей';
-                if (mod10 === 1) return 'Друг';
-                if (mod10 >= 2 && mod10 <= 4) return 'Друга';
-                return 'Друзей';
-              })()}
-            </span>
+            {/* Количество друзей */}
+            <div className="flex flex-col items-center">
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '28px',
+                  color: '#FFBE4E',
+                  lineHeight: 1.2,
+                }}
+              >
+                {user.friends_count || 0}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '16px',
+                  color: '#FFFFFF',
+                  marginTop: '2px',
+                }}
+              >
+                {(() => {
+                  const n = user.friends_count || 0;
+                  const mod10 = n % 10;
+                  const mod100 = n % 100;
+                  if (mod100 >= 11 && mod100 <= 19) return 'Друзей';
+                  if (mod10 === 1) return 'Друг';
+                  if (mod10 >= 2 && mod10 <= 4) return 'Друга';
+                  return 'Друзей';
+                })()}
+              </span>
+            </div>
+
+            {/* $RDN */}
+            <div className="flex flex-col items-center">
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '28px',
+                  color: '#FFBE4E',
+                  lineHeight: 1.2,
+                }}
+              >
+                {user.rdn_balance || 0}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '16px',
+                  color: '#FFFFFF',
+                  marginTop: '2px',
+                }}
+              >
+                $RDN
+              </span>
+            </div>
           </motion.div>
         </motion.div>
       )}
