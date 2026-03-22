@@ -85,38 +85,63 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
             </div>
           </motion.div>
 
-          {/* Online/Offline бейдж */}
+          {/* Online/Offline и Level бейджи */}
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.25 }}
             className="flex items-center gap-2"
-            style={{
-              marginTop: '12px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-            }}
+            style={{ marginTop: '12px' }}
           >
+            {/* Online/Offline */}
             <div
+              className="flex items-center gap-2"
               style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: user.is_online ? '#4ADE80' : '#EF4444',
-                boxShadow: user.is_online ? '0 0 6px rgba(74, 222, 128, 0.5)' : '0 0 6px rgba(239, 68, 68, 0.5)',
-              }}
-            />
-            <span
-              style={{
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 500,
-                fontSize: '14px',
-                color: '#FFFFFF',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
               }}
             >
-              {user.is_online ? 'Online' : 'Offline'}
-            </span>
+              <div
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: user.is_online ? '#4ADE80' : '#EF4444',
+                  boxShadow: user.is_online ? '0 0 6px rgba(74, 222, 128, 0.5)' : '0 0 6px rgba(239, 68, 68, 0.5)',
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  color: '#FFFFFF',
+                }}
+              >
+                {user.is_online ? 'Online' : 'Offline'}
+              </span>
+            </div>
+
+            {/* Level */}
+            <div
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                backgroundColor: '#F7B84B',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  color: '#1c1c1c',
+                }}
+              >
+                LV. {user.level || 74}
+              </span>
+            </div>
           </motion.div>
 
           {/* Юзернейм или имя */}
