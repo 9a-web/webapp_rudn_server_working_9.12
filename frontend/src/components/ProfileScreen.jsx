@@ -53,8 +53,8 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
             <div
               className="overflow-hidden relative"
               style={{
-                width: '110px',
-                height: '110px',
+                width: '140px',
+                height: '140px',
                 borderRadius: '38px',
                 border: '3px solid rgba(255, 255, 255, 0.12)',
                 boxShadow: '0 0 60px rgba(255, 255, 255, 0.06)',
@@ -94,7 +94,7 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
               marginTop: '16px',
               fontFamily: "'Proxima Nova ExCn', sans-serif",
               fontWeight: 800,
-              fontSize: '39px',
+              fontSize: '48px',
               color: '#FFFFFF',
               textAlign: 'center',
               lineHeight: 1.1,
