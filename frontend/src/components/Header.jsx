@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { headerItemVariants } from '../utils/animations';
 import { MenuModal } from './MenuModal';
-import { ProfileModal } from './ProfileModal';
+import ProfileScreen from './ProfileScreen';
 import { rainbowConfetti } from '../utils/confetti';
 import { botAPI } from '../services/api';
 
@@ -475,15 +475,13 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
         hapticFeedback={hapticFeedback}
       />
 
-      {/* Profile Modal */}
-      <ProfileModal
+      {/* Profile Screen */}
+      <ProfileScreen
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         user={user}
-        userSettings={userSettings}
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
-        onThemeChange={onThemeChange}
       />
 
       {/* Easter Egg Message - Элегантное уведомление */}
