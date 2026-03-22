@@ -311,13 +311,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.25, duration: 0.35, ease: 'easeOut' }}
             style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
+              marginTop: 'auto',
               width: '100%',
               height: '430px',
               borderRadius: '32px 32px 0 0',
               background: 'linear-gradient(180deg, #1E1D1A 0%, #1C1C1C 100%)',
+              flexShrink: 0,
             }}
           />
         </motion.div>
