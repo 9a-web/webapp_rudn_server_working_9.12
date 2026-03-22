@@ -441,15 +441,15 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                 className="w-5 h-5 md:w-6 md:h-6 relative z-10" 
                 style={{ color: '#E7E7E7' }} 
               />
-              {/* Фото поверх иконки — не удаляется из DOM при ошибке */}
+              {/* Фото поверх иконки — скрывается через CSS при ошибке */}
               {profilePhoto && (
                 <img 
                   src={profilePhoto} 
-                  alt="Profile Avatar" 
+                  alt="" 
                   className="absolute inset-0 w-full h-full object-cover rounded-full z-20"
                   style={{ objectPosition: 'center' }}
-                  onLoad={() => {}}
-                  onError={() => {}}
+                  onLoad={(e) => { e.target.style.opacity = '1'; }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               )}
             </motion.button>
