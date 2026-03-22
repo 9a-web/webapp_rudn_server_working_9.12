@@ -325,7 +325,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 left: 0,
                 width: '100%',
                 height: '225px',
-                background: 'radial-gradient(ellipse 70% 100% at 50% 100%, rgba(248, 185, 76, 0.15) 0%, rgba(248, 185, 76, 0) 70%)',
+                background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.15) 100%)',
                 pointerEvents: 'none',
               }}
             />
