@@ -436,28 +436,20 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
               {/* Gradient glow effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/20 via-blue-400/20 to-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full" />
               
-              {profilePhoto && !photoError ? (
+              {/* Fallback icon — всегда в DOM */}
+              <User 
+                className="w-5 h-5 md:w-6 md:h-6 relative z-10" 
+                style={{ color: '#E7E7E7' }} 
+              />
+              {/* Фото поверх иконки — не удаляется из DOM при ошибке */}
+              {profilePhoto && (
                 <img 
                   src={profilePhoto} 
                   alt="Profile Avatar" 
-                  className="w-full h-full object-cover rounded-full relative z-10"
+                  className="absolute inset-0 w-full h-full object-cover rounded-full z-20"
                   style={{ objectPosition: 'center' }}
                   onLoad={() => {}}
-                  onError={(e) => {
-                    // Фото не загрузилось — тихо показываем иконку
-                    setPhotoError(true);
-                    setProfilePhoto(null);
-                    photoLoadedRef.current = false;
-                  }}
-                />
-              ) : photoLoading ? (
-                <div className="w-full h-full flex items-center justify-center relative z-10">
-                  <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <User 
-                  className="w-5 h-5 md:w-6 md:h-6 relative z-10" 
-                  style={{ color: '#E7E7E7' }} 
+                  onError={() => {}}
                 />
               )}
             </motion.button>

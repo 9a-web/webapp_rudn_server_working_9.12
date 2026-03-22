@@ -3,14 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
 const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) => {
-  const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   if (!user) return null;
 
-  // Первая буква имени для fallback-аватара
   const initial = (user.first_name?.[0] || user.username?.[0] || '?').toUpperCase();
-
-  const showPhoto = profilePhoto && !imgError;
 
   return (
     <AnimatePresence>
@@ -54,29 +51,33 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
             className="relative"
           >
             <div
-              className="w-28 h-28 rounded-full overflow-hidden"
+              className="w-28 h-28 rounded-full overflow-hidden relative"
               style={{
                 border: '3px solid rgba(255, 255, 255, 0.12)',
                 boxShadow: '0 0 60px rgba(255, 255, 255, 0.06)',
               }}
             >
-              {showPhoto ? (
+              {/* Fallback — всегда в DOM, виден когда фото не загрузилось */}
+              <div
+                className="absolute inset-0 flex items-center justify-center text-4xl font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#FFFFFF',
+                }}
+              >
+                {initial}
+              </div>
+
+              {/* Фото — всегда в DOM поверх fallback, скрыто пока не загрузится */}
+              {profilePhoto && (
                 <img
                   src={profilePhoto}
                   alt="Profile"
-                  className="w-full h-full object-cover"
-                  onError={() => setImgError(true)}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{ opacity: imgLoaded ? 1 : 0 }}
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => {}}
                 />
-              ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center text-4xl font-bold"
-                  style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  {initial}
-                </div>
               )}
             </div>
           </motion.div>
