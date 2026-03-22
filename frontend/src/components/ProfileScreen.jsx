@@ -55,7 +55,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               style={{
                 width: '140px',
                 height: '140px',
-                borderRadius: '38px',
+                borderRadius: '44px',
                 border: '3px solid rgba(255, 255, 255, 0.12)',
                 boxShadow: '0 0 60px rgba(255, 255, 255, 0.06)',
               }}
