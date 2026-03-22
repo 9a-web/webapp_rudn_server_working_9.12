@@ -169,7 +169,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.3 }}
               style={{
-                marginTop: '-2px',
+                marginTop: '-6px',
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 600,
                 fontSize: '20px',
