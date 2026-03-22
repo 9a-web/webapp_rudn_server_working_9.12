@@ -260,7 +260,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 }}
               >
                 {(() => {
-                  const tier = (user.tier || 'base').toLowerCase();
+                  const tier = (user.tier || 'premium').toLowerCase();
                   const names = { base: 'Base', medium: 'Medium', rare: 'Rare', premium: 'Premium' };
                   return names[tier] || 'Base';
                 })()}
