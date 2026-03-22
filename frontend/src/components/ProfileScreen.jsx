@@ -84,6 +84,24 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
               )}
             </div>
           </motion.div>
+
+          {/* Юзернейм или имя */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            style={{
+              marginTop: '16px',
+              fontFamily: "'Proxima Nova ExCn', sans-serif",
+              fontWeight: 800,
+              fontSize: '39px',
+              color: '#FFFFFF',
+              textAlign: 'center',
+              lineHeight: 1.1,
+            }}
+          >
+            {user.username ? `@${user.username}` : (user.first_name || '')}
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -19,6 +19,15 @@
   font-display: swap;
 }
 
+/* Proxima Nova Extra Condensed ExtraBold */
+@font-face {
+  font-family: 'Proxima Nova ExCn';
+  src: url('/fonts/ProximaNovaExCn-Extrabld.woff') format('woff');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
