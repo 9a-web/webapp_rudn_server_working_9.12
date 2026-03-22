@@ -1823,8 +1823,12 @@ async def get_user_profile_photo_proxy(telegram_id: int):
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = str(e).lower()
+        # User not found / Invalid user_id - это 404, не 500
+        if 'user not found' in error_msg or 'invalid user' in error_msg or 'bad request' in error_msg:
+            raise HTTPException(status_code=404, detail="User not found")
         logger.error(f"Ошибка при проксировании фото профиля: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load profile photo")
+        raise HTTPException(status_code=404, detail="Profile photo not available")
 
 
 # ============ YouTube API ============

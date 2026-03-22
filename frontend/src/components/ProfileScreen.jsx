@@ -61,6 +61,11 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
                   src={profilePhoto}
                   alt="Profile"
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center text-4xl font-bold" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#FFF">${initial}</div>`;
+                  }}
                 />
               ) : (
                 <div
