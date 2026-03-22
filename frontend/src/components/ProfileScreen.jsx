@@ -153,7 +153,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               marginTop: '16px',
               fontFamily: "'Proxima Nova ExCn', sans-serif",
               fontWeight: 800,
-              fontSize: '48px',
+              fontSize: '56px',
               color: '#FFFFFF',
               textAlign: 'center',
               lineHeight: 1.1,
