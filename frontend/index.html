@@ -51,21 +51,22 @@
         <script>
           (function() {
             if (typeof window === 'undefined') return;
-            // 1) Перехватываем WebSocket — блокируем подключение к Vite HMR серверу
+            // Перехватываем WebSocket — блокируем Vite HMR соединения
             var _OrigWS = window.WebSocket;
             window.WebSocket = function(url, protocols) {
-              // Блокируем только Vite HMR соединения (они идут на тот же хост)
-              if (typeof url === 'string' && (url.includes('__vite') || url.includes('/_vite') || url.match(/wss?:\/\/[^/]+\/?$/))) {
-                console.log('[HMR-BLOCK] Blocked Vite WebSocket:', url);
-                // Возвращаем заглушку с нужным интерфейсом
+              var protoStr = String(protocols || '');
+              var urlStr = String(url || '');
+              // Блокируем Vite HMR: протокол "vite-hmr" или URL с vite-токеном
+              if (protoStr.indexOf('vite-hmr') !== -1 || urlStr.indexOf('__vite') !== -1 || urlStr.indexOf('token=') !== -1) {
+                console.log('[HMR-BLOCK] Blocked Vite WS:', urlStr);
                 return { 
                   send: function(){}, close: function(){}, 
                   addEventListener: function(){}, removeEventListener: function(){},
                   readyState: 3, CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3,
-                  onopen: null, onclose: null, onmessage: null, onerror: null
+                  onopen: null, onclose: null, onmessage: null, onerror: null,
+                  url: urlStr, protocol: '', extensions: '', bufferedAmount: 0, binaryType: 'blob'
                 };
               }
-              // Все остальные WebSocket (чаты, сессии, и т.д.) — пропускаем
               if (protocols) return new _OrigWS(url, protocols);
               return new _OrigWS(url);
             };
@@ -74,7 +75,7 @@
             window.WebSocket.OPEN = 1;
             window.WebSocket.CLOSING = 2;
             window.WebSocket.CLOSED = 3;
-            // 2) Блокируем событие full-reload от Vite
+            // Блокируем событие full-reload от Vite
             window.addEventListener('vite:beforeFullReload', function(e) {
               e.preventDefault();
               return false;
