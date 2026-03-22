@@ -47,12 +47,27 @@
           })();
         </script>
 
-        <!-- 🛑 Блокируем Vite HMR full-reload в Telegram WebView -->
+        <!-- 🛑 Блокируем Vite HMR full-reload -->
         <script>
           (function() {
             if (typeof window !== 'undefined') {
+              // Блокируем событие vite:beforeFullReload
               window.addEventListener('vite:beforeFullReload', function(e) {
                 e.preventDefault();
+                return false;
+              });
+              // Перехватываем location.reload чтобы Vite client не мог перезагрузить страницу
+              var _originalReload = window.location.reload.bind(window.location);
+              var _reloadBlocked = false;
+              Object.defineProperty(window.location, 'reload', {
+                configurable: true,
+                value: function() {
+                  // Разрешаем только явные перезагрузки из нашего кода
+                  if (_reloadBlocked) return;
+                  _reloadBlocked = true;
+                  setTimeout(function() { _reloadBlocked = false; }, 2000);
+                  _originalReload();
+                }
               });
             }
           })();
