@@ -238,6 +238,46 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
+            {/* Уровень */}
+            <div className="flex flex-col items-center">
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '28px',
+                  lineHeight: 1.2,
+                  ...(() => {
+                    const tier = (user.tier || 'base').toLowerCase();
+                    if (tier === 'premium') return {
+                      background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    };
+                    const colors = { base: '#4D85FF', medium: '#FFA04D', rare: '#B84DFF' };
+                    return { color: colors[tier] || '#4D85FF' };
+                  })(),
+                }}
+              >
+                {(() => {
+                  const tier = (user.tier || 'base').toLowerCase();
+                  const names = { base: 'Base', medium: 'Medium', rare: 'Rare', premium: 'Premium' };
+                  return names[tier] || 'Base';
+                })()}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '16px',
+                  color: '#FFFFFF',
+                  marginTop: '2px',
+                }}
+              >
+                Уровень
+              </span>
+            </div>
+
             {/* $RDN */}
             <div className="flex flex-col items-center">
               <span
