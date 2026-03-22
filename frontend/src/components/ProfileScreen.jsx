@@ -208,7 +208,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               style={{
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 600,
-                fontSize: '26px',
+                fontSize: '28px',
                 color: '#FFBE4E',
                 lineHeight: 1.2,
               }}
@@ -219,7 +219,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               style={{
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 500,
-                fontSize: '14px',
+                fontSize: '16px',
                 color: '#FFFFFF',
                 marginTop: '2px',
               }}
