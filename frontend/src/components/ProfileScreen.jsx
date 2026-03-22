@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trophy } from 'lucide-react';
 
 const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -175,9 +175,24 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 fontSize: '16px',
                 color: '#FF4E9D',
                 textAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               {userSettings.group_name}
+              <Trophy style={{ width: '12px', height: '12px', color: '#FFB54E', marginLeft: '8px', flexShrink: 0 }} />
+              <span
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  color: '#FFB54E',
+                  marginLeft: '3px',
+                }}
+              >
+                (#{user.rank || 1})
+              </span>
             </motion.div>
           )}
         </motion.div>
