@@ -29,12 +29,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               if (hapticFeedback) hapticFeedback('impact', 'light');
               onClose();
             }}
-            className="absolute top-0 left-0 p-4 z-10"
+            className="absolute z-10"
             style={{
-              paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
+              top: '62px',
+              left: '24px',
             }}
           >
-            <ChevronLeft className="w-6 h-6 text-white/70" />
+            <ChevronLeft style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
           </motion.button>
 
           {/* Аватар — 87px от верха */}
