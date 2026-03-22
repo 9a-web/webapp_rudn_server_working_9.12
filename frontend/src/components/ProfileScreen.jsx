@@ -100,7 +100,7 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
               lineHeight: 1.1,
             }}
           >
-            {user.username ? `@${user.username}` : (user.first_name || '')}
+            {(user.username || user.first_name || '').toUpperCase()}
           </motion.div>
         </motion.div>
       )}
