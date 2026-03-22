@@ -202,7 +202,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.3 }}
             className="flex items-start justify-center"
-            style={{ marginTop: '24px', gap: '40px' }}
+            style={{ marginTop: '24px', gap: '40px', marginBottom: '30px' }}
           >
             {/* Количество друзей */}
             <div className="flex flex-col items-center">
