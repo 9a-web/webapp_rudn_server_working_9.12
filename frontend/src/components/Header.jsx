@@ -472,6 +472,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         user={user}
+        userSettings={userSettings}
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
       />

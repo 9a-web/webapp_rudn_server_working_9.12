@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
-const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) => {
+const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
 
   if (!user) return null;
@@ -160,6 +160,26 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
             }}
           >
             {(user.username || user.first_name || '').toUpperCase()}
+          </motion.div>
+
+          {/* Группа */}
+          {userSettings?.group_name && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25, duration: 0.3 }}
+              style={{
+                marginTop: '6px',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '16px',
+                color: '#FF4E9D',
+                textAlign: 'center',
+              }}
+            >
+              {userSettings.group_name}
+            </motion.div>
+          )}
           </motion.div>
         </motion.div>
       )}
