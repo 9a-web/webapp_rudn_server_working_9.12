@@ -150,7 +150,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.3 }}
             style={{
-              marginTop: '16px',
+              marginTop: '8px',
               fontFamily: "'Proxima Nova ExCn', sans-serif",
               fontWeight: 800,
               fontSize: '56px',
@@ -169,7 +169,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.3 }}
               style={{
-                marginTop: '6px',
+                marginTop: '2px',
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 600,
                 fontSize: '20px',
