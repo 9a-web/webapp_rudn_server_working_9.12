@@ -247,7 +247,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   fontSize: '28px',
                   lineHeight: 1.2,
                   ...(() => {
-                    const tier = (user.tier || 'base').toLowerCase();
+                    const tier = (user.tier || 'premium').toLowerCase();
                     if (tier === 'premium') return {
                       background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
                       WebkitBackgroundClip: 'text',
