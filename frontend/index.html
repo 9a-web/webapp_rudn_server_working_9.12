@@ -47,29 +47,38 @@
           })();
         </script>
 
-        <!-- 🛑 Блокируем Vite HMR full-reload -->
+        <!-- 🛑 Полностью блокируем Vite HMR WebSocket и reload -->
         <script>
           (function() {
-            if (typeof window !== 'undefined') {
-              // Блокируем событие vite:beforeFullReload
-              window.addEventListener('vite:beforeFullReload', function(e) {
-                e.preventDefault();
-                return false;
-              });
-              // Перехватываем location.reload чтобы Vite client не мог перезагрузить страницу
-              var _originalReload = window.location.reload.bind(window.location);
-              var _reloadBlocked = false;
-              Object.defineProperty(window.location, 'reload', {
-                configurable: true,
-                value: function() {
-                  // Разрешаем только явные перезагрузки из нашего кода
-                  if (_reloadBlocked) return;
-                  _reloadBlocked = true;
-                  setTimeout(function() { _reloadBlocked = false; }, 2000);
-                  _originalReload();
-                }
-              });
-            }
+            if (typeof window === 'undefined') return;
+            // 1) Перехватываем WebSocket — блокируем подключение к Vite HMR серверу
+            var _OrigWS = window.WebSocket;
+            window.WebSocket = function(url, protocols) {
+              // Блокируем только Vite HMR соединения (они идут на тот же хост)
+              if (typeof url === 'string' && (url.includes('__vite') || url.includes('/_vite') || url.match(/wss?:\/\/[^/]+\/?$/))) {
+                console.log('[HMR-BLOCK] Blocked Vite WebSocket:', url);
+                // Возвращаем заглушку с нужным интерфейсом
+                return { 
+                  send: function(){}, close: function(){}, 
+                  addEventListener: function(){}, removeEventListener: function(){},
+                  readyState: 3, CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3,
+                  onopen: null, onclose: null, onmessage: null, onerror: null
+                };
+              }
+              // Все остальные WebSocket (чаты, сессии, и т.д.) — пропускаем
+              if (protocols) return new _OrigWS(url, protocols);
+              return new _OrigWS(url);
+            };
+            window.WebSocket.prototype = _OrigWS.prototype;
+            window.WebSocket.CONNECTING = 0;
+            window.WebSocket.OPEN = 1;
+            window.WebSocket.CLOSING = 2;
+            window.WebSocket.CLOSED = 3;
+            // 2) Блокируем событие full-reload от Vite
+            window.addEventListener('vite:beforeFullReload', function(e) {
+              e.preventDefault();
+              return false;
+            });
           })();
         </script>
 

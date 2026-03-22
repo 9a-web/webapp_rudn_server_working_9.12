@@ -51,10 +51,8 @@ export default defineConfig(({ mode }) => {
       // Отключаем HMR — предотвращает перезагрузки в Telegram WebView
       // при потере/восстановлении WebSocket соединения
       hmr: false,
-      // Отключаем слежение за файлами (не нужно без HMR)
-      watch: {
-        ignored: ['**'],
-      },
+      // Полностью отключаем file watcher (chokidar)
+      watch: null,
       // Проксируем /api/* запросы к бэкенду на порту 8001
       proxy: {
         '/api': {
