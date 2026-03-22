@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
 const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) => {
+  const [imgError, setImgError] = useState(false);
+
   if (!user) return null;
 
   // Первая буква имени для fallback-аватара
   const initial = (user.first_name?.[0] || user.username?.[0] || '?').toUpperCase();
+
+  const showPhoto = profilePhoto && !imgError;
 
   return (
     <AnimatePresence>
@@ -56,16 +60,12 @@ const ProfileScreen = ({ isOpen, onClose, user, profilePhoto, hapticFeedback }) 
                 boxShadow: '0 0 60px rgba(255, 255, 255, 0.06)',
               }}
             >
-              {profilePhoto ? (
+              {showPhoto ? (
                 <img
                   src={profilePhoto}
                   alt="Profile"
                   className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.style.display = 'none';
-                    e.target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center text-4xl font-bold" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#FFF">${initial}</div>`;
-                  }}
+                  onError={() => setImgError(true)}
                 />
               ) : (
                 <div
