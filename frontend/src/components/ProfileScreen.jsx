@@ -305,18 +305,30 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
+          {/* Свечение над прямоугольником */}
+          <div
+            style={{
+              marginTop: 'auto',
+              width: '100%',
+              height: '225px',
+              background: 'radial-gradient(ellipse 70% 100% at 50% 100%, rgba(248, 185, 76, 0.15) 0%, rgba(248, 185, 76, 0) 70%)',
+              flexShrink: 0,
+              pointerEvents: 'none',
+            }}
+          />
+
           {/* Нижний прямоугольник */}
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.25, duration: 0.35, ease: 'easeOut' }}
             style={{
-              marginTop: 'auto',
               width: '100%',
               height: '430px',
               borderRadius: '32px 32px 0 0',
               background: 'linear-gradient(180deg, #1E1D1A 0%, #1C1C1C 100%)',
               flexShrink: 0,
+              marginTop: '-1px',
             }}
           />
         </motion.div>
