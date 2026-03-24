@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Trophy } from 'lucide-react';
 
+const TABS = [
+  { id: 'general', label: 'Общее' },
+  { id: 'friends', label: 'Друзья' },
+  { id: 'materials', label: 'Материалы' },
+];
+
 const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
 
   if (!user) return null;
 
@@ -334,13 +341,63 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             <div
               style={{
                 width: '100%',
-                height: '430px',
+                minHeight: '430px',
                 borderRadius: '32px 32px 0 0',
                 background: 'linear-gradient(180deg, #1E1D1A 0%, #1C1C1C 100%)',
                 position: 'relative',
                 zIndex: 1,
+                padding: '24px 20px 0',
               }}
-            />
+            >
+              {/* Табы */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '28px',
+                }}
+              >
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      if (hapticFeedback) hapticFeedback('impact', 'light');
+                    }}
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      color: activeTab === tab.id ? '#F8B94C' : '#F4F3FC',
+                      background: 'none',
+                      border: 'none',
+                      padding: '0 0 8px 0',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      transition: 'color 0.2s ease',
+                    }}
+                  >
+                    {tab.label}
+                    {/* Подчёркивание активного таба */}
+                    {activeTab === tab.id && (
+                      <motion.div
+                        layoutId="tab-underline"
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '2px',
+                          backgroundColor: '#F8B94C',
+                          borderRadius: '1px',
+                        }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
           </motion.div>
         </motion.div>
       )}
