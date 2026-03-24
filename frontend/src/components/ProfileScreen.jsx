@@ -188,7 +188,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               }}
             >
               {userSettings.group_name}
-              <Trophy style={{ width: '16px', height: '16px', color: '#FFB54E', marginLeft: '8px', flexShrink: 0 }} />
+              <Trophy style={{ width: '14px', height: '14px', color: '#FFB54E', marginLeft: '8px', flexShrink: 0 }} />
               <span
                 style={{
                   fontFamily: "'Poppins', sans-serif",
