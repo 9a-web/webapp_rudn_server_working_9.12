@@ -217,7 +217,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '21px',
+                  fontSize: '18px',
                   color: '#FFBE4E',
                   lineHeight: 1.2,
                 }}
@@ -251,7 +251,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '21px',
+                  fontSize: '18px',
                   lineHeight: 1.2,
                   ...(() => {
                     const tier = (user.tier || 'premium').toLowerCase();
@@ -291,7 +291,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '21px',
+                  fontSize: '18px',
                   color: '#FFBE4E',
                   lineHeight: 1.2,
                 }}
