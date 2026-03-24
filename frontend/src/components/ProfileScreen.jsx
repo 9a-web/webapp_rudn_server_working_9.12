@@ -179,7 +179,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 marginTop: '-6px',
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 600,
-                fontSize: '14px',
+                fontSize: '16px',
                 color: '#FF4E9D',
                 textAlign: 'center',
                 display: 'flex',
