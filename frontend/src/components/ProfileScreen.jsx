@@ -122,7 +122,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 500,
-                  fontSize: '14px',
+                  fontSize: '12px',
                   color: '#FFFFFF',
                 }}
               >
@@ -142,7 +142,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '14px',
+                  fontSize: '12px',
                   color: '#1c1c1c',
                 }}
               >
@@ -179,7 +179,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 marginTop: '-6px',
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 600,
-                fontSize: '20px',
+                fontSize: '14px',
                 color: '#FF4E9D',
                 textAlign: 'center',
                 display: 'flex',
@@ -193,7 +193,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '16px',
+                  fontSize: '14px',
                   color: '#FFB54E',
                   marginLeft: '3px',
                 }}
@@ -228,7 +228,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 500,
-                  fontSize: '16px',
+                  fontSize: '14px',
                   color: '#FFFFFF',
                   marginTop: '2px',
                 }}
@@ -276,7 +276,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 500,
-                  fontSize: '16px',
+                  fontSize: '14px',
                   color: '#FFFFFF',
                   marginTop: '2px',
                 }}
@@ -302,7 +302,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 500,
-                  fontSize: '16px',
+                  fontSize: '14px',
                   color: '#FFFFFF',
                   marginTop: '2px',
                 }}
@@ -367,7 +367,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     style={{
                       fontFamily: "'Poppins', sans-serif",
                       fontWeight: 600,
-                      fontSize: '16px',
+                      fontSize: '14px',
                       color: activeTab === tab.id ? '#F8B94C' : '#F4F3FC',
                       background: 'none',
                       border: activeTab === tab.id ? '2px solid #F8B94C' : '2px solid transparent',
