@@ -370,30 +370,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       fontSize: '16px',
                       color: activeTab === tab.id ? '#F8B94C' : '#F4F3FC',
                       background: 'none',
-                      border: 'none',
-                      padding: '0 0 8px 0',
+                      border: activeTab === tab.id ? '2px solid #F8B94C' : '2px solid transparent',
+                      borderRadius: '12px',
+                      padding: '6px 14px',
                       cursor: 'pointer',
                       position: 'relative',
-                      transition: 'color 0.2s ease',
+                      transition: 'color 0.2s ease, border-color 0.2s ease',
                     }}
                   >
                     {tab.label}
-                    {/* Подчёркивание активного таба */}
-                    {activeTab === tab.id && (
-                      <motion.div
-                        layoutId="tab-underline"
-                        style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: '2px',
-                          backgroundColor: '#F8B94C',
-                          borderRadius: '1px',
-                        }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      />
-                    )}
                   </button>
                 ))}
               </div>
