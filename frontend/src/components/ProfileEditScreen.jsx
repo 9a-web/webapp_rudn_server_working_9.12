@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake } from 'lucide-react';
+import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCheck } from 'lucide-react';
 import GroupSelector from './GroupSelector';
 import { userAPI, getBackendURL } from '../services/api';
 
-const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged }) => {
+const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy }) => {
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [avatarMode, setAvatarMode] = useState('telegram'); // 'telegram' | 'custom' | 'none'
   const [customAvatar, setCustomAvatar] = useState(null);
@@ -655,6 +655,41 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                       : 'Укажите дату рождения для поздравлений от друзей'}
                   </span>
                 </motion.div>
+
+                {/* Кнопка настроек приватности */}
+                <motion.button
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 }}
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    if (onOpenPrivacy) onOpenPrivacy();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '16px 18px',
+                    borderRadius: '16px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1.5px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'border-color 0.2s, background 0.2s',
+                    marginTop: '8px',
+                  }}
+                >
+                  <ShieldCheck style={{ width: '22px', height: '22px', color: '#FFBE4E', flexShrink: 0 }} />
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    color: '#F4F3FC',
+                  }}>
+                    Настройки приватности
+                  </span>
+                </motion.button>
               </div>
             </div>
           </motion.div>

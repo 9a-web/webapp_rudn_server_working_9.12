@@ -758,6 +758,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         userSettings={userSettings}
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
+        onOpenPrivacy={() => {
+          setShowProfileEdit(false);
+          setTimeout(() => setShowProfileSettings(true), 200);
+        }}
       />
 
       {showDevices && (
