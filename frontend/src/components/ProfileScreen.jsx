@@ -438,6 +438,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               width: '100%',
               position: 'relative',
               flexShrink: 0,
+              paddingLeft: '10px',
+              paddingRight: '10px',
             }}
           >
             {/* Свечение наверх */}
