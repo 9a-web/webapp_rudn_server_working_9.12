@@ -171,9 +171,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const initial = (user.first_name?.[0] || user.username?.[0] || '?').toUpperCase();
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          key="profile-screen"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -813,6 +815,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           />
         </motion.div>
       )}
+    </AnimatePresence>
 
       {/* QR-код оверлей */}
       <AnimatePresence>
@@ -1346,7 +1349,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
         )}
       </AnimatePresence>
-    </AnimatePresence>
+    </>
   );
 };
 
