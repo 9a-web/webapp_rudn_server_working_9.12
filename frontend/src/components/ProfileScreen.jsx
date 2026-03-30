@@ -4,6 +4,7 @@ import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, L
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import ProfileSettingsModal from './ProfileSettingsModal';
+import ProfileEditScreen from './ProfileEditScreen';
 import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
 
@@ -24,6 +25,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
   // Sub-modals
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
   const [showLKModal, setShowLKModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -151,7 +153,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </button>
               <button onClick={() => {
                 if (hapticFeedback) hapticFeedback('impact', 'light');
-                setShowProfileSettings(true);
+                setShowProfileEdit(true);
               }}>
                 <Pencil style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
               </button>
@@ -747,6 +749,16 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           />
         </div>
       )}
+
+      {/* Экран редактирования профиля */}
+      <ProfileEditScreen
+        isOpen={showProfileEdit}
+        onClose={() => setShowProfileEdit(false)}
+        user={user}
+        userSettings={userSettings}
+        profilePhoto={profilePhoto}
+        hapticFeedback={hapticFeedback}
+      />
 
       {showDevices && (
         <div className="relative z-[350]">
