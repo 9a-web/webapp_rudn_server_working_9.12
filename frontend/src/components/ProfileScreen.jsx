@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pencil } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pencil, ShieldCheck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import ProfileSettingsModal from './ProfileSettingsModal';
@@ -67,10 +67,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const settingsItems = [
     {
       id: 'profile',
-      icon: Sliders,
-      label: 'Настроить профиль',
-      sublabel: 'Приватность и дизайн',
-      color: '#F8B94C',
+      icon: ShieldCheck,
+      label: 'Настройки приватности',
+      sublabel: 'Управление видимостью данных',
+      color: '#FFBE4E',
       action: () => { closeSheet(); setTimeout(() => setShowProfileSettings(true), 200); },
     },
     {
