@@ -428,86 +428,70 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
-          {/* Нижняя секция с свечением */}
+          {/* Табы */}
           <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.25, duration: 0.35, ease: 'easeOut' }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25, duration: 0.3 }}
             style={{
-              marginTop: 'auto',
-              width: '100%',
-              position: 'relative',
-              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: '2px',
+              padding: '0 20px 2px',
+              marginTop: '20px',
             }}
+            className="scrollbar-hide"
           >
-            {/* Свечение */}
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                top: '-225px',
-                background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 225px, rgba(248, 185, 76, 0.30) 100%)',
-                pointerEvents: 'none',
-                zIndex: 0,
-              }}
-            />
-            {/* Контент */}
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 1,
-                padding: '24px 20px 0',
-              }}
-            >
-              {/* Табы */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  overflowX: 'auto',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
-                  WebkitOverflowScrolling: 'touch',
-                  paddingBottom: '2px',
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (hapticFeedback) hapticFeedback('impact', 'light');
                 }}
-                className="scrollbar-hide"
+                style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '16px',
+                  color: activeTab === tab.id ? '#F8B94C' : '#88888B',
+                  background: activeTab === tab.id
+                    ? 'rgba(248, 185, 76, 0.08)'
+                    : 'rgba(255, 255, 255, 0.04)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: activeTab === tab.id ? '1px solid rgba(248, 185, 76, 0.25)' : '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: '16px',
+                  padding: '6px 18px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'all 0.25s ease',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}
               >
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      if (hapticFeedback) hapticFeedback('impact', 'light');
-                    }}
-                    style={{
-                      fontFamily: "'Poppins', sans-serif",
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      color: activeTab === tab.id ? '#F8B94C' : '#88888B',
-                      background: activeTab === tab.id
-                        ? 'rgba(248, 185, 76, 0.08)'
-                        : 'rgba(255, 255, 255, 0.04)',
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                      border: activeTab === tab.id ? '1px solid rgba(248, 185, 76, 0.25)' : '1px solid rgba(255, 255, 255, 0.06)',
-                      borderRadius: '16px',
-                      padding: '6px 18px',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      transition: 'all 0.25s ease',
-                      flexShrink: 0,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+                {tab.label}
+              </button>
+            ))}
           </motion.div>
+
+          {/* Свечение внизу */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '300px',
+              background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 100%)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
         </motion.div>
       )}
 
