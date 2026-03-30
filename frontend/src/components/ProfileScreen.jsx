@@ -353,6 +353,28 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [isOpen]);
 
+  // Блокировка скролла фона при открытом профиле
+  useEffect(() => {
+    if (isOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.touchAction = 'none';
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.touchAction = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
+
   // Bottom Sheet drag
   const sheetY = useMotionValue(0);
   const sheetBg = useTransform(sheetY, [0, 400], ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0)']);
@@ -488,7 +510,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
           className="fixed inset-0 z-[200] flex flex-col items-center"
-          style={{ backgroundColor: '#000000' }}
+          style={{ backgroundColor: '#000000', overscrollBehavior: 'contain', touchAction: 'pan-y' }}
+          onTouchMove={(e) => {
+            // Не даём событию пробрасываться к фону, если скроллим профиль
+            e.stopPropagation();
+          }}
         >
           {/* Верхняя панель навигации */}
           <motion.div
