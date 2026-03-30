@@ -105,6 +105,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          key="privacy-settings-modal"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

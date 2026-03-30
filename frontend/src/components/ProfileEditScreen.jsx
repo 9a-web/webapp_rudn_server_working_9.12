@@ -149,6 +149,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
       <AnimatePresence>
         {isOpen && !showGroupSelector && (
           <motion.div
+            key="profile-edit-screen"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -250,6 +251,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                 <AnimatePresence>
                   {showAvatarMenu && (
                     <motion.div
+                      key="avatar-menu"
                       initial={{ opacity: 0, y: -8, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -8, scale: 0.95 }}
@@ -700,6 +702,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
       <AnimatePresence>
         {isOpen && showGroupSelector && (
           <motion.div
+            key="group-selector-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

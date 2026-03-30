@@ -817,6 +817,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       <AnimatePresence>
         {showQR && (
           <motion.div
+            key="qr-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -913,6 +914,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       <AnimatePresence>
         {showSettings && (
           <motion.div
+            key="settings-overlay"
             className="fixed inset-0 z-[300]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1100,6 +1102,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       <AnimatePresence>
         {showReferral && (
           <motion.div
+            key="referral-overlay"
             className="fixed inset-0 z-[350]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1235,6 +1238,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       <AnimatePresence>
         {showDeleteConfirm && (
           <motion.div
+            key="delete-overlay"
             className="fixed inset-0 z-[350] flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
