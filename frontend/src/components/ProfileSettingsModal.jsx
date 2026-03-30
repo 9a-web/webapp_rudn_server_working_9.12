@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ChevronLeft, Eye, Users, Trophy, Calendar, Radio, ShieldCheck
+  ChevronLeft, Eye, Users, Trophy, Calendar, Radio, ShieldCogCorner
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 
@@ -159,7 +159,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
                 paddingLeft: '4px',
               }}
             >
-              <ShieldCheck style={{ width: '16px', height: '16px', color: '#FFBE4E' }} />
+              <ShieldCogCorner style={{ width: '16px', height: '16px', color: '#FFBE4E' }} />
               <span style={{
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 500,
