@@ -48,6 +48,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [brushColor, setBrushColor] = useState('#F8B94C');
   const [brushSize, setBrushSize] = useState(4);
   const lastPointRef = useRef(null);
+  const [isGraffitiEditing, setIsGraffitiEditing] = useState(false);
 
   const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 
@@ -660,130 +661,200 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                         Граффити
                       </span>
                     </div>
-                    <button
-                      onClick={clearGraffiti}
-                      style={{
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '10px',
-                        padding: '5px 12px',
-                        cursor: 'pointer',
-                        fontFamily: "'Poppins', sans-serif",
-                        fontWeight: 500,
-                        fontSize: '12px',
-                        color: 'rgba(255,255,255,0.4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <Trash2 style={{ width: '12px', height: '12px' }} />
-                      Очистить
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isGraffitiEditing && (
+                        <button
+                          onClick={clearGraffiti}
+                          style={{
+                            background: 'rgba(239,68,68,0.1)',
+                            border: '1px solid rgba(239,68,68,0.2)',
+                            borderRadius: '10px',
+                            padding: '5px 12px',
+                            cursor: 'pointer',
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500,
+                            fontSize: '12px',
+                            color: '#EF4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Trash2 style={{ width: '12px', height: '12px' }} />
+                          Очистить
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setIsGraffitiEditing(!isGraffitiEditing);
+                          if (hapticFeedback) hapticFeedback('impact', 'light');
+                        }}
+                        style={{
+                          background: isGraffitiEditing
+                            ? 'rgba(248,185,76,0.15)'
+                            : 'rgba(255,255,255,0.06)',
+                          border: isGraffitiEditing
+                            ? '1px solid rgba(248,185,76,0.35)'
+                            : '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px',
+                          padding: '5px 12px',
+                          cursor: 'pointer',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 500,
+                          fontSize: '12px',
+                          color: isGraffitiEditing ? '#F8B94C' : 'rgba(255,255,255,0.4)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <Pen style={{ width: '12px', height: '12px' }} />
+                        {isGraffitiEditing ? 'Готово' : 'Рисовать'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Canvas */}
                   <div style={{
                     borderRadius: '20px',
                     background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    border: isGraffitiEditing
+                      ? '1px solid rgba(248,185,76,0.25)'
+                      : '1px solid rgba(255,255,255,0.06)',
                     overflow: 'hidden',
                     height: '260px',
                     position: 'relative',
-                    touchAction: 'none',
+                    touchAction: isGraffitiEditing ? 'none' : 'auto',
+                    transition: 'border-color 0.25s ease',
                   }}>
                     <canvas
                       ref={graffitiCanvasRef}
-                      onMouseDown={startDraw}
-                      onMouseMove={draw}
-                      onMouseUp={stopDraw}
-                      onMouseLeave={stopDraw}
-                      onTouchStart={startDraw}
-                      onTouchMove={draw}
-                      onTouchEnd={stopDraw}
-                      onTouchCancel={stopDraw}
+                      onMouseDown={isGraffitiEditing ? startDraw : undefined}
+                      onMouseMove={isGraffitiEditing ? draw : undefined}
+                      onMouseUp={isGraffitiEditing ? stopDraw : undefined}
+                      onMouseLeave={isGraffitiEditing ? stopDraw : undefined}
+                      onTouchStart={isGraffitiEditing ? startDraw : undefined}
+                      onTouchMove={isGraffitiEditing ? draw : undefined}
+                      onTouchEnd={isGraffitiEditing ? stopDraw : undefined}
+                      onTouchCancel={isGraffitiEditing ? stopDraw : undefined}
                       style={{
                         width: '100%',
                         height: '100%',
-                        cursor: 'crosshair',
+                        cursor: isGraffitiEditing ? 'crosshair' : 'default',
                         display: 'block',
                       }}
                     />
+                    {/* Подсказка, если не в режиме редактирования и canvas пустой */}
+                    {!isGraffitiEditing && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 500,
+                          fontSize: '13px',
+                          color: 'rgba(255,255,255,0.12)',
+                        }}>
+                          Нажмите «Рисовать» чтобы начать
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Палитра цветов + размер кисти */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                  }}>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                      {GRAFFITI_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => {
-                            setBrushColor(c);
-                            if (hapticFeedback) hapticFeedback('impact', 'light');
-                          }}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            backgroundColor: c,
-                            border: brushColor === c
-                              ? '2.5px solid #FFFFFF'
-                              : '2px solid rgba(255,255,255,0.1)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            transform: brushColor === c ? 'scale(1.15)' : 'scale(1)',
-                            boxShadow: brushColor === c ? `0 0 10px ${c}40` : 'none',
-                            flexShrink: 0,
-                          }}
-                        />
-                      ))}
-                    </div>
-                    {/* Размер кисти */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      flexShrink: 0,
-                    }}>
-                      {[2, 4, 8, 14].map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => {
-                            setBrushSize(s);
-                            if (hapticFeedback) hapticFeedback('impact', 'light');
-                          }}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            background: brushSize === s
-                              ? 'rgba(248,185,76,0.15)'
-                              : 'rgba(255,255,255,0.04)',
-                            border: brushSize === s
-                              ? '1px solid rgba(248,185,76,0.4)'
-                              : '1px solid rgba(255,255,255,0.08)',
-                            cursor: 'pointer',
+                  {/* Палитра цветов + размер кисти — только в режиме редактирования */}
+                  <AnimatePresence>
+                    {isGraffitiEditing && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                        animate={{ opacity: 1, height: 'auto', marginTop: 0 }}
+                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeInOut' }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          paddingTop: '2px',
+                        }}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
+                            {GRAFFITI_COLORS.map((c) => (
+                              <button
+                                key={c}
+                                onClick={() => {
+                                  setBrushColor(c);
+                                  if (hapticFeedback) hapticFeedback('impact', 'light');
+                                }}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  backgroundColor: c,
+                                  border: brushColor === c
+                                    ? '2.5px solid #FFFFFF'
+                                    : '2px solid rgba(255,255,255,0.1)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  transform: brushColor === c ? 'scale(1.15)' : 'scale(1)',
+                                  boxShadow: brushColor === c ? `0 0 10px ${c}40` : 'none',
+                                  flexShrink: 0,
+                                }}
+                              />
+                            ))}
+                          </div>
+                          {/* Размер кисти */}
+                          <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <div style={{
-                            width: `${Math.min(s + 2, 16)}px`,
-                            height: `${Math.min(s + 2, 16)}px`,
-                            borderRadius: '50%',
-                            backgroundColor: brushSize === s ? '#F8B94C' : 'rgba(255,255,255,0.3)',
-                          }} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                            gap: '6px',
+                            flexShrink: 0,
+                          }}>
+                            {[2, 4, 8, 14].map((s) => (
+                              <button
+                                key={s}
+                                onClick={() => {
+                                  setBrushSize(s);
+                                  if (hapticFeedback) hapticFeedback('impact', 'light');
+                                }}
+                                style={{
+                                  width: '28px',
+                                  height: '28px',
+                                  borderRadius: '50%',
+                                  background: brushSize === s
+                                    ? 'rgba(248,185,76,0.15)'
+                                    : 'rgba(255,255,255,0.04)',
+                                  border: brushSize === s
+                                    ? '1px solid rgba(248,185,76,0.4)'
+                                    : '1px solid rgba(255,255,255,0.08)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                <div style={{
+                                  width: `${Math.min(s + 2, 16)}px`,
+                                  height: `${Math.min(s + 2, 16)}px`,
+                                  borderRadius: '50%',
+                                  backgroundColor: brushSize === s ? '#F8B94C' : 'rgba(255,255,255,0.3)',
+                                }} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               ) : activeTab === 'friends' ? (
                 <motion.div
