@@ -475,6 +475,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
         userSettings={userSettings}
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
+        onThemeChange={onThemeChange}
       />
 
       {/* Easter Egg Message - Элегантное уведомление */}

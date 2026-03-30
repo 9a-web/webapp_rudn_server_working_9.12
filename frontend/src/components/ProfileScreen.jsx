@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Trophy } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { ProfileModal } from './ProfileModal';
+import { friendsAPI } from '../services/friendsAPI';
 
 const TABS = [
   { id: 'general', label: 'Общее' },
@@ -8,9 +11,33 @@ const TABS = [
   { id: 'materials', label: 'Материалы' },
 ];
 
-const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback }) => {
+const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onThemeChange }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [qrData, setQrData] = useState(null);
+
+  const loadQRData = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await friendsAPI.getProfileQR(user.id);
+      setQrData(data);
+    } catch (err) {
+      console.error('Failed to load QR data:', err);
+    }
+  }, [user?.id]);
+
+  const handleQRClick = () => {
+    if (hapticFeedback) hapticFeedback('impact', 'light');
+    loadQRData();
+    setShowQR(true);
+  };
+
+  const handleSettingsClick = () => {
+    if (hapticFeedback) hapticFeedback('impact', 'light');
+    setShowSettings(true);
+  };
 
   if (!user) return null;
 
@@ -43,6 +70,24 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           >
             <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
           </motion.button>
+
+          {/* Кнопки QR и Настройки — правый верхний угол */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.15, duration: 0.25 }}
+            className="absolute top-0 right-0 z-10 flex items-center gap-3 pr-4"
+            style={{
+              paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
+            }}
+          >
+            <button onClick={handleQRClick}>
+              <QrCode style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+            </button>
+            <button onClick={handleSettingsClick}>
+              <Settings style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+            </button>
+          </motion.div>
 
           {/* Аватар — 87px от верха */}
           <motion.div
@@ -386,6 +431,113 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
         </motion.div>
       )}
+
+      {/* QR-код оверлей */}
+      <AnimatePresence>
+        {showQR && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[250] flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+            onClick={() => setShowQR(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#1C1C1C',
+                borderRadius: '24px',
+                padding: '32px 28px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '16px',
+                position: 'relative',
+                minWidth: '280px',
+              }}
+            >
+              <button
+                onClick={() => setShowQR(false)}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X style={{ width: '20px', height: '20px', color: 'rgba(255,255,255,0.5)' }} />
+              </button>
+
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '16px',
+                color: '#F4F3FC',
+              }}>
+                QR-код профиля
+              </span>
+
+              <div style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '16px',
+              }}>
+                {qrData?.qr_data ? (
+                  <QRCodeSVG
+                    value={qrData.qr_data}
+                    size={200}
+                    bgColor="#FFFFFF"
+                    fgColor="#000000"
+                    level="M"
+                  />
+                ) : (
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#999',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontSize: '14px',
+                  }}>
+                    Загрузка...
+                  </div>
+                )}
+              </div>
+
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                fontSize: '13px',
+                color: 'rgba(255,255,255,0.5)',
+                textAlign: 'center',
+              }}>
+                Покажи друзьям для добавления
+              </span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Настройки (ProfileModal) */}
+      <ProfileModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        user={user}
+        userSettings={userSettings}
+        profilePhoto={profilePhoto}
+        hapticFeedback={hapticFeedback}
+        onThemeChange={onThemeChange}
+      />
     </AnimatePresence>
   );
 };
