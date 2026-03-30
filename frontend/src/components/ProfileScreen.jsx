@@ -44,7 +44,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Graffiti state
   const graffitiCanvasRef = useRef(null);
   const graffitiCtxRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawingRef = useRef(false);
   const [brushColor, setBrushColor] = useState('#F8B94C');
   const [brushSize, setBrushSize] = useState(4);
   const lastPointRef = useRef(null);
@@ -53,14 +53,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 
   // Инициализация canvas граффити
-  useEffect(() => {
-    if (activeTab !== 'general' || !graffitiCanvasRef.current) return;
+  const initGraffitiCanvas = useCallback(() => {
     const canvas = graffitiCanvasRef.current;
+    if (!canvas) return;
     const parent = canvas.parentElement;
     if (!parent) return;
     const dpr = window.devicePixelRatio || 1;
     const w = parent.clientWidth;
     const h = parent.clientHeight;
+    if (w === 0 || h === 0) return;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width = w + 'px';
@@ -70,7 +71,25 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     graffitiCtxRef.current = ctx;
-  }, [activeTab]);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'general') return;
+    // Задержка чтобы DOM (AnimatePresence) успел отрисовать canvas
+    const t = setTimeout(initGraffitiCanvas, 150);
+    return () => clearTimeout(t);
+  }, [activeTab, initGraffitiCanvas]);
+
+  // Переинициализация при входе в режим редактирования
+  useEffect(() => {
+    if (isGraffitiEditing) {
+      // Если canvas ещё не инициализирован
+      if (!graffitiCtxRef.current) {
+        const t = setTimeout(initGraffitiCanvas, 100);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [isGraffitiEditing, initGraffitiCanvas]);
 
   const getPos = (e) => {
     const canvas = graffitiCanvasRef.current;
@@ -82,20 +101,26 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   };
 
   const startDraw = (e) => {
+    console.log('[Graffiti] startDraw called, editing:', isGraffitiEditing, 'ctx:', !!graffitiCtxRef.current);
     if (!isGraffitiEditing) return;
-    setIsDrawing(true);
+    isDrawingRef.current = true;
     const pos = getPos(e);
     lastPointRef.current = pos;
     const ctx = graffitiCtxRef.current;
-    if (!ctx) return;
+    if (!ctx) {
+      console.log('[Graffiti] No ctx! Trying to init...');
+      initGraffitiCanvas();
+      return;
+    }
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
     ctx.fillStyle = brushColor;
     ctx.fill();
+    console.log('[Graffiti] Drew dot at', pos);
   };
 
   const draw = (e) => {
-    if (!isDrawing || !isGraffitiEditing) return;
+    if (!isDrawingRef.current || !isGraffitiEditing) return;
     const ctx = graffitiCtxRef.current;
     if (!ctx) return;
     const pos = getPos(e);
@@ -112,7 +137,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   };
 
   const stopDraw = () => {
-    setIsDrawing(false);
+    isDrawingRef.current = false;
     lastPointRef.current = null;
   };
 
