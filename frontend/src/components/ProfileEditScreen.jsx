@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake } from 'lucide-react';
 import GroupSelector from './GroupSelector';
 import { userAPI, getBackendURL } from '../services/api';
 
@@ -11,6 +11,79 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Birthday state
+  const [birthDate, setBirthDate] = useState({ day: '', month: '', year: '' });
+  const [birthSource, setBirthSource] = useState(null);
+  const [birthLoading, setBirthLoading] = useState(false);
+  const [birthSaving, setBirthSaving] = useState(false);
+  const dayRef = useRef(null);
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  // Загрузка даты рождения при открытии
+  useEffect(() => {
+    if (!isOpen || !user?.id) return;
+    const loadBirthday = async () => {
+      setBirthLoading(true);
+      try {
+        const backendUrl = getBackendURL();
+        const res = await fetch(`${backendUrl}/api/user-settings/${user.id}/birthday`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.birth_date) {
+            const parts = data.birth_date.split('.');
+            if (parts.length >= 2) {
+              setBirthDate({
+                day: parts[0] || '',
+                month: parts[1] || '',
+                year: parts[2] && parts[2] !== '0000' ? parts[2] : '',
+              });
+              setBirthSource(data.source);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load birthday:', err);
+      } finally {
+        setBirthLoading(false);
+      }
+    };
+    loadBirthday();
+  }, [isOpen, user?.id]);
+
+  // Сохранение даты рождения
+  const saveBirthday = async () => {
+    if (!birthDate.day || !birthDate.month) return;
+    setBirthSaving(true);
+    try {
+      const dateStr = `${birthDate.day.padStart(2, '0')}.${birthDate.month.padStart(2, '0')}.${birthDate.year || '0000'}`;
+      const backendUrl = getBackendURL();
+      const res = await fetch(`${backendUrl}/api/user-settings/${user.id}/birthday`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birth_date: dateStr }),
+      });
+      if (res.ok) {
+        setBirthSource('saved');
+        if (hapticFeedback) hapticFeedback('notification', 'success');
+      }
+    } catch (err) {
+      console.error('Failed to save birthday:', err);
+      if (hapticFeedback) hapticFeedback('notification', 'error');
+    } finally {
+      setBirthSaving(false);
+    }
+  };
+
+  // Авто-переход между полями даты
+  const handleDateInput = (field, value, maxLen, nextRef) => {
+    const cleaned = value.replace(/\D/g, '').slice(0, maxLen);
+    setBirthDate(prev => ({ ...prev, [field]: cleaned }));
+    if (cleaned.length === maxLen && nextRef?.current) {
+      nextRef.current.focus();
+    }
+  };
 
   if (!user) return null;
 
@@ -423,6 +496,164 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                       Смена группы повлияет на всё расписание, задачи и другие функции приложения
                     </span>
                   </div>
+                </motion.div>
+
+                {/* Дата рождения */}
+                <motion.div
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <label style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.4)',
+                    marginBottom: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    paddingLeft: '4px',
+                  }}>
+                    <Cake style={{ width: '13px', height: '13px' }} />
+                    Дата рождения
+                    {birthSource === 'telegram' && (
+                      <span style={{
+                        fontSize: '10px',
+                        color: '#3B82F6',
+                        background: 'rgba(59,130,246,0.12)',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                      }}>из Telegram</span>
+                    )}
+                  </label>
+
+                  {birthLoading ? (
+                    <div style={{
+                      padding: '14px 16px',
+                      borderRadius: '14px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1.5px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <span style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontSize: '14px',
+                        color: 'rgba(255,255,255,0.25)',
+                      }}>Загрузка...</span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      {/* День */}
+                      <input
+                        ref={dayRef}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ДД"
+                        value={birthDate.day}
+                        onChange={(e) => handleDateInput('day', e.target.value, 2, monthRef)}
+                        onBlur={saveBirthday}
+                        style={{
+                          width: '52px',
+                          padding: '14px 0',
+                          borderRadius: '14px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1.5px solid rgba(255,255,255,0.08)',
+                          color: '#F4F3FC',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
+                        onBlurCapture={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                      />
+                      <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '18px', fontWeight: 600 }}>.</span>
+
+                      {/* Месяц */}
+                      <input
+                        ref={monthRef}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ММ"
+                        value={birthDate.month}
+                        onChange={(e) => handleDateInput('month', e.target.value, 2, yearRef)}
+                        onBlur={saveBirthday}
+                        style={{
+                          width: '52px',
+                          padding: '14px 0',
+                          borderRadius: '14px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1.5px solid rgba(255,255,255,0.08)',
+                          color: '#F4F3FC',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
+                        onBlurCapture={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                      />
+                      <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '18px', fontWeight: 600 }}>.</span>
+
+                      {/* Год */}
+                      <input
+                        ref={yearRef}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ГГГГ"
+                        value={birthDate.year}
+                        onChange={(e) => handleDateInput('year', e.target.value, 4, null)}
+                        onBlur={saveBirthday}
+                        style={{
+                          width: '72px',
+                          padding: '14px 0',
+                          borderRadius: '14px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1.5px solid rgba(255,255,255,0.08)',
+                          color: '#F4F3FC',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
+                        onBlurCapture={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                      />
+
+                      {/* Статус сохранения */}
+                      {birthSaving && (
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontSize: '11px',
+                          color: 'rgba(255,255,255,0.3)',
+                        }}>...</span>
+                      )}
+                    </div>
+                  )}
+
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 400,
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,0.25)',
+                    marginTop: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    {birthSource === 'telegram' 
+                      ? 'Получено из вашего профиля Telegram. Можете изменить' 
+                      : 'Укажите дату рождения для поздравлений от друзей'}
+                  </span>
                 </motion.div>
               </div>
             </div>

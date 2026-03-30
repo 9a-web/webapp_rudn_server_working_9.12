@@ -112,6 +112,9 @@ class UserSettings(BaseModel):
     # Настройки темы
     new_year_theme_mode: str = "auto"  # Режим новогодней темы: "auto", "always", "off"
     
+    # Персональные данные
+    birth_date: Optional[str] = None  # Дата рождения в формате DD.MM.YYYY
+    
     # Реферальная система
     referral_code: Optional[str] = None  # уникальный реферальный код пользователя
     referred_by: Optional[int] = None  # telegram_id пригласившего
@@ -162,6 +165,9 @@ class UserSettingsResponse(BaseModel):
     # Настройки уведомлений
     notifications_enabled: bool = False
     notification_time: int = 10
+    
+    # Персональные данные
+    birth_date: Optional[str] = None
     
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

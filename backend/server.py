@@ -1370,6 +1370,73 @@ async def get_theme_settings(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+@api_router.get("/user-settings/{telegram_id}/birthday")
+async def get_user_birthday(telegram_id: int):
+    """Получить дату рождения пользователя (из БД или Telegram)"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        # Если есть в БД — возвращаем
+        if user and user.get("birth_date"):
+            return {"birth_date": user["birth_date"], "source": "saved"}
+        
+        # Пробуем получить из Telegram (Bot API getChat -> birthdate)
+        try:
+            from telegram import Bot
+            bot_token = get_telegram_bot_token()
+            if bot_token:
+                bot = Bot(token=bot_token)
+                chat = await bot.get_chat(telegram_id)
+                if hasattr(chat, 'birthdate') and chat.birthdate:
+                    bd = chat.birthdate
+                    day = str(bd.day).zfill(2)
+                    month = str(bd.month).zfill(2)
+                    year = str(bd.year) if bd.year else "0000"
+                    birth_str = f"{day}.{month}.{year}"
+                    
+                    # Сохраняем в БД
+                    await db.user_settings.update_one(
+                        {"telegram_id": telegram_id},
+                        {"$set": {"birth_date": birth_str}},
+                        upsert=False
+                    )
+                    return {"birth_date": birth_str, "source": "telegram"}
+        except Exception as tg_err:
+            logger.warning(f"Не удалось получить birthday из Telegram: {tg_err}")
+        
+        return {"birth_date": None, "source": None}
+    except Exception as e:
+        logger.error(f"Ошибка при получении birthday: {e}")
+        return {"birth_date": None, "source": None}
+
+
+@api_router.put("/user-settings/{telegram_id}/birthday")
+async def update_user_birthday(telegram_id: int, data: dict):
+    """Сохранить дату рождения пользователя"""
+    try:
+        birth_date = data.get("birth_date")
+        if not birth_date:
+            raise HTTPException(status_code=400, detail="birth_date is required")
+        
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"birth_date": birth_date, "updated_at": datetime.utcnow()}},
+            upsert=False
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {"success": True, "birth_date": birth_date}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении birthday: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 @api_router.get("/notifications/stats", response_model=NotificationStatsResponse)
 async def get_notification_stats(date: Optional[str] = None):
     """
