@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { ProfileModal } from './ProfileModal';
 import { friendsAPI } from '../services/friendsAPI';
+import ProfileSettingsModal from './ProfileSettingsModal';
+import DevicesModal from './DevicesModal';
+import LKConnectionModal from './LKConnectionModal';
+
+const ADMIN_UIDS = ['765963392', '1311283832'];
 
 const TABS = [
   { id: 'general', label: 'Общее' },
@@ -17,6 +21,21 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [showSettings, setShowSettings] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [qrData, setQrData] = useState(null);
+
+  // Sub-modals
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [showDevices, setShowDevices] = useState(false);
+  const [showLKModal, setShowLKModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const isAdmin = useMemo(() => {
+    if (!user?.id) return false;
+    return ADMIN_UIDS.includes(String(user.id));
+  }, [user?.id]);
+
+  // Bottom Sheet drag
+  const sheetY = useMotionValue(0);
+  const sheetBg = useTransform(sheetY, [0, 400], ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0)']);
 
   const loadQRData = useCallback(async () => {
     if (!user?.id) return;
@@ -38,6 +57,54 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (hapticFeedback) hapticFeedback('impact', 'light');
     setShowSettings(true);
   };
+
+  const closeSheet = () => {
+    setShowSettings(false);
+  };
+
+  const settingsItems = [
+    {
+      id: 'profile',
+      icon: Sliders,
+      label: 'Настроить профиль',
+      sublabel: 'Приватность и дизайн',
+      color: '#F8B94C',
+      action: () => { closeSheet(); setTimeout(() => setShowProfileSettings(true), 200); },
+    },
+    {
+      id: 'devices',
+      icon: Smartphone,
+      label: 'Устройства',
+      sublabel: 'Управление сессиями',
+      color: '#8B5CF6',
+      action: () => { closeSheet(); setTimeout(() => setShowDevices(true), 200); },
+    },
+    {
+      id: 'referral',
+      icon: Users,
+      label: 'Реферальная программа',
+      sublabel: 'Приглашай друзей',
+      color: '#3B82F6',
+      action: () => { /* TODO */ },
+    },
+    ...(isAdmin ? [{
+      id: 'lk',
+      icon: GraduationCap,
+      label: 'ЛК РУДН',
+      sublabel: 'Подключение личного кабинета',
+      color: '#10B981',
+      action: () => { closeSheet(); setTimeout(() => setShowLKModal(true), 200); },
+    }] : []),
+    {
+      id: 'delete',
+      icon: Trash2,
+      label: 'Удалить аккаунт',
+      sublabel: '',
+      color: '#EF4444',
+      action: () => { closeSheet(); setTimeout(() => setShowDeleteConfirm(true), 200); },
+      danger: true,
+    },
+  ];
 
   if (!user) return null;
 
@@ -524,18 +591,266 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         )}
       </AnimatePresence>
 
-      {/* Настройки (ProfileModal) — поверх ProfileScreen */}
-      <div className="relative z-[300]">
-        <ProfileModal
-          isOpen={showSettings}
-          onClose={() => setShowSettings(false)}
-          user={user}
-          userSettings={userSettings}
-          profilePhoto={profilePhoto}
-          hapticFeedback={hapticFeedback}
-          onThemeChange={onThemeChange}
-        />
-      </div>
+      {/* Settings Bottom Sheet */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            className="fixed inset-0 z-[300]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ backgroundColor: sheetBg }}
+            onClick={closeSheet}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              drag="y"
+              dragConstraints={{ top: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 120 || info.velocity.y > 500) {
+                  closeSheet();
+                }
+              }}
+              style={{ y: sheetY }}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-0 left-0 right-0"
+            >
+              {/* Контейнер */}
+              <div
+                style={{
+                  background: 'linear-gradient(180deg, #1E1D1A 0%, #141414 100%)',
+                  borderRadius: '24px 24px 0 0',
+                  padding: '12px 20px 40px',
+                  maxHeight: '70vh',
+                  overflowY: 'auto',
+                }}
+              >
+                {/* Ручка */}
+                <div style={{
+                  width: '40px',
+                  height: '4px',
+                  borderRadius: '2px',
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  margin: '0 auto 20px',
+                }} />
+
+                {/* Заголовок */}
+                <div style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '18px',
+                  color: '#F4F3FC',
+                  marginBottom: '20px',
+                  paddingLeft: '4px',
+                }}>
+                  Настройки
+                </div>
+
+                {/* Кнопки */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {settingsItems.map((item, idx) => (
+                    <motion.button
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05, duration: 0.2 }}
+                      onClick={() => {
+                        if (hapticFeedback) hapticFeedback('impact', 'light');
+                        item.action();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        padding: '14px 16px',
+                        borderRadius: '16px',
+                        background: item.danger
+                          ? 'rgba(239, 68, 68, 0.08)'
+                          : 'rgba(255,255,255,0.04)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s ease',
+                        width: '100%',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {/* Иконка */}
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        backgroundColor: `${item.color}15`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <item.icon style={{
+                          width: '20px',
+                          height: '20px',
+                          color: item.color,
+                        }} />
+                      </div>
+
+                      {/* Текст */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '15px',
+                          color: item.danger ? '#EF4444' : '#F4F3FC',
+                          lineHeight: 1.2,
+                        }}>
+                          {item.label}
+                        </span>
+                        {item.sublabel && (
+                          <span style={{
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 400,
+                            fontSize: '12px',
+                            color: 'rgba(255,255,255,0.35)',
+                            lineHeight: 1.2,
+                          }}>
+                            {item.sublabel}
+                          </span>
+                        )}
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sub-модалы */}
+      {showProfileSettings && (
+        <div className="relative z-[350]">
+          <ProfileSettingsModal
+            isOpen={showProfileSettings}
+            onClose={() => setShowProfileSettings(false)}
+            user={user}
+            userSettings={userSettings}
+            hapticFeedback={hapticFeedback}
+          />
+        </div>
+      )}
+
+      {showDevices && (
+        <div className="relative z-[350]">
+          <DevicesModal
+            isOpen={showDevices}
+            onClose={() => setShowDevices(false)}
+            user={user}
+            hapticFeedback={hapticFeedback}
+          />
+        </div>
+      )}
+
+      {showLKModal && (
+        <div className="relative z-[350]">
+          <LKConnectionModal
+            isOpen={showLKModal}
+            onClose={() => setShowLKModal(false)}
+            user={user}
+            hapticFeedback={hapticFeedback}
+          />
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            className="fixed inset-0 z-[350] flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#1C1C1C',
+                borderRadius: '24px',
+                padding: '28px 24px',
+                maxWidth: '320px',
+                width: '90%',
+                textAlign: 'center',
+              }}
+            >
+              <AlertTriangle style={{ width: '40px', height: '40px', color: '#EF4444', margin: '0 auto 12px' }} />
+              <div style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '16px',
+                color: '#F4F3FC',
+                marginBottom: '8px',
+              }}>
+                Удалить аккаунт?
+              </div>
+              <div style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontSize: '13px',
+                color: 'rgba(255,255,255,0.4)',
+                marginBottom: '20px',
+                lineHeight: 1.4,
+              }}>
+                Все данные будут безвозвратно удалены
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: 'none',
+                    color: '#F4F3FC',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: delete account API call
+                    setShowDeleteConfirm(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#EF4444',
+                    border: 'none',
+                    color: '#FFFFFF',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Удалить
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };
