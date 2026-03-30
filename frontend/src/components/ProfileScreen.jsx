@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCogCorner } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCogCorner, Copy, Award, ChevronRight } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
+import { getReferralCode, getReferralStats } from '../services/referralAPI';
+import { getBackendURL } from '../services/api';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProfileEditScreen from './ProfileEditScreen';
 import DevicesModal from './DevicesModal';
@@ -29,6 +31,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [showDevices, setShowDevices] = useState(false);
   const [showLKModal, setShowLKModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReferral, setShowReferral] = useState(false);
+  const [referralData, setReferralData] = useState(null);
+  const [referralStats, setReferralStats] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  // Friends list state
+  const [friendsList, setFriendsList] = useState([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
 
   const isAdmin = useMemo(() => {
     if (!user?.id) return false;
@@ -53,6 +64,53 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (hapticFeedback) hapticFeedback('impact', 'light');
     loadQRData();
     setShowQR(true);
+  };
+
+  // Загрузка реферальных данных
+  const loadReferralData = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const [codeData, statsData] = await Promise.all([
+        getReferralCode(user.id),
+        getReferralStats(user.id),
+      ]);
+      setReferralData(codeData);
+      setReferralStats(statsData);
+    } catch (err) {
+      console.error('Failed to load referral data:', err);
+    }
+  }, [user?.id]);
+
+  // Загрузка друзей при переключении на таб "Друзья"
+  useEffect(() => {
+    if (activeTab === 'friends' && user?.id && friendsList.length === 0 && !friendsLoading) {
+      setFriendsLoading(true);
+      friendsAPI.getFriends(user.id)
+        .then(data => setFriendsList(data?.friends || []))
+        .catch(err => console.error('Failed to load friends:', err))
+        .finally(() => setFriendsLoading(false));
+    }
+  }, [activeTab, user?.id]);
+
+  // Копирование реферальной ссылки
+  const copyReferralLink = async () => {
+    const linkToCopy = referralData?.referral_link_webapp || referralData?.referral_link;
+    if (!linkToCopy) return;
+    try {
+      await navigator.clipboard.writeText(linkToCopy);
+      setCopiedLink(true);
+      if (hapticFeedback) hapticFeedback('impact', 'medium');
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = linkToCopy;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
   };
 
   const handleSettingsClick = () => {
@@ -87,7 +145,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       label: 'Реферальная программа',
       sublabel: 'Приглашай друзей',
       color: '#3B82F6',
-      action: () => { /* TODO */ },
+      action: () => { closeSheet(); setTimeout(() => { setShowReferral(true); loadReferralData(); }, 200); },
     },
     ...(isAdmin ? [{
       id: 'lk',
@@ -479,6 +537,267 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             ))}
           </motion.div>
 
+          {/* Контент табов */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '16px 20px 100px',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          >
+            <AnimatePresence mode="wait">
+              {activeTab === 'general' && (
+                <motion.div
+                  key="general"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+                >
+                  {/* Учебная информация */}
+                  {(userSettings?.facultet_name || userSettings?.kurs) && (
+                    <div style={{
+                      padding: '16px',
+                      borderRadius: '20px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}>
+                      <span style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        color: 'rgba(255,255,255,0.3)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>
+                        Учебная информация
+                      </span>
+                      {userSettings?.facultet_name && (
+                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <GraduationCap style={{ width: '16px', height: '16px', color: '#F8B94C', flexShrink: 0 }} />
+                          <span style={{
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            color: '#F4F3FC',
+                          }}>
+                            {userSettings.facultet_name}
+                          </span>
+                        </div>
+                      )}
+                      {userSettings?.kurs && (
+                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Trophy style={{ width: '16px', height: '16px', color: '#A855F7', flexShrink: 0 }} />
+                          <span style={{
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            color: '#F4F3FC',
+                          }}>
+                            {userSettings.kurs} курс
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Статистика */}
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '20px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      color: 'rgba(255,255,255,0.3)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                    }}>
+                      Статистика
+                    </span>
+                    <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{
+                        padding: '12px',
+                        borderRadius: '14px',
+                        background: 'rgba(248,185,76,0.08)',
+                        border: '1px solid rgba(248,185,76,0.15)',
+                        textAlign: 'center',
+                      }}>
+                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#F8B94C' }}>
+                          {user.friends_count || 0}
+                        </span>
+                        <br />
+                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                          Друзей
+                        </span>
+                      </div>
+                      <div style={{
+                        padding: '12px',
+                        borderRadius: '14px',
+                        background: 'rgba(168,85,247,0.08)',
+                        border: '1px solid rgba(168,85,247,0.15)',
+                        textAlign: 'center',
+                      }}>
+                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#A855F7' }}>
+                          {user.achievements_count || 0}
+                        </span>
+                        <br />
+                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                          Достижений
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'friends' && (
+                <motion.div
+                  key="friends"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                >
+                  {friendsLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        border: '2px solid rgba(248,185,76,0.3)',
+                        borderTopColor: '#F8B94C',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }} />
+                    </div>
+                  ) : friendsList.length > 0 ? (
+                    friendsList.map((friend) => (
+                      <div
+                        key={friend.telegram_id}
+                        style={{
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>
+                          <span style={{ color: '#fff', fontWeight: 700, fontSize: '16px' }}>
+                            {(friend.first_name?.[0] || '?').toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: '#F4F3FC',
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {[friend.first_name, friend.last_name].filter(Boolean).join(' ') || 'Пользователь'}
+                          </span>
+                          {friend.group_name && (
+                            <span style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 400,
+                              fontSize: '12px',
+                              color: 'rgba(255,255,255,0.35)',
+                            }}>
+                              {friend.group_name}
+                            </span>
+                          )}
+                        </div>
+                        {friend.is_online && (
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: '#4ADE80',
+                            boxShadow: '0 0 6px rgba(74,222,128,0.5)',
+                            flexShrink: 0,
+                          }} />
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{
+                      padding: '32px 0',
+                      textAlign: 'center',
+                    }}>
+                      <Users style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.15)', margin: '0 auto 12px' }} />
+                      <span style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        color: 'rgba(255,255,255,0.3)',
+                      }}>
+                        Пока нет друзей
+                      </span>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {activeTab === 'materials' && (
+                <motion.div
+                  key="materials"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div style={{
+                    padding: '32px 0',
+                    textAlign: 'center',
+                  }}>
+                    <Sliders style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.15)', margin: '0 auto 12px' }} />
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      color: 'rgba(255,255,255,0.3)',
+                      display: 'block',
+                    }}>
+                      Скоро появится
+                    </span>
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 400,
+                      fontSize: '12px',
+                      color: 'rgba(255,255,255,0.2)',
+                      marginTop: '4px',
+                      display: 'block',
+                    }}>
+                      Учебные материалы, заметки и файлы
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {/* Свечение внизу */}
           <div
             style={{
@@ -778,6 +1097,141 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         </div>
       )}
 
+      {/* Referral Bottom Sheet */}
+      <AnimatePresence>
+        {showReferral && (
+          <motion.div
+            className="fixed inset-0 z-[350]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+            onClick={() => setShowReferral(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-0 left-0 right-0"
+            >
+              <div style={{
+                background: 'linear-gradient(180deg, #1E1D1A 0%, #141414 100%)',
+                borderRadius: '24px 24px 0 0',
+                padding: '12px 20px 40px',
+                maxHeight: '70vh',
+                overflowY: 'auto',
+              }}>
+                {/* Ручка */}
+                <div style={{
+                  width: '40px', height: '4px', borderRadius: '2px',
+                  backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 auto 20px',
+                }} />
+
+                <div style={{
+                  fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '18px',
+                  color: '#F4F3FC', marginBottom: '20px', paddingLeft: '4px',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <Users style={{ width: '20px', height: '20px', color: '#3B82F6' }} />
+                  Реферальная программа
+                </div>
+
+                {!referralData ? (
+                  <div style={{ textAlign: 'center', padding: '24px' }}>
+                    <div style={{
+                      width: '32px', height: '32px', border: '2px solid rgba(59,130,246,0.3)',
+                      borderTopColor: '#3B82F6', borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+                      margin: '0 auto',
+                    }} />
+                    <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '13px', color: 'rgba(255,255,255,0.3)', marginTop: '12px', display: 'block' }}>
+                      Загрузка...
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Код */}
+                    <div style={{
+                      padding: '16px', borderRadius: '16px',
+                      background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                      marginBottom: '12px',
+                    }}>
+                      <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
+                        Ваш код
+                      </span>
+                      <div style={{
+                        fontFamily: "'Poppins', monospace", fontWeight: 700, fontSize: '22px',
+                        color: '#60A5FA', marginTop: '4px',
+                      }}>
+                        {referralData.referral_code}
+                      </div>
+                    </div>
+
+                    {/* Кнопка копирования */}
+                    <button
+                      onClick={copyReferralLink}
+                      style={{
+                        width: '100%', padding: '14px', borderRadius: '14px',
+                        border: 'none', cursor: 'pointer',
+                        fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '15px',
+                        color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        background: copiedLink
+                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                          : 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                        transition: 'all 0.2s',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      {copiedLink ? (
+                        <><Award style={{ width: '18px', height: '18px' }} /> Скопировано!</>
+                      ) : (
+                        <><Copy style={{ width: '18px', height: '18px' }} /> Копировать ссылку</>
+                      )}
+                    </button>
+
+                    {/* Статистика */}
+                    {referralStats && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)', textAlign: 'center' }}>
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#34D399' }}>
+                            {referralStats.level_1_count || 0}
+                          </span>
+                          <br />
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>Уровень 1</span>
+                        </div>
+                        <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)', textAlign: 'center' }}>
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#60A5FA' }}>
+                            {referralStats.level_2_count || 0}
+                          </span>
+                          <br />
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>Уровень 2</span>
+                        </div>
+                        <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)', textAlign: 'center' }}>
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#A78BFA' }}>
+                            {referralStats.level_3_count || 0}
+                          </span>
+                          <br />
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>Уровень 3</span>
+                        </div>
+                        <div style={{ padding: '12px', borderRadius: '14px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)', textAlign: 'center' }}>
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#FBBF24' }}>
+                            {referralStats.total_referral_points || 0}
+                          </span>
+                          <br />
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>Заработано</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Delete Confirm */}
       <AnimatePresence>
         {showDeleteConfirm && (
@@ -841,9 +1295,35 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   Отмена
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: delete account API call
-                    setShowDeleteConfirm(false);
+                  disabled={deleteLoading}
+                  onClick={async () => {
+                    if (!user?.id || deleteLoading) return;
+                    setDeleteLoading(true);
+                    try {
+                      const backendUrl = getBackendURL();
+                      const response = await fetch(`${backendUrl}/api/user/${user.id}`, {
+                        method: 'DELETE',
+                      });
+                      if (response.ok) {
+                        if (hapticFeedback) hapticFeedback('notification', 'success');
+                        localStorage.removeItem('telegram_user');
+                        localStorage.removeItem('synced_user');
+                        localStorage.removeItem('user_settings');
+                        localStorage.removeItem('session_token');
+                        localStorage.removeItem('linked_telegram_id');
+                        localStorage.removeItem(`user_settings_${user.id}`);
+                        setShowDeleteConfirm(false);
+                        onClose();
+                        window.location.reload();
+                      } else {
+                        throw new Error('Ошибка удаления');
+                      }
+                    } catch (error) {
+                      console.error('Ошибка удаления аккаунта:', error);
+                      if (hapticFeedback) hapticFeedback('notification', 'error');
+                    } finally {
+                      setDeleteLoading(false);
+                    }
                   }}
                   style={{
                     flex: 1,
@@ -855,10 +1335,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                     fontSize: '14px',
-                    cursor: 'pointer',
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                    opacity: deleteLoading ? 0.6 : 1,
                   }}
                 >
-                  Удалить
+                  {deleteLoading ? 'Удаление...' : 'Удалить'}
                 </button>
               </div>
             </motion.div>

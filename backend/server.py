@@ -1173,24 +1173,48 @@ async def delete_user_account(telegram_id: int):
         # 17. Удаляем друзей и запросы в друзья
         await db.friends.delete_many({
             "$or": [
-                {"user_id": telegram_id},
-                {"friend_id": telegram_id}
+                {"user_telegram_id": telegram_id},
+                {"friend_telegram_id": telegram_id}
             ]
         })
         await db.friend_requests.delete_many({
             "$or": [
-                {"from_user_id": telegram_id},
-                {"to_user_id": telegram_id}
+                {"from_telegram_id": telegram_id},
+                {"to_telegram_id": telegram_id}
             ]
         })
         
         # 18. Удаляем блокировки
         await db.user_blocks.delete_many({
             "$or": [
-                {"blocker_id": telegram_id},
-                {"blocked_id": telegram_id}
+                {"blocker_telegram_id": telegram_id},
+                {"blocked_telegram_id": telegram_id}
             ]
         })
+        
+        # 19. Удаляем сообщения и чаты
+        await db.messages.delete_many({"sender_id": telegram_id})
+        # Удаляем из участников чатов
+        await db.conversations.update_many(
+            {"participants": telegram_id},
+            {"$pull": {"participants": telegram_id}}
+        )
+        # Удаляем пустые чаты (без участников)
+        await db.conversations.delete_many({"participants": {"$size": 0}})
+        
+        # 20. Удаляем историю прослушивания музыки
+        await db.music_history.delete_many({"telegram_id": telegram_id})
+        
+        # 21. Удаляем совместные расписания и токены
+        await db.shared_schedules.delete_many({"owner_id": telegram_id})
+        await db.shared_schedules.update_many(
+            {"participants": {"$elemMatch": {"telegram_id": telegram_id}}},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        await db.schedule_share_tokens.delete_many({"created_by": telegram_id})
+        
+        # 22. Удаляем подключения ЛК
+        await db.lk_connections.delete_many({"telegram_id": telegram_id})
         
         logger.info(f"✅ Аккаунт пользователя {telegram_id} полностью удален. Статистика: {deleted_counts}")
         
@@ -1418,6 +1442,31 @@ async def update_user_birthday(telegram_id: int, data: dict):
         birth_date = data.get("birth_date")
         if not birth_date:
             raise HTTPException(status_code=400, detail="birth_date is required")
+        
+        # Валидация формата даты ДД.ММ.ГГГГ
+        import re
+        if not re.match(r'^\d{2}\.\d{2}\.\d{4}$', birth_date):
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте ДД.ММ.ГГГГ")
+        
+        parts = birth_date.split('.')
+        day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+        
+        if month < 1 or month > 12:
+            raise HTTPException(status_code=400, detail="Месяц должен быть от 01 до 12")
+        if day < 1 or day > 31:
+            raise HTTPException(status_code=400, detail="День должен быть от 01 до 31")
+        if year != 0 and (year < 1920 or year > 2015):
+            raise HTTPException(status_code=400, detail="Год должен быть от 1920 до 2015")
+        
+        # Проверка дней в месяце (кроме year=0000)
+        if year != 0:
+            try:
+                from calendar import monthrange
+                max_day = monthrange(year, month)[1]
+                if day > max_day:
+                    raise HTTPException(status_code=400, detail=f"В месяце {month} максимум {max_day} дней")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Некорректная дата")
         
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
@@ -14715,7 +14764,7 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
             is_online=is_online if privacy.show_online_status else False,
             last_activity=last_activity if privacy.show_online_status else None,
-            privacy=privacy,
+            privacy=privacy if viewer_telegram_id == telegram_id or viewer_telegram_id is None else None,
             created_at=user.get("created_at"),
             friendship_status=friendship_status
         )

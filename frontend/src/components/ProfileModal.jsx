@@ -1538,9 +1538,9 @@ export const ProfileModal = ({
           <ProfileSettingsModal
             isOpen={showProfileSettings}
             onClose={() => setShowProfileSettings(false)}
-            telegramId={user?.id}
+            user={user}
+            userSettings={userSettings}
             hapticFeedback={hapticFeedback}
-            onThemeChange={onThemeChange}
           />
 
           {/* Модальное окно управления устройствами */}
