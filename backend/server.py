@@ -14913,6 +14913,58 @@ async def get_profile_qr_data(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ========== GRAFFITI ==========
+
+@api_router.put("/profile/{telegram_id}/graffiti")
+async def save_graffiti(telegram_id: int, request: Request):
+    """Сохранить граффити пользователя (base64 data URL)"""
+    try:
+        body = await request.json()
+        graffiti_data = body.get("graffiti_data", "")
+        
+        # Ограничение размера ~2MB base64
+        if len(graffiti_data) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Graffiti data too large")
+        
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"graffiti_data": graffiti_data}},
+            upsert=False
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save graffiti error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/profile/{telegram_id}/graffiti")
+async def get_graffiti(telegram_id: int):
+    """Получить граффити пользователя"""
+    try:
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"graffiti_data": 1, "_id": 0}
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {"graffiti_data": user.get("graffiti_data", "")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get graffiti error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ========== END GRAFFITI ==========
+
+
+
 # Обработка приглашения от друга (онбординг)
 
 @api_router.post("/friends/process-invite", response_model=ProcessFriendInviteResponse)

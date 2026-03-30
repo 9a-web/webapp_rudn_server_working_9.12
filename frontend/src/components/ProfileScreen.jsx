@@ -248,6 +248,63 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     saveSnapshot();
     if (hapticFeedback) hapticFeedback('impact', 'light');
   };
+
+  // Сохранение граффити на сервер
+  const saveGraffitiToServer = useCallback(async () => {
+    const canvas = graffitiCanvasRef.current;
+    if (!canvas || !user?.id) return;
+    try {
+      const dataURL = canvas.toDataURL('image/png');
+      const backendURL = getBackendURL();
+      await fetch(`${backendURL}/api/profile/${user.id}/graffiti`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ graffiti_data: dataURL }),
+      });
+    } catch (err) {
+      console.error('[Graffiti] Save error:', err);
+    }
+  }, [user?.id]);
+
+  // Загрузка граффити с сервера
+  const loadGraffitiFromServer = useCallback(async () => {
+    const canvas = graffitiCanvasRef.current;
+    if (!canvas || !user?.id) return;
+    try {
+      const backendURL = getBackendURL();
+      const res = await fetch(`${backendURL}/api/profile/${user.id}/graffiti`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.graffiti_data) return;
+      // Рисуем сохранённое изображение на canvas
+      const img = new window.Image();
+      img.onload = () => {
+        const ctx = graffitiCtxRef.current;
+        if (!ctx) {
+          setupCanvas(canvas);
+        }
+        const drawCtx = graffitiCtxRef.current;
+        if (!drawCtx) return;
+        const dpr = window.devicePixelRatio || 1;
+        drawCtx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+        // Сохраняем snapshot для undo
+        saveSnapshot();
+      };
+      img.src = data.graffiti_data;
+    } catch (err) {
+      console.error('[Graffiti] Load error:', err);
+    }
+  }, [user?.id, setupCanvas, saveSnapshot]);
+
+  // Загрузка при открытии профиля / переключении на таб
+  useEffect(() => {
+    if (activeTab === 'general' && isOpen && user?.id) {
+      const t = setTimeout(loadGraffitiFromServer, 350);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isOpen]);
+
   // ========== END GRAFFITI ==========
 
   const isAdmin = useMemo(() => {
@@ -843,6 +900,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       )}
                       <button
                         onClick={() => {
+                          if (graffitiEditMode) {
+                            // Выходим из режима — сохраняем на сервер
+                            saveGraffitiToServer();
+                          }
                           setGraffitiEditMode(prev => !prev);
                           if (hapticFeedback) hapticFeedback('impact', 'light');
                         }}
