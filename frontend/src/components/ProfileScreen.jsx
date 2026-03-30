@@ -491,13 +491,17 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       fontWeight: 600,
                       fontSize: '16px',
                       color: activeTab === tab.id ? '#F8B94C' : '#88888B',
-                      background: 'none',
-                      border: activeTab === tab.id ? '2px solid #F8B94C' : '2px solid transparent',
+                      background: activeTab === tab.id
+                        ? 'rgba(248, 185, 76, 0.08)'
+                        : 'rgba(255, 255, 255, 0.04)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: activeTab === tab.id ? '1px solid rgba(248, 185, 76, 0.25)' : '1px solid rgba(255, 255, 255, 0.06)',
                       borderRadius: '16px',
                       padding: '6px 18px',
                       cursor: 'pointer',
                       position: 'relative',
-                      transition: 'color 0.2s ease, border-color 0.2s ease',
+                      transition: 'all 0.25s ease',
                       flexShrink: 0,
                       whiteSpace: 'nowrap',
                     }}
