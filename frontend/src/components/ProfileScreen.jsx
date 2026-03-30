@@ -54,39 +54,35 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           className="fixed inset-0 z-[200] flex flex-col items-center"
           style={{ backgroundColor: '#000000' }}
         >
-          {/* Кнопка назад */}
-          <motion.button
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15, duration: 0.25 }}
-            onClick={() => {
-              if (hapticFeedback) hapticFeedback('impact', 'light');
-              onClose();
-            }}
-            className="absolute top-0 left-0 p-4 z-10"
-            style={{
-              paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
-            }}
-          >
-            <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
-          </motion.button>
-
-          {/* Кнопки QR и Настройки — правый верхний угол */}
+          {/* Верхняя панель навигации */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.25 }}
-            className="absolute top-0 right-0 z-10 flex items-center gap-3 pr-4"
+            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4"
             style={{
               paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
             }}
           >
-            <button onClick={handleQRClick}>
-              <QrCode style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+            {/* Кнопка назад */}
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'light');
+                onClose();
+              }}
+            >
+              <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
             </button>
-            <button onClick={handleSettingsClick}>
-              <Settings style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
-            </button>
+
+            {/* QR и Настройки */}
+            <div className="flex items-center gap-3">
+              <button onClick={handleQRClick}>
+                <QrCode style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+              </button>
+              <button onClick={handleSettingsClick}>
+                <Settings style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+              </button>
+            </div>
           </motion.div>
 
           {/* Аватар — 87px от верха */}
@@ -528,16 +524,18 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         )}
       </AnimatePresence>
 
-      {/* Настройки (ProfileModal) */}
-      <ProfileModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        user={user}
-        userSettings={userSettings}
-        profilePhoto={profilePhoto}
-        hapticFeedback={hapticFeedback}
-        onThemeChange={onThemeChange}
-      />
+      {/* Настройки (ProfileModal) — поверх ProfileScreen */}
+      <div className="relative z-[300]">
+        <ProfileModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          user={user}
+          userSettings={userSettings}
+          profilePhoto={profilePhoto}
+          hapticFeedback={hapticFeedback}
+          onThemeChange={onThemeChange}
+        />
+      </div>
     </AnimatePresence>
   );
 };
