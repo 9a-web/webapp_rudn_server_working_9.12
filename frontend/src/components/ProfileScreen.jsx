@@ -503,7 +503,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               WebkitOverflowScrolling: 'touch',
               paddingBottom: '2px',
               padding: '0 20px 2px',
-              marginTop: '20px',
+              marginTop: '10px',
             }}
             className="scrollbar-hide"
           >
