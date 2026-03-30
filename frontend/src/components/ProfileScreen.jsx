@@ -44,28 +44,23 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Graffiti state
   const graffitiCanvasRef = useRef(null);
   const graffitiCtxRef = useRef(null);
-  const isDrawingRef = useRef(false);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [brushColor, setBrushColor] = useState('#F8B94C');
   const [brushSize, setBrushSize] = useState(4);
   const lastPointRef = useRef(null);
   const [isGraffitiEditing, setIsGraffitiEditing] = useState(false);
-  const brushColorRef = useRef(brushColor);
-  const brushSizeRef = useRef(brushSize);
-  brushColorRef.current = brushColor;
-  brushSizeRef.current = brushSize;
 
   const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 
   // Инициализация canvas граффити
-  const initCanvas = useCallback(() => {
+  useEffect(() => {
+    if (activeTab !== 'general' || !graffitiCanvasRef.current) return;
     const canvas = graffitiCanvasRef.current;
-    if (!canvas) return;
     const parent = canvas.parentElement;
     if (!parent) return;
     const dpr = window.devicePixelRatio || 1;
     const w = parent.clientWidth;
     const h = parent.clientHeight;
-    if (w === 0 || h === 0) return;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width = w + 'px';
@@ -75,51 +70,33 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     graffitiCtxRef.current = ctx;
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'general') return;
-    // Небольшая задержка чтобы DOM отрендерился
-    const timer = setTimeout(initCanvas, 100);
-    return () => clearTimeout(timer);
-  }, [activeTab, initCanvas]);
-
-  // Переинициализация при входе в режим редактирования
-  useEffect(() => {
-    if (isGraffitiEditing && activeTab === 'general') {
-      setTimeout(initCanvas, 50);
-    }
-  }, [isGraffitiEditing, activeTab, initCanvas]);
+  }, [activeTab]);
 
   const getPos = (e) => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const touch = e.touches?.[0] || e.changedTouches?.[0];
-    const clientX = touch ? touch.clientX : e.clientX;
-    const clientY = touch ? touch.clientY : e.clientY;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  const startDraw = useCallback((e) => {
+  // --- Mouse handlers (React) — для десктопа ---
+  const startDrawMouse = (e) => {
     if (!isGraffitiEditing) return;
-    e.preventDefault();
-    e.stopPropagation();
-    isDrawingRef.current = true;
+    setIsDrawing(true);
     const pos = getPos(e);
     lastPointRef.current = pos;
     const ctx = graffitiCtxRef.current;
     if (!ctx) return;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, brushSizeRef.current / 2, 0, Math.PI * 2);
-    ctx.fillStyle = brushColorRef.current;
+    ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = brushColor;
     ctx.fill();
-  }, [isGraffitiEditing]);
+  };
 
-  const draw = useCallback((e) => {
-    if (!isDrawingRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
+  const drawMouse = (e) => {
+    if (!isDrawing || !isGraffitiEditing) return;
     const ctx = graffitiCtxRef.current;
     if (!ctx) return;
     const pos = getPos(e);
@@ -128,76 +105,85 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       ctx.beginPath();
       ctx.moveTo(last.x, last.y);
       ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = brushColorRef.current;
-      ctx.lineWidth = brushSizeRef.current;
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushSize;
       ctx.stroke();
     }
     lastPointRef.current = pos;
-  }, []);
+  };
 
-  const stopDraw = useCallback(() => {
-    isDrawingRef.current = false;
+  const stopDrawMouse = () => {
+    setIsDrawing(false);
     lastPointRef.current = null;
-  }, []);
+  };
 
-  // Нативная привязка touch-событий с passive: false (для preventDefault на мобильных)
+  // --- Native touch handlers с { passive: false } — для мобильных ---
+  const isDrawingTouchRef = useRef(false);
+  const brushColorTouchRef = useRef(brushColor);
+  const brushSizeTouchRef = useRef(brushSize);
+  const isGraffitiEditingRef = useRef(isGraffitiEditing);
+  brushColorTouchRef.current = brushColor;
+  brushSizeTouchRef.current = brushSize;
+  isGraffitiEditingRef.current = isGraffitiEditing;
+
   useEffect(() => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas) return;
 
-    const handleTouchStart = (e) => {
-      if (!isGraffitiEditing) return;
-      e.preventDefault();
-      isDrawingRef.current = true;
+    const getTouchPos = (touch) => {
       const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      const pos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    };
+
+    const onTouchStart = (e) => {
+      if (!isGraffitiEditingRef.current) return;
+      e.preventDefault();
+      isDrawingTouchRef.current = true;
+      const pos = getTouchPos(e.touches[0]);
       lastPointRef.current = pos;
       const ctx = graffitiCtxRef.current;
       if (!ctx) return;
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, brushSizeRef.current / 2, 0, Math.PI * 2);
-      ctx.fillStyle = brushColorRef.current;
+      ctx.arc(pos.x, pos.y, brushSizeTouchRef.current / 2, 0, Math.PI * 2);
+      ctx.fillStyle = brushColorTouchRef.current;
       ctx.fill();
     };
 
-    const handleTouchMove = (e) => {
-      if (!isDrawingRef.current) return;
+    const onTouchMove = (e) => {
+      if (!isDrawingTouchRef.current) return;
       e.preventDefault();
       const ctx = graffitiCtxRef.current;
       if (!ctx) return;
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      const pos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+      const pos = getTouchPos(e.touches[0]);
       const last = lastPointRef.current;
       if (last) {
         ctx.beginPath();
         ctx.moveTo(last.x, last.y);
         ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = brushColorRef.current;
-        ctx.lineWidth = brushSizeRef.current;
+        ctx.strokeStyle = brushColorTouchRef.current;
+        ctx.lineWidth = brushSizeTouchRef.current;
         ctx.stroke();
       }
       lastPointRef.current = pos;
     };
 
-    const handleTouchEnd = () => {
-      isDrawingRef.current = false;
+    const onTouchEnd = () => {
+      isDrawingTouchRef.current = false;
       lastPointRef.current = null;
     };
 
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd);
-    canvas.addEventListener('touchcancel', handleTouchEnd);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
 
     return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('touchcancel', handleTouchEnd);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [isGraffitiEditing]);
+  }, []);
 
   const clearGraffiti = () => {
     const canvas = graffitiCanvasRef.current;
@@ -812,10 +798,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   }}>
                     <canvas
                       ref={graffitiCanvasRef}
-                      onMouseDown={startDraw}
-                      onMouseMove={draw}
-                      onMouseUp={stopDraw}
-                      onMouseLeave={stopDraw}
+                      onMouseDown={startDrawMouse}
+                      onMouseMove={drawMouse}
+                      onMouseUp={stopDrawMouse}
+                      onMouseLeave={stopDrawMouse}
                       style={{
                         width: '100%',
                         height: '100%',
