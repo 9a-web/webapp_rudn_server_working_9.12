@@ -509,21 +509,21 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="fixed inset-0 z-[200] flex flex-col items-center"
-          style={{ backgroundColor: '#000000', overscrollBehavior: 'contain', touchAction: 'pan-y' }}
-          onTouchMove={(e) => {
-            // Не даём событию пробрасываться к фону, если скроллим профиль
-            e.stopPropagation();
-          }}
+          className="fixed inset-0 z-[200] flex flex-col"
+          style={{ backgroundColor: '#000000', overscrollBehavior: 'contain' }}
         >
-          {/* Верхняя панель навигации */}
+          {/* Верхняя панель навигации — фиксирована */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.25 }}
-            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4"
+            className="flex items-center justify-between px-4"
             style={{
               paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
+              paddingBottom: '8px',
+              position: 'relative',
+              zIndex: 10,
+              flexShrink: 0,
             }}
           >
             {/* Кнопка назад */}
@@ -553,7 +553,20 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
-          {/* Аватар — 87px от верха */}
+          {/* === Единый скроллируемый контейнер === */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+
+          {/* Аватар */}
           <motion.div
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -564,7 +577,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               stiffness: 260,
               delay: 0.08,
             }}
-            style={{ marginTop: '67px' }}
+            style={{ marginTop: '12px' }}
           >
             <div
               className="overflow-hidden relative"
@@ -821,7 +834,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
-          {/* Табы */}
+          {/* Табы — sticky при скролле */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -835,8 +848,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
               paddingBottom: '2px',
-              padding: '0 20px 2px',
+              padding: '8px 20px 2px',
               marginTop: '-5px',
+              position: 'sticky',
+              top: 0,
+              zIndex: 5,
+              backgroundColor: '#000000',
+              width: '100%',
             }}
             className="scrollbar-hide"
           >
@@ -875,8 +893,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           {/* Контент табов */}
           <div
             style={{
-              flex: 1,
-              overflowY: 'auto',
+              width: '100%',
               padding: '16px 20px 100px',
               position: 'relative',
               zIndex: 1,
@@ -1349,6 +1366,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               )}
             </AnimatePresence>
           </div>
+
+          </div>{/* === Конец скроллируемого контейнера === */}
 
           {/* Свечение внизу */}
           <div
