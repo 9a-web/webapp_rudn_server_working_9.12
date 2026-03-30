@@ -335,7 +335,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                       fontSize: '16px',
                       color: 'rgba(255,255,255,0.35)',
                     }}>
-                      {user.first_name || user.username || 'User'}
+                      @{user.username || 'user'}
                     </span>
                   </div>
                   <span style={{
@@ -347,7 +347,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                     display: 'block',
                     paddingLeft: '4px',
                   }}>
-                    Используется короткое имя из Telegram
+                    Используется короткое имя (@username) из Telegram
                   </span>
                 </motion.div>
 
