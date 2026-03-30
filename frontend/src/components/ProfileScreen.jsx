@@ -41,6 +41,90 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
 
+  // Graffiti state
+  const graffitiCanvasRef = useRef(null);
+  const graffitiCtxRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [brushColor, setBrushColor] = useState('#F8B94C');
+  const [brushSize, setBrushSize] = useState(4);
+  const lastPointRef = useRef(null);
+
+  const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
+
+  // Инициализация canvas граффити
+  useEffect(() => {
+    if (activeTab !== 'general' || !graffitiCanvasRef.current) return;
+    const canvas = graffitiCanvasRef.current;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = parent.clientWidth;
+    const h = parent.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    graffitiCtxRef.current = ctx;
+  }, [activeTab]);
+
+  const getPos = (e) => {
+    const canvas = graffitiCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    setIsDrawing(true);
+    const pos = getPos(e);
+    lastPointRef.current = pos;
+    const ctx = graffitiCtxRef.current;
+    if (!ctx) return;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = brushColor;
+    ctx.fill();
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const ctx = graffitiCtxRef.current;
+    if (!ctx) return;
+    const pos = getPos(e);
+    const last = lastPointRef.current;
+    if (last) {
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushSize;
+      ctx.stroke();
+    }
+    lastPointRef.current = pos;
+  };
+
+  const stopDraw = () => {
+    setIsDrawing(false);
+    lastPointRef.current = null;
+  };
+
+  const clearGraffiti = () => {
+    const canvas = graffitiCanvasRef.current;
+    const ctx = graffitiCtxRef.current;
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    if (hapticFeedback) hapticFeedback('impact', 'light');
+  };
+
   const isAdmin = useMemo(() => {
     if (!user?.id) return false;
     return ADMIN_UIDS.includes(String(user.id));
@@ -557,103 +641,147 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
                 >
-                  {/* Учебная информация */}
-                  {(userSettings?.facultet_name || userSettings?.kurs) && (
-                    <div style={{
-                      padding: '16px',
-                      borderRadius: '20px',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                    }}>
+                  {/* Заголовок граффити */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Pen style={{ width: '16px', height: '16px', color: '#F8B94C' }} />
                       <span style={{
                         fontFamily: "'Poppins', sans-serif",
                         fontWeight: 600,
-                        fontSize: '12px',
-                        color: 'rgba(255,255,255,0.3)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
+                        fontSize: '14px',
+                        color: '#F4F3FC',
                       }}>
-                        Учебная информация
+                        Граффити
                       </span>
-                      {userSettings?.facultet_name && (
-                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <GraduationCap style={{ width: '16px', height: '16px', color: '#F8B94C', flexShrink: 0 }} />
-                          <span style={{
-                            fontFamily: "'Poppins', sans-serif",
-                            fontWeight: 500,
-                            fontSize: '14px',
-                            color: '#F4F3FC',
-                          }}>
-                            {userSettings.facultet_name}
-                          </span>
-                        </div>
-                      )}
-                      {userSettings?.kurs && (
-                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Trophy style={{ width: '16px', height: '16px', color: '#A855F7', flexShrink: 0 }} />
-                          <span style={{
-                            fontFamily: "'Poppins', sans-serif",
-                            fontWeight: 500,
-                            fontSize: '14px',
-                            color: '#F4F3FC',
-                          }}>
-                            {userSettings.kurs} курс
-                          </span>
-                        </div>
-                      )}
                     </div>
-                  )}
+                    <button
+                      onClick={clearGraffiti}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '10px',
+                        padding: '5px 12px',
+                        cursor: 'pointer',
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 500,
+                        fontSize: '12px',
+                        color: 'rgba(255,255,255,0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Trash2 style={{ width: '12px', height: '12px' }} />
+                      Очистить
+                    </button>
+                  </div>
 
-                  {/* Статистика */}
+                  {/* Canvas */}
                   <div style={{
-                    padding: '16px',
                     borderRadius: '20px',
-                    background: 'rgba(255,255,255,0.04)',
+                    background: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.06)',
+                    overflow: 'hidden',
+                    height: '260px',
+                    position: 'relative',
+                    touchAction: 'none',
                   }}>
-                    <span style={{
-                      fontFamily: "'Poppins', sans-serif",
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      color: 'rgba(255,255,255,0.3)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
+                    <canvas
+                      ref={graffitiCanvasRef}
+                      onMouseDown={startDraw}
+                      onMouseMove={draw}
+                      onMouseUp={stopDraw}
+                      onMouseLeave={stopDraw}
+                      onTouchStart={startDraw}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDraw}
+                      onTouchCancel={stopDraw}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        cursor: 'crosshair',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+
+                  {/* Палитра цветов + размер кисти */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                  }}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
+                      {GRAFFITI_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => {
+                            setBrushColor(c);
+                            if (hapticFeedback) hapticFeedback('impact', 'light');
+                          }}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            backgroundColor: c,
+                            border: brushColor === c
+                              ? '2.5px solid #FFFFFF'
+                              : '2px solid rgba(255,255,255,0.1)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            transform: brushColor === c ? 'scale(1.15)' : 'scale(1)',
+                            boxShadow: brushColor === c ? `0 0 10px ${c}40` : 'none',
+                            flexShrink: 0,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {/* Размер кисти */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      flexShrink: 0,
                     }}>
-                      Статистика
-                    </span>
-                    <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div style={{
-                        padding: '12px',
-                        borderRadius: '14px',
-                        background: 'rgba(248,185,76,0.08)',
-                        border: '1px solid rgba(248,185,76,0.15)',
-                        textAlign: 'center',
-                      }}>
-                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#F8B94C' }}>
-                          {user.friends_count || 0}
-                        </span>
-                        <br />
-                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                          Друзей
-                        </span>
-                      </div>
-                      <div style={{
-                        padding: '12px',
-                        borderRadius: '14px',
-                        background: 'rgba(168,85,247,0.08)',
-                        border: '1px solid rgba(168,85,247,0.15)',
-                        textAlign: 'center',
-                      }}>
-                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#A855F7' }}>
-                          {user.achievements_count || 0}
-                        </span>
-                        <br />
-                        <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                          Достижений
-                        </span>
-                      </div>
+                      {[2, 4, 8, 14].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => {
+                            setBrushSize(s);
+                            if (hapticFeedback) hapticFeedback('impact', 'light');
+                          }}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: brushSize === s
+                              ? 'rgba(248,185,76,0.15)'
+                              : 'rgba(255,255,255,0.04)',
+                            border: brushSize === s
+                              ? '1px solid rgba(248,185,76,0.4)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{
+                            width: `${Math.min(s + 2, 16)}px`,
+                            height: `${Math.min(s + 2, 16)}px`,
+                            borderRadius: '50%',
+                            backgroundColor: brushSize === s ? '#F8B94C' : 'rgba(255,255,255,0.3)',
+                          }} />
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </motion.div>
