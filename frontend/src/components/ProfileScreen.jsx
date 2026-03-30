@@ -550,7 +550,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             }}
           >
             <AnimatePresence mode="wait">
-              {activeTab === 'general' && (
+              {activeTab === 'general' ? (
                 <motion.div
                   key="general"
                   initial={{ opacity: 0, y: 10 }}
@@ -657,9 +657,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     </div>
                   </div>
                 </motion.div>
-              )}
-
-              {activeTab === 'friends' && (
+              ) : activeTab === 'friends' ? (
                 <motion.div
                   key="friends"
                   initial={{ opacity: 0, y: 10 }}
@@ -760,9 +758,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     </div>
                   )}
                 </motion.div>
-              )}
-
-              {activeTab === 'materials' && (
+              ) : (
                 <motion.div
                   key="materials"
                   initial={{ opacity: 0, y: 10 }}
