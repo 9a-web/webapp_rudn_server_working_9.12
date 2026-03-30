@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCogCorner, Copy, Award, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCogCorner, Copy, Award, ChevronRight, Undo2, Redo2, Eraser } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
@@ -48,17 +48,26 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const graffitiLastPt = useRef(null);
   const graffitiColor = useRef('#F8B94C');
   const graffitiSize = useRef(4);
+  const graffitiToolRef = useRef('pen'); // 'pen' | 'eraser'
   const [graffitiEditMode, setGraffitiEditMode] = useState(false);
   const [graffitiColorUI, setGraffitiColorUI] = useState('#F8B94C');
   const [graffitiSizeUI, setGraffitiSizeUI] = useState(4);
+  const [graffitiToolUI, setGraffitiToolUI] = useState('pen');
+
+  // Undo/Redo history
+  const graffitiHistory = useRef([]); // массив ImageData
+  const graffitiHistoryIdx = useRef(-1);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 
-  // Sync UI state → refs (refs are always fresh inside event handlers)
+  // Sync UI state → refs
   useEffect(() => { graffitiColor.current = graffitiColorUI; }, [graffitiColorUI]);
   useEffect(() => { graffitiSize.current = graffitiSizeUI; }, [graffitiSizeUI]);
+  useEffect(() => { graffitiToolRef.current = graffitiToolUI; }, [graffitiToolUI]);
 
-  // Init canvas whenever it appears in DOM
+  // Init canvas
   const setupCanvas = useCallback((canvas) => {
     if (!canvas) return;
     const parent = canvas.parentElement;
@@ -74,9 +83,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     graffitiCtxRef.current = ctx;
+    // Сохраняем начальное пустое состояние в историю
+    saveSnapshot();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-init on tab switch (canvas might resize)
+  // Re-init on tab switch
   useEffect(() => {
     if (activeTab === 'general' && graffitiCanvasRef.current) {
       const t = setTimeout(() => setupCanvas(graffitiCanvasRef.current), 200);
@@ -84,7 +96,52 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [activeTab, setupCanvas]);
 
-  // Pointer helpers — work for both mouse & touch
+  // --- Snapshot helpers ---
+  const saveSnapshot = useCallback(() => {
+    const canvas = graffitiCanvasRef.current;
+    const ctx = graffitiCtxRef.current;
+    if (!canvas || !ctx) return;
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Обрезаем redo-историю после текущего индекса
+    const idx = graffitiHistoryIdx.current;
+    graffitiHistory.current = graffitiHistory.current.slice(0, idx + 1);
+    graffitiHistory.current.push(imgData);
+    // Ограничиваем историю 30 шагами
+    if (graffitiHistory.current.length > 30) {
+      graffitiHistory.current.shift();
+    }
+    graffitiHistoryIdx.current = graffitiHistory.current.length - 1;
+    setCanUndo(graffitiHistoryIdx.current > 0);
+    setCanRedo(false);
+  }, []);
+
+  const graffitiUndo = useCallback(() => {
+    const idx = graffitiHistoryIdx.current;
+    if (idx <= 0) return;
+    graffitiHistoryIdx.current = idx - 1;
+    const canvas = graffitiCanvasRef.current;
+    const ctx = graffitiCtxRef.current;
+    if (!canvas || !ctx) return;
+    ctx.putImageData(graffitiHistory.current[graffitiHistoryIdx.current], 0, 0);
+    setCanUndo(graffitiHistoryIdx.current > 0);
+    setCanRedo(true);
+    if (hapticFeedback) hapticFeedback('impact', 'light');
+  }, [hapticFeedback]);
+
+  const graffitiRedo = useCallback(() => {
+    const idx = graffitiHistoryIdx.current;
+    if (idx >= graffitiHistory.current.length - 1) return;
+    graffitiHistoryIdx.current = idx + 1;
+    const canvas = graffitiCanvasRef.current;
+    const ctx = graffitiCtxRef.current;
+    if (!canvas || !ctx) return;
+    ctx.putImageData(graffitiHistory.current[graffitiHistoryIdx.current], 0, 0);
+    setCanUndo(true);
+    setCanRedo(graffitiHistoryIdx.current < graffitiHistory.current.length - 1);
+    if (hapticFeedback) hapticFeedback('impact', 'light');
+  }, [hapticFeedback]);
+
+  // --- Coordinate helper ---
   const getXY = (e) => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas) return null;
@@ -103,7 +160,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     return { x: cx - rect.left, y: cy - rect.top };
   };
 
-  // Attach native touch listeners (passive: false) when canvas mounts
+  // --- Native event listeners ---
   useEffect(() => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas) return;
@@ -111,7 +168,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     const onDown = (e) => {
       if (!graffitiEditMode) return;
       e.preventDefault();
-      // Lazy-init if needed
       if (!graffitiCtxRef.current) setupCanvas(canvas);
       graffitiDrawing.current = true;
       const pt = getXY(e);
@@ -119,9 +175,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       graffitiLastPt.current = pt;
       const ctx = graffitiCtxRef.current;
       if (!ctx) return;
+      const isEraser = graffitiToolRef.current === 'eraser';
+      ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, graffitiSize.current / 2, 0, Math.PI * 2);
-      ctx.fillStyle = graffitiColor.current;
+      ctx.fillStyle = isEraser ? 'rgba(0,0,0,1)' : graffitiColor.current;
       ctx.fill();
     };
 
@@ -134,10 +192,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       if (!pt) return;
       const last = graffitiLastPt.current;
       if (last) {
+        const isEraser = graffitiToolRef.current === 'eraser';
+        ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
         ctx.beginPath();
         ctx.moveTo(last.x, last.y);
         ctx.lineTo(pt.x, pt.y);
-        ctx.strokeStyle = graffitiColor.current;
+        ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : graffitiColor.current;
         ctx.lineWidth = graffitiSize.current;
         ctx.stroke();
       }
@@ -145,8 +205,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     };
 
     const onUp = () => {
-      graffitiDrawing.current = false;
-      graffitiLastPt.current = null;
+      if (graffitiDrawing.current) {
+        graffitiDrawing.current = false;
+        graffitiLastPt.current = null;
+        // Восстанавливаем compositeOperation
+        const ctx = graffitiCtxRef.current;
+        if (ctx) ctx.globalCompositeOperation = 'source-over';
+        // Сохраняем snapshot для undo
+        saveSnapshot();
+      }
     };
 
     canvas.addEventListener('touchstart', onDown, { passive: false });
@@ -169,14 +236,16 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       canvas.removeEventListener('mouseleave', onUp);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graffitiEditMode, setupCanvas]);
+  }, [graffitiEditMode, setupCanvas, saveSnapshot]);
 
   const clearGraffiti = () => {
     const canvas = graffitiCanvasRef.current;
     const ctx = graffitiCtxRef.current;
     if (!canvas || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    saveSnapshot();
     if (hapticFeedback) hapticFeedback('impact', 'light');
   };
   // ========== END GRAFFITI ==========
@@ -716,28 +785,61 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                         Граффити
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {graffitiEditMode && (
-                        <button
-                          onClick={clearGraffiti}
-                          style={{
-                            background: 'rgba(239,68,68,0.1)',
-                            border: '1px solid rgba(239,68,68,0.2)',
-                            borderRadius: '10px',
-                            padding: '5px 12px',
-                            cursor: 'pointer',
-                            fontFamily: "'Poppins', sans-serif",
-                            fontWeight: 500,
-                            fontSize: '12px',
-                            color: '#EF4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          <Trash2 style={{ width: '12px', height: '12px' }} />
-                          Очистить
-                        </button>
+                        <>
+                          {/* Undo */}
+                          <button
+                            onClick={graffitiUndo}
+                            disabled={!canUndo}
+                            style={{
+                              background: canUndo ? 'rgba(255,255,255,0.06)' : 'transparent',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '10px',
+                              padding: '5px 8px',
+                              cursor: canUndo ? 'pointer' : 'default',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: canUndo ? 1 : 0.3,
+                              transition: 'opacity 0.15s',
+                            }}
+                          >
+                            <Undo2 style={{ width: '14px', height: '14px', color: '#F4F3FC' }} />
+                          </button>
+                          {/* Redo */}
+                          <button
+                            onClick={graffitiRedo}
+                            disabled={!canRedo}
+                            style={{
+                              background: canRedo ? 'rgba(255,255,255,0.06)' : 'transparent',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '10px',
+                              padding: '5px 8px',
+                              cursor: canRedo ? 'pointer' : 'default',
+                              display: 'flex',
+                              alignItems: 'center',
+                              opacity: canRedo ? 1 : 0.3,
+                              transition: 'opacity 0.15s',
+                            }}
+                          >
+                            <Redo2 style={{ width: '14px', height: '14px', color: '#F4F3FC' }} />
+                          </button>
+                          {/* Очистить */}
+                          <button
+                            onClick={clearGraffiti}
+                            style={{
+                              background: 'rgba(239,68,68,0.1)',
+                              border: '1px solid rgba(239,68,68,0.2)',
+                              borderRadius: '10px',
+                              padding: '5px 8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Trash2 style={{ width: '14px', height: '14px', color: '#EF4444' }} />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => {
@@ -770,7 +872,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     </div>
                   </div>
 
-                  {/* Canvas — никаких React-обработчиков, всё через нативные listeners */}
+                  {/* Canvas */}
                   <div style={{
                     borderRadius: '20px',
                     background: 'rgba(255,255,255,0.03)',
@@ -787,22 +889,22 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       style={{
                         width: '100%',
                         height: '100%',
-                        cursor: graffitiEditMode ? 'crosshair' : 'default',
+                        cursor: graffitiEditMode
+                          ? (graffitiToolUI === 'eraser' ? 'cell' : 'crosshair')
+                          : 'default',
                         display: 'block',
                         touchAction: 'none',
                       }}
                     />
                     {!graffitiEditMode && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          pointerEvents: 'none',
-                        }}
-                      >
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        pointerEvents: 'none',
+                      }}>
                         <span style={{
                           fontFamily: "'Poppins', sans-serif",
                           fontWeight: 500,
@@ -815,7 +917,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     )}
                   </div>
 
-                  {/* Палитра + размер кисти — только в режиме редактирования */}
+                  {/* Тулбар — инструменты + палитра + размер кисти */}
                   <AnimatePresence>
                     {graffitiEditMode && (
                       <motion.div
@@ -823,47 +925,125 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.25, ease: 'easeInOut' }}
-                        style={{ overflow: 'hidden' }}
+                        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '8px' }}
                       >
+                        {/* Строка 1: инструменты Pen / Eraser */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          paddingTop: '2px',
+                        }}>
+                          <button
+                            onClick={() => {
+                              setGraffitiToolUI('pen');
+                              if (hapticFeedback) hapticFeedback('impact', 'light');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 14px',
+                              borderRadius: '12px',
+                              cursor: 'pointer',
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 500,
+                              fontSize: '12px',
+                              transition: 'all 0.15s ease',
+                              background: graffitiToolUI === 'pen'
+                                ? 'rgba(248,185,76,0.15)'
+                                : 'rgba(255,255,255,0.04)',
+                              border: graffitiToolUI === 'pen'
+                                ? '1px solid rgba(248,185,76,0.4)'
+                                : '1px solid rgba(255,255,255,0.08)',
+                              color: graffitiToolUI === 'pen' ? '#F8B94C' : 'rgba(255,255,255,0.4)',
+                            }}
+                          >
+                            <Pen style={{ width: '13px', height: '13px' }} />
+                            Кисть
+                          </button>
+                          <button
+                            onClick={() => {
+                              setGraffitiToolUI('eraser');
+                              if (hapticFeedback) hapticFeedback('impact', 'light');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 14px',
+                              borderRadius: '12px',
+                              cursor: 'pointer',
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 500,
+                              fontSize: '12px',
+                              transition: 'all 0.15s ease',
+                              background: graffitiToolUI === 'eraser'
+                                ? 'rgba(168,85,247,0.15)'
+                                : 'rgba(255,255,255,0.04)',
+                              border: graffitiToolUI === 'eraser'
+                                ? '1px solid rgba(168,85,247,0.4)'
+                                : '1px solid rgba(255,255,255,0.08)',
+                              color: graffitiToolUI === 'eraser' ? '#A855F7' : 'rgba(255,255,255,0.4)',
+                            }}
+                          >
+                            <Eraser style={{ width: '13px', height: '13px' }} />
+                            Ластик
+                          </button>
+                        </div>
+
+                        {/* Строка 2: палитра цветов (только для кисти) + размер */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '8px',
-                          paddingTop: '2px',
                         }}>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                            {GRAFFITI_COLORS.map((c) => (
-                              <button
-                                key={c}
-                                onClick={() => {
-                                  setGraffitiColorUI(c);
-                                  if (hapticFeedback) hapticFeedback('impact', 'light');
-                                }}
-                                style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '50%',
-                                  backgroundColor: c,
-                                  border: graffitiColorUI === c
-                                    ? '2.5px solid #FFFFFF'
-                                    : '2px solid rgba(255,255,255,0.1)',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
-                                  transform: graffitiColorUI === c ? 'scale(1.15)' : 'scale(1)',
-                                  boxShadow: graffitiColorUI === c ? `0 0 10px ${c}40` : 'none',
-                                  flexShrink: 0,
-                                }}
-                              />
-                            ))}
-                          </div>
+                          {graffitiToolUI === 'pen' ? (
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
+                              {GRAFFITI_COLORS.map((c) => (
+                                <button
+                                  key={c}
+                                  onClick={() => {
+                                    setGraffitiColorUI(c);
+                                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                                  }}
+                                  style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '50%',
+                                    backgroundColor: c,
+                                    border: graffitiColorUI === c
+                                      ? '2.5px solid #FFFFFF'
+                                      : '2px solid rgba(255,255,255,0.1)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    transform: graffitiColorUI === c ? 'scale(1.15)' : 'scale(1)',
+                                    boxShadow: graffitiColorUI === c ? `0 0 10px ${c}40` : 'none',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 500,
+                              fontSize: '12px',
+                              color: 'rgba(255,255,255,0.3)',
+                              flex: 1,
+                            }}>
+                              Размер ластика →
+                            </span>
+                          )}
+                          {/* Размер кисти / ластика */}
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
                             flexShrink: 0,
                           }}>
-                            {[2, 4, 8, 14].map((s) => (
+                            {(graffitiToolUI === 'pen' ? [2, 4, 8, 14] : [8, 14, 22, 32]).map((s) => (
                               <button
                                 key={s}
                                 onClick={() => {
@@ -875,10 +1055,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                                   height: '28px',
                                   borderRadius: '50%',
                                   background: graffitiSizeUI === s
-                                    ? 'rgba(248,185,76,0.15)'
+                                    ? (graffitiToolUI === 'pen' ? 'rgba(248,185,76,0.15)' : 'rgba(168,85,247,0.15)')
                                     : 'rgba(255,255,255,0.04)',
                                   border: graffitiSizeUI === s
-                                    ? '1px solid rgba(248,185,76,0.4)'
+                                    ? (graffitiToolUI === 'pen' ? '1px solid rgba(248,185,76,0.4)' : '1px solid rgba(168,85,247,0.4)')
                                     : '1px solid rgba(255,255,255,0.08)',
                                   cursor: 'pointer',
                                   display: 'flex',
@@ -891,7 +1071,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                                   width: `${Math.min(s + 2, 16)}px`,
                                   height: `${Math.min(s + 2, 16)}px`,
                                   borderRadius: '50%',
-                                  backgroundColor: graffitiSizeUI === s ? '#F8B94C' : 'rgba(255,255,255,0.3)',
+                                  backgroundColor: graffitiSizeUI === s
+                                    ? (graffitiToolUI === 'pen' ? '#F8B94C' : '#A855F7')
+                                    : 'rgba(255,255,255,0.3)',
                                 }} />
                               </button>
                             ))}
