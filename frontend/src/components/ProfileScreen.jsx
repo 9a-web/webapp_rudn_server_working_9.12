@@ -470,8 +470,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '28px',
+                  gap: '10px',
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  WebkitOverflowScrolling: 'touch',
+                  paddingBottom: '2px',
                 }}
+                className="scrollbar-hide"
               >
                 {TABS.map((tab) => (
                   <button
@@ -492,6 +498,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       cursor: 'pointer',
                       position: 'relative',
                       transition: 'color 0.2s ease, border-color 0.2s ease',
+                      flexShrink: 0,
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {tab.label}
