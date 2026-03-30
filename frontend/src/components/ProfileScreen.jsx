@@ -446,11 +446,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             <div
               style={{
                 position: 'absolute',
-                bottom: 'calc(100% - 32px)',
+                bottom: 0,
                 left: '-10px',
                 right: '-10px',
-                height: '257px',
-                background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 100%)',
+                top: '-225px',
+                background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 225px, rgba(248, 185, 76, 0.30) 100%)',
                 pointerEvents: 'none',
                 zIndex: 0,
               }}
