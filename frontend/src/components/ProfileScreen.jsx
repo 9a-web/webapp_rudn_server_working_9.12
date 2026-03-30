@@ -41,20 +41,25 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
 
-  // Graffiti state
+  // ========== GRAFFITI ==========
   const graffitiCanvasRef = useRef(null);
   const graffitiCtxRef = useRef(null);
-  const isDrawingRef = useRef(false);
-  const [brushColor, setBrushColor] = useState('#F8B94C');
-  const [brushSize, setBrushSize] = useState(4);
-  const lastPointRef = useRef(null);
-  const [isGraffitiEditing, setIsGraffitiEditing] = useState(false);
+  const graffitiDrawing = useRef(false);
+  const graffitiLastPt = useRef(null);
+  const graffitiColor = useRef('#F8B94C');
+  const graffitiSize = useRef(4);
+  const [graffitiEditMode, setGraffitiEditMode] = useState(false);
+  const [graffitiColorUI, setGraffitiColorUI] = useState('#F8B94C');
+  const [graffitiSizeUI, setGraffitiSizeUI] = useState(4);
 
   const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 
-  // Инициализация canvas граффити
-  const initGraffitiCanvas = useCallback(() => {
-    const canvas = graffitiCanvasRef.current;
+  // Sync UI state → refs (refs are always fresh inside event handlers)
+  useEffect(() => { graffitiColor.current = graffitiColorUI; }, [graffitiColorUI]);
+  useEffect(() => { graffitiSize.current = graffitiSizeUI; }, [graffitiSizeUI]);
+
+  // Init canvas whenever it appears in DOM
+  const setupCanvas = useCallback((canvas) => {
     if (!canvas) return;
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -64,82 +69,107 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (w === 0 || h === 0) return;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
     const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     graffitiCtxRef.current = ctx;
   }, []);
 
+  // Re-init on tab switch (canvas might resize)
   useEffect(() => {
-    if (activeTab !== 'general') return;
-    // Задержка чтобы DOM (AnimatePresence) успел отрисовать canvas
-    const t = setTimeout(initGraffitiCanvas, 150);
-    return () => clearTimeout(t);
-  }, [activeTab, initGraffitiCanvas]);
-
-  // Переинициализация при входе в режим редактирования
-  useEffect(() => {
-    if (isGraffitiEditing) {
-      // Если canvas ещё не инициализирован
-      if (!graffitiCtxRef.current) {
-        const t = setTimeout(initGraffitiCanvas, 100);
-        return () => clearTimeout(t);
-      }
+    if (activeTab === 'general' && graffitiCanvasRef.current) {
+      const t = setTimeout(() => setupCanvas(graffitiCanvasRef.current), 200);
+      return () => clearTimeout(t);
     }
-  }, [isGraffitiEditing, initGraffitiCanvas]);
+  }, [activeTab, setupCanvas]);
 
-  const getPos = (e) => {
+  // Pointer helpers — work for both mouse & touch
+  const getXY = (e) => {
     const canvas = graffitiCanvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
-  };
-
-  const startDraw = (e) => {
-    console.log('[Graffiti] startDraw called, editing:', isGraffitiEditing, 'ctx:', !!graffitiCtxRef.current);
-    if (!isGraffitiEditing) return;
-    isDrawingRef.current = true;
-    const pos = getPos(e);
-    lastPointRef.current = pos;
-    const ctx = graffitiCtxRef.current;
-    if (!ctx) {
-      console.log('[Graffiti] No ctx! Trying to init...');
-      initGraffitiCanvas();
-      return;
+    let cx, cy;
+    if (e.touches && e.touches.length > 0) {
+      cx = e.touches[0].clientX;
+      cy = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      cx = e.changedTouches[0].clientX;
+      cy = e.changedTouches[0].clientY;
+    } else {
+      cx = e.clientX;
+      cy = e.clientY;
     }
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, brushSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = brushColor;
-    ctx.fill();
-    console.log('[Graffiti] Drew dot at', pos);
+    return { x: cx - rect.left, y: cy - rect.top };
   };
 
-  const draw = (e) => {
-    if (!isDrawingRef.current || !isGraffitiEditing) return;
-    const ctx = graffitiCtxRef.current;
-    if (!ctx) return;
-    const pos = getPos(e);
-    const last = lastPointRef.current;
-    if (last) {
+  // Attach native touch listeners (passive: false) when canvas mounts
+  useEffect(() => {
+    const canvas = graffitiCanvasRef.current;
+    if (!canvas) return;
+
+    const onDown = (e) => {
+      if (!graffitiEditMode) return;
+      e.preventDefault();
+      // Lazy-init if needed
+      if (!graffitiCtxRef.current) setupCanvas(canvas);
+      graffitiDrawing.current = true;
+      const pt = getXY(e);
+      if (!pt) return;
+      graffitiLastPt.current = pt;
+      const ctx = graffitiCtxRef.current;
+      if (!ctx) return;
       ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = brushColor;
-      ctx.lineWidth = brushSize;
-      ctx.stroke();
-    }
-    lastPointRef.current = pos;
-  };
+      ctx.arc(pt.x, pt.y, graffitiSize.current / 2, 0, Math.PI * 2);
+      ctx.fillStyle = graffitiColor.current;
+      ctx.fill();
+    };
 
-  const stopDraw = () => {
-    isDrawingRef.current = false;
-    lastPointRef.current = null;
-  };
+    const onMove = (e) => {
+      if (!graffitiDrawing.current) return;
+      e.preventDefault();
+      const ctx = graffitiCtxRef.current;
+      if (!ctx) return;
+      const pt = getXY(e);
+      if (!pt) return;
+      const last = graffitiLastPt.current;
+      if (last) {
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(pt.x, pt.y);
+        ctx.strokeStyle = graffitiColor.current;
+        ctx.lineWidth = graffitiSize.current;
+        ctx.stroke();
+      }
+      graffitiLastPt.current = pt;
+    };
+
+    const onUp = () => {
+      graffitiDrawing.current = false;
+      graffitiLastPt.current = null;
+    };
+
+    canvas.addEventListener('touchstart', onDown, { passive: false });
+    canvas.addEventListener('touchmove', onMove, { passive: false });
+    canvas.addEventListener('touchend', onUp);
+    canvas.addEventListener('touchcancel', onUp);
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseup', onUp);
+    canvas.addEventListener('mouseleave', onUp);
+
+    return () => {
+      canvas.removeEventListener('touchstart', onDown);
+      canvas.removeEventListener('touchmove', onMove);
+      canvas.removeEventListener('touchend', onUp);
+      canvas.removeEventListener('touchcancel', onUp);
+      canvas.removeEventListener('mousedown', onDown);
+      canvas.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('mouseup', onUp);
+      canvas.removeEventListener('mouseleave', onUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graffitiEditMode, setupCanvas]);
 
   const clearGraffiti = () => {
     const canvas = graffitiCanvasRef.current;
@@ -149,6 +179,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     if (hapticFeedback) hapticFeedback('impact', 'light');
   };
+  // ========== END GRAFFITI ==========
 
   const isAdmin = useMemo(() => {
     if (!user?.id) return false;
@@ -686,7 +717,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {isGraffitiEditing && (
+                      {graffitiEditMode && (
                         <button
                           onClick={clearGraffiti}
                           style={{
@@ -710,14 +741,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       )}
                       <button
                         onClick={() => {
-                          setIsGraffitiEditing(!isGraffitiEditing);
+                          setGraffitiEditMode(prev => !prev);
                           if (hapticFeedback) hapticFeedback('impact', 'light');
                         }}
                         style={{
-                          background: isGraffitiEditing
+                          background: graffitiEditMode
                             ? 'rgba(248,185,76,0.15)'
                             : 'rgba(255,255,255,0.06)',
-                          border: isGraffitiEditing
+                          border: graffitiEditMode
                             ? '1px solid rgba(248,185,76,0.35)'
                             : '1px solid rgba(255,255,255,0.08)',
                           borderRadius: '10px',
@@ -726,7 +757,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                           fontFamily: "'Poppins', sans-serif",
                           fontWeight: 500,
                           fontSize: '12px',
-                          color: isGraffitiEditing ? '#F8B94C' : 'rgba(255,255,255,0.4)',
+                          color: graffitiEditMode ? '#F8B94C' : 'rgba(255,255,255,0.4)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
@@ -734,44 +765,34 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                         }}
                       >
                         <Pen style={{ width: '12px', height: '12px' }} />
-                        {isGraffitiEditing ? 'Готово' : 'Рисовать'}
+                        {graffitiEditMode ? 'Готово' : 'Рисовать'}
                       </button>
                     </div>
                   </div>
 
-                  {/* Canvas */}
+                  {/* Canvas — никаких React-обработчиков, всё через нативные listeners */}
                   <div style={{
                     borderRadius: '20px',
                     background: 'rgba(255,255,255,0.03)',
-                    border: isGraffitiEditing
+                    border: graffitiEditMode
                       ? '1px solid rgba(248,185,76,0.25)'
                       : '1px solid rgba(255,255,255,0.06)',
                     overflow: 'hidden',
                     height: '260px',
                     position: 'relative',
-                    touchAction: isGraffitiEditing ? 'none' : 'auto',
                     transition: 'border-color 0.25s ease',
                   }}>
                     <canvas
                       ref={graffitiCanvasRef}
-                      onMouseDown={startDraw}
-                      onMouseMove={draw}
-                      onMouseUp={stopDraw}
-                      onMouseLeave={stopDraw}
-                      onTouchStart={startDraw}
-                      onTouchMove={draw}
-                      onTouchEnd={stopDraw}
-                      onTouchCancel={stopDraw}
                       style={{
                         width: '100%',
                         height: '100%',
-                        cursor: isGraffitiEditing ? 'crosshair' : 'default',
+                        cursor: graffitiEditMode ? 'crosshair' : 'default',
                         display: 'block',
                         touchAction: 'none',
                       }}
                     />
-                    {/* Подсказка, если не в режиме редактирования и canvas пустой */}
-                    {!isGraffitiEditing && (
+                    {!graffitiEditMode && (
                       <div
                         style={{
                           position: 'absolute',
@@ -794,13 +815,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     )}
                   </div>
 
-                  {/* Палитра цветов + размер кисти — только в режиме редактирования */}
+                  {/* Палитра + размер кисти — только в режиме редактирования */}
                   <AnimatePresence>
-                    {isGraffitiEditing && (
+                    {graffitiEditMode && (
                       <motion.div
-                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                        animate={{ opacity: 1, height: 'auto', marginTop: 0 }}
-                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.25, ease: 'easeInOut' }}
                         style={{ overflow: 'hidden' }}
                       >
@@ -816,7 +837,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                               <button
                                 key={c}
                                 onClick={() => {
-                                  setBrushColor(c);
+                                  setGraffitiColorUI(c);
                                   if (hapticFeedback) hapticFeedback('impact', 'light');
                                 }}
                                 style={{
@@ -824,19 +845,18 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                                   height: '28px',
                                   borderRadius: '50%',
                                   backgroundColor: c,
-                                  border: brushColor === c
+                                  border: graffitiColorUI === c
                                     ? '2.5px solid #FFFFFF'
                                     : '2px solid rgba(255,255,255,0.1)',
                                   cursor: 'pointer',
                                   transition: 'all 0.15s ease',
-                                  transform: brushColor === c ? 'scale(1.15)' : 'scale(1)',
-                                  boxShadow: brushColor === c ? `0 0 10px ${c}40` : 'none',
+                                  transform: graffitiColorUI === c ? 'scale(1.15)' : 'scale(1)',
+                                  boxShadow: graffitiColorUI === c ? `0 0 10px ${c}40` : 'none',
                                   flexShrink: 0,
                                 }}
                               />
                             ))}
                           </div>
-                          {/* Размер кисти */}
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -847,17 +867,17 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                               <button
                                 key={s}
                                 onClick={() => {
-                                  setBrushSize(s);
+                                  setGraffitiSizeUI(s);
                                   if (hapticFeedback) hapticFeedback('impact', 'light');
                                 }}
                                 style={{
                                   width: '28px',
                                   height: '28px',
                                   borderRadius: '50%',
-                                  background: brushSize === s
+                                  background: graffitiSizeUI === s
                                     ? 'rgba(248,185,76,0.15)'
                                     : 'rgba(255,255,255,0.04)',
-                                  border: brushSize === s
+                                  border: graffitiSizeUI === s
                                     ? '1px solid rgba(248,185,76,0.4)'
                                     : '1px solid rgba(255,255,255,0.08)',
                                   cursor: 'pointer',
@@ -871,7 +891,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                                   width: `${Math.min(s + 2, 16)}px`,
                                   height: `${Math.min(s + 2, 16)}px`,
                                   borderRadius: '50%',
-                                  backgroundColor: brushSize === s ? '#F8B94C' : 'rgba(255,255,255,0.3)',
+                                  backgroundColor: graffitiSizeUI === s ? '#F8B94C' : 'rgba(255,255,255,0.3)',
                                 }} />
                               </button>
                             ))}
