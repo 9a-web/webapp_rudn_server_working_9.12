@@ -37,6 +37,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [copiedLink, setCopiedLink] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   
+  // Bug 9: Актуальные данные профиля с сервера
+  const [profileData, setProfileData] = useState(null);
+  
   // Friends list state
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
@@ -259,7 +262,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       await fetch(`${backendURL}/api/profile/${user.id}/graffiti`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graffiti_data: dataURL }),
+        body: JSON.stringify({ graffiti_data: dataURL, requester_telegram_id: user.id }),
       });
     } catch (err) {
       console.error('[Graffiti] Save error:', err);
@@ -297,10 +300,20 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   }, [user?.id, setupCanvas, saveSnapshot]);
 
   // Загрузка при открытии профиля / переключении на таб
+  // Bug 14: Исправлена гонка — сначала инициализируем canvas, потом грузим данные
   useEffect(() => {
     if (activeTab === 'general' && isOpen && user?.id) {
-      const t = setTimeout(loadGraffitiFromServer, 350);
-      return () => clearTimeout(t);
+      let cancelled = false;
+      const t = setTimeout(async () => {
+        if (cancelled) return;
+        // Убеждаемся что canvas готов
+        if (graffitiCanvasRef.current) {
+          setupCanvas(graffitiCanvasRef.current);
+        }
+        // Теперь загружаем граффити с сервера
+        await loadGraffitiFromServer();
+      }, 300);
+      return () => { cancelled = true; clearTimeout(t); };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isOpen]);
@@ -311,6 +324,34 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (!user?.id) return false;
     return ADMIN_UIDS.includes(String(user.id));
   }, [user?.id]);
+
+  // Bug 9: Загрузка актуальных данных профиля с сервера
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      friendsAPI.getUserProfile(user.id, user.id)
+        .then(data => {
+          if (data) setProfileData(data);
+        })
+        .catch(err => console.error('Error loading own profile:', err));
+    }
+  }, [isOpen, user?.id]);
+
+  // Bug 13: Очистка памяти граффити + Bug 11: Сброс друзей при закрытии
+  useEffect(() => {
+    if (!isOpen) {
+      // Очищаем тяжелые объекты ImageData
+      graffitiHistory.current = [];
+      graffitiHistoryIdx.current = -1;
+      setCanUndo(false);
+      setCanRedo(false);
+      setGraffitiEditMode(false);
+      // Сброс друзей для обновления при следующем открытии
+      setFriendsList([]);
+      // Сброс данных профиля
+      setProfileData(null);
+      setActiveTab('general');
+    }
+  }, [isOpen]);
 
   // Bottom Sheet drag
   const sheetY = useMotionValue(0);
@@ -347,9 +388,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [user?.id]);
 
-  // Загрузка друзей при переключении на таб "Друзья"
+  // Bug 11: Загрузка друзей при каждом переключении на таб (обновление)
   useEffect(() => {
-    if (activeTab === 'friends' && user?.id && friendsList.length === 0 && !friendsLoading) {
+    if (activeTab === 'friends' && user?.id && !friendsLoading) {
       setFriendsLoading(true);
       friendsAPI.getFriends(user.id)
         .then(data => setFriendsList(data?.friends || []))
@@ -556,8 +597,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   width: '8px',
                   height: '8px',
                   borderRadius: '50%',
-                  backgroundColor: user.is_online ? '#4ADE80' : '#EF4444',
-                  boxShadow: user.is_online ? '0 0 6px rgba(74, 222, 128, 0.5)' : '0 0 6px rgba(239, 68, 68, 0.5)',
+                  backgroundColor: (profileData?.is_online ?? user.is_online) ? '#4ADE80' : '#EF4444',
+                  boxShadow: (profileData?.is_online ?? user.is_online) ? '0 0 6px rgba(74, 222, 128, 0.5)' : '0 0 6px rgba(239, 68, 68, 0.5)',
                 }}
               />
               <span
@@ -568,7 +609,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   color: '#FFFFFF',
                 }}
               >
-                {user.is_online ? 'Online' : 'Offline'}
+                {(profileData?.is_online ?? user.is_online) ? 'Online' : 'Offline'}
               </span>
             </div>
 
@@ -664,7 +705,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   lineHeight: 1.2,
                 }}
               >
-                {user.friends_count || 0}
+                {profileData?.friends_count ?? user.friends_count ?? 0}
               </span>
               <span
                 style={{
@@ -676,7 +717,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 }}
               >
                 {(() => {
-                  const n = user.friends_count || 0;
+                  const n = profileData?.friends_count ?? user.friends_count ?? 0;
                   const mod10 = n % 10;
                   const mod100 = n % 100;
                   if (mod100 >= 11 && mod100 <= 19) return 'Друзей';

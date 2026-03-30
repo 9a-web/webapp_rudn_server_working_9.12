@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCogCorner } from 'lucide-react';
 import GroupSelector from './GroupSelector';
@@ -10,6 +10,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
   const [customAvatar, setCustomAvatar] = useState(null);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const fileInputRef = useRef(null);
 
   // Birthday state
@@ -17,9 +18,34 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
   const [birthSource, setBirthSource] = useState(null);
   const [birthLoading, setBirthLoading] = useState(false);
   const [birthSaving, setBirthSaving] = useState(false);
+  const [birthError, setBirthError] = useState('');
+  const birthSaveTimerRef = useRef(null);
   const dayRef = useRef(null);
   const monthRef = useRef(null);
   const yearRef = useRef(null);
+
+  // Bug 10: Загрузка кастомного аватара с сервера при открытии
+  useEffect(() => {
+    if (!isOpen || !user?.id) return;
+    const loadAvatar = async () => {
+      try {
+        const backendUrl = getBackendURL();
+        const res = await fetch(`${backendUrl}/api/profile/${user.id}/avatar`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.avatar_data && data.avatar_mode === 'custom') {
+            setCustomAvatar(data.avatar_data);
+            setAvatarMode('custom');
+          } else {
+            setAvatarMode(data.avatar_mode || 'telegram');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load custom avatar:', err);
+      }
+    };
+    loadAvatar();
+  }, [isOpen, user?.id]);
 
   // Загрузка даты рождения при открытии
   useEffect(() => {
@@ -52,9 +78,36 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     loadBirthday();
   }, [isOpen, user?.id]);
 
-  // Сохранение даты рождения
-  const saveBirthday = async () => {
-    if (!birthDate.day || !birthDate.month) return;
+  // Bug 12: Валидация и debounce сохранения даты рождения
+  const validateBirthDate = useCallback((bd) => {
+    const day = parseInt(bd.day);
+    const month = parseInt(bd.month);
+    const year = bd.year ? parseInt(bd.year) : 0;
+    
+    if (!bd.day || !bd.month) return ''; // Ещё не заполнено
+    if (isNaN(day) || isNaN(month)) return 'Некорректные данные';
+    if (day < 1 || day > 31) return 'День: 01–31';
+    if (month < 1 || month > 12) return 'Месяц: 01–12';
+    if (bd.year && (year < 1920 || year > 2015)) return 'Год: 1920–2015';
+    
+    // Проверка дней в месяце
+    if (year > 0) {
+      const maxDays = new Date(year, month, 0).getDate();
+      if (day > maxDays) return `В месяце ${month} максимум ${maxDays} дней`;
+    }
+    return '';
+  }, []);
+
+  const saveBirthday = useCallback(async () => {
+    if (!birthDate.day || !birthDate.month || !user?.id) return;
+    
+    const validationError = validateBirthDate(birthDate);
+    if (validationError) {
+      setBirthError(validationError);
+      return;
+    }
+    setBirthError('');
+    
     setBirthSaving(true);
     try {
       const dateStr = `${birthDate.day.padStart(2, '0')}.${birthDate.month.padStart(2, '0')}.${birthDate.year || '0000'}`;
@@ -67,6 +120,9 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
       if (res.ok) {
         setBirthSource('saved');
         if (hapticFeedback) hapticFeedback('notification', 'success');
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setBirthError(errorData.detail || 'Ошибка сохранения');
       }
     } catch (err) {
       console.error('Failed to save birthday:', err);
@@ -74,15 +130,33 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     } finally {
       setBirthSaving(false);
     }
-  };
+  }, [birthDate, user?.id, hapticFeedback, validateBirthDate]);
 
-  // Авто-переход между полями даты
+  // Debounced save — вызывается после 1.5 сек паузы ввода
+  const debouncedSaveBirthday = useCallback(() => {
+    if (birthSaveTimerRef.current) clearTimeout(birthSaveTimerRef.current);
+    birthSaveTimerRef.current = setTimeout(() => {
+      saveBirthday();
+    }, 1500);
+  }, [saveBirthday]);
+
+  // Очистка таймера при unmount
+  useEffect(() => {
+    return () => {
+      if (birthSaveTimerRef.current) clearTimeout(birthSaveTimerRef.current);
+    };
+  }, []);
+
+  // Авто-переход между полями даты + debounced save
   const handleDateInput = (field, value, maxLen, nextRef) => {
     const cleaned = value.replace(/\D/g, '').slice(0, maxLen);
     setBirthDate(prev => ({ ...prev, [field]: cleaned }));
+    setBirthError('');
     if (cleaned.length === maxLen && nextRef?.current) {
       nextRef.current.focus();
     }
+    // Debounced save при каждом изменении
+    debouncedSaveBirthday();
   };
 
   if (!user) return null;
@@ -94,16 +168,44 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
   // Текущий аватар
   const currentAvatar = avatarMode === 'custom' ? customAvatar : avatarMode === 'telegram' ? profilePhoto : null;
 
+  // Bug 10: Сохранение аватара на сервер
+  const saveAvatarToServer = useCallback(async (avatarData, mode) => {
+    if (!user?.id) return;
+    setAvatarSaving(true);
+    try {
+      const backendUrl = getBackendURL();
+      if (mode === 'custom' && avatarData) {
+        await fetch(`${backendUrl}/api/profile/${user.id}/avatar`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatar_data: avatarData, requester_telegram_id: user.id }),
+        });
+      } else {
+        // Удаляем кастомный аватар (режим telegram или none)
+        await fetch(`${backendUrl}/api/profile/${user.id}/avatar`, {
+          method: 'DELETE',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save avatar:', err);
+    } finally {
+      setAvatarSaving(false);
+    }
+  }, [user?.id]);
+
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setCustomAvatar(ev.target.result);
+      const dataUrl = ev.target.result;
+      setCustomAvatar(dataUrl);
       setAvatarMode('custom');
       setShowAvatarMenu(false);
       if (hapticFeedback) hapticFeedback('notification', 'success');
+      // Сохраняем на сервер
+      saveAvatarToServer(dataUrl, 'custom');
     };
     reader.readAsDataURL(file);
   };
@@ -113,6 +215,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     setCustomAvatar(null);
     setShowAvatarMenu(false);
     if (hapticFeedback) hapticFeedback('impact', 'medium');
+    saveAvatarToServer(null, 'none');
   };
 
   const handleRestoreTelegram = () => {
@@ -120,6 +223,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     setCustomAvatar(null);
     setShowAvatarMenu(false);
     if (hapticFeedback) hapticFeedback('impact', 'light');
+    saveAvatarToServer(null, 'telegram');
   };
 
   const handleGroupSelected = async (groupData) => {
@@ -557,13 +661,12 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                         placeholder="ДД"
                         value={birthDate.day}
                         onChange={(e) => handleDateInput('day', e.target.value, 2, monthRef)}
-                        onBlur={saveBirthday}
                         style={{
                           width: '52px',
                           padding: '14px 0',
                           borderRadius: '14px',
                           background: 'rgba(255,255,255,0.04)',
-                          border: '1.5px solid rgba(255,255,255,0.08)',
+                          border: `1.5px solid ${birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
                           color: '#F4F3FC',
                           fontFamily: "'Poppins', sans-serif",
                           fontWeight: 600,
@@ -573,7 +676,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                           transition: 'border-color 0.2s',
                         }}
                         onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
-                        onBlurCapture={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                        onBlurCapture={(e) => { e.target.style.borderColor = birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'; }}
                       />
                       <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '18px', fontWeight: 600 }}>.</span>
 
@@ -585,13 +688,12 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                         placeholder="ММ"
                         value={birthDate.month}
                         onChange={(e) => handleDateInput('month', e.target.value, 2, yearRef)}
-                        onBlur={saveBirthday}
                         style={{
                           width: '52px',
                           padding: '14px 0',
                           borderRadius: '14px',
                           background: 'rgba(255,255,255,0.04)',
-                          border: '1.5px solid rgba(255,255,255,0.08)',
+                          border: `1.5px solid ${birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
                           color: '#F4F3FC',
                           fontFamily: "'Poppins', sans-serif",
                           fontWeight: 600,
@@ -601,7 +703,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                           transition: 'border-color 0.2s',
                         }}
                         onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
-                        onBlurCapture={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                        onBlurCapture={(e) => { e.target.style.borderColor = birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'; }}
                       />
                       <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '18px', fontWeight: 600 }}>.</span>
 
@@ -613,13 +715,12 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                         placeholder="ГГГГ"
                         value={birthDate.year}
                         onChange={(e) => handleDateInput('year', e.target.value, 4, null)}
-                        onBlur={saveBirthday}
                         style={{
                           width: '72px',
                           padding: '14px 0',
                           borderRadius: '14px',
                           background: 'rgba(255,255,255,0.04)',
-                          border: '1.5px solid rgba(255,255,255,0.08)',
+                          border: `1.5px solid ${birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
                           color: '#F4F3FC',
                           fontFamily: "'Poppins', sans-serif",
                           fontWeight: 600,
@@ -629,7 +730,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                           transition: 'border-color 0.2s',
                         }}
                         onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
-                        onBlurCapture={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                        onBlurCapture={(e) => { e.target.style.borderColor = birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'; }}
                       />
 
                       {/* Статус сохранения */}
@@ -647,14 +748,16 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                     fontFamily: "'Poppins', sans-serif",
                     fontWeight: 400,
                     fontSize: '11px',
-                    color: 'rgba(255,255,255,0.25)',
+                    color: birthError ? '#EF4444' : 'rgba(255,255,255,0.25)',
                     marginTop: '6px',
                     display: 'block',
                     paddingLeft: '4px',
                   }}>
-                    {birthSource === 'telegram' 
-                      ? 'Получено из вашего профиля Telegram. Можете изменить' 
-                      : 'Укажите дату рождения для поздравлений от друзей'}
+                    {birthError 
+                      ? birthError
+                      : birthSource === 'telegram' 
+                        ? 'Получено из вашего профиля Telegram. Можете изменить' 
+                        : 'Укажите дату рождения для поздравлений от друзей'}
                   </span>
                 </motion.div>
 

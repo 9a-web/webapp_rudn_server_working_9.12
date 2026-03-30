@@ -17,7 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from itertools import groupby
 import httpx
 import aiohttp
@@ -13935,11 +13935,14 @@ async def get_friendship_status(user_id: int, target_id: int) -> Optional[str]:
     return None
 
 
-async def get_user_privacy_settings(telegram_id: int) -> PrivacySettings:
-    """Получить настройки приватности пользователя"""
-    user = await db.user_settings.find_one({"telegram_id": telegram_id})
-    if user and "privacy_settings" in user:
-        return PrivacySettings(**user["privacy_settings"])
+async def get_user_privacy_settings(telegram_id: int, user_doc: dict = None) -> PrivacySettings:
+    """Получить настройки приватности пользователя.
+    Если user_doc передан — используем его (экономим запрос в БД).
+    """
+    if user_doc is None:
+        user_doc = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if user_doc and "privacy_settings" in user_doc:
+        return PrivacySettings(**user_doc["privacy_settings"])
     return PrivacySettings()  # Возвращаем настройки по умолчанию
 
 
@@ -14719,24 +14722,34 @@ async def get_mutual_friends(telegram_id: int, other_telegram_id: int):
 async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
     """Получить публичный профиль пользователя"""
     try:
+        # Проверяем блокировку — если viewer заблокирован владельцем профиля, отказ
+        if viewer_telegram_id and viewer_telegram_id != telegram_id:
+            if await is_blocked(telegram_id, viewer_telegram_id):
+                raise HTTPException(status_code=403, detail="Профиль недоступен")
+        
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
-        privacy = await get_user_privacy_settings(telegram_id)
+        # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
+        privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
         
         # Получаем статистику
         stats = await db.user_stats.find_one({"telegram_id": telegram_id})
         achievements_count = await db.user_achievements.count_documents({"telegram_id": telegram_id})
         friends_count = await get_user_friends_count(telegram_id)
         
-        # Проверяем онлайн-статус
+        # Проверяем онлайн-статус (timezone-aware)
         is_online = False
         last_activity = user.get("last_activity")
         if last_activity and privacy.show_online_status:
             if isinstance(last_activity, str):
                 last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-            is_online = (datetime.utcnow() - last_activity).total_seconds() < 300
+            # Если last_activity naive — считаем UTC
+            if last_activity.tzinfo is None:
+                from datetime import timezone as tz
+                last_activity = last_activity.replace(tzinfo=tz.utc)
+            is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
         
         # Вычисляем общих друзей
         mutual_count = 0
@@ -14764,7 +14777,8 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
             is_online=is_online if privacy.show_online_status else False,
             last_activity=last_activity if privacy.show_online_status else None,
-            privacy=privacy if viewer_telegram_id == telegram_id or viewer_telegram_id is None else None,
+            # Приватность видна ТОЛЬКО владельцу профиля
+            privacy=privacy if viewer_telegram_id is not None and viewer_telegram_id == telegram_id else None,
             created_at=user.get("created_at"),
             friendship_status=friendship_status
         )
@@ -14798,7 +14812,7 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
         from rudn_parser import get_schedule
         
         if not date:
-            date = datetime.now().strftime("%Y-%m-%d")
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         
         # Правильный порядок параметров: facultet_id, level_id, kurs, form_code, group_id
         schedule_events = await get_schedule(
@@ -14855,8 +14869,13 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
 async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpdate):
     """Обновить настройки приватности"""
     try:
-        # Получаем текущие настройки
-        current = await get_user_privacy_settings(telegram_id)
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Получаем текущие настройки (из уже загруженного документа)
+        current = await get_user_privacy_settings(telegram_id, user_doc=user)
         
         # Обновляем только переданные поля
         update_data = settings.dict(exclude_unset=True)
@@ -14864,14 +14883,19 @@ async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpd
             setattr(current, key, value)
         
         # Сохраняем
-        await db.user_settings.update_one(
+        result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
             {"$set": {"privacy_settings": current.dict()}}
         )
         
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
         logger.info(f"🔒 Privacy settings updated for {telegram_id}")
         return current
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Update privacy settings error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -14922,6 +14946,11 @@ async def save_graffiti(telegram_id: int, request: Request):
         body = await request.json()
         graffiti_data = body.get("graffiti_data", "")
         
+        # Авторизация: проверяем что запрос от владельца профиля
+        requester_id = body.get("requester_telegram_id")
+        if requester_id is not None and int(requester_id) != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно изменять только своё граффити")
+        
         # Ограничение размера ~2MB base64
         if len(graffiti_data) > 2 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Graffiti data too large")
@@ -14962,6 +14991,85 @@ async def get_graffiti(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ========== END GRAFFITI ==========
+
+
+# ========== CUSTOM AVATAR ==========
+
+@api_router.put("/profile/{telegram_id}/avatar")
+async def save_custom_avatar(telegram_id: int, request: Request):
+    """Save custom avatar for user (base64 data URL)"""
+    try:
+        body = await request.json()
+        avatar_data = body.get("avatar_data", "")
+        requester_id = body.get("requester_telegram_id")
+        
+        # Авторизация
+        if requester_id is not None and int(requester_id) != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно изменять только свой аватар")
+        
+        # Ограничение размера ~3MB base64
+        if avatar_data and len(avatar_data) > 3 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Avatar data too large (max 3MB)")
+        
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"custom_avatar": avatar_data, "avatar_mode": "custom" if avatar_data else "telegram"}},
+            upsert=False
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save custom avatar error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/profile/{telegram_id}/avatar")
+async def get_custom_avatar(telegram_id: int):
+    """Get custom avatar for user"""
+    try:
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"custom_avatar": 1, "avatar_mode": 1, "_id": 0}
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {
+            "avatar_data": user.get("custom_avatar", ""),
+            "avatar_mode": user.get("avatar_mode", "telegram")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get custom avatar error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/profile/{telegram_id}/avatar")
+async def delete_custom_avatar(telegram_id: int):
+    """Delete custom avatar (return to Telegram avatar)"""
+    try:
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"custom_avatar": "", "avatar_mode": "telegram"}}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete custom avatar error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ========== END CUSTOM AVATAR ==========
+
 
 
 

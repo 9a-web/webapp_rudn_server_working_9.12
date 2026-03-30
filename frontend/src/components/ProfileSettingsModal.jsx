@@ -20,18 +20,22 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
     show_achievements: true,
     show_schedule: true,
   });
+  const [originalSettings, setOriginalSettings] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Загрузка настроек
   useEffect(() => {
     const load = async () => {
       if (!isOpen || !telegramId) return;
       setIsLoading(true);
+      setIsDirty(false);
       try {
         const data = await friendsAPI.getPrivacySettings(telegramId);
         setPrivacySettings(data);
+        setOriginalSettings(JSON.stringify(data));
       } catch (err) {
         console.error('Error loading privacy settings:', err);
       } finally {
@@ -48,6 +52,8 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
       await friendsAPI.updatePrivacySettings(telegramId, privacySettings);
       hapticFeedback?.('notification', 'success');
       setSaved(true);
+      setIsDirty(false);
+      setOriginalSettings(JSON.stringify(privacySettings));
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error('Error saving privacy:', err);
@@ -61,6 +67,21 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
     hapticFeedback?.('impact', 'light');
     setPrivacySettings(prev => ({ ...prev, [key]: !prev[key] }));
     setSaved(false);
+    setIsDirty(true);
+  };
+
+  // Bug 16: Автосохранение при закрытии если есть несохранённые изменения
+  const handleClose = async () => {
+    if (isDirty && !isSaving) {
+      try {
+        await friendsAPI.updatePrivacySettings(telegramId, privacySettings);
+        hapticFeedback?.('notification', 'success');
+      } catch (err) {
+        console.error('Auto-save privacy on close error:', err);
+      }
+    }
+    setIsDirty(false);
+    onClose();
   };
 
   const privacyItems = [
@@ -123,7 +144,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
           >
             <button onClick={() => {
               hapticFeedback?.('impact', 'light');
-              onClose();
+              handleClose();
             }}>
               <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
             </button>
@@ -318,7 +339,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
                 opacity: isSaving || isLoading ? 0.5 : 1,
               }}
             >
-              {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : 'Сохранить настройки'}
+              {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : isDirty ? 'Сохранить изменения' : 'Сохранить настройки'}
             </button>
           </motion.div>
         </motion.div>
