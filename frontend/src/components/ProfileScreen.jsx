@@ -81,7 +81,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
+  const graffitiEditingRef = useRef(false);
+  graffitiEditingRef.current = isGraffitiEditing;
+
   const startDraw = (e) => {
+    if (!graffitiEditingRef.current) return;
     e.preventDefault();
     setIsDrawing(true);
     const pos = getPos(e);
@@ -95,7 +99,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   };
 
   const draw = (e) => {
-    if (!isDrawing) return;
+    if (!graffitiEditingRef.current || !isDrawing) return;
     e.preventDefault();
     const ctx = graffitiCtxRef.current;
     if (!ctx) return;
@@ -730,14 +734,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   }}>
                     <canvas
                       ref={graffitiCanvasRef}
-                      onMouseDown={isGraffitiEditing ? startDraw : undefined}
-                      onMouseMove={isGraffitiEditing ? draw : undefined}
-                      onMouseUp={isGraffitiEditing ? stopDraw : undefined}
-                      onMouseLeave={isGraffitiEditing ? stopDraw : undefined}
-                      onTouchStart={isGraffitiEditing ? startDraw : undefined}
-                      onTouchMove={isGraffitiEditing ? draw : undefined}
-                      onTouchEnd={isGraffitiEditing ? stopDraw : undefined}
-                      onTouchCancel={isGraffitiEditing ? stopDraw : undefined}
+                      onMouseDown={startDraw}
+                      onMouseMove={draw}
+                      onMouseUp={stopDraw}
+                      onMouseLeave={stopDraw}
+                      onTouchStart={startDraw}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDraw}
+                      onTouchCancel={stopDraw}
                       style={{
                         width: '100%',
                         height: '100%',
