@@ -126,12 +126,26 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   brushSizeTouchRef.current = brushSize;
   isGraffitiEditingRef.current = isGraffitiEditing;
 
-  useEffect(() => {
-    const canvas = graffitiCanvasRef.current;
-    if (!canvas) return;
+  // Callback ref для canvas — привязывает нативные touch-обработчики при появлении элемента
+  const touchHandlersRef = useRef(null);
+
+  const graffitiCanvasCallbackRef = useCallback((node) => {
+    // Убираем старые обработчики если были
+    if (touchHandlersRef.current) {
+      const { canvas, onTouchStart, onTouchMove, onTouchEnd } = touchHandlersRef.current;
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
+      touchHandlersRef.current = null;
+    }
+
+    graffitiCanvasRef.current = node;
+
+    if (!node) return;
 
     const getTouchPos = (touch) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = node.getBoundingClientRect();
       return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
     };
 
@@ -172,17 +186,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       lastPointRef.current = null;
     };
 
-    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
-    canvas.addEventListener('touchend', onTouchEnd);
-    canvas.addEventListener('touchcancel', onTouchEnd);
+    node.addEventListener('touchstart', onTouchStart, { passive: false });
+    node.addEventListener('touchmove', onTouchMove, { passive: false });
+    node.addEventListener('touchend', onTouchEnd);
+    node.addEventListener('touchcancel', onTouchEnd);
 
-    return () => {
-      canvas.removeEventListener('touchstart', onTouchStart);
-      canvas.removeEventListener('touchmove', onTouchMove);
-      canvas.removeEventListener('touchend', onTouchEnd);
-      canvas.removeEventListener('touchcancel', onTouchEnd);
-    };
+    touchHandlersRef.current = { canvas: node, onTouchStart, onTouchMove, onTouchEnd };
   }, []);
 
   const clearGraffiti = () => {
@@ -797,7 +806,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     transition: 'border-color 0.25s ease',
                   }}>
                     <canvas
-                      ref={graffitiCanvasRef}
+                      ref={graffitiCanvasCallbackRef}
                       onMouseDown={startDrawMouse}
                       onMouseMove={drawMouse}
                       onMouseUp={stopDrawMouse}
