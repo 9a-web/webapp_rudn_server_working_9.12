@@ -484,7 +484,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       fontFamily: "'Poppins', sans-serif",
                       fontWeight: 600,
                       fontSize: '16px',
-                      color: activeTab === tab.id ? '#F8B94C' : '#F4F3FC',
+                      color: activeTab === tab.id ? '#F8B94C' : '#88888B',
                       background: 'none',
                       border: activeTab === tab.id ? '2px solid #F8B94C' : '2px solid transparent',
                       borderRadius: '16px',
