@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pencil } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import ProfileSettingsModal from './ProfileSettingsModal';
@@ -141,13 +141,19 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
             </button>
 
-            {/* QR и Настройки */}
+            {/* QR, Настройки и Редактирование профиля */}
             <div className="flex items-center gap-3">
               <button onClick={handleQRClick}>
                 <QrCode style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
               </button>
               <button onClick={handleSettingsClick}>
                 <Settings style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+              </button>
+              <button onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'light');
+                setShowProfileSettings(true);
+              }}>
+                <Pencil style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
               </button>
             </div>
           </motion.div>
