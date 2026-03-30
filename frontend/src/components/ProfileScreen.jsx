@@ -447,8 +447,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               style={{
                 position: 'absolute',
                 bottom: 'calc(100% - 32px)',
-                left: 0,
-                width: '100%',
+                left: '-10px',
+                right: '-10px',
                 height: '257px',
                 background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 100%)',
                 pointerEvents: 'none',
