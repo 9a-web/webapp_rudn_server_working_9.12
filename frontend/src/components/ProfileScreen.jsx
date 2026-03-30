@@ -428,7 +428,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
-          {/* Нижний прямоугольник с свечением */}
+          {/* Нижняя секция с свечением */}
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -438,30 +438,24 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               width: '100%',
               position: 'relative',
               flexShrink: 0,
-              paddingLeft: '10px',
-              paddingRight: '10px',
             }}
           >
-            {/* Свечение наверх */}
+            {/* Свечение */}
             <div
               style={{
                 position: 'absolute',
                 bottom: 0,
-                left: '-10px',
-                right: '-10px',
+                left: 0,
+                right: 0,
                 top: '-225px',
                 background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 225px, rgba(248, 185, 76, 0.30) 100%)',
                 pointerEvents: 'none',
                 zIndex: 0,
               }}
             />
-            {/* Сам прямоугольник */}
+            {/* Контент */}
             <div
               style={{
-                width: '100%',
-                minHeight: '430px',
-                borderRadius: '32px 32px 0 0',
-                background: 'linear-gradient(180deg, #1E1D1A 0%, #1C1C1C 100%)',
                 position: 'relative',
                 zIndex: 1,
                 padding: '24px 20px 0',
