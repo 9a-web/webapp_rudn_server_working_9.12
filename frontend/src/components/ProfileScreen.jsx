@@ -145,7 +145,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
             {/* QR, Редактирование профиля и Настройки */}
             <div className="flex items-center gap-3">
-              <button onClick={handleQRClick} style={{ marginRight: '4px' }}>
+              <button onClick={handleQRClick}>
                 <QrCode style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
               </button>
               <button onClick={() => {
