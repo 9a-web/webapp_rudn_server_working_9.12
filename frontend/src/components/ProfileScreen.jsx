@@ -897,8 +897,19 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   if (btn && container) {
                     const btnRect = btn.getBoundingClientRect();
                     const containerRect = container.getBoundingClientRect();
-                    const scrollLeft = container.scrollLeft + (btnRect.left - containerRect.left) - (containerRect.width / 2) + (btnRect.width / 2);
-                    container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                    const targetScroll = container.scrollLeft + (btnRect.left - containerRect.left) - (containerRect.width / 2) + (btnRect.width / 2);
+                    const startScroll = container.scrollLeft;
+                    const diff = targetScroll - startScroll;
+                    const duration = 400;
+                    let startTime = null;
+                    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+                    const step = (timestamp) => {
+                      if (!startTime) startTime = timestamp;
+                      const progress = Math.min((timestamp - startTime) / duration, 1);
+                      container.scrollLeft = startScroll + diff * easeOutCubic(progress);
+                      if (progress < 1) requestAnimationFrame(step);
+                    };
+                    requestAnimationFrame(step);
                   }
                 }}
                 style={{
