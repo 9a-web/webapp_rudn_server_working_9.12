@@ -844,7 +844,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   lineHeight: 1.2,
                 }}
               >
-                {user.rdn_balance || 0}
+                {profileData?.total_points ?? user.rdn_balance ?? 0}
               </span>
               <span
                 style={{
