@@ -14722,8 +14722,10 @@ async def get_mutual_friends(telegram_id: int, other_telegram_id: int):
 async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
     """Получить публичный профиль пользователя"""
     try:
+        is_own_profile = viewer_telegram_id is not None and viewer_telegram_id == telegram_id
+
         # Проверяем блокировку — если viewer заблокирован владельцем профиля, отказ
-        if viewer_telegram_id and viewer_telegram_id != telegram_id:
+        if viewer_telegram_id and not is_own_profile:
             if await is_blocked(telegram_id, viewer_telegram_id):
                 raise HTTPException(status_code=403, detail="Профиль недоступен")
         
@@ -14734,33 +14736,73 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
         # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
         privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
         
-        # Получаем статистику
-        stats = await db.user_stats.find_one({"telegram_id": telegram_id})
-        achievements_count = await db.user_achievements.count_documents({"telegram_id": telegram_id})
-        friends_count = await get_user_friends_count(telegram_id)
+        # Оптимизация: параллельные запросы к БД
+        import asyncio
+        tasks = [
+            db.user_stats.find_one({"telegram_id": telegram_id}),
+            db.user_achievements.count_documents({"telegram_id": telegram_id}),
+            get_user_friends_count(telegram_id),
+        ]
+        # Общие друзья и статус дружбы — только если смотрит другой пользователь
+        if viewer_telegram_id and not is_own_profile:
+            tasks.append(get_mutual_friends_count(viewer_telegram_id, telegram_id))
+            tasks.append(get_friendship_status(viewer_telegram_id, telegram_id))
+        
+        results = await asyncio.gather(*tasks)
+        
+        stats = results[0]
+        achievements_count = results[1]
+        friends_count = results[2]
+        mutual_count = results[3] if len(results) > 3 else 0
+        friendship_status = results[4] if len(results) > 4 else None
         
         # Проверяем онлайн-статус (timezone-aware)
         is_online = False
         last_activity = user.get("last_activity")
-        if last_activity and privacy.show_online_status:
+        if last_activity:
             if isinstance(last_activity, str):
                 last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
             # Если last_activity naive — считаем UTC
             if last_activity.tzinfo is None:
-                from datetime import timezone as tz
-                last_activity = last_activity.replace(tzinfo=tz.utc)
+                last_activity = last_activity.replace(tzinfo=timezone.utc)
             is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
         
-        # Вычисляем общих друзей
-        mutual_count = 0
-        if viewer_telegram_id and viewer_telegram_id != telegram_id:
-            mutual_count = await get_mutual_friends_count(viewer_telegram_id, telegram_id)
+        # Streak данные
+        streak_current = stats.get("visit_streak_current", 0) if stats else 0
+        streak_max = stats.get("visit_streak_max", 0) if stats else 0
         
-        # Определяем статус дружбы
-        friendship_status = None
-        if viewer_telegram_id and viewer_telegram_id != telegram_id:
-            friendship_status = await get_friendship_status(viewer_telegram_id, telegram_id)
+        # Avatar info
+        avatar_mode = user.get("avatar_mode", "telegram")
+        has_custom_avatar = bool(user.get("custom_avatar"))
         
+        # Применяем privacy-фильтры ТОЛЬКО для чужих профилей (владелец видит всё)
+        if is_own_profile:
+            return UserProfilePublic(
+                telegram_id=telegram_id,
+                username=user.get("username"),
+                first_name=user.get("first_name"),
+                last_name=user.get("last_name"),
+                group_id=user.get("group_id"),
+                group_name=user.get("group_name"),
+                facultet_id=user.get("facultet_id"),
+                facultet_name=user.get("facultet_name"),
+                kurs=user.get("kurs"),
+                friends_count=friends_count,
+                mutual_friends_count=0,
+                achievements_count=achievements_count,
+                total_points=stats.get("total_points", 0) if stats else 0,
+                visit_streak_current=streak_current,
+                visit_streak_max=streak_max,
+                avatar_mode=avatar_mode,
+                has_custom_avatar=has_custom_avatar,
+                is_online=is_online,
+                last_activity=last_activity,
+                privacy=privacy,
+                created_at=user.get("created_at"),
+                friendship_status=None
+            )
+        
+        # Для чужого профиля — применяем privacy-фильтры
         return UserProfilePublic(
             telegram_id=telegram_id,
             username=user.get("username"),
@@ -14775,10 +14817,13 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             mutual_friends_count=mutual_count,
             achievements_count=achievements_count if privacy.show_achievements else 0,
             total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
+            visit_streak_current=streak_current if privacy.show_achievements else 0,
+            visit_streak_max=streak_max if privacy.show_achievements else 0,
+            avatar_mode=avatar_mode,
+            has_custom_avatar=has_custom_avatar,
             is_online=is_online if privacy.show_online_status else False,
             last_activity=last_activity if privacy.show_online_status else None,
-            # Приватность видна ТОЛЬКО владельцу профиля
-            privacy=privacy if viewer_telegram_id is not None and viewer_telegram_id == telegram_id else None,
+            privacy=None,
             created_at=user.get("created_at"),
             friendship_status=friendship_status
         )
@@ -14794,6 +14839,12 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
 async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: str = None):
     """Получить расписание друга"""
     try:
+        # Проверяем блокировку
+        if await is_blocked(telegram_id, viewer_telegram_id):
+            raise HTTPException(status_code=403, detail="Профиль недоступен")
+        if await is_blocked(viewer_telegram_id, telegram_id):
+            raise HTTPException(status_code=403, detail="Профиль недоступен")
+        
         # Проверяем, что пользователи друзья
         if not await are_friends(viewer_telegram_id, telegram_id):
             raise HTTPException(status_code=403, detail="Вы не друзья с этим пользователем")
@@ -14866,9 +14917,13 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
 
 
 @api_router.put("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
-async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpdate):
+async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpdate, requester_telegram_id: int = None):
     """Обновить настройки приватности"""
     try:
+        # Авторизация: только владелец может менять свои настройки
+        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно изменять только свои настройки приватности")
+        
         # Проверяем существование пользователя
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
         if not user:
@@ -14946,9 +15001,11 @@ async def save_graffiti(telegram_id: int, request: Request):
         body = await request.json()
         graffiti_data = body.get("graffiti_data", "")
         
-        # Авторизация: проверяем что запрос от владельца профиля
+        # Авторизация: обязательная проверка что запрос от владельца профиля
         requester_id = body.get("requester_telegram_id")
-        if requester_id is not None and int(requester_id) != telegram_id:
+        if requester_id is None:
+            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+        if int(requester_id) != telegram_id:
             raise HTTPException(status_code=403, detail="Можно изменять только своё граффити")
         
         # Ограничение размера ~2MB base64
@@ -15051,9 +15108,13 @@ async def get_custom_avatar(telegram_id: int):
 
 
 @api_router.delete("/profile/{telegram_id}/avatar")
-async def delete_custom_avatar(telegram_id: int):
+async def delete_custom_avatar(telegram_id: int, requester_telegram_id: int = None):
     """Delete custom avatar (return to Telegram avatar)"""
     try:
+        # Авторизация: только владелец может удалить свой аватар
+        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно удалять только свой аватар")
+        
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
             {"$set": {"custom_avatar": "", "avatar_mode": "telegram"}}

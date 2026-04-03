@@ -228,7 +228,7 @@ export const friendsAPI = {
 
   updatePrivacySettings: async (telegramId, settings) => {
     try {
-      const response = await api.put(`/profile/${telegramId}/privacy`, settings);
+      const response = await api.put(`/profile/${telegramId}/privacy?requester_telegram_id=${telegramId}`, settings);
       return response.data;
     } catch (error) {
       handleError(error);

@@ -182,7 +182,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
         });
       } else {
         // Удаляем кастомный аватар (режим telegram или none)
-        await fetch(`${backendUrl}/api/profile/${user.id}/avatar`, {
+        await fetch(`${backendUrl}/api/profile/${user.id}/avatar?requester_telegram_id=${user.id}`, {
           method: 'DELETE',
         });
       }
@@ -193,19 +193,50 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     }
   }, [user?.id]);
 
+  // Компрессия изображения перед загрузкой
+  const compressImage = useCallback((dataUrl, maxWidth = 512, quality = 0.85) => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        
+        // Масштабируем если превышает maxWidth
+        if (width > maxWidth || height > maxWidth) {
+          const ratio = Math.min(maxWidth / width, maxWidth / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Пробуем JPEG для лучшей компрессии, PNG для прозрачности
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      };
+      img.onerror = () => resolve(dataUrl); // fallback
+      img.src = dataUrl;
+    });
+  }, []);
+
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const dataUrl = ev.target.result;
-      setCustomAvatar(dataUrl);
+      // Сжимаем изображение перед загрузкой
+      const compressed = await compressImage(dataUrl, 512, 0.85);
+      setCustomAvatar(compressed);
       setAvatarMode('custom');
       setShowAvatarMenu(false);
       if (hapticFeedback) hapticFeedback('notification', 'success');
       // Сохраняем на сервер
-      saveAvatarToServer(dataUrl, 'custom');
+      saveAvatarToServer(compressed, 'custom');
     };
     reader.readAsDataURL(file);
   };

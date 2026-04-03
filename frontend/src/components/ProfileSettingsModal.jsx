@@ -303,45 +303,50 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
             )}
           </div>
 
-          {/* Кнопка сохранения — фиксированная снизу */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              padding: '16px 24px 32px',
-              background: 'linear-gradient(transparent, #000000 30%)',
-            }}
-          >
-            <button
-              onClick={handleSave}
-              disabled={isSaving || isLoading}
-              style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '16px',
-                border: 'none',
-                cursor: isSaving || isLoading ? 'not-allowed' : 'pointer',
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: '15px',
-                color: '#000000',
-                background: saved
-                  ? '#22C55E'
-                  : isSaving || isLoading
-                    ? 'rgba(255,255,255,0.1)'
-                    : 'linear-gradient(135deg, #F8B94C 0%, #FFBE4E 100%)',
-                transition: 'opacity 0.2s',
-                opacity: isSaving || isLoading ? 0.5 : 1,
-              }}
-            >
-              {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : isDirty ? 'Сохранить изменения' : 'Сохранить настройки'}
-            </button>
-          </motion.div>
+          {/* Кнопка сохранения — фиксированная снизу, видна только при изменениях */}
+          <AnimatePresence>
+            {(isDirty || saved) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.25 }}
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: '16px 24px 32px',
+                  background: 'linear-gradient(transparent, #000000 30%)',
+                }}
+              >
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || isLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    border: 'none',
+                    cursor: isSaving || isLoading ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    color: '#000000',
+                    background: saved
+                      ? '#22C55E'
+                      : isSaving || isLoading
+                        ? 'rgba(255,255,255,0.1)'
+                        : 'linear-gradient(135deg, #F8B94C 0%, #FFBE4E 100%)',
+                    transition: 'opacity 0.2s',
+                    opacity: isSaving || isLoading ? 0.5 : 1,
+                  }}
+                >
+                  {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : 'Сохранить изменения'}
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

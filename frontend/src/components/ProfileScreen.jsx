@@ -350,6 +350,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       // Сброс данных профиля
       setProfileData(null);
       setActiveTab('general');
+      // Сброс загрузки аватара для корректного рендера при переоткрытии
+      setImgLoaded(false);
     }
   }, [isOpen]);
 

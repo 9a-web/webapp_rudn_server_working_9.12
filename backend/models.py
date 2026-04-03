@@ -1879,6 +1879,14 @@ class UserProfilePublic(BaseModel):
     achievements_count: int = 0
     total_points: int = 0
     
+    # Streak
+    visit_streak_current: int = 0
+    visit_streak_max: int = 0
+    
+    # Аватар
+    avatar_mode: Optional[str] = "telegram"  # "telegram" | "custom" | "none"
+    has_custom_avatar: bool = False
+    
     # Статус
     is_online: bool = False
     last_activity: Optional[datetime] = None

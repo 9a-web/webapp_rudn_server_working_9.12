@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 import { groupScheduleItems } from '../utils/scheduleUtils';
-import { getBackendURL } from '../utils/config';
+import { getBackendURL } from '../services/api';
 
 const getAvatarGradient = (id) => {
   const gradients = [
@@ -237,7 +237,7 @@ const FriendProfileModal = ({
                     <p className="text-xl font-bold text-white">{mutualFriends.length}</p>
                     <p className="text-[11px] text-gray-500 mt-0.5">Общих</p>
                   </div>
-                  {profile.privacy?.show_achievements !== false && (
+                  {(profile.achievements_count > 0) && (
                     <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
                       <p className="text-xl font-bold text-white">{profile.achievements_count || 0}</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">Достижений</p>
