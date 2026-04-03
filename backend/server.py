@@ -14718,130 +14718,7 @@ async def get_mutual_friends(telegram_id: int, other_telegram_id: int):
 
 # API для профиля
 
-@api_router.get("/profile/{telegram_id}", response_model=UserProfilePublic)
-async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
-    """Получить публичный профиль пользователя"""
-    try:
-        is_own_profile = viewer_telegram_id is not None and viewer_telegram_id == telegram_id
-
-        # Проверяем блокировку — если viewer заблокирован владельцем профиля, отказ
-        if viewer_telegram_id and not is_own_profile:
-            if await is_blocked(telegram_id, viewer_telegram_id):
-                raise HTTPException(status_code=403, detail="Профиль недоступен")
-        
-        user = await db.user_settings.find_one({"telegram_id": telegram_id})
-        if not user:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
-        
-        # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
-        privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
-        
-        # Оптимизация: параллельные запросы к БД
-        import asyncio
-        tasks = [
-            db.user_stats.find_one({"telegram_id": telegram_id}),
-            db.user_achievements.count_documents({"telegram_id": telegram_id}),
-            get_user_friends_count(telegram_id),
-        ]
-        # Общие друзья и статус дружбы — только если смотрит другой пользователь
-        if viewer_telegram_id and not is_own_profile:
-            tasks.append(get_mutual_friends_count(viewer_telegram_id, telegram_id))
-            tasks.append(get_friendship_status(viewer_telegram_id, telegram_id))
-        
-        results = await asyncio.gather(*tasks)
-        
-        stats = results[0]
-        achievements_count = results[1]
-        friends_count = results[2]
-        mutual_count = results[3] if len(results) > 3 else 0
-        friendship_status = results[4] if len(results) > 4 else None
-        
-        # Проверяем онлайн-статус (timezone-aware)
-        is_online = False
-        last_activity = user.get("last_activity")
-        if last_activity:
-            if isinstance(last_activity, str):
-                last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-            # Если last_activity naive — считаем UTC
-            if last_activity.tzinfo is None:
-                last_activity = last_activity.replace(tzinfo=timezone.utc)
-            is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
-        
-        # Владелец профиля — всегда онлайн (раз открыл профиль — значит в приложении)
-        if is_own_profile:
-            is_online = True
-            # Обновляем last_activity при просмотре своего профиля
-            await db.user_settings.update_one(
-                {"telegram_id": telegram_id},
-                {"$set": {"last_activity": datetime.utcnow()}}
-            )
-        
-        # Streak данные
-        streak_current = stats.get("visit_streak_current", 0) if stats else 0
-        streak_max = stats.get("visit_streak_max", 0) if stats else 0
-        
-        # Avatar info
-        avatar_mode = user.get("avatar_mode", "telegram")
-        has_custom_avatar = bool(user.get("custom_avatar"))
-        
-        # Применяем privacy-фильтры ТОЛЬКО для чужих профилей (владелец видит всё)
-        if is_own_profile:
-            return UserProfilePublic(
-                telegram_id=telegram_id,
-                username=user.get("username"),
-                first_name=user.get("first_name"),
-                last_name=user.get("last_name"),
-                group_id=user.get("group_id"),
-                group_name=user.get("group_name"),
-                facultet_id=user.get("facultet_id"),
-                facultet_name=user.get("facultet_name"),
-                kurs=user.get("kurs"),
-                friends_count=friends_count,
-                mutual_friends_count=0,
-                achievements_count=achievements_count,
-                total_points=stats.get("total_points", 0) if stats else 0,
-                visit_streak_current=streak_current,
-                visit_streak_max=streak_max,
-                avatar_mode=avatar_mode,
-                has_custom_avatar=has_custom_avatar,
-                is_online=is_online,
-                last_activity=last_activity,
-                privacy=privacy,
-                created_at=user.get("created_at"),
-                friendship_status=None
-            )
-        
-        # Для чужого профиля — применяем privacy-фильтры
-        return UserProfilePublic(
-            telegram_id=telegram_id,
-            username=user.get("username"),
-            first_name=user.get("first_name"),
-            last_name=user.get("last_name"),
-            group_id=user.get("group_id"),
-            group_name=user.get("group_name"),
-            facultet_id=user.get("facultet_id"),
-            facultet_name=user.get("facultet_name"),
-            kurs=user.get("kurs"),
-            friends_count=friends_count if privacy.show_friends_list else 0,
-            mutual_friends_count=mutual_count,
-            achievements_count=achievements_count if privacy.show_achievements else 0,
-            total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
-            visit_streak_current=streak_current if privacy.show_achievements else 0,
-            visit_streak_max=streak_max if privacy.show_achievements else 0,
-            avatar_mode=avatar_mode,
-            has_custom_avatar=has_custom_avatar,
-            is_online=is_online if privacy.show_online_status else False,
-            last_activity=last_activity if privacy.show_online_status else None,
-            privacy=None,
-            created_at=user.get("created_at"),
-            friendship_status=friendship_status
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Get user profile error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Moved general profile endpoint after specific ones to fix routing
 
 
 @api_router.get("/profile/{telegram_id}/schedule", response_model=FriendScheduleResponse)
@@ -15017,20 +14894,31 @@ async def save_graffiti(telegram_id: int, request: Request):
         if int(requester_id) != telegram_id:
             raise HTTPException(status_code=403, detail="Можно изменять только своё граффити")
         
-        # Ограничение размера ~2MB base64
-        if len(graffiti_data) > 2 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Graffiti data too large")
+        # Валидация формата: должен быть data URL изображения или пустая строка
+        if graffiti_data and not graffiti_data.startswith("data:image/"):
+            raise HTTPException(status_code=400, detail="Неверный формат данных граффити. Ожидается data:image/* URL")
         
-        result = await db.user_settings.update_one(
+        # Ограничение размера ~3MB base64 (учитываем Retina дисплеи с DPR 2-3)
+        max_size = 3 * 1024 * 1024
+        if len(graffiti_data) > max_size:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Граффити слишком большое ({len(graffiti_data)} байт). Максимум: {max_size} байт"
+            )
+        
+        update_data = {
+            "graffiti_data": graffiti_data,
+            "graffiti_updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        # upsert=True — позволяет сохранить граффити даже если документ ещё не создан
+        await db.user_settings.update_one(
             {"telegram_id": telegram_id},
-            {"$set": {"graffiti_data": graffiti_data}},
-            upsert=False
+            {"$set": update_data},
+            upsert=True
         )
         
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
-        
-        return {"success": True}
+        return {"success": True, "graffiti_updated_at": update_data["graffiti_updated_at"]}
     except HTTPException:
         raise
     except Exception as e:
@@ -15044,16 +14932,45 @@ async def get_graffiti(telegram_id: int):
     try:
         user = await db.user_settings.find_one(
             {"telegram_id": telegram_id},
-            {"graffiti_data": 1, "_id": 0}
+            {"graffiti_data": 1, "graffiti_updated_at": 1, "_id": 0}
         )
         if not user:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
+            return {"graffiti_data": "", "graffiti_updated_at": None}
         
-        return {"graffiti_data": user.get("graffiti_data", "")}
+        return {
+            "graffiti_data": user.get("graffiti_data", ""),
+            "graffiti_updated_at": user.get("graffiti_updated_at", None),
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Get graffiti error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/profile/{telegram_id}/graffiti")
+async def delete_graffiti(telegram_id: int, request: Request):
+    """Удалить граффити пользователя (полная очистка)"""
+    try:
+        body = await request.json()
+        
+        # Авторизация
+        requester_id = body.get("requester_telegram_id")
+        if requester_id is None:
+            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+        if int(requester_id) != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно удалять только своё граффити")
+        
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$unset": {"graffiti_data": "", "graffiti_updated_at": ""}},
+        )
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete graffiti error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ========== END GRAFFITI ==========
@@ -15139,6 +15056,136 @@ async def delete_custom_avatar(telegram_id: int, requester_telegram_id: int = No
         raise HTTPException(status_code=500, detail=str(e))
 
 # ========== END CUSTOM AVATAR ==========
+
+
+# ========== GENERAL PROFILE ENDPOINT (moved after specific ones) ==========
+
+@api_router.get("/profile/{telegram_id}", response_model=UserProfilePublic)
+async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
+    """Получить публичный профиль пользователя"""
+    try:
+        is_own_profile = viewer_telegram_id is not None and viewer_telegram_id == telegram_id
+
+        # Проверяем блокировку — если viewer заблокирован владельцем профиля, отказ
+        if viewer_telegram_id and not is_own_profile:
+            if await is_blocked(telegram_id, viewer_telegram_id):
+                raise HTTPException(status_code=403, detail="Профиль недоступен")
+        
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
+        privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
+        
+        # Оптимизация: параллельные запросы к БД
+        import asyncio
+        tasks = [
+            db.user_stats.find_one({"telegram_id": telegram_id}),
+            db.user_achievements.count_documents({"telegram_id": telegram_id}),
+            get_user_friends_count(telegram_id),
+        ]
+        # Общие друзья и статус дружбы — только если смотрит другой пользователь
+        if viewer_telegram_id and not is_own_profile:
+            tasks.append(get_mutual_friends_count(viewer_telegram_id, telegram_id))
+            tasks.append(get_friendship_status(viewer_telegram_id, telegram_id))
+        
+        results = await asyncio.gather(*tasks)
+        
+        stats = results[0]
+        achievements_count = results[1]
+        friends_count = results[2]
+        mutual_count = results[3] if len(results) > 3 else 0
+        friendship_status = results[4] if len(results) > 4 else None
+        
+        # Проверяем онлайн-статус (timezone-aware)
+        is_online = False
+        last_activity = user.get("last_activity")
+        if last_activity:
+            if isinstance(last_activity, str):
+                last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+            # Если last_activity naive — считаем UTC
+            if last_activity.tzinfo is None:
+                last_activity = last_activity.replace(tzinfo=timezone.utc)
+            is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
+        
+        # Владелец профиля — всегда онлайн (раз открыл профиль — значит в приложении)
+        if is_own_profile:
+            is_online = True
+            # Обновляем last_activity при просмотре своего профиля
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"last_activity": datetime.utcnow()}}
+            )
+        
+        # Streak данные
+        streak_current = stats.get("visit_streak_current", 0) if stats else 0
+        streak_max = stats.get("visit_streak_max", 0) if stats else 0
+        
+        # Avatar info
+        avatar_mode = user.get("avatar_mode", "telegram")
+        has_custom_avatar = bool(user.get("custom_avatar"))
+        
+        # Применяем privacy-фильтры ТОЛЬКО для чужих профилей (владелец видит всё)
+        if is_own_profile:
+            return UserProfilePublic(
+                telegram_id=telegram_id,
+                username=user.get("username"),
+                first_name=user.get("first_name"),
+                last_name=user.get("last_name"),
+                group_id=user.get("group_id"),
+                group_name=user.get("group_name"),
+                facultet_id=user.get("facultet_id"),
+                facultet_name=user.get("facultet_name"),
+                kurs=user.get("kurs"),
+                friends_count=friends_count,
+                mutual_friends_count=0,
+                achievements_count=achievements_count,
+                total_points=stats.get("total_points", 0) if stats else 0,
+                visit_streak_current=streak_current,
+                visit_streak_max=streak_max,
+                avatar_mode=avatar_mode,
+                has_custom_avatar=has_custom_avatar,
+                is_online=is_online,
+                last_activity=last_activity,
+                privacy=privacy,
+                created_at=user.get("created_at"),
+                friendship_status=None
+            )
+        
+        # Для чужого профиля — применяем privacy-фильтры
+        return UserProfilePublic(
+            telegram_id=telegram_id,
+            username=user.get("username"),
+            first_name=user.get("first_name"),
+            last_name=user.get("last_name"),
+            group_id=user.get("group_id"),
+            group_name=user.get("group_name"),
+            facultet_id=user.get("facultet_id"),
+            facultet_name=user.get("facultet_name"),
+            kurs=user.get("kurs"),
+            friends_count=friends_count if privacy.show_friends_list else 0,
+            mutual_friends_count=mutual_count,
+            achievements_count=achievements_count if privacy.show_achievements else 0,
+            total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
+            visit_streak_current=streak_current if privacy.show_achievements else 0,
+            visit_streak_max=streak_max if privacy.show_achievements else 0,
+            avatar_mode=avatar_mode,
+            has_custom_avatar=has_custom_avatar,
+            is_online=is_online if privacy.show_online_status else False,
+            last_activity=last_activity if privacy.show_online_status else None,
+            privacy=None,
+            created_at=user.get("created_at"),
+            friendship_status=friendship_status
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get user profile error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ========== END GENERAL PROFILE ENDPOINT ==========
 
 
 
