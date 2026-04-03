@@ -13,14 +13,14 @@ from datetime import datetime
 BACKEND_URL = "https://rudn-server-2.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
-# Test user IDs
-TEST_USER_ID = 12345
-NON_EXISTENT_USER_ID = 9999999
+# Test user IDs - Using admin user that exists in DB as per review request
+TEST_USER_ID = 765963392
+NON_EXISTENT_USER_ID = 999999999
 WRONG_REQUESTER_ID = 99999
 
 # Test data
-VALID_GRAFFITI_DATA = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-INVALID_GRAFFITI_DATA = "not_a_data_url"
+VALID_GRAFFITI_DATA = "data:image/png;base64,iVBORw0KGgo="
+INVALID_GRAFFITI_DATA = "invalid_format_not_image"
 
 class TestResults:
     def __init__(self):
@@ -56,6 +56,8 @@ def make_request(method, endpoint, data=None, expected_status=200):
             response = requests.get(url, headers=headers, timeout=30)
         elif method == "PUT":
             response = requests.put(url, json=data, headers=headers, timeout=30)
+        elif method == "POST":
+            response = requests.post(url, json=data, headers=headers, timeout=30)
         elif method == "DELETE":
             response = requests.delete(url, json=data, headers=headers, timeout=30)
         else:
@@ -209,8 +211,8 @@ def test_graffiti_endpoints():
     except Exception as e:
         results.add_fail("GET graffiti for non-existent user", str(e))
     
-    # Test 9: Set up graffiti for DELETE tests
-    print("\n9️⃣ Setting up graffiti for DELETE tests")
+    # Test 9: Set up graffiti for POST clear tests
+    print("\n9️⃣ Setting up graffiti for POST clear tests")
     try:
         data = {
             "graffiti_data": VALID_GRAFFITI_DATA,
@@ -219,57 +221,57 @@ def test_graffiti_endpoints():
         response = make_request("PUT", f"/profile/{TEST_USER_ID}/graffiti", data, 200)
         
         if response.status_code == 200:
-            results.add_pass("Setup graffiti for DELETE tests")
+            results.add_pass("Setup graffiti for POST clear tests")
         else:
-            results.add_fail("Setup graffiti for DELETE tests", f"Expected 200, got {response.status_code}: {response.text}")
+            results.add_fail("Setup graffiti for POST clear tests", f"Expected 200, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_fail("Setup graffiti for DELETE tests", str(e))
+        results.add_fail("Setup graffiti for POST clear tests", str(e))
     
-    # Test 10: DELETE graffiti - Missing requester
-    print("\n🔟 Testing DELETE /api/profile/{telegram_id}/graffiti - Missing requester")
+    # Test 10: POST graffiti/clear - Missing requester
+    print("\n🔟 Testing POST /api/profile/{telegram_id}/graffiti/clear - Missing requester")
     try:
         data = {}  # No requester_telegram_id
-        response = make_request("DELETE", f"/profile/{TEST_USER_ID}/graffiti", data)
+        response = make_request("POST", f"/profile/{TEST_USER_ID}/graffiti/clear", data)
         
         if response.status_code == 400:
-            results.add_pass("DELETE missing requester validation")
+            results.add_pass("POST clear missing requester validation")
         else:
-            results.add_fail("DELETE missing requester validation", f"Expected 400, got {response.status_code}: {response.text}")
+            results.add_fail("POST clear missing requester validation", f"Expected 400, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_fail("DELETE missing requester validation", str(e))
+        results.add_fail("POST clear missing requester validation", str(e))
     
-    # Test 11: DELETE graffiti - Wrong requester
-    print("\n1️⃣1️⃣ Testing DELETE /api/profile/{telegram_id}/graffiti - Wrong requester")
+    # Test 11: POST graffiti/clear - Wrong requester
+    print("\n1️⃣1️⃣ Testing POST /api/profile/{telegram_id}/graffiti/clear - Wrong requester")
     try:
         data = {"requester_telegram_id": WRONG_REQUESTER_ID}
-        response = make_request("DELETE", f"/profile/{TEST_USER_ID}/graffiti", data)
+        response = make_request("POST", f"/profile/{TEST_USER_ID}/graffiti/clear", data)
         
         if response.status_code == 403:
-            results.add_pass("DELETE wrong requester authorization")
+            results.add_pass("POST clear wrong requester authorization")
         else:
-            results.add_fail("DELETE wrong requester authorization", f"Expected 403, got {response.status_code}: {response.text}")
+            results.add_fail("POST clear wrong requester authorization", f"Expected 403, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_fail("DELETE wrong requester authorization", str(e))
+        results.add_fail("POST clear wrong requester authorization", str(e))
     
-    # Test 12: DELETE graffiti - Valid delete
-    print("\n1️⃣2️⃣ Testing DELETE /api/profile/{telegram_id}/graffiti - Valid delete")
+    # Test 12: POST graffiti/clear - Valid clear
+    print("\n1️⃣2️⃣ Testing POST /api/profile/{telegram_id}/graffiti/clear - Valid clear")
     try:
         data = {"requester_telegram_id": TEST_USER_ID}
-        response = make_request("DELETE", f"/profile/{TEST_USER_ID}/graffiti", data)
+        response = make_request("POST", f"/profile/{TEST_USER_ID}/graffiti/clear", data)
         
         if response.status_code == 200:
             response_data = response.json()
             if response_data.get("success"):
-                results.add_pass("Valid DELETE graffiti")
+                results.add_pass("Valid POST clear graffiti")
             else:
-                results.add_fail("Valid DELETE graffiti", f"Invalid response: {response_data}")
+                results.add_fail("Valid POST clear graffiti", f"Invalid response: {response_data}")
         else:
-            results.add_fail("Valid DELETE graffiti", f"Expected 200, got {response.status_code}: {response.text}")
+            results.add_fail("Valid POST clear graffiti", f"Expected 200, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_fail("Valid DELETE graffiti", str(e))
+        results.add_fail("Valid POST clear graffiti", str(e))
     
-    # Test 13: GET graffiti after DELETE (should return empty)
-    print("\n1️⃣3️⃣ Testing GET /api/profile/{telegram_id}/graffiti - After DELETE")
+    # Test 13: GET graffiti after POST clear (should return empty)
+    print("\n1️⃣3️⃣ Testing GET /api/profile/{telegram_id}/graffiti - After POST clear")
     try:
         response = make_request("GET", f"/profile/{TEST_USER_ID}/graffiti")
         
@@ -277,13 +279,13 @@ def test_graffiti_endpoints():
             response_data = response.json()
             if (response_data.get("graffiti_data") == "" and 
                 response_data.get("graffiti_updated_at") is None):
-                results.add_pass("GET graffiti after DELETE")
+                results.add_pass("GET graffiti after POST clear")
             else:
-                results.add_fail("GET graffiti after DELETE", f"Expected empty graffiti: {response_data}")
+                results.add_fail("GET graffiti after POST clear", f"Expected empty graffiti: {response_data}")
         else:
-            results.add_fail("GET graffiti after DELETE", f"Expected 200, got {response.status_code}: {response.text}")
+            results.add_fail("GET graffiti after POST clear", f"Expected 200, got {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_fail("GET graffiti after DELETE", str(e))
+        results.add_fail("GET graffiti after POST clear", str(e))
     
     return results.summary()
 

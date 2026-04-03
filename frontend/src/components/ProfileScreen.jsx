@@ -294,12 +294,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     setGraffitiHasContent(false);
     setShowClearConfirm(false);
     if (hapticFeedback) hapticFeedback('notification', 'success');
-    // Fix: Сразу удаляем на сервере через DELETE
+    // Fix: Сразу удаляем на сервере через POST /graffiti/clear
     if (user?.id) {
       try {
         const backendURL = getBackendURL();
-        await fetch(`${backendURL}/api/profile/${user.id}/graffiti`, {
-          method: 'DELETE',
+        await fetch(`${backendURL}/api/profile/${user.id}/graffiti/clear`, {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ requester_telegram_id: user.id }),
         });

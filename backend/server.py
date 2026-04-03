@@ -14948,9 +14948,9 @@ async def get_graffiti(telegram_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_router.delete("/profile/{telegram_id}/graffiti")
+@api_router.post("/profile/{telegram_id}/graffiti/clear")
 async def delete_graffiti(telegram_id: int, request: Request):
-    """Удалить граффити пользователя (полная очистка)"""
+    """Удалить граффити пользователя (полная очистка). POST вместо DELETE из-за инфраструктурных ограничений."""
     try:
         body = await request.json()
         
