@@ -846,7 +846,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              padding: '12px 20px 12px',
+              padding: '30px 20px',
               position: 'sticky',
               top: 0,
               zIndex: 10,
