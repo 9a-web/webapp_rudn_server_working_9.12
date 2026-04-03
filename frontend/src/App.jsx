@@ -1940,21 +1940,9 @@ const Home = () => {
   };
 
   // Рендерим новогоднюю тему для всех экранов
+  // ОТКЛЮЧЕНО: снег деактивирован
   const renderNewYearTheme = () => {
-    // Определяем, показывать ли снег
-    let showSnow = false;
-    
-    if (newYearThemeMode === 'always') {
-      // Режим "Всегда" - показываем круглый год
-      showSnow = true;
-    } else if (newYearThemeMode === 'auto') {
-      // Режим "Авто" - показываем только зимой (Dec/Jan/Feb)
-      const isWinter = isWinterSeason();
-      showSnow = isWinter;
-    }
-    // Режим "off" - не показываем (showSnow остаётся false)
-    
-    return showSnow ? <NewYearTheme enabled={true} /> : null;
+    return null;
   };
 
   // Показываем Welcome Screen
