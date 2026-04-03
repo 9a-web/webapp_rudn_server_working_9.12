@@ -900,13 +900,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     const targetScroll = container.scrollLeft + (btnRect.left - containerRect.left) - (containerRect.width / 2) + (btnRect.width / 2);
                     const startScroll = container.scrollLeft;
                     const diff = targetScroll - startScroll;
-                    const duration = 400;
+                    const duration = 250;
                     let startTime = null;
-                    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+                    const easeOut = (t) => 1 - (1 - t) * (1 - t);
                     const step = (timestamp) => {
                       if (!startTime) startTime = timestamp;
                       const progress = Math.min((timestamp - startTime) / duration, 1);
-                      container.scrollLeft = startScroll + diff * easeOutCubic(progress);
+                      container.scrollLeft = startScroll + diff * easeOut(progress);
                       if (progress < 1) requestAnimationFrame(step);
                     };
                     requestAnimationFrame(step);
