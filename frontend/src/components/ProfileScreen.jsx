@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCogCorner, Copy, Award, ChevronRight, Undo2, Redo2, Eraser } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCogCorner, Copy, Award, ChevronRight, Undo2, Redo2, Eraser, Star, Lock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
-import { getBackendURL } from '../services/api';
+import { getBackendURL, achievementsAPI } from '../services/api';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProfileEditScreen from './ProfileEditScreen';
 import DevicesModal from './DevicesModal';
@@ -15,6 +15,7 @@ const ADMIN_UIDS = ['765963392', '1311283832'];
 const TABS = [
   { id: 'general', label: 'Общее' },
   { id: 'friends', label: 'Друзья' },
+  { id: 'achievements', label: 'Достижения' },
   { id: 'materials', label: 'Материалы' },
 ];
 
@@ -43,6 +44,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Friends list state
   const [friendsList, setFriendsList] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+
+  // Achievements state
+  const [allAchievements, setAllAchievements] = useState([]);
+  const [userAchievements, setUserAchievements] = useState([]);
+  const [achievementsLoading, setAchievementsLoading] = useState(false);
 
   // ========== GRAFFITI ==========
   const graffitiCanvasRef = useRef(null);
@@ -420,6 +426,23 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         .then(data => setFriendsList(data?.friends || []))
         .catch(err => console.error('Failed to load friends:', err))
         .finally(() => setFriendsLoading(false));
+    }
+  }, [activeTab, user?.id]);
+
+  // Загрузка достижений при переключении на таб
+  useEffect(() => {
+    if (activeTab === 'achievements' && user?.id && !achievementsLoading) {
+      setAchievementsLoading(true);
+      Promise.all([
+        achievementsAPI.getAllAchievements(),
+        achievementsAPI.getUserAchievements(user.id),
+      ])
+        .then(([all, userAch]) => {
+          setAllAchievements(all || []);
+          setUserAchievements(userAch || []);
+        })
+        .catch(err => console.error('Failed to load achievements:', err))
+        .finally(() => setAchievementsLoading(false));
     }
   }, [activeTab, user?.id]);
 
@@ -1326,6 +1349,171 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                         Пока нет друзей
                       </span>
                     </div>
+                  )}
+                </motion.div>
+              ) : activeTab === 'achievements' ? (
+                <motion.div
+                  key="achievements"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+                >
+                  {achievementsLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        border: '2px solid rgba(248,185,76,0.3)',
+                        borderTopColor: '#F8B94C',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }} />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Статистика достижений */}
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '4px' }}>
+                        <div style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, rgba(248,185,76,0.1) 0%, rgba(248,185,76,0.04) 100%)',
+                          borderRadius: '16px',
+                          padding: '14px',
+                          border: '1px solid rgba(248,185,76,0.15)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <Star style={{ width: '14px', height: '14px', color: '#F8B94C' }} />
+                            <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Очки</span>
+                          </div>
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#F4F3FC' }}>
+                            {profileData?.total_points || 0}
+                          </span>
+                        </div>
+                        <div style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, rgba(163,247,191,0.1) 0%, rgba(163,247,191,0.04) 100%)',
+                          borderRadius: '16px',
+                          padding: '14px',
+                          border: '1px solid rgba(163,247,191,0.15)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <Trophy style={{ width: '14px', height: '14px', color: '#A3F7BF' }} />
+                            <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Получено</span>
+                          </div>
+                          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#F4F3FC' }}>
+                            {userAchievements.length}/{allAchievements.length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Список достижений */}
+                      {(() => {
+                        const earnedIds = new Set(userAchievements.map(ua => ua.achievement?.id));
+                        const sorted = [...allAchievements].sort((a, b) => {
+                          const ae = earnedIds.has(a.id) ? 1 : 0;
+                          const be = earnedIds.has(b.id) ? 1 : 0;
+                          if (ae !== be) return be - ae;
+                          return a.points - b.points;
+                        });
+                        return sorted.map((ach) => {
+                          const earned = userAchievements.find(ua => ua.achievement?.id === ach.id);
+                          const isEarned = !!earned;
+                          return (
+                            <div
+                              key={ach.id}
+                              style={{
+                                padding: '14px 16px',
+                                borderRadius: '16px',
+                                background: isEarned
+                                  ? 'linear-gradient(135deg, rgba(163,247,191,0.08) 0%, rgba(248,185,76,0.06) 100%)'
+                                  : 'rgba(255,255,255,0.03)',
+                                border: isEarned
+                                  ? '1px solid rgba(163,247,191,0.2)'
+                                  : '1px solid rgba(255,255,255,0.06)',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '12px',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              {/* Emoji */}
+                              <div style={{
+                                fontSize: '32px',
+                                lineHeight: 1,
+                                flexShrink: 0,
+                                opacity: isEarned ? 1 : 0.3,
+                                filter: isEarned ? 'none' : 'grayscale(1)',
+                              }}>
+                                {ach.emoji}
+                              </div>
+
+                              {/* Info */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+                                  <span style={{
+                                    fontFamily: "'Poppins', sans-serif",
+                                    fontWeight: 600,
+                                    fontSize: '14px',
+                                    color: isEarned ? '#F4F3FC' : 'rgba(255,255,255,0.35)',
+                                  }}>
+                                    {ach.name}
+                                  </span>
+                                  {!isEarned && <Lock style={{ width: '14px', height: '14px', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />}
+                                </div>
+                                <span style={{
+                                  fontFamily: "'Poppins', sans-serif",
+                                  fontWeight: 400,
+                                  fontSize: '12px',
+                                  color: isEarned ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
+                                  display: 'block',
+                                  marginBottom: '6px',
+                                }}>
+                                  {ach.description}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Star style={{ width: '13px', height: '13px', color: isEarned ? '#F8B94C' : 'rgba(255,255,255,0.2)' }} />
+                                    <span style={{
+                                      fontFamily: "'Poppins', sans-serif",
+                                      fontWeight: 600,
+                                      fontSize: '12px',
+                                      color: isEarned ? '#F8B94C' : 'rgba(255,255,255,0.2)',
+                                    }}>
+                                      {ach.points} $RDN
+                                    </span>
+                                  </div>
+                                  {isEarned && earned.earned_at && (
+                                    <span style={{
+                                      fontFamily: "'Poppins', sans-serif",
+                                      fontWeight: 400,
+                                      fontSize: '11px',
+                                      color: 'rgba(255,255,255,0.3)',
+                                    }}>
+                                      {new Date(earned.earned_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+
+                      {allAchievements.length === 0 && (
+                        <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                          <Trophy style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.15)', margin: '0 auto 12px' }} />
+                          <span style={{
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            color: 'rgba(255,255,255,0.3)',
+                          }}>
+                            Достижения загружаются...
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </motion.div>
               ) : (
