@@ -560,7 +560,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             style={{
               flex: 1,
               overflowY: 'auto',
-              overflowX: 'hidden',
               WebkitOverflowScrolling: 'touch',
               display: 'flex',
               flexDirection: 'column',
@@ -837,10 +836,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
 
           {/* Табы — sticky при скролле */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25, duration: 0.3 }}
+          <div
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -856,6 +852,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               zIndex: 10,
               backgroundColor: '#000000',
               width: '100%',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
             }}
             className="scrollbar-hide"
           >
@@ -890,7 +887,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 {tab.label}
               </button>
             ))}
-          </motion.div>
+          </div>{/* конец табов */}
 
           {/* Контент табов */}
           <div
