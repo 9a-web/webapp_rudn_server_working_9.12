@@ -844,14 +844,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '10px',
               overflowX: 'auto',
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              paddingBottom: '2px',
-              padding: '8px 20px 2px',
-              marginTop: '-5px',
+              padding: '12px 20px 10px',
               position: 'sticky',
               top: 0,
               zIndex: 5,
@@ -870,7 +869,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '16px',
+                  fontSize: '15px',
                   color: activeTab === tab.id ? '#F8B94C' : '#88888B',
                   background: activeTab === tab.id
                     ? 'rgba(248, 185, 76, 0.08)'
@@ -879,12 +878,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   WebkitBackdropFilter: 'blur(12px)',
                   border: activeTab === tab.id ? '1px solid rgba(248, 185, 76, 0.25)' : '1px solid rgba(255, 255, 255, 0.06)',
                   borderRadius: '16px',
-                  padding: '6px 18px',
+                  padding: '10px 22px',
                   cursor: 'pointer',
                   position: 'relative',
                   transition: 'all 0.25s ease',
                   flexShrink: 0,
                   whiteSpace: 'nowrap',
+                  lineHeight: 1.2,
                 }}
               >
                 {tab.label}
