@@ -32,7 +32,8 @@ export const LiveScheduleCarousel = ({
   isAchievementsOpen,
   setIsAchievementsOpen,
   isAnalyticsOpen,
-  setIsAnalyticsOpen
+  setIsAnalyticsOpen,
+  onOpenProfileAchievements
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -142,7 +143,11 @@ export const LiveScheduleCarousel = ({
             style={{ ...sharedCardStyle, minHeight: '130px' }}
             onClick={(e) => {
               e.stopPropagation();
-              if (user) setIsAchievementsOpen(true);
+              if (user && onOpenProfileAchievements) {
+                onOpenProfileAchievements();
+              } else if (user) {
+                setIsAchievementsOpen(true);
+              }
             }}
           >
             <motion.div 

@@ -272,6 +272,7 @@ const Home = () => {
   // Состояния для модальных окон в Header (для отслеживания)
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [openProfileTab, setOpenProfileTab] = useState(null);
   // Состояние для модального окна ShareScheduleModal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   // Состояние для модального окна добавления друга в совместное расписание
@@ -2061,6 +2062,8 @@ const Home = () => {
           hapticFeedback={hapticFeedback}
           onMenuStateChange={setIsMenuOpen}
           onProfileStateChange={setIsProfileOpen}
+          openProfileTab={openProfileTab}
+          onProfileTabHandled={() => setOpenProfileTab(null)}
           onThemeChange={handleThemeChange}
           unreadNotificationsCount={unreadNotificationsCount}
           hasNewNotification={hasNewNotification}
@@ -2105,6 +2108,7 @@ const Home = () => {
                   setIsAchievementsOpen={setIsAchievementsOpen}
                   isAnalyticsOpen={isAnalyticsOpen}
                   setIsAnalyticsOpen={setIsAnalyticsOpen}
+                  onOpenProfileAchievements={() => setOpenProfileTab('achievements')}
                 />
               
                 <WeekDaySelector 

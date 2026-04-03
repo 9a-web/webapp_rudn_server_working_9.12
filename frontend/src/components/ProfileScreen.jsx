@@ -19,7 +19,7 @@ const TABS = [
   { id: 'materials', label: 'Материалы' },
 ];
 
-const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onThemeChange }) => {
+const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onThemeChange, initialTab }) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [showSettings, setShowSettings] = useState(false);
@@ -106,6 +106,13 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       return () => clearTimeout(t);
     }
   }, [activeTab, setupCanvas]);
+
+  // Реакция на initialTab — открыть нужный таб извне
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // --- Snapshot helpers ---
   const saveSnapshot = useCallback(() => {

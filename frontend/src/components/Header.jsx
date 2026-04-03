@@ -8,10 +8,11 @@ import ProfileScreen from './ProfileScreen';
 import { rainbowConfetti } from '../utils/confetti';
 import { botAPI } from '../services/api';
 
-export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false, onQRScanned, onFriendsClick }) => {
+export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false, onQRScanned, onFriendsClick, openProfileTab, onProfileTabHandled }) => {
   const { t } = useTranslation();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [profileInitialTab, setProfileInitialTab] = useState(null);
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
@@ -58,6 +59,15 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
       onProfileStateChange(isProfileOpen);
     }
   }, [isProfileOpen, onProfileStateChange]);
+
+  // Открытие профиля на конкретный таб извне
+  useEffect(() => {
+    if (openProfileTab) {
+      setProfileInitialTab(openProfileTab);
+      setIsProfileOpen(true);
+      if (onProfileTabHandled) onProfileTabHandled();
+    }
+  }, [openProfileTab, onProfileTabHandled]);
 
   const handleMenuClick = () => {
     if (hapticFeedback) hapticFeedback('impact', 'medium');
@@ -470,12 +480,13 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
       {/* Profile Screen */}
       <ProfileScreen
         isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
+        onClose={() => { setIsProfileOpen(false); setProfileInitialTab(null); }}
         user={user}
         userSettings={userSettings}
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
         onThemeChange={onThemeChange}
+        initialTab={profileInitialTab}
       />
 
       {/* Easter Egg Message - Элегантное уведомление */}
