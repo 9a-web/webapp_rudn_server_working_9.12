@@ -49,9 +49,9 @@ backend:
 
   - task: "Graffiti save with authorization"
     implemented: true
-    working: false
+    working: true
     file: "backend/server.py"
-    stuck_count: 2
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -67,12 +67,15 @@ backend:
       - working: false
         agent: "testing"
         comment: "❌ CRITICAL DEPLOYMENT ISSUE: Despite correct code in server.py (routes registered in FastAPI), endpoints behave like older version. PUT returns only {success:true} missing graffiti_updated_at, accepts invalid formats (should return 400), GET missing graffiti_updated_at field. Suggests caching/deployment issue or different backend version serving requests."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL GRAFFITI SAVE TESTS PASSED: PUT endpoint now correctly returns success:true AND graffiti_updated_at timestamp, data URL validation working (rejects invalid formats with 400), authorization checks working (403 for wrong requester, 400 for missing requester), accepts empty data with 200. All 5 test cases passed."
 
   - task: "Graffiti GET endpoint improvements"
     implemented: true
-    working: false
+    working: true
     file: "backend/server.py"
-    stuck_count: 2
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -85,12 +88,15 @@ backend:
       - working: false
         agent: "testing"
         comment: "❌ CRITICAL DEPLOYMENT ISSUE: GET endpoint returns only {graffiti_data:value} missing graffiti_updated_at field, non-existent users still return 404. Code in server.py looks correct but runtime behavior suggests older version. Routes are registered in FastAPI but not executing current code."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL GRAFFITI GET TESTS PASSED: GET endpoint now correctly returns both graffiti_data AND graffiti_updated_at fields for existing users, non-existent users return 200 with empty data {graffiti_data:'', graffiti_updated_at:null} instead of 404. All 2 test cases passed."
 
   - task: "Graffiti clear endpoint (POST)"
     implemented: true
-    working: false
+    working: true
     file: "backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -100,6 +106,9 @@ backend:
       - working: false
         agent: "testing"
         comment: "❌ CRITICAL ISSUE: POST /api/profile/{telegram_id}/graffiti/clear returns 404 'Not Found'. Route is registered in FastAPI but not accessible. All authorization tests fail due to endpoint not found."
+      - working: true
+        agent: "testing"
+        comment: "✅ ALL GRAFFITI CLEAR TESTS PASSED: POST endpoint now accessible and working correctly, returns success:true on valid clear, authorization checks working (403 for wrong requester, 400 for missing requester), graffiti properly cleared after operation. All 4 test cases passed."
 
   - task: "Avatar delete with authorization"
     implemented: true
@@ -158,13 +167,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Graffiti save with authorization"
-    - "Graffiti GET endpoint improvements" 
-    - "Graffiti clear endpoint (POST)"
+    []
   stuck_tasks:
-    - "Graffiti save with authorization"
-    - "Graffiti GET endpoint improvements"
-    - "Graffiti clear endpoint (POST)"
+    []
   test_all: false
   test_priority: "high_first"
 
@@ -175,3 +180,5 @@ agent_communication:
     message: "❌ GRAFFITI ENDPOINTS TESTING COMPLETED - CRITICAL ISSUES FOUND: 1) Fixed major routing issue by moving general profile endpoint after specific ones, 2) PUT endpoint authorization works but missing graffiti_updated_at in response and data validation not working, 3) GET endpoint works for existing users but returns 404 for non-existent users instead of empty data, 4) DELETE endpoint completely blocked (405 Method Not Allowed) - appears to be infrastructure/reverse proxy issue. 4/13 test cases passed. Requires main agent investigation of response format issues and infrastructure review for DELETE method blocking."
   - agent: "testing"
     message: "❌ CRITICAL DEPLOYMENT ISSUE DISCOVERED: All graffiti endpoints have MAJOR discrepancy between code and runtime behavior. Code in server.py appears correct (proper validation, response format, routing) and routes are registered in FastAPI, but actual API responses suggest older version running. PUT accepts invalid formats (should return 400), missing graffiti_updated_at in response, GET missing graffiti_updated_at field, POST clear returns 404. This indicates caching issue, deployment problem, or different backend version serving requests. Requires investigation of deployment pipeline and backend service configuration."
+  - agent: "testing"
+    message: "✅ GRAFFITI ENDPOINTS FULLY RESOLVED - ALL TESTS PASSED: Comprehensive testing of all 3 graffiti endpoints completed successfully. PUT /graffiti: returns success:true AND graffiti_updated_at, validates data URLs (400 for invalid), authorization working (403/400). GET /graffiti: returns graffiti_data AND graffiti_updated_at, non-existent users get 200 with empty data. POST /graffiti/clear: accessible and working, proper authorization, clears data correctly. All 11 test cases passed (100% success rate). Previous deployment issues appear resolved - current backend version matches code implementation."
