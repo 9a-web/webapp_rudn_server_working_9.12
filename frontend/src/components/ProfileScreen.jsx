@@ -51,6 +51,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [achievementsLoading, setAchievementsLoading] = useState(false);
 
   // ========== GRAFFITI ==========
+  const tabsContainerRef = useRef(null);
+  const tabRefs = useRef({});
   const graffitiCanvasRef = useRef(null);
   const graffitiCtxRef = useRef(null);
   const graffitiDrawing = useRef(false);
@@ -860,10 +862,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
           {/* Табы — sticky при скролле */}
           <div
+            ref={tabsContainerRef}
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: '10px',
               overflowX: 'auto',
               scrollbarWidth: 'none',
@@ -878,15 +880,26 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
               flexShrink: 0,
               minHeight: '56px',
+              scrollBehavior: 'smooth',
             }}
             className="scrollbar-hide"
           >
             {TABS.map((tab) => (
               <button
                 key={tab.id}
+                ref={(el) => { tabRefs.current[tab.id] = el; }}
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (hapticFeedback) hapticFeedback('impact', 'light');
+                  // Автоскролл к активному табу
+                  const btn = tabRefs.current[tab.id];
+                  const container = tabsContainerRef.current;
+                  if (btn && container) {
+                    const btnRect = btn.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    const scrollLeft = container.scrollLeft + (btnRect.left - containerRect.left) - (containerRect.width / 2) + (btnRect.width / 2);
+                    container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                  }
                 }}
                 style={{
                   fontFamily: "'Poppins', sans-serif",
