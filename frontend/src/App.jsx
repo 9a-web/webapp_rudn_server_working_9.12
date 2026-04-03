@@ -29,7 +29,7 @@ import { friendsAPI } from './services/friendsAPI';
 import { getWeekNumberForDate, isWinterSeason } from './utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n/config';
-import { NewYearTheme } from './components/NewYearTheme';
+// import { NewYearTheme } from './components/NewYearTheme'; // ОТКЛЮЧЕНО: снег деактивирован
 import { PlayerProvider, usePlayer, MiniPlayer, FullscreenPlayer, MusicSection, ArtistCard } from './components/music';
 
 // Lazy load модальных окон для уменьшения начального bundle
@@ -107,7 +107,7 @@ const Home = () => {
   const effectiveUser = syncedUser || user;
   
   // Состояние для новогодней темы
-  const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
+  const [newYearThemeMode, setNewYearThemeMode] = useState('off'); // ОТКЛЮЧЕНО: снег деактивирован
 
   // Состояния для достижений
   const [allAchievements, setAllAchievements] = useState([]);
@@ -1042,12 +1042,12 @@ const Home = () => {
           const themeResponse = await fetch(`${backendUrl}/api/user-settings/${currentUser.id}/theme`);
           if (themeResponse.ok) {
             const themeData = await themeResponse.json();
-            setNewYearThemeMode(themeData.new_year_theme_mode || 'auto');
+            // setNewYearThemeMode(themeData.new_year_theme_mode || 'auto'); // ОТКЛЮЧЕНО: снег деактивирован
           }
         } catch (themeError) {
           console.error('Error loading theme settings:', themeError);
           // Используем значение по умолчанию
-          setNewYearThemeMode('auto');
+          // setNewYearThemeMode('auto'); // ОТКЛЮЧЕНО: снег деактивирован
         }
       } else if (settings) {
         // Пользователь существует, но у него неполные настройки
