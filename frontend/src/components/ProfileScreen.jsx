@@ -853,6 +853,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               backgroundColor: '#000000',
               width: '100%',
               boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              flexShrink: 0,
+              minHeight: '56px',
             }}
             className="scrollbar-hide"
           >
