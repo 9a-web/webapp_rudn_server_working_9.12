@@ -14767,6 +14767,15 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
                 last_activity = last_activity.replace(tzinfo=timezone.utc)
             is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
         
+        # Владелец профиля — всегда онлайн (раз открыл профиль — значит в приложении)
+        if is_own_profile:
+            is_online = True
+            # Обновляем last_activity при просмотре своего профиля
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"last_activity": datetime.utcnow()}}
+            )
+        
         # Streak данные
         streak_current = stats.get("visit_streak_current", 0) if stats else 0
         streak_max = stats.get("visit_streak_max", 0) if stats else 0
