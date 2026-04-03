@@ -850,10 +850,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              padding: '12px 20px 10px',
+              padding: '12px 20px 12px',
               position: 'sticky',
               top: 0,
-              zIndex: 5,
+              zIndex: 10,
               backgroundColor: '#000000',
               width: '100%',
             }}
@@ -897,8 +897,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             style={{
               width: '100%',
               padding: '16px 20px 100px',
-              position: 'relative',
-              zIndex: 1,
             }}
           >
             <AnimatePresence mode="wait">
