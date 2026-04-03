@@ -732,7 +732,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.3 }}
             className="flex items-start justify-center"
-            style={{ marginTop: '10px', gap: '40px', marginBottom: '30px' }}
+            style={{ marginTop: '10px', gap: '40px' }}
           >
             {/* Количество друзей */}
             <div className="flex flex-col items-center">
@@ -846,7 +846,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              padding: '30px 20px',
+              padding: '15px 20px',
               position: 'sticky',
               top: 0,
               zIndex: 10,
