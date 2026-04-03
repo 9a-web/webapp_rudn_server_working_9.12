@@ -1455,8 +1455,8 @@ async def update_user_birthday(telegram_id: int, data: dict):
             raise HTTPException(status_code=400, detail="Месяц должен быть от 01 до 12")
         if day < 1 or day > 31:
             raise HTTPException(status_code=400, detail="День должен быть от 01 до 31")
-        if year != 0 and (year < 1920 or year > 2015):
-            raise HTTPException(status_code=400, detail="Год должен быть от 1920 до 2015")
+        if year != 0 and (year < 1920 or year > 2025):
+            raise HTTPException(status_code=400, detail="Год должен быть от 1920 до 2025")
         
         # Проверка дней в месяце (кроме year=0000)
         if year != 0:
