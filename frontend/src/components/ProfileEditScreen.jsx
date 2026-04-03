@@ -88,7 +88,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     if (isNaN(day) || isNaN(month)) return 'Некорректные данные';
     if (day < 1 || day > 31) return 'День: 01–31';
     if (month < 1 || month > 12) return 'Месяц: 01–12';
-    if (bd.year && (year < 1920 || year > 2015)) return 'Год: 1920–2015';
+    if (bd.year && (year < 1920 || year > 2025)) return 'Год: 1920–2025';
     
     // Проверка дней в месяце
     if (year > 0) {
