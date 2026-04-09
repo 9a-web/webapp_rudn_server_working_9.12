@@ -253,16 +253,28 @@ const GroupSelector = ({ onGroupSelected, onCancel }) => {
       {/* RUDN unavailable warning */}
       {rudnUnavailable && (
         <div style={{
-          background: 'rgba(234, 179, 8, 0.15)',
-          border: '1px solid rgba(234, 179, 8, 0.5)',
-          borderRadius: '12px',
-          padding: '16px',
+          background: 'rgba(234, 179, 8, 0.12)',
+          border: '1px solid rgba(234, 179, 8, 0.35)',
+          borderRadius: '16px',
+          padding: '24px 20px',
           marginBottom: '16px',
+          textAlign: 'center',
         }}>
-          <p style={{ color: '#EAB308', fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
-            ⚠️ Технические проблемы на стороне rudn.ru
+          <div style={{ fontSize: '32px', marginBottom: '10px' }}>⚠️</div>
+          <p style={{
+            color: '#FACC15',
+            fontSize: '15px',
+            fontWeight: 600,
+            marginBottom: '6px',
+            lineHeight: '1.4',
+          }}>
+            Технические проблемы на стороне rudn.ru
           </p>
-          <p style={{ color: 'rgba(234, 179, 8, 0.7)', fontSize: '12px' }}>
+          <p style={{
+            color: 'rgba(250, 204, 21, 0.55)',
+            fontSize: '12px',
+            lineHeight: '1.5',
+          }}>
             Расписание и выбор группы временно недоступны. Попробуйте позже.
           </p>
         </div>

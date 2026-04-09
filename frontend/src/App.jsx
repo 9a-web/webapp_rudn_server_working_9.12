@@ -1987,12 +1987,41 @@ const Home = () => {
 
   // Показываем ошибку
   if (error && !userSettings) {
+    const isRudnError = error.includes('rudn.ru');
     return (
       <>
         {renderNewYearTheme()}
         <div className="h-full min-h-screen bg-background flex items-center justify-center p-4">
-          <div className="text-center">
-            <p className="text-red-400 mb-4">{error}</p>
+          <div className="text-center max-w-sm mx-auto">
+            {isRudnError ? (
+              <div style={{
+                background: 'rgba(234, 179, 8, 0.12)',
+                border: '1px solid rgba(234, 179, 8, 0.4)',
+                borderRadius: '16px',
+                padding: '24px 20px',
+                marginBottom: '20px',
+              }}>
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>⚠️</div>
+                <p style={{
+                  color: '#FACC15',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  marginBottom: '8px',
+                  lineHeight: '1.4',
+                }}>
+                  Технические проблемы на стороне rudn.ru
+                </p>
+                <p style={{
+                  color: 'rgba(250, 204, 21, 0.6)',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                }}>
+                  Расписание и выбор группы временно недоступны. Сайт РУДН проводит технические работы — попробуйте позже.
+                </p>
+              </div>
+            ) : (
+              <p className="text-red-400 mb-4">{error}</p>
+            )}
             <button
               onClick={loadUserData}
               className="bg-white text-black px-6 py-3 rounded-full font-medium"
