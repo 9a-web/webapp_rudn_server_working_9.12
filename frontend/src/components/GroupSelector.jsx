@@ -277,6 +277,17 @@ const GroupSelector = ({ onGroupSelected, onCancel }) => {
           }}>
             Расписание и выбор группы временно недоступны. Попробуйте позже.
           </p>
+          <img
+            src="https://customer-assets.emergentagent.com/job_rudn-server-3/artifacts/bzyw6d2g_gemini-3-pro-image-preview-2k_a_Ultra%E2%80%91realistic_8K_3.png"
+            alt="RUDN Parser Error"
+            style={{
+              width: '100%',
+              maxWidth: '220px',
+              margin: '12px auto 0',
+              borderRadius: '12px',
+              display: 'block',
+            }}
+          />
         </div>
       )}
 
