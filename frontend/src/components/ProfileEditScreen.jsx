@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCogCorner } from 'lucide-react';
+import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCheck } from 'lucide-react';
 import GroupSelector from './GroupSelector';
 import { userAPI } from '../services/api';
 import friendsAPI from '../services/friendsAPI';
@@ -812,7 +812,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                     marginTop: '8px',
                   }}
                 >
-                  <ShieldCogCorner style={{ width: '22px', height: '22px', color: '#FFBE4E', flexShrink: 0 }} />
+                  <ShieldCheck style={{ width: '22px', height: '22px', color: '#FFBE4E', flexShrink: 0 }} />
                   <span style={{
                     fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
