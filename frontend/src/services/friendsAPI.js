@@ -248,7 +248,77 @@ export const friendsAPI = {
     } catch (error) {
       handleError(error);
     }
-  }
+  },
+
+  // ========== Граффити ==========
+
+  getGraffiti: async (telegramId) => {
+    try {
+      const response = await api.get(`/profile/${telegramId}/graffiti`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  saveGraffiti: async (telegramId, graffitiData) => {
+    try {
+      const response = await api.put(`/profile/${telegramId}/graffiti`, {
+        graffiti_data: graffitiData,
+        requester_telegram_id: telegramId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  clearGraffiti: async (telegramId) => {
+    try {
+      const response = await api.post(`/profile/${telegramId}/graffiti/clear`, {
+        requester_telegram_id: telegramId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  // ========== Кастомный аватар ==========
+
+  getCustomAvatar: async (telegramId) => {
+    try {
+      const response = await api.get(`/profile/${telegramId}/avatar`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  saveCustomAvatar: async (telegramId, avatarData) => {
+    try {
+      const response = await api.put(`/profile/${telegramId}/avatar`, {
+        avatar_data: avatarData,
+        requester_telegram_id: telegramId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  deleteCustomAvatar: async (telegramId) => {
+    try {
+      const response = await api.delete(`/profile/${telegramId}/avatar?requester_telegram_id=${telegramId}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
 };
 
 export default friendsAPI;

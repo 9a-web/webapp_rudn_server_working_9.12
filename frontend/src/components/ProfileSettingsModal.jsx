@@ -70,14 +70,26 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
     setIsDirty(true);
   };
 
-  // Bug 16: Автосохранение при закрытии если есть несохранённые изменения
+  // Bug 16: Автосохранение при закрытии с обратной связью пользователю
+  const [autoSaveError, setAutoSaveError] = useState(false);
+
   const handleClose = async () => {
     if (isDirty && !isSaving) {
       try {
+        setAutoSaveError(false);
         await friendsAPI.updatePrivacySettings(telegramId, privacySettings);
         hapticFeedback?.('notification', 'success');
       } catch (err) {
         console.error('Auto-save privacy on close error:', err);
+        setAutoSaveError(true);
+        hapticFeedback?.('notification', 'error');
+        // Показываем ошибку на 2 секунды перед закрытием
+        setTimeout(() => {
+          setAutoSaveError(false);
+          setIsDirty(false);
+          onClose();
+        }, 2000);
+        return; // Не закрываем сразу — даём увидеть ошибку
       }
     }
     setIsDirty(false);
@@ -342,7 +354,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
                     opacity: isSaving || isLoading ? 0.5 : 1,
                   }}
                 >
-                  {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : 'Сохранить изменения'}
+                  {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : autoSaveError ? '✗ Ошибка сохранения' : 'Сохранить изменения'}
                 </button>
               </motion.div>
             )}

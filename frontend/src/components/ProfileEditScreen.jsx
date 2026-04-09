@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCogCorner } from 'lucide-react';
 import GroupSelector from './GroupSelector';
-import { userAPI, getBackendURL } from '../services/api';
+import { userAPI } from '../services/api';
+import friendsAPI from '../services/friendsAPI';
 
-const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy }) => {
+const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy, onProfileUpdated }) => {
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [avatarMode, setAvatarMode] = useState('telegram'); // 'telegram' | 'custom' | 'none'
   const [customAvatar, setCustomAvatar] = useState(null);
@@ -88,7 +89,7 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     if (isNaN(day) || isNaN(month)) return 'Некорректные данные';
     if (day < 1 || day > 31) return 'День: 01–31';
     if (month < 1 || month > 12) return 'Месяц: 01–12';
-    if (bd.year && (year < 1920 || year > 2025)) return 'Год: 1920–2025';
+    if (bd.year && (year < 1920 || year > new Date().getFullYear())) return `Год: 1920\u2013${new Date().getFullYear()}`;
     
     // Проверка дней в месяце
     if (year > 0) {
@@ -173,25 +174,20 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
     if (!user?.id) return;
     setAvatarSaving(true);
     try {
-      const backendUrl = getBackendURL();
       if (mode === 'custom' && avatarData) {
-        await fetch(`${backendUrl}/api/profile/${user.id}/avatar`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ avatar_data: avatarData, requester_telegram_id: user.id }),
-        });
+        await friendsAPI.saveCustomAvatar(user.id, avatarData);
       } else {
         // Удаляем кастомный аватар (режим telegram или none)
-        await fetch(`${backendUrl}/api/profile/${user.id}/avatar?requester_telegram_id=${user.id}`, {
-          method: 'DELETE',
-        });
+        await friendsAPI.deleteCustomAvatar(user.id);
       }
+      // Fix Bug 11: Уведомляем родителя об обновлении профиля
+      if (onProfileUpdated) onProfileUpdated();
     } catch (err) {
       console.error('Failed to save avatar:', err);
     } finally {
       setAvatarSaving(false);
     }
-  }, [user?.id]);
+  }, [user?.id, onProfileUpdated]);
 
   // Компрессия изображения перед загрузкой
   const compressImage = useCallback((dataUrl, maxWidth = 512, quality = 0.85) => {

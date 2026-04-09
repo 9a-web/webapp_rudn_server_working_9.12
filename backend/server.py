@@ -13903,33 +13903,36 @@ async def are_friends(user1_id: int, user2_id: int) -> bool:
 
 
 async def get_friendship_status(user_id: int, target_id: int) -> Optional[str]:
-    """Получить статус дружбы между пользователями"""
-    # Проверка блокировки
-    if await is_blocked(user_id, target_id):
+    """Получить статус дружбы между пользователями (оптимизировано: параллельные запросы)"""
+    import asyncio
+    
+    # Параллельно запускаем все проверки
+    block_user_target, block_target_user, friendship, incoming_req, outgoing_req = await asyncio.gather(
+        is_blocked(user_id, target_id),
+        is_blocked(target_id, user_id),
+        are_friends(user_id, target_id),
+        db.friend_requests.find_one({
+            "from_telegram_id": target_id,
+            "to_telegram_id": user_id,
+            "status": "pending"
+        }),
+        db.friend_requests.find_one({
+            "from_telegram_id": user_id,
+            "to_telegram_id": target_id,
+            "status": "pending"
+        }),
+    )
+    
+    # Проверяем результаты в порядке приоритета
+    if block_user_target:
         return "blocked"
-    if await is_blocked(target_id, user_id):
+    if block_target_user:
         return "blocked_by"
-    
-    # Проверка дружбы
-    if await are_friends(user_id, target_id):
+    if friendship:
         return "friend"
-    
-    # Проверка входящих запросов
-    incoming = await db.friend_requests.find_one({
-        "from_telegram_id": target_id,
-        "to_telegram_id": user_id,
-        "status": "pending"
-    })
-    if incoming:
+    if incoming_req:
         return "pending_incoming"
-    
-    # Проверка исходящих запросов
-    outgoing = await db.friend_requests.find_one({
-        "from_telegram_id": user_id,
-        "to_telegram_id": target_id,
-        "status": "pending"
-    })
-    if outgoing:
+    if outgoing_req:
         return "pending_outgoing"
     
     return None
@@ -13957,7 +13960,10 @@ async def build_friend_card(user_data: dict, current_user_id: int, friendship_da
     if last_activity and privacy.show_online_status:
         if isinstance(last_activity, str):
             last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-        is_online = (datetime.utcnow() - last_activity).total_seconds() < 300
+        # Fix: используем timezone-aware сравнение
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=timezone.utc)
+        is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
     
     return FriendCard(
         telegram_id=friend_id,
@@ -14860,6 +14866,11 @@ async def get_profile_qr_data(telegram_id: int):
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
+        # Проверяем приватность — если пользователь скрыл себя из поиска, QR недоступен
+        privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
+        if not privacy.show_in_search:
+            raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль из поиска")
+        
         # Генерируем ссылку для добавления в друзья (открывает Web App напрямую)
         bot_username = get_telegram_bot_username()
         # Формат для прямого открытия Web App: https://t.me/{bot}/app?startapp=friend_{id}
@@ -14986,8 +14997,10 @@ async def save_custom_avatar(telegram_id: int, request: Request):
         avatar_data = body.get("avatar_data", "")
         requester_id = body.get("requester_telegram_id")
         
-        # Авторизация
-        if requester_id is not None and int(requester_id) != telegram_id:
+        # Авторизация: обязательная проверка что запрос от владельца
+        if requester_id is None:
+            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+        if int(requester_id) != telegram_id:
             raise HTTPException(status_code=403, detail="Можно изменять только свой аватар")
         
         # Ограничение размера ~3MB base64
@@ -15037,8 +15050,10 @@ async def get_custom_avatar(telegram_id: int):
 async def delete_custom_avatar(telegram_id: int, requester_telegram_id: int = None):
     """Delete custom avatar (return to Telegram avatar)"""
     try:
-        # Авторизация: только владелец может удалить свой аватар
-        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+        # Авторизация: обязательная проверка что запрос от владельца
+        if requester_telegram_id is None:
+            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+        if requester_telegram_id != telegram_id:
             raise HTTPException(status_code=403, detail="Можно удалять только свой аватар")
         
         result = await db.user_settings.update_one(
@@ -15066,9 +15081,11 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
     try:
         is_own_profile = viewer_telegram_id is not None and viewer_telegram_id == telegram_id
 
-        # Проверяем блокировку — если viewer заблокирован владельцем профиля, отказ
+        # Проверяем блокировку — в обе стороны (как в get_friend_schedule)
         if viewer_telegram_id and not is_own_profile:
             if await is_blocked(telegram_id, viewer_telegram_id):
+                raise HTTPException(status_code=403, detail="Профиль недоступен")
+            if await is_blocked(viewer_telegram_id, telegram_id):
                 raise HTTPException(status_code=403, detail="Профиль недоступен")
         
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
@@ -15115,7 +15132,7 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             # Обновляем last_activity при просмотре своего профиля
             await db.user_settings.update_one(
                 {"telegram_id": telegram_id},
-                {"$set": {"last_activity": datetime.utcnow()}}
+                {"$set": {"last_activity": datetime.now(timezone.utc)}}
             )
         
         # Streak данные
@@ -15154,28 +15171,31 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             )
         
         # Для чужого профиля — применяем privacy-фильтры
+        # Если viewer_telegram_id не указан (анонимный запрос) — показываем минимум
+        is_anonymous = viewer_telegram_id is None
+        
         return UserProfilePublic(
             telegram_id=telegram_id,
             username=user.get("username"),
             first_name=user.get("first_name"),
             last_name=user.get("last_name"),
-            group_id=user.get("group_id"),
-            group_name=user.get("group_name"),
-            facultet_id=user.get("facultet_id"),
-            facultet_name=user.get("facultet_name"),
-            kurs=user.get("kurs"),
-            friends_count=friends_count if privacy.show_friends_list else 0,
+            group_id=user.get("group_id") if not is_anonymous else None,
+            group_name=user.get("group_name") if not is_anonymous else None,
+            facultet_id=user.get("facultet_id") if not is_anonymous else None,
+            facultet_name=user.get("facultet_name") if not is_anonymous else None,
+            kurs=user.get("kurs") if not is_anonymous else None,
+            friends_count=friends_count if privacy.show_friends_list and not is_anonymous else 0,
             mutual_friends_count=mutual_count,
-            achievements_count=achievements_count if privacy.show_achievements else 0,
-            total_points=stats.get("total_points", 0) if stats and privacy.show_achievements else 0,
-            visit_streak_current=streak_current if privacy.show_achievements else 0,
-            visit_streak_max=streak_max if privacy.show_achievements else 0,
+            achievements_count=achievements_count if privacy.show_achievements and not is_anonymous else 0,
+            total_points=stats.get("total_points", 0) if stats and privacy.show_achievements and not is_anonymous else 0,
+            visit_streak_current=streak_current if privacy.show_achievements and not is_anonymous else 0,
+            visit_streak_max=streak_max if privacy.show_achievements and not is_anonymous else 0,
             avatar_mode=avatar_mode,
             has_custom_avatar=has_custom_avatar,
-            is_online=is_online if privacy.show_online_status else False,
-            last_activity=last_activity if privacy.show_online_status else None,
+            is_online=is_online if privacy.show_online_status and not is_anonymous else False,
+            last_activity=last_activity if privacy.show_online_status and not is_anonymous else None,
             privacy=None,
-            created_at=user.get("created_at"),
+            created_at=user.get("created_at") if not is_anonymous else None,
             friendship_status=friendship_status
         )
         

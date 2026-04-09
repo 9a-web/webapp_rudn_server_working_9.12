@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for RUDN Schedule App - Graffiti Endpoints
-Tests all graffiti-related endpoints with comprehensive test cases.
+Backend API Testing Script for RUDN Schedule App - Profile Endpoints
+Tests all profile-related endpoints with comprehensive test cases.
 """
 
 import asyncio
@@ -12,13 +12,15 @@ from datetime import datetime
 import base64
 
 # Backend URL from environment
-BACKEND_URL = "https://student-platform-11.preview.emergentagent.com"
+BACKEND_URL = "http://localhost:8001"
 API_BASE = f"{BACKEND_URL}/api"
 
-# Test user ID
-TEST_USER_ID = 765963392
+# Test user IDs
+TEST_USER_1 = 123456789
+TEST_USER_2 = 987654321
+TEST_USER_3 = 555666777
 
-class GraffitiAPITester:
+class ProfileAPITester:
     def __init__(self):
         self.session = None
         self.test_results = []
@@ -64,287 +66,479 @@ class GraffitiAPITester:
         except Exception as e:
             return None, str(e)
     
-    async def test_save_graffiti_valid(self):
-        """Test 1: Valid graffiti save"""
-        test_name = "Save graffiti - Valid data URL"
+    async def setup_test_users(self):
+        """Create test users for testing"""
+        print("🔧 Setting up test users...")
         
-        # Create a simple base64 PNG data URL
-        valid_data_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        users = [
+            {
+                "telegram_id": TEST_USER_1,
+                "first_name": "TestUser1",
+                "username": "testuser1",
+                "group_id": "ИБАС-01-23",
+                "group_name": "ИБАС-01-23",
+                "facultet_id": "1",
+                "facultet_name": "Институт прикладной математики и телекоммуникаций",
+                "level_id": "1",
+                "kurs": "1",
+                "form_code": "1"
+            },
+            {
+                "telegram_id": TEST_USER_2,
+                "first_name": "TestUser2", 
+                "username": "testuser2",
+                "group_id": "ИБАС-02-23",
+                "group_name": "ИБАС-02-23",
+                "facultet_id": "1",
+                "facultet_name": "Институт прикладной математики и телекоммуникаций",
+                "level_id": "1",
+                "kurs": "1",
+                "form_code": "1"
+            },
+            {
+                "telegram_id": TEST_USER_3,
+                "first_name": "TestUser3",
+                "username": "testuser3",
+                "group_id": "ИБАС-03-23", 
+                "group_name": "ИБАС-03-23",
+                "facultet_id": "1",
+                "facultet_name": "Институт прикладной математики и телекоммуникаций",
+                "level_id": "1",
+                "kurs": "1",
+                "form_code": "1"
+            }
+        ]
         
-        payload = {
-            "graffiti_data": valid_data_url,
-            "requester_telegram_id": TEST_USER_ID
+        for user in users:
+            status, response = await self.make_request(
+                "POST",
+                f"{API_BASE}/user-settings",
+                json=user
+            )
+            if status == 200:
+                print(f"✅ Created user {user['telegram_id']}")
+            else:
+                print(f"⚠️ User {user['telegram_id']} setup: {status} - {response}")
+    
+    # ========== PROFILE ENDPOINT TESTS ==========
+    
+    async def test_profile_bidirectional_block_check(self):
+        """Test 1: Bidirectional block check in profile endpoint"""
+        test_name = "Profile - Bidirectional block check"
+        
+        # First create a block relationship: USER_1 blocks USER_2
+        block_payload = {
+            "telegram_id": TEST_USER_1
         }
         
+        # Create block via friends API
         status, response = await self.make_request(
-            "PUT", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti",
-            json=payload
+            "POST", 
+            f"{API_BASE}/friends/block/{TEST_USER_2}",
+            json=block_payload
         )
         
-        if status == 200:
-            if isinstance(response, dict):
-                has_success = response.get("success") is True
-                has_timestamp = "graffiti_updated_at" in response
-                
-                if has_success and has_timestamp:
-                    self.log_test(test_name, True, f"Response: {response}")
-                else:
-                    missing = []
-                    if not has_success: missing.append("success: true")
-                    if not has_timestamp: missing.append("graffiti_updated_at")
-                    self.log_test(
-                        test_name, False, 
-                        f"Missing fields: {missing}",
-                        "Response with success: true AND graffiti_updated_at",
-                        str(response)
-                    )
+        if status != 200:
+            self.log_test(f"{test_name} - Block setup", False, f"Failed to create block: {status} - {response}")
+            return
+        
+        # Test 1a: USER_2 tries to view USER_1's profile (should get 403)
+        status, response = await self.make_request(
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_1}?viewer_telegram_id={TEST_USER_2}"
+        )
+        
+        if status == 403:
+            self.log_test(f"{test_name} - Blocked viewer", True, f"Correctly blocked: {response}")
+        else:
+            self.log_test(f"{test_name} - Blocked viewer", False, f"HTTP {status}", "403", str(response))
+        
+        # Test 1b: USER_1 tries to view USER_2's profile (should also get 403 - bidirectional)
+        status, response = await self.make_request(
+            "GET", 
+            f"{API_BASE}/profile/{TEST_USER_2}?viewer_telegram_id={TEST_USER_1}"
+        )
+        
+        if status == 403:
+            self.log_test(f"{test_name} - Blocker viewing blocked", True, f"Correctly blocked bidirectionally: {response}")
+        else:
+            self.log_test(f"{test_name} - Blocker viewing blocked", False, f"HTTP {status}", "403", str(response))
+        
+        # Clean up: unblock the user
+        await self.make_request(
+            "DELETE",
+            f"{API_BASE}/friends/block/{TEST_USER_2}",
+            json=block_payload
+        )
+    
+    async def test_profile_anonymous_privacy(self):
+        """Test 2: Anonymous privacy - limited data without viewer_telegram_id"""
+        test_name = "Profile - Anonymous privacy"
+        
+        # Request profile without viewer_telegram_id
+        status, response = await self.make_request(
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_1}"
+        )
+        
+        if status == 200 and isinstance(response, dict):
+            # Check that sensitive fields are null for anonymous requests
+            group_id = response.get("group_id")
+            kurs = response.get("kurs") 
+            created_at = response.get("created_at")
+            
+            if group_id is None and kurs is None and created_at is None:
+                self.log_test(test_name, True, f"Anonymous request correctly limited: {response}")
             else:
-                self.log_test(test_name, False, "Invalid response format", "JSON object", str(response))
+                self.log_test(
+                    test_name, False,
+                    f"Anonymous request exposed sensitive data",
+                    "group_id=null, kurs=null, created_at=null",
+                    f"group_id={group_id}, kurs={kurs}, created_at={created_at}"
+                )
         else:
             self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
     
-    async def test_save_graffiti_missing_requester(self):
-        """Test 2: Missing requester_telegram_id"""
-        test_name = "Save graffiti - Missing requester"
+    async def test_profile_friendship_status(self):
+        """Test 3: Friendship status in profile response"""
+        test_name = "Profile - Friendship status"
         
+        # Request USER_2's profile from USER_3's perspective
+        status, response = await self.make_request(
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_2}?viewer_telegram_id={TEST_USER_3}"
+        )
+        
+        if status == 200 and isinstance(response, dict):
+            friendship_status = response.get("friendship_status")
+            # friendship_status can be null when users aren't friends, which is correct
+            if "friendship_status" in response:
+                self.log_test(test_name, True, f"Friendship status field present: {friendship_status}")
+            else:
+                self.log_test(test_name, False, "Missing friendship_status field", "friendship_status field", str(response))
+        else:
+            self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
+    
+    # ========== QR ENDPOINT TESTS ==========
+    
+    async def test_qr_privacy_check(self):
+        """Test 4: QR endpoint privacy check"""
+        test_name = "QR - Privacy check"
+        
+        # First set user privacy to hide from search
+        privacy_payload = {
+            "show_in_search": False,
+            "show_friends_list": True,
+            "show_achievements": True,
+            "show_online_status": True
+        }
+        
+        await self.make_request(
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/privacy",
+            json=privacy_payload
+        )
+        
+        # Try to get QR data for user with show_in_search=false
+        status, response = await self.make_request(
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_1}/qr"
+        )
+        
+        if status == 403:
+            self.log_test(test_name, True, f"QR correctly blocked for hidden user: {response}")
+        else:
+            self.log_test(test_name, False, f"HTTP {status}", "403", str(response))
+        
+        # Reset privacy to allow search
+        privacy_payload["show_in_search"] = True
+        await self.make_request(
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/privacy", 
+            json=privacy_payload
+        )
+        
+        # Now QR should work
+        status, response = await self.make_request(
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_1}/qr"
+        )
+        
+        if status == 200 and isinstance(response, dict):
+            qr_data = response.get("qr_data")
+            if qr_data and qr_data.startswith("https://t.me/"):
+                self.log_test(f"{test_name} - Allowed", True, f"QR data generated: {qr_data}")
+            else:
+                self.log_test(f"{test_name} - Allowed", False, "Invalid QR data format", "https://t.me/ URL", str(response))
+        else:
+            self.log_test(f"{test_name} - Allowed", False, f"HTTP {status}", "200", str(response))
+    
+    # ========== AVATAR ENDPOINT TESTS ==========
+    
+    async def test_avatar_authorization_put(self):
+        """Test 5: Avatar PUT endpoint authorization"""
+        test_name = "Avatar PUT - Authorization"
+        
+        valid_avatar_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        
+        # Test 5a: Missing requester_telegram_id
         payload = {
-            "graffiti_data": "data:image/png;base64,test"
+            "avatar_data": valid_avatar_data
         }
         
         status, response = await self.make_request(
-            "PUT", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti",
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar",
             json=payload
         )
         
         if status == 400:
-            self.log_test(test_name, True, f"Correctly rejected: {response}")
+            self.log_test(f"{test_name} - Missing requester", True, f"Correctly rejected: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "400", str(response))
-    
-    async def test_save_graffiti_wrong_requester(self):
-        """Test 3: Wrong requester_telegram_id"""
-        test_name = "Save graffiti - Wrong requester"
+            self.log_test(f"{test_name} - Missing requester", False, f"HTTP {status}", "400", str(response))
         
+        # Test 5b: Wrong requester_telegram_id
         payload = {
-            "graffiti_data": "data:image/png;base64,abc",
-            "requester_telegram_id": 99999
+            "avatar_data": valid_avatar_data,
+            "requester_telegram_id": TEST_USER_2  # Wrong user
         }
         
         status, response = await self.make_request(
-            "PUT", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti",
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar",
             json=payload
         )
         
         if status == 403:
-            self.log_test(test_name, True, f"Correctly rejected: {response}")
+            self.log_test(f"{test_name} - Wrong requester", True, f"Correctly rejected: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "403", str(response))
-    
-    async def test_save_graffiti_invalid_format(self):
-        """Test 4: Invalid data URL format"""
-        test_name = "Save graffiti - Invalid format"
+            self.log_test(f"{test_name} - Wrong requester", False, f"HTTP {status}", "403", str(response))
         
+        # Test 5c: Correct requester_telegram_id
         payload = {
-            "graffiti_data": "not_a_data_url",
-            "requester_telegram_id": TEST_USER_ID
+            "avatar_data": valid_avatar_data,
+            "requester_telegram_id": TEST_USER_1  # Correct user
         }
         
         status, response = await self.make_request(
-            "PUT", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti",
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar",
+            json=payload
+        )
+        
+        if status == 200:
+            self.log_test(f"{test_name} - Correct requester", True, f"Avatar saved: {response}")
+        else:
+            self.log_test(f"{test_name} - Correct requester", False, f"HTTP {status}", "200", str(response))
+    
+    async def test_avatar_authorization_delete(self):
+        """Test 6: Avatar DELETE endpoint authorization"""
+        test_name = "Avatar DELETE - Authorization"
+        
+        # Test 6a: Missing requester_telegram_id parameter
+        status, response = await self.make_request(
+            "DELETE",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar"
+        )
+        
+        if status == 400:
+            self.log_test(f"{test_name} - Missing requester", True, f"Correctly rejected: {response}")
+        else:
+            self.log_test(f"{test_name} - Missing requester", False, f"HTTP {status}", "400", str(response))
+        
+        # Test 6b: Wrong requester_telegram_id parameter
+        status, response = await self.make_request(
+            "DELETE",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar?requester_telegram_id={TEST_USER_2}"
+        )
+        
+        if status == 403:
+            self.log_test(f"{test_name} - Wrong requester", True, f"Correctly rejected: {response}")
+        else:
+            self.log_test(f"{test_name} - Wrong requester", False, f"HTTP {status}", "403", str(response))
+        
+        # Test 6c: Correct requester_telegram_id parameter
+        status, response = await self.make_request(
+            "DELETE",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar?requester_telegram_id={TEST_USER_1}"
+        )
+        
+        if status == 200:
+            self.log_test(f"{test_name} - Correct requester", True, f"Avatar deleted: {response}")
+        else:
+            self.log_test(f"{test_name} - Correct requester", False, f"HTTP {status}", "200", str(response))
+    
+    async def test_avatar_get(self):
+        """Test 7: Avatar GET endpoint"""
+        test_name = "Avatar GET"
+        
+        status, response = await self.make_request(
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_1}/avatar"
+        )
+        
+        if status == 200 and isinstance(response, dict):
+            avatar_data = response.get("avatar_data")
+            avatar_mode = response.get("avatar_mode")
+            
+            if avatar_data is not None and avatar_mode is not None:
+                self.log_test(test_name, True, f"Avatar data retrieved: mode={avatar_mode}")
+            else:
+                self.log_test(test_name, False, "Missing avatar fields", "avatar_data and avatar_mode", str(response))
+        else:
+            self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
+    
+    # ========== GRAFFITI ENDPOINT TESTS ==========
+    
+    async def test_graffiti_put_authorization(self):
+        """Test 8: Graffiti PUT endpoint authorization"""
+        test_name = "Graffiti PUT - Authorization"
+        
+        valid_graffiti_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+        
+        # Test 8a: Missing requester_telegram_id
+        payload = {
+            "graffiti_data": valid_graffiti_data
+        }
+        
+        status, response = await self.make_request(
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti",
             json=payload
         )
         
         if status == 400:
-            self.log_test(test_name, True, f"Correctly rejected: {response}")
+            self.log_test(f"{test_name} - Missing requester", True, f"Correctly rejected: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "400", str(response))
-    
-    async def test_save_graffiti_empty_data(self):
-        """Test 5: Empty graffiti data"""
-        test_name = "Save graffiti - Empty data"
+            self.log_test(f"{test_name} - Missing requester", False, f"HTTP {status}", "400", str(response))
         
+        # Test 8b: Wrong requester_telegram_id
         payload = {
-            "graffiti_data": "",
-            "requester_telegram_id": TEST_USER_ID
+            "graffiti_data": valid_graffiti_data,
+            "requester_telegram_id": TEST_USER_2  # Wrong user
         }
         
         status, response = await self.make_request(
-            "PUT", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti",
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti",
+            json=payload
+        )
+        
+        if status == 403:
+            self.log_test(f"{test_name} - Wrong requester", True, f"Correctly rejected: {response}")
+        else:
+            self.log_test(f"{test_name} - Wrong requester", False, f"HTTP {status}", "403", str(response))
+        
+        # Test 8c: Correct requester_telegram_id
+        payload = {
+            "graffiti_data": valid_graffiti_data,
+            "requester_telegram_id": TEST_USER_1  # Correct user
+        }
+        
+        status, response = await self.make_request(
+            "PUT",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti",
             json=payload
         )
         
         if status == 200:
-            self.log_test(test_name, True, f"Empty data accepted: {response}")
+            self.log_test(f"{test_name} - Correct requester", True, f"Graffiti saved: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
+            self.log_test(f"{test_name} - Correct requester", False, f"HTTP {status}", "200", str(response))
     
-    async def test_get_graffiti_after_save(self):
-        """Test 6: Get graffiti after saving"""
-        test_name = "Get graffiti - After save"
+    async def test_graffiti_get(self):
+        """Test 9: Graffiti GET endpoint"""
+        test_name = "Graffiti GET"
         
         status, response = await self.make_request(
-            "GET", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti"
+            "GET",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti"
         )
         
-        if status == 200:
-            if isinstance(response, dict):
-                has_data = "graffiti_data" in response
-                has_timestamp = "graffiti_updated_at" in response
-                
-                if has_data and has_timestamp:
-                    self.log_test(test_name, True, f"Response: {response}")
-                else:
-                    missing = []
-                    if not has_data: missing.append("graffiti_data")
-                    if not has_timestamp: missing.append("graffiti_updated_at")
-                    self.log_test(
-                        test_name, False,
-                        f"Missing fields: {missing}",
-                        "Response with graffiti_data AND graffiti_updated_at",
-                        str(response)
-                    )
+        if status == 200 and isinstance(response, dict):
+            graffiti_data = response.get("graffiti_data")
+            graffiti_updated_at = response.get("graffiti_updated_at")
+            
+            if graffiti_data is not None and graffiti_updated_at is not None:
+                self.log_test(test_name, True, f"Graffiti data retrieved: {len(graffiti_data)} chars")
             else:
-                self.log_test(test_name, False, "Invalid response format", "JSON object", str(response))
+                self.log_test(test_name, False, "Missing graffiti fields", "graffiti_data and graffiti_updated_at", str(response))
         else:
             self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
     
-    async def test_get_graffiti_nonexistent_user(self):
-        """Test 7: Get graffiti for non-existent user"""
-        test_name = "Get graffiti - Non-existent user"
+    async def test_graffiti_clear_authorization(self):
+        """Test 10: Graffiti clear endpoint authorization"""
+        test_name = "Graffiti CLEAR - Authorization"
         
-        nonexistent_user_id = 999999999
-        status, response = await self.make_request(
-            "GET", 
-            f"{API_BASE}/profile/{nonexistent_user_id}/graffiti"
-        )
-        
-        if status == 200:
-            if isinstance(response, dict):
-                graffiti_data = response.get("graffiti_data")
-                graffiti_timestamp = response.get("graffiti_updated_at")
-                
-                if graffiti_data == "" and graffiti_timestamp is None:
-                    self.log_test(test_name, True, f"Correct empty response: {response}")
-                else:
-                    self.log_test(
-                        test_name, False,
-                        "Incorrect empty response format",
-                        '{"graffiti_data": "", "graffiti_updated_at": null}',
-                        str(response)
-                    )
-            else:
-                self.log_test(test_name, False, "Invalid response format", "JSON object", str(response))
-        elif status == 404:
-            self.log_test(test_name, False, "Should return 200 with empty data, not 404", "200", f"404: {response}")
-        else:
-            self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
-    
-    async def test_clear_graffiti_valid(self):
-        """Test 8: Valid graffiti clear"""
-        test_name = "Clear graffiti - Valid request"
-        
-        payload = {
-            "requester_telegram_id": TEST_USER_ID
-        }
-        
-        status, response = await self.make_request(
-            "POST", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti/clear",
-            json=payload
-        )
-        
-        if status == 200:
-            if isinstance(response, dict) and response.get("success") is True:
-                self.log_test(test_name, True, f"Response: {response}")
-            else:
-                self.log_test(test_name, False, "Missing success: true", '{"success": true}', str(response))
-        else:
-            self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
-    
-    async def test_clear_graffiti_missing_requester(self):
-        """Test 9: Clear graffiti missing requester"""
-        test_name = "Clear graffiti - Missing requester"
-        
+        # Test 10a: Missing requester_telegram_id
         payload = {}
         
         status, response = await self.make_request(
-            "POST", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti/clear",
+            "POST",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti/clear",
             json=payload
         )
         
         if status == 400:
-            self.log_test(test_name, True, f"Correctly rejected: {response}")
+            self.log_test(f"{test_name} - Missing requester", True, f"Correctly rejected: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "400", str(response))
-    
-    async def test_clear_graffiti_wrong_requester(self):
-        """Test 10: Clear graffiti wrong requester"""
-        test_name = "Clear graffiti - Wrong requester"
+            self.log_test(f"{test_name} - Missing requester", False, f"HTTP {status}", "400", str(response))
         
+        # Test 10b: Wrong requester_telegram_id
         payload = {
-            "requester_telegram_id": 99999
+            "requester_telegram_id": TEST_USER_2  # Wrong user
         }
         
         status, response = await self.make_request(
-            "POST", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti/clear",
+            "POST",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti/clear",
             json=payload
         )
         
         if status == 403:
-            self.log_test(test_name, True, f"Correctly rejected: {response}")
+            self.log_test(f"{test_name} - Wrong requester", True, f"Correctly rejected: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "403", str(response))
-    
-    async def test_get_graffiti_after_clear(self):
-        """Test 11: Get graffiti after clear"""
-        test_name = "Get graffiti - After clear"
+            self.log_test(f"{test_name} - Wrong requester", False, f"HTTP {status}", "403", str(response))
+        
+        # Test 10c: Correct requester_telegram_id
+        payload = {
+            "requester_telegram_id": TEST_USER_1  # Correct user
+        }
         
         status, response = await self.make_request(
-            "GET", 
-            f"{API_BASE}/profile/{TEST_USER_ID}/graffiti"
+            "POST",
+            f"{API_BASE}/profile/{TEST_USER_1}/graffiti/clear",
+            json=payload
         )
         
         if status == 200:
-            if isinstance(response, dict):
-                graffiti_data = response.get("graffiti_data")
-                
-                if graffiti_data == "":
-                    self.log_test(test_name, True, f"Graffiti cleared: {response}")
-                else:
-                    self.log_test(test_name, False, "Graffiti not cleared", "Empty graffiti_data", str(response))
-            else:
-                self.log_test(test_name, False, "Invalid response format", "JSON object", str(response))
+            self.log_test(f"{test_name} - Correct requester", True, f"Graffiti cleared: {response}")
         else:
-            self.log_test(test_name, False, f"HTTP {status}", "200", str(response))
+            self.log_test(f"{test_name} - Correct requester", False, f"HTTP {status}", "200", str(response))
     
     async def run_all_tests(self):
-        """Run all graffiti API tests in sequence"""
-        print(f"🧪 Starting Graffiti API Tests")
+        """Run all profile API tests in sequence"""
+        print(f"🧪 Starting Profile API Tests")
         print(f"Backend URL: {BACKEND_URL}")
-        print(f"Test User ID: {TEST_USER_ID}")
+        print(f"Test Users: {TEST_USER_1}, {TEST_USER_2}, {TEST_USER_3}")
+        print("=" * 60)
+        
+        # Setup test users first
+        await self.setup_test_users()
         print("=" * 60)
         
         # Test sequence as specified in the review request
         test_methods = [
-            self.test_save_graffiti_valid,
-            self.test_get_graffiti_after_save,
-            self.test_save_graffiti_wrong_requester,
-            self.test_save_graffiti_missing_requester,
-            self.test_save_graffiti_invalid_format,
-            self.test_save_graffiti_empty_data,
-            self.test_clear_graffiti_valid,
-            self.test_clear_graffiti_missing_requester,
-            self.test_clear_graffiti_wrong_requester,
-            self.test_get_graffiti_after_clear,
-            self.test_get_graffiti_nonexistent_user,
+            self.test_profile_bidirectional_block_check,
+            self.test_profile_anonymous_privacy,
+            self.test_profile_friendship_status,
+            self.test_qr_privacy_check,
+            self.test_avatar_authorization_put,
+            self.test_avatar_authorization_delete,
+            self.test_avatar_get,
+            self.test_graffiti_put_authorization,
+            self.test_graffiti_get,
+            self.test_graffiti_clear_authorization,
         ]
         
         for test_method in test_methods:
@@ -376,7 +570,7 @@ class GraffitiAPITester:
 
 async def main():
     """Main test runner"""
-    async with GraffitiAPITester() as tester:
+    async with ProfileAPITester() as tester:
         passed, total = await tester.run_all_tests()
         
         # Exit with error code if any tests failed

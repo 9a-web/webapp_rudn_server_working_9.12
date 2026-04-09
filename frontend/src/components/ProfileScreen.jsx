@@ -282,7 +282,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graffitiEditMode, setupCanvas, saveSnapshot]);
 
-  // Fix: Очистка с подтверждением и сохранением на сервер
+  // Fix: Очистка с подтверждением и сохранением на сервер (через friendsAPI)
   const clearGraffiti = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     const ctx = graffitiCtxRef.current;
@@ -294,22 +294,17 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     setGraffitiHasContent(false);
     setShowClearConfirm(false);
     if (hapticFeedback) hapticFeedback('notification', 'success');
-    // Fix: Сразу удаляем на сервере через POST /graffiti/clear
+    // Fix: Сразу удаляем на сервере через friendsAPI
     if (user?.id) {
       try {
-        const backendURL = getBackendURL();
-        await fetch(`${backendURL}/api/profile/${user.id}/graffiti/clear`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requester_telegram_id: user.id }),
-        });
+        await friendsAPI.clearGraffiti(user.id);
       } catch (err) {
         console.error('[Graffiti] Delete error:', err);
       }
     }
   }, [saveSnapshot, hapticFeedback, user?.id]);
 
-  // Сохранение граффити на сервер — Fix: со статусом и сжатием
+  // Сохранение граффити на сервер — Fix: через friendsAPI
   const saveGraffitiToServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
@@ -341,19 +336,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         }
       }
 
-      const backendURL = getBackendURL();
-      const res = await fetch(`${backendURL}/api/profile/${user.id}/graffiti`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ graffiti_data: dataURL, requester_telegram_id: user.id }),
-      });
-      if (res.ok) {
-        setGraffitiSaveStatus('saved');
-        setTimeout(() => setGraffitiSaveStatus('idle'), 2000);
-      } else {
-        setGraffitiSaveStatus('error');
-        setTimeout(() => setGraffitiSaveStatus('idle'), 3000);
-      }
+      await friendsAPI.saveGraffiti(user.id, dataURL);
+      setGraffitiSaveStatus('saved');
+      setTimeout(() => setGraffitiSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('[Graffiti] Save error:', err);
       setGraffitiSaveStatus('error');
@@ -361,7 +346,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [user?.id]);
 
-  // Загрузка граффити с сервера — Fix: отмена при unmount, кросс-DPR
+  // Загрузка граффити с сервера — Fix: через friendsAPI
   const loadGraffitiFromServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
@@ -372,11 +357,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       graffitiLoadedImgRef.current = null;
     }
     try {
-      const backendURL = getBackendURL();
-      const res = await fetch(`${backendURL}/api/profile/${user.id}/graffiti`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data.graffiti_data) return;
+      const data = await friendsAPI.getGraffiti(user.id);
+      if (!data || !data.graffiti_data) return;
       // Рисуем сохранённое изображение на canvas
       const img = new window.Image();
       graffitiLoadedImgRef.current = img;
@@ -418,8 +400,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         }
         // Загружаем граффити с сервера
         await loadGraffitiFromServer();
-        // Если граффити нет — сохраняем пустой snapshot как начало
-        if (!graffitiHasContent) {
+        // Fix: используем ref-чтение checkCanvasHasContent вместо stale state
+        if (!checkCanvasHasContent()) {
           saveSnapshot();
         }
       }, 250);
@@ -436,15 +418,21 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   }, [user?.id]);
 
   // Bug 9: Загрузка актуальных данных профиля с сервера
-  useEffect(() => {
-    if (isOpen && user?.id) {
+  const refreshProfile = useCallback(() => {
+    if (user?.id) {
       friendsAPI.getUserProfile(user.id, user.id)
         .then(data => {
           if (data) setProfileData(data);
         })
         .catch(err => console.error('Error loading own profile:', err));
     }
-  }, [isOpen, user?.id]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      refreshProfile();
+    }
+  }, [isOpen, user?.id, refreshProfile]);
 
   // Bug 13: Очистка памяти граффити + Bug 11: Сброс друзей при закрытии
   useEffect(() => {
@@ -535,7 +523,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
   // Bug 11: Загрузка друзей при каждом переключении на таб (обновление)
   useEffect(() => {
-    if (activeTab === 'friends' && user?.id && !friendsLoading) {
+    if (activeTab === 'friends' && user?.id) {
       setFriendsLoading(true);
       friendsAPI.getFriends(user.id)
         .then(data => setFriendsList(data?.friends || []))
@@ -546,7 +534,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
   // Загрузка достижений при переключении на таб
   useEffect(() => {
-    if (activeTab === 'achievements' && user?.id && !achievementsLoading) {
+    if (activeTab === 'achievements' && user?.id) {
       setAchievementsLoading(true);
       Promise.all([
         achievementsAPI.getAllAchievements(),
@@ -807,7 +795,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   color: '#1c1c1c',
                 }}
               >
-                LV. {user.level || 74}
+                LV. {profileData?.visit_streak_current ?? user.level ?? 1}
               </span>
             </div>
           </motion.div>
@@ -859,7 +847,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   marginLeft: '3px',
                 }}
               >
-                (#{user.rank || 1})
+                (#{profileData?.visit_streak_max ?? user.rank ?? 0})
               </span>
             </motion.div>
           )}
@@ -915,7 +903,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   fontSize: '24px',
                   lineHeight: 1.2,
                   ...(() => {
-                    const tier = (user.tier || 'premium').toLowerCase();
+                    const tier = (user.tier || 'base').toLowerCase();
                     if (tier === 'premium') return {
                       background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
                       WebkitBackgroundClip: 'text',
@@ -928,7 +916,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 }}
               >
                 {(() => {
-                  const tier = (user.tier || 'premium').toLowerCase();
+                  const tier = (user.tier || 'base').toLowerCase();
                   const names = { base: 'Base', medium: 'Medium', rare: 'Rare', premium: 'Premium' };
                   return names[tier] || 'Base';
                 })()}
@@ -2084,6 +2072,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         userSettings={userSettings}
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
+        onProfileUpdated={refreshProfile}
         onOpenPrivacy={() => {
           setShowProfileEdit(false);
           setTimeout(() => setShowProfileSettings(true), 200);
