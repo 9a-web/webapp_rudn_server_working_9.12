@@ -31,14 +31,21 @@ const GroupSelector = ({ onGroupSelected, onCancel }) => {
     loadFaculties();
   }, []);
 
+  const [rudnUnavailable, setRudnUnavailable] = useState(false);
+
   const loadFaculties = async () => {
     setLoading(true);
     setError(null);
+    setRudnUnavailable(false);
     try {
       const data = await scheduleAPI.getFaculties();
       setFaculties(data);
     } catch (err) {
-      setError(err.message);
+      if (err.message && err.message.includes('rudn.ru')) {
+        setRudnUnavailable(true);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -242,6 +249,24 @@ const GroupSelector = ({ onGroupSelected, onCancel }) => {
         </div>
         <h1 className="text-2xl font-bold text-white">{getStepTitle()}</h1>
       </div>
+
+      {/* RUDN unavailable warning */}
+      {rudnUnavailable && (
+        <div style={{
+          background: 'rgba(234, 179, 8, 0.15)',
+          border: '1px solid rgba(234, 179, 8, 0.5)',
+          borderRadius: '12px',
+          padding: '16px',
+          marginBottom: '16px',
+        }}>
+          <p style={{ color: '#EAB308', fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
+            ⚠️ Технические проблемы на стороне rudn.ru
+          </p>
+          <p style={{ color: 'rgba(234, 179, 8, 0.7)', fontSize: '12px' }}>
+            Расписание и выбор группы временно недоступны. Попробуйте позже.
+          </p>
+        </div>
+      )}
 
       {/* Error message */}
       {error && (

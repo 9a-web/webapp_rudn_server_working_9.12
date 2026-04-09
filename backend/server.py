@@ -806,59 +806,32 @@ async def get_status_checks():
 
 @api_router.get("/faculties", response_model=List[Faculty])
 async def get_faculties():
-    """Получить список всех факультетов (3-уровневый fallback: парсер → MongoDB → хардкод)"""
+    """Получить список всех факультетов (с кешированием на 60 минут)"""
     try:
-        # 1. Проверяем in-memory кеш
+        # Проверяем кеш
         cached_faculties = cache.get("faculties")
         if cached_faculties:
             return cached_faculties
             
-        # 2. Пробуем получить из внешнего парсера РУДН
+        # Получаем из API РУДН
         faculties = await get_facultets()
-        if faculties:
-            # Сохраняем в in-memory кеш на 60 минут
-            cache.set("faculties", faculties, ttl_minutes=60)
-            # Сохраняем в MongoDB как persistent кэш
-            try:
-                await db.faculties_cache.delete_many({})
-                await db.faculties_cache.insert_many([{"id": f["id"], "name": f["name"]} for f in faculties])
-                logger.info(f"Сохранено {len(faculties)} факультетов в MongoDB кэш")
-            except Exception as cache_err:
-                logger.warning(f"Не удалось сохранить факультеты в MongoDB: {cache_err}")
-            return faculties
+        if not faculties:
+            raise HTTPException(
+                status_code=503,
+                detail="Временные технические проблемы на стороне rudn.ru. Расписание и выбор группы временно недоступны."
+            )
         
-        # 3. Fallback: MongoDB persistent кэш
-        logger.warning("Внешний парсер РУДН не вернул факультеты, пробуем MongoDB кэш")
-        db_faculties = await db.faculties_cache.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(length=200)
-        if db_faculties:
-            cache.set("faculties", db_faculties, ttl_minutes=30)
-            logger.info(f"Загружено {len(db_faculties)} факультетов из MongoDB кэша")
-            return db_faculties
-        
-        # 4. Fallback: хардкод известных факультетов РУДН
-        logger.warning("MongoDB кэш пуст, используем хардкод факультетов РУДН")
-        hardcoded_faculties = [
-            {"id": "1", "name": "Институт прикладной математики и телекоммуникаций"},
-            {"id": "2", "name": "Инженерная академия"},
-            {"id": "3", "name": "Институт экологии"},
-            {"id": "4", "name": "Юридический институт"},
-            {"id": "5", "name": "Экономический факультет"},
-            {"id": "6", "name": "Филологический факультет"},
-            {"id": "7", "name": "Медицинский институт"},
-            {"id": "8", "name": "Институт мировой экономики и бизнеса"},
-            {"id": "9", "name": "Факультет гуманитарных и социальных наук"},
-            {"id": "10", "name": "Факультет физико-математических и естественных наук"},
-            {"id": "11", "name": "Институт иностранных языков"},
-            {"id": "21", "name": "Аграрно-технологический институт"},
-            {"id": "22", "name": "Институт русского языка"},
-        ]
-        cache.set("faculties", hardcoded_faculties, ttl_minutes=10)
-        return hardcoded_faculties
+        # Сохраняем в кеш на 60 минут
+        cache.set("faculties", faculties, ttl_minutes=60)
+        return faculties
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Ошибка при получении факультетов: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=503,
+            detail="Временные технические проблемы на стороне rudn.ru. Расписание и выбор группы временно недоступны."
+        )
 
 
 @api_router.post("/filter-data", response_model=FilterDataResponse)
