@@ -184,18 +184,19 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
   const [devCommandLoading, setDevCommandLoading] = useState(false);
   const [devCommandHistory, setDevCommandHistory] = useState([]);
   
-  // Проверка на админа в webapp
+  // Проверка на админа — ТОЛЬКО в Telegram WebApp
+  // В веб-версии (браузер) dev-команды доступны без проверки
   const isDevAdmin = useMemo(() => {
-    // Проверяем только в Telegram WebApp
     const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    if (tgUser) {
+    const isTelegramWebApp = !!tgUser;
+    
+    if (isTelegramWebApp) {
+      // В Telegram WebApp — проверяем admin ID
       return ADMIN_UIDS.includes(String(tgUser.id));
     }
-    // Fallback: если user из контекста (для dev-тестов вне Telegram)
-    if (user?.id) {
-      return ADMIN_UIDS.includes(String(user.id));
-    }
-    return false;
+    
+    // В веб-версии (не Telegram) — доступно всем
+    return true;
   }, [user?.id]);
   
   // Определяем, является ли текущий ввод dev-командой
@@ -260,7 +261,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
 
   // ===== Dev Command Executor =====
   const executeDevCommand = useCallback(async (cmdString) => {
-    if (!isDevAdmin || !user?.id) return;
+    if (!isDevAdmin) return;
     
     setDevCommandLoading(true);
     const timestamp = new Date().toLocaleTimeString('ru-RU');
