@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, Reorder, useDragControls, AnimatePresence } from 'framer-motion';
 import { ClipboardList, Check, Plus, Edit2, Trash2, X, Flag, Calendar, AlertCircle, Filter, Zap, Bell, Star, Clock, ChevronDown, GripVertical, Users, TrendingUp, Link2, ListChecks, Play, RefreshCw } from 'lucide-react';
 import { tasksAPI, scheduleAPI, achievementsAPI, plannerAPI } from '../services/api';
@@ -23,6 +23,7 @@ import * as roomsAPI from '../services/roomsAPI';
 import { ProductivityStats } from './ProductivityStats';
 import SyncPreviewModal from './SyncPreviewModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import TaskCompletionBanner from './TaskCompletionBanner';
 
 import { getWeekNumberForDate } from '../utils/dateUtils';
 import { splitTextByAllVideoUrls } from '../utils/textUtils';
@@ -222,6 +223,10 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
   const [editingTask, setEditingTask] = useState(null);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  
+  // XP Banner state
+  const [xpBannerVisible, setXpBannerVisible] = useState(false);
+  const [xpBannerData, setXpBannerData] = useState(null);
   
   // Состояния для inline добавления подзадач
   const [addingSubtaskForTaskId, setAddingSubtaskForTaskId] = useState(null);
@@ -1059,6 +1064,16 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
       
       // Обновляем статистику продуктивности при изменении статуса задачи
       loadProductivityStats();
+      
+      // Показываем XP баннер при выполнении задачи
+      if (!wasCompleted && updatedTask.completed && updatedTask.xp_awarded) {
+        setXpBannerData({
+          taskText: task.text,
+          xpAwarded: updatedTask.xp_awarded,
+          xpInfo: updatedTask.xp_info,
+        });
+        setXpBannerVisible(true);
+      }
       
       // Проверяем, завершены ли все задачи на выбранную дату
       if (!wasCompleted && updatedTask.completed) {
@@ -2352,6 +2367,13 @@ export const TasksSection = ({ userSettings, selectedDate, weekNumber, onModalSt
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* XP Banner при выполнении задачи */}
+      <TaskCompletionBanner
+        isVisible={xpBannerVisible}
+        onClose={() => setXpBannerVisible(false)}
+        data={xpBannerData}
+      />
     </motion.div>
   );
 };

@@ -590,6 +590,9 @@ class TaskResponse(BaseModel):
     videos: List[VideoData] = []
     # Связь с исходной задачей из списка дел
     source_task_id: Optional[str] = None
+    # XP info при выполнении задачи (опционально)
+    xp_awarded: Optional[int] = None
+    xp_info: Optional[dict] = None
 
 
 class YouTubeInfoResponse(BaseModel):

@@ -2609,6 +2609,7 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         was_incomplete = not existing_task.get("completed", False)
         is_completing = task_update.completed is True and was_incomplete
         is_uncompleting = task_update.completed is False and existing_task.get("completed", False)
+        xp_result = None
         
         # Обновляем только переданные поля
         update_data = {}
@@ -2698,10 +2699,10 @@ async def update_task(task_id: str, task_update: TaskUpdate):
             xp_amount = XP_REWARDS["task_complete"]
             if on_time:
                 xp_amount += XP_REWARDS["task_on_time_bonus"]
-            asyncio.create_task(safe_award_xp(
+            xp_result = await safe_award_xp(
                 db, existing_task["telegram_id"], xp_amount,
                 reason=f"task_complete{'_on_time' if on_time else ''}"
-            ))
+            )
         
         # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video — убираем медленные yt_dlp запросы
         if 'videos' not in updated_task:
@@ -2710,7 +2711,34 @@ async def update_task(task_id: str, task_update: TaskUpdate):
         # Добавляем статистику подзадач
         progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
         
-        return TaskResponse(**updated_task, **progress_info)
+        # XP info при выполнении задачи
+        xp_awarded_amount = None
+        xp_info_data = None
+        if is_completing:
+            try:
+                xp_awarded_amount = xp_result.get("xp_awarded", 0) if xp_result else 0
+                xp_info_data = {
+                    "xp": xp_result.get("xp", 0),
+                    "level": xp_result.get("level", 1),
+                    "tier": xp_result.get("tier", "base"),
+                    "progress": xp_result.get("progress", 0),
+                    "xp_current_level": xp_result.get("xp_current_level", 0),
+                    "xp_next_level": xp_result.get("xp_next_level", 100),
+                    "leveled_up": xp_result.get("leveled_up", False),
+                    "old_level": xp_result.get("old_level"),
+                    "new_level": xp_result.get("new_level"),
+                    "old_tier": xp_result.get("old_tier"),
+                    "new_tier": xp_result.get("new_tier"),
+                }
+            except Exception as xp_err:
+                logger.warning(f"Failed to extract xp_info: {xp_err}")
+        
+        return TaskResponse(
+            **updated_task,
+            **progress_info,
+            xp_awarded=xp_awarded_amount,
+            xp_info=xp_info_data,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -12025,7 +12053,7 @@ async def get_similar_tracks(track_id: str, count: int = 20):
 # ============ VK AUTH API ============
 
 from vk_auth_service import vk_auth_service, VKAuthError
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from urllib.parse import urlencode, quote
 
 class VKAuthRequest(BaseModel):
@@ -12302,7 +12330,7 @@ async def vk_oauth_callback(code: str = None, state: str = None, error: str = No
         else:
             return make_html_response(
                 True,
-                f"Аккаунт подключен, но доступ к аудио ограничен VK. Попробуйте использовать Kate Mobile.",
+                "Аккаунт подключен, но доступ к аудио ограничен VK. Попробуйте использовать Kate Mobile.",
                 user_name
             )
         
@@ -16488,7 +16516,7 @@ async def set_typing(conversation_id: str, data: TypingIndicator):
             typing_indicators_store[conversation_id] = {}
         typing_indicators_store[conversation_id][data.telegram_id] = datetime.utcnow()
         return {"success": True}
-    except Exception as e:
+    except Exception:
         return {"success": False}
 
 
@@ -16520,7 +16548,7 @@ async def get_typing(conversation_id: str, telegram_id: int = 0):
             for cid in stale_convs:
                 typing_indicators_store.pop(cid, None)
         return {"typing_users": typing_users}
-    except Exception as e:
+    except Exception:
         return {"typing_users": []}
 
 

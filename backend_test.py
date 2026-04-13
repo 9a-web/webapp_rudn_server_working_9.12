@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for RUDN Schedule Level System
-Tests the new Level System and Profile endpoints
+Backend Test Suite for RUDN Schedule App
+Testing task completion flow with XP info
 """
 
 import asyncio
 import aiohttp
 import json
 import sys
+from datetime import datetime
 from typing import Dict, Any, Optional
 
-# Backend URL - using localhost since service is running locally
-BACKEND_URL = "http://localhost:8001"
+# Backend URL from environment
+BACKEND_URL = "http://localhost:8001/api"
 
-class LevelSystemTester:
+class BackendTester:
     def __init__(self):
         self.session = None
         self.test_results = []
-        self.test_user_id = 123456  # Non-existent user for testing
         
     async def __aenter__(self):
         self.session = aiohttp.ClientSession()
@@ -27,338 +27,326 @@ class LevelSystemTester:
         if self.session:
             await self.session.close()
     
-    def log_test(self, test_name: str, success: bool, details: str, response_data: Optional[Dict] = None):
+    def log_test(self, test_name: str, success: bool, details: str = ""):
         """Log test result"""
         status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} {test_name}")
-        print(f"   Details: {details}")
-        if response_data:
-            print(f"   Response: {json.dumps(response_data, indent=2)}")
-        print()
-        
+        print(f"{status} - {test_name}")
+        if details:
+            print(f"    {details}")
         self.test_results.append({
             "test": test_name,
             "success": success,
-            "details": details,
-            "response": response_data
+            "details": details
         })
     
-    async def test_endpoint(self, method: str, endpoint: str, expected_status: int = 200, 
-                          expected_fields: list = None, data: dict = None) -> Dict[str, Any]:
-        """Generic endpoint testing method"""
-        url = f"{BACKEND_URL}{endpoint}"
+    async def test_task_completion_xp_flow(self):
+        """Test the complete task completion flow with XP info"""
+        print("🧪 Testing Task Completion Flow with XP Info")
+        print("=" * 60)
+        
+        test_telegram_id = 999999
+        task_id = None
         
         try:
-            if method.upper() == "GET":
-                async with self.session.get(url) as response:
-                    status = response.status
-                    try:
-                        response_data = await response.json()
-                    except:
-                        response_data = {"error": "Invalid JSON response"}
-            elif method.upper() == "POST":
-                async with self.session.post(url, json=data) as response:
-                    status = response.status
-                    try:
-                        response_data = await response.json()
-                    except:
-                        response_data = {"error": "Invalid JSON response"}
-            else:
-                return {"error": f"Unsupported method: {method}"}
-            
-            # Check status code
-            status_ok = status == expected_status
-            
-            # Check expected fields if provided
-            fields_ok = True
-            missing_fields = []
-            if expected_fields and isinstance(response_data, dict):
-                for field in expected_fields:
-                    if field not in response_data:
-                        fields_ok = False
-                        missing_fields.append(field)
-            
-            return {
-                "status": status,
-                "status_ok": status_ok,
-                "response_data": response_data,
-                "fields_ok": fields_ok,
-                "missing_fields": missing_fields,
-                "success": status_ok and fields_ok
+            # Step 1: Create a test task
+            print("\n📝 Step 1: Creating test task...")
+            create_payload = {
+                "telegram_id": test_telegram_id,
+                "text": "Test task for XP banner"
             }
+            
+            async with self.session.post(
+                f"{BACKEND_URL}/tasks",
+                json=create_payload,
+                headers={"Content-Type": "application/json"}
+            ) as response:
+                if response.status == 200:
+                    task_data = await response.json()
+                    task_id = task_data.get("id")
+                    self.log_test(
+                        "Create test task", 
+                        True, 
+                        f"Task created with ID: {task_id}"
+                    )
+                    
+                    # Verify task structure
+                    required_fields = ["id", "telegram_id", "text", "completed"]
+                    missing_fields = [f for f in required_fields if f not in task_data]
+                    if missing_fields:
+                        self.log_test(
+                            "Task creation response structure",
+                            False,
+                            f"Missing fields: {missing_fields}"
+                        )
+                    else:
+                        self.log_test("Task creation response structure", True)
+                        
+                    # Verify initial XP fields are null (not completing)
+                    if task_data.get("xp_awarded") is None and task_data.get("xp_info") is None:
+                        self.log_test("Initial XP fields are null", True)
+                    else:
+                        self.log_test(
+                            "Initial XP fields are null", 
+                            False,
+                            f"xp_awarded: {task_data.get('xp_awarded')}, xp_info: {task_data.get('xp_info')}"
+                        )
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Create test task", 
+                        False, 
+                        f"HTTP {response.status}: {error_text}"
+                    )
+                    return
+            
+            # Step 2: Test text update (should not award XP)
+            print("\n✏️ Step 2: Testing text update (no XP)...")
+            update_payload = {
+                "text": "Updated test task for XP banner"
+            }
+            
+            async with self.session.put(
+                f"{BACKEND_URL}/tasks/{task_id}",
+                json=update_payload,
+                headers={"Content-Type": "application/json"}
+            ) as response:
+                if response.status == 200:
+                    task_data = await response.json()
+                    self.log_test("Update task text", True)
+                    
+                    # Verify XP fields are still null (not completing)
+                    if task_data.get("xp_awarded") is None and task_data.get("xp_info") is None:
+                        self.log_test("XP fields remain null on text update", True)
+                    else:
+                        self.log_test(
+                            "XP fields remain null on text update", 
+                            False,
+                            f"xp_awarded: {task_data.get('xp_awarded')}, xp_info: {task_data.get('xp_info')}"
+                        )
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Update task text", 
+                        False, 
+                        f"HTTP {response.status}: {error_text}"
+                    )
+            
+            # Step 3: Complete the task (should award XP)
+            print("\n🎯 Step 3: Completing task (should award XP)...")
+            complete_payload = {
+                "completed": True
+            }
+            
+            async with self.session.put(
+                f"{BACKEND_URL}/tasks/{task_id}",
+                json=complete_payload,
+                headers={"Content-Type": "application/json"}
+            ) as response:
+                if response.status == 200:
+                    task_data = await response.json()
+                    self.log_test("Complete task", True)
+                    
+                    # Verify task is marked as completed
+                    if task_data.get("completed") is True:
+                        self.log_test("Task marked as completed", True)
+                    else:
+                        self.log_test(
+                            "Task marked as completed", 
+                            False,
+                            f"completed: {task_data.get('completed')}"
+                        )
+                    
+                    # Verify XP awarded field
+                    xp_awarded = task_data.get("xp_awarded")
+                    if xp_awarded is not None and isinstance(xp_awarded, int) and xp_awarded > 0:
+                        expected_xp = [5, 8]  # Base task completion XP values
+                        if xp_awarded in expected_xp:
+                            self.log_test(
+                                "XP awarded field", 
+                                True, 
+                                f"Awarded {xp_awarded} XP"
+                            )
+                        else:
+                            self.log_test(
+                                "XP awarded field", 
+                                True, 
+                                f"Awarded {xp_awarded} XP (different from expected {expected_xp})"
+                            )
+                    else:
+                        self.log_test(
+                            "XP awarded field", 
+                            False,
+                            f"xp_awarded: {xp_awarded} (expected positive integer)"
+                        )
+                    
+                    # Verify XP info structure
+                    xp_info = task_data.get("xp_info")
+                    if xp_info is not None and isinstance(xp_info, dict):
+                        required_xp_fields = [
+                            "xp", "level", "tier", "progress", 
+                            "xp_current_level", "xp_next_level", 
+                            "leveled_up", "old_level", "new_level", 
+                            "old_tier", "new_tier"
+                        ]
+                        missing_xp_fields = [f for f in required_xp_fields if f not in xp_info]
+                        
+                        if missing_xp_fields:
+                            self.log_test(
+                                "XP info structure", 
+                                False,
+                                f"Missing fields: {missing_xp_fields}"
+                            )
+                        else:
+                            self.log_test("XP info structure", True, "All required fields present")
+                            
+                            # Verify tier value
+                            tier = xp_info.get("tier")
+                            valid_tiers = ["base", "medium", "rare", "premium"]
+                            if tier in valid_tiers:
+                                self.log_test("XP info tier value", True, f"tier: {tier}")
+                            else:
+                                self.log_test(
+                                    "XP info tier value", 
+                                    False,
+                                    f"tier: {tier} (expected one of {valid_tiers})"
+                                )
+                            
+                            # Verify level value
+                            level = xp_info.get("level")
+                            if isinstance(level, int) and level >= 1:
+                                self.log_test("XP info level value", True, f"level: {level}")
+                            else:
+                                self.log_test(
+                                    "XP info level value", 
+                                    False,
+                                    f"level: {level} (expected integer >= 1)"
+                                )
+                    else:
+                        self.log_test(
+                            "XP info structure", 
+                            False,
+                            f"xp_info: {xp_info} (expected dict)"
+                        )
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Complete task", 
+                        False, 
+                        f"HTTP {response.status}: {error_text}"
+                    )
+            
+            # Step 4: Test uncompleting task (should not award XP)
+            print("\n↩️ Step 4: Uncompleting task (no XP)...")
+            uncomplete_payload = {
+                "completed": False
+            }
+            
+            async with self.session.put(
+                f"{BACKEND_URL}/tasks/{task_id}",
+                json=uncomplete_payload,
+                headers={"Content-Type": "application/json"}
+            ) as response:
+                if response.status == 200:
+                    task_data = await response.json()
+                    self.log_test("Uncomplete task", True)
+                    
+                    # Verify task is marked as not completed
+                    if task_data.get("completed") is False:
+                        self.log_test("Task marked as not completed", True)
+                    else:
+                        self.log_test(
+                            "Task marked as not completed", 
+                            False,
+                            f"completed: {task_data.get('completed')}"
+                        )
+                    
+                    # Verify XP fields are null (not completing)
+                    if task_data.get("xp_awarded") is None and task_data.get("xp_info") is None:
+                        self.log_test("XP fields null on uncomplete", True)
+                    else:
+                        self.log_test(
+                            "XP fields null on uncomplete", 
+                            False,
+                            f"xp_awarded: {task_data.get('xp_awarded')}, xp_info: {task_data.get('xp_info')}"
+                        )
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Uncomplete task", 
+                        False, 
+                        f"HTTP {response.status}: {error_text}"
+                    )
+            
+            # Step 5: Complete again to test XP consistency
+            print("\n🔄 Step 5: Completing task again (XP consistency)...")
+            complete_payload = {
+                "completed": True
+            }
+            
+            async with self.session.put(
+                f"{BACKEND_URL}/tasks/{task_id}",
+                json=complete_payload,
+                headers={"Content-Type": "application/json"}
+            ) as response:
+                if response.status == 200:
+                    task_data = await response.json()
+                    self.log_test("Complete task again", True)
+                    
+                    # Verify XP is awarded again
+                    xp_awarded = task_data.get("xp_awarded")
+                    if xp_awarded is not None and isinstance(xp_awarded, int) and xp_awarded > 0:
+                        self.log_test("XP awarded on re-completion", True, f"Awarded {xp_awarded} XP")
+                    else:
+                        self.log_test(
+                            "XP awarded on re-completion", 
+                            False,
+                            f"xp_awarded: {xp_awarded}"
+                        )
+                else:
+                    error_text = await response.text()
+                    self.log_test(
+                        "Complete task again", 
+                        False, 
+                        f"HTTP {response.status}: {error_text}"
+                    )
             
         except Exception as e:
-            return {
-                "error": str(e),
-                "success": False,
-                "status": None,
-                "response_data": None
-            }
+            self.log_test("Task completion XP flow", False, f"Exception: {str(e)}")
+        
+        finally:
+            # Cleanup: Delete the test task
+            if task_id:
+                print("\n🧹 Cleanup: Deleting test task...")
+                try:
+                    async with self.session.delete(f"{BACKEND_URL}/tasks/{task_id}") as response:
+                        if response.status == 200:
+                            self.log_test("Cleanup test task", True)
+                        else:
+                            error_text = await response.text()
+                            self.log_test(
+                                "Cleanup test task", 
+                                False, 
+                                f"HTTP {response.status}: {error_text}"
+                            )
+                except Exception as e:
+                    self.log_test("Cleanup test task", False, f"Exception: {str(e)}")
     
-    async def test_xp_rewards_info(self):
-        """Test GET /api/xp-rewards-info endpoint"""
-        print("🧪 Testing GET /api/xp-rewards-info")
-        
-        result = await self.test_endpoint(
-            "GET", 
-            "/api/xp-rewards-info",
-            expected_fields=["rewards"]
-        )
-        
-        if result["success"]:
-            response_data = result["response_data"]
-            rewards = response_data.get("rewards", [])
-            
-            # Validate rewards structure
-            if isinstance(rewards, list) and len(rewards) > 0:
-                # Check first reward has required fields
-                first_reward = rewards[0]
-                required_reward_fields = ["action", "xp", "label", "emoji", "limit"]
-                missing_reward_fields = [f for f in required_reward_fields if f not in first_reward]
-                
-                if not missing_reward_fields:
-                    self.log_test(
-                        "GET /api/xp-rewards-info",
-                        True,
-                        f"Returns valid rewards array with {len(rewards)} items",
-                        response_data
-                    )
+    async def test_backend_health(self):
+        """Test backend health endpoint"""
+        print("\n🏥 Testing Backend Health...")
+        try:
+            async with self.session.get(f"{BACKEND_URL}/health") as response:
+                if response.status == 200:
+                    health_data = await response.json()
+                    self.log_test("Backend health check", True, f"Status: {health_data.get('status')}")
                 else:
-                    self.log_test(
-                        "GET /api/xp-rewards-info",
-                        False,
-                        f"Reward items missing fields: {missing_reward_fields}",
-                        response_data
-                    )
-            else:
-                self.log_test(
-                    "GET /api/xp-rewards-info",
-                    False,
-                    "Rewards array is empty or not a list",
-                    response_data
-                )
-        else:
-            self.log_test(
-                "GET /api/xp-rewards-info",
-                False,
-                f"Request failed: {result.get('error', 'Unknown error')}",
-                result.get("response_data")
-            )
+                    self.log_test("Backend health check", False, f"HTTP {response.status}")
+        except Exception as e:
+            self.log_test("Backend health check", False, f"Exception: {str(e)}")
     
-    async def test_pending_level_up(self):
-        """Test GET /api/users/{id}/pending-level-up endpoint"""
-        print(f"🧪 Testing GET /api/users/{self.test_user_id}/pending-level-up")
-        
-        result = await self.test_endpoint(
-            "GET",
-            f"/api/users/{self.test_user_id}/pending-level-up",
-            expected_fields=["has_level_up"]
-        )
-        
-        if result["success"]:
-            response_data = result["response_data"]
-            has_level_up = response_data.get("has_level_up")
-            
-            # For non-existent user, should return has_level_up: false
-            if has_level_up is False:
-                self.log_test(
-                    "GET /api/users/{id}/pending-level-up",
-                    True,
-                    "Returns has_level_up: false for non-existent user",
-                    response_data
-                )
-            else:
-                self.log_test(
-                    "GET /api/users/{id}/pending-level-up",
-                    False,
-                    f"Expected has_level_up: false, got: {has_level_up}",
-                    response_data
-                )
-        else:
-            self.log_test(
-                "GET /api/users/{id}/pending-level-up",
-                False,
-                f"Request failed: {result.get('error', 'Unknown error')}",
-                result.get("response_data")
-            )
-    
-    async def test_xp_breakdown(self):
-        """Test GET /api/users/{id}/xp-breakdown endpoint"""
-        print(f"🧪 Testing GET /api/users/{self.test_user_id}/xp-breakdown")
-        
-        result = await self.test_endpoint(
-            "GET",
-            f"/api/users/{self.test_user_id}/xp-breakdown",
-            expected_fields=["status", "xp", "breakdown", "level", "tier"]
-        )
-        
-        if result["success"]:
-            response_data = result["response_data"]
-            
-            # Validate response structure
-            status = response_data.get("status")
-            xp = response_data.get("xp")
-            breakdown = response_data.get("breakdown")
-            level = response_data.get("level")
-            tier = response_data.get("tier")
-            
-            validation_errors = []
-            
-            if status != "ok":
-                validation_errors.append(f"status should be 'ok', got: {status}")
-            
-            if not isinstance(xp, int) or xp < 0:
-                validation_errors.append(f"xp should be non-negative integer, got: {xp}")
-            
-            if not isinstance(breakdown, dict):
-                validation_errors.append(f"breakdown should be object, got: {type(breakdown)}")
-            else:
-                # Check breakdown has expected keys
-                expected_breakdown_keys = ["tasks", "achievements", "visits", "streak_bonuses", "referrals", "group_tasks", "messages"]
-                missing_breakdown_keys = [k for k in expected_breakdown_keys if k not in breakdown]
-                if missing_breakdown_keys:
-                    validation_errors.append(f"breakdown missing keys: {missing_breakdown_keys}")
-            
-            if not isinstance(level, int) or level < 1:
-                validation_errors.append(f"level should be positive integer, got: {level}")
-            
-            if not isinstance(tier, str) or tier not in ["base", "medium", "rare", "premium"]:
-                validation_errors.append(f"tier should be valid tier string, got: {tier}")
-            
-            if not validation_errors:
-                self.log_test(
-                    "GET /api/users/{id}/xp-breakdown",
-                    True,
-                    "Returns valid XP breakdown with correct structure",
-                    response_data
-                )
-            else:
-                self.log_test(
-                    "GET /api/users/{id}/xp-breakdown",
-                    False,
-                    f"Validation errors: {'; '.join(validation_errors)}",
-                    response_data
-                )
-        else:
-            self.log_test(
-                "GET /api/users/{id}/xp-breakdown",
-                False,
-                f"Request failed: {result.get('error', 'Unknown error')}",
-                result.get("response_data")
-            )
-    
-    async def test_user_level(self):
-        """Test GET /api/users/{id}/level endpoint (existing)"""
-        print(f"🧪 Testing GET /api/users/{self.test_user_id}/level")
-        
-        result = await self.test_endpoint(
-            "GET",
-            f"/api/users/{self.test_user_id}/level",
-            expected_fields=["status"]
-        )
-        
-        if result["success"]:
-            response_data = result["response_data"]
-            status = response_data.get("status")
-            
-            if status == "ok":
-                # Should have level info fields
-                level_fields = ["level", "tier", "xp", "xp_current_level", "xp_next_level", "progress"]
-                missing_level_fields = [f for f in level_fields if f not in response_data]
-                
-                if not missing_level_fields:
-                    self.log_test(
-                        "GET /api/users/{id}/level",
-                        True,
-                        "Returns valid level info with all required fields",
-                        response_data
-                    )
-                else:
-                    self.log_test(
-                        "GET /api/users/{id}/level",
-                        False,
-                        f"Missing level fields: {missing_level_fields}",
-                        response_data
-                    )
-            else:
-                self.log_test(
-                    "GET /api/users/{id}/level",
-                    False,
-                    f"Expected status: 'ok', got: {status}",
-                    response_data
-                )
-        else:
-            self.log_test(
-                "GET /api/users/{id}/level",
-                False,
-                f"Request failed: {result.get('error', 'Unknown error')}",
-                result.get("response_data")
-            )
-    
-    async def test_recalculate_xp(self):
-        """Test POST /api/users/{id}/recalculate-xp endpoint"""
-        print(f"🧪 Testing POST /api/users/{self.test_user_id}/recalculate-xp")
-        
-        result = await self.test_endpoint(
-            "POST",
-            f"/api/users/{self.test_user_id}/recalculate-xp",
-            expected_fields=["status"]
-        )
-        
-        if result["success"]:
-            response_data = result["response_data"]
-            status = response_data.get("status")
-            
-            if status == "ok":
-                # Should have recalculated XP data
-                expected_fields = ["telegram_id", "xp", "breakdown", "level", "tier"]
-                missing_fields = [f for f in expected_fields if f not in response_data]
-                
-                if not missing_fields:
-                    self.log_test(
-                        "POST /api/users/{id}/recalculate-xp",
-                        True,
-                        "Returns recalculated XP data with all required fields",
-                        response_data
-                    )
-                else:
-                    self.log_test(
-                        "POST /api/users/{id}/recalculate-xp",
-                        False,
-                        f"Missing fields in recalculated data: {missing_fields}",
-                        response_data
-                    )
-            else:
-                self.log_test(
-                    "POST /api/users/{id}/recalculate-xp",
-                    False,
-                    f"Expected status: 'ok', got: {status}",
-                    response_data
-                )
-        else:
-            self.log_test(
-                "POST /api/users/{id}/recalculate-xp",
-                False,
-                f"Request failed: {result.get('error', 'Unknown error')}",
-                result.get("response_data")
-            )
-    
-    async def run_all_tests(self):
-        """Run all Level System endpoint tests"""
-        print("🚀 Starting Level System Backend API Tests")
-        print(f"Backend URL: {BACKEND_URL}")
-        print(f"Test User ID: {self.test_user_id}")
-        print("=" * 60)
-        
-        # Test all endpoints
-        await self.test_xp_rewards_info()
-        await self.test_pending_level_up()
-        await self.test_xp_breakdown()
-        await self.test_user_level()
-        await self.test_recalculate_xp()
-        
-        # Summary
-        print("=" * 60)
+    def print_summary(self):
+        """Print test summary"""
+        print("\n" + "=" * 60)
         print("📊 TEST SUMMARY")
         print("=" * 60)
         
@@ -367,35 +355,39 @@ class LevelSystemTester:
         failed_tests = total_tests - passed_tests
         
         print(f"Total Tests: {total_tests}")
-        print(f"Passed: {passed_tests}")
-        print(f"Failed: {failed_tests}")
-        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+        print(f"✅ Passed: {passed_tests}")
+        print(f"❌ Failed: {failed_tests}")
+        print(f"Success Rate: {(passed_tests/total_tests*100):.1f}%" if total_tests > 0 else "No tests run")
         
         if failed_tests > 0:
             print("\n❌ FAILED TESTS:")
             for result in self.test_results:
                 if not result["success"]:
-                    print(f"  - {result['test']}: {result['details']}")
+                    print(f"  • {result['test']}: {result['details']}")
         
-        return {
-            "total": total_tests,
-            "passed": passed_tests,
-            "failed": failed_tests,
-            "success_rate": (passed_tests/total_tests)*100,
-            "results": self.test_results
-        }
+        return failed_tests == 0
 
 async def main():
     """Main test runner"""
-    async with LevelSystemTester() as tester:
-        summary = await tester.run_all_tests()
+    print("🚀 Starting Backend Tests for RUDN Schedule App")
+    print(f"🔗 Backend URL: {BACKEND_URL}")
+    
+    async with BackendTester() as tester:
+        # Test backend health first
+        await tester.test_backend_health()
         
-        # Exit with error code if tests failed
-        if summary["failed"] > 0:
-            sys.exit(1)
-        else:
+        # Test task completion XP flow
+        await tester.test_task_completion_xp_flow()
+        
+        # Print summary
+        success = tester.print_summary()
+        
+        if success:
             print("\n🎉 All tests passed!")
             sys.exit(0)
+        else:
+            print("\n💥 Some tests failed!")
+            sys.exit(1)
 
 if __name__ == "__main__":
     asyncio.run(main())
