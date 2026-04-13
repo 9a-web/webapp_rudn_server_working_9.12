@@ -9,7 +9,7 @@ import {
   Users, Search, UserPlus, Bell, Star, 
   RefreshCw, UserCheck, UserX, Clock, Send, 
   QrCode, ScanLine, X, Sparkles, Heart, Loader2, MessageCircle,
-  Check, CheckCheck
+  Check, CheckCheck, Terminal, ChevronRight, Zap
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../contexts/TelegramContext';
@@ -21,6 +21,35 @@ import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
 import ChatModal from './ChatModal';
 import { getBackendURL } from '../utils/config';
+
+// Админ IDs
+const ADMIN_UIDS = ['765963392', '1311283832'];
+
+// Все доступные dev-команды с описаниями
+const DEV_COMMANDS = [
+  { cmd: 'dev.help()', desc: 'Список команд', emoji: '📋' },
+  { cmd: 'dev.getUser()', desc: 'Текущий пользователь', emoji: '👤' },
+  { cmd: 'dev.getLevel()', desc: 'Уровень и XP', emoji: '📊' },
+  { cmd: 'dev.addXP(', desc: 'Добавить XP (amount)', emoji: '⭐' },
+  { cmd: 'dev.setXP(', desc: 'Установить XP (amount)', emoji: '⭐' },
+  { cmd: 'dev.resetStreak()', desc: 'Сбросить стрик', emoji: '🔥' },
+  { cmd: 'dev.recordVisit()', desc: 'Записать визит', emoji: '📅' },
+  { cmd: 'dev.listFriends()', desc: 'Список друзей', emoji: '👥' },
+  { cmd: 'dev.listRequests()', desc: 'Запросы в друзья', emoji: '📬' },
+  { cmd: 'dev.listTasks()', desc: 'Список задач', emoji: '📋' },
+  { cmd: 'dev.addTask(', desc: 'Создать задачу ("Название")', emoji: '✅' },
+  { cmd: 'dev.createFriend(', desc: 'Создать друга (targetId)', emoji: '🤝' },
+  { cmd: 'dev.sendFriendRequest(', desc: 'Запрос дружбы (targetId)', emoji: '📨' },
+  { cmd: 'dev.removeFriend(', desc: 'Удалить друга (targetId)', emoji: '🗑' },
+  { cmd: 'dev.deleteTask(', desc: 'Удалить задачу (taskId)', emoji: '🗑' },
+  { cmd: 'dev.showStreakModal()', desc: 'Показать модалку стрика', emoji: '🔥' },
+  { cmd: 'dev.hideStreakModal()', desc: 'Скрыть модалку', emoji: '🔥' },
+  { cmd: 'dev.clearUserData()', desc: 'Удалить данные юзера', emoji: '⚠️' },
+  { cmd: 'dev.apiCall(', desc: 'API вызов ("METHOD", "/path")', emoji: '📡' },
+  { cmd: 'dev.enableLogs()', desc: 'Включить логи', emoji: '🔊' },
+  { cmd: 'dev.disableLogs()', desc: 'Выключить логи', emoji: '🔇' },
+  { cmd: 'dev.getUserSettings()', desc: 'Настройки юзера', emoji: '⚙️' },
+];
 
 // Русское склонение
 const pluralize = (n, one, few, many) => {
@@ -150,6 +179,37 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
   const tabsContainerRef = useRef(null);
   const [friendEventTrigger, setFriendEventTrigger] = useState(0); // SSE refresh trigger
   
+  // === Dev Command State ===
+  const [devCommandResult, setDevCommandResult] = useState(null);
+  const [devCommandLoading, setDevCommandLoading] = useState(false);
+  const [devCommandHistory, setDevCommandHistory] = useState([]);
+  
+  // Проверка на админа в webapp
+  const isDevAdmin = useMemo(() => {
+    // Проверяем только в Telegram WebApp
+    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    if (tgUser) {
+      return ADMIN_UIDS.includes(String(tgUser.id));
+    }
+    // Fallback: если user из контекста (для dev-тестов вне Telegram)
+    if (user?.id) {
+      return ADMIN_UIDS.includes(String(user.id));
+    }
+    return false;
+  }, [user?.id]);
+  
+  // Определяем, является ли текущий ввод dev-командой
+  const isDevCommand = useMemo(() => {
+    return isDevAdmin && searchQuery.trim().toLowerCase().startsWith('dev.');
+  }, [isDevAdmin, searchQuery]);
+  
+  // Автодополнение команд
+  const devSuggestions = useMemo(() => {
+    if (!isDevCommand) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return DEV_COMMANDS.filter(c => c.cmd.toLowerCase().startsWith(q) && c.cmd.toLowerCase() !== q);
+  }, [isDevCommand, searchQuery]);
+  
   // Debounced search
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
   
@@ -197,6 +257,133 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
       }
     }
   }, [webApp]);
+
+  // ===== Dev Command Executor =====
+  const executeDevCommand = useCallback(async (cmdString) => {
+    if (!isDevAdmin || !user?.id) return;
+    
+    setDevCommandLoading(true);
+    const timestamp = new Date().toLocaleTimeString('ru-RU');
+    
+    try {
+      // Парсим команду: dev.commandName(arg1, arg2, ...)
+      const match = cmdString.trim().match(/^dev\.(\w+)\((.*)\)$/);
+      if (!match) {
+        setDevCommandResult({ 
+          status: 'error', 
+          input: cmdString,
+          message: 'Неверный формат. Пример: dev.help()',
+          time: timestamp
+        });
+        setDevCommandLoading(false);
+        return;
+      }
+      
+      const [, funcName, argsStr] = match;
+      // Парсим аргументы: поддержка чисел, строк в кавычках
+      const args = argsStr.trim() ? argsStr.split(',').map(a => {
+        const trimmed = a.trim();
+        // Убираем кавычки если есть
+        if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || 
+            (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+          return trimmed.slice(1, -1);
+        }
+        // Пробуем число
+        const num = Number(trimmed);
+        if (!isNaN(num) && trimmed !== '') return num;
+        return trimmed;
+      }) : [];
+      
+      // Команды, которые работают через window.dev (клиентские)
+      const clientCommands = ['enableLogs', 'disableLogs', 'showStreakModal', 'hideStreakModal'];
+      
+      if (clientCommands.includes(funcName) && window.dev && window.dev[funcName]) {
+        const result = window.dev[funcName](...args);
+        const entry = {
+          status: 'ok',
+          input: cmdString,
+          command: funcName,
+          message: `✅ ${funcName}() выполнен`,
+          result: typeof result === 'object' ? result : null,
+          time: timestamp
+        };
+        setDevCommandResult(entry);
+        setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+        setDevCommandLoading(false);
+        return;
+      }
+      
+      // Команды через window.dev с API вызовами
+      const devApiCommands = [
+        'getUser', 'getUserSettings', 'createUser', 'createFriend', 
+        'listFriends', 'removeFriend', 'sendFriendRequest', 'listRequests',
+        'addTask', 'listTasks', 'deleteTask', 'recordVisit', 'clearUserData',
+        'apiCall', 'addXP', 'setXP', 'getLevel', 'resetStreak'
+      ];
+      
+      if (devApiCommands.includes(funcName) && window.dev && window.dev[funcName]) {
+        try {
+          const result = await window.dev[funcName](...args);
+          const entry = {
+            status: 'ok',
+            input: cmdString,
+            command: funcName,
+            message: result?.message || `✅ ${funcName}() выполнен`,
+            result: result,
+            time: timestamp
+          };
+          setDevCommandResult(entry);
+          setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+        } catch (err) {
+          const entry = {
+            status: 'error',
+            input: cmdString,
+            command: funcName,
+            message: `❌ ${err.message || err}`,
+            time: timestamp
+          };
+          setDevCommandResult(entry);
+          setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+        }
+        setDevCommandLoading(false);
+        return;
+      }
+      
+      // Команда help — возвращаем список
+      if (funcName === 'help') {
+        const entry = {
+          status: 'ok',
+          input: cmdString,
+          command: 'help',
+          message: '📋 Доступные команды:',
+          result: { commands: DEV_COMMANDS.map(c => `${c.emoji} ${c.cmd} — ${c.desc}`) },
+          time: timestamp
+        };
+        setDevCommandResult(entry);
+        setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+        setDevCommandLoading(false);
+        return;
+      }
+      
+      // Неизвестная команда
+      const entry = {
+        status: 'error',
+        input: cmdString,
+        message: `❌ Неизвестная команда: ${funcName}. Введите dev.help()`,
+        time: timestamp
+      };
+      setDevCommandResult(entry);
+      setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+    } catch (err) {
+      setDevCommandResult({
+        status: 'error',
+        input: cmdString,
+        message: `❌ Ошибка: ${err.message}`,
+        time: timestamp
+      });
+    }
+    setDevCommandLoading(false);
+  }, [isDevAdmin, user?.id]);
 
   // Загрузка данных
   const loadFriends = useCallback(async () => {
@@ -381,6 +568,11 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
   // Debounced search effect
   useEffect(() => {
     const doSearch = async () => {
+      // Если это dev-команда, не делаем обычный поиск
+      if (isDevCommand) {
+        setSearchResults([]);
+        return;
+      }
       if (!user?.id || !debouncedSearchQuery.trim()) {
         setSearchResults([]);
         return;
@@ -393,7 +585,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
       }
     };
     doSearch();
-  }, [debouncedSearchQuery, user?.id]);
+  }, [debouncedSearchQuery, user?.id, isDevCommand]);
 
   // Подсчёт непрочитанных входящих (без обработанных)
   const unprocessedIncomingCount = useMemo(() => {
@@ -1164,20 +1356,34 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
             >
               {/* Поле поиска */}
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500" />
+                {isDevCommand ? (
+                  <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-amber-400" />
+                ) : (
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-gray-500" />
+                )}
                 <input
                   ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Поиск по имени или @username"
-                  className="w-full pl-11 pr-10 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-2xl text-white text-[14px] placeholder-gray-600 focus:outline-none focus:border-purple-500/40 focus:bg-white/[0.06] transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && isDevCommand) {
+                      e.preventDefault();
+                      executeDevCommand(searchQuery.trim());
+                    }
+                  }}
+                  placeholder={isDevAdmin ? "Поиск или dev.help()" : "Поиск по имени или @username"}
+                  className={`w-full pl-11 pr-10 py-3.5 border rounded-2xl text-[14px] placeholder-gray-600 focus:outline-none transition-all ${
+                    isDevCommand 
+                      ? 'bg-amber-500/[0.06] border-amber-500/20 text-amber-100 focus:border-amber-500/40 font-mono text-[13px]' 
+                      : 'bg-white/[0.04] border-white/[0.08] text-white focus:border-purple-500/40 focus:bg-white/[0.06]'
+                  }`}
                 />
                 {searchQuery && (
                   <motion.button
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+                    onClick={() => { setSearchQuery(''); setSearchResults([]); setDevCommandResult(null); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-white/10 rounded-full text-gray-400"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -1185,55 +1391,187 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
                 )}
               </div>
 
-              {/* Быстрые фильтры */}
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowSearchModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-purple-500/12 text-purple-400 rounded-xl whitespace-nowrap text-[13px] font-medium border border-purple-500/15"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Расширенный
-                </motion.button>
-                {userSettings?.group_id && (
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={async () => {
-                      const data = await friendsAPI.searchUsers(user.id, '', userSettings.group_id);
-                      setSearchResults(data.results || []);
-                    }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white/[0.04] text-gray-400 rounded-xl whitespace-nowrap text-[13px] font-medium border border-white/[0.06]"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    Моя группа
-                  </motion.button>
-                )}
-              </div>
+              {/* ===== Dev Command Mode ===== */}
+              {isDevCommand ? (
+                <div className="space-y-3">
+                  {/* Dev Mode Indicator */}
+                  <div className="flex items-center gap-2 px-3 py-1.5">
+                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="text-[11px] text-amber-400/70 font-medium uppercase tracking-wider">Dev Console</span>
+                    {devCommandLoading && <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />}
+                  </div>
 
-              {/* Результаты */}
-              {searchResults.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-[12px] text-gray-500 font-medium">
-                    Найдено: {searchResults.length}
-                  </p>
-                  {searchResults.map((r, idx) => renderSearchResult(r, idx))}
+                  {/* Подсказки команд */}
+                  {devSuggestions.length > 0 && !devCommandLoading && (
+                    <div className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide">
+                      {devSuggestions.slice(0, 6).map((suggestion, idx) => (
+                        <motion.button
+                          key={idx}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          onClick={() => {
+                            const cmd = suggestion.cmd;
+                            setSearchQuery(cmd.endsWith('(') ? cmd : cmd);
+                            searchInputRef.current?.focus();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 bg-white/[0.03] hover:bg-white/[0.06] rounded-xl transition-colors text-left group"
+                        >
+                          <span className="text-[15px] w-6 text-center">{suggestion.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-amber-300/90 font-mono text-[12px]">{suggestion.cmd}</span>
+                            <span className="text-gray-500 text-[11px] ml-2">{suggestion.desc}</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-amber-400/50 transition-colors" />
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Кнопка выполнения */}
+                  {searchQuery.trim().endsWith(')') && (
+                    <motion.button
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => executeDevCommand(searchQuery.trim())}
+                      disabled={devCommandLoading}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500/15 hover:bg-amber-500/20 border border-amber-500/20 rounded-2xl text-amber-300 text-[13px] font-medium transition-all disabled:opacity-50"
+                    >
+                      {devCommandLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                      Выполнить
+                    </motion.button>
+                  )}
+
+                  {/* Результат последней команды */}
+                  {devCommandResult && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`rounded-2xl border p-4 ${
+                        devCommandResult.status === 'ok' 
+                          ? 'bg-emerald-500/[0.06] border-emerald-500/15' 
+                          : 'bg-red-500/[0.06] border-red-500/15'
+                      }`}
+                    >
+                      {/* Заголовок команды */}
+                      <div className="flex items-center justify-between mb-2">
+                        <code className="text-[11px] text-gray-400 font-mono">{devCommandResult.input}</code>
+                        <span className="text-[10px] text-gray-600">{devCommandResult.time}</span>
+                      </div>
+                      
+                      {/* Сообщение */}
+                      {devCommandResult.message && (
+                        <p className={`text-[13px] font-medium ${
+                          devCommandResult.status === 'ok' ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
+                          {devCommandResult.message}
+                        </p>
+                      )}
+                      
+                      {/* Данные результата */}
+                      {devCommandResult.result && (
+                        <div className="mt-2 space-y-1">
+                          {/* Если commands (от help) */}
+                          {devCommandResult.result.commands && (
+                            <div className="space-y-0.5 max-h-[240px] overflow-y-auto scrollbar-hide">
+                              {devCommandResult.result.commands.map((cmd, i) => (
+                                <p key={i} className="text-[11px] text-gray-400 font-mono leading-relaxed">{cmd}</p>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Общие данные объекта */}
+                          {!devCommandResult.result.commands && (
+                            <div className="bg-black/20 rounded-xl p-3 max-h-[200px] overflow-y-auto scrollbar-hide">
+                              <pre className="text-[11px] text-gray-300 font-mono whitespace-pre-wrap break-all">
+                                {JSON.stringify(devCommandResult.result, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* История команд */}
+                  {devCommandHistory.length > 1 && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-gray-600 font-medium px-1">История</p>
+                      {devCommandHistory.slice(1, 5).map((entry, idx) => (
+                        <motion.button
+                          key={idx}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: idx * 0.05 }}
+                          onClick={() => setSearchQuery(entry.input)}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] hover:bg-white/[0.04] rounded-lg transition-colors text-left"
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${entry.status === 'ok' ? 'bg-emerald-500/50' : 'bg-red-500/50'}`} />
+                          <code className="text-[11px] text-gray-500 font-mono truncate flex-1">{entry.input}</code>
+                          <span className="text-[10px] text-gray-700">{entry.time}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : searchQuery ? (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                  <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-8 h-8 text-gray-600" />
-                  </div>
-                  <p className="text-gray-400 text-[14px]">Никого не найдено</p>
-                  <p className="text-gray-600 text-[12px] mt-1">Попробуйте другой запрос</p>
-                </motion.div>
               ) : (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-8 h-8 text-purple-400/40" />
+                <>
+                  {/* Быстрые фильтры */}
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowSearchModal(true)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-purple-500/12 text-purple-400 rounded-xl whitespace-nowrap text-[13px] font-medium border border-purple-500/15"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Расширенный
+                    </motion.button>
+                    {userSettings?.group_id && (
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={async () => {
+                          const data = await friendsAPI.searchUsers(user.id, '', userSettings.group_id);
+                          setSearchResults(data.results || []);
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-white/[0.04] text-gray-400 rounded-xl whitespace-nowrap text-[13px] font-medium border border-white/[0.06]"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        Моя группа
+                      </motion.button>
+                    )}
                   </div>
-                  <p className="text-gray-400 text-[14px]">Введите имя или @username</p>
-                  <p className="text-gray-600 text-[12px] mt-1">Или используйте фильтры выше</p>
-                </motion.div>
+
+                  {/* Результаты */}
+                  {searchResults.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-[12px] text-gray-500 font-medium">
+                        Найдено: {searchResults.length}
+                      </p>
+                      {searchResults.map((r, idx) => renderSearchResult(r, idx))}
+                    </div>
+                  ) : searchQuery ? (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                      <div className="w-16 h-16 rounded-2xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+                        <Search className="w-8 h-8 text-gray-600" />
+                      </div>
+                      <p className="text-gray-400 text-[14px]">Никого не найдено</p>
+                      <p className="text-gray-600 text-[12px] mt-1">Попробуйте другой запрос</p>
+                    </motion.div>
+                  ) : (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-4">
+                        <Search className="w-8 h-8 text-purple-400/40" />
+                      </div>
+                      <p className="text-gray-400 text-[14px]">Введите имя или @username</p>
+                      <p className="text-gray-600 text-[12px] mt-1">Или используйте фильтры выше</p>
+                    </motion.div>
+                  )}
+                </>
               )}
             </motion.div>
           )}

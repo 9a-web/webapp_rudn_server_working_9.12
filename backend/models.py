@@ -263,6 +263,30 @@ class ThemeSettingsResponse(BaseModel):
     telegram_id: int
 
 
+
+# ============ Модели для Dev-команд (админ-панель в поиске) ============
+
+class DevAddXPRequest(BaseModel):
+    """Запрос на добавление XP"""
+    telegram_id: int
+    amount: int = Field(..., gt=0, le=100000, description="Количество XP для добавления")
+
+class DevSetXPRequest(BaseModel):
+    """Запрос на установку XP"""
+    telegram_id: int
+    amount: int = Field(..., ge=0, le=1000000, description="Количество XP")
+
+class DevResetStreakRequest(BaseModel):
+    """Запрос на сброс стрика"""
+    telegram_id: int
+
+class DevCommandRequest(BaseModel):
+    """Запрос на выполнение dev-команды"""
+    telegram_id: int
+    command: str
+    args: Optional[list] = []
+
+
 # ============ Модели для достижений ============
 
 class Achievement(BaseModel):

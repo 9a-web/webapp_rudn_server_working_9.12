@@ -158,6 +158,10 @@
                 'dev.setApi(url)                    — задать backend URL\n' +
                 'dev.getUser()                      — текущий пользователь\n' +
                 'dev.createUser(id, "Имя")          — создать пользователя\n\n' +
+                'dev.addXP(amount)                  — добавить XP (админ)\n' +
+                'dev.setXP(amount)                  — установить XP (админ)\n' +
+                'dev.getLevel()                     — информация об уровне (админ)\n' +
+                'dev.resetStreak()                  — сбросить стрик (админ)\n\n' +
                 'dev.createFriend(targetId)          — создать друга\n' +
                 'dev.listFriends()                  — список друзей\n' +
                 'dev.removeFriend(targetId)          — удалить друга\n' +
@@ -292,6 +296,37 @@
 
             apiCall: function(method, path, body) {
               return api(method || 'GET', path || '/', body).then(function(d) { log('📡', (method||'GET') + ' ' + path + ':', d); return d; }).catch(function(e) { log('❌', '', e); });
+            },
+
+            // ===== Админ-команды (XP/Level) =====
+            addXP: function(amount) {
+              var id = uid(); if (!id) return;
+              amount = parseInt(amount) || 100;
+              return api('POST', '/dev/add-xp', { telegram_id: id, amount: amount })
+                .then(function(d) { log('⭐', '+' + amount + ' XP:', d); return d; })
+                .catch(function(e) { log('❌', 'addXP error:', e); });
+            },
+
+            setXP: function(amount) {
+              var id = uid(); if (!id) return;
+              amount = parseInt(amount) || 0;
+              return api('POST', '/dev/set-xp', { telegram_id: id, amount: amount })
+                .then(function(d) { log('⭐', 'XP = ' + amount + ':', d); return d; })
+                .catch(function(e) { log('❌', 'setXP error:', e); });
+            },
+
+            getLevel: function() {
+              var id = uid(); if (!id) return;
+              return api('GET', '/dev/get-level/' + id)
+                .then(function(d) { log('📊', 'Уровень:', d); return d; })
+                .catch(function(e) { log('❌', 'getLevel error:', e); });
+            },
+
+            resetStreak: function() {
+              var id = uid(); if (!id) return;
+              return api('POST', '/dev/reset-streak', { telegram_id: id })
+                .then(function(d) { log('🔥', 'Стрик сброшен:', d); return d; })
+                .catch(function(e) { log('❌', 'resetStreak error:', e); });
             },
 
             _bind: function(refs) {

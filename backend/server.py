@@ -264,6 +264,11 @@ from models import (
     SharedScheduleCreate,
     SharedScheduleAddParticipant,
     SharedScheduleResponse,
+    # Модели для Dev-команд
+    DevAddXPRequest,
+    DevSetXPRequest,
+    DevResetStreakRequest,
+    DevCommandRequest,
 )
 from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
@@ -1604,6 +1609,242 @@ async def get_user_xp_breakdown(telegram_id: int):
     except Exception as e:
         logger.error(f"Error getting XP breakdown for {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Dev-команды (админ-панель в поиске) ============
+
+ADMIN_IDS = [765963392, 1311283832]
+
+def _check_admin(telegram_id: int):
+    """Проверка на админа"""
+    if telegram_id not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Доступ запрещён: не админ")
+
+
+@api_router.post("/dev/add-xp")
+async def dev_add_xp(data: DevAddXPRequest):
+    """Добавить XP пользователю (только для админов, только для себя)"""
+    _check_admin(data.telegram_id)
+    try:
+        result = await award_xp(db, data.telegram_id, data.amount, reason="dev_command")
+        return {"status": "ok", "message": f"+{data.amount} XP", **result}
+    except Exception as e:
+        logger.error(f"Dev add-xp error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/dev/set-xp")
+async def dev_set_xp(data: DevSetXPRequest):
+    """Установить XP пользователю (только для админов, только для себя)"""
+    _check_admin(data.telegram_id)
+    try:
+        # Устанавливаем XP напрямую
+        await db.user_stats.update_one(
+            {"telegram_id": data.telegram_id},
+            {"$set": {"xp": data.amount}},
+            upsert=True
+        )
+        info = calculate_level_info(data.amount)
+        return {"status": "ok", "message": f"XP установлен: {data.amount}", **info}
+    except Exception as e:
+        logger.error(f"Dev set-xp error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/dev/get-level/{telegram_id}")
+async def dev_get_level(telegram_id: int):
+    """Получить информацию об уровне (для dev-команд)"""
+    _check_admin(telegram_id)
+    try:
+        stats = await db.user_stats.find_one({"telegram_id": telegram_id})
+        xp = stats.get("xp", 0) if stats else 0
+        info = calculate_level_info(xp)
+        streak = stats.get("visit_streak_current", 0) if stats else 0
+        max_streak = stats.get("visit_streak_max", 0) if stats else 0
+        return {
+            "status": "ok",
+            "streak": streak,
+            "max_streak": max_streak,
+            **info
+        }
+    except Exception as e:
+        logger.error(f"Dev get-level error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/dev/reset-streak")
+async def dev_reset_streak(data: DevResetStreakRequest):
+    """Сбросить стрик пользователя (только для админов, только для себя)"""
+    _check_admin(data.telegram_id)
+    try:
+        await db.user_stats.update_one(
+            {"telegram_id": data.telegram_id},
+            {"$set": {
+                "visit_streak_current": 0,
+                "visit_streak_max": 0,
+                "active_days": [],
+                "freeze_shields": 0,
+            }},
+            upsert=True
+        )
+        return {"status": "ok", "message": "Стрик сброшен"}
+    except Exception as e:
+        logger.error(f"Dev reset-streak error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/dev/execute")
+async def dev_execute_command(data: DevCommandRequest):
+    """Универсальный endpoint для dev-команд"""
+    _check_admin(data.telegram_id)
+    
+    command = data.command.lower().strip()
+    args = data.args or []
+    tid = data.telegram_id
+    
+    try:
+        if command == "help":
+            return {
+                "status": "ok",
+                "result": {
+                    "commands": [
+                        "dev.help() — список команд",
+                        "dev.getUser() — текущий пользователь",
+                        "dev.getLevel() — уровень и XP",
+                        "dev.addXP(amount) — добавить XP",
+                        "dev.setXP(amount) — установить XP",
+                        "dev.resetStreak() — сбросить стрик",
+                        "dev.recordVisit() — записать визит",
+                        "dev.listFriends() — список друзей",
+                        "dev.listRequests() — запросы в друзья",
+                        "dev.listTasks() — список задач",
+                        "dev.addTask(\"Название\") — создать задачу",
+                        "dev.createFriend(targetId) — создать друга",
+                        "dev.sendFriendRequest(targetId) — запрос дружбы",
+                        "dev.removeFriend(targetId) — удалить друга",
+                        "dev.deleteTask(taskId) — удалить задачу",
+                        "dev.showStreakModal() — показать модалку стрика",
+                        "dev.hideStreakModal() — скрыть модалку",
+                        "dev.clearUserData() — удалить данные",
+                        "dev.apiCall(\"METHOD\", \"/path\") — API вызов",
+                        "dev.enableLogs() — включить логи",
+                        "dev.disableLogs() — выключить логи",
+                    ]
+                }
+            }
+        
+        elif command == "getlevel":
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            xp = stats.get("xp", 0) if stats else 0
+            info = calculate_level_info(xp)
+            streak = stats.get("visit_streak_current", 0) if stats else 0
+            max_streak = stats.get("visit_streak_max", 0) if stats else 0
+            return {"status": "ok", "result": {**info, "streak": streak, "max_streak": max_streak}}
+        
+        elif command == "addxp":
+            amount = int(args[0]) if args else 100
+            if amount <= 0 or amount > 100000:
+                return {"status": "error", "message": "Сумма XP: 1–100000"}
+            result = await award_xp(db, tid, amount, reason="dev_command")
+            return {"status": "ok", "result": result, "message": f"+{amount} XP"}
+        
+        elif command == "setxp":
+            amount = int(args[0]) if args else 0
+            if amount < 0 or amount > 1000000:
+                return {"status": "error", "message": "XP: 0–1000000"}
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$set": {"xp": amount}},
+                upsert=True
+            )
+            info = calculate_level_info(amount)
+            return {"status": "ok", "result": info, "message": f"XP = {amount}"}
+        
+        elif command == "resetstreak":
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$set": {
+                    "visit_streak_current": 0,
+                    "visit_streak_max": 0,
+                    "active_days": [],
+                    "freeze_shields": 0,
+                }},
+                upsert=True
+            )
+            return {"status": "ok", "message": "Стрик сброшен"}
+        
+        elif command == "getuser":
+            settings = await db.user_settings.find_one({"telegram_id": tid})
+            if settings:
+                settings.pop("_id", None)
+            return {"status": "ok", "result": settings}
+        
+        elif command == "listfriends":
+            friends_data = await db.friends.find({
+                "$or": [{"user_id": tid}, {"friend_id": tid}]
+            }).to_list(length=200)
+            friend_ids = []
+            for f in friends_data:
+                fid = f["friend_id"] if f["user_id"] == tid else f["user_id"]
+                friend_ids.append(fid)
+            return {"status": "ok", "result": {"count": len(friend_ids), "friend_ids": friend_ids}}
+        
+        elif command == "listrequests":
+            incoming = await db.friend_requests.find({"to_id": tid, "status": "pending"}).to_list(length=100)
+            outgoing = await db.friend_requests.find({"from_id": tid, "status": "pending"}).to_list(length=100)
+            for r in incoming + outgoing:
+                r.pop("_id", None)
+            return {"status": "ok", "result": {"incoming": len(incoming), "outgoing": len(outgoing)}}
+        
+        elif command == "listtasks":
+            tasks = await db.tasks.find({"telegram_id": tid}).to_list(length=200)
+            for t in tasks:
+                t.pop("_id", None)
+            return {"status": "ok", "result": {"count": len(tasks), "tasks": tasks[:10]}}
+        
+        elif command == "addtask":
+            text = str(args[0]) if args else "Dev задача"
+            task = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": tid,
+                "text": text,
+                "completed": False,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            await db.tasks.insert_one(task)
+            task.pop("_id", None)
+            return {"status": "ok", "result": task, "message": f"Задача создана: {text}"}
+        
+        elif command == "recordvisit":
+            # Простой visit — вызов существующего endpoint логики
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            today = datetime.utcnow().strftime("%Y-%m-%d")
+            active_days = stats.get("active_days", []) if stats else []
+            if today not in active_days:
+                active_days.append(today)
+            streak = stats.get("visit_streak_current", 0) if stats else 0
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$set": {"active_days": active_days, "visit_streak_current": streak + 1},
+                 "$max": {"visit_streak_max": streak + 1}},
+                upsert=True
+            )
+            return {"status": "ok", "message": f"Визит записан. Стрик: {streak + 1}"}
+        
+        elif command == "clearuserdata":
+            await db.user_settings.delete_one({"telegram_id": tid})
+            await db.user_stats.delete_one({"telegram_id": tid})
+            return {"status": "ok", "message": "Данные пользователя удалены"}
+        
+        else:
+            return {"status": "error", "message": f"Неизвестная команда: {command}. Введите dev.help()"}
+    
+    except (ValueError, IndexError) as e:
+        return {"status": "error", "message": f"Ошибка аргументов: {str(e)}"}
+    except Exception as e:
+        logger.error(f"Dev execute error: command={command}, error={e}")
+        return {"status": "error", "message": str(e)}
+
 
 
 # ============ Эндпоинты для достижений ============
