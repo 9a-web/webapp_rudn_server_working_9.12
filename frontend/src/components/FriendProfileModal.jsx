@@ -205,6 +205,46 @@ const FriendProfileModal = ({
                       {friend.facultet_name || profile?.facultet_name}
                     </p>
                   )}
+                  {/* Level/Tier badge */}
+                  {profile?.level && (
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span
+                        style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '8px',
+                          background: profile.tier === 'premium' ? 'linear-gradient(90deg, #FF4EEA22, #FFCE2E22)' :
+                                     profile.tier === 'rare' ? '#B84DFF18' :
+                                     profile.tier === 'medium' ? '#FFA04D18' : '#4D85FF18',
+                          color: profile.tier === 'premium' ? '#FF4EEA' :
+                                 profile.tier === 'rare' ? '#B84DFF' :
+                                 profile.tier === 'medium' ? '#FFA04D' : '#4D85FF',
+                          border: `1px solid ${
+                            profile.tier === 'premium' ? '#FF4EEA33' :
+                            profile.tier === 'rare' ? '#B84DFF33' :
+                            profile.tier === 'medium' ? '#FFA04D33' : '#4D85FF33'
+                          }`,
+                        }}
+                      >
+                        LV. {profile.level}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '10px',
+                          color: profile.tier === 'premium' ? '#FF4EEA' :
+                                 profile.tier === 'rare' ? '#B84DFF' :
+                                 profile.tier === 'medium' ? '#FFA04D' : '#4D85FF',
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {profile.tier === 'premium' ? '✨' : profile.tier === 'rare' ? '🟣' : profile.tier === 'medium' ? '🟠' : '🔵'} {profile.tier}
+                      </span>
+                    </div>
+                  )}
                   {profile?.is_online && (
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-1">
                       <Wifi className="w-3 h-3" /> в сети
@@ -257,6 +297,45 @@ const FriendProfileModal = ({
                       <p className="text-[11px] text-gray-500 mt-0.5">Достижений</p>
                     </div>
                   )}
+                </motion.div>
+              )}
+              
+              {/* XP Progress Bar for friend */}
+              {profile && profile.xp > 0 && profile.xp_progress > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  style={{
+                    margin: '8px 0 0 0',
+                    padding: '10px 14px',
+                    borderRadius: '14px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                      {profile.xp || 0} XP
+                    </span>
+                    <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                      LV. {profile.level} → {profile.level + 1}
+                    </span>
+                  </div>
+                  <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: '100%',
+                        borderRadius: '3px',
+                        width: `${Math.max(profile.xp_progress * 100, 1)}%`,
+                        background: profile.tier === 'premium' ? 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)' :
+                                   profile.tier === 'rare' ? 'linear-gradient(135deg, #B84DFF, #D47FFF)' :
+                                   profile.tier === 'medium' ? 'linear-gradient(135deg, #FFA04D, #FFB976)' :
+                                   'linear-gradient(135deg, #4D85FF, #6EA0FF)',
+                        transition: 'width 0.5s ease',
+                      }}
+                    />
+                  </div>
                 </motion.div>
               )}
             </div>

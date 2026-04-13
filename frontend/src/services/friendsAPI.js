@@ -319,6 +319,54 @@ export const friendsAPI = {
       throw error;
     }
   },
+
+  // ========== Система уровней ==========
+
+  getUserLevel: async (telegramId) => {
+    try {
+      const response = await api.get(`/users/${telegramId}/level`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  recalculateXP: async (telegramId) => {
+    try {
+      const response = await api.post(`/users/${telegramId}/recalculate-xp`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  getXPBreakdown: async (telegramId) => {
+    try {
+      const response = await api.get(`/users/${telegramId}/xp-breakdown`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  getXPRewardsInfo: async () => {
+    try {
+      const response = await api.get('/xp-rewards-info');
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  getPendingLevelUp: async (telegramId) => {
+    try {
+      const response = await api.get(`/users/${telegramId}/pending-level-up`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
 };
 
 export default friendsAPI;

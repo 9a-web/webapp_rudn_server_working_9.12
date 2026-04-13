@@ -48,6 +48,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [levelUpData, setLevelUpData] = useState(null);
   const prevLevelRef = useRef(null);
+  const prevTierRef = useRef(null);
   
   // Friends list state
   const [friendsList, setFriendsList] = useState([]);
@@ -467,29 +468,46 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Bug 9: Загрузка актуальных данных профиля с сервера
   const refreshProfile = useCallback(() => {
     if (user?.id) {
+      // Загрузка профиля
       friendsAPI.getUserProfile(user.id, user.id)
         .then(data => {
           if (data) {
             setProfileData(data);
-            // Обнаружение level-up
+            // Обнаружение level-up: сравниваем с предыдущими данными
             const newLevel = data.level || 1;
             const newTier = data.tier || 'base';
             if (prevLevelRef.current !== null && newLevel > prevLevelRef.current) {
               setLevelUpData({
                 newLevel,
                 newTier,
-                oldTier: prevLevelRef.current >= 20 ? 'premium' :
-                         prevLevelRef.current >= 10 ? 'rare' :
-                         prevLevelRef.current >= 5 ? 'medium' : 'base',
+                oldTier: prevTierRef.current || 'base',
               });
               setShowLevelUp(true);
             }
             prevLevelRef.current = newLevel;
+            prevTierRef.current = newTier;
           }
         })
         .catch(err => console.error('Error loading own profile:', err));
+
+      // Проверяем pending level-up с бэкенда (для случаев когда XP начислен вне профиля)
+      friendsAPI.getPendingLevelUp(user.id)
+        .then(data => {
+          if (data?.has_level_up && !showLevelUp) {
+            setLevelUpData({
+              newLevel: data.new_level,
+              newTier: data.new_tier,
+              oldTier: data.old_tier,
+            });
+            setShowLevelUp(true);
+            // Обновляем ref чтобы не показать дубль
+            prevLevelRef.current = data.new_level;
+            prevTierRef.current = data.new_tier;
+          }
+        })
+        .catch(() => {}); // Молча игнорируем
     }
-  }, [user?.id]);
+  }, [user?.id, showLevelUp]);
 
   useEffect(() => {
     if (isOpen && user?.id) {
@@ -946,7 +964,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   marginLeft: '3px',
                 }}
               >
-                (#{profileData?.visit_streak_max ?? user.rank ?? 0})
+                🔥{profileData?.visit_streak_current ?? 0}
               </span>
             </motion.div>
           )}
@@ -2468,6 +2486,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           progress: profileData.xp_progress || 0,
         } : null}
         hapticFeedback={hapticFeedback}
+        telegramId={user?.id}
       />
 
       {/* Модалка Level-Up с конфетти */}
