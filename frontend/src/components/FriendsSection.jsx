@@ -1373,7 +1373,7 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
                       executeDevCommand(searchQuery.trim());
                     }
                   }}
-                  placeholder={isDevAdmin ? "Поиск или dev.help()" : "Поиск по имени или @username"}
+                  placeholder="Поиск по имени или @username"
                   className={`w-full pl-11 pr-10 py-3.5 border rounded-2xl text-[14px] placeholder-gray-600 focus:outline-none transition-all ${
                     isDevCommand 
                       ? 'bg-amber-500/[0.06] border-amber-500/20 text-amber-100 focus:border-amber-500/40 font-mono text-[13px]' 
