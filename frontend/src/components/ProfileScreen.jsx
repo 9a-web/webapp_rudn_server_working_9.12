@@ -51,6 +51,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [achievementsLoading, setAchievementsLoading] = useState(false);
 
   // ========== GRAFFITI ==========
+  // Fix: Фиксированное логическое разрешение для кросс-девайсной совместимости
+  // Canvas ВСЕГДА работает в этом пространстве координат, независимо от ширины экрана
+  const GRAFFITI_LOGICAL_W = 500;
+  const GRAFFITI_LOGICAL_H = 260;
+
   const tabsContainerRef = useRef(null);
   const tabRefs = useRef({});
   const graffitiCanvasRef = useRef(null);
@@ -102,27 +107,24 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, []);
 
-  // Init canvas — Fix: не сохраняем snapshot при инициализации, не сбрасываем историю
+  // Init canvas — Fix: фиксированное логическое разрешение для кросс-девайсной совместимости
   const setupCanvas = useCallback((canvas, skipSnapshot) => {
     if (!canvas) return;
-    const parent = canvas.parentElement;
-    if (!parent) return;
     const dpr = window.devicePixelRatio || 1;
-    const w = parent.clientWidth;
-    const h = parent.clientHeight;
-    if (w === 0 || h === 0) return;
-    // Fix: Проверяем размер, чтобы не пере-инициализировать зря
-    const needsResize = canvas.width !== w * dpr || canvas.height !== h * dpr;
-    if (!needsResize && graffitiCtxRef.current) return; // уже инициализирован
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
+    // Fix: Всегда используем фиксированное логическое разрешение
+    const targetW = GRAFFITI_LOGICAL_W * dpr;
+    const targetH = GRAFFITI_LOGICAL_H * dpr;
+    // Проверяем, нужно ли перенастраивать
+    const needsResize = canvas.width !== targetW || canvas.height !== targetH;
+    if (!needsResize && graffitiCtxRef.current) return;
+    canvas.width = targetW;
+    canvas.height = targetH;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     graffitiCtxRef.current = ctx;
     graffitiCanvasReady.current = true;
-    // Fix: не сохраняем blank snapshot при первой инициализации — он будет после загрузки
     if (!skipSnapshot) {
       saveSnapshot();
     }
@@ -185,7 +187,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (hapticFeedback) hapticFeedback('impact', 'light');
   }, [hapticFeedback, checkCanvasHasContent]);
 
-  // --- Coordinate helper ---
+  // --- Coordinate helper — Fix: масштабируем из CSS-координат в логические ---
   const getXY = (e) => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas) return null;
@@ -201,7 +203,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       cx = e.clientX;
       cy = e.clientY;
     }
-    return { x: cx - rect.left, y: cy - rect.top };
+    // Fix: Масштабируем из CSS display-пикселей в логические координаты canvas
+    const scaleX = GRAFFITI_LOGICAL_W / rect.width;
+    const scaleY = GRAFFITI_LOGICAL_H / rect.height;
+    return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
   };
 
   // --- Native event listeners ---
@@ -287,9 +292,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     const canvas = graffitiCanvasRef.current;
     const ctx = graffitiCtxRef.current;
     if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    // Fix: Используем логические размеры вместо canvas.width/dpr
+    ctx.clearRect(0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
     saveSnapshot();
     setGraffitiHasContent(false);
     setShowClearConfirm(false);
@@ -304,29 +309,37 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [saveSnapshot, hapticFeedback, user?.id]);
 
-  // Сохранение граффити на сервер — Fix: через friendsAPI
+  // Сохранение граффити на сервер — Fix: нормализация через offscreen canvas
   const saveGraffitiToServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
     setGraffitiSaveStatus('saving');
     try {
-      // Fix: Используем WebP с качеством 0.85 для сжатия, fallback на PNG
+      // Fix: Нормализуем в offscreen canvas фиксированного размера (2x для качества)
+      const NORM_W = GRAFFITI_LOGICAL_W * 2;
+      const NORM_H = GRAFFITI_LOGICAL_H * 2;
+      const offscreen = document.createElement('canvas');
+      offscreen.width = NORM_W;
+      offscreen.height = NORM_H;
+      const offCtx = offscreen.getContext('2d');
+      // Рисуем текущий canvas в нормализованный
+      offCtx.drawImage(canvas, 0, 0, NORM_W, NORM_H);
+
       let dataURL;
       const testCanvas = document.createElement('canvas');
       testCanvas.width = 1;
       testCanvas.height = 1;
       const supportsWebP = testCanvas.toDataURL('image/webp').startsWith('data:image/webp');
       if (supportsWebP) {
-        dataURL = canvas.toDataURL('image/webp', 0.85);
+        dataURL = offscreen.toDataURL('image/webp', 0.85);
       } else {
-        dataURL = canvas.toDataURL('image/png');
+        dataURL = offscreen.toDataURL('image/png');
       }
       
       // Fix: Проверяем размер перед отправкой
       if (dataURL.length > 3 * 1024 * 1024) {
-        // Пробуем с меньшим качеством
         if (supportsWebP) {
-          dataURL = canvas.toDataURL('image/webp', 0.6);
+          dataURL = offscreen.toDataURL('image/webp', 0.6);
         }
         if (dataURL.length > 3 * 1024 * 1024) {
           console.warn('[Graffiti] Image too large even after compression');
@@ -346,7 +359,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [user?.id]);
 
-  // Загрузка граффити с сервера — Fix: через friendsAPI
+  // Загрузка граффити с сервера — Fix: корректное масштабирование для кросс-девайсной совместимости
   const loadGraffitiFromServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
@@ -367,11 +380,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         if (!graffitiCanvasRef.current) return;
         const drawCtx = graffitiCtxRef.current;
         if (!drawCtx) return;
-        const dpr = window.devicePixelRatio || 1;
-        const cssW = canvas.width / dpr;
-        const cssH = canvas.height / dpr;
-        // Fix: Кросс-DPR совместимость — всегда рисуем в CSS-координатах
-        drawCtx.drawImage(img, 0, 0, cssW, cssH);
+        // Fix: Всегда рисуем в фиксированное логическое пространство
+        // Если изображение было сохранено в другом размере — оно масштабируется
+        drawCtx.drawImage(img, 0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
         // Сохраняем snapshot для undo (это станет "начальным" состоянием)
         saveSnapshot();
         setGraffitiHasContent(true);
@@ -1306,7 +1317,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     )}
                   </AnimatePresence>
 
-                  {/* Canvas */}
+                  {/* Canvas — Fix: max-width для консистентного отображения на десктопе */}
                   <div style={{
                     borderRadius: '20px',
                     background: 'rgba(255,255,255,0.03)',
@@ -1315,6 +1326,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       : '1px solid rgba(255,255,255,0.06)',
                     overflow: 'hidden',
                     height: '260px',
+                    maxWidth: '500px',
+                    width: '100%',
+                    margin: '0 auto',
                     position: 'relative',
                     transition: 'border-color 0.25s ease',
                   }}>

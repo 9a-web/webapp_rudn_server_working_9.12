@@ -99,6 +99,18 @@ frontend:
     needs_retesting: true
     status_history: []
 
+  - task: "Fix: graffiti cross-device adaptation — fixed logical resolution"
+    implemented: true
+    working: "needs_testing"
+    file: "ProfileScreen.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "needs_testing"
+        agent: "main"
+        comment: "Fixed graffiti canvas to use fixed logical resolution (500x260) for cross-device compatibility. Changes: setupCanvas uses fixed dims, getXY scales CSS->logical, save normalizes to offscreen canvas, load draws to logical space, container has max-width:500px."
+
   - task: "Fix: ProfileSettingsModal auto-save error handling"
     implemented: true
     working: "needs_testing"
