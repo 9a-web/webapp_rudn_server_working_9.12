@@ -359,7 +359,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [user?.id]);
 
-  // Загрузка граффити с сервера — Fix: корректное масштабирование для кросс-девайсной совместимости
+  // Загрузка граффити с сервера — Fix: contain-стиль масштабирование для обратной совместимости
   const loadGraffitiFromServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
@@ -380,9 +380,37 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         if (!graffitiCanvasRef.current) return;
         const drawCtx = graffitiCtxRef.current;
         if (!drawCtx) return;
-        // Fix: Всегда рисуем в фиксированное логическое пространство
-        // Если изображение было сохранено в другом размере — оно масштабируется
-        drawCtx.drawImage(img, 0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
+        // Fix: Contain-стиль масштабирование — сохраняем пропорции исходного изображения
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+        if (imgW > 0 && imgH > 0) {
+          const imgAspect = imgW / imgH;
+          const canvasAspect = GRAFFITI_LOGICAL_W / GRAFFITI_LOGICAL_H;
+          let drawW, drawH, drawX, drawY;
+          // Если aspect ratio совпадает (или почти) — заполняем целиком
+          if (Math.abs(imgAspect - canvasAspect) < 0.05) {
+            drawW = GRAFFITI_LOGICAL_W;
+            drawH = GRAFFITI_LOGICAL_H;
+            drawX = 0;
+            drawY = 0;
+          } else if (imgAspect > canvasAspect) {
+            // Изображение шире canvas — вписываем по ширине
+            drawW = GRAFFITI_LOGICAL_W;
+            drawH = GRAFFITI_LOGICAL_W / imgAspect;
+            drawX = 0;
+            drawY = (GRAFFITI_LOGICAL_H - drawH) / 2;
+          } else {
+            // Изображение выше canvas — вписываем по высоте
+            drawH = GRAFFITI_LOGICAL_H;
+            drawW = GRAFFITI_LOGICAL_H * imgAspect;
+            drawX = (GRAFFITI_LOGICAL_W - drawW) / 2;
+            drawY = 0;
+          }
+          drawCtx.drawImage(img, drawX, drawY, drawW, drawH);
+        } else {
+          // Fallback
+          drawCtx.drawImage(img, 0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
+        }
         // Сохраняем snapshot для undo (это станет "начальным" состоянием)
         saveSnapshot();
         setGraffitiHasContent(true);
@@ -1317,7 +1345,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     )}
                   </AnimatePresence>
 
-                  {/* Canvas — Fix: max-width для консистентного отображения на десктопе */}
+                  {/* Canvas — Fix: aspect-ratio для пропорционального масштабирования */}
                   <div style={{
                     borderRadius: '20px',
                     background: 'rgba(255,255,255,0.03)',
@@ -1325,7 +1353,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       ? '1px solid rgba(248,185,76,0.25)'
                       : '1px solid rgba(255,255,255,0.06)',
                     overflow: 'hidden',
-                    height: '260px',
+                    aspectRatio: '500 / 260',
                     maxWidth: '500px',
                     width: '100%',
                     margin: '0 auto',
