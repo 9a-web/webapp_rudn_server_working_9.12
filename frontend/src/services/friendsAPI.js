@@ -219,7 +219,7 @@ export const friendsAPI = {
 
   getPrivacySettings: async (telegramId) => {
     try {
-      const response = await api.get(`/profile/${telegramId}/privacy`);
+      const response = await api.get(`/profile/${telegramId}/privacy?requester_telegram_id=${telegramId}`);
       return response.data;
     } catch (error) {
       handleError(error);

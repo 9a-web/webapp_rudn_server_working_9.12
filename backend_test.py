@@ -12,7 +12,7 @@ from datetime import datetime
 import base64
 
 # Backend URL from environment
-BACKEND_URL = "http://localhost:8001"
+BACKEND_URL = "https://rudn-server-3.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 # Test user IDs

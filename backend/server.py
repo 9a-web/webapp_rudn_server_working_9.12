@@ -13912,8 +13912,6 @@ async def are_friends(user1_id: int, user2_id: int) -> bool:
 
 async def get_friendship_status(user_id: int, target_id: int) -> Optional[str]:
     """Получить статус дружбы между пользователями (оптимизировано: параллельные запросы)"""
-    import asyncio
-    
     # Параллельно запускаем все проверки
     block_user_target, block_target_user, friendship, incoming_req, outgoing_req = await asyncio.gather(
         is_blocked(user_id, target_id),
@@ -14820,8 +14818,10 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
 async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpdate, requester_telegram_id: int = None):
     """Обновить настройки приватности"""
     try:
-        # Авторизация: только владелец может менять свои настройки
-        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+        # Авторизация: обязательная проверка что запрос от владельца
+        if requester_telegram_id is None:
+            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+        if requester_telegram_id != telegram_id:
             raise HTTPException(status_code=403, detail="Можно изменять только свои настройки приватности")
         
         # Проверяем существование пользователя
@@ -14857,10 +14857,18 @@ async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpd
 
 
 @api_router.get("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
-async def get_privacy_settings(telegram_id: int):
-    """Получить настройки приватности"""
+async def get_privacy_settings(telegram_id: int, requester_telegram_id: int = None):
+    """Получить настройки приватности (только владелец)"""
     try:
+        # Авторизация: только владелец может видеть свои настройки приватности
+        if requester_telegram_id is None:
+            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+        if requester_telegram_id != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно просматривать только свои настройки приватности")
+        
         return await get_user_privacy_settings(telegram_id)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Get privacy settings error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -15018,10 +15026,10 @@ async def save_custom_avatar(telegram_id: int, request: Request):
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
             {"$set": {"custom_avatar": avatar_data, "avatar_mode": "custom" if avatar_data else "telegram"}},
-            upsert=False
+            upsert=True
         )
         
-        if result.matched_count == 0:
+        if result.matched_count == 0 and result.upserted_id is None:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         
         return {"success": True}
@@ -15066,7 +15074,10 @@ async def delete_custom_avatar(telegram_id: int, requester_telegram_id: int = No
         
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
-            {"$set": {"custom_avatar": "", "avatar_mode": "telegram"}}
+            {
+                "$unset": {"custom_avatar": ""},
+                "$set": {"avatar_mode": "telegram"}
+            }
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -15089,11 +15100,13 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
     try:
         is_own_profile = viewer_telegram_id is not None and viewer_telegram_id == telegram_id
 
-        # Проверяем блокировку — в обе стороны (как в get_friend_schedule)
+        # Проверяем блокировку — в обе стороны параллельно (оптимизировано)
         if viewer_telegram_id and not is_own_profile:
-            if await is_blocked(telegram_id, viewer_telegram_id):
-                raise HTTPException(status_code=403, detail="Профиль недоступен")
-            if await is_blocked(viewer_telegram_id, telegram_id):
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, viewer_telegram_id),
+                is_blocked(viewer_telegram_id, telegram_id)
+            )
+            if blocked_by_owner or blocked_by_viewer:
                 raise HTTPException(status_code=403, detail="Профиль недоступен")
         
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
@@ -15104,7 +15117,6 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
         privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
         
         # Оптимизация: параллельные запросы к БД
-        import asyncio
         tasks = [
             db.user_stats.find_one({"telegram_id": telegram_id}),
             db.user_achievements.count_documents({"telegram_id": telegram_id}),

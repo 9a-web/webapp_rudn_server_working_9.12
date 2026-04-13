@@ -222,6 +222,20 @@ const FriendProfileModal = ({
               </div>
 
               {/* Stats */}
+              {isLoading && !profile && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex gap-3 mt-5"
+                >
+                  {[1,2,3].map(i => (
+                    <div key={i} className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05] animate-pulse">
+                      <div className="h-6 bg-white/[0.06] rounded-lg mx-auto w-10 mb-1" />
+                      <div className="h-3 bg-white/[0.04] rounded mx-auto w-12" />
+                    </div>
+                  ))}
+                </motion.div>
+              )}
               {profile && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}

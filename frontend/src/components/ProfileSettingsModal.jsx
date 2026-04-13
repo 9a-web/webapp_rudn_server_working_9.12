@@ -79,6 +79,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
         setAutoSaveError(false);
         await friendsAPI.updatePrivacySettings(telegramId, privacySettings);
         hapticFeedback?.('notification', 'success');
+        setIsDirty(false);
       } catch (err) {
         console.error('Auto-save privacy on close error:', err);
         setAutoSaveError(true);

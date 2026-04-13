@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCheck } from 'lucide-react';
 import GroupSelector from './GroupSelector';
-import { userAPI } from '../services/api';
+import { userAPI, getBackendURL } from '../services/api';
 import friendsAPI from '../services/friendsAPI';
 
 const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy, onProfileUpdated }) => {

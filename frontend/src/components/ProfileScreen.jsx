@@ -464,6 +464,33 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [isOpen]);
 
+  // Fix: Освобождаем память граффити при переключении с таба 'general' на другие
+  useEffect(() => {
+    if (activeTab !== 'general' && isOpen) {
+      // Сохраняем граффити если были в режиме редактирования
+      if (graffitiEditMode) {
+        saveGraffitiToServer();
+        setGraffitiEditMode(false);
+      }
+      setShowClearConfirm(false);
+      // Освобождаем ImageData объекты из памяти
+      graffitiHistory.current = [];
+      graffitiHistoryIdx.current = -1;
+      graffitiCanvasReady.current = false;
+      graffitiCtxRef.current = null;
+      setCanUndo(false);
+      setCanRedo(false);
+      setGraffitiHasContent(false);
+      // Отменяем загрузку граффити если в процессе
+      if (graffitiLoadedImgRef.current) {
+        graffitiLoadedImgRef.current.onload = null;
+        graffitiLoadedImgRef.current.onerror = null;
+        graffitiLoadedImgRef.current = null;
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   // Блокировка скролла фона при открытом профиле
   useEffect(() => {
     if (isOpen) {
@@ -779,7 +806,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Level */}
+            {/* Streak */}
             <div
               style={{
                 padding: '6px 14px',
@@ -795,7 +822,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   color: '#1c1c1c',
                 }}
               >
-                LV. {profileData?.visit_streak_current ?? user.level ?? 1}
+                🔥 {profileData?.visit_streak_current ?? user.visit_streak_current ?? 0}
               </span>
             </div>
           </motion.div>
@@ -847,7 +874,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   marginLeft: '3px',
                 }}
               >
-                (#{profileData?.visit_streak_max ?? user.rank ?? 0})
+                (макс. 🔥{profileData?.visit_streak_max ?? user.visit_streak_max ?? 0})
               </span>
             </motion.div>
           )}
