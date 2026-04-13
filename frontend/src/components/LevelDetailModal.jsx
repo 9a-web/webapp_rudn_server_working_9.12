@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { friendsAPI } from '../services/friendsAPI';
-import { RefreshCw } from 'lucide-react';
 
 /**
  * Таблица порогов (должна совпадать с бэкендом level_system.py)
@@ -58,7 +57,21 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
     }
   }, [isOpen, xpRewards]);
 
-  // Загрузка XP breakdown при переключении на таб
+  // Автоматический пересчёт XP при открытии модалки
+  useEffect(() => {
+    if (isOpen && telegramId && !recalcResult && !recalculating) {
+      setRecalculating(true);
+      friendsAPI.recalculateXP(telegramId)
+        .then(result => {
+          setRecalcResult(result);
+          setXpBreakdown(result);
+        })
+        .catch(() => {})
+        .finally(() => setRecalculating(false));
+    }
+  }, [isOpen, telegramId]);
+
+  // Загрузка XP breakdown при переключении на таб (если ещё нет данных)
   useEffect(() => {
     if (isOpen && activeSection === 'breakdown' && telegramId && !xpBreakdown) {
       friendsAPI.getXPBreakdown(telegramId)
@@ -75,22 +88,6 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
       setXpBreakdown(null);
     }
   }, [isOpen]);
-
-  const handleRecalculate = useCallback(async () => {
-    if (!telegramId || recalculating) return;
-    setRecalculating(true);
-    try {
-      const result = await friendsAPI.recalculateXP(telegramId);
-      setRecalcResult(result);
-      setXpBreakdown(result);
-      if (hapticFeedback) hapticFeedback('notification', 'success');
-    } catch (err) {
-      console.error('Recalculate XP error:', err);
-      if (hapticFeedback) hapticFeedback('notification', 'error');
-    } finally {
-      setRecalculating(false);
-    }
-  }, [telegramId, recalculating, hapticFeedback]);
 
   if (!levelData) return null;
 
@@ -375,58 +372,17 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                   })}
                 </div>
 
-                {/* Кнопка пересчёта XP */}
-                {telegramId && (
-                  <button
-                    onClick={handleRecalculate}
-                    disabled={recalculating}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '14px',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      background: recalculating ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
-                      cursor: recalculating ? 'not-allowed' : 'pointer',
-                      fontFamily: "'Poppins', sans-serif",
-                      fontWeight: 500,
-                      fontSize: '13px',
-                      color: recalculating ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <RefreshCw
-                      style={{
-                        width: '14px',
-                        height: '14px',
-                        animation: recalculating ? 'spin 1s linear infinite' : 'none',
-                      }}
-                    />
-                    {recalculating ? 'Пересчёт...' : 'Пересчитать XP'}
-                  </button>
-                )}
-
-                {recalcResult && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{
-                      marginTop: '8px',
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      background: 'rgba(16,185,129,0.1)',
-                      border: '1px solid rgba(16,185,129,0.2)',
-                      fontFamily: "'Poppins', sans-serif",
-                      fontSize: '12px',
-                      color: '#10B981',
-                      textAlign: 'center',
-                    }}
-                  >
-                    ✓ XP пересчитан: {recalcResult.xp} XP → LV. {recalcResult.level}
-                  </motion.div>
+                {/* Индикатор автоматического пересчёта */}
+                {recalculating && (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '8px',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,0.3)',
+                  }}>
+                    Синхронизация XP...
+                  </div>
                 )}
               </motion.div>
             )}

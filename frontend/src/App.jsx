@@ -2074,6 +2074,7 @@ const Home = () => {
             achievement={activeQueueNotification.data}
             onClose={closeQueueNotification}
             hapticFeedback={hapticFeedback}
+            telegramId={(syncedUser || user)?.id}
           />
         )}
       </AnimatePresence>
