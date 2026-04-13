@@ -806,7 +806,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Streak */}
+            {/* Level */}
             <div
               style={{
                 padding: '6px 14px',
@@ -822,7 +822,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   color: '#1c1c1c',
                 }}
               >
-                🔥 {profileData?.visit_streak_current ?? user.visit_streak_current ?? 0}
+                LV. {profileData?.visit_streak_current ?? user.level ?? 1}
               </span>
             </div>
           </motion.div>
@@ -874,7 +874,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   marginLeft: '3px',
                 }}
               >
-                (макс. 🔥{profileData?.visit_streak_max ?? user.visit_streak_max ?? 0})
+                (#{profileData?.visit_streak_max ?? user.rank ?? 0})
               </span>
             </motion.div>
           )}
