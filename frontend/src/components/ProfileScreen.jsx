@@ -9,6 +9,8 @@ import ProfileSettingsModal from './ProfileSettingsModal';
 import ProfileEditScreen from './ProfileEditScreen';
 import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
+import LevelDetailModal from './LevelDetailModal';
+import LevelUpModal from './LevelUpModal';
 
 const ADMIN_UIDS = ['765963392', '1311283832'];
 
@@ -40,6 +42,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   
   // Bug 9: Актуальные данные профиля с сервера
   const [profileData, setProfileData] = useState(null);
+  
+  // === Система уровней ===
+  const [showLevelDetail, setShowLevelDetail] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [levelUpData, setLevelUpData] = useState(null);
+  const prevLevelRef = useRef(null);
   
   // Friends list state
   const [friendsList, setFriendsList] = useState([]);
@@ -461,7 +469,23 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (user?.id) {
       friendsAPI.getUserProfile(user.id, user.id)
         .then(data => {
-          if (data) setProfileData(data);
+          if (data) {
+            setProfileData(data);
+            // Обнаружение level-up
+            const newLevel = data.level || 1;
+            const newTier = data.tier || 'base';
+            if (prevLevelRef.current !== null && newLevel > prevLevelRef.current) {
+              setLevelUpData({
+                newLevel,
+                newTier,
+                oldTier: prevLevelRef.current >= 20 ? 'premium' :
+                         prevLevelRef.current >= 10 ? 'rare' :
+                         prevLevelRef.current >= 5 ? 'medium' : 'base',
+              });
+              setShowLevelUp(true);
+            }
+            prevLevelRef.current = newLevel;
+          }
         })
         .catch(err => console.error('Error loading own profile:', err));
     }
@@ -845,12 +869,21 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Level */}
+            {/* Level — кликабельный бейдж */}
             <div
+              onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }}
               style={{
                 padding: '6px 14px',
                 borderRadius: '20px',
-                backgroundColor: '#F7B84B',
+                backgroundColor: (() => {
+                  const tier = (profileData?.tier || 'base').toLowerCase();
+                  if (tier === 'premium') return '#FF4EEA';
+                  if (tier === 'rare') return '#B84DFF';
+                  if (tier === 'medium') return '#FFA04D';
+                  return '#F7B84B';
+                })(),
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease',
               }}
             >
               <span
@@ -861,7 +894,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   color: '#1c1c1c',
                 }}
               >
-                LV. {profileData?.visit_streak_current ?? user.level ?? 1}
+                LV. {profileData?.level ?? 1}
               </span>
             </div>
           </motion.div>
@@ -960,8 +993,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Уровень */}
-            <div className="flex flex-col items-center">
+            {/* Уровень — реальный тир из backend */}
+            <div className="flex flex-col items-center" onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }} style={{ cursor: 'pointer' }}>
               <span
                 style={{
                   fontFamily: "'Poppins', sans-serif",
@@ -969,7 +1002,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   fontSize: '24px',
                   lineHeight: 1.2,
                   ...(() => {
-                    const tier = (user.tier || 'base').toLowerCase();
+                    const tier = (profileData?.tier || 'base').toLowerCase();
                     if (tier === 'premium') return {
                       background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
                       WebkitBackgroundClip: 'text',
@@ -982,7 +1015,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 }}
               >
                 {(() => {
-                  const tier = (user.tier || 'base').toLowerCase();
+                  const tier = (profileData?.tier || 'base').toLowerCase();
                   const names = { base: 'Base', medium: 'Medium', rare: 'Rare', premium: 'Premium' };
                   return names[tier] || 'Base';
                 })()}
@@ -2421,6 +2454,30 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Модалка деталей уровня */}
+      <LevelDetailModal
+        isOpen={showLevelDetail}
+        onClose={() => setShowLevelDetail(false)}
+        levelData={profileData ? {
+          level: profileData.level || 1,
+          tier: profileData.tier || 'base',
+          xp: profileData.xp || 0,
+          xp_current_level: profileData.xp_current_level || 0,
+          xp_next_level: profileData.xp_next_level || 100,
+          progress: profileData.xp_progress || 0,
+        } : null}
+        hapticFeedback={hapticFeedback}
+      />
+
+      {/* Модалка Level-Up с конфетти */}
+      <LevelUpModal
+        isOpen={showLevelUp}
+        onClose={() => setShowLevelUp(false)}
+        newLevel={levelUpData?.newLevel}
+        newTier={levelUpData?.newTier}
+        oldTier={levelUpData?.oldTier}
+      />
     </>
   );
 };

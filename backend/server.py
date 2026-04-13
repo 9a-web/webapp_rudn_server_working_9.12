@@ -277,6 +277,7 @@ from achievements import (
     mark_achievements_as_seen,
     check_and_award_achievements
 )
+from level_system import calculate_level_info, award_xp, recalculate_xp_for_user, XP_REWARDS
 from weather import get_moscow_weather
 from config import get_telegram_bot_token, get_telegram_bot_username, is_test_environment, ENV
 from lk_parser import RUDNLKParser
@@ -1526,6 +1527,49 @@ async def get_notification_stats(date: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ Эндпоинты для системы уровней ============
+
+@api_router.get("/users/{telegram_id}/level")
+async def get_user_level(telegram_id: int):
+    """Получить информацию об уровне пользователя"""
+    try:
+        stats = await db.user_stats.find_one({"telegram_id": telegram_id})
+        xp = stats.get("xp", 0) if stats else 0
+        info = calculate_level_info(xp)
+        return {"status": "ok", **info}
+    except Exception as e:
+        logger.error(f"Error getting level for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/users/{telegram_id}/recalculate-xp")
+async def recalculate_user_xp(telegram_id: int):
+    """Ретроактивный пересчёт XP для пользователя"""
+    try:
+        result = await recalculate_xp_for_user(db, telegram_id)
+        return {"status": "ok", **result}
+    except Exception as e:
+        logger.error(f"Error recalculating XP for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/users/recalculate-xp-all")
+async def recalculate_all_xp():
+    """Ретроактивный пересчёт XP для ВСЕХ пользователей"""
+    try:
+        users = await db.user_stats.find({}).to_list(length=10000)
+        results = []
+        for user in users:
+            tid = user.get("telegram_id")
+            if tid:
+                result = await recalculate_xp_for_user(db, tid)
+                results.append({"telegram_id": tid, "xp": result["xp"], "level": result["level"], "tier": result["tier"]})
+        return {"status": "ok", "count": len(results), "results": results}
+    except Exception as e:
+        logger.error(f"Error recalculating all XP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ Эндпоинты для достижений ============
 
 @api_router.get("/achievements", response_model=List[Achievement])
@@ -1724,6 +1768,17 @@ async def record_user_visit(telegram_id: int):
                 {"telegram_id": telegram_id},
                 update_data
             )
+            
+            # Начисляем XP за ежедневный визит
+            xp_amount = XP_REWARDS["daily_visit"]
+            # Бонусы за milestones стрика
+            if current_streak == 7:
+                xp_amount += XP_REWARDS["streak_7_bonus"]
+            elif current_streak == 14:
+                xp_amount += XP_REWARDS["streak_14_bonus"]
+            elif current_streak == 30:
+                xp_amount += XP_REWARDS["streak_30_bonus"]
+            asyncio.create_task(award_xp(db, telegram_id, xp_amount, reason=f"daily_visit_streak_{current_streak}"))
             
             # Ограничиваем active_days до последних 400 записей для производительности
             stats_doc = await db.user_stats.find_one({"telegram_id": telegram_id})
@@ -2601,6 +2656,15 @@ async def update_task(task_id: str, task_update: TaskUpdate):
                     "hour": current_hour,
                     "on_time": on_time
                 }
+            ))
+            
+            # Начисляем XP за выполнение задачи
+            xp_amount = XP_REWARDS["task_complete"]
+            if on_time:
+                xp_amount += XP_REWARDS["task_on_time_bonus"]
+            asyncio.create_task(award_xp(
+                db, existing_task["telegram_id"], xp_amount,
+                reason=f"task_complete{'_on_time' if on_time else ''}"
             ))
         
         # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video — убираем медленные yt_dlp запросы
@@ -15159,6 +15223,10 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
         streak_current = stats.get("visit_streak_current", 0) if stats else 0
         streak_max = stats.get("visit_streak_max", 0) if stats else 0
         
+        # Система уровней
+        user_xp = stats.get("xp", 0) if stats else 0
+        level_info = calculate_level_info(user_xp)
+        
         # Avatar info
         avatar_mode = user.get("avatar_mode", "telegram")
         has_custom_avatar = bool(user.get("custom_avatar"))
@@ -15179,6 +15247,12 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
                 mutual_friends_count=0,
                 achievements_count=achievements_count,
                 total_points=stats.get("total_points", 0) if stats else 0,
+                xp=user_xp,
+                level=level_info["level"],
+                tier=level_info["tier"],
+                xp_current_level=level_info["xp_current_level"],
+                xp_next_level=level_info["xp_next_level"],
+                xp_progress=level_info["progress"],
                 visit_streak_current=streak_current,
                 visit_streak_max=streak_max,
                 avatar_mode=avatar_mode,
@@ -15208,6 +15282,12 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             mutual_friends_count=mutual_count,
             achievements_count=achievements_count if privacy.show_achievements and not is_anonymous else 0,
             total_points=stats.get("total_points", 0) if stats and privacy.show_achievements and not is_anonymous else 0,
+            xp=user_xp if not is_anonymous else 0,
+            level=level_info["level"],
+            tier=level_info["tier"],
+            xp_current_level=level_info["xp_current_level"] if not is_anonymous else 0,
+            xp_next_level=level_info["xp_next_level"] if not is_anonymous else 0,
+            xp_progress=level_info["progress"] if not is_anonymous else 0.0,
             visit_streak_current=streak_current if privacy.show_achievements and not is_anonymous else 0,
             visit_streak_max=streak_max if privacy.show_achievements and not is_anonymous else 0,
             avatar_mode=avatar_mode,

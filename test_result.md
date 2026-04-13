@@ -1,4 +1,23 @@
 backend:
+  - task: "Level system — XP calculation, level endpoints, XP awarding on task complete and visit"
+    implemented: true
+    working: true
+    file: "server.py, level_system.py, models.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ VERIFIED: All Level System API endpoints working perfectly. Tested: GET /api/users/{id}/level (returns status, level, tier, xp, progress), POST /api/users/{id}/recalculate-xp (XP breakdown with tasks/achievements/visits/referrals), POST /api/users/recalculate-xp-all (batch processing), level calculation logic verified (0→L1/base, 700→L5/medium, 3200→L10/rare, 22000→L20/premium), profile integration includes all XP fields (xp, level, tier, xp_current_level, xp_next_level, xp_progress). XP rewards configured correctly: task_complete=5, daily_visit=3, group_task=8, referral=50, streak bonuses=20/40/80."
+    test_instructions: |
+      Test endpoints:
+      1. GET /api/users/{telegram_id}/level - should return level info with xp, level, tier, progress
+      2. POST /api/users/{telegram_id}/recalculate-xp - should recalculate XP retroactively
+      3. POST /api/users/recalculate-xp-all - batch recalculation
+      4. Verify level_system.py logic: XP 0=LV1(base), 700=LV5(medium), 3200=LV10(rare), 22000=LV20(premium)
+      5. Profile endpoint should include xp, level, tier, xp_current_level, xp_next_level, xp_progress fields
+
   - task: "Fix: update_privacy_settings — mandatory requester_telegram_id authorization"
     implemented: true
     working: true
@@ -146,6 +165,7 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Level System API endpoints testing - COMPLETED ✅"
     - "Verify all profile backend endpoints after authorization fixes"
     - "Verify privacy settings endpoints require requester_telegram_id"
     - "Verify delete_custom_avatar uses $unset"
@@ -159,6 +179,8 @@ agent_communication:
     message: "Implemented 12 fixes for Profile module. Backend: 6 fixes (authorization hardening, parallel optimization, $unset, upsert consistency, removed duplicate imports). Frontend: 6 fixes (critical missing import, streak display, memory leak, auto-save errors, loading skeleton, API parameter). Need backend testing for all profile endpoints."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE: All 6 profile backend fixes verified and working perfectly. Comprehensive testing of 25 test cases covering privacy authorization, profile endpoints, QR generation, avatar operations, graffiti operations, and bidirectional block checks. All critical authorization fixes (requester_telegram_id mandatory) working as expected. Ready for frontend testing or deployment."
+  - agent: "testing"
+    message: "✅ LEVEL SYSTEM TESTING COMPLETE: All Level System API endpoints verified and working perfectly. Tested 6 comprehensive test cases: (1) GET /api/users/{id}/level returns correct structure with status, level, tier, xp, progress fields, (2) POST /api/users/{id}/recalculate-xp provides detailed XP breakdown from tasks/achievements/visits/referrals/group_tasks, (3) POST /api/users/recalculate-xp-all batch processes all users correctly, (4) Level calculation logic verified for all tiers (0→L1/base, 700→L5/medium, 3200→L10/rare, 22000→L20/premium), (5) Profile endpoint integration includes all required XP fields, (6) XP rewards properly configured. All endpoints responding correctly with proper data structures. Ready for production use."
 
 ## Testing Protocol
 

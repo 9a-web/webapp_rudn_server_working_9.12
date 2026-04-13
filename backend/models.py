@@ -333,8 +333,11 @@ class UserStats(BaseModel):
     streak_claimed_today: bool = False  # Уже показан попап сегодня
     
     # Общая статистика
-    total_points: int = 0  # Всего очков
+    total_points: int = 0  # Всего очков ($RDN валюта)
     achievements_count: int = 0  # Количество достижений
+    
+    # Система уровней
+    xp: int = 0  # Очки опыта (определяют уровень)
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -377,6 +380,7 @@ class UserStatsResponse(BaseModel):
     streak_claimed_today: bool = False
     total_points: int
     achievements_count: int
+    xp: int = 0
 
 
 # ============ Модели для стрик-механики ============
@@ -1878,6 +1882,14 @@ class UserProfilePublic(BaseModel):
     mutual_friends_count: int = 0
     achievements_count: int = 0
     total_points: int = 0
+    
+    # Система уровней
+    xp: int = 0
+    level: int = 1
+    tier: str = "base"
+    xp_current_level: int = 0
+    xp_next_level: int = 100
+    xp_progress: float = 0.0
     
     # Streak
     visit_streak_current: int = 0
