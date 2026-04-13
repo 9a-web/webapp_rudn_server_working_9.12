@@ -105,35 +105,8 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
               }}
             />
 
-            {/* Заголовок: уровень + тир */}
+            {/* Заголовок: уровень */}
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 20px',
-                  borderRadius: '20px',
-                  background: tier === 'premium' ? tierCfg.gradient : `${tierCfg.color}22`,
-                  border: `1px solid ${tierCfg.color}44`,
-                }}
-              >
-                <span style={{ fontSize: '20px' }}>{tierCfg.emoji}</span>
-                <span
-                  style={{
-                    fontFamily: "'Poppins', sans-serif",
-                    fontWeight: 700,
-                    fontSize: '18px',
-                    ...(tier === 'premium' ? {
-                      color: '#1c1c1c',
-                    } : {
-                      color: tierCfg.color,
-                    }),
-                  }}
-                >
-                  {tierCfg.name}
-                </span>
-              </div>
               <div
                 style={{
                   fontFamily: "'Poppins', sans-serif",
