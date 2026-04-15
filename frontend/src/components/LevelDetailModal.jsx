@@ -1,17 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { friendsAPI } from '../services/friendsAPI';
-import { TIER_CONFIG, TIER_RANGES, getTierConfig } from '../constants/levelConstants';
+import {
+  TIER_CONFIG, TIER_RANGES, TIER_ORDER,
+  getTierConfig, getTierIndex, renderStars,
+} from '../constants/levelConstants';
 
 /**
- * Модалка детальной информации об уровне.
- * Открывается при нажатии на бейдж LV. в профиле.
+ * Модалка детальной информации об уровне v3.0.
  *
- * v2.0:
- * - Убран авто-recalculate (не мутирует данные)
- * - Загружает read-only breakdown через GET /xp-breakdown
- * - Отображает bonus, schedule_views, task_on_time_bonus
- * - Единый TIER_CONFIG из levelConstants
+ * Новое:
+ * - SVG-график истории XP
+ * - Кольцо дневного прогресса XP
+ * - Система звёзд внутри тиров
+ * - Roadmap-вид тиров
+ * - Индикатор "Почти там!"
+ * - Тир Legend
  */
 export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFeedback, telegramId }) {
   const overlayRef = useRef(null);
@@ -20,6 +24,11 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
   const [xpRewards, setXpRewards] = useState(null);
   const [xpBreakdown, setXpBreakdown] = useState(null);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
+  const [xpHistory, setXpHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [dailyXp, setDailyXp] = useState(null);
+  const [loadingDaily, setLoadingDaily] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
 
   // Анимация прогресс-бара при открытии
   useEffect(() => {
@@ -43,18 +52,44 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
   useEffect(() => {
     if (isOpen && activeSection === 'breakdown' && telegramId && !xpBreakdown && !loadingBreakdown) {
       setLoadingBreakdown(true);
+      setErrorMsg(null);
       friendsAPI.getXPBreakdown(telegramId)
         .then(data => setXpBreakdown(data))
-        .catch(() => {})
+        .catch(() => setErrorMsg('Не удалось загрузить разбивку XP'))
         .finally(() => setLoadingBreakdown(false));
     }
   }, [isOpen, activeSection, telegramId, xpBreakdown, loadingBreakdown]);
+
+  // Загрузка XP History при переключении на график
+  useEffect(() => {
+    if (isOpen && activeSection === 'progress' && telegramId && !xpHistory && !loadingHistory) {
+      setLoadingHistory(true);
+      friendsAPI.getXPHistory(telegramId, 14)
+        .then(data => setXpHistory(data?.history || []))
+        .catch(() => {})
+        .finally(() => setLoadingHistory(false));
+    }
+  }, [isOpen, activeSection, telegramId, xpHistory, loadingHistory]);
+
+  // Загрузка Daily XP при открытии
+  useEffect(() => {
+    if (isOpen && telegramId && !dailyXp && !loadingDaily) {
+      setLoadingDaily(true);
+      friendsAPI.getDailyXP(telegramId)
+        .then(data => setDailyXp(data))
+        .catch(() => {})
+        .finally(() => setLoadingDaily(false));
+    }
+  }, [isOpen, telegramId, dailyXp, loadingDaily]);
 
   // Сброс при закрытии
   useEffect(() => {
     if (!isOpen) {
       setActiveSection('progress');
       setXpBreakdown(null);
+      setXpHistory(null);
+      setDailyXp(null);
+      setErrorMsg(null);
     }
   }, [isOpen]);
 
@@ -67,11 +102,15 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
     xp_current_level = 0,
     xp_next_level = 100,
     progress = 0,
+    stars = 1,
+    title = '',
   } = levelData;
 
   const tierCfg = getTierConfig(tier);
   const xpInLevel = Math.max(0, xp - xp_current_level);
   const xpNeeded = Math.max(1, xp_next_level - xp_current_level);
+  const almostThere = progress >= 0.85 && progress < 1.0;
+  const dailyTotal = dailyXp?.total_xp_today || 0;
 
   const sections = [
     { id: 'progress', label: 'Прогресс', icon: '📊' },
@@ -92,6 +131,8 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
     { key: 'schedule_views',     label: 'Просмотры расписания',  color: '#14B8A6', icon: '📋' },
     { key: 'bonus',              label: 'Бонусный XP',           color: '#A78BFA', icon: '🎁' },
   ];
+
+  const isHighTier = tier === 'premium' || tier === 'legend';
 
   return (
     <AnimatePresence>
@@ -140,15 +181,15 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
               margin: '0 auto 20px',
             }} />
 
-            {/* Заголовок: уровень */}
+            {/* Заголовок: уровень + звёзды */}
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
               <div style={{
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 800,
                 fontSize: '48px',
                 lineHeight: 1.1,
-                background: tier === 'premium'
-                  ? 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)'
+                background: isHighTier
+                  ? tierCfg.gradient
                   : tierCfg.gradient,
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -159,7 +200,19 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                 LV. {level}
               </div>
 
-              {/* Бейдж тира */}
+              {/* Звёзды */}
+              <div style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontSize: '18px',
+                letterSpacing: '3px',
+                color: tierCfg.color,
+                marginTop: '2px',
+                filter: `drop-shadow(0 0 6px ${tierCfg.color}66)`,
+              }}>
+                {renderStars(stars)}
+              </div>
+
+              {/* Бейдж тира + название уровня */}
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -179,6 +232,17 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                 }}>
                   {tierCfg.name}
                 </span>
+                {title && (
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 400,
+                    fontSize: '11px',
+                    color: `${tierCfg.color}99`,
+                    marginLeft: '4px',
+                  }}>
+                    · {title}
+                  </span>
+                )}
               </div>
 
               <div style={{
@@ -191,6 +255,31 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                 {xp.toLocaleString()} XP
               </div>
             </div>
+
+            {/* Daily XP ring - маленький виджет */}
+            {dailyTotal > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                marginBottom: '14px',
+                padding: '8px 16px',
+                borderRadius: '14px',
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.18)',
+              }}>
+                <DailyXPRing value={dailyTotal} max={30} color="#10B981" size={32} />
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  color: '#10B981',
+                }}>
+                  +{dailyTotal} XP сегодня
+                </span>
+              </div>
+            )}
 
             {/* Табы */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
@@ -257,8 +346,8 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                       transition={{ duration: 0.8, ease: 'easeOut' }}
                       style={{
                         height: '100%', borderRadius: '6px',
-                        background: tier === 'premium'
-                          ? 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)'
+                        background: isHighTier
+                          ? tierCfg.gradient
                           : tierCfg.gradient,
                         boxShadow: `0 0 14px ${tierCfg.color}55`,
                       }}
@@ -270,58 +359,106 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                     marginTop: '6px',
                     fontFamily: "'Poppins', sans-serif",
                     fontSize: '11px',
-                    color: 'rgba(255,255,255,0.3)',
+                    color: almostThere ? tierCfg.color : 'rgba(255,255,255,0.3)',
+                    fontWeight: almostThere ? 600 : 400,
                   }}>
-                    {Math.round(progress * 100)}% до следующего уровня
+                    {almostThere
+                      ? `🔥 Почти там! ${Math.round(progress * 100)}% — осталось ${(xpNeeded - xpInLevel).toLocaleString()} XP`
+                      : `${Math.round(progress * 100)}% до следующего уровня`
+                    }
                   </div>
                 </div>
 
-                {/* Карта тиров */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  gap: '8px',
-                  marginBottom: '8px',
-                }}>
-                  {TIER_RANGES.map((range) => {
-                    const tc = TIER_CONFIG[range.tier];
-                    const isActive = tier === range.tier;
-                    const isPast = TIER_RANGES.findIndex(r => r.tier === tier) > TIER_RANGES.findIndex(r => r.tier === range.tier);
-                    return (
-                      <div
-                        key={range.tier}
-                        style={{
-                          padding: '10px 6px',
-                          borderRadius: '12px',
-                          textAlign: 'center',
-                          backgroundColor: isActive ? `${tc.color}18` : 'rgba(255,255,255,0.03)',
-                          border: isActive
-                            ? `1.5px solid ${tc.color}55`
-                            : isPast
-                              ? `1px solid ${tc.color}22`
-                              : '1px solid rgba(255,255,255,0.05)',
-                          opacity: isActive ? 1 : isPast ? 0.65 : 0.4,
-                          transition: 'all 0.3s ease',
-                        }}
-                      >
-                        <div style={{ fontSize: '16px', marginBottom: '4px' }}>{tc.emoji}</div>
-                        <div style={{
-                          fontFamily: "'Poppins', sans-serif",
-                          fontWeight: 600, fontSize: '11px',
-                          color: isActive ? tc.color : 'rgba(255,255,255,0.5)',
-                        }}>
-                          {tc.name}
+                {/* SVG XP Chart */}
+                {xpHistory && xpHistory.length > 1 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <div style={sectionTitleStyle}>📈 Прогресс XP за 14 дней</div>
+                    <XPChart data={xpHistory} color={tierCfg.color} />
+                  </div>
+                )}
+
+                {/* Roadmap тиров */}
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={sectionTitleStyle}>🗺️ Дорожная карта</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {TIER_RANGES.map((range, idx) => {
+                      const tc = TIER_CONFIG[range.tier];
+                      const isActive = tier === range.tier;
+                      const isPast = getTierIndex(tier) > getTierIndex(range.tier);
+                      const isFuture = getTierIndex(tier) < getTierIndex(range.tier);
+                      const isNext = getTierIndex(range.tier) === getTierIndex(tier) + 1;
+                      return (
+                        <div
+                          key={range.tier}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '10px 14px',
+                            borderRadius: '14px',
+                            backgroundColor: isActive ? `${tc.color}14` : 'rgba(255,255,255,0.02)',
+                            border: isActive
+                              ? `1.5px solid ${tc.color}44`
+                              : isNext
+                                ? `1px dashed ${tc.color}30`
+                                : '1px solid rgba(255,255,255,0.04)',
+                            opacity: isFuture && !isNext ? 0.4 : 1,
+                            transition: 'all 0.3s ease',
+                          }}
+                        >
+                          {/* Иконка статуса */}
+                          <div style={{
+                            width: '28px', height: '28px',
+                            borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '14px',
+                            background: isPast
+                              ? `${tc.color}25`
+                              : isActive
+                                ? `${tc.color}30`
+                                : 'rgba(255,255,255,0.05)',
+                            border: isActive ? `2px solid ${tc.color}` : 'none',
+                            flexShrink: 0,
+                          }}>
+                            {isPast ? '✓' : tc.emoji}
+                          </div>
+
+                          {/* Инфо */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: isActive ? 700 : 500,
+                              fontSize: '13px',
+                              color: isActive ? tc.color : isPast ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.35)',
+                            }}>
+                              {tc.name}
+                              {isActive && <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7 }}>← Вы здесь</span>}
+                            </div>
+                            <div style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontWeight: 400, fontSize: '11px',
+                              color: 'rgba(255,255,255,0.25)',
+                            }}>
+                              LV. {range.min}–{range.max}
+                            </div>
+                          </div>
+
+                          {/* Звёзды для текущего */}
+                          {isActive && (
+                            <div style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontSize: '14px',
+                              color: tc.color,
+                              letterSpacing: '1px',
+                              flexShrink: 0,
+                            }}>
+                              {renderStars(stars)}
+                            </div>
+                          )}
                         </div>
-                        <div style={{
-                          fontFamily: "'Poppins', sans-serif",
-                          fontWeight: 400, fontSize: '10px',
-                          color: 'rgba(255,255,255,0.3)', marginTop: '2px',
-                        }}>
-                          LV. {range.min}–{range.max}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -387,7 +524,15 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                 style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
               >
                 <div style={sectionTitleStyle}>Откуда ваш XP</div>
-                {xpBreakdown?.breakdown ? (
+                {errorMsg ? (
+                  <div style={{
+                    textAlign: 'center', padding: '24px',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontSize: '13px', color: '#EF4444',
+                  }}>
+                    {errorMsg}
+                  </div>
+                ) : xpBreakdown?.breakdown ? (
                   <>
                     {breakdownCategories
                       .filter(item => (xpBreakdown.breakdown[item.key] || 0) > 0)
@@ -481,6 +626,147 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
   );
 }
 
+
+/* ── SVG XP Chart ── */
+function XPChart({ data, color }) {
+  if (!data || data.length < 2) return null;
+
+  const W = 320;
+  const H = 100;
+  const PAD = { top: 10, right: 10, bottom: 22, left: 10 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  const maxXP = Math.max(...data.map(d => d.xp_earned), 1);
+
+  const points = data.map((d, i) => {
+    const x = PAD.left + (i / (data.length - 1)) * chartW;
+    const y = PAD.top + chartH - (d.xp_earned / maxXP) * chartH;
+    return { x, y, ...d };
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${PAD.top + chartH} L ${points[0].x} ${PAD.top + chartH} Z`;
+
+  return (
+    <div style={{
+      padding: '12px',
+      borderRadius: '14px',
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((r, i) => (
+          <line
+            key={i}
+            x1={PAD.left}
+            y1={PAD.top + chartH * (1 - r)}
+            x2={PAD.left + chartW}
+            y2={PAD.top + chartH * (1 - r)}
+            stroke="rgba(255,255,255,0.04)"
+            strokeWidth="1"
+          />
+        ))}
+
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#chartGrad)" />
+
+        {/* Line */}
+        <path
+          d={linePath}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Dots */}
+        {points.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={p.xp_earned > 0 ? 3 : 2}
+            fill={p.xp_earned > 0 ? color : 'rgba(255,255,255,0.15)'}
+            stroke="none"
+          />
+        ))}
+
+        {/* Date labels */}
+        {points.filter((_, i) => i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)).map((p, i) => (
+          <text
+            key={i}
+            x={p.x}
+            y={H - 4}
+            textAnchor="middle"
+            fill="rgba(255,255,255,0.25)"
+            fontSize="9"
+            fontFamily="Poppins, sans-serif"
+          >
+            {p.date?.slice(5)}
+          </text>
+        ))}
+
+        {/* Max value label */}
+        <text
+          x={PAD.left + chartW}
+          y={PAD.top - 2}
+          textAnchor="end"
+          fill="rgba(255,255,255,0.3)"
+          fontSize="9"
+          fontFamily="Poppins, sans-serif"
+        >
+          макс: {maxXP} XP
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+
+/* ── Daily XP Ring ── */
+function DailyXPRing({ value, max, color, size = 32 }) {
+  const radius = (size - 4) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.min(value / Math.max(max, 1), 1);
+  const dashOffset = circumference * (1 - progress);
+
+  return (
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="rgba(255,255,255,0.08)"
+        strokeWidth="3"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth="3"
+        strokeDasharray={circumference}
+        strokeDashoffset={dashOffset}
+        strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+      />
+    </svg>
+  );
+}
+
+
 /* ── Helpers ── */
 
 const labelStyle = {
@@ -495,7 +781,7 @@ const sectionTitleStyle = {
   fontWeight: 500,
   fontSize: '12px',
   color: 'rgba(255,255,255,0.3)',
-  marginBottom: '4px',
+  marginBottom: '8px',
 };
 
 function LoadingSpinner({ color }) {

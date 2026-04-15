@@ -367,6 +367,26 @@ export const friendsAPI = {
       handleError(error);
     }
   },
+
+  // ========== v3: XP History & Daily XP ==========
+
+  getXPHistory: async (telegramId, days = 30) => {
+    try {
+      const response = await api.get(`/users/${telegramId}/xp-history?days=${days}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  getDailyXP: async (telegramId) => {
+    try {
+      const response = await api.get(`/users/${telegramId}/daily-xp`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
 };
 
 export default friendsAPI;

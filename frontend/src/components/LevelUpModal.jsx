@@ -4,8 +4,13 @@ import confetti from 'canvas-confetti';
 import { TIER_CONFIG } from '../constants/levelConstants';
 
 /**
- * Модалка Level-Up с конфетти.
+ * Модалка Level-Up с конфетти v3.0.
  * Показывается при повышении уровня пользователя.
+ *
+ * v3.0:
+ * - Спец. анимация для Legend тира (золотой огнепад)
+ * - Улучшенная анимация для Premium
+ * - Добавлен текст "Звёзды" тира
  */
 export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTier }) {
   const overlayRef = useRef(null);
@@ -14,15 +19,26 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
   useEffect(() => {
     if (isOpen && !hasTriggeredConfetti.current) {
       hasTriggeredConfetti.current = true;
-      fireConfetti();
-      const t1 = setTimeout(() => fireConfetti(), 350);
-      const t2 = setTimeout(() => fireStars(), 700);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
+
+      if (newTier === 'legend') {
+        // 🌟 LEGEND: Грандиозный золотой салют
+        fireLegendConfetti();
+        const t1 = setTimeout(() => fireLegendConfetti(), 300);
+        const t2 = setTimeout(() => fireGoldRain(), 600);
+        const t3 = setTimeout(() => fireStars(), 900);
+        const t4 = setTimeout(() => fireLegendConfetti(), 1200);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+      } else {
+        fireConfetti();
+        const t1 = setTimeout(() => fireConfetti(), 350);
+        const t2 = setTimeout(() => fireStars(), 700);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+      }
     }
     if (!isOpen) {
       hasTriggeredConfetti.current = false;
     }
-  }, [isOpen]);
+  }, [isOpen, newTier]);
 
   const fireConfetti = () => {
     const tierCfg = TIER_CONFIG[newTier] || TIER_CONFIG.base;
@@ -32,6 +48,27 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
 
     confetti({ particleCount: 70, spread: 80, origin: { x: 0.15, y: 0.55 }, colors, disableForReducedMotion: true });
     confetti({ particleCount: 70, spread: 80, origin: { x: 0.85, y: 0.55 }, colors, disableForReducedMotion: true });
+  };
+
+  const fireLegendConfetti = () => {
+    const colors = ['#FFD700', '#FF6B00', '#FF0080', '#7B2FFF', '#FFFFFF'];
+    confetti({ particleCount: 100, spread: 120, origin: { x: 0.5, y: 0.5 }, colors, disableForReducedMotion: true, scalar: 1.3 });
+    confetti({ particleCount: 60, spread: 80, origin: { x: 0.2, y: 0.4 }, colors, disableForReducedMotion: true });
+    confetti({ particleCount: 60, spread: 80, origin: { x: 0.8, y: 0.4 }, colors, disableForReducedMotion: true });
+  };
+
+  const fireGoldRain = () => {
+    confetti({
+      particleCount: 40,
+      spread: 180,
+      startVelocity: 35,
+      gravity: 1.5,
+      origin: { x: 0.5, y: 0.1 },
+      shapes: ['circle'],
+      colors: ['#FFD700', '#FFC400', '#FFE44D', '#FFECB3'],
+      scalar: 0.8,
+      disableForReducedMotion: true,
+    });
   };
 
   const fireStars = () => {
@@ -51,6 +88,8 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
 
   const tierCfg = TIER_CONFIG[newTier] || TIER_CONFIG.base;
   const tierChanged = oldTier && oldTier !== newTier;
+  const isLegend = newTier === 'legend';
+  const isHighTier = newTier === 'premium' || newTier === 'legend';
 
   return (
     <AnimatePresence>
@@ -69,7 +108,7 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(0,0,0,0.75)',
+            backgroundColor: isLegend ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.75)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
           }}
@@ -82,12 +121,16 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
             style={{
               width: 'calc(100% - 40px)',
               maxWidth: '340px',
-              background: 'linear-gradient(180deg, #1E1E3A 0%, #141428 100%)',
+              background: isLegend
+                ? 'linear-gradient(180deg, #2A1E00 0%, #1A0D00 50%, #141428 100%)'
+                : 'linear-gradient(180deg, #1E1E3A 0%, #141428 100%)',
               borderRadius: '28px',
               padding: '36px 28px 28px',
               textAlign: 'center',
               border: `1.5px solid ${tierCfg.color}55`,
-              boxShadow: `0 0 60px ${tierCfg.color}22, inset 0 1px 0 rgba(255,255,255,0.06)`,
+              boxShadow: isLegend
+                ? `0 0 80px ${tierCfg.color}33, 0 0 160px ${tierCfg.color}11, inset 0 1px 0 rgba(255,255,255,0.08)`
+                : `0 0 60px ${tierCfg.color}22, inset 0 1px 0 rgba(255,255,255,0.06)`,
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -101,18 +144,42 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
               transform: 'translateX(-50%)',
               width: '200%',
               height: '200%',
-              background: `radial-gradient(ellipse at center, ${tierCfg.color}12 0%, transparent 60%)`,
+              background: isLegend
+                ? `radial-gradient(ellipse at center, ${tierCfg.color}22 0%, transparent 50%)`
+                : `radial-gradient(ellipse at center, ${tierCfg.color}12 0%, transparent 60%)`,
               pointerEvents: 'none',
             }} />
+
+            {/* Legend: пульсирующее кольцо */}
+            {isLegend && (
+              <motion.div
+                animate={{
+                  scale: [1, 1.15, 1],
+                  opacity: [0.3, 0.6, 0.3],
+                }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: '250px',
+                  height: '250px',
+                  borderRadius: '50%',
+                  border: `2px solid ${tierCfg.color}20`,
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
 
             {/* Эмодзи */}
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ delay: 0.15, type: 'spring', damping: 10, stiffness: 180 }}
-              style={{ fontSize: '56px', marginBottom: '12px', position: 'relative' }}
+              style={{ fontSize: isLegend ? '72px' : '56px', marginBottom: '12px', position: 'relative' }}
             >
-              🎉
+              {isLegend ? '🏆' : '🎉'}
             </motion.div>
 
             {/* Заголовок */}
@@ -123,14 +190,14 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
               style={{
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 800,
-                fontSize: '24px',
+                fontSize: isLegend ? '28px' : '24px',
                 color: '#FFFFFF',
                 letterSpacing: '-0.02em',
                 marginBottom: '4px',
                 position: 'relative',
               }}
             >
-              Новый уровень!
+              {isLegend ? 'ЛЕГЕНДА!' : 'Новый уровень!'}
             </motion.div>
 
             {/* Номер уровня */}
@@ -141,11 +208,9 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
               style={{
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 900,
-                fontSize: '64px',
+                fontSize: isLegend ? '72px' : '64px',
                 lineHeight: 1,
-                background: newTier === 'premium'
-                  ? 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)'
-                  : tierCfg.gradient,
+                background: tierCfg.gradient,
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
@@ -205,15 +270,13 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
                 fontFamily: "'Poppins', sans-serif",
                 fontWeight: 600,
                 fontSize: '16px',
-                color: newTier === 'premium' ? '#1c1c1c' : '#FFFFFF',
-                background: newTier === 'premium'
-                  ? 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)'
-                  : tierCfg.gradient,
+                color: isHighTier ? '#1c1c1c' : '#FFFFFF',
+                background: tierCfg.gradient,
                 boxShadow: `0 4px 20px ${tierCfg.color}44`,
                 position: 'relative',
               }}
             >
-              Отлично!
+              {isLegend ? '🌟 Невероятно!' : 'Отлично!'}
             </motion.button>
           </motion.div>
         </motion.div>

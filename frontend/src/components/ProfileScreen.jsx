@@ -11,7 +11,7 @@ import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
 import LevelDetailModal from './LevelDetailModal';
 import LevelUpModal from './LevelUpModal';
-import { getTierColor, getTierName } from '../constants/levelConstants';
+import { getTierColor, getTierName, getTierConfig, renderStars } from '../constants/levelConstants';
 
 const ADMIN_UIDS = ['765963392', '1311283832'];
 
@@ -892,15 +892,23 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Level — кликабельный бейдж */}
+            {/* Level — кликабельный бейдж со звёздами и пульсацией */}
             <div
               onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }}
               style={{
                 padding: '6px 14px',
                 borderRadius: '20px',
-                backgroundColor: getTierColor(profileData?.tier),
+                background: (profileData?.tier || 'base') === 'legend'
+                  ? getTierConfig(profileData?.tier).gradient
+                  : (profileData?.tier || 'base') === 'premium'
+                    ? getTierConfig(profileData?.tier).gradient
+                    : getTierColor(profileData?.tier),
                 cursor: 'pointer',
                 transition: 'transform 0.15s ease',
+                animation: (profileData?.tier === 'legend' || profileData?.tier === 'premium') ? 'levelPulse 2s ease-in-out infinite' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
               }}
             >
               <span
@@ -913,6 +921,17 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               >
                 LV. {profileData?.level ?? 1}
               </span>
+              {(profileData?.stars || 0) > 0 && (
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontSize: '10px',
+                  color: '#1c1c1c',
+                  opacity: 0.7,
+                  letterSpacing: '1px',
+                }}>
+                  {renderStars(profileData?.stars)}
+                </span>
+              )}
             </div>
           </motion.div>
 
@@ -1010,7 +1029,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Уровень — реальный тир из backend */}
+            {/* Уровень — реальный тир из backend + звёзды */}
             <div className="flex flex-col items-center" onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }} style={{ cursor: 'pointer' }}>
               <span
                 style={{
@@ -1018,8 +1037,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   fontWeight: 600,
                   fontSize: '24px',
                   lineHeight: 1.2,
-                  ...((profileData?.tier || 'base').toLowerCase() === 'premium' ? {
-                    background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
+                  ...((['premium', 'legend'].includes((profileData?.tier || 'base').toLowerCase())) ? {
+                    background: getTierConfig(profileData?.tier).gradient,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
@@ -1039,7 +1058,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   marginTop: '2px',
                 }}
               >
-                Уровень
+                {profileData?.level_title || 'Уровень'}
               </span>
             </div>
 
@@ -2476,6 +2495,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           xp_current_level: profileData.xp_current_level || 0,
           xp_next_level: profileData.xp_next_level || 100,
           progress: profileData.xp_progress || 0,
+          stars: profileData.stars || 1,
+          title: profileData.level_title || '',
         } : null}
         hapticFeedback={hapticFeedback}
         telegramId={user?.id}

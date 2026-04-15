@@ -287,6 +287,9 @@ from level_system import (
     recalculate_xp_for_user, get_xp_breakdown_readonly,
     XP_REWARDS, XP_REWARDS_INFO, DAILY_XP_LIMITS,
     consume_pending_level_up, check_daily_xp_limit,
+    get_xp_history, get_daily_xp_progress,
+    LEVEL_TITLES, TIER_THRESHOLDS as LEVEL_TIER_THRESHOLDS,
+    get_stars_in_tier, get_level_title,
 )
 from weather import get_moscow_weather
 from config import get_telegram_bot_token, get_telegram_bot_username, is_test_environment, ENV
@@ -1545,7 +1548,7 @@ async def get_notification_stats(date: Optional[str] = None):
 
 @api_router.get("/users/{telegram_id}/level")
 async def get_user_level(telegram_id: int):
-    """Получить информацию об уровне пользователя"""
+    """Получить информацию об уровне пользователя (v3 — stars, title)"""
     try:
         stats = await db.user_stats.find_one({"telegram_id": telegram_id})
         xp = stats.get("xp", 0) if stats else 0
@@ -1605,7 +1608,7 @@ async def get_pending_level_up(telegram_id: int):
 
 @api_router.get("/users/{telegram_id}/xp-breakdown")
 async def get_user_xp_breakdown(telegram_id: int):
-    """Получить детальную разбивку XP пользователя (read-only, без мутации)"""
+    """Получить детальную разбивку XP пользователя (read-only, v3 — stars, title, xp_in_level, xp_needed)"""
     try:
         result = await get_xp_breakdown_readonly(db, telegram_id)
         return {
@@ -1616,10 +1619,37 @@ async def get_user_xp_breakdown(telegram_id: int):
             "tier": result["tier"],
             "xp_current_level": result["xp_current_level"],
             "xp_next_level": result["xp_next_level"],
+            "xp_in_level": result["xp_in_level"],
+            "xp_needed": result["xp_needed"],
             "progress": result["progress"],
+            "stars": result.get("stars", 1),
+            "title": result.get("title", ""),
         }
     except Exception as e:
         logger.error(f"Error getting XP breakdown for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/users/{telegram_id}/xp-history")
+async def get_user_xp_history(telegram_id: int, days: int = 30):
+    """Получить историю XP по дням для графиков (v3)"""
+    try:
+        days = min(max(days, 7), 90)  # от 7 до 90 дней
+        history = await get_xp_history(db, telegram_id, days)
+        return {"status": "ok", "history": history, "days": days}
+    except Exception as e:
+        logger.error(f"Error getting XP history for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/users/{telegram_id}/daily-xp")
+async def get_user_daily_xp(telegram_id: int):
+    """Получить XP заработанный сегодня с разбивкой по действиям (v3)"""
+    try:
+        progress = await get_daily_xp_progress(db, telegram_id)
+        return {"status": "ok", **progress}
+    except Exception as e:
+        logger.error(f"Error getting daily XP for {telegram_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -15616,6 +15646,8 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
                 xp_current_level=level_info["xp_current_level"],
                 xp_next_level=level_info["xp_next_level"],
                 xp_progress=level_info["progress"],
+                stars=level_info.get("stars", 1),
+                level_title=level_info.get("title", ""),
                 visit_streak_current=streak_current,
                 visit_streak_max=streak_max,
                 avatar_mode=avatar_mode,
@@ -15651,6 +15683,8 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             xp_current_level=level_info["xp_current_level"] if privacy.show_achievements and not is_anonymous else 0,
             xp_next_level=level_info["xp_next_level"] if privacy.show_achievements and not is_anonymous else 0,
             xp_progress=level_info["progress"] if privacy.show_achievements and not is_anonymous else 0.0,
+            stars=level_info.get("stars", 1),
+            level_title=level_info.get("title", "") if privacy.show_achievements and not is_anonymous else "",
             visit_streak_current=streak_current if privacy.show_achievements and not is_anonymous else 0,
             visit_streak_max=streak_max if privacy.show_achievements and not is_anonymous else 0,
             avatar_mode=avatar_mode,

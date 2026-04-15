@@ -1,4 +1,19 @@
 backend:
+  - task: "Level System v3.0 - New endpoints and improvements"
+    implemented: true
+    working: true
+    file: "backend/level_system.py, backend/server.py, backend/models.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Level System v3.0: 1) Added Legend tier (LV 30+), 2) Referral XP 50→100, 3) Stars system (1-5), 4) Level titles, 5) XP history endpoint GET /api/users/{id}/xp-history, 6) Daily XP endpoint GET /api/users/{id}/daily-xp, 7) Fixed timezone in daily XP limit (UTC→Moscow), 8) Fixed breakdown to use xp_events aggregation for accurate data, 9) Added xp_in_level/xp_needed/stars/title to xp-breakdown response, 10) Updated profile model with stars and level_title fields. Need to test: GET /api/users/{id}/level (should return stars+title), GET /api/users/{id}/xp-history, GET /api/users/{id}/daily-xp, GET /api/users/{id}/xp-breakdown (new fields), GET /api/xp-rewards-info (referral=100)"
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Level System v3.0 FULLY WORKING (28/28 tests passed, 100% success rate). All critical features verified: 1) GET /api/users/{id}/level returns all required fields including stars (1-5) and title ('Новичок'), 2) GET /api/xp-rewards-info returns 10 reward items with referral XP correctly set to 100 (was 50), 3) GET /api/users/{id}/xp-breakdown includes new fields (xp_in_level, xp_needed, stars, title) and all 10 breakdown categories, 4) NEW ENDPOINT GET /api/users/{id}/xp-history working correctly with proper date format and history structure, 5) NEW ENDPOINT GET /api/users/{id}/daily-xp working correctly with date and by_action breakdown, 6) POST /api/users/{id}/recalculate-xp includes stars and title fields, 7) Legend tier verification successful (admin ID 765963392 with 92000 XP → tier='legend', level=30, stars=1, title='Легенда'), 8) Stars system verification successful across all tiers (base: 4-5 stars, medium: 2-4 stars, rare: 1-3 stars). All Level System v3.0 requirements fully implemented and working."
+
   - task: "GET /api/xp-rewards-info endpoint"
     implemented: true
     working: true
@@ -223,4 +238,7 @@ agent_communication:
       - working: true
         agent: "testing"
         comment: "✅ PASS - Level System v2.0 fully working (10/10 tests passed, 100% success rate). All critical features verified: 1) GET /api/xp-rewards-info returns 10 reward items with all required fields (action, xp, label, emoji, limit), 2) GET /api/users/{id}/level returns complete level info with all required fields (level, tier, xp, xp_current_level, xp_next_level, xp_in_level, xp_needed, progress), 3) GET /api/users/{id}/xp-breakdown returns extended breakdown with new fields (task_on_time_bonus, schedule_views, bonus, xp_current_level, xp_next_level, progress) and verified no data mutation, 4) POST /api/users/{id}/recalculate-xp works with XP loss protection, 5) POST /api/track-action with view_schedule successfully tracks actions, 6) GET /api/users/{id}/pending-level-up returns correct structure, 7) Daily XP limits properly enforced (XP stops increasing after hitting limits). All atomic XP operations, read-only breakdown, and daily limit enforcement working correctly."
+
+  - agent: "testing"
+    message: "✅ LEVEL SYSTEM V3.0 COMPREHENSIVE TESTING COMPLETE - Completed full testing of Level System v3.0 with all 28 tests passing (100% success rate). All new features verified: 1) GET /api/users/{id}/level returns stars (1-5) and title fields correctly, 2) GET /api/xp-rewards-info shows referral XP increased to 100 (was 50), 3) GET /api/users/{id}/xp-breakdown includes new fields (xp_in_level, xp_needed, stars, title), 4) NEW ENDPOINT GET /api/users/{id}/xp-history working with proper date format and history structure, 5) NEW ENDPOINT GET /api/users/{id}/daily-xp working with date and by_action breakdown, 6) POST /api/users/{id}/recalculate-xp includes stars and title, 7) Legend tier verification successful (92000 XP → tier='legend', level=30, title='Легенда'), 8) Stars system working across all tiers (base: 4-5 stars, medium: 2-4 stars, rare: 1-3 stars). Level System v3.0 is production-ready."
 

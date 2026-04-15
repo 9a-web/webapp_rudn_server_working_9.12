@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Backend Testing Script for RUDN Schedule Dev Commands
-Tests all dev command endpoints with admin and non-admin access
+Backend Testing Script for RUDN Schedule Level System v3.0
+Tests Level System v3.0 endpoints including new features:
+- Stars system (1-5)
+- Level titles
+- XP history endpoint
+- Daily XP endpoint
+- Legend tier verification
+- Referral XP increase (50→100)
 """
 
 import asyncio
@@ -10,7 +16,7 @@ import json
 import sys
 from typing import Dict, Any, List
 
-# Backend URL - using localhost since dev endpoints are internal
+# Backend URL - using the configured external URL from frontend/.env
 BACKEND_URL = "http://localhost:8001/api"
 
 # Admin IDs (allowed)
@@ -18,7 +24,7 @@ ADMIN_IDS = [765963392, 1311283832]
 # Non-admin ID (should get 403)
 NON_ADMIN_ID = 123456
 
-class DevCommandTester:
+class LevelSystemTester:
     def __init__(self):
         self.session = None
         self.test_results = []
@@ -78,237 +84,344 @@ class DevCommandTester:
                 "data": {"error": str(e)}
             }
 
-    async def test_dev_execute_help(self):
-        """Test POST /api/dev/execute with help command"""
-        print("\n=== Testing POST /api/dev/execute - help command ===")
+    async def test_user_level_endpoint(self):
+        """Test GET /api/users/{id}/level - should return stars and title"""
+        print("\n=== Testing GET /api/users/{id}/level ===")
         
-        # Test with admin ID
-        data = {"telegram_id": ADMIN_IDS[0], "command": "help", "args": []}
-        response = await self.make_request("POST", "/dev/execute", data)
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            commands = response["data"].get("result", {}).get("commands", [])
-            self.log_test("Admin help command", len(commands) > 0, f"Returned {len(commands)} commands")
-        else:
-            self.log_test("Admin help command", False, f"Status: {response['status_code']}, Data: {response['data']}")
-
-        # Test with non-admin ID (should get 403)
-        data = {"telegram_id": NON_ADMIN_ID, "command": "help", "args": []}
-        response = await self.make_request("POST", "/dev/execute", data)
-        
-        self.log_test("Non-admin help command (403 expected)", 
-                     response["status_code"] == 403, 
-                     f"Status: {response['status_code']}")
-
-    async def test_dev_add_xp(self):
-        """Test POST /api/dev/add-xp"""
-        print("\n=== Testing POST /api/dev/add-xp ===")
-        
-        # Test with admin ID
-        data = {"telegram_id": ADMIN_IDS[0], "amount": 100}
-        response = await self.make_request("POST", "/dev/add-xp", data)
+        test_user_id = 123456
+        response = await self.make_request("GET", f"/users/{test_user_id}/level")
         
         if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            result_data = response["data"]
-            has_xp_info = all(key in result_data for key in ["xp", "level", "tier"])
-            self.log_test("Admin add XP", has_xp_info, f"Added 100 XP, got level info")
+            data = response["data"]
+            required_fields = ["level", "tier", "xp", "xp_current_level", "xp_next_level", 
+                             "xp_in_level", "xp_needed", "progress", "stars", "title"]
+            
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if not missing_fields:
+                stars = data.get("stars", 0)
+                title = data.get("title", "")
+                level = data.get("level", 0)
+                tier = data.get("tier", "")
+                
+                # Validate stars are 1-5
+                stars_valid = 1 <= stars <= 5
+                # Validate title is not empty
+                title_valid = len(title) > 0
+                
+                self.log_test("User level endpoint - all fields", True, 
+                            f"Level {level}, Tier {tier}, Stars {stars}, Title '{title}'")
+                self.log_test("User level endpoint - stars range", stars_valid, 
+                            f"Stars: {stars} (should be 1-5)")
+                self.log_test("User level endpoint - title present", title_valid, 
+                            f"Title: '{title}'")
+            else:
+                self.log_test("User level endpoint - missing fields", False, 
+                            f"Missing: {missing_fields}")
         else:
-            self.log_test("Admin add XP", False, f"Status: {response['status_code']}, Data: {response['data']}")
+            self.log_test("User level endpoint", False, 
+                        f"Status: {response['status_code']}, Data: {response['data']}")
 
-        # Test with non-admin ID (should get 403)
-        data = {"telegram_id": NON_ADMIN_ID, "amount": 100}
-        response = await self.make_request("POST", "/dev/add-xp", data)
+    async def test_xp_rewards_info_endpoint(self):
+        """Test GET /api/xp-rewards-info - referral XP should be 100"""
+        print("\n=== Testing GET /api/xp-rewards-info ===")
         
-        self.log_test("Non-admin add XP (403 expected)", 
-                     response["status_code"] == 403, 
-                     f"Status: {response['status_code']}")
+        response = await self.make_request("GET", "/xp-rewards-info")
+        
+        if response["status_code"] == 200:
+            data = response["data"]
+            rewards = data.get("rewards", [])
+            
+            if rewards:
+                # Find referral reward
+                referral_reward = None
+                for reward in rewards:
+                    if reward.get("action") == "referral":
+                        referral_reward = reward
+                        break
+                
+                if referral_reward:
+                    referral_xp = referral_reward.get("xp", 0)
+                    self.log_test("XP rewards info - referral XP", referral_xp == 100, 
+                                f"Referral XP: {referral_xp} (should be 100)")
+                    
+                    # Check all required fields
+                    required_fields = ["action", "xp", "label", "emoji", "limit"]
+                    all_rewards_valid = all(
+                        all(field in reward for field in required_fields) 
+                        for reward in rewards
+                    )
+                    self.log_test("XP rewards info - all fields", all_rewards_valid, 
+                                f"Found {len(rewards)} rewards with all required fields")
+                else:
+                    self.log_test("XP rewards info - referral not found", False, 
+                                "Referral reward not found in rewards list")
+            else:
+                self.log_test("XP rewards info - empty rewards", False, 
+                            "No rewards returned")
+        else:
+            self.log_test("XP rewards info endpoint", False, 
+                        f"Status: {response['status_code']}, Data: {response['data']}")
 
-    async def test_dev_set_xp(self):
-        """Test POST /api/dev/set-xp"""
-        print("\n=== Testing POST /api/dev/set-xp ===")
+    async def test_xp_breakdown_endpoint(self):
+        """Test GET /api/users/{id}/xp-breakdown - should include new fields"""
+        print("\n=== Testing GET /api/users/{id}/xp-breakdown ===")
         
-        # Test with admin ID
-        data = {"telegram_id": ADMIN_IDS[0], "amount": 1000}
+        test_user_id = 123456
+        response = await self.make_request("GET", f"/users/{test_user_id}/xp-breakdown")
+        
+        if response["status_code"] == 200 and response["data"].get("status") == "ok":
+            data = response["data"]
+            required_fields = ["xp", "breakdown", "level", "tier", "xp_current_level", 
+                             "xp_next_level", "xp_in_level", "xp_needed", "progress", 
+                             "stars", "title"]
+            
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if not missing_fields:
+                breakdown = data.get("breakdown", {})
+                expected_breakdown_keys = ["tasks", "task_on_time_bonus", "achievements", 
+                                         "visits", "streak_bonuses", "referrals", 
+                                         "group_tasks", "messages", "schedule_views", "bonus"]
+                
+                missing_breakdown = [key for key in expected_breakdown_keys if key not in breakdown]
+                
+                if not missing_breakdown:
+                    stars = data.get("stars", 0)
+                    title = data.get("title", "")
+                    xp_in_level = data.get("xp_in_level", 0)
+                    xp_needed = data.get("xp_needed", 0)
+                    
+                    self.log_test("XP breakdown - all fields", True, 
+                                f"Stars: {stars}, Title: '{title}', XP in level: {xp_in_level}")
+                    self.log_test("XP breakdown - breakdown structure", True, 
+                                f"All {len(expected_breakdown_keys)} breakdown categories present")
+                else:
+                    self.log_test("XP breakdown - missing breakdown keys", False, 
+                                f"Missing breakdown keys: {missing_breakdown}")
+            else:
+                self.log_test("XP breakdown - missing fields", False, 
+                            f"Missing: {missing_fields}")
+        else:
+            self.log_test("XP breakdown endpoint", False, 
+                        f"Status: {response['status_code']}, Data: {response['data']}")
+
+    async def test_xp_history_endpoint(self):
+        """Test GET /api/users/{id}/xp-history - NEW ENDPOINT"""
+        print("\n=== Testing GET /api/users/{id}/xp-history ===")
+        
+        test_user_id = 123456
+        days = 14
+        response = await self.make_request("GET", f"/users/{test_user_id}/xp-history?days={days}")
+        
+        if response["status_code"] == 200 and response["data"].get("status") == "ok":
+            data = response["data"]
+            required_fields = ["history", "days"]
+            
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if not missing_fields:
+                history = data.get("history", [])
+                returned_days = data.get("days", 0)
+                
+                # Validate history structure
+                history_valid = True
+                if history:
+                    for entry in history:
+                        required_entry_fields = ["date", "xp_earned", "events_count", "total_xp"]
+                        if not all(field in entry for field in required_entry_fields):
+                            history_valid = False
+                            break
+                
+                self.log_test("XP history endpoint - structure", True, 
+                            f"Days: {returned_days}, History entries: {len(history)}")
+                self.log_test("XP history endpoint - entry format", history_valid, 
+                            "All history entries have required fields")
+            else:
+                self.log_test("XP history endpoint - missing fields", False, 
+                            f"Missing: {missing_fields}")
+        else:
+            self.log_test("XP history endpoint", False, 
+                        f"Status: {response['status_code']}, Data: {response['data']}")
+
+    async def test_daily_xp_endpoint(self):
+        """Test GET /api/users/{id}/daily-xp - NEW ENDPOINT"""
+        print("\n=== Testing GET /api/users/{id}/daily-xp ===")
+        
+        test_user_id = 123456
+        response = await self.make_request("GET", f"/users/{test_user_id}/daily-xp")
+        
+        if response["status_code"] == 200 and response["data"].get("status") == "ok":
+            data = response["data"]
+            required_fields = ["date", "total_xp_today", "by_action"]
+            
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if not missing_fields:
+                date = data.get("date", "")
+                total_xp_today = data.get("total_xp_today", 0)
+                by_action = data.get("by_action", {})
+                
+                # Validate date format (YYYY-MM-DD)
+                date_valid = len(date) == 10 and date.count("-") == 2
+                
+                self.log_test("Daily XP endpoint - structure", True, 
+                            f"Date: {date}, Total XP today: {total_xp_today}")
+                self.log_test("Daily XP endpoint - date format", date_valid, 
+                            f"Date format: {date}")
+                self.log_test("Daily XP endpoint - by_action", isinstance(by_action, dict), 
+                            f"By action breakdown: {len(by_action)} categories")
+            else:
+                self.log_test("Daily XP endpoint - missing fields", False, 
+                            f"Missing: {missing_fields}")
+        else:
+            self.log_test("Daily XP endpoint", False, 
+                        f"Status: {response['status_code']}, Data: {response['data']}")
+
+    async def test_recalculate_xp_endpoint(self):
+        """Test POST /api/users/{id}/recalculate-xp - should include stars, title"""
+        print("\n=== Testing POST /api/users/{id}/recalculate-xp ===")
+        
+        test_user_id = 123456
+        response = await self.make_request("POST", f"/users/{test_user_id}/recalculate-xp")
+        
+        if response["status_code"] == 200 and response["data"].get("status") == "ok":
+            data = response["data"]
+            required_fields = ["xp", "breakdown", "level", "tier", "xp_current_level", 
+                             "xp_next_level", "xp_in_level", "xp_needed", "progress", 
+                             "stars", "title"]
+            
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if not missing_fields:
+                stars = data.get("stars", 0)
+                title = data.get("title", "")
+                level = data.get("level", 0)
+                tier = data.get("tier", "")
+                
+                self.log_test("Recalculate XP - all fields", True, 
+                            f"Level {level}, Tier {tier}, Stars {stars}, Title '{title}'")
+                self.log_test("Recalculate XP - stars range", 1 <= stars <= 5, 
+                            f"Stars: {stars}")
+                self.log_test("Recalculate XP - title present", len(title) > 0, 
+                            f"Title: '{title}'")
+            else:
+                self.log_test("Recalculate XP - missing fields", False, 
+                            f"Missing: {missing_fields}")
+        else:
+            self.log_test("Recalculate XP endpoint", False, 
+                        f"Status: {response['status_code']}, Data: {response['data']}")
+
+    async def test_legend_tier_verification(self):
+        """Test Legend tier with admin ID 765963392 and 92000 XP"""
+        print("\n=== Testing Legend Tier Verification ===")
+        
+        admin_id = 765963392
+        legend_xp = 92000
+        
+        # Set XP to legend tier threshold
+        data = {"telegram_id": admin_id, "amount": legend_xp}
         response = await self.make_request("POST", "/dev/set-xp", data)
         
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            result_data = response["data"]
-            has_level_info = all(key in result_data for key in ["level", "tier", "xp"])
-            self.log_test("Admin set XP", has_level_info, f"Set XP to 1000, got level info")
-        else:
-            self.log_test("Admin set XP", False, f"Status: {response['status_code']}, Data: {response['data']}")
-
-        # Test with non-admin ID (should get 403)
-        data = {"telegram_id": NON_ADMIN_ID, "amount": 1000}
-        response = await self.make_request("POST", "/dev/set-xp", data)
-        
-        self.log_test("Non-admin set XP (403 expected)", 
-                     response["status_code"] == 403, 
-                     f"Status: {response['status_code']}")
-
-    async def test_dev_get_level(self):
-        """Test GET /api/dev/get-level/{id}"""
-        print("\n=== Testing GET /api/dev/get-level/{id} ===")
-        
-        # Test with admin ID
-        response = await self.make_request("GET", f"/dev/get-level/{ADMIN_IDS[0]}")
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            result_data = response["data"]
-            has_level_info = all(key in result_data for key in ["level", "tier", "xp", "streak"])
-            self.log_test("Admin get level", has_level_info, f"Got level info with streak data")
-        else:
-            self.log_test("Admin get level", False, f"Status: {response['status_code']}, Data: {response['data']}")
-
-        # Test with non-admin ID (should get 403)
-        response = await self.make_request("GET", f"/dev/get-level/{NON_ADMIN_ID}")
-        
-        self.log_test("Non-admin get level (403 expected)", 
-                     response["status_code"] == 403, 
-                     f"Status: {response['status_code']}")
-
-    async def test_dev_reset_streak(self):
-        """Test POST /api/dev/reset-streak"""
-        print("\n=== Testing POST /api/dev/reset-streak ===")
-        
-        # Test with admin ID
-        data = {"telegram_id": ADMIN_IDS[0]}
-        response = await self.make_request("POST", "/dev/reset-streak", data)
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            message = response["data"].get("message", "")
-            self.log_test("Admin reset streak", "сброшен" in message.lower(), f"Message: {message}")
-        else:
-            self.log_test("Admin reset streak", False, f"Status: {response['status_code']}, Data: {response['data']}")
-
-        # Test with non-admin ID (should get 403)
-        data = {"telegram_id": NON_ADMIN_ID}
-        response = await self.make_request("POST", "/dev/reset-streak", data)
-        
-        self.log_test("Non-admin reset streak (403 expected)", 
-                     response["status_code"] == 403, 
-                     f"Status: {response['status_code']}")
-
-    async def test_dev_execute_commands(self):
-        """Test various commands through POST /api/dev/execute"""
-        print("\n=== Testing Various Dev Execute Commands ===")
-        
-        commands_to_test = [
-            {"command": "getlevel", "args": [], "expected_keys": ["level", "tier", "xp", "streak"]},
-            {"command": "addxp", "args": [200], "expected_keys": ["xp", "level", "tier"]},
-            {"command": "setxp", "args": [5000], "expected_keys": ["level", "tier", "xp"]},
-            {"command": "resetstreak", "args": [], "check_message": True},
-            {"command": "getuser", "args": [], "allow_null_result": True},
-            {"command": "listtasks", "args": [], "expected_keys": ["count"]},
-            {"command": "listfriends", "args": [], "expected_keys": ["count"]},
-            {"command": "listrequests", "args": [], "expected_keys": ["incoming", "outgoing"]},
-            {"command": "recordvisit", "args": [], "check_message": True},
-            {"command": "addtask", "args": ["Test Task"], "expected_keys": ["id", "text"]},
-        ]
-        
-        for cmd_test in commands_to_test:
-            data = {
-                "telegram_id": ADMIN_IDS[0], 
-                "command": cmd_test["command"], 
-                "args": cmd_test["args"]
-            }
-            response = await self.make_request("POST", "/dev/execute", data)
+        if response["status_code"] == 200:
+            # Get level info to verify legend tier
+            response = await self.make_request("GET", f"/users/{admin_id}/level")
             
             if response["status_code"] == 200 and response["data"].get("status") == "ok":
-                if cmd_test.get("check_message"):
-                    # Check for message field
-                    has_message = "message" in response["data"]
-                    self.log_test(f"Execute {cmd_test['command']}", has_message, 
-                                f"Message: {response['data'].get('message', 'None')}")
-                elif cmd_test.get("allow_null_result"):
-                    # Allow null result (e.g., getuser for non-existent user)
-                    result = response["data"].get("result")
-                    self.log_test(f"Execute {cmd_test['command']}", True, 
-                                f"Result: {result}")
+                data = response["data"]
+                tier = data.get("tier", "")
+                level = data.get("level", 0)
+                stars = data.get("stars", 0)
+                title = data.get("title", "")
+                
+                legend_tier_correct = tier == "legend"
+                level_30_or_higher = level >= 30
+                stars_valid = 1 <= stars <= 5
+                title_legend = "легенда" in title.lower() or "legend" in title.lower()
+                
+                self.log_test("Legend tier - tier correct", legend_tier_correct, 
+                            f"Tier: {tier} (should be 'legend')")
+                self.log_test("Legend tier - level 30+", level_30_or_higher, 
+                            f"Level: {level} (should be 30+)")
+                self.log_test("Legend tier - stars", stars_valid, 
+                            f"Stars: {stars}")
+                self.log_test("Legend tier - title", title_legend, 
+                            f"Title: '{title}'")
+            else:
+                self.log_test("Legend tier verification", False, 
+                            f"Failed to get level after setting XP: {response['data']}")
+        else:
+            self.log_test("Legend tier verification", False, 
+                        f"Failed to set XP: {response['data']}")
+
+    async def test_stars_system_verification(self):
+        """Test Stars system with different XP levels"""
+        print("\n=== Testing Stars System Verification ===")
+        
+        admin_id = 765963392
+        
+        # Test different XP levels and expected stars
+        test_cases = [
+            {"xp": 500, "expected_level": 4, "expected_tier": "base", "expected_stars_range": (4, 5)},
+            {"xp": 1500, "expected_level": 7, "expected_tier": "medium", "expected_stars_range": (2, 4)},
+            {"xp": 5000, "expected_level": 12, "expected_tier": "rare", "expected_stars_range": (1, 3)},
+        ]
+        
+        for i, test_case in enumerate(test_cases):
+            xp = test_case["xp"]
+            expected_level = test_case["expected_level"]
+            expected_tier = test_case["expected_tier"]
+            expected_stars_range = test_case["expected_stars_range"]
+            
+            # Set XP
+            data = {"telegram_id": admin_id, "amount": xp}
+            response = await self.make_request("POST", "/dev/set-xp", data)
+            
+            if response["status_code"] == 200:
+                # Get level info
+                response = await self.make_request("GET", f"/users/{admin_id}/level")
+                
+                if response["status_code"] == 200 and response["data"].get("status") == "ok":
+                    data = response["data"]
+                    level = data.get("level", 0)
+                    tier = data.get("tier", "")
+                    stars = data.get("stars", 0)
+                    
+                    level_correct = level == expected_level
+                    tier_correct = tier == expected_tier
+                    stars_in_range = expected_stars_range[0] <= stars <= expected_stars_range[1]
+                    
+                    self.log_test(f"Stars test {i+1} - level", level_correct, 
+                                f"XP {xp} → Level {level} (expected {expected_level})")
+                    self.log_test(f"Stars test {i+1} - tier", tier_correct, 
+                                f"XP {xp} → Tier {tier} (expected {expected_tier})")
+                    self.log_test(f"Stars test {i+1} - stars", stars_in_range, 
+                                f"XP {xp} → Stars {stars} (expected {expected_stars_range[0]}-{expected_stars_range[1]})")
                 else:
-                    # Check for expected keys in result
-                    result = response["data"].get("result", {})
-                    expected_keys = cmd_test.get("expected_keys", [])
-                    if result is not None:
-                        has_keys = all(key in result for key in expected_keys)
-                        self.log_test(f"Execute {cmd_test['command']}", has_keys, 
-                                    f"Has keys: {expected_keys}")
-                    else:
-                        self.log_test(f"Execute {cmd_test['command']}", False, 
-                                    f"No result data returned")
+                    self.log_test(f"Stars test {i+1}", False, 
+                                f"Failed to get level for XP {xp}")
             else:
-                self.log_test(f"Execute {cmd_test['command']}", False, 
-                            f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_dev_execute_invalid_command(self):
-        """Test invalid command through POST /api/dev/execute"""
-        print("\n=== Testing Invalid Dev Execute Command ===")
-        
-        data = {"telegram_id": ADMIN_IDS[0], "command": "unknown_cmd", "args": []}
-        response = await self.make_request("POST", "/dev/execute", data)
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "error":
-            message = response["data"].get("message", "")
-            self.log_test("Invalid command error", "неизвестная команда" in message.lower(), 
-                         f"Error message: {message}")
-        else:
-            self.log_test("Invalid command error", False, 
-                         f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_data_modification_verification(self):
-        """Verify that commands actually modify data correctly"""
-        print("\n=== Testing Data Modification Verification ===")
-        
-        # 1. Set XP to a known value
-        data = {"telegram_id": ADMIN_IDS[0], "amount": 2500}
-        response = await self.make_request("POST", "/dev/set-xp", data)
-        
-        if response["status_code"] == 200:
-            # 2. Get level to verify XP was set
-            response = await self.make_request("GET", f"/dev/get-level/{ADMIN_IDS[0]}")
-            if response["status_code"] == 200:
-                xp = response["data"].get("xp", 0)
-                self.log_test("XP modification verification", xp == 2500, f"XP set to 2500, got {xp}")
-            else:
-                self.log_test("XP modification verification", False, "Failed to get level after setting XP")
-        else:
-            self.log_test("XP modification verification", False, "Failed to set XP")
-
-        # 3. Reset streak and verify
-        data = {"telegram_id": ADMIN_IDS[0]}
-        response = await self.make_request("POST", "/dev/reset-streak", data)
-        
-        if response["status_code"] == 200:
-            # 4. Get level to verify streak was reset
-            response = await self.make_request("GET", f"/dev/get-level/{ADMIN_IDS[0]}")
-            if response["status_code"] == 200:
-                streak = response["data"].get("streak", -1)
-                self.log_test("Streak reset verification", streak == 0, f"Streak reset to 0, got {streak}")
-            else:
-                self.log_test("Streak reset verification", False, "Failed to get level after resetting streak")
-        else:
-            self.log_test("Streak reset verification", False, "Failed to reset streak")
+                self.log_test(f"Stars test {i+1}", False, 
+                            f"Failed to set XP to {xp}")
 
     async def run_all_tests(self):
-        """Run all dev command tests"""
-        print("🚀 Starting RUDN Schedule Dev Commands Backend Testing")
+        """Run all Level System v3.0 tests"""
+        print("🚀 Starting RUDN Schedule Level System v3.0 Backend Testing")
         print(f"Backend URL: {BACKEND_URL}")
-        print(f"Admin IDs: {ADMIN_IDS}")
-        print(f"Non-admin ID: {NON_ADMIN_ID}")
         
         # Run all test methods
-        await self.test_dev_execute_help()
-        await self.test_dev_add_xp()
-        await self.test_dev_set_xp()
-        await self.test_dev_get_level()
-        await self.test_dev_reset_streak()
-        await self.test_dev_execute_commands()
-        await self.test_dev_execute_invalid_command()
-        await self.test_data_modification_verification()
+        await self.test_user_level_endpoint()
+        await self.test_xp_rewards_info_endpoint()
+        await self.test_xp_breakdown_endpoint()
+        await self.test_xp_history_endpoint()
+        await self.test_daily_xp_endpoint()
+        await self.test_recalculate_xp_endpoint()
+        await self.test_legend_tier_verification()
+        await self.test_stars_system_verification()
         
         # Print summary
         print(f"\n{'='*60}")
-        print(f"🏁 TEST SUMMARY")
+        print(f"🏁 LEVEL SYSTEM v3.0 TEST SUMMARY")
         print(f"{'='*60}")
         print(f"Total Tests: {self.total_tests}")
         print(f"✅ Passed: {self.passed_tests}")
@@ -325,7 +438,7 @@ class DevCommandTester:
 
 async def main():
     """Main test runner"""
-    async with DevCommandTester() as tester:
+    async with LevelSystemTester() as tester:
         success = await tester.run_all_tests()
         return 0 if success else 1
 

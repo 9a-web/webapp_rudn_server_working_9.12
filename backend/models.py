@@ -1917,6 +1917,8 @@ class UserProfilePublic(BaseModel):
     xp_current_level: int = 0
     xp_next_level: int = 100
     xp_progress: float = 0.0
+    stars: int = 1
+    level_title: str = ""
     
     # Streak
     visit_streak_current: int = 0
