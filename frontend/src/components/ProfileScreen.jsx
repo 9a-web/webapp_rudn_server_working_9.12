@@ -377,19 +377,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
-          {/* === Единый скроллируемый контейнер === */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}
-          >
-
-          {/* ===== ШАПКА ПРОФИЛЯ с граффити-фоном ===== */}
+          {/* ===== ШАПКА ПРОФИЛЯ с граффити-фоном (всегда видна) ===== */}
           <div style={{
             position: 'relative',
             width: '100%',
@@ -397,6 +385,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             flexDirection: 'column',
             alignItems: 'center',
             overflow: 'hidden',
+            flexShrink: 0,
           }}>
             {/* Граффити как фоновый слой шапки */}
             {headerGraffitiUrl && (
@@ -713,7 +702,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
           </div>{/* ===== КОНЕЦ ШАПКИ С ГРАФФИТИ-ФОНОМ ===== */}
 
-          {/* Табы — sticky при скролле */}
+          {/* Табы — фиксированы под шапкой */}
           <div
             ref={tabsContainerRef}
             style={{
@@ -725,8 +714,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
               padding: '15px 20px',
-              position: 'sticky',
-              top: 0,
               zIndex: 10,
               backgroundColor: '#000000',
               width: '100%',
@@ -791,6 +778,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             ))}
           </div>{/* конец табов */}
 
+          {/* === Скроллируемый контейнер только для контента табов === */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              width: '100%',
+            }}
+          >
           {/* Контент табов */}
           <div
             style={{
@@ -1131,7 +1127,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </div>{/* конец контента табов */}
 
           </div>{/* === Конец скроллируемого контейнера === */}
 
