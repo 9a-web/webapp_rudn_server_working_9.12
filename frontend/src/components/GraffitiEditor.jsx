@@ -529,27 +529,26 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             background: 'rgba(255,255,255,0.02)',
           }}
         >
-          {/* Ghost preview профиля */}
+          {/* Ghost preview профиля — точная копия расположения из ProfileScreen */}
           <div style={{
             position: 'absolute',
             inset: 0,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             pointerEvents: 'none',
             opacity: 0.18,
             zIndex: 1,
-            padding: '8px 12px 10px',
-            gap: '3px',
           }}>
-            {/* Avatar ghost */}
+            {/* Avatar — marginTop:12, 140x140 */}
             <div style={{
-              width: '72px',
-              height: '72px',
-              borderRadius: '24px',
+              marginTop: '12px',
+              width: '140px',
+              height: '140px',
+              borderRadius: '44px',
               overflow: 'hidden',
-              border: '2px solid rgba(255,255,255,0.3)',
+              border: '3px solid rgba(255, 255, 255, 0.12)',
               flexShrink: 0,
             }}>
               {profilePhoto ? (
@@ -574,58 +573,58 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
                   justifyContent: 'center',
                   color: '#FFF',
                   fontWeight: 700,
-                  fontSize: '22px',
+                  fontSize: '36px',
                 }}>
                   {initial}
                 </div>
               )}
             </div>
 
-            {/* Online/Offline + Level бейджи */}
+            {/* Online/Offline + Level бейджи — marginTop:12, gap:16 */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              marginTop: '2px',
+              marginTop: '12px',
+              gap: '16px',
             }}>
               {/* Online/Offline */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '3px 10px',
-                borderRadius: '14px',
+                gap: '8px',
+                padding: '6px 14px',
+                borderRadius: '20px',
                 backgroundColor: 'rgba(255, 255, 255, 0.08)',
               }}>
                 <div style={{
-                  width: '6px',
-                  height: '6px',
+                  width: '8px',
+                  height: '8px',
                   borderRadius: '50%',
                   backgroundColor: '#4ADE80',
                 }} />
                 <span style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 500,
-                  fontSize: '9px',
+                  fontSize: '12px',
                   color: '#FFFFFF',
                 }}>
                   Online
                 </span>
               </div>
 
-              {/* Level бейдж */}
+              {/* Level бейдж — padding:6px 14px, borderRadius:20, bg gold */}
               <div style={{
-                padding: '3px 10px',
-                borderRadius: '14px',
+                padding: '6px 14px',
+                borderRadius: '20px',
                 background: '#F8B94C',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '2px',
+                gap: '4px',
               }}>
                 <span style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '9px',
+                  fontSize: '12px',
                   color: '#1c1c1c',
                 }}>
                   LV. {profileData?.level ?? 1}
@@ -633,61 +632,118 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
               </div>
             </div>
 
-            {/* Username ghost */}
-            <span style={{
+            {/* Юзернейм — marginTop:8, fontSize:47, lineHeight:1.1 */}
+            <div style={{
+              marginTop: '8px',
               fontFamily: "'Proxima Nova ExCn', sans-serif",
               fontWeight: 800,
-              fontSize: '26px',
+              fontSize: '47px',
               color: '#FFFFFF',
               textAlign: 'center',
               lineHeight: 1.1,
             }}>
               {displayName}
-            </span>
+            </div>
 
-            {/* Group + Trophy + Streak ghost */}
+            {/* Группа + Trophy + Streak — marginTop:-6, fontSize:16 */}
             {groupName && (
               <div style={{
+                marginTop: '-6px',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '16px',
+                color: '#FF4E9D',
+                textAlign: 'center',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                justifyContent: 'center',
               }}>
+                {groupName}
                 <span style={{
                   fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
-                  fontSize: '11px',
-                  color: '#FF4E9D',
-                  textAlign: 'center',
-                }}>
-                  {groupName}
-                </span>
-                <span style={{
-                  fontFamily: "'Poppins', sans-serif",
-                  fontWeight: 600,
-                  fontSize: '10px',
+                  fontSize: '14.5px',
                   color: '#FFB54E',
+                  marginLeft: '8px',
                 }}>
                   🏆 🔥{profileData?.visit_streak_current ?? 0}
                 </span>
               </div>
             )}
 
-            {/* Stats ghost: Друзья / Уровень / $RDN */}
+            {/* Статистика: Друзья / Уровень / $RDN — marginTop:10, gap:40 */}
             <div style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: '24px',
-              marginTop: '3px',
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              marginTop: '10px',
+              gap: '40px',
             }}>
-              {[
-                { val: profileData?.friends_count ?? 0, label: 'Друзья' },
-                { val: profileData?.total_points ?? 0, label: '$RDN' },
-              ].map((s) => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '13px', color: '#FFBE4E' }}>{s.val}</div>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '9px', color: '#FFF' }}>{s.label}</div>
-                </div>
-              ))}
+              {/* Друзья */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '21px',
+                  color: '#FFBE4E',
+                  lineHeight: 1.2,
+                }}>
+                  {profileData?.friends_count ?? 0}
+                </span>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  color: '#FFFFFF',
+                  marginTop: '2px',
+                }}>
+                  Друзья
+                </span>
+              </div>
+
+              {/* Уровень (тир) */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '24px',
+                  lineHeight: 1.2,
+                  color: '#FFBE4E',
+                }}>
+                  Base
+                </span>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  color: '#FFFFFF',
+                  marginTop: '2px',
+                }}>
+                  Уровень
+                </span>
+              </div>
+
+              {/* $RDN */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '21px',
+                  color: '#FFBE4E',
+                  lineHeight: 1.2,
+                }}>
+                  {profileData?.total_points ?? 0}
+                </span>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  color: '#FFFFFF',
+                  marginTop: '2px',
+                }}>
+                  $RDN
+                </span>
+              </div>
             </div>
           </div>
 
