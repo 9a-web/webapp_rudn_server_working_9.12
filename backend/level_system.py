@@ -335,22 +335,25 @@ async def recalculate_xp_for_user(db, telegram_id: int) -> dict:
     message_xp = min(messages_sent * XP_REWARDS["message_sent"], max_message_xp)
     xp += message_xp
     
-    # Обновляем в БД
+    # Обновляем в БД (учитываем bonus_xp от dev-команд)
+    bonus_xp = stats.get("bonus_xp", 0) if stats else 0
+    total_xp = xp + bonus_xp
+    
     await db.user_stats.update_one(
         {"telegram_id": telegram_id},
-        {"$set": {"xp": xp}},
+        {"$set": {"xp": total_xp}},
         upsert=True,
     )
     
-    info = calculate_level_info(xp)
+    info = calculate_level_info(total_xp)
     logger.info(
         f"📊 Recalculated XP for user={telegram_id}: "
-        f"{xp} XP → LV.{info['level']} ({info['tier']})"
+        f"{total_xp} XP (organic={xp}, bonus={bonus_xp}) → LV.{info['level']} ({info['tier']})"
     )
     
     return {
         "telegram_id": telegram_id,
-        "xp": xp,
+        "xp": total_xp,
         "breakdown": {
             "tasks": completed_tasks * XP_REWARDS["task_complete"],
             "achievements": sum(a.get("points", 0) for a in achievements),
@@ -363,6 +366,7 @@ async def recalculate_xp_for_user(db, telegram_id: int) -> dict:
             "referrals": referral_connections * XP_REWARDS["referral"],
             "group_tasks": group_tasks_completed * XP_REWARDS["group_task_complete"],
             "messages": message_xp,
+            "bonus": bonus_xp,
         },
         **info,
     }

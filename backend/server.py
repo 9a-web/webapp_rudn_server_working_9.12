@@ -1626,8 +1626,16 @@ async def dev_add_xp(data: DevAddXPRequest):
     """Добавить XP пользователю (только для админов, только для себя)"""
     _check_admin(data.telegram_id)
     try:
-        result = await award_xp(db, data.telegram_id, data.amount, reason="dev_command")
-        return {"status": "ok", "message": f"+{data.amount} XP", **result}
+        # Сохраняем в bonus_xp чтобы recalculate не затёр
+        await db.user_stats.update_one(
+            {"telegram_id": data.telegram_id},
+            {"$inc": {"bonus_xp": data.amount, "xp": data.amount}},
+            upsert=True
+        )
+        stats = await db.user_stats.find_one({"telegram_id": data.telegram_id})
+        total_xp = stats.get("xp", 0) if stats else data.amount
+        info = calculate_level_info(total_xp)
+        return {"status": "ok", "message": f"+{data.amount} XP (всего: {total_xp})", "xp": total_xp, **info}
     except Exception as e:
         logger.error(f"Dev add-xp error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1638,14 +1646,20 @@ async def dev_set_xp(data: DevSetXPRequest):
     """Установить XP пользователю (только для админов, только для себя)"""
     _check_admin(data.telegram_id)
     try:
-        # Устанавливаем XP напрямую
+        # Считаем органический XP и вычисляем bonus
+        stats = await db.user_stats.find_one({"telegram_id": data.telegram_id})
+        current_xp = stats.get("xp", 0) if stats else 0
+        current_bonus = stats.get("bonus_xp", 0) if stats else 0
+        organic_xp = current_xp - current_bonus
+        new_bonus = max(0, data.amount - organic_xp)
+        
         await db.user_stats.update_one(
             {"telegram_id": data.telegram_id},
-            {"$set": {"xp": data.amount}},
+            {"$set": {"xp": data.amount, "bonus_xp": new_bonus}},
             upsert=True
         )
         info = calculate_level_info(data.amount)
-        return {"status": "ok", "message": f"XP установлен: {data.amount}", **info}
+        return {"status": "ok", "message": f"XP установлен: {data.amount} (bonus: {new_bonus})", "xp": data.amount, **info}
     except Exception as e:
         logger.error(f"Dev set-xp error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1745,20 +1759,34 @@ async def dev_execute_command(data: DevCommandRequest):
             amount = int(args[0]) if args else 100
             if amount <= 0 or amount > 100000:
                 return {"status": "error", "message": "Сумма XP: 1–100000"}
-            result = await award_xp(db, tid, amount, reason="dev_command")
-            return {"status": "ok", "result": result, "message": f"+{amount} XP"}
+            # Сохраняем в bonus_xp чтобы recalculate не затёр
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$inc": {"bonus_xp": amount, "xp": amount}},
+                upsert=True
+            )
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            total_xp = stats.get("xp", 0) if stats else amount
+            info = calculate_level_info(total_xp)
+            return {"status": "ok", "result": info, "message": f"+{amount} XP (всего: {total_xp})"}
         
         elif command == "setxp":
             amount = int(args[0]) if args else 0
             if amount < 0 or amount > 1000000:
                 return {"status": "error", "message": "XP: 0–1000000"}
+            # Считаем органический XP и вычисляем bonus
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            current_xp = stats.get("xp", 0) if stats else 0
+            current_bonus = stats.get("bonus_xp", 0) if stats else 0
+            organic_xp = current_xp - current_bonus
+            new_bonus = max(0, amount - organic_xp)
             await db.user_stats.update_one(
                 {"telegram_id": tid},
-                {"$set": {"xp": amount}},
+                {"$set": {"xp": amount, "bonus_xp": new_bonus}},
                 upsert=True
             )
             info = calculate_level_info(amount)
-            return {"status": "ok", "result": info, "message": f"XP = {amount}"}
+            return {"status": "ok", "result": info, "message": f"XP = {amount} (bonus: {new_bonus})"}
         
         elif command == "resetstreak":
             await db.user_stats.update_one(
