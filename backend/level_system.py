@@ -166,16 +166,16 @@ DAILY_XP_LIMITS = {
 
 # Описания XP-наград для отображения на фронтенде
 XP_REWARDS_INFO = [
-    {"action": "daily_visit",       "xp": 3,   "label": "Ежедневный визит",        "emoji": "📅", "limit": "1/день"},
-    {"action": "task_complete",     "xp": 5,   "label": "Выполнение задачи",       "emoji": "✅", "limit": None},
-    {"action": "task_on_time_bonus","xp": 3,   "label": "Задача вовремя (бонус)",  "emoji": "⏰", "limit": None},
-    {"action": "group_task_complete","xp": 8,  "label": "Групповая задача",        "emoji": "👥", "limit": None},
-    {"action": "referral",          "xp": 100, "label": "Приглашение друга",       "emoji": "🔗", "limit": None},
-    {"action": "schedule_view",     "xp": 1,   "label": "Просмотр расписания",     "emoji": "📋", "limit": "3/день"},
-    {"action": "message_sent",      "xp": 1,   "label": "Отправка сообщения",      "emoji": "💬", "limit": "5/день"},
-    {"action": "streak_7_bonus",    "xp": 20,  "label": "Стрик 7 дней",            "emoji": "🔥", "limit": "каждые 7 дней"},
-    {"action": "streak_14_bonus",   "xp": 40,  "label": "Стрик 14 дней",           "emoji": "🔥🔥", "limit": "каждые 14 дней"},
-    {"action": "streak_30_bonus",   "xp": 80,  "label": "Стрик 30 дней",           "emoji": "🔥🔥🔥", "limit": "каждые 30 дней"},
+    {"action": "daily_visit",       "xp": 3,   "label": "Ежедневный визит",        "limit": "1/день"},
+    {"action": "task_complete",     "xp": 5,   "label": "Выполнение задачи",       "limit": None},
+    {"action": "task_on_time_bonus","xp": 3,   "label": "Задача вовремя (бонус)",  "limit": None},
+    {"action": "group_task_complete","xp": 8,  "label": "Групповая задача",        "limit": None},
+    {"action": "referral",          "xp": 100, "label": "Приглашение друга",       "limit": None},
+    {"action": "schedule_view",     "xp": 1,   "label": "Просмотр расписания",     "limit": "3/день"},
+    {"action": "message_sent",      "xp": 1,   "label": "Отправка сообщения",      "limit": "5/день"},
+    {"action": "streak_7_bonus",    "xp": 20,  "label": "Стрик 7 дней",            "limit": "каждые 7 дней"},
+    {"action": "streak_14_bonus",   "xp": 40,  "label": "Стрик 14 дней",           "limit": "каждые 14 дней"},
+    {"action": "streak_30_bonus",   "xp": 80,  "label": "Стрик 30 дней",           "limit": "каждые 30 дней"},
 ]
 
 

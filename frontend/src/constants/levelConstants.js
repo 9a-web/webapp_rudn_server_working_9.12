@@ -1,12 +1,13 @@
 /**
- * Общие константы системы уровней v3.0.
- * Единственный источник правды — дублирование запрещено.
+ * Общие константы системы уровней v4.0.
+ * Единственный источник правды.
  *
- * v3.0:
- * - Добавлен тир Legend
- * - Система звёзд (1-5 ⭐) внутри тиров
- * - Русские и английские названия тиров
- * - Конфиг для roadmap и анимаций
+ * v4.0 — Психология-ориентированный дизайн:
+ * - Тир Legend
+ * - Система звёзд (1-5) внутри тиров
+ * - Русские названия тиров
+ * - Конфиг для roadmap, анимаций
+ * - Без эмодзи — всё через иконки
  */
 
 export const TIER_CONFIG = {
@@ -14,46 +15,51 @@ export const TIER_CONFIG = {
     name: 'Base',
     nameRu: 'Базовый',
     color: '#4D85FF',
+    colorSecondary: '#6EA0FF',
     gradient: 'linear-gradient(135deg, #4D85FF, #6EA0FF)',
-    emoji: '🔵',
     glow: 'rgba(77, 133, 255, 0.35)',
-    icon: '🛡️',
+    bgTint: 'rgba(77, 133, 255, 0.08)',
+    borderTint: 'rgba(77, 133, 255, 0.20)',
   },
   medium: {
     name: 'Medium',
     nameRu: 'Средний',
     color: '#FFA04D',
+    colorSecondary: '#FFB976',
     gradient: 'linear-gradient(135deg, #FFA04D, #FFB976)',
-    emoji: '🟠',
     glow: 'rgba(255, 160, 77, 0.35)',
-    icon: '⚔️',
+    bgTint: 'rgba(255, 160, 77, 0.08)',
+    borderTint: 'rgba(255, 160, 77, 0.20)',
   },
   rare: {
     name: 'Rare',
     nameRu: 'Редкий',
     color: '#B84DFF',
+    colorSecondary: '#D47FFF',
     gradient: 'linear-gradient(135deg, #B84DFF, #D47FFF)',
-    emoji: '🟣',
     glow: 'rgba(184, 77, 255, 0.35)',
-    icon: '👑',
+    bgTint: 'rgba(184, 77, 255, 0.08)',
+    borderTint: 'rgba(184, 77, 255, 0.20)',
   },
   premium: {
     name: 'Premium',
     nameRu: 'Премиум',
     color: '#FF4EEA',
+    colorSecondary: '#FFCE2E',
     gradient: 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)',
-    emoji: '✨',
     glow: 'rgba(255, 78, 234, 0.4)',
-    icon: '💎',
+    bgTint: 'rgba(255, 78, 234, 0.08)',
+    borderTint: 'rgba(255, 78, 234, 0.20)',
   },
   legend: {
     name: 'Legend',
     nameRu: 'Легенда',
     color: '#FFD700',
+    colorSecondary: '#FF6B00',
     gradient: 'linear-gradient(135deg, #FFD700, #FF6B00, #FF0080, #7B2FFF)',
-    emoji: '🏆',
     glow: 'rgba(255, 215, 0, 0.5)',
-    icon: '🌟',
+    bgTint: 'rgba(255, 215, 0, 0.08)',
+    borderTint: 'rgba(255, 215, 0, 0.25)',
   },
 };
 
@@ -65,59 +71,28 @@ export const TIER_RANGES = [
   { min: 30, max: 99, tier: 'legend' },
 ];
 
-/** Порядок тиров для roadmap и сравнения */
 export const TIER_ORDER = ['base', 'medium', 'rare', 'premium', 'legend'];
 
-/**
- * Генерация звёзд (⭐) для отображения.
- * @param {number} count — количество звёзд (1-5)
- * @returns {string}
- */
 export function renderStars(count) {
   return '★'.repeat(Math.min(Math.max(count || 1, 1), 5));
 }
 
-/**
- * Получить конфиг тира по названию.
- * @param {string} tier
- * @returns {object}
- */
 export function getTierConfig(tier) {
   return TIER_CONFIG[(tier || 'base').toLowerCase()] || TIER_CONFIG.base;
 }
 
-/**
- * Получить цвет тира.
- * @param {string} tier
- * @returns {string}
- */
 export function getTierColor(tier) {
   return getTierConfig(tier).color;
 }
 
-/**
- * Получить название тира.
- * @param {string} tier
- * @returns {string}
- */
 export function getTierName(tier) {
   return getTierConfig(tier).name;
 }
 
-/**
- * Получить русское название тира.
- * @param {string} tier
- * @returns {string}
- */
 export function getTierNameRu(tier) {
   return getTierConfig(tier).nameRu || getTierConfig(tier).name;
 }
 
-/**
- * Индекс тира в порядке прогрессии (0 = base, 4 = legend).
- * @param {string} tier
- * @returns {number}
- */
 export function getTierIndex(tier) {
   const idx = TIER_ORDER.indexOf((tier || 'base').toLowerCase());
   return idx >= 0 ? idx : 0;
