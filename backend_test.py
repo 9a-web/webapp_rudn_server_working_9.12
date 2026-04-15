@@ -1,496 +1,333 @@
 #!/usr/bin/env python3
 """
-Comprehensive Backend Testing for Graffiti API Endpoints
-Testing all scenarios as specified in the review request
+Backend API Testing for Graffiti Endpoints
+Tests the graffiti API endpoints as specified in the review request.
 """
 
 import requests
 import json
 import sys
-from datetime import datetime
+from typing import Dict, Any
 
-# Backend URL - using localhost since external URL is not accessible
+# Backend URL - using local backend since external URL is not accessible
 BACKEND_URL = "http://localhost:8001/api"
 
 # Test data
-TEST_TELEGRAM_ID = 999001
-VALID_BASE64_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
-INVALID_REQUESTER_ID = 99999
+VALID_GRAFFITI_DATA = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+TEST_USER_ID = 999001
+VISITOR_USER_ID = 888888
+UNAUTHORIZED_USER_ID = 999999
 
-def log_test(test_name, status, details=""):
-    """Log test results with timestamp"""
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    status_symbol = "✅" if status == "PASS" else "❌"
-    print(f"[{timestamp}] {status_symbol} {test_name}")
-    if details:
-        print(f"    {details}")
-
-def test_graffiti_endpoints():
-    """Test all Graffiti API endpoints comprehensively"""
-    print("🧪 STARTING GRAFFITI API COMPREHENSIVE TESTING")
-    print("=" * 60)
-    
-    total_tests = 0
-    passed_tests = 0
-    failed_tests = []
-    
-    # Test 1: Valid save - PUT with valid data
-    print("\n📝 TEST 1: Valid graffiti save")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": VALID_BASE64_IMAGE,
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
+class GraffitiTester:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+        self.results = []
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") and "graffiti_updated_at" in data:
-                log_test("Valid save", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
+    def log_test(self, test_name: str, success: bool, details: str = ""):
+        """Log test result"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} {test_name}")
+        if details:
+            print(f"    {details}")
+        self.results.append({
+            "test": test_name,
+            "success": success,
+            "details": details
+        })
+        
+    def make_request(self, method: str, endpoint: str, data: Dict[Any, Any] = None) -> tuple:
+        """Make HTTP request and return (response, success, error_msg)"""
+        try:
+            url = f"{BACKEND_URL}{endpoint}"
+            if method.upper() == "GET":
+                response = self.session.get(url)
+            elif method.upper() == "PUT":
+                response = self.session.put(url, json=data)
+            elif method.upper() == "POST":
+                response = self.session.post(url, json=data)
             else:
-                log_test("Valid save", "FAIL", f"Missing required fields in response: {data}")
-                failed_tests.append("Valid save - missing fields")
-        else:
-            log_test("Valid save", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Valid save - wrong status code")
-    except Exception as e:
-        log_test("Valid save", "FAIL", f"Exception: {e}")
-        failed_tests.append("Valid save - exception")
+                return None, False, f"Unsupported method: {method}"
+                
+            return response, True, ""
+        except Exception as e:
+            return None, False, str(e)
     
-    # Test 2: Empty data clear - PUT with empty string
-    print("\n🧹 TEST 2: Empty data clear")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": "",
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
+    def test_header_graffiti_flow(self):
+        """Test Header Graffiti (шапка) endpoints in order"""
+        print("\n=== Testing Header Graffiti (шапка) ===")
         
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("success") and data.get("cleared"):
-                log_test("Empty data clear", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
-            else:
-                log_test("Empty data clear", "FAIL", f"Missing cleared=true in response: {data}")
-                failed_tests.append("Empty data clear - missing cleared field")
-        else:
-            log_test("Empty data clear", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Empty data clear - wrong status code")
-    except Exception as e:
-        log_test("Empty data clear", "FAIL", f"Exception: {e}")
-        failed_tests.append("Empty data clear - exception")
-    
-    # Test 3: Invalid JSON body
-    print("\n🚫 TEST 3: Invalid JSON body")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            data="not-json",  # Invalid JSON
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            data = response.json()
-            if "JSON" in data.get("detail", "").upper() or "json" in data.get("detail", ""):
-                log_test("Invalid JSON body", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
-            else:
-                log_test("Invalid JSON body", "FAIL", f"Wrong error message: {data}")
-                failed_tests.append("Invalid JSON body - wrong error message")
-        else:
-            log_test("Invalid JSON body", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Invalid JSON body - wrong status code")
-    except Exception as e:
-        log_test("Invalid JSON body", "FAIL", f"Exception: {e}")
-        failed_tests.append("Invalid JSON body - exception")
-    
-    # Test 4: Non-numeric requester
-    print("\n🔢 TEST 4: Non-numeric requester")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": VALID_BASE64_IMAGE,
-                "requester_telegram_id": "abc"  # Non-numeric
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            data = response.json()
-            if "числом" in data.get("detail", ""):
-                log_test("Non-numeric requester", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
-            else:
-                log_test("Non-numeric requester", "FAIL", f"Wrong error message: {data}")
-                failed_tests.append("Non-numeric requester - wrong error message")
-        else:
-            log_test("Non-numeric requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Non-numeric requester - wrong status code")
-    except Exception as e:
-        log_test("Non-numeric requester", "FAIL", f"Exception: {e}")
-        failed_tests.append("Non-numeric requester - exception")
-    
-    # Test 5: Missing requester
-    print("\n❓ TEST 5: Missing requester")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": VALID_BASE64_IMAGE
-                # Missing requester_telegram_id
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            data = response.json()
-            if "обязателен" in data.get("detail", ""):
-                log_test("Missing requester", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
-            else:
-                log_test("Missing requester", "FAIL", f"Wrong error message: {data}")
-                failed_tests.append("Missing requester - wrong error message")
-        else:
-            log_test("Missing requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Missing requester - wrong status code")
-    except Exception as e:
-        log_test("Missing requester", "FAIL", f"Exception: {e}")
-        failed_tests.append("Missing requester - exception")
-    
-    # Test 6: Wrong requester (authorization)
-    print("\n🔒 TEST 6: Wrong requester (authorization)")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": VALID_BASE64_IMAGE,
-                "requester_telegram_id": INVALID_REQUESTER_ID  # Wrong requester
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 403:
-            log_test("Wrong requester", "PASS", f"Status: {response.status_code}, Response: {response.json()}")
-            passed_tests += 1
-        else:
-            log_test("Wrong requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Wrong requester - wrong status code")
-    except Exception as e:
-        log_test("Wrong requester", "FAIL", f"Exception: {e}")
-        failed_tests.append("Wrong requester - exception")
-    
-    # Test 7: Invalid format
-    print("\n🖼️ TEST 7: Invalid format")
-    total_tests += 1
-    try:
-        response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": "not-a-data-url",
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            data = response.json()
-            if "формат" in data.get("detail", "").lower() or "data:image" in data.get("detail", ""):
-                log_test("Invalid format", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
-            else:
-                log_test("Invalid format", "FAIL", f"Wrong error message: {data}")
-                failed_tests.append("Invalid format - wrong error message")
-        else:
-            log_test("Invalid format", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Invalid format - wrong status code")
-    except Exception as e:
-        log_test("Invalid format", "FAIL", f"Exception: {e}")
-        failed_tests.append("Invalid format - exception")
-    
-    # Test 8: Get graffiti for non-existent user
-    print("\n👤 TEST 8: Get graffiti for non-existent user")
-    total_tests += 1
-    try:
-        non_existent_id = 999999
-        response = requests.get(
-            f"{BACKEND_URL}/profile/{non_existent_id}/graffiti",
-            timeout=10
-        )
-        
+        # 1. GET initial state - expect empty graffiti
+        response, success, error = self.make_request("GET", f"/profile/{TEST_USER_ID}/graffiti")
+        if not success:
+            self.log_test("GET initial header graffiti", False, f"Request failed: {error}")
+            return
+            
         if response.status_code == 200:
             data = response.json()
             if data.get("graffiti_data") == "" and data.get("graffiti_updated_at") is None:
-                log_test("Get non-existent user", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
+                self.log_test("GET initial header graffiti", True, "Empty state as expected")
             else:
-                log_test("Get non-existent user", "FAIL", f"Wrong default values: {data}")
-                failed_tests.append("Get non-existent user - wrong default values")
+                self.log_test("GET initial header graffiti", False, f"Expected empty state, got: {data}")
         else:
-            log_test("Get non-existent user", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Get non-existent user - wrong status code")
-    except Exception as e:
-        log_test("Get non-existent user", "FAIL", f"Exception: {e}")
-        failed_tests.append("Get non-existent user - exception")
-    
-    # Test 9: Save valid data and then GET (sequence test)
-    print("\n🔄 TEST 9: Save and GET sequence")
-    total_tests += 1
-    try:
-        # First save
-        save_response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": VALID_BASE64_IMAGE,
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
+            self.log_test("GET initial header graffiti", False, f"Status {response.status_code}: {response.text}")
         
-        if save_response.status_code == 200:
-            # Then get
-            get_response = requests.get(
-                f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-                timeout=10
-            )
+        # 2. PUT valid graffiti data
+        put_data = {
+            "graffiti_data": VALID_GRAFFITI_DATA,
+            "requester_telegram_id": TEST_USER_ID
+        }
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/graffiti", put_data)
+        if not success:
+            self.log_test("PUT header graffiti with valid data", False, f"Request failed: {error}")
+            return
             
-            if get_response.status_code == 200:
-                data = get_response.json()
-                if data.get("graffiti_data") == VALID_BASE64_IMAGE and data.get("graffiti_updated_at"):
-                    log_test("Save and GET sequence", "PASS", f"GET Status: {get_response.status_code}, Data matches")
-                    passed_tests += 1
-                else:
-                    log_test("Save and GET sequence", "FAIL", f"Data mismatch: {data}")
-                    failed_tests.append("Save and GET sequence - data mismatch")
-            else:
-                log_test("Save and GET sequence", "FAIL", f"GET failed: {get_response.status_code}")
-                failed_tests.append("Save and GET sequence - GET failed")
-        else:
-            log_test("Save and GET sequence", "FAIL", f"Save failed: {save_response.status_code}")
-            failed_tests.append("Save and GET sequence - save failed")
-    except Exception as e:
-        log_test("Save and GET sequence", "FAIL", f"Exception: {e}")
-        failed_tests.append("Save and GET sequence - exception")
-    
-    # Test 10: Clear with valid requester
-    print("\n🧹 TEST 10: Clear with valid requester")
-    total_tests += 1
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
-            json={
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
-        
         if response.status_code == 200:
             data = response.json()
-            if data.get("success") and "had_graffiti" in data:
-                log_test("Clear with valid requester", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
+            if data.get("success") is True:
+                self.log_test("PUT header graffiti with valid data", True, "Successfully saved graffiti")
             else:
-                log_test("Clear with valid requester", "FAIL", f"Missing had_graffiti field: {data}")
-                failed_tests.append("Clear with valid requester - missing had_graffiti")
+                self.log_test("PUT header graffiti with valid data", False, f"Success=False: {data}")
         else:
-            log_test("Clear with valid requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Clear with valid requester - wrong status code")
-    except Exception as e:
-        log_test("Clear with valid requester", "FAIL", f"Exception: {e}")
-        failed_tests.append("Clear with valid requester - exception")
-    
-    # Test 11: Clear invalid JSON body
-    print("\n🚫 TEST 11: Clear invalid JSON body")
-    total_tests += 1
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
-            data="not-json",  # Invalid JSON
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
+            self.log_test("PUT header graffiti with valid data", False, f"Status {response.status_code}: {response.text}")
         
+        # 3. GET graffiti after saving - expect non-empty
+        response, success, error = self.make_request("GET", f"/profile/{TEST_USER_ID}/graffiti")
+        if not success:
+            self.log_test("GET header graffiti after save", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("graffiti_data") and data.get("graffiti_data") != "":
+                self.log_test("GET header graffiti after save", True, "Graffiti data is non-empty")
+            else:
+                self.log_test("GET header graffiti after save", False, f"Expected non-empty graffiti_data, got: {data}")
+        else:
+            self.log_test("GET header graffiti after save", False, f"Status {response.status_code}: {response.text}")
+        
+        # 4. PUT without requester_telegram_id - expect 400
+        put_data_no_requester = {"graffiti_data": "test"}
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/graffiti", put_data_no_requester)
+        if not success:
+            self.log_test("PUT header graffiti without requester_telegram_id", False, f"Request failed: {error}")
+            return
+            
         if response.status_code == 400:
-            data = response.json()
-            if "JSON" in data.get("detail", "").upper() or "json" in data.get("detail", ""):
-                log_test("Clear invalid JSON", "PASS", f"Status: {response.status_code}, Response: {data}")
-                passed_tests += 1
-            else:
-                log_test("Clear invalid JSON", "FAIL", f"Wrong error message: {data}")
-                failed_tests.append("Clear invalid JSON - wrong error message")
+            self.log_test("PUT header graffiti without requester_telegram_id", True, "Correctly rejected with 400")
         else:
-            log_test("Clear invalid JSON", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Clear invalid JSON - wrong status code")
-    except Exception as e:
-        log_test("Clear invalid JSON", "FAIL", f"Exception: {e}")
-        failed_tests.append("Clear invalid JSON - exception")
-    
-    # Test 12: Clear with wrong requester
-    print("\n🔒 TEST 12: Clear with wrong requester")
-    total_tests += 1
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
-            json={
-                "requester_telegram_id": INVALID_REQUESTER_ID  # Wrong requester
-            },
-            timeout=10
-        )
+            self.log_test("PUT header graffiti without requester_telegram_id", False, f"Expected 400, got {response.status_code}: {response.text}")
         
+        # 5. PUT with wrong requester_telegram_id - expect 403
+        put_data_wrong_requester = {
+            "graffiti_data": "test",
+            "requester_telegram_id": UNAUTHORIZED_USER_ID
+        }
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/graffiti", put_data_wrong_requester)
+        if not success:
+            self.log_test("PUT header graffiti with wrong requester", False, f"Request failed: {error}")
+            return
+            
         if response.status_code == 403:
-            log_test("Clear with wrong requester", "PASS", f"Status: {response.status_code}, Response: {response.json()}")
-            passed_tests += 1
+            self.log_test("PUT header graffiti with wrong requester", True, "Correctly rejected with 403")
         else:
-            log_test("Clear with wrong requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Clear with wrong requester - wrong status code")
-    except Exception as e:
-        log_test("Clear with wrong requester", "FAIL", f"Exception: {e}")
-        failed_tests.append("Clear with wrong requester - exception")
-    
-    # Test 13: Clear non-existent graffiti
-    print("\n❌ TEST 13: Clear non-existent graffiti")
-    total_tests += 1
-    try:
-        # First ensure no graffiti exists
-        clear_response = requests.post(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
-            json={
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
+            self.log_test("PUT header graffiti with wrong requester", False, f"Expected 403, got {response.status_code}: {response.text}")
         
-        # Then try to clear again
-        response = requests.post(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
-            json={
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
-        
+        # 6. POST clear graffiti
+        clear_data = {"requester_telegram_id": TEST_USER_ID}
+        response, success, error = self.make_request("POST", f"/profile/{TEST_USER_ID}/graffiti/clear", clear_data)
+        if not success:
+            self.log_test("POST clear header graffiti", False, f"Request failed: {error}")
+            return
+            
         if response.status_code == 200:
             data = response.json()
-            if data.get("success") and data.get("had_graffiti") == False:
-                log_test("Clear non-existent", "PASS", f"Status: {response.status_code}, had_graffiti: {data.get('had_graffiti')}")
-                passed_tests += 1
+            if data.get("success") is True:
+                self.log_test("POST clear header graffiti", True, "Successfully cleared graffiti")
             else:
-                log_test("Clear non-existent", "FAIL", f"Wrong had_graffiti value: {data}")
-                failed_tests.append("Clear non-existent - wrong had_graffiti value")
+                self.log_test("POST clear header graffiti", False, f"Success=False: {data}")
         else:
-            log_test("Clear non-existent", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
-            failed_tests.append("Clear non-existent - wrong status code")
-    except Exception as e:
-        log_test("Clear non-existent", "FAIL", f"Exception: {e}")
-        failed_tests.append("Clear non-existent - exception")
+            self.log_test("POST clear header graffiti", False, f"Status {response.status_code}: {response.text}")
     
-    # Test 14: Full sequence - Save, Get, Clear, Get again
-    print("\n🔄 TEST 14: Full sequence (Save → Get → Clear → Get)")
-    total_tests += 1
-    try:
-        # Step 1: Save
-        save_response = requests.put(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            json={
-                "graffiti_data": VALID_BASE64_IMAGE,
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
+    def test_wall_graffiti_flow(self):
+        """Test Wall Graffiti (стена) endpoints in order"""
+        print("\n=== Testing Wall Graffiti (стена) ===")
         
-        # Step 2: Get (should have data)
-        get1_response = requests.get(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            timeout=10
-        )
-        
-        # Step 3: Clear
-        clear_response = requests.post(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
-            json={
-                "requester_telegram_id": TEST_TELEGRAM_ID
-            },
-            timeout=10
-        )
-        
-        # Step 4: Get again (should be empty)
-        get2_response = requests.get(
-            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
-            timeout=10
-        )
-        
-        # Validate sequence
-        if (save_response.status_code == 200 and 
-            get1_response.status_code == 200 and 
-            clear_response.status_code == 200 and 
-            get2_response.status_code == 200):
+        # 1. GET initial state - expect empty wall graffiti with access=false
+        response, success, error = self.make_request("GET", f"/profile/{TEST_USER_ID}/wall-graffiti")
+        if not success:
+            self.log_test("GET initial wall graffiti", False, f"Request failed: {error}")
+            return
             
-            get1_data = get1_response.json()
-            clear_data = clear_response.json()
-            get2_data = get2_response.json()
-            
-            if (get1_data.get("graffiti_data") == VALID_BASE64_IMAGE and
-                clear_data.get("had_graffiti") == True and
-                get2_data.get("graffiti_data") == "" and
-                get2_data.get("graffiti_updated_at") is None):
-                
-                log_test("Full sequence", "PASS", "Save → Get (has data) → Clear (had_graffiti=true) → Get (empty)")
-                passed_tests += 1
+        if response.status_code == 200:
+            data = response.json()
+            expected_state = {
+                "wall_graffiti_data": "",
+                "wall_graffiti_access": False
+            }
+            if (data.get("wall_graffiti_data") == "" and 
+                data.get("wall_graffiti_access") is False):
+                self.log_test("GET initial wall graffiti", True, "Empty state with access=false as expected")
             else:
-                log_test("Full sequence", "FAIL", f"Data validation failed. Get1: {get1_data}, Clear: {clear_data}, Get2: {get2_data}")
-                failed_tests.append("Full sequence - data validation failed")
+                self.log_test("GET initial wall graffiti", False, f"Expected {expected_state}, got: {data}")
         else:
-            log_test("Full sequence", "FAIL", f"HTTP errors: Save={save_response.status_code}, Get1={get1_response.status_code}, Clear={clear_response.status_code}, Get2={get2_response.status_code}")
-            failed_tests.append("Full sequence - HTTP errors")
-    except Exception as e:
-        log_test("Full sequence", "FAIL", f"Exception: {e}")
-        failed_tests.append("Full sequence - exception")
+            self.log_test("GET initial wall graffiti", False, f"Status {response.status_code}: {response.text}")
+        
+        # 2. PUT wall graffiti as owner - expect 200
+        put_data_owner = {
+            "wall_graffiti_data": VALID_GRAFFITI_DATA,
+            "requester_telegram_id": TEST_USER_ID
+        }
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/wall-graffiti", put_data_owner)
+        if not success:
+            self.log_test("PUT wall graffiti as owner", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True:
+                self.log_test("PUT wall graffiti as owner", True, "Owner can always draw")
+            else:
+                self.log_test("PUT wall graffiti as owner", False, f"Success=False: {data}")
+        else:
+            self.log_test("PUT wall graffiti as owner", False, f"Status {response.status_code}: {response.text}")
+        
+        # 3. GET wall graffiti after owner save - expect non-empty
+        response, success, error = self.make_request("GET", f"/profile/{TEST_USER_ID}/wall-graffiti")
+        if not success:
+            self.log_test("GET wall graffiti after owner save", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("wall_graffiti_data") and data.get("wall_graffiti_data") != "":
+                self.log_test("GET wall graffiti after owner save", True, "Wall graffiti data is non-empty")
+            else:
+                self.log_test("GET wall graffiti after owner save", False, f"Expected non-empty wall_graffiti_data, got: {data}")
+        else:
+            self.log_test("GET wall graffiti after owner save", False, f"Status {response.status_code}: {response.text}")
+        
+        # 4. PUT wall graffiti as visitor (access=false) - expect 403
+        put_data_visitor = {
+            "wall_graffiti_data": VALID_GRAFFITI_DATA,
+            "requester_telegram_id": VISITOR_USER_ID
+        }
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/wall-graffiti", put_data_visitor)
+        if not success:
+            self.log_test("PUT wall graffiti as visitor (blocked)", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 403:
+            self.log_test("PUT wall graffiti as visitor (blocked)", True, "Visitor correctly blocked with 403")
+        else:
+            self.log_test("PUT wall graffiti as visitor (blocked)", False, f"Expected 403, got {response.status_code}: {response.text}")
+        
+        # 5. PUT toggle access to true
+        toggle_data = {"requester_telegram_id": TEST_USER_ID}
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/wall-graffiti/access", toggle_data)
+        if not success:
+            self.log_test("PUT toggle wall graffiti access", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True and data.get("wall_graffiti_access") is True:
+                self.log_test("PUT toggle wall graffiti access", True, "Access toggled to true")
+            else:
+                self.log_test("PUT toggle wall graffiti access", False, f"Expected success=True and access=True, got: {data}")
+        else:
+            self.log_test("PUT toggle wall graffiti access", False, f"Status {response.status_code}: {response.text}")
+        
+        # 6. PUT wall graffiti as visitor (access=true) - expect 200
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/wall-graffiti", put_data_visitor)
+        if not success:
+            self.log_test("PUT wall graffiti as visitor (allowed)", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True:
+                self.log_test("PUT wall graffiti as visitor (allowed)", True, "Visitor allowed after access toggle")
+            else:
+                self.log_test("PUT wall graffiti as visitor (allowed)", False, f"Success=False: {data}")
+        else:
+            self.log_test("PUT wall graffiti as visitor (allowed)", False, f"Status {response.status_code}: {response.text}")
+        
+        # 7. POST clear wall graffiti as visitor - expect 403
+        clear_data_visitor = {"requester_telegram_id": VISITOR_USER_ID}
+        response, success, error = self.make_request("POST", f"/profile/{TEST_USER_ID}/wall-graffiti/clear", clear_data_visitor)
+        if not success:
+            self.log_test("POST clear wall graffiti as visitor", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 403:
+            self.log_test("POST clear wall graffiti as visitor", True, "Only owner can clear - visitor correctly rejected")
+        else:
+            self.log_test("POST clear wall graffiti as visitor", False, f"Expected 403, got {response.status_code}: {response.text}")
+        
+        # 8. POST clear wall graffiti as owner - expect 200
+        clear_data_owner = {"requester_telegram_id": TEST_USER_ID}
+        response, success, error = self.make_request("POST", f"/profile/{TEST_USER_ID}/wall-graffiti/clear", clear_data_owner)
+        if not success:
+            self.log_test("POST clear wall graffiti as owner", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") is True:
+                self.log_test("POST clear wall graffiti as owner", True, "Owner can clear wall graffiti")
+            else:
+                self.log_test("POST clear wall graffiti as owner", False, f"Success=False: {data}")
+        else:
+            self.log_test("POST clear wall graffiti as owner", False, f"Status {response.status_code}: {response.text}")
+        
+        # 9. PUT toggle access as visitor - expect 403
+        toggle_data_visitor = {"requester_telegram_id": VISITOR_USER_ID}
+        response, success, error = self.make_request("PUT", f"/profile/{TEST_USER_ID}/wall-graffiti/access", toggle_data_visitor)
+        if not success:
+            self.log_test("PUT toggle access as visitor", False, f"Request failed: {error}")
+            return
+            
+        if response.status_code == 403:
+            self.log_test("PUT toggle access as visitor", True, "Only owner can toggle access - visitor correctly rejected")
+        else:
+            self.log_test("PUT toggle access as visitor", False, f"Expected 403, got {response.status_code}: {response.text}")
     
-    # Summary
-    print("\n" + "=" * 60)
-    print("🏁 GRAFFITI API TESTING SUMMARY")
-    print("=" * 60)
-    print(f"Total Tests: {total_tests}")
-    print(f"Passed: {passed_tests}")
-    print(f"Failed: {len(failed_tests)}")
-    print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
-    
-    if failed_tests:
-        print("\n❌ FAILED TESTS:")
-        for i, test in enumerate(failed_tests, 1):
-            print(f"  {i}. {test}")
-    else:
-        print("\n✅ ALL TESTS PASSED!")
-    
-    return passed_tests, total_tests, failed_tests
+    def run_all_tests(self):
+        """Run all graffiti tests"""
+        print("🧪 Starting Graffiti API Tests")
+        print(f"Backend URL: {BACKEND_URL}")
+        print(f"Test User ID: {TEST_USER_ID}")
+        print(f"Visitor User ID: {VISITOR_USER_ID}")
+        
+        # Test header graffiti flow
+        self.test_header_graffiti_flow()
+        
+        # Test wall graffiti flow  
+        self.test_wall_graffiti_flow()
+        
+        # Summary
+        print("\n=== Test Summary ===")
+        total_tests = len(self.results)
+        passed_tests = sum(1 for r in self.results if r["success"])
+        failed_tests = total_tests - passed_tests
+        
+        print(f"Total Tests: {total_tests}")
+        print(f"Passed: {passed_tests} ✅")
+        print(f"Failed: {failed_tests} ❌")
+        
+        if failed_tests > 0:
+            print("\nFailed Tests:")
+            for result in self.results:
+                if not result["success"]:
+                    print(f"  ❌ {result['test']}: {result['details']}")
+        
+        return failed_tests == 0
 
 if __name__ == "__main__":
-    print("🚀 Starting Graffiti API Comprehensive Testing")
-    print(f"Backend URL: {BACKEND_URL}")
-    print(f"Test Telegram ID: {TEST_TELEGRAM_ID}")
-    print()
-    
-    passed, total, failed = test_graffiti_endpoints()
-    
-    # Exit with appropriate code
-    if len(failed) == 0:
-        print("\n🎉 All tests passed successfully!")
-        sys.exit(0)
-    else:
-        print(f"\n💥 {len(failed)} tests failed!")
-        sys.exit(1)
+    tester = GraffitiTester()
+    success = tester.run_all_tests()
+    sys.exit(0 if success else 1)

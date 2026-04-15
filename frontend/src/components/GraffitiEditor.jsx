@@ -3,56 +3,71 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Pen, Eraser, Undo2, Redo2, Trash2, AlertTriangle, Check } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 
-// Фиксированное логическое разрешение canvas — покрывает шапку профиля
+/* ────────────────────────────────────────────────
+   Фиксированное логическое разрешение canvas
+   ──────────────────────────────────────────────── */
 const GRAFFITI_W = 500;
 const GRAFFITI_H = 350;
 
-const PEN_SIZES = [2, 4, 8, 14];
+const PEN_SIZES   = [2, 4, 8, 14];
 const ERASER_SIZES = [8, 14, 22, 32];
-const DEFAULT_PEN_SIZE = 4;
+const DEFAULT_PEN_SIZE    = 4;
 const DEFAULT_ERASER_SIZE = 14;
 const COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 const MAX_HISTORY = 30;
 
+/**
+ * GraffitiEditor — полноэкранный редактор граффити для шапки профиля.
+ *
+ * Исправления:
+ * - FIX-1: loadFromServer теперь возвращает Promise, резолвящийся ПОСЛЕ img.onload
+ * - FIX-2: loading state сбрасывается при каждом открытии
+ * - FIX-3: clearing ref блокирует saveToServer во время clearCanvas
+ * - FIX-4: handleDone ожидает завершение save
+ * - FIX-5: setupCanvas корректно использует saveSnapshot через ref
+ */
 const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, profileData, onGraffitiSaved }) => {
   // === Canvas refs ===
-  const canvasRef = useRef(null);
-  const ctxRef = useRef(null);
-  const drawing = useRef(false);
-  const lastPt = useRef(null);
-  const colorRef = useRef('#F8B94C');
-  const sizeRef = useRef(DEFAULT_PEN_SIZE);
-  const toolRef = useRef('pen');
+  const canvasRef    = useRef(null);
+  const ctxRef       = useRef(null);
+  const drawing      = useRef(false);
+  const lastPt       = useRef(null);
+  const colorRef     = useRef('#F8B94C');
+  const sizeRef      = useRef(DEFAULT_PEN_SIZE);
+  const toolRef      = useRef('pen');
   const loadedImgRef = useRef(null);
-  const dirty = useRef(false);
-  const savingLock = useRef(false);
+  const dirty        = useRef(false);
+  const savingLock   = useRef(false);
   const cancelledRef = useRef(false);
+  const clearingRef  = useRef(false); // FIX-3: защита от race condition clear + save
 
-  // === Undo/Redo ===
-  const history = useRef([]);
+  // === Undo / Redo ===
+  const history    = useRef([]);
   const historyIdx = useRef(-1);
+  // FIX-5: saveSnapshot ref для стабильной ссылки в setupCanvas
+  const saveSnapshotRef = useRef(null);
 
   // === UI state ===
-  const [tool, setTool] = useState('pen');
-  const [color, setColor] = useState('#F8B94C');
-  const [size, setSize] = useState(DEFAULT_PEN_SIZE);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const [hasContent, setHasContent] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved | error
-  const [loading, setLoading] = useState(false);
+  const [tool, setTool]                   = useState('pen');
+  const [color, setColor]                 = useState('#F8B94C');
+  const [size, setSize]                   = useState(DEFAULT_PEN_SIZE);
+  const [canUndo, setCanUndo]             = useState(false);
+  const [canRedo, setCanRedo]             = useState(false);
+  const [hasContent, setHasContent]       = useState(false);
+  const [saveStatus, setSaveStatus]       = useState('idle'); // idle | saving | saved | error
+  const [loading, setLoading]             = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgLoaded, setImgLoaded]         = useState(false);
 
   // Sync state → refs
   useEffect(() => { colorRef.current = color; }, [color]);
-  useEffect(() => { sizeRef.current = size; }, [size]);
-  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { sizeRef.current  = size;  }, [size]);
+  useEffect(() => { toolRef.current  = tool;  }, [tool]);
 
   // === Canvas helpers ===
   const checkHasContent = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
+    const ctx    = ctxRef.current;
     if (!canvas || !ctx) { setHasContent(false); return false; }
     try {
       const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -66,7 +81,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
 
   const saveSnapshot = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
+    const ctx    = ctxRef.current;
     if (!canvas || !ctx) return;
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const idx = historyIdx.current;
@@ -80,21 +95,24 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
     checkHasContent();
   }, [checkHasContent]);
 
+  // FIX-5: обновляем ref при изменении saveSnapshot
+  useEffect(() => { saveSnapshotRef.current = saveSnapshot; }, [saveSnapshot]);
+
   const setupCanvas = useCallback((canvas, skipSnapshot) => {
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const tW = GRAFFITI_W * dpr;
-    const tH = GRAFFITI_H * dpr;
+    const tW  = GRAFFITI_W * dpr;
+    const tH  = GRAFFITI_H * dpr;
     if (canvas.width === tW && canvas.height === tH && ctxRef.current) return;
-    canvas.width = tW;
+    canvas.width  = tW;
     canvas.height = tH;
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.lineCap = 'round';
+    ctx.lineCap  = 'round';
     ctx.lineJoin = 'round';
     ctxRef.current = ctx;
-    if (!skipSnapshot) saveSnapshot();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // FIX-5: вызываем через ref для актуальной ссылки
+    if (!skipSnapshot && saveSnapshotRef.current) saveSnapshotRef.current();
   }, []);
 
   // === Coordinate helper ===
@@ -103,12 +121,12 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     let cx, cy;
-    if (e.touches?.length > 0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+    if (e.touches?.length > 0)        { cx = e.touches[0].clientX;        cy = e.touches[0].clientY; }
     else if (e.changedTouches?.length > 0) { cx = e.changedTouches[0].clientX; cy = e.changedTouches[0].clientY; }
-    else { cx = e.clientX; cy = e.clientY; }
+    else                               { cx = e.clientX;                   cy = e.clientY; }
     return {
       x: (cx - rect.left) * (GRAFFITI_W / rect.width),
-      y: (cy - rect.top) * (GRAFFITI_H / rect.height),
+      y: (cy - rect.top)  * (GRAFFITI_H / rect.height),
     };
   }, []);
 
@@ -143,29 +161,35 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
   const clearCanvas = useCallback(async () => {
     const ctx = ctxRef.current;
     if (!ctx) return;
+    // FIX-3: помечаем что идёт очистка — блокирует saveToServer
+    clearingRef.current = true;
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, GRAFFITI_W, GRAFFITI_H);
-    history.current = [];
+    history.current    = [];
     historyIdx.current = -1;
     setCanUndo(false);
     setCanRedo(false);
     saveSnapshot();
-    dirty.current = true;
+    dirty.current = false; // FIX-3: сразу false, чтобы handleDone не пытался сохранить
     setHasContent(false);
     setShowClearConfirm(false);
     if (hapticFeedback) hapticFeedback('notification', 'success');
     if (user?.id) {
       try {
         await friendsAPI.clearGraffiti(user.id);
-        dirty.current = false;
-      } catch (err) { console.error('[GraffitiEditor] Clear error:', err); }
+        if (onGraffitiSaved) onGraffitiSaved(null);
+      } catch (err) {
+        console.error('[GraffitiEditor] Clear error:', err);
+      }
     }
-  }, [saveSnapshot, hapticFeedback, user?.id]);
+    clearingRef.current = false;
+  }, [saveSnapshot, hapticFeedback, user?.id, onGraffitiSaved]);
 
   // === Save ===
   const saveToServer = useCallback(async () => {
     const canvas = canvasRef.current;
-    if (!canvas || !user?.id || !dirty.current || savingLock.current) return;
+    // FIX-3: не сохраняем если идёт очистка
+    if (!canvas || !user?.id || !dirty.current || savingLock.current || clearingRef.current) return;
     savingLock.current = true;
     setSaveStatus('saving');
     try {
@@ -200,49 +224,64 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
   }, [user?.id, onGraffitiSaved]);
 
   // === Load ===
-  const loadFromServer = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !user?.id) return;
-    if (loadedImgRef.current) {
-      loadedImgRef.current.onload = null;
-      loadedImgRef.current.onerror = null;
-      loadedImgRef.current = null;
-    }
-    cancelledRef.current = false;
-    setLoading(true);
-    try {
-      const data = await friendsAPI.getGraffiti(user.id);
-      if (cancelledRef.current) { setLoading(false); return; }
-      if (!data?.graffiti_data) { setLoading(false); return; }
-      const img = new window.Image();
-      loadedImgRef.current = img;
-      img.onload = () => {
-        if (cancelledRef.current || !canvasRef.current) { setLoading(false); return; }
-        const ctx = ctxRef.current;
-        if (!ctx) { setLoading(false); return; }
-        const iW = img.naturalWidth, iH = img.naturalHeight;
-        if (iW > 0 && iH > 0) {
-          const iA = iW / iH, cA = GRAFFITI_W / GRAFFITI_H;
-          let dW, dH, dX, dY;
-          if (Math.abs(iA - cA) < 0.05) { dW = GRAFFITI_W; dH = GRAFFITI_H; dX = 0; dY = 0; }
-          else if (iA > cA) { dW = GRAFFITI_W; dH = GRAFFITI_W / iA; dX = 0; dY = (GRAFFITI_H - dH) / 2; }
-          else { dH = GRAFFITI_H; dW = GRAFFITI_H * iA; dX = (GRAFFITI_W - dW) / 2; dY = 0; }
-          ctx.drawImage(img, dX, dY, dW, dH);
-        } else {
-          ctx.drawImage(img, 0, 0, GRAFFITI_W, GRAFFITI_H);
-        }
-        saveSnapshot();
-        dirty.current = false;
-        setHasContent(true);
-        setLoading(false);
+  // FIX-1: возвращает Promise, который резолвится ПОСЛЕ загрузки изображения
+  const loadFromServer = useCallback(() => {
+    return new Promise(async (resolve) => {
+      const canvas = canvasRef.current;
+      if (!canvas || !user?.id) { resolve(false); return; }
+      // Отмена предыдущей загрузки
+      if (loadedImgRef.current) {
+        loadedImgRef.current.onload  = null;
+        loadedImgRef.current.onerror = null;
         loadedImgRef.current = null;
-      };
-      img.onerror = () => { setLoading(false); loadedImgRef.current = null; };
-      img.src = data.graffiti_data;
-    } catch (err) {
-      console.error('[GraffitiEditor] Load error:', err);
-      setLoading(false);
-    }
+      }
+      cancelledRef.current = false;
+      setLoading(true);
+      try {
+        const data = await friendsAPI.getGraffiti(user.id);
+        if (cancelledRef.current) { setLoading(false); resolve(false); return; }
+        if (!data?.graffiti_data)  { setLoading(false); resolve(false); return; }
+
+        const img = new window.Image();
+        loadedImgRef.current = img;
+
+        img.onload = () => {
+          if (cancelledRef.current || !canvasRef.current) { setLoading(false); resolve(false); return; }
+          const ctx = ctxRef.current;
+          if (!ctx) { setLoading(false); resolve(false); return; }
+          const iW = img.naturalWidth, iH = img.naturalHeight;
+          if (iW > 0 && iH > 0) {
+            const iA = iW / iH, cA = GRAFFITI_W / GRAFFITI_H;
+            let dW, dH, dX, dY;
+            if (Math.abs(iA - cA) < 0.05) { dW = GRAFFITI_W; dH = GRAFFITI_H; dX = 0; dY = 0; }
+            else if (iA > cA) { dW = GRAFFITI_W; dH = GRAFFITI_W / iA; dX = 0; dY = (GRAFFITI_H - dH) / 2; }
+            else               { dH = GRAFFITI_H; dW = GRAFFITI_H * iA; dX = (GRAFFITI_W - dW) / 2; dY = 0; }
+            ctx.drawImage(img, dX, dY, dW, dH);
+          } else {
+            ctx.drawImage(img, 0, 0, GRAFFITI_W, GRAFFITI_H);
+          }
+          // FIX-1: snapshot сохраняется ПОСЛЕ отрисовки — это будет единственный начальный snapshot
+          saveSnapshot();
+          dirty.current = false;
+          setHasContent(true);
+          setLoading(false);
+          loadedImgRef.current = null;
+          resolve(true); // изображение загружено
+        };
+
+        img.onerror = () => {
+          setLoading(false);
+          loadedImgRef.current = null;
+          resolve(false);
+        };
+
+        img.src = data.graffiti_data;
+      } catch (err) {
+        console.error('[GraffitiEditor] Load error:', err);
+        setLoading(false);
+        resolve(false);
+      }
+    });
   }, [user?.id, saveSnapshot]);
 
   // === Canvas event listeners ===
@@ -291,31 +330,31 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
     const onUp = () => {
       if (drawing.current) {
         drawing.current = false;
-        lastPt.current = null;
+        lastPt.current  = null;
         const ctx = ctxRef.current;
         if (ctx) ctx.globalCompositeOperation = 'source-over';
         saveSnapshot();
       }
     };
 
-    canvas.addEventListener('touchstart', onDown, { passive: false });
-    canvas.addEventListener('touchmove', onMove, { passive: false });
-    canvas.addEventListener('touchend', onUp);
+    canvas.addEventListener('touchstart',  onDown, { passive: false });
+    canvas.addEventListener('touchmove',   onMove, { passive: false });
+    canvas.addEventListener('touchend',    onUp);
     canvas.addEventListener('touchcancel', onUp);
-    canvas.addEventListener('mousedown', onDown);
-    canvas.addEventListener('mousemove', onMove);
-    canvas.addEventListener('mouseup', onUp);
-    canvas.addEventListener('mouseleave', onUp);
+    canvas.addEventListener('mousedown',   onDown);
+    canvas.addEventListener('mousemove',   onMove);
+    canvas.addEventListener('mouseup',     onUp);
+    canvas.addEventListener('mouseleave',  onUp);
 
     return () => {
-      canvas.removeEventListener('touchstart', onDown);
-      canvas.removeEventListener('touchmove', onMove);
-      canvas.removeEventListener('touchend', onUp);
+      canvas.removeEventListener('touchstart',  onDown);
+      canvas.removeEventListener('touchmove',   onMove);
+      canvas.removeEventListener('touchend',    onUp);
       canvas.removeEventListener('touchcancel', onUp);
-      canvas.removeEventListener('mousedown', onDown);
-      canvas.removeEventListener('mousemove', onMove);
-      canvas.removeEventListener('mouseup', onUp);
-      canvas.removeEventListener('mouseleave', onUp);
+      canvas.removeEventListener('mousedown',   onDown);
+      canvas.removeEventListener('mousemove',   onMove);
+      canvas.removeEventListener('mouseup',     onUp);
+      canvas.removeEventListener('mouseleave',  onUp);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, setupCanvas, saveSnapshot, getXY]);
@@ -325,8 +364,9 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
     if (!isOpen || !user?.id) return;
     let cancelled = false;
     cancelledRef.current = false;
-    dirty.current = false;
-    history.current = [];
+    dirty.current    = false;
+    clearingRef.current = false;
+    history.current    = [];
     historyIdx.current = -1;
     setCanUndo(false);
     setCanRedo(false);
@@ -334,12 +374,16 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
     setSaveStatus('idle');
     setShowClearConfirm(false);
     setImgLoaded(false);
+    setLoading(false); // FIX-2: явно сбрасываем loading при каждом открытии
 
     const t = setTimeout(async () => {
       if (cancelled) return;
       if (canvasRef.current) setupCanvas(canvasRef.current, true);
-      await loadFromServer();
-      if (!checkHasContent()) {
+      // FIX-1: ждём реальной загрузки изображения
+      const loaded = await loadFromServer();
+      if (cancelled) return;
+      // Если ничего не загрузилось — создаём начальный пустой snapshot
+      if (!loaded) {
         saveSnapshot();
         dirty.current = false;
       }
@@ -357,30 +401,33 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
   useEffect(() => {
     if (!isOpen) {
       if (loadedImgRef.current) {
-        loadedImgRef.current.onload = null;
+        loadedImgRef.current.onload  = null;
         loadedImgRef.current.onerror = null;
         loadedImgRef.current = null;
       }
-      history.current = [];
+      history.current    = [];
       historyIdx.current = -1;
-      ctxRef.current = null;
-      dirty.current = false;
-      savingLock.current = false;
+      ctxRef.current     = null;
+      dirty.current      = false;
+      savingLock.current  = false;
+      clearingRef.current = false;
+      setLoading(false); // FIX-2: сбрасываем и при закрытии
     }
   }, [isOpen]);
 
   // === Handle "Готово" ===
-  const handleDone = useCallback(() => {
-    if (dirty.current) saveToServer();
+  // FIX-4: handleDone теперь async и ожидает save
+  const handleDone = useCallback(async () => {
+    if (dirty.current && !clearingRef.current) await saveToServer();
     if (hapticFeedback) hapticFeedback('impact', 'light');
     onClose();
   }, [saveToServer, hapticFeedback, onClose]);
 
   if (!isOpen) return null;
 
-  const initial = (user?.first_name?.[0] || user?.username?.[0] || '?').toUpperCase();
+  const initial     = (user?.first_name?.[0] || user?.username?.[0] || '?').toUpperCase();
   const displayName = (user?.username || user?.first_name || 'User').toUpperCase();
-  const groupName = userSettings?.group_name || '';
+  const groupName   = userSettings?.group_name || '';
 
   return (
     <motion.div
@@ -391,7 +438,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
       className="fixed inset-0 z-[400] flex flex-col"
       style={{ backgroundColor: '#000000' }}
     >
-      {/* Верхняя панель */}
+      {/* ─── Верхняя панель ─── */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -403,7 +450,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
           flexShrink: 0,
         }}
       >
-        <button onClick={() => { if (dirty.current) saveToServer(); onClose(); }}>
+        <button onClick={async () => { if (dirty.current && !clearingRef.current) await saveToServer(); onClose(); }}>
           <ChevronLeft style={{ width: '28px', height: '28px', color: 'rgba(255,255,255,0.7)' }} />
         </button>
 
@@ -415,7 +462,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             fontSize: '15px',
             color: '#F4F3FC',
           }}>
-            Граффити профиля
+            Граффити шапки
           </span>
           {saveStatus === 'saving' && (
             <span style={{ fontSize: '11px', color: 'rgba(248,185,76,0.7)', animation: 'pulse 1s infinite' }}>
@@ -457,7 +504,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
         </button>
       </motion.div>
 
-      {/* Основная область — Canvas + Preview */}
+      {/* ─── Основная область — Canvas + Preview ─── */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -482,7 +529,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             background: 'rgba(255,255,255,0.02)',
           }}
         >
-          {/* Ghost preview профиля — гайд для ориентации */}
+          {/* Ghost preview профиля */}
           <div style={{
             position: 'absolute',
             inset: 0,
@@ -686,7 +733,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
           )}
         </AnimatePresence>
 
-        {/* === ТУЛБАР === */}
+        {/* ─── ТУЛБАР ─── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

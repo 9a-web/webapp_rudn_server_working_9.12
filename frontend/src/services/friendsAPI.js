@@ -250,7 +250,7 @@ export const friendsAPI = {
     }
   },
 
-  // ========== Граффити ==========
+  // ========== Header Граффити (шапка) ==========
 
   getGraffiti: async (telegramId) => {
     try {
@@ -258,7 +258,7 @@ export const friendsAPI = {
       return response.data;
     } catch (error) {
       handleError(error);
-      throw error; // Fix F6: пробрасываем ошибку вызывающему коду для обработки
+      throw error;
     }
   },
 
@@ -278,6 +278,55 @@ export const friendsAPI = {
   clearGraffiti: async (telegramId) => {
     try {
       const response = await api.post(`/profile/${telegramId}/graffiti/clear`, {
+        requester_telegram_id: telegramId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  // ========== Wall Граффити (стена под шапкой) ==========
+
+  getWallGraffiti: async (telegramId) => {
+    try {
+      const response = await api.get(`/profile/${telegramId}/wall-graffiti`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  saveWallGraffiti: async (profileOwnerId, requesterId, graffitiData) => {
+    try {
+      const response = await api.put(`/profile/${profileOwnerId}/wall-graffiti`, {
+        wall_graffiti_data: graffitiData,
+        requester_telegram_id: requesterId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  clearWallGraffiti: async (telegramId) => {
+    try {
+      const response = await api.post(`/profile/${telegramId}/wall-graffiti/clear`, {
+        requester_telegram_id: telegramId,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  },
+
+  toggleWallGraffitiAccess: async (telegramId) => {
+    try {
+      const response = await api.put(`/profile/${telegramId}/wall-graffiti/access`, {
         requester_telegram_id: telegramId,
       });
       return response.data;

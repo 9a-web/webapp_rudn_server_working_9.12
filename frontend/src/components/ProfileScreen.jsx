@@ -12,6 +12,7 @@ import LKConnectionModal from './LKConnectionModal';
 import LevelDetailModal from './LevelDetailModal';
 import LevelUpModal from './LevelUpModal';
 import GraffitiEditor from './GraffitiEditor';
+import WallGraffiti from './WallGraffiti';
 import { getTierColor, getTierName, getTierConfig, renderStars } from '../constants/levelConstants';
 
 const ADMIN_UIDS = ['765963392', '1311283832'];
@@ -805,20 +806,28 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}
                 >
+                  {/* Инфо о шапке граффити */}
                   <div style={{
                     textAlign: 'center',
-                    padding: '16px 0',
+                    padding: '8px 0 0',
                     fontFamily: "'Poppins', sans-serif",
                     fontWeight: 500,
-                    fontSize: '13px',
-                    color: 'rgba(255,255,255,0.2)',
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.15)',
                   }}>
                     {headerGraffitiUrl
                       ? 'Граффити отображается в шапке профиля ✨'
-                      : 'Добавьте граффити через редактирование профиля 🎨'}
+                      : 'Добавьте граффити шапки через редактирование профиля 🎨'}
                   </div>
+
+                  {/* Стена граффити */}
+                  <WallGraffiti
+                    user={user}
+                    profileOwnerId={user?.id}
+                    hapticFeedback={hapticFeedback}
+                  />
                 </motion.div>
               ) : activeTab === 'friends' ? (
                 <motion.div
