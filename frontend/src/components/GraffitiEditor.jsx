@@ -40,6 +40,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
   const savingLock   = useRef(false);
   const cancelledRef = useRef(false);
   const clearingRef  = useRef(false); // FIX-3: защита от race condition clear + save
+  const canvasContainerRef = useRef(null); // Ref для контейнера canvas (для масштабирования ghost)
 
   // === Undo / Redo ===
   const history    = useRef([]);
@@ -58,11 +59,27 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
   const [loading, setLoading]             = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [imgLoaded, setImgLoaded]         = useState(false);
+  const [ghostScale, setGhostScale]       = useState(1); // Масштаб ghost-preview
 
   // Sync state → refs
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { sizeRef.current  = size;  }, [size]);
   useEffect(() => { toolRef.current  = tool;  }, [tool]);
+
+  // === Масштаб ghost-preview: контейнер может быть меньше 500px ===
+  useEffect(() => {
+    if (!isOpen) return;
+    const container = canvasContainerRef.current;
+    if (!container) return;
+    const updateScale = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0) setGhostScale(rect.width / GRAFFITI_W);
+    };
+    updateScale();
+    const ro = new ResizeObserver(updateScale);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [isOpen]);
 
   // === Canvas helpers ===
   const checkHasContent = useCallback(() => {
@@ -528,11 +545,18 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             border: '1.5px solid rgba(248,185,76,0.2)',
             background: 'rgba(255,255,255,0.02)',
           }}
+          ref={canvasContainerRef}
         >
           {/* Ghost preview профиля — точная копия расположения из ProfileScreen */}
+          {/* Фиксированный размер 500×350, масштабируется под реальный контейнер */}
           <div style={{
             position: 'absolute',
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: `${GRAFFITI_W}px`,
+            height: `${GRAFFITI_H}px`,
+            transformOrigin: 'top left',
+            transform: `scale(${ghostScale})`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
