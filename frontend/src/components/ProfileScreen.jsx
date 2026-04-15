@@ -399,6 +399,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             flexDirection: 'column',
             alignItems: 'center',
             overflow: 'hidden',
+            paddingBottom: '18px',
+            zIndex: 1,
           }}>
             {/* Граффити как фоновый слой шапки */}
             {headerGraffitiUrl && (
@@ -744,12 +746,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 key={tab.id}
                 ref={(el) => { tabRefs.current[tab.id] = el; }}
                 onClick={() => {
+                  // Мгновенный скролл наверх ДО смены таба — шапка видна сразу
+                  if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+                  }
                   setActiveTab(tab.id);
                   if (hapticFeedback) hapticFeedback('impact', 'light');
-                  // Скролл наверх при переключении таба — шапка всегда видна
-                  if (scrollContainerRef.current) {
-                    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
                   // Автоскролл к активному табу (горизонтальный)
                   const btn = tabRefs.current[tab.id];
                   const container = tabsContainerRef.current;
