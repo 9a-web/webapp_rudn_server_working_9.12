@@ -385,9 +385,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               flex: 1,
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
             }}
           >
 
@@ -400,7 +397,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             alignItems: 'center',
             overflow: 'hidden',
             paddingBottom: '18px',
-            zIndex: 1,
           }}>
             {/* Граффити как фоновый слой шапки */}
             {headerGraffitiUrl && (
@@ -717,7 +713,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
           </div>{/* ===== КОНЕЦ ШАПКИ С ГРАФФИТИ-ФОНОМ ===== */}
 
-          {/* Табы — sticky при скролле */}
+          {/* Табы */}
           <div
             ref={tabsContainerRef}
             style={{
@@ -729,12 +725,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
               padding: '15px 20px',
-              position: 'sticky',
-              top: 0,
-              zIndex: 10,
               backgroundColor: '#000000',
               width: '100%',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
               flexShrink: 0,
               minHeight: '56px',
               scrollBehavior: 'smooth',
