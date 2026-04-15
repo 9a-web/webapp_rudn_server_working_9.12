@@ -1020,9 +1020,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             display: 'flex',
             flexDirection: 'column',
             gap: '10px',
-            padding: '10px 4px',
-            marginTop: 'auto',
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+            padding: '6px 4px',
           }}
         >
           {/* Строка 1: Pen / Eraser + Undo/Redo + Clear */}
