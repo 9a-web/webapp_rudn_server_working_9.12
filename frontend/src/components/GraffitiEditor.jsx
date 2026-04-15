@@ -540,14 +540,14 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             pointerEvents: 'none',
             opacity: 0.18,
             zIndex: 1,
-            padding: '16px 12px 12px',
-            gap: '4px',
+            padding: '8px 12px 10px',
+            gap: '3px',
           }}>
             {/* Avatar ghost */}
             <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '28px',
+              width: '72px',
+              height: '72px',
+              borderRadius: '24px',
               overflow: 'hidden',
               border: '2px solid rgba(255,255,255,0.3)',
               flexShrink: 0,
@@ -574,50 +574,118 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
                   justifyContent: 'center',
                   color: '#FFF',
                   fontWeight: 700,
-                  fontSize: '24px',
+                  fontSize: '22px',
                 }}>
                   {initial}
                 </div>
               )}
             </div>
+
+            {/* Online/Offline + Level бейджи */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: '2px',
+            }}>
+              {/* Online/Offline */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 10px',
+                borderRadius: '14px',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              }}>
+                <div style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: '#4ADE80',
+                }} />
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '9px',
+                  color: '#FFFFFF',
+                }}>
+                  Online
+                </span>
+              </div>
+
+              {/* Level бейдж */}
+              <div style={{
+                padding: '3px 10px',
+                borderRadius: '14px',
+                background: '#F8B94C',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+              }}>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '9px',
+                  color: '#1c1c1c',
+                }}>
+                  LV. {profileData?.level ?? 1}
+                </span>
+              </div>
+            </div>
+
             {/* Username ghost */}
             <span style={{
               fontFamily: "'Proxima Nova ExCn', sans-serif",
               fontWeight: 800,
-              fontSize: '28px',
+              fontSize: '26px',
               color: '#FFFFFF',
               textAlign: 'center',
               lineHeight: 1.1,
             }}>
               {displayName}
             </span>
-            {/* Group ghost */}
+
+            {/* Group + Trophy + Streak ghost */}
             {groupName && (
-              <span style={{
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: '12px',
-                color: '#FF4E9D',
-                textAlign: 'center',
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
               }}>
-                {groupName}
-              </span>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '11px',
+                  color: '#FF4E9D',
+                  textAlign: 'center',
+                }}>
+                  {groupName}
+                </span>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '10px',
+                  color: '#FFB54E',
+                }}>
+                  🏆 🔥{profileData?.visit_streak_current ?? 0}
+                </span>
+              </div>
             )}
-            {/* Stats ghost */}
+
+            {/* Stats ghost: Друзья / Уровень / $RDN */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '28px',
-              marginTop: '4px',
+              gap: '24px',
+              marginTop: '3px',
             }}>
               {[
                 { val: profileData?.friends_count ?? 0, label: 'Друзья' },
-                { val: `LV.${profileData?.level ?? 1}`, label: 'Уровень' },
                 { val: profileData?.total_points ?? 0, label: '$RDN' },
               ].map((s) => (
                 <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '14px', color: '#FFBE4E' }}>{s.val}</div>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '10px', color: '#FFF' }}>{s.label}</div>
+                  <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: '13px', color: '#FFBE4E' }}>{s.val}</div>
+                  <div style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 500, fontSize: '9px', color: '#FFF' }}>{s.label}</div>
                 </div>
               ))}
             </div>
