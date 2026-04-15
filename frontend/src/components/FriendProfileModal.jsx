@@ -239,7 +239,7 @@ const FriendProfileModal = ({
                       </span>
                       {profile.stars > 0 && (
                         <span style={{ fontSize: '10px', color: tc.color, letterSpacing: '1px' }}>
-                          {'★'.repeat(Math.min(profile.stars || 1, 5))}
+                          {'★'.repeat(Math.min(profile.stars || 1, 4))}
                         </span>
                       )}
                     </div>

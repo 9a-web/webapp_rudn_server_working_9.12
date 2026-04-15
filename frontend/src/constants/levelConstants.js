@@ -65,16 +65,16 @@ export const TIER_CONFIG = {
 
 export const TIER_RANGES = [
   { min: 1,  max: 4,  tier: 'base' },
-  { min: 5,  max: 9,  tier: 'medium' },
-  { min: 10, max: 19, tier: 'rare' },
-  { min: 20, max: 29, tier: 'premium' },
-  { min: 30, max: 99, tier: 'legend' },
+  { min: 5,  max: 8,  tier: 'medium' },
+  { min: 9,  max: 12, tier: 'rare' },
+  { min: 13, max: 16, tier: 'premium' },
+  { min: 17, max: 20, tier: 'legend' },
 ];
 
 export const TIER_ORDER = ['base', 'medium', 'rare', 'premium', 'legend'];
 
 export function renderStars(count) {
-  return '★'.repeat(Math.min(Math.max(count || 1, 1), 5));
+  return '★'.repeat(Math.min(Math.max(count || 1, 1), 4));
 }
 
 export function getTierConfig(tier) {
