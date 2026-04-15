@@ -761,6 +761,93 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             }}
           />
 
+          {/* ─── Зоны видимости устройств (safe zones) ─── */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 3,
+          }}>
+            {/* Мобильная зона — самая узкая, центральная полоса */}
+            {/* Mobile ~375px screen / ~500px canvas ≈ 75% ширины, полная высота */}
+            <div style={{
+              position: 'absolute',
+              left: '12.5%',
+              right: '12.5%',
+              top: '1%',
+              bottom: '1%',
+              border: '1.5px dashed rgba(248,185,76,0.35)',
+              borderRadius: '12px',
+            }}>
+              <span style={{
+                position: 'absolute',
+                bottom: '4px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '9px',
+                color: 'rgba(248,185,76,0.5)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.5px',
+              }}>
+                📱 Мобильная
+              </span>
+            </div>
+
+            {/* Планшетная зона — шире мобильной, обрезает верх/низ */}
+            {/* Tablet ~768px screen, шире канваса → обрезает по высоте ~85% */}
+            <div style={{
+              position: 'absolute',
+              left: '2%',
+              right: '2%',
+              top: '8%',
+              bottom: '8%',
+              border: '1.5px dashed rgba(59,130,246,0.30)',
+              borderRadius: '16px',
+            }}>
+              <span style={{
+                position: 'absolute',
+                bottom: '4px',
+                right: '8px',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '9px',
+                color: 'rgba(59,130,246,0.45)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.5px',
+              }}>
+                📋 Планшет
+              </span>
+            </div>
+
+            {/* Десктопная зона — вся ширина, сильно обрезает верх/низ */}
+            {/* Desktop ~1200px+, ширина > канваса → обрезает по высоте ~60% */}
+            <div style={{
+              position: 'absolute',
+              left: '0',
+              right: '0',
+              top: '20%',
+              bottom: '20%',
+              border: '1.5px dashed rgba(168,85,247,0.25)',
+              borderRadius: '4px',
+            }}>
+              <span style={{
+                position: 'absolute',
+                bottom: '3px',
+                right: '6px',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '9px',
+                color: 'rgba(168,85,247,0.40)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.5px',
+              }}>
+                🖥 Десктоп
+              </span>
+            </div>
+          </div>
+
           {/* Loading overlay */}
           {loading && (
             <div style={{
@@ -793,8 +880,9 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
           fontSize: '11px',
           fontWeight: 500,
           color: 'rgba(255,255,255,0.2)',
+          lineHeight: 1.4,
         }}>
-          Рисуйте поверх превью — оно показывает расположение элементов профиля
+          Пунктирные рамки показывают видимую область на разных устройствах
         </div>
 
         {/* Подтверждение очистки */}
