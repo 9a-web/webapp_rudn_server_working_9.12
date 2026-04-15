@@ -68,6 +68,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
   const tabsContainerRef = useRef(null);
   const tabRefs = useRef({});
+  const scrollContainerRef = useRef(null);
 
   // Загрузка граффити для отображения в шапке
   useEffect(() => {
@@ -377,7 +378,20 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </div>
           </motion.div>
 
-          {/* ===== ШАПКА ПРОФИЛЯ с граффити-фоном (всегда видна) ===== */}
+          {/* === Единый скроллируемый контейнер === */}
+          <div
+            ref={scrollContainerRef}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+
+          {/* ===== ШАПКА ПРОФИЛЯ с граффити-фоном ===== */}
           <div style={{
             position: 'relative',
             width: '100%',
@@ -385,7 +399,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             flexDirection: 'column',
             alignItems: 'center',
             overflow: 'hidden',
-            flexShrink: 0,
           }}>
             {/* Граффити как фоновый слой шапки */}
             {headerGraffitiUrl && (
@@ -702,7 +715,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           </motion.div>
           </div>{/* ===== КОНЕЦ ШАПКИ С ГРАФФИТИ-ФОНОМ ===== */}
 
-          {/* Табы — фиксированы под шапкой */}
+          {/* Табы — sticky при скролле */}
           <div
             ref={tabsContainerRef}
             style={{
@@ -714,6 +727,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
               padding: '15px 20px',
+              position: 'sticky',
+              top: 0,
               zIndex: 10,
               backgroundColor: '#000000',
               width: '100%',
@@ -731,7 +746,11 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (hapticFeedback) hapticFeedback('impact', 'light');
-                  // Автоскролл к активному табу
+                  // Скролл наверх при переключении таба — шапка всегда видна
+                  if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                  // Автоскролл к активному табу (горизонтальный)
                   const btn = tabRefs.current[tab.id];
                   const container = tabsContainerRef.current;
                   if (btn && container) {
@@ -778,15 +797,6 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             ))}
           </div>{/* конец табов */}
 
-          {/* === Скроллируемый контейнер только для контента табов === */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              width: '100%',
-            }}
-          >
           {/* Контент табов */}
           <div
             style={{
@@ -1129,7 +1139,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             </AnimatePresence>
           </div>{/* конец контента табов */}
 
-          </div>{/* === Конец скроллируемого контейнера === */}
+          </div>{/* === Конец единого скроллируемого контейнера === */}
 
           {/* Свечение внизу */}
           <div
