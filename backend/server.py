@@ -282,7 +282,12 @@ from achievements import (
     mark_achievements_as_seen,
     check_and_award_achievements
 )
-from level_system import calculate_level_info, award_xp, safe_award_xp, recalculate_xp_for_user, XP_REWARDS, XP_REWARDS_INFO, consume_pending_level_up
+from level_system import (
+    calculate_level_info, award_xp, safe_award_xp,
+    recalculate_xp_for_user, get_xp_breakdown_readonly,
+    XP_REWARDS, XP_REWARDS_INFO, DAILY_XP_LIMITS,
+    consume_pending_level_up, check_daily_xp_limit,
+)
 from weather import get_moscow_weather
 from config import get_telegram_bot_token, get_telegram_bot_username, is_test_environment, ENV
 from lk_parser import RUDNLKParser
@@ -513,6 +518,10 @@ async def create_indexes():
         
         # User Stats - индекс для быстрого поиска статистики достижений
         await safe_create_index(db.user_stats, "telegram_id", unique=True)
+        
+        # XP Events - индексы для дневных лимитов и аудита
+        await safe_create_index(db.xp_events, [("telegram_id", 1), ("reason", 1), ("created_at", -1)])
+        await safe_create_index(db.xp_events, "created_at")
         
         # User Achievements - индекс для быстрой проверки достижений
         await safe_create_index(db.user_achievements, "telegram_id")
@@ -1596,15 +1605,18 @@ async def get_pending_level_up(telegram_id: int):
 
 @api_router.get("/users/{telegram_id}/xp-breakdown")
 async def get_user_xp_breakdown(telegram_id: int):
-    """Получить детальную разбивку XP пользователя"""
+    """Получить детальную разбивку XP пользователя (read-only, без мутации)"""
     try:
-        result = await recalculate_xp_for_user(db, telegram_id)
+        result = await get_xp_breakdown_readonly(db, telegram_id)
         return {
             "status": "ok",
             "xp": result["xp"],
             "breakdown": result["breakdown"],
             "level": result["level"],
             "tier": result["tier"],
+            "xp_current_level": result["xp_current_level"],
+            "xp_next_level": result["xp_next_level"],
+            "progress": result["progress"],
         }
     except Exception as e:
         logger.error(f"Error getting XP breakdown for {telegram_id}: {e}")
@@ -1958,6 +1970,14 @@ async def track_action_endpoint(request: TrackActionRequest):
             request.metadata
         )
         
+        # Начисляем XP за просмотр расписания (лимит 3/день)
+        if request.action_type == "view_schedule":
+            asyncio.create_task(safe_award_xp(
+                db, request.telegram_id,
+                XP_REWARDS["schedule_view"],
+                reason="schedule_view"
+            ))
+        
         return new_achievements
     except Exception as e:
         logger.error(f"Ошибка при отслеживании действия: {e}")
@@ -2076,13 +2096,15 @@ async def record_user_visit(telegram_id: int):
             
             # Начисляем XP за ежедневный визит
             xp_amount = XP_REWARDS["daily_visit"]
-            # Бонусы за milestones стрика
-            if current_streak == 7:
-                xp_amount += XP_REWARDS["streak_7_bonus"]
-            elif current_streak == 14:
-                xp_amount += XP_REWARDS["streak_14_bonus"]
-            elif current_streak == 30:
+            # Бонусы за milestones стрика (>= чтобы не пропустить при перескоке)
+            # Каждый milestone начисляется однократно — проверяем что именно сейчас пересекли порог
+            prev_streak = current_streak - 1 if streak_continued else 0
+            if current_streak >= 30 and prev_streak < 30:
                 xp_amount += XP_REWARDS["streak_30_bonus"]
+            elif current_streak >= 14 and prev_streak < 14:
+                xp_amount += XP_REWARDS["streak_14_bonus"]
+            elif current_streak >= 7 and prev_streak < 7:
+                xp_amount += XP_REWARDS["streak_7_bonus"]
             asyncio.create_task(safe_award_xp(db, telegram_id, xp_amount, reason=f"daily_visit_streak_{current_streak}"))
             
             # Ограничиваем active_days до последних 400 записей для производительности
@@ -6323,6 +6345,14 @@ async def award_referral_bonus(referrer_id: int, referred_id: int, points: int, 
         )
         
         logger.info(f"💰 Начислено {points} баллов пользователю {referrer_id} за реферала {referred_id} (уровень {level})")
+        
+        # Начисляем XP за реферал (только для level-1 рефералов)
+        if level == 1:
+            asyncio.create_task(safe_award_xp(
+                database, referrer_id,
+                XP_REWARDS["referral"],
+                reason="referral"
+            ))
         
     except Exception as e:
         logger.error(f"❌ Ошибка при начислении бонуса: {e}", exc_info=True)
@@ -16381,6 +16411,8 @@ async def send_message(data: MessageCreate):
             )
         except Exception as ne:
             logger.warning(f"Notification error: {ne}")
+        # Начисляем XP за отправку сообщения (лимит 5/день)
+        asyncio.create_task(safe_award_xp(db, data.sender_id, XP_REWARDS["message_sent"], reason="message_sent"))
         return build_message_response(message_doc)
     except HTTPException:
         raise

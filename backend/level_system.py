@@ -2,15 +2,19 @@
 Система уровней RUDN GO
 XP → Level → Tier (Base / Medium / Rare / Premium)
 
-Исправления:
-- Оптимизация recalculate_xp_for_user (фильтрация group_tasks на уровне БД)
-- Добавлен safe_award_xp с логированием ошибок
-- Учёт XP за сообщения в пересчёте
-- Добавлен get_xp_breakdown для фронтенда
+v2.0 — Полная переработка:
+- Атомарное начисление XP (findOneAndUpdate)
+- Enforcement дневных лимитов (schedule_view, message_sent)
+- XP event log для аудита
+- Read-only breakdown (без мутации данных)
+- Учёт task_on_time_bonus и schedule_view в пересчёте
+- Защита от уменьшения XP при recalculate
 """
 
 import logging
 import traceback
+from datetime import datetime, timedelta
+from pymongo import ReturnDocument
 
 logger = logging.getLogger(__name__)
 
@@ -68,18 +72,24 @@ XP_REWARDS = {
     "message_sent":         1,   # лимит 5/день
 }
 
+# Дневные лимиты для определённых действий
+DAILY_XP_LIMITS = {
+    "schedule_view": 3,
+    "message_sent":  5,
+}
+
 # Описания XP-наград для отображения на фронтенде
 XP_REWARDS_INFO = [
-    {"action": "daily_visit", "xp": 3, "label": "Ежедневный визит", "emoji": "📅", "limit": "1/день"},
-    {"action": "task_complete", "xp": 5, "label": "Выполнение задачи", "emoji": "✅", "limit": None},
-    {"action": "task_on_time_bonus", "xp": 3, "label": "Задача вовремя (бонус)", "emoji": "⏰", "limit": None},
-    {"action": "group_task_complete", "xp": 8, "label": "Групповая задача", "emoji": "👥", "limit": None},
-    {"action": "referral", "xp": 50, "label": "Приглашение друга", "emoji": "🔗", "limit": None},
-    {"action": "schedule_view", "xp": 1, "label": "Просмотр расписания", "emoji": "📋", "limit": "3/день"},
-    {"action": "message_sent", "xp": 1, "label": "Отправка сообщения", "emoji": "💬", "limit": "5/день"},
-    {"action": "streak_7_bonus", "xp": 20, "label": "Стрик 7 дней", "emoji": "🔥", "limit": "1 раз"},
-    {"action": "streak_14_bonus", "xp": 40, "label": "Стрик 14 дней", "emoji": "🔥🔥", "limit": "1 раз"},
-    {"action": "streak_30_bonus", "xp": 80, "label": "Стрик 30 дней", "emoji": "🔥🔥🔥", "limit": "1 раз"},
+    {"action": "daily_visit",       "xp": 3,  "label": "Ежедневный визит",        "emoji": "📅", "limit": "1/день"},
+    {"action": "task_complete",     "xp": 5,  "label": "Выполнение задачи",       "emoji": "✅", "limit": None},
+    {"action": "task_on_time_bonus","xp": 3,  "label": "Задача вовремя (бонус)",  "emoji": "⏰", "limit": None},
+    {"action": "group_task_complete","xp": 8, "label": "Групповая задача",        "emoji": "👥", "limit": None},
+    {"action": "referral",          "xp": 50, "label": "Приглашение друга",       "emoji": "🔗", "limit": None},
+    {"action": "schedule_view",     "xp": 1,  "label": "Просмотр расписания",     "emoji": "📋", "limit": "3/день"},
+    {"action": "message_sent",      "xp": 1,  "label": "Отправка сообщения",      "emoji": "💬", "limit": "5/день"},
+    {"action": "streak_7_bonus",    "xp": 20, "label": "Стрик 7 дней",            "emoji": "🔥", "limit": "1 раз"},
+    {"action": "streak_14_bonus",   "xp": 40, "label": "Стрик 14 дней",           "emoji": "🔥🔥", "limit": "1 раз"},
+    {"action": "streak_30_bonus",   "xp": 80, "label": "Стрик 30 дней",           "emoji": "🔥🔥🔥", "limit": "1 раз"},
 ]
 
 
@@ -93,6 +103,8 @@ def get_tier(level: int) -> str:
 
 def get_level_threshold(level: int) -> int:
     """XP, необходимый для достижения данного уровня"""
+    if level < 1:
+        return 0
     idx = level - 1
     if idx < len(LEVEL_THRESHOLDS):
         return LEVEL_THRESHOLDS[idx]
@@ -103,7 +115,7 @@ def get_level_threshold(level: int) -> int:
 def calculate_level_info(xp: int) -> dict:
     """
     Вычисляет полную информацию об уровне по XP.
-    
+
     Returns:
         {
             "level": 7,
@@ -116,30 +128,30 @@ def calculate_level_info(xp: int) -> dict:
             "progress": 0.1,
         }
     """
-    xp = max(0, xp)
-    
-    # Определяем уровень
+    xp = max(0, int(xp))
+
+    # Определяем уровень по таблице
     level = 1
     for i, threshold in enumerate(LEVEL_THRESHOLDS):
         if xp >= threshold:
             level = i + 1
         else:
             break
-    
-    # За пределами таблицы
-    if level == len(LEVEL_THRESHOLDS) and xp >= LEVEL_THRESHOLDS[-1]:
+
+    # За пределами таблицы: каждый уровень = +EXTRA_LEVEL_STEP XP
+    if level >= len(LEVEL_THRESHOLDS) and xp >= LEVEL_THRESHOLDS[-1]:
         extra = xp - LEVEL_THRESHOLDS[-1]
         level = len(LEVEL_THRESHOLDS) + extra // EXTRA_LEVEL_STEP
-    
+
     # Пороги текущего и следующего уровня
     xp_current = get_level_threshold(level)
     xp_next = get_level_threshold(level + 1)
-    
+
     # Прогресс внутри уровня
     xp_in_level = xp - xp_current
     xp_needed = xp_next - xp_current
     progress = round(min(max(xp_in_level / xp_needed, 0.0), 1.0), 4) if xp_needed > 0 else 1.0
-    
+
     return {
         "level": level,
         "tier": get_tier(level),
@@ -152,32 +164,92 @@ def calculate_level_info(xp: int) -> dict:
     }
 
 
+# ──────────────────────────────────────────────
+# XP Event Log (аудит)
+# ──────────────────────────────────────────────
+async def _log_xp_event(db, telegram_id: int, amount: int, reason: str, new_total: int):
+    """Записывает событие начисления XP для аудита."""
+    try:
+        await db.xp_events.insert_one({
+            "telegram_id": telegram_id,
+            "amount": amount,
+            "reason": reason,
+            "new_total": new_total,
+            "created_at": datetime.utcnow(),
+        })
+    except Exception:
+        pass  # Не критично — не роняем основной поток
+
+
+# ──────────────────────────────────────────────
+# Дневные лимиты
+# ──────────────────────────────────────────────
+async def check_daily_xp_limit(db, telegram_id: int, action: str) -> bool:
+    """
+    Проверяет, не превышен ли дневной лимит XP для указанного действия.
+    Возвращает True, если начисление разрешено.
+    """
+    limit = DAILY_XP_LIMITS.get(action)
+    if limit is None:
+        return True  # Нет лимита для этого действия
+
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Считаем сколько раз уже начислено сегодня
+    count = await db.xp_events.count_documents({
+        "telegram_id": telegram_id,
+        "reason": action,
+        "created_at": {
+            "$gte": datetime.strptime(today_str, "%Y-%m-%d"),
+            "$lt": datetime.strptime(today_str, "%Y-%m-%d") + timedelta(days=1),
+        }
+    })
+
+    return count < limit
+
+
+# ──────────────────────────────────────────────
+# Начисление XP
+# ──────────────────────────────────────────────
 async def award_xp(db, telegram_id: int, amount: int, reason: str = "") -> dict:
     """
-    Начисляет XP пользователю и возвращает информацию об уровне.
-    Если произошёл level-up, возвращает {"leveled_up": True, "old_level": N, "new_level": M}
+    Атомарно начисляет XP пользователю и возвращает информацию об уровне.
+    Использует findOneAndUpdate для предотвращения race conditions.
+    Если произошёл level-up, сохраняет pending_level_up в БД.
     """
     if amount <= 0:
         return {"leveled_up": False}
-    
-    # Получаем текущий XP
-    stats = await db.user_stats.find_one({"telegram_id": telegram_id})
-    old_xp = stats.get("xp", 0) if stats else 0
-    old_info = calculate_level_info(old_xp)
-    
-    new_xp = old_xp + amount
-    new_info = calculate_level_info(new_xp)
-    
-    # Обновляем XP в БД
-    await db.user_stats.update_one(
+
+    # Проверяем дневной лимит
+    if reason in DAILY_XP_LIMITS:
+        allowed = await check_daily_xp_limit(db, telegram_id, reason)
+        if not allowed:
+            logger.debug(f"Daily XP limit reached: user={telegram_id} action={reason}")
+            return {"leveled_up": False, "daily_limit_reached": True}
+
+    # Атомарный инкремент XP + получение нового значения
+    updated_doc = await db.user_stats.find_one_and_update(
         {"telegram_id": telegram_id},
-        {"$inc": {"xp": amount}},
-        upsert=True
+        {
+            "$inc": {"xp": amount},
+            "$setOnInsert": {"telegram_id": telegram_id, "bonus_xp": 0},
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
     )
-    
+
+    new_xp = updated_doc.get("xp", amount)
+    old_xp = new_xp - amount
+
+    old_info = calculate_level_info(old_xp)
+    new_info = calculate_level_info(new_xp)
+
     leveled_up = new_info["level"] > old_info["level"]
     tier_changed = new_info["tier"] != old_info["tier"]
-    
+
+    # Логируем XP event
+    await _log_xp_event(db, telegram_id, amount, reason, new_xp)
+
     result = {
         "leveled_up": leveled_up,
         "tier_changed": tier_changed,
@@ -189,15 +261,14 @@ async def award_xp(db, telegram_id: int, amount: int, reason: str = "") -> dict:
         "reason": reason,
         **new_info,
     }
-    
-    # Сохраняем event level-up в БД для фронтенда
+
+    # Сохраняем pending level-up для фронтенда
     if leveled_up:
         logger.info(
             f"🎉 Level UP! user={telegram_id} "
             f"LV.{old_info['level']}→{new_info['level']} "
             f"({old_info['tier']}→{new_info['tier']}) +{amount}XP reason={reason}"
         )
-        # Сохраняем pending level-up для отображения на фронтенде
         try:
             await db.user_stats.update_one(
                 {"telegram_id": telegram_id},
@@ -214,7 +285,7 @@ async def award_xp(db, telegram_id: int, amount: int, reason: str = "") -> dict:
             )
         except Exception as e:
             logger.warning(f"Failed to save pending level-up: {e}")
-    
+
     return result
 
 
@@ -235,67 +306,97 @@ async def safe_award_xp(db, telegram_id: int, amount: int, reason: str = "") -> 
 
 async def consume_pending_level_up(db, telegram_id: int) -> dict:
     """
-    Забирает pending level-up из БД (фронтенд вызывает после отображения).
-    Возвращает данные level-up или None.
+    Атомарно забирает pending level-up из БД (consumed after read).
+    Использует findOneAndUpdate чтобы избежать race condition.
     """
-    stats = await db.user_stats.find_one({"telegram_id": telegram_id})
-    if not stats or not stats.get("pending_level_up"):
-        return None
-    
-    pending = stats["pending_level_up"]
-    
-    # Очищаем pending
-    await db.user_stats.update_one(
-        {"telegram_id": telegram_id},
-        {"$unset": {"pending_level_up": ""}}
+    result = await db.user_stats.find_one_and_update(
+        {"telegram_id": telegram_id, "pending_level_up": {"$exists": True, "$ne": None}},
+        {"$unset": {"pending_level_up": ""}},
+        return_document=False,  # Возвращаем документ ДО изменения
     )
-    
-    return pending
+
+    if result and result.get("pending_level_up"):
+        return result["pending_level_up"]
+
+    return None
 
 
-async def recalculate_xp_for_user(db, telegram_id: int) -> dict:
+# ──────────────────────────────────────────────
+# Read-only breakdown XP (без мутации)
+# ──────────────────────────────────────────────
+async def get_xp_breakdown_readonly(db, telegram_id: int) -> dict:
     """
-    Ретроактивный пересчёт XP для пользователя на основе всех его действий.
-    ОПТИМИЗИРОВАНО: фильтрация group_tasks на уровне MongoDB + учёт сообщений.
+    Подсчитывает breakdown XP БЕЗ перезаписи в БД.
+    Используется для GET /xp-breakdown (без побочных эффектов).
     """
-    xp = 0
-    
+    breakdown = {
+        "tasks": 0,
+        "task_on_time_bonus": 0,
+        "achievements": 0,
+        "visits": 0,
+        "streak_bonuses": 0,
+        "referrals": 0,
+        "group_tasks": 0,
+        "messages": 0,
+        "schedule_views": 0,
+        "bonus": 0,
+    }
+
     # 1. Выполненные задачи
     completed_tasks = await db.tasks.count_documents({
         "telegram_id": telegram_id,
         "completed": True,
     })
-    xp += completed_tasks * XP_REWARDS["task_complete"]
-    
+    breakdown["tasks"] = completed_tasks * XP_REWARDS["task_complete"]
+
+    # 1b. Бонус за задачи вовремя (из XP event log или из tasks)
+    try:
+        on_time_count = await db.tasks.count_documents({
+            "telegram_id": telegram_id,
+            "completed": True,
+            "completed_on_time": True,
+        })
+        breakdown["task_on_time_bonus"] = on_time_count * XP_REWARDS["task_on_time_bonus"]
+    except Exception:
+        # Fallback: подсчёт из xp_events
+        try:
+            on_time_events = await db.xp_events.count_documents({
+                "telegram_id": telegram_id,
+                "reason": {"$regex": "task_complete_on_time"},
+            })
+            breakdown["task_on_time_bonus"] = on_time_events * XP_REWARDS["task_on_time_bonus"]
+        except Exception:
+            pass
+
     # 2. Достижения
     achievements = await db.user_achievements.find(
         {"telegram_id": telegram_id}
-    ).to_list(length=100)
-    for ach in achievements:
-        xp += ach.get("points", 0)
-    
+    ).to_list(length=200)
+    breakdown["achievements"] = sum(a.get("points", 0) for a in achievements)
+
     # 3. Стрик + визиты
     stats = await db.user_stats.find_one({"telegram_id": telegram_id})
     if stats:
-        max_streak = stats.get("visit_streak_max", 0)
         active_days = stats.get("active_days", [])
-        xp += len(active_days) * XP_REWARDS["daily_visit"]
-        # Бонусы за milestones
+        breakdown["visits"] = len(active_days) * XP_REWARDS["daily_visit"]
+
+        max_streak = stats.get("visit_streak_max", 0)
+        streak_bonus = 0
         if max_streak >= 7:
-            xp += XP_REWARDS["streak_7_bonus"]
+            streak_bonus += XP_REWARDS["streak_7_bonus"]
         if max_streak >= 14:
-            xp += XP_REWARDS["streak_14_bonus"]
+            streak_bonus += XP_REWARDS["streak_14_bonus"]
         if max_streak >= 30:
-            xp += XP_REWARDS["streak_30_bonus"]
-    
+            streak_bonus += XP_REWARDS["streak_30_bonus"]
+        breakdown["streak_bonuses"] = streak_bonus
+
     # 4. Рефералы
     referral_connections = await db.referral_connections.count_documents({
         "referrer_id": telegram_id,
     })
-    xp += referral_connections * XP_REWARDS["referral"]
-    
-    # 5. Групповые задачи — ОПТИМИЗИРОВАНО: фильтрация на уровне MongoDB
-    group_tasks_completed = 0
+    breakdown["referrals"] = referral_connections * XP_REWARDS["referral"]
+
+    # 5. Групповые задачи
     try:
         pipeline = [
             {"$match": {"participants.telegram_id": telegram_id}},
@@ -308,65 +409,88 @@ async def recalculate_xp_for_user(db, telegram_id: int) -> dict:
         ]
         result = await db.group_tasks.aggregate(pipeline).to_list(1)
         group_tasks_completed = result[0]["total"] if result else 0
-    except Exception as e:
-        logger.warning(f"Failed to aggregate group tasks for {telegram_id}, falling back: {e}")
-        # Fallback к старому методу
-        group_tasks = await db.group_tasks.find(
-            {"participants.telegram_id": telegram_id}
-        ).to_list(length=500)
-        for gt in group_tasks:
-            for p in gt.get("participants", []):
-                if p.get("telegram_id") == telegram_id and p.get("completed"):
-                    group_tasks_completed += 1
-    xp += group_tasks_completed * XP_REWARDS["group_task_complete"]
-    
-    # 6. Отправленные сообщения (учитываем лимит 5/день)
-    messages_sent = 0
+    except Exception:
+        group_tasks_completed = 0
+    breakdown["group_tasks"] = group_tasks_completed * XP_REWARDS["group_task_complete"]
+
+    # 6. Сообщения (с приблизительным лимитом 5/день)
     try:
-        messages_sent = await db.messages.count_documents({
-            "sender_id": telegram_id
-        })
+        messages_sent = await db.messages.count_documents({"sender_id": telegram_id})
+        active_days_count = len(stats.get("active_days", [])) if stats else 1
+        max_message_xp = active_days_count * DAILY_XP_LIMITS["message_sent"] * XP_REWARDS["message_sent"]
+        breakdown["messages"] = min(messages_sent * XP_REWARDS["message_sent"], max_message_xp)
     except Exception:
         pass
-    # Лимит: 5 XP за сообщения в день. Приблизительный подсчёт:
-    # Считаем макс 5 XP/день × кол-во активных дней
-    active_days_count = len(stats.get("active_days", [])) if stats else 0
-    max_message_xp = active_days_count * 5 * XP_REWARDS["message_sent"]
-    message_xp = min(messages_sent * XP_REWARDS["message_sent"], max_message_xp)
-    xp += message_xp
-    
-    # Обновляем в БД (учитываем bonus_xp от dev-команд)
-    bonus_xp = stats.get("bonus_xp", 0) if stats else 0
-    total_xp = xp + bonus_xp
-    
-    await db.user_stats.update_one(
-        {"telegram_id": telegram_id},
-        {"$set": {"xp": total_xp}},
-        upsert=True,
-    )
-    
-    info = calculate_level_info(total_xp)
-    logger.info(
-        f"📊 Recalculated XP for user={telegram_id}: "
-        f"{total_xp} XP (organic={xp}, bonus={bonus_xp}) → LV.{info['level']} ({info['tier']})"
-    )
-    
+
+    # 7. Просмотры расписания (с приблизительным лимитом 3/день)
+    try:
+        schedule_views_total = stats.get("schedule_views", 0) if stats else 0
+        active_days_count = len(stats.get("active_days", [])) if stats else 1
+        max_schedule_xp = active_days_count * DAILY_XP_LIMITS["schedule_view"] * XP_REWARDS["schedule_view"]
+        breakdown["schedule_views"] = min(schedule_views_total * XP_REWARDS["schedule_view"], max_schedule_xp)
+    except Exception:
+        pass
+
+    # 8. Бонус XP (от dev-команд)
+    breakdown["bonus"] = stats.get("bonus_xp", 0) if stats else 0
+
+    # Итоговый XP из breakdown
+    calculated_xp = sum(breakdown.values())
+
+    # Реальный XP из БД
+    real_xp = stats.get("xp", 0) if stats else 0
+
+    # Используем максимум (защита от занижения)
+    display_xp = max(real_xp, calculated_xp)
+
+    info = calculate_level_info(display_xp)
+
     return {
         "telegram_id": telegram_id,
-        "xp": total_xp,
-        "breakdown": {
-            "tasks": completed_tasks * XP_REWARDS["task_complete"],
-            "achievements": sum(a.get("points", 0) for a in achievements),
-            "visits": len(stats.get("active_days", [])) * XP_REWARDS["daily_visit"] if stats else 0,
-            "streak_bonuses": (
-                (XP_REWARDS["streak_7_bonus"] if (stats and stats.get("visit_streak_max", 0) >= 7) else 0) +
-                (XP_REWARDS["streak_14_bonus"] if (stats and stats.get("visit_streak_max", 0) >= 14) else 0) +
-                (XP_REWARDS["streak_30_bonus"] if (stats and stats.get("visit_streak_max", 0) >= 30) else 0)
-            ),
-            "referrals": referral_connections * XP_REWARDS["referral"],
-            "group_tasks": group_tasks_completed * XP_REWARDS["group_task_complete"],
-            "messages": message_xp,
-            "bonus": bonus_xp,
-        },
+        "xp": display_xp,
+        "calculated_xp": calculated_xp,
+        "real_xp": real_xp,
+        "breakdown": breakdown,
+        **info,
+    }
+
+
+# ──────────────────────────────────────────────
+# Ретроактивный пересчёт (с защитой от потери XP)
+# ──────────────────────────────────────────────
+async def recalculate_xp_for_user(db, telegram_id: int) -> dict:
+    """
+    Ретроактивный пересчёт XP для пользователя.
+    ЗАЩИТА: никогда не уменьшает текущий XP.
+    ОПТИМИЗИРОВАНО: фильтрация group_tasks на уровне MongoDB.
+    """
+    breakdown_result = await get_xp_breakdown_readonly(db, telegram_id)
+    calculated_xp = breakdown_result["calculated_xp"]
+
+    # Получаем текущий XP из БД
+    stats = await db.user_stats.find_one({"telegram_id": telegram_id})
+    current_xp = stats.get("xp", 0) if stats else 0
+
+    # ЗАЩИТА: берём максимум, чтобы не потерять XP
+    final_xp = max(current_xp, calculated_xp)
+
+    # Обновляем только если calculated > current (не уменьшаем)
+    if final_xp != current_xp:
+        await db.user_stats.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"xp": final_xp}},
+            upsert=True,
+        )
+
+    info = calculate_level_info(final_xp)
+    logger.info(
+        f"📊 Recalculated XP for user={telegram_id}: "
+        f"{final_xp} XP (calculated={calculated_xp}, was={current_xp}) → LV.{info['level']} ({info['tier']})"
+    )
+
+    return {
+        "telegram_id": telegram_id,
+        "xp": final_xp,
+        "breakdown": breakdown_result["breakdown"],
         **info,
     }

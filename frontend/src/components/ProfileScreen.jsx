@@ -11,6 +11,7 @@ import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
 import LevelDetailModal from './LevelDetailModal';
 import LevelUpModal from './LevelUpModal';
+import { getTierColor, getTierName } from '../constants/levelConstants';
 
 const ADMIN_UIDS = ['765963392', '1311283832'];
 
@@ -466,51 +467,55 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   }, [user?.id]);
 
   // Bug 9: Загрузка актуальных данных профиля с сервера
-  const refreshProfile = useCallback(() => {
-    if (user?.id) {
-      // Загрузка профиля
-      friendsAPI.getUserProfile(user.id, user.id)
-        .then(data => {
-          if (data) {
-            setProfileData(data);
-            // Обнаружение level-up: сравниваем с предыдущими данными
-            const newLevel = data.level || 1;
-            const newTier = data.tier || 'base';
-            if (prevLevelRef.current !== null && newLevel > prevLevelRef.current) {
-              setLevelUpData({
-                newLevel,
-                newTier,
-                oldTier: prevTierRef.current || 'base',
-              });
-              setShowLevelUp(true);
-            }
-            prevLevelRef.current = newLevel;
-            prevTierRef.current = newTier;
-          }
-        })
-        .catch(err => console.error('Error loading own profile:', err));
+  // FIX: Убрана зависимость от showLevelUp — предотвращает рекурсию и дубли
+  const levelUpShownRef = useRef(false);
 
-      // Проверяем pending level-up с бэкенда (для случаев когда XP начислен вне профиля)
-      friendsAPI.getPendingLevelUp(user.id)
-        .then(data => {
-          if (data?.has_level_up && !showLevelUp) {
-            setLevelUpData({
-              newLevel: data.new_level,
-              newTier: data.new_tier,
-              oldTier: data.old_tier,
-            });
-            setShowLevelUp(true);
-            // Обновляем ref чтобы не показать дубль
-            prevLevelRef.current = data.new_level;
-            prevTierRef.current = data.new_tier;
-          }
-        })
-        .catch(() => {}); // Молча игнорируем
-    }
-  }, [user?.id, showLevelUp]);
+  const refreshProfile = useCallback(() => {
+    if (!user?.id) return;
+
+    // 1. Загрузка профиля
+    friendsAPI.getUserProfile(user.id, user.id)
+      .then(data => {
+        if (!data) return;
+        setProfileData(data);
+
+        const newLevel = data.level || 1;
+        const newTier = data.tier || 'base';
+
+        // Level-up detection: ТОЛЬКО через сравнение с ref, НЕ дублируя pending
+        if (prevLevelRef.current !== null && newLevel > prevLevelRef.current && !levelUpShownRef.current) {
+          levelUpShownRef.current = true;
+          setLevelUpData({ newLevel, newTier, oldTier: prevTierRef.current || 'base' });
+          setShowLevelUp(true);
+        }
+
+        prevLevelRef.current = newLevel;
+        prevTierRef.current = newTier;
+      })
+      .catch(err => console.error('Error loading own profile:', err));
+
+    // 2. Проверяем pending level-up с бэкенда (consumed after read)
+    //    Показываем ТОЛЬКО если profile detection не сработал
+    friendsAPI.getPendingLevelUp(user.id)
+      .then(data => {
+        if (data?.has_level_up && !levelUpShownRef.current) {
+          levelUpShownRef.current = true;
+          setLevelUpData({
+            newLevel: data.new_level,
+            newTier: data.new_tier,
+            oldTier: data.old_tier,
+          });
+          setShowLevelUp(true);
+          prevLevelRef.current = data.new_level;
+          prevTierRef.current = data.new_tier;
+        }
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     if (isOpen && user?.id) {
+      levelUpShownRef.current = false; // Сбрасываем при каждом открытии
       refreshProfile();
     }
   }, [isOpen, user?.id, refreshProfile]);
@@ -893,13 +898,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               style={{
                 padding: '6px 14px',
                 borderRadius: '20px',
-                backgroundColor: (() => {
-                  const tier = (profileData?.tier || 'base').toLowerCase();
-                  if (tier === 'premium') return '#FF4EEA';
-                  if (tier === 'rare') return '#B84DFF';
-                  if (tier === 'medium') return '#FFA04D';
-                  return '#F7B84B';
-                })(),
+                backgroundColor: getTierColor(profileData?.tier),
                 cursor: 'pointer',
                 transition: 'transform 0.15s ease',
               }}
@@ -1019,24 +1018,17 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   fontWeight: 600,
                   fontSize: '24px',
                   lineHeight: 1.2,
-                  ...(() => {
-                    const tier = (profileData?.tier || 'base').toLowerCase();
-                    if (tier === 'premium') return {
-                      background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                    };
-                    const colors = { base: '#4D85FF', medium: '#FFA04D', rare: '#B84DFF' };
-                    return { color: colors[tier] || '#4D85FF' };
-                  })(),
+                  ...((profileData?.tier || 'base').toLowerCase() === 'premium' ? {
+                    background: 'linear-gradient(90deg, #FF4EEA 0%, #FFCE2E 50%, #FF8717 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  } : {
+                    color: getTierColor(profileData?.tier),
+                  }),
                 }}
               >
-                {(() => {
-                  const tier = (profileData?.tier || 'base').toLowerCase();
-                  const names = { base: 'Base', medium: 'Medium', rare: 'Rare', premium: 'Premium' };
-                  return names[tier] || 'Base';
-                })()}
+                {getTierName(profileData?.tier)}
               </span>
               <span
                 style={{

@@ -202,3 +202,25 @@ agent_communication:
       - working: true
         agent: "testing"
         comment: "✅ PASS - Get level endpoint working correctly. Returns complete level info including level, tier, xp, streak, and max_streak data. Proper admin access control (403 for non-admin ID 123456)."
+
+  - agent: "main"
+    message: "Level System v2.0 complete rewrite: 1) level_system.py - Atomic XP award via findOneAndUpdate, daily limit enforcement for schedule_view and message_sent, XP event log for audit, read-only XP breakdown (no mutation), recalculate with XP loss protection, task_on_time_bonus + schedule_view in breakdown. 2) server.py - Fixed streak bonus == to >= with prev_streak check, XP for messages in send_message, XP for schedule_view in track-action, XP for referrals in award_referral_bonus, xp-breakdown now read-only, xp_events indexes. 3) Frontend - Fixed double level-up notification, shared TIER_CONFIG constants, improved LevelDetailModal with new breakdown categories (task_on_time_bonus, schedule_views, bonus), improved LevelUpModal visuals. Need retesting of: GET /api/xp-rewards-info, GET /api/users/{id}/level, GET /api/users/{id}/xp-breakdown (now includes xp_current_level, xp_next_level, progress), POST /api/users/{id}/recalculate-xp, POST /api/track-action with view_schedule, POST /api/messages/send XP award."
+
+  - agent: "testing"
+    message: "✅ LEVEL SYSTEM V2.0 FULLY VERIFIED - Completed comprehensive testing of Level System v2.0 rewrite with all 10 tests passing (100% success rate). All critical requirements verified: 1) Atomic XP operations working correctly, 2) Daily limit enforcement properly implemented (XP stops increasing after hitting limits), 3) Read-only XP breakdown confirmed (no data mutation between calls), 4) XP loss protection in recalculate-xp verified, 5) All new breakdown fields present (task_on_time_bonus, schedule_views, bonus, xp_current_level, xp_next_level, progress), 6) Track-action with view_schedule working, 7) All endpoints returning correct data structures. The complete rewrite is production-ready."
+
+  - task: "Level System v2.0 - atomic XP + daily limits + read-only breakdown"
+    implemented: true
+    working: true
+    file: "backend/level_system.py, backend/server.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Complete rewrite of Level System. Need to test: 1) GET /api/users/{id}/xp-breakdown returns breakdown with new fields (task_on_time_bonus, schedule_views, bonus, xp_current_level, xp_next_level, progress), 2) POST /api/track-action with action_type=view_schedule awards XP, 3) POST /api/messages/send awards XP, 4) POST /api/users/{id}/recalculate-xp protects against XP loss, 5) GET /api/users/{id}/level still works, 6) GET /api/xp-rewards-info still returns 10 items, 7) Daily XP limits enforced via xp_events collection"
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS - Level System v2.0 fully working (10/10 tests passed, 100% success rate). All critical features verified: 1) GET /api/xp-rewards-info returns 10 reward items with all required fields (action, xp, label, emoji, limit), 2) GET /api/users/{id}/level returns complete level info with all required fields (level, tier, xp, xp_current_level, xp_next_level, xp_in_level, xp_needed, progress), 3) GET /api/users/{id}/xp-breakdown returns extended breakdown with new fields (task_on_time_bonus, schedule_views, bonus, xp_current_level, xp_next_level, progress) and verified no data mutation, 4) POST /api/users/{id}/recalculate-xp works with XP loss protection, 5) POST /api/track-action with view_schedule successfully tracks actions, 6) GET /api/users/{id}/pending-level-up returns correct structure, 7) Daily XP limits properly enforced (XP stops increasing after hitting limits). All atomic XP operations, read-only breakdown, and daily limit enforcement working correctly."
+
