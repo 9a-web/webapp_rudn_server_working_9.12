@@ -29,6 +29,7 @@ const ADMIN_UIDS = ['765963392', '1311283832'];
 const DEV_COMMANDS = [
   { cmd: 'dev.help()', desc: 'Список команд', emoji: '📋' },
   { cmd: 'dev.getUser()', desc: 'Текущий пользователь', emoji: '👤' },
+  { cmd: 'dev.getUserSettings()', desc: 'Настройки юзера', emoji: '⚙️' },
   { cmd: 'dev.getLevel()', desc: 'Уровень и XP', emoji: '📊' },
   { cmd: 'dev.addXP(', desc: 'Добавить XP (amount)', emoji: '⭐' },
   { cmd: 'dev.setXP(', desc: 'Установить XP (amount)', emoji: '⭐' },
@@ -38,6 +39,7 @@ const DEV_COMMANDS = [
   { cmd: 'dev.listRequests()', desc: 'Запросы в друзья', emoji: '📬' },
   { cmd: 'dev.listTasks()', desc: 'Список задач', emoji: '📋' },
   { cmd: 'dev.addTask(', desc: 'Создать задачу ("Название")', emoji: '✅' },
+  { cmd: 'dev.createUser(', desc: 'Создать пользователя (id, "Имя")', emoji: '👤' },
   { cmd: 'dev.createFriend(', desc: 'Создать друга (targetId)', emoji: '🤝' },
   { cmd: 'dev.sendFriendRequest(', desc: 'Запрос дружбы (targetId)', emoji: '📨' },
   { cmd: 'dev.removeFriend(', desc: 'Удалить друга (targetId)', emoji: '🗑' },
@@ -45,10 +47,10 @@ const DEV_COMMANDS = [
   { cmd: 'dev.showStreakModal()', desc: 'Показать модалку стрика', emoji: '🔥' },
   { cmd: 'dev.hideStreakModal()', desc: 'Скрыть модалку', emoji: '🔥' },
   { cmd: 'dev.clearUserData()', desc: 'Удалить данные юзера', emoji: '⚠️' },
+  { cmd: 'dev.setApi(', desc: 'Задать backend URL', emoji: '🔗' },
   { cmd: 'dev.apiCall(', desc: 'API вызов ("METHOD", "/path")', emoji: '📡' },
   { cmd: 'dev.enableLogs()', desc: 'Включить логи', emoji: '🔊' },
   { cmd: 'dev.disableLogs()', desc: 'Выключить логи', emoji: '🔇' },
-  { cmd: 'dev.getUserSettings()', desc: 'Настройки юзера', emoji: '⚙️' },
 ];
 
 // Русское склонение
@@ -266,17 +268,26 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
     setDevCommandLoading(true);
     const timestamp = new Date().toLocaleTimeString('ru-RU');
     
+    const makeEntry = (status, message, result = null) => ({
+      status,
+      input: cmdString,
+      command: '',
+      message,
+      result: (result && typeof result === 'object') ? result : null,
+      time: timestamp
+    });
+    
+    const pushResult = (entry) => {
+      setDevCommandResult(entry);
+      setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+      setDevCommandLoading(false);
+    };
+    
     try {
       // Парсим команду: dev.commandName(arg1, arg2, ...)
       const match = cmdString.trim().match(/^dev\.(\w+)\((.*)\)$/);
       if (!match) {
-        setDevCommandResult({ 
-          status: 'error', 
-          input: cmdString,
-          message: 'Неверный формат. Пример: dev.help()',
-          time: timestamp
-        });
-        setDevCommandLoading(false);
+        pushResult(makeEntry('error', '❌ Неверный формат. Пример: dev.help()'));
         return;
       }
       
@@ -284,107 +295,85 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
       // Парсим аргументы: поддержка чисел, строк в кавычках
       const args = argsStr.trim() ? argsStr.split(',').map(a => {
         const trimmed = a.trim();
-        // Убираем кавычки если есть
         if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || 
             (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
           return trimmed.slice(1, -1);
         }
-        // Пробуем число
         const num = Number(trimmed);
         if (!isNaN(num) && trimmed !== '') return num;
         return trimmed;
       }) : [];
       
-      // Команды, которые работают через window.dev (клиентские)
-      const clientCommands = ['enableLogs', 'disableLogs', 'showStreakModal', 'hideStreakModal'];
-      
-      if (clientCommands.includes(funcName) && window.dev && window.dev[funcName]) {
-        const result = window.dev[funcName](...args);
-        const entry = {
-          status: 'ok',
-          input: cmdString,
-          command: funcName,
-          message: `✅ ${funcName}() выполнен`,
-          result: typeof result === 'object' ? result : null,
-          time: timestamp
-        };
-        setDevCommandResult(entry);
-        setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
-        setDevCommandLoading(false);
-        return;
-      }
-      
-      // Команды через window.dev с API вызовами
-      const devApiCommands = [
-        'getUser', 'getUserSettings', 'createUser', 'createFriend', 
-        'listFriends', 'removeFriend', 'sendFriendRequest', 'listRequests',
-        'addTask', 'listTasks', 'deleteTask', 'recordVisit', 'clearUserData',
-        'apiCall', 'addXP', 'setXP', 'getLevel', 'resetStreak'
-      ];
-      
-      if (devApiCommands.includes(funcName) && window.dev && window.dev[funcName]) {
-        try {
-          const result = await window.dev[funcName](...args);
-          const entry = {
-            status: 'ok',
-            input: cmdString,
-            command: funcName,
-            message: result?.message || `✅ ${funcName}() выполнен`,
-            result: result,
-            time: timestamp
-          };
-          setDevCommandResult(entry);
-          setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
-        } catch (err) {
-          const entry = {
-            status: 'error',
-            input: cmdString,
-            command: funcName,
-            message: `❌ ${err.message || err}`,
-            time: timestamp
-          };
-          setDevCommandResult(entry);
-          setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
-        }
-        setDevCommandLoading(false);
-        return;
-      }
-      
-      // Команда help — возвращаем список
+      // Команда help — возвращаем список (не через window.dev)
       if (funcName === 'help') {
-        const entry = {
-          status: 'ok',
-          input: cmdString,
+        pushResult({
+          ...makeEntry('ok', '📋 Доступные команды:'),
           command: 'help',
-          message: '📋 Доступные команды:',
-          result: { commands: DEV_COMMANDS.map(c => `${c.emoji} ${c.cmd} — ${c.desc}`) },
-          time: timestamp
-        };
-        setDevCommandResult(entry);
-        setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
-        setDevCommandLoading(false);
+          result: { commands: DEV_COMMANDS.map(c => `${c.emoji} ${c.cmd} — ${c.desc}`) }
+        });
         return;
       }
       
-      // Неизвестная команда
-      const entry = {
-        status: 'error',
-        input: cmdString,
-        message: `❌ Неизвестная команда: ${funcName}. Введите dev.help()`,
-        time: timestamp
-      };
-      setDevCommandResult(entry);
-      setDevCommandHistory(prev => [entry, ...prev].slice(0, 20));
+      // Проверяем существует ли функция в window.dev
+      if (!window.dev || typeof window.dev[funcName] !== 'function') {
+        pushResult(makeEntry('error', `❌ Неизвестная команда: ${funcName}. Введите dev.help()`));
+        return;
+      }
+      
+      // Клиентские команды (синхронные, без API)
+      const clientCommands = ['enableLogs', 'disableLogs', 'showStreakModal', 'hideStreakModal', 'setApi'];
+      
+      if (clientCommands.includes(funcName)) {
+        try {
+          const result = window.dev[funcName](...args);
+          pushResult({
+            ...makeEntry('ok', `✅ ${funcName}() выполнен`, result),
+            command: funcName
+          });
+        } catch (err) {
+          pushResult(makeEntry('error', `❌ ${err.message || err}`));
+        }
+        return;
+      }
+      
+      // API команды (асинхронные) — вызываем через window.dev и await
+      try {
+        const result = await window.dev[funcName](...args);
+        
+        // Проверяем: если result содержит detail (ошибка бэкенда, не перехваченная)
+        if (result && result.detail) {
+          pushResult({
+            ...makeEntry('error', `❌ ${result.detail}`, result),
+            command: funcName
+          });
+          return;
+        }
+        
+        // Проверяем: если result.status === "error" (от /dev/execute)
+        if (result && result.status === 'error') {
+          pushResult({
+            ...makeEntry('error', `❌ ${result.message || 'Ошибка'}`, result),
+            command: funcName
+          });
+          return;
+        }
+        
+        pushResult({
+          ...makeEntry('ok', result?.message || `✅ ${funcName}() выполнен`, result),
+          command: funcName
+        });
+      } catch (err) {
+        // Ошибки от api() — 403, 500 и т.д.
+        const errMsg = err?.message || err?.data?.detail || String(err);
+        pushResult({
+          ...makeEntry('error', `❌ ${errMsg}`, err?.data || null),
+          command: funcName
+        });
+      }
     } catch (err) {
-      setDevCommandResult({
-        status: 'error',
-        input: cmdString,
-        message: `❌ Ошибка: ${err.message}`,
-        time: timestamp
-      });
+      pushResult(makeEntry('error', `❌ Критическая ошибка: ${err.message}`));
     }
-    setDevCommandLoading(false);
-  }, [isDevAdmin, user?.id]);
+  }, [isDevAdmin]);
 
   // Загрузка данных
   const loadFriends = useCallback(async () => {

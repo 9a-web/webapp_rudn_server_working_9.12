@@ -136,11 +136,22 @@
           var _setStreakData = null;
 
           function api(method, path, body) {
-            if (!_apiBase) { C.error('❌ API не настроен. Вызовите dev.setApi("https://...")'); return Promise.reject('no api'); }
+            if (!_apiBase) { C.error('❌ API не настроен. Вызовите dev.setApi("https://...")'); return Promise.reject(new Error('API не настроен')); }
             var url = _apiBase + '/api' + (path.charAt(0) === '/' ? path : '/' + path);
             var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
-            return fetch(url, opts).then(function(r) { return r.json(); });
+            return fetch(url, opts).then(function(r) {
+              return r.json().then(function(data) {
+                if (!r.ok) {
+                  var errMsg = data.detail || data.message || ('HTTP ' + r.status);
+                  var err = new Error(errMsg);
+                  err.status = r.status;
+                  err.data = data;
+                  throw err;
+                }
+                return data;
+              });
+            });
           }
 
           function uid() {
@@ -157,6 +168,7 @@
                 '%c🛠 Dev Console%c\n\n' +
                 'dev.setApi(url)                    — задать backend URL\n' +
                 'dev.getUser()                      — текущий пользователь\n' +
+                'dev.getUserSettings()              — настройки юзера\n' +
                 'dev.createUser(id, "Имя")          — создать пользователя\n\n' +
                 'dev.addXP(amount)                  — добавить XP (админ)\n' +
                 'dev.setXP(amount)                  — установить XP (админ)\n' +
@@ -198,11 +210,11 @@
               log('✅', 'API: ' + _apiBase);
             },
 
-            getUser: function() { var u = _getUser(); log('👤', 'Пользователь:', u); return u; },
+            getUser: function() { var u = _getUser(); if (!u) { C.error('❌ Нет пользователя'); return Promise.reject(new Error('Нет пользователя')); } log('👤', 'Пользователь:', u); return u; },
 
             getUserSettings: function() {
-              var id = uid(); if (!id) return;
-              return api('GET', '/user-settings/' + id).then(function(d) { log('⚙️', 'Настройки:', d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/user-settings/' + id).then(function(d) { log('⚙️', 'Настройки:', d); return d; }).catch(function(e) { log('❌', 'getUserSettings:', e.message || e); throw e; });
             },
 
             createUser: function(telegramId, firstName) {
@@ -212,8 +224,8 @@
             },
 
             createFriend: function(targetId) {
-              var myId = uid(); if (!myId) return;
-              if (!targetId) { C.error('❌ dev.createFriend(222222)'); return; }
+              var myId = uid(); if (!myId) return Promise.reject(new Error('Нет пользователя'));
+              if (!targetId) { C.error('❌ dev.createFriend(222222)'); return Promise.reject(new Error('Нет targetId')); }
               return api('POST', '/user-settings', {
                 telegram_id: targetId, first_name: 'Друг_' + targetId, last_name: 'Тестовый', username: 'friend_' + targetId
               }).catch(function(){}).then(function() {
@@ -228,40 +240,41 @@
             },
 
             listFriends: function() {
-              var id = uid(); if (!id) return;
-              return api('GET', '/friends/' + id).then(function(d) { log('👥', '(' + (d.friends ? d.friends.length : 0) + '):', d.friends); return d.friends; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/friends/' + id).then(function(d) { log('👥', '(' + (d.friends ? d.friends.length : 0) + '):', d.friends); return d.friends; }).catch(function(e) { log('❌', 'listFriends:', e.message || e); throw e; });
             },
 
             removeFriend: function(targetId) {
-              var id = uid(); if (!id) return;
-              return fetch(_apiBase + '/api/friends/' + targetId, { method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({telegram_id:id}) })
-                .then(function(r){return r.json();}).then(function(d) { log('🗑', 'Удалён:', d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('DELETE', '/friends/' + targetId, { telegram_id: id })
+                .then(function(d) { log('🗑', 'Удалён:', d); return d; }).catch(function(e) { log('❌', 'removeFriend:', e.message || e); throw e; });
             },
 
             sendFriendRequest: function(targetId) {
-              var id = uid(); if (!id) return;
-              return api('POST', '/friends/request/' + targetId, { telegram_id: id }).then(function(d) { log('📨', '', d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('POST', '/friends/request/' + targetId, { telegram_id: id }).then(function(d) { log('📨', '', d); return d; }).catch(function(e) { log('❌', 'sendFriendRequest:', e.message || e); throw e; });
             },
 
             listRequests: function() {
-              var id = uid(); if (!id) return;
-              return api('GET', '/friends/' + id + '/requests').then(function(d) { log('📬', '', d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/friends/' + id + '/requests').then(function(d) { log('📬', '', d); return d; }).catch(function(e) { log('❌', 'listRequests:', e.message || e); throw e; });
             },
 
             addTask: function(text, opts) {
-              var id = uid(); if (!id) return;
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
               var body = Object.assign({ telegram_id: id, text: text || 'Тестовая задача' }, opts || {});
-              return api('POST', '/tasks', body).then(function(d) { log('✅', 'Задача:', d); return d; }).catch(function(e) { log('❌', '', e); });
+              return api('POST', '/tasks', body).then(function(d) { log('✅', 'Задача:', d); return d; }).catch(function(e) { log('❌', 'addTask:', e.message || e); throw e; });
             },
 
             listTasks: function() {
-              var id = uid(); if (!id) return;
-              return api('GET', '/tasks/' + id).then(function(d) { log('📋', '(' + d.length + '):', d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/tasks/' + id).then(function(d) { log('📋', '(' + d.length + '):', d); return d; }).catch(function(e) { log('❌', 'listTasks:', e.message || e); throw e; });
             },
 
             deleteTask: function(taskId) {
-              if (!taskId) { C.error('❌ dev.deleteTask("id")'); return; }
-              return fetch(_apiBase + '/api/tasks/' + taskId, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d) { log('🗑', '', d); return d; }).catch(function(e) { log('❌', '', e); });
+              if (!taskId) { C.error('❌ dev.deleteTask("id")'); return Promise.reject(new Error('Нет taskId')); }
+              return api('DELETE', '/tasks/' + taskId)
+                .then(function(d) { log('🗑', 'Задача удалена:', d); return d; }).catch(function(e) { log('❌', 'deleteTask:', e.message || e); throw e; });
             },
 
             showStreakModal: function() {
@@ -285,13 +298,14 @@
             },
 
             recordVisit: function() {
-              var id = uid(); if (!id) return;
-              return api('POST', '/users/' + id + '/visit').then(function(d) { log('🔥', 'Визит:', d); if (_setStreakData) _setStreakData(d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('POST', '/users/' + id + '/visit').then(function(d) { log('🔥', 'Визит:', d); if (_setStreakData) _setStreakData(d); return d; }).catch(function(e) { log('❌', 'recordVisit:', e.message || e); throw e; });
             },
 
             clearUserData: function() {
-              var id = uid(); if (!id) return;
-              return fetch(_apiBase + '/api/user-settings/' + id, {method:'DELETE'}).then(function(r){return r.json();}).then(function(d) { log('🗑', '', d); return d; }).catch(function(e) { log('❌', '', e); });
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('DELETE', '/user-settings/' + id)
+                .then(function(d) { log('🗑', 'Данные удалены:', d); return d; }).catch(function(e) { log('❌', 'clearUserData:', e.message || e); throw e; });
             },
 
             apiCall: function(method, path, body) {
@@ -300,33 +314,33 @@
 
             // ===== Админ-команды (XP/Level) =====
             addXP: function(amount) {
-              var id = uid(); if (!id) return;
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
               amount = parseInt(amount) || 100;
               return api('POST', '/dev/add-xp', { telegram_id: id, amount: amount })
                 .then(function(d) { log('⭐', '+' + amount + ' XP:', d); return d; })
-                .catch(function(e) { log('❌', 'addXP error:', e); });
+                .catch(function(e) { log('❌', 'addXP:', e.message || e); throw e; });
             },
 
             setXP: function(amount) {
-              var id = uid(); if (!id) return;
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
               amount = parseInt(amount) || 0;
               return api('POST', '/dev/set-xp', { telegram_id: id, amount: amount })
                 .then(function(d) { log('⭐', 'XP = ' + amount + ':', d); return d; })
-                .catch(function(e) { log('❌', 'setXP error:', e); });
+                .catch(function(e) { log('❌', 'setXP:', e.message || e); throw e; });
             },
 
             getLevel: function() {
-              var id = uid(); if (!id) return;
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
               return api('GET', '/dev/get-level/' + id)
                 .then(function(d) { log('📊', 'Уровень:', d); return d; })
-                .catch(function(e) { log('❌', 'getLevel error:', e); });
+                .catch(function(e) { log('❌', 'getLevel:', e.message || e); throw e; });
             },
 
             resetStreak: function() {
-              var id = uid(); if (!id) return;
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
               return api('POST', '/dev/reset-streak', { telegram_id: id })
                 .then(function(d) { log('🔥', 'Стрик сброшен:', d); return d; })
-                .catch(function(e) { log('❌', 'resetStreak error:', e); });
+                .catch(function(e) { log('❌', 'resetStreak:', e.message || e); throw e; });
             },
 
             _bind: function(refs) {
