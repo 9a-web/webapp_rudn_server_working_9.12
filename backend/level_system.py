@@ -170,6 +170,7 @@ XP_REWARDS_INFO = [
     {"action": "task_complete",     "xp": 5,   "label": "Выполнение задачи",       "limit": None},
     {"action": "task_on_time_bonus","xp": 3,   "label": "Задача вовремя (бонус)",  "limit": None},
     {"action": "group_task_complete","xp": 8,  "label": "Групповая задача",        "limit": None},
+    {"action": "achievement_earned","xp": "5–50", "label": "Получение достижения",  "limit": None},
     {"action": "referral",          "xp": 100, "label": "Приглашение друга",       "limit": None},
     {"action": "schedule_view",     "xp": 1,   "label": "Просмотр расписания",     "limit": "3/день"},
     {"action": "message_sent",      "xp": 1,   "label": "Отправка сообщения",      "limit": "5/день"},
@@ -186,9 +187,13 @@ def get_stars_in_tier(level: int, tier: str) -> int:
     """
     Возвращает количество звёзд (1-5) внутри текущего тира.
     Звёзды распределяются равномерно по уровням тира.
+
+    FIX v3.1: Исправлена формула — теперь для base тира (4 уровня)
+    корректно выдаются звёзды 1,2,3,4 (вместо 1,2,3,5 с пропуском 4).
+    Для всех тиров звёзды распределяются равномерно через round вместо int.
     """
     tier_ranges = {
-        "base":    (1, 4),     # 4 уровня → звёзды: 1,2,3,4→5
+        "base":    (1, 4),     # 4 уровня → звёзды: 1,2,3,4
         "medium":  (5, 9),     # 5 уровней → звёзды: 1,2,3,4,5
         "rare":    (10, 19),   # 10 уровней → звёзды по 2 уровня
         "premium": (20, 29),   # 10 уровней → звёзды по 2 уровня
@@ -207,8 +212,16 @@ def get_stars_in_tier(level: int, tier: str) -> int:
     tier_size = max_lvl - min_lvl + 1
     pos = level - min_lvl  # 0-based
 
-    # Распределяем 5 звёзд по tier_size уровней
-    star = int((pos / max(tier_size - 1, 1)) * 4) + 1
+    if tier_size <= 5:
+        # Для маленьких тиров (base=4, medium=5) — прямое отображение
+        # base(4): pos 0→1, 1→2, 2→3, 3→4  (макс 4 звезды, 5я при переходе в medium)
+        # medium(5): pos 0→1, 1→2, 2→3, 3→4, 4→5
+        star = pos + 1
+    else:
+        # Для больших тиров (rare=10, premium=10) — равномерное распределение
+        # 10 уровней → 5 звёзд, по 2 уровня на звезду
+        star = round((pos / max(tier_size - 1, 1)) * 4) + 1
+
     return min(max(star, 1), 5)
 
 
@@ -401,6 +414,7 @@ async def award_xp(db, telegram_id: int, amount: int, reason: str = "") -> dict:
                         "new_level": new_info["level"],
                         "old_tier": old_info["tier"],
                         "new_tier": new_info["tier"],
+                        "level_title": new_info.get("title", ""),
                         "xp_awarded": amount,
                         "reason": reason,
                     }
@@ -596,23 +610,21 @@ async def get_xp_breakdown_readonly(db, telegram_id: int) -> dict:
                 "referral_xp": {"$sum": {
                     "$cond": [{"$eq": ["$reason", "referral"]}, "$amount", 0]
                 }},
-                # Задачи
+                # Задачи (базовый XP: 5 за каждую, включая выполненные вовремя)
+                # FIX v3.1: on_time задачи тоже дают базовые 5 XP в "tasks"
                 "task_xp": {"$sum": {
                     "$cond": [
                         {"$regexMatch": {"input": "$reason", "regex": "^task_complete"}},
-                        {"$cond": [
-                            {"$regexMatch": {"input": "$reason", "regex": "on_time"}},
-                            0,
-                            "$amount"
-                        ]},
+                        XP_REWARDS["task_complete"],
                         0
                     ]
                 }},
-                # Бонус за вовремя
+                # Бонус за вовремя (только дополнительные 3 XP, не вся сумма)
+                # FIX v3.1: вычитаем базовый XP задачи из суммы
                 "task_on_time_xp": {"$sum": {
                     "$cond": [
                         {"$regexMatch": {"input": "$reason", "regex": "on_time"}},
-                        "$amount",
+                        {"$subtract": ["$amount", XP_REWARDS["task_complete"]]},
                         0
                     ]
                 }},

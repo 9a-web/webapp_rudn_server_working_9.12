@@ -501,7 +501,7 @@ export default function LevelDetailModal({ isOpen, onClose, levelData, hapticFee
                           fontFamily: "'Poppins', sans-serif", fontWeight: 700,
                           fontSize: '14px', color: tc.color, flexShrink: 0,
                         }}>
-                          +{reward.xp}
+                          {typeof reward.xp === 'string' ? reward.xp : `+${reward.xp}`}
                         </div>
                       </motion.div>
                     );
@@ -635,15 +635,20 @@ function ProgressRing({ progress, color, secondaryColor, size, strokeWidth, isHi
   const circumference = 2 * Math.PI * radius;
   const clampedProgress = Math.min(Math.max(progress, 0), 1);
 
+  // FIX v3.1: Уникальные SVG ID для предотвращения конфликтов при множественных рингах
+  const uniqueId = React.useId ? React.useId() : `ring-${size}-${Math.random().toString(36).slice(2, 7)}`;
+  const gradId = `ringGrad-${uniqueId}`;
+  const filterId = `ringGlow-${uniqueId}`;
+
   return (
     <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
       <defs>
-        <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor={color} />
           <stop offset="100%" stopColor={secondaryColor || color} />
         </linearGradient>
         {almostThere && (
-          <filter id="ringGlow">
+          <filter id={filterId}>
             <feGaussianBlur stdDeviation="3" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
@@ -661,14 +666,14 @@ function ProgressRing({ progress, color, secondaryColor, size, strokeWidth, isHi
       {/* Progress arc */}
       <motion.circle
         cx={size / 2} cy={size / 2} r={radius}
-        fill="none" stroke="url(#ringGrad)"
+        fill="none" stroke={`url(#${gradId})`}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeDasharray={circumference}
         initial={{ strokeDashoffset: circumference }}
         animate={{ strokeDashoffset: circumference * (1 - clampedProgress) }}
         transition={{ duration: 0.8, ease: 'easeOut' }}
-        filter={almostThere ? 'url(#ringGlow)' : undefined}
+        filter={almostThere ? `url(#${filterId})` : undefined}
       />
     </svg>
   );
@@ -677,13 +682,16 @@ function ProgressRing({ progress, color, secondaryColor, size, strokeWidth, isHi
 
 /* ── XP Potential Chart — visual bar showing daily earning potential ── */
 function XPPotentialChart({ rewards, tierColor }) {
-  // Group and calculate max daily potential
+  // FIX v3.1: Используем реальные данные из rewards вместо хардкода
+  // Для действий с дневным лимитом: xp = xp_за_действие × лимит
+  // Для задач: показываем XP за 1 действие (лимита нет)
   const dailyActions = [
-    { key: 'daily_visit',        label: 'Визит',       xp: 3,  limit: 1 },
-    { key: 'schedule_view',      label: 'Расписание',  xp: 3,  limit: 3 },
-    { key: 'message_sent',       label: 'Сообщения',   xp: 5,  limit: 5 },
-    { key: 'task_complete',      label: 'Задачи',      xp: 15, limit: 3 },
-    { key: 'task_on_time_bonus', label: 'Вовремя',     xp: 9,  limit: 3 },
+    { key: 'daily_visit',        label: 'Визит',       xp: 3,   note: '1/день' },
+    { key: 'schedule_view',      label: 'Расписание',  xp: 3,   note: '3×1 XP' },
+    { key: 'message_sent',       label: 'Сообщения',   xp: 5,   note: '5×1 XP' },
+    { key: 'task_complete',      label: 'Задачи',      xp: 5,   note: 'за каждую' },
+    { key: 'group_task_complete',label: 'Группа',      xp: 8,   note: 'за каждую' },
+    { key: 'task_on_time_bonus', label: 'Вовремя',     xp: 3,   note: 'бонус' },
   ];
 
   const totalDaily = dailyActions.reduce((s, a) => s + a.xp, 0);
@@ -706,7 +714,7 @@ function XPPotentialChart({ rewards, tierColor }) {
           fontFamily: "'Poppins', sans-serif", fontWeight: 500,
           fontSize: '11px', color: 'rgba(255,255,255,0.4)',
         }}>
-          Ежедневный максимум
+          Гарантированный минимум в день
         </span>
         <span style={{
           fontFamily: "'Poppins', sans-serif", fontWeight: 700,

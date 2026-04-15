@@ -20,7 +20,7 @@ const TIER_ICONS = {
  * Peak-End Rule: максимально запоминающийся момент повышения.
  * Legend: грандиозный золотой салют.
  */
-export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTier }) {
+export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTier, levelTitle }) {
   const overlayRef = useRef(null);
   const confettiFired = useRef(false);
 
@@ -191,6 +191,22 @@ export default function LevelUpModal({ isOpen, onClose, newLevel, newTier, oldTi
             >
               LV. {newLevel}
             </motion.div>
+
+            {/* Level title (e.g. "Мастер", "Элита") */}
+            {levelTitle && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.42, type: 'spring', damping: 16 }}
+                style={{
+                  fontFamily: "'Poppins', sans-serif", fontWeight: 600,
+                  fontSize: '15px', color: `${tc.color}BB`,
+                  marginBottom: '10px', letterSpacing: '0.5px',
+                }}
+              >
+                «{levelTitle}»
+              </motion.div>
+            )}
 
             {/* New tier badge */}
             {tierChanged && (

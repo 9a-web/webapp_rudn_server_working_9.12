@@ -12,6 +12,7 @@ import {
 import { friendsAPI } from '../services/friendsAPI';
 import { groupScheduleItems } from '../utils/scheduleUtils';
 import { getBackendURL } from '../services/api';
+import { getTierConfig } from '../constants/levelConstants';
 
 const getAvatarGradient = (id) => {
   const gradients = [
@@ -207,6 +208,9 @@ const FriendProfileModal = ({
                   )}
                   {/* Level/Tier badge */}
                   {profile?.level && (
+                    (() => {
+                      const tc = getTierConfig(profile.tier);
+                      return (
                     <div className="flex items-center gap-2 mt-1.5">
                       <span
                         style={{
@@ -215,17 +219,9 @@ const FriendProfileModal = ({
                           fontSize: '11px',
                           padding: '2px 8px',
                           borderRadius: '8px',
-                          background: profile.tier === 'premium' ? 'linear-gradient(90deg, #FF4EEA22, #FFCE2E22)' :
-                                     profile.tier === 'rare' ? '#B84DFF18' :
-                                     profile.tier === 'medium' ? '#FFA04D18' : '#4D85FF18',
-                          color: profile.tier === 'premium' ? '#FF4EEA' :
-                                 profile.tier === 'rare' ? '#B84DFF' :
-                                 profile.tier === 'medium' ? '#FFA04D' : '#4D85FF',
-                          border: `1px solid ${
-                            profile.tier === 'premium' ? '#FF4EEA33' :
-                            profile.tier === 'rare' ? '#B84DFF33' :
-                            profile.tier === 'medium' ? '#FFA04D33' : '#4D85FF33'
-                          }`,
+                          background: tc.bgTint,
+                          color: tc.color,
+                          border: `1px solid ${tc.borderTint}`,
                         }}
                       >
                         LV. {profile.level}
@@ -235,15 +231,20 @@ const FriendProfileModal = ({
                           fontFamily: "'Poppins', sans-serif",
                           fontWeight: 600,
                           fontSize: '10px',
-                          color: profile.tier === 'premium' ? '#FF4EEA' :
-                                 profile.tier === 'rare' ? '#B84DFF' :
-                                 profile.tier === 'medium' ? '#FFA04D' : '#4D85FF',
+                          color: tc.color,
                           textTransform: 'capitalize',
                         }}
                       >
-                        {profile.tier === 'premium' ? '✨' : profile.tier === 'rare' ? '🟣' : profile.tier === 'medium' ? '🟠' : '🔵'} {profile.tier}
+                        {tc.nameRu}
                       </span>
+                      {profile.stars > 0 && (
+                        <span style={{ fontSize: '10px', color: tc.color, letterSpacing: '1px' }}>
+                          {'★'.repeat(Math.min(profile.stars || 1, 5))}
+                        </span>
+                      )}
                     </div>
+                      );
+                    })()
                   )}
                   {profile?.is_online && (
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-1">
@@ -302,6 +303,9 @@ const FriendProfileModal = ({
               
               {/* XP Progress Bar for friend */}
               {profile && profile.xp > 0 && profile.xp_progress > 0 && (
+                (() => {
+                  const tc = getTierConfig(profile.tier);
+                  return (
                 <motion.div
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -328,15 +332,14 @@ const FriendProfileModal = ({
                         height: '100%',
                         borderRadius: '3px',
                         width: `${Math.max(profile.xp_progress * 100, 1)}%`,
-                        background: profile.tier === 'premium' ? 'linear-gradient(90deg, #FF4EEA, #FFCE2E, #FF8717)' :
-                                   profile.tier === 'rare' ? 'linear-gradient(135deg, #B84DFF, #D47FFF)' :
-                                   profile.tier === 'medium' ? 'linear-gradient(135deg, #FFA04D, #FFB976)' :
-                                   'linear-gradient(135deg, #4D85FF, #6EA0FF)',
+                        background: tc.gradient,
                         transition: 'width 0.5s ease',
                       }}
                     />
                   </div>
                 </motion.div>
+                  );
+                })()
               )}
             </div>
 

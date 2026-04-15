@@ -115,7 +115,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         // Level-up detection: ТОЛЬКО через сравнение с ref, НЕ дублируя pending
         if (prevLevelRef.current !== null && newLevel > prevLevelRef.current && !levelUpShownRef.current) {
           levelUpShownRef.current = true;
-          setLevelUpData({ newLevel, newTier, oldTier: prevTierRef.current || 'base' });
+          setLevelUpData({ newLevel, newTier, oldTier: prevTierRef.current || 'base', levelTitle: data.level_title || '' });
           setShowLevelUp(true);
         }
 
@@ -134,6 +134,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             newLevel: data.new_level,
             newTier: data.new_tier,
             oldTier: data.old_tier,
+            levelTitle: data.level_title || '',
           });
           setShowLevelUp(true);
           prevLevelRef.current = data.new_level;
@@ -1735,6 +1736,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         newLevel={levelUpData?.newLevel}
         newTier={levelUpData?.newTier}
         oldTier={levelUpData?.oldTier}
+        levelTitle={levelUpData?.levelTitle || profileData?.level_title || ''}
       />
     </>
   );

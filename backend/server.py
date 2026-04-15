@@ -4346,6 +4346,14 @@ async def complete_group_task(task_id: str, complete_data: GroupTaskCompleteRequ
             )
             await db.room_activities.insert_one(activity.model_dump())
         
+        # FIX v3.1: Начисляем XP за выполнение групповой задачи (раньше отсутствовало!)
+        if complete_data.completed:
+            asyncio.create_task(safe_award_xp(
+                db, complete_data.telegram_id,
+                XP_REWARDS["group_task_complete"],
+                reason="group_task_complete"
+            ))
+        
         # Подсчитываем количество комментариев
         comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
         
@@ -15844,12 +15852,12 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             achievements_count=achievements_count if privacy.show_achievements and not is_anonymous else 0,
             total_points=stats.get("total_points", 0) if stats and privacy.show_achievements and not is_anonymous else 0,
             xp=user_xp if privacy.show_achievements and not is_anonymous else 0,
-            level=level_info["level"],
-            tier=level_info["tier"],
+            level=level_info["level"] if privacy.show_achievements and not is_anonymous else 1,
+            tier=level_info["tier"] if privacy.show_achievements and not is_anonymous else "base",
             xp_current_level=level_info["xp_current_level"] if privacy.show_achievements and not is_anonymous else 0,
             xp_next_level=level_info["xp_next_level"] if privacy.show_achievements and not is_anonymous else 0,
             xp_progress=level_info["progress"] if privacy.show_achievements and not is_anonymous else 0.0,
-            stars=level_info.get("stars", 1),
+            stars=level_info.get("stars", 1) if privacy.show_achievements and not is_anonymous else 1,
             level_title=level_info.get("title", "") if privacy.show_achievements and not is_anonymous else "",
             visit_streak_current=streak_current if privacy.show_achievements and not is_anonymous else 0,
             visit_streak_max=streak_max if privacy.show_achievements and not is_anonymous else 0,
