@@ -60,6 +60,7 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [imgLoaded, setImgLoaded]         = useState(false);
   const [ghostScale, setGhostScale]       = useState(1); // Масштаб ghost-preview
+  const [deviceZone, setDeviceZone]       = useState('mobile'); // 'off' | 'mobile' | 'tablet' | 'desktop'
 
   // Sync state → refs
   useEffect(() => { colorRef.current = color; }, [color]);
@@ -785,92 +786,85 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
             }}
           />
 
-          {/* ─── Зоны видимости устройств (safe zones) ─── */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            zIndex: 3,
-          }}>
-            {/* Мобильная зона — самая узкая, центральная полоса */}
-            {/* Mobile ~375px screen / ~500px canvas ≈ 75% ширины, полная высота */}
-            <div style={{
-              position: 'absolute',
-              left: '12.5%',
-              right: '12.5%',
-              top: '1%',
-              bottom: '1%',
-              border: '1.5px dashed rgba(248,185,76,0.35)',
-              borderRadius: '12px',
-            }}>
-              <span style={{
+          {/* ─── Активная зона видимости устройства с маской обрезки ─── */}
+          {deviceZone !== 'off' && (() => {
+            // Зоны: процент от canvas, который ВИДЕН на каждом устройстве
+            const zones = {
+              mobile:  { left: 12.5, right: 12.5, top: 1,  bottom: 1,  color: '#F8B94C', label: '📱 Мобильная зона', radius: '12px' },
+              tablet:  { left: 2,    right: 2,    top: 8,  bottom: 8,  color: '#3B82F6', label: '📋 Планшетная зона', radius: '14px' },
+              desktop: { left: 0,    right: 0,    top: 20, bottom: 20, color: '#A855F7', label: '🖥 Десктопная зона', radius: '4px' },
+            };
+            const z = zones[deviceZone];
+            if (!z) return null;
+            return (
+              <div style={{
                 position: 'absolute',
-                bottom: '4px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: '9px',
-                color: 'rgba(248,185,76,0.5)',
-                whiteSpace: 'nowrap',
-                letterSpacing: '0.5px',
+                inset: 0,
+                pointerEvents: 'none',
+                zIndex: 3,
               }}>
-                📱 Мобильная
-              </span>
-            </div>
-
-            {/* Планшетная зона — шире мобильной, обрезает верх/низ */}
-            {/* Tablet ~768px screen, шире канваса → обрезает по высоте ~85% */}
-            <div style={{
-              position: 'absolute',
-              left: '2%',
-              right: '2%',
-              top: '8%',
-              bottom: '8%',
-              border: '1.5px dashed rgba(59,130,246,0.30)',
-              borderRadius: '16px',
-            }}>
-              <span style={{
-                position: 'absolute',
-                bottom: '4px',
-                right: '8px',
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: '9px',
-                color: 'rgba(59,130,246,0.45)',
-                whiteSpace: 'nowrap',
-                letterSpacing: '0.5px',
-              }}>
-                📋 Планшет
-              </span>
-            </div>
-
-            {/* Десктопная зона — вся ширина, сильно обрезает верх/низ */}
-            {/* Desktop ~1200px+, ширина > канваса → обрезает по высоте ~60% */}
-            <div style={{
-              position: 'absolute',
-              left: '0',
-              right: '0',
-              top: '20%',
-              bottom: '20%',
-              border: '1.5px dashed rgba(168,85,247,0.25)',
-              borderRadius: '4px',
-            }}>
-              <span style={{
-                position: 'absolute',
-                bottom: '3px',
-                right: '6px',
-                fontFamily: "'Poppins', sans-serif",
-                fontWeight: 600,
-                fontSize: '9px',
-                color: 'rgba(168,85,247,0.40)',
-                whiteSpace: 'nowrap',
-                letterSpacing: '0.5px',
-              }}>
-                🖥 Десктоп
-              </span>
-            </div>
-          </div>
+                {/* Затемнение обрезаемых областей */}
+                {/* Верх */}
+                {z.top > 0 && <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0,
+                  height: `${z.top}%`,
+                  background: 'rgba(0,0,0,0.45)',
+                  borderRadius: '24px 24px 0 0',
+                }} />}
+                {/* Низ */}
+                {z.bottom > 0 && <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  height: `${z.bottom}%`,
+                  background: 'rgba(0,0,0,0.45)',
+                  borderRadius: '0 0 24px 24px',
+                }} />}
+                {/* Лево */}
+                {z.left > 0 && <div style={{
+                  position: 'absolute',
+                  top: `${z.top}%`, bottom: `${z.bottom}%`,
+                  left: 0, width: `${z.left}%`,
+                  background: 'rgba(0,0,0,0.45)',
+                }} />}
+                {/* Право */}
+                {z.right > 0 && <div style={{
+                  position: 'absolute',
+                  top: `${z.top}%`, bottom: `${z.bottom}%`,
+                  right: 0, width: `${z.right}%`,
+                  background: 'rgba(0,0,0,0.45)',
+                }} />}
+                {/* Рамка видимой зоны */}
+                <div style={{
+                  position: 'absolute',
+                  left: `${z.left}%`,
+                  right: `${z.right}%`,
+                  top: `${z.top}%`,
+                  bottom: `${z.bottom}%`,
+                  border: `1.5px dashed ${z.color}55`,
+                  borderRadius: z.radius,
+                  boxShadow: `inset 0 0 20px ${z.color}08`,
+                }}>
+                  {/* Подпись зоны */}
+                  <span style={{
+                    position: 'absolute',
+                    bottom: '4px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '9px',
+                    color: `${z.color}88`,
+                    whiteSpace: 'nowrap',
+                    letterSpacing: '0.5px',
+                    background: 'rgba(0,0,0,0.5)',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                  }}>
+                    {z.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Loading overlay */}
           {loading && (
@@ -896,17 +890,60 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
           )}
         </motion.div>
 
-        {/* Подсказка */}
+        {/* ─── Переключатель зон видимости устройств ─── */}
         <div style={{
-          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
           padding: '8px 0 4px',
-          fontFamily: "'Poppins', sans-serif",
-          fontSize: '11px',
-          fontWeight: 500,
-          color: 'rgba(255,255,255,0.2)',
-          lineHeight: 1.4,
         }}>
-          Пунктирные рамки показывают видимую область на разных устройствах
+          {[
+            { id: 'mobile',  icon: '📱', label: 'Моб.',    color: '#F8B94C' },
+            { id: 'tablet',  icon: '📋', label: 'Планшет', color: '#3B82F6' },
+            { id: 'desktop', icon: '🖥',  label: 'ПК',      color: '#A855F7' },
+            { id: 'off',     icon: '✕',  label: '',        color: '#888' },
+          ].map((d) => {
+            const isActive = deviceZone === d.id;
+            return (
+              <button
+                key={d.id}
+                onClick={() => {
+                  setDeviceZone(d.id);
+                  if (hapticFeedback) hapticFeedback('impact', 'light');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: d.id === 'off' ? '5px 10px' : '5px 12px',
+                  borderRadius: '10px',
+                  border: isActive
+                    ? `1px solid ${d.color}55`
+                    : '1px solid rgba(255,255,255,0.06)',
+                  background: isActive
+                    ? `${d.color}18`
+                    : 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                }}
+              >
+                <span style={{ fontSize: '12px', lineHeight: 1 }}>{d.icon}</span>
+                {d.label && (
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: isActive ? 600 : 500,
+                    fontSize: '10px',
+                    color: isActive ? d.color : 'rgba(255,255,255,0.3)',
+                    transition: 'color 0.15s ease',
+                  }}>
+                    {d.label}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Подтверждение очистки */}
