@@ -77,6 +77,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const graffitiToolRef = useRef('pen'); // 'pen' | 'eraser'
   const graffitiLoadedImgRef = useRef(null); // Fix: для отмены загрузки Image при unmount
   const graffitiCanvasReady = useRef(false); // Fix: предотвращаем двойную инициализацию
+  const graffitiDirty = useRef(false); // Fix F5: трекинг реальных изменений canvas
+  const graffitiSavingRef = useRef(false); // Fix F4: debounce — предотвращаем параллельные save
+  const graffitiLoadCancelledRef = useRef(false); // Fix F9: отмена загрузки при быстром переключении
   const [graffitiEditMode, setGraffitiEditMode] = useState(false);
   const [graffitiColorUI, setGraffitiColorUI] = useState('#F8B94C');
   const [graffitiSizeUI, setGraffitiSizeUI] = useState(4);
@@ -84,6 +87,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [graffitiHasContent, setGraffitiHasContent] = useState(false); // Fix: трекинг наличия контента
   const [graffitiSaveStatus, setGraffitiSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [showClearConfirm, setShowClearConfirm] = useState(false); // Fix: подтверждение очистки
+  const [graffitiLoading, setGraffitiLoading] = useState(false); // Fix F8: индикатор загрузки с сервера
 
   // Undo/Redo history
   const graffitiHistory = useRef([]); // массив ImageData
@@ -92,6 +96,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [canRedo, setCanRedo] = useState(false);
 
   const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
+  const PEN_SIZES = [2, 4, 8, 14];
+  const ERASER_SIZES = [8, 14, 22, 32];
+  const DEFAULT_PEN_SIZE = 4;
+  const DEFAULT_ERASER_SIZE = 14;
 
   // Sync UI state → refs
   useEffect(() => { graffitiColor.current = graffitiColorUI; }, [graffitiColorUI]);
@@ -99,6 +107,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   useEffect(() => { graffitiToolRef.current = graffitiToolUI; }, [graffitiToolUI]);
 
   // --- Проверка, есть ли что-то на canvas (не пустой ли) ---
+  // Fix F2: уменьшен шаг проверки с 16 до 4 (каждый пиксель по alpha-каналу)
+  // Старый шаг 16 пропускал мелкие точки 1-2px
   const checkCanvasHasContent = useCallback(() => {
     const canvas = graffitiCanvasRef.current;
     const ctx = graffitiCtxRef.current;
@@ -106,8 +116,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     try {
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
-      // Проверяем есть ли хотя бы один непрозрачный пиксель
-      for (let i = 3; i < data.length; i += 16) { // шаг 16 для быстрой проверки
+      // Проверяем alpha-канал каждого пикселя (каждый 4-й байт = alpha)
+      for (let i = 3; i < data.length; i += 4) {
         if (data[i] > 0) { setGraffitiHasContent(true); return true; }
       }
       setGraffitiHasContent(false);
@@ -165,6 +175,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     graffitiHistoryIdx.current = graffitiHistory.current.length - 1;
     setCanUndo(graffitiHistoryIdx.current > 0);
     setCanRedo(false);
+    // Fix F5: Помечаем canvas как изменённый (dirty)
+    graffitiDirty.current = true;
     // Fix: Обновляем флаг наличия контента
     checkCanvasHasContent();
   }, [checkCanvasHasContent]);
@@ -305,7 +317,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     ctx.globalCompositeOperation = 'source-over';
     // Fix: Используем логические размеры вместо canvas.width/dpr
     ctx.clearRect(0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
+    // Fix F3: Полный сброс undo-истории — после явного "Да, стереть" нельзя undo назад
+    graffitiHistory.current = [];
+    graffitiHistoryIdx.current = -1;
+    setCanUndo(false);
+    setCanRedo(false);
+    // Сохраняем единственный "чистый" snapshot как начальное состояние
     saveSnapshot();
+    // Fix F5: Помечаем dirty для сохранения на сервер
+    graffitiDirty.current = true;
     setGraffitiHasContent(false);
     setShowClearConfirm(false);
     if (hapticFeedback) hapticFeedback('notification', 'success');
@@ -313,6 +333,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (user?.id) {
       try {
         await friendsAPI.clearGraffiti(user.id);
+        graffitiDirty.current = false; // Успешно синхронизировано с сервером
       } catch (err) {
         console.error('[Graffiti] Delete error:', err);
       }
@@ -320,9 +341,20 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   }, [saveSnapshot, hapticFeedback, user?.id]);
 
   // Сохранение граффити на сервер — Fix: нормализация через offscreen canvas
+  // Fix F4: debounce через ref — предотвращаем параллельные save
+  // Fix F5: dirty-check — не сохраняем если ничего не менялось
   const saveGraffitiToServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
+    // Fix F5: Не сохраняем если ничего не изменилось
+    if (!graffitiDirty.current) {
+      return;
+    }
+    // Fix F4: Предотвращаем параллельные сохранения
+    if (graffitiSavingRef.current) {
+      return;
+    }
+    graffitiSavingRef.current = true;
     setGraffitiSaveStatus('saving');
     try {
       // Fix: Нормализуем в offscreen canvas фиксированного размера (2x для качества)
@@ -355,21 +387,26 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
           console.warn('[Graffiti] Image too large even after compression');
           setGraffitiSaveStatus('error');
           setTimeout(() => setGraffitiSaveStatus('idle'), 3000);
+          graffitiSavingRef.current = false;
           return;
         }
       }
 
       await friendsAPI.saveGraffiti(user.id, dataURL);
+      graffitiDirty.current = false; // Fix F5: Сброс dirty после успешного save
       setGraffitiSaveStatus('saved');
       setTimeout(() => setGraffitiSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('[Graffiti] Save error:', err);
       setGraffitiSaveStatus('error');
       setTimeout(() => setGraffitiSaveStatus('idle'), 3000);
+    } finally {
+      graffitiSavingRef.current = false; // Fix F4: Разблокируем следующее сохранение
     }
   }, [user?.id]);
 
   // Загрузка граффити с сервера — Fix: contain-стиль масштабирование для обратной совместимости
+  // Fix F8: индикатор загрузки + Fix F9: cancellation flag + Fix F6: обработка ошибок
   const loadGraffitiFromServer = useCallback(async () => {
     const canvas = graffitiCanvasRef.current;
     if (!canvas || !user?.id) return;
@@ -379,17 +416,24 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       graffitiLoadedImgRef.current.onerror = null;
       graffitiLoadedImgRef.current = null;
     }
+    graffitiLoadCancelledRef.current = false;
+    setGraffitiLoading(true); // Fix F8: показываем индикатор загрузки
     try {
       const data = await friendsAPI.getGraffiti(user.id);
-      if (!data || !data.graffiti_data) return;
+      // Fix F9: Проверяем что загрузка не отменена
+      if (graffitiLoadCancelledRef.current) { setGraffitiLoading(false); return; }
+      if (!data || !data.graffiti_data) { setGraffitiLoading(false); return; }
       // Рисуем сохранённое изображение на canvas
       const img = new window.Image();
       graffitiLoadedImgRef.current = img;
       img.onload = () => {
-        // Fix: Проверяем что canvas всё ещё существует (не unmounted)
-        if (!graffitiCanvasRef.current) return;
+        // Fix F9: Проверяем отмену + что canvas всё ещё существует
+        if (graffitiLoadCancelledRef.current || !graffitiCanvasRef.current) {
+          setGraffitiLoading(false);
+          return;
+        }
         const drawCtx = graffitiCtxRef.current;
-        if (!drawCtx) return;
+        if (!drawCtx) { setGraffitiLoading(false); return; }
         // Fix: Contain-стиль масштабирование — сохраняем пропорции исходного изображения
         const imgW = img.naturalWidth;
         const imgH = img.naturalHeight;
@@ -423,16 +467,21 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         }
         // Сохраняем snapshot для undo (это станет "начальным" состоянием)
         saveSnapshot();
+        graffitiDirty.current = false; // Fix F5: загруженное состояние — не dirty
         setGraffitiHasContent(true);
+        setGraffitiLoading(false);
         graffitiLoadedImgRef.current = null;
       };
       img.onerror = () => {
         console.error('[Graffiti] Failed to load image');
+        setGraffitiLoading(false);
         graffitiLoadedImgRef.current = null;
       };
       img.src = data.graffiti_data;
     } catch (err) {
+      // Fix F6: Обработка ошибок загрузки — показываем в консоль, скрываем loading
       console.error('[Graffiti] Load error:', err);
+      setGraffitiLoading(false);
     }
   }, [user?.id, saveSnapshot]);
 
@@ -441,6 +490,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (activeTab === 'general' && isOpen && user?.id) {
       let cancelled = false;
       graffitiCanvasReady.current = false;
+      graffitiLoadCancelledRef.current = false; // Fix F9: сбрасываем флаг отмены
+      graffitiDirty.current = false; // Fix F5: начальное состояние — не dirty
       const t = setTimeout(async () => {
         if (cancelled) return;
         // Единственная инициализация canvas
@@ -452,9 +503,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         // Fix: используем ref-чтение checkCanvasHasContent вместо stale state
         if (!checkCanvasHasContent()) {
           saveSnapshot();
+          graffitiDirty.current = false; // Начальный пустой snapshot — не dirty
         }
       }, 250);
-      return () => { cancelled = true; clearTimeout(t); };
+      return () => {
+        cancelled = true;
+        graffitiLoadCancelledRef.current = true; // Fix F9: отмена загрузки
+        clearTimeout(t);
+      };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isOpen]);
@@ -523,6 +579,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Bug 13: Очистка памяти граффити + Bug 11: Сброс друзей при закрытии
   useEffect(() => {
     if (!isOpen) {
+      // Fix F9: Отменяем загрузку если в процессе
+      graffitiLoadCancelledRef.current = true;
       // Fix: Отменяем загрузку изображения если в процессе
       if (graffitiLoadedImgRef.current) {
         graffitiLoadedImgRef.current.onload = null;
@@ -534,12 +592,15 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       graffitiHistoryIdx.current = -1;
       graffitiCanvasReady.current = false;
       graffitiCtxRef.current = null;
+      graffitiDirty.current = false; // Fix F5: сброс dirty
+      graffitiSavingRef.current = false; // Fix F4: сброс saving lock
       setCanUndo(false);
       setCanRedo(false);
       setGraffitiEditMode(false);
       setGraffitiHasContent(false);
       setGraffitiSaveStatus('idle');
       setShowClearConfirm(false);
+      setGraffitiLoading(false); // Fix F8: сброс loading
       // Сброс друзей для обновления при следующем открытии
       setFriendsList([]);
       // Сброс данных профиля
@@ -553,20 +614,26 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Fix: Освобождаем память граффити при переключении с таба 'general' на другие
   useEffect(() => {
     if (activeTab !== 'general' && isOpen) {
-      // Сохраняем граффити если были в режиме редактирования
-      if (graffitiEditMode) {
+      // Fix F7: Сохраняем ТОЛЬКО если были реальные изменения (dirty)
+      if (graffitiEditMode && graffitiDirty.current) {
         saveGraffitiToServer();
+      }
+      if (graffitiEditMode) {
         setGraffitiEditMode(false);
       }
       setShowClearConfirm(false);
+      // Fix F9: Отменяем загрузку
+      graffitiLoadCancelledRef.current = true;
       // Освобождаем ImageData объекты из памяти
       graffitiHistory.current = [];
       graffitiHistoryIdx.current = -1;
       graffitiCanvasReady.current = false;
       graffitiCtxRef.current = null;
+      graffitiDirty.current = false;
       setCanUndo(false);
       setCanRedo(false);
       setGraffitiHasContent(false);
+      setGraffitiLoading(false);
       // Отменяем загрузку граффити если в процессе
       if (graffitiLoadedImgRef.current) {
         graffitiLoadedImgRef.current.onload = null;
@@ -1305,8 +1372,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       <button
                         onClick={() => {
                           if (graffitiEditMode) {
-                            // Выходим из режима — сохраняем на сервер
-                            saveGraffitiToServer();
+                            // Fix F5: Сохраняем ТОЛЬКО если были реальные изменения (dirty)
+                            if (graffitiDirty.current) {
+                              saveGraffitiToServer();
+                            }
                           }
                           setGraffitiEditMode(prev => !prev);
                           setShowClearConfirm(false); // скрываем подтверждение при переключении
@@ -1435,8 +1504,30 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                         touchAction: graffitiEditMode ? 'none' : 'auto',
                       }}
                     />
-                    {/* Fix: Placeholder только когда canvas пуст И НЕ в режиме рисования */}
-                    {!graffitiEditMode && !graffitiHasContent && (
+                    {/* Fix F8: Индикатор загрузки граффити с сервера */}
+                    {graffitiLoading && (
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        pointerEvents: 'none',
+                        background: 'rgba(0,0,0,0.15)',
+                        borderRadius: '20px',
+                      }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          border: '2px solid rgba(248,185,76,0.3)',
+                          borderTop: '2px solid #F8B94C',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }} />
+                      </div>
+                    )}
+                    {/* Fix F8: Placeholder только когда canvas пуст И НЕ загружается И НЕ в режиме рисования */}
+                    {!graffitiEditMode && !graffitiHasContent && !graffitiLoading && (
                       <div style={{
                         position: 'absolute',
                         inset: 0,
@@ -1477,6 +1568,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                           <button
                             onClick={() => {
                               setGraffitiToolUI('pen');
+                              // Fix F1: авто-сброс размера если текущий не подходит для pen
+                              if (!PEN_SIZES.includes(graffitiSizeUI)) {
+                                setGraffitiSizeUI(DEFAULT_PEN_SIZE);
+                              }
                               if (hapticFeedback) hapticFeedback('impact', 'light');
                             }}
                             style={{
@@ -1505,6 +1600,10 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                           <button
                             onClick={() => {
                               setGraffitiToolUI('eraser');
+                              // Fix F1: авто-сброс размера если текущий не подходит для eraser
+                              if (!ERASER_SIZES.includes(graffitiSizeUI)) {
+                                setGraffitiSizeUI(DEFAULT_ERASER_SIZE);
+                              }
                               if (hapticFeedback) hapticFeedback('impact', 'light');
                             }}
                             style={{
@@ -1583,7 +1682,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                             gap: '6px',
                             flexShrink: 0,
                           }}>
-                            {(graffitiToolUI === 'pen' ? [2, 4, 8, 14] : [8, 14, 22, 32]).map((s) => (
+                            {(graffitiToolUI === 'pen' ? PEN_SIZES : ERASER_SIZES).map((s) => (
                               <button
                                 key={s}
                                 onClick={() => {

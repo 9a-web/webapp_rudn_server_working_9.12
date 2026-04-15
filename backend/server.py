@@ -15364,22 +15364,51 @@ async def get_profile_qr_data(telegram_id: int):
 
 # ========== GRAFFITI ==========
 
+def _parse_graffiti_requester(body: dict, telegram_id: int, action: str = "изменять") -> int:
+    """Безопасная валидация requester_telegram_id для граффити endpoints.
+    Возвращает parsed requester_id или бросает HTTPException.
+    Fix B1: безопасный парсинг int вместо голого int() — корректная 400 вместо 500.
+    """
+    requester_id = body.get("requester_telegram_id")
+    if requester_id is None:
+        raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+    try:
+        requester_int = int(requester_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="requester_telegram_id должен быть числом")
+    if requester_int != telegram_id:
+        raise HTTPException(status_code=403, detail=f"Можно {action} только своё граффити")
+    return requester_int
+
+
+async def _parse_json_body(request: Request) -> dict:
+    """Fix B2: безопасный парсинг JSON body — возвращает 400 вместо 500 при невалидном JSON."""
+    try:
+        return await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалидное тело запроса. Ожидается JSON.")
+
+
 @api_router.put("/profile/{telegram_id}/graffiti")
 async def save_graffiti(telegram_id: int, request: Request):
     """Сохранить граффити пользователя (base64 data URL)"""
     try:
-        body = await request.json()
+        body = await _parse_json_body(request)
         graffiti_data = body.get("graffiti_data", "")
         
-        # Авторизация: обязательная проверка что запрос от владельца профиля
-        requester_id = body.get("requester_telegram_id")
-        if requester_id is None:
-            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
-        if int(requester_id) != telegram_id:
-            raise HTTPException(status_code=403, detail="Можно изменять только своё граффити")
+        # Fix B1: безопасная авторизация
+        _parse_graffiti_requester(body, telegram_id, "изменять")
         
-        # Валидация формата: должен быть data URL изображения или пустая строка
-        if graffiti_data and not graffiti_data.startswith("data:image/"):
+        # Fix B3: пустая строка = очистка граффити (вместо записи "" в БД)
+        if not graffiti_data or graffiti_data.strip() == "":
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$unset": {"graffiti_data": "", "graffiti_updated_at": ""}},
+            )
+            return {"success": True, "cleared": True, "graffiti_updated_at": None}
+        
+        # Валидация формата: должен быть data URL изображения
+        if not graffiti_data.startswith("data:image/"):
             raise HTTPException(status_code=400, detail="Неверный формат данных граффити. Ожидается data:image/* URL")
         
         # Ограничение размера ~3MB base64 (учитываем Retina дисплеи с DPR 2-3)
@@ -15387,7 +15416,7 @@ async def save_graffiti(telegram_id: int, request: Request):
         if len(graffiti_data) > max_size:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Граффити слишком большое ({len(graffiti_data)} байт). Максимум: {max_size} байт"
+                detail=f"Граффити слишком большое. Максимум: {max_size} байт"
             )
         
         update_data = {
@@ -15406,8 +15435,9 @@ async def save_graffiti(telegram_id: int, request: Request):
     except HTTPException:
         raise
     except Exception as e:
+        # Fix B4: не раскрываем внутренние ошибки клиенту
         logger.error(f"Save graffiti error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при сохранении граффити")
 
 
 @api_router.get("/profile/{telegram_id}/graffiti")
@@ -15428,34 +15458,33 @@ async def get_graffiti(telegram_id: int):
     except HTTPException:
         raise
     except Exception as e:
+        # Fix B4: не раскрываем внутренние ошибки клиенту
         logger.error(f"Get graffiti error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при загрузке граффити")
 
 
 @api_router.post("/profile/{telegram_id}/graffiti/clear")
 async def delete_graffiti(telegram_id: int, request: Request):
     """Удалить граффити пользователя (полная очистка). POST вместо DELETE из-за инфраструктурных ограничений."""
     try:
-        body = await request.json()
+        body = await _parse_json_body(request)
         
-        # Авторизация
-        requester_id = body.get("requester_telegram_id")
-        if requester_id is None:
-            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
-        if int(requester_id) != telegram_id:
-            raise HTTPException(status_code=403, detail="Можно удалять только своё граффити")
+        # Fix B1: безопасная авторизация
+        _parse_graffiti_requester(body, telegram_id, "удалять")
         
-        await db.user_settings.update_one(
+        result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
             {"$unset": {"graffiti_data": "", "graffiti_updated_at": ""}},
         )
         
-        return {"success": True}
+        # Fix B5: информативный ответ — было ли что удалять
+        return {"success": True, "had_graffiti": result.modified_count > 0}
     except HTTPException:
         raise
     except Exception as e:
+        # Fix B4: не раскрываем внутренние ошибки клиенту
         logger.error(f"Delete graffiti error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при удалении граффити")
 
 # ========== END GRAFFITI ==========
 

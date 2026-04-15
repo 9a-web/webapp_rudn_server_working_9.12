@@ -1,447 +1,496 @@
 #!/usr/bin/env python3
 """
-Backend Testing Script for RUDN Schedule Level System v3.0
-Tests Level System v3.0 endpoints including new features:
-- Stars system (1-5)
-- Level titles
-- XP history endpoint
-- Daily XP endpoint
-- Legend tier verification
-- Referral XP increase (50→100)
+Comprehensive Backend Testing for Graffiti API Endpoints
+Testing all scenarios as specified in the review request
 """
 
-import asyncio
-import aiohttp
+import requests
 import json
 import sys
-from typing import Dict, Any, List
+from datetime import datetime
 
-# Backend URL - using the configured external URL from frontend/.env
+# Backend URL - using localhost since external URL is not accessible
 BACKEND_URL = "http://localhost:8001/api"
 
-# Admin IDs (allowed)
-ADMIN_IDS = [765963392, 1311283832]
-# Non-admin ID (should get 403)
-NON_ADMIN_ID = 123456
+# Test data
+TEST_TELEGRAM_ID = 999001
+VALID_BASE64_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+INVALID_REQUESTER_ID = 99999
 
-class LevelSystemTester:
-    def __init__(self):
-        self.session = None
-        self.test_results = []
-        self.total_tests = 0
-        self.passed_tests = 0
-        self.failed_tests = 0
+def log_test(test_name, status, details=""):
+    """Log test results with timestamp"""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    status_symbol = "✅" if status == "PASS" else "❌"
+    print(f"[{timestamp}] {status_symbol} {test_name}")
+    if details:
+        print(f"    {details}")
 
-    async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-
-    def log_test(self, test_name: str, passed: bool, details: str = ""):
-        """Log test result"""
-        self.total_tests += 1
-        if passed:
-            self.passed_tests += 1
-            status = "✅ PASS"
-        else:
-            self.failed_tests += 1
-            status = "❌ FAIL"
+def test_graffiti_endpoints():
+    """Test all Graffiti API endpoints comprehensively"""
+    print("🧪 STARTING GRAFFITI API COMPREHENSIVE TESTING")
+    print("=" * 60)
+    
+    total_tests = 0
+    passed_tests = 0
+    failed_tests = []
+    
+    # Test 1: Valid save - PUT with valid data
+    print("\n📝 TEST 1: Valid graffiti save")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": VALID_BASE64_IMAGE,
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        result = f"{status} - {test_name}"
-        if details:
-            result += f" | {details}"
-        
-        print(result)
-        self.test_results.append({
-            "test": test_name,
-            "passed": passed,
-            "details": details
-        })
-
-    async def make_request(self, method: str, endpoint: str, data: Dict[Any, Any] = None) -> Dict[Any, Any]:
-        """Make HTTP request to backend"""
-        url = f"{BACKEND_URL}{endpoint}"
-        
-        try:
-            if method.upper() == "GET":
-                async with self.session.get(url) as response:
-                    return {
-                        "status_code": response.status,
-                        "data": await response.json() if response.content_type == 'application/json' else await response.text()
-                    }
-            elif method.upper() == "POST":
-                async with self.session.post(url, json=data) as response:
-                    return {
-                        "status_code": response.status,
-                        "data": await response.json() if response.content_type == 'application/json' else await response.text()
-                    }
-        except Exception as e:
-            return {
-                "status_code": 0,
-                "data": {"error": str(e)}
-            }
-
-    async def test_user_level_endpoint(self):
-        """Test GET /api/users/{id}/level - should return stars and title"""
-        print("\n=== Testing GET /api/users/{id}/level ===")
-        
-        test_user_id = 123456
-        response = await self.make_request("GET", f"/users/{test_user_id}/level")
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            data = response["data"]
-            required_fields = ["level", "tier", "xp", "xp_current_level", "xp_next_level", 
-                             "xp_in_level", "xp_needed", "progress", "stars", "title"]
-            
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if not missing_fields:
-                stars = data.get("stars", 0)
-                title = data.get("title", "")
-                level = data.get("level", 0)
-                tier = data.get("tier", "")
-                
-                # Validate stars are 1-5
-                stars_valid = 1 <= stars <= 5
-                # Validate title is not empty
-                title_valid = len(title) > 0
-                
-                self.log_test("User level endpoint - all fields", True, 
-                            f"Level {level}, Tier {tier}, Stars {stars}, Title '{title}'")
-                self.log_test("User level endpoint - stars range", stars_valid, 
-                            f"Stars: {stars} (should be 1-5)")
-                self.log_test("User level endpoint - title present", title_valid, 
-                            f"Title: '{title}'")
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and "graffiti_updated_at" in data:
+                log_test("Valid save", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
             else:
-                self.log_test("User level endpoint - missing fields", False, 
-                            f"Missing: {missing_fields}")
+                log_test("Valid save", "FAIL", f"Missing required fields in response: {data}")
+                failed_tests.append("Valid save - missing fields")
         else:
-            self.log_test("User level endpoint", False, 
-                        f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_xp_rewards_info_endpoint(self):
-        """Test GET /api/xp-rewards-info - referral XP should be 100"""
-        print("\n=== Testing GET /api/xp-rewards-info ===")
+            log_test("Valid save", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Valid save - wrong status code")
+    except Exception as e:
+        log_test("Valid save", "FAIL", f"Exception: {e}")
+        failed_tests.append("Valid save - exception")
+    
+    # Test 2: Empty data clear - PUT with empty string
+    print("\n🧹 TEST 2: Empty data clear")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": "",
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        response = await self.make_request("GET", "/xp-rewards-info")
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and data.get("cleared"):
+                log_test("Empty data clear", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
+            else:
+                log_test("Empty data clear", "FAIL", f"Missing cleared=true in response: {data}")
+                failed_tests.append("Empty data clear - missing cleared field")
+        else:
+            log_test("Empty data clear", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Empty data clear - wrong status code")
+    except Exception as e:
+        log_test("Empty data clear", "FAIL", f"Exception: {e}")
+        failed_tests.append("Empty data clear - exception")
+    
+    # Test 3: Invalid JSON body
+    print("\n🚫 TEST 3: Invalid JSON body")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            data="not-json",  # Invalid JSON
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
         
-        if response["status_code"] == 200:
-            data = response["data"]
-            rewards = data.get("rewards", [])
+        if response.status_code == 400:
+            data = response.json()
+            if "JSON" in data.get("detail", "").upper() or "json" in data.get("detail", ""):
+                log_test("Invalid JSON body", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
+            else:
+                log_test("Invalid JSON body", "FAIL", f"Wrong error message: {data}")
+                failed_tests.append("Invalid JSON body - wrong error message")
+        else:
+            log_test("Invalid JSON body", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Invalid JSON body - wrong status code")
+    except Exception as e:
+        log_test("Invalid JSON body", "FAIL", f"Exception: {e}")
+        failed_tests.append("Invalid JSON body - exception")
+    
+    # Test 4: Non-numeric requester
+    print("\n🔢 TEST 4: Non-numeric requester")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": VALID_BASE64_IMAGE,
+                "requester_telegram_id": "abc"  # Non-numeric
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            data = response.json()
+            if "числом" in data.get("detail", ""):
+                log_test("Non-numeric requester", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
+            else:
+                log_test("Non-numeric requester", "FAIL", f"Wrong error message: {data}")
+                failed_tests.append("Non-numeric requester - wrong error message")
+        else:
+            log_test("Non-numeric requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Non-numeric requester - wrong status code")
+    except Exception as e:
+        log_test("Non-numeric requester", "FAIL", f"Exception: {e}")
+        failed_tests.append("Non-numeric requester - exception")
+    
+    # Test 5: Missing requester
+    print("\n❓ TEST 5: Missing requester")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": VALID_BASE64_IMAGE
+                # Missing requester_telegram_id
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            data = response.json()
+            if "обязателен" in data.get("detail", ""):
+                log_test("Missing requester", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
+            else:
+                log_test("Missing requester", "FAIL", f"Wrong error message: {data}")
+                failed_tests.append("Missing requester - wrong error message")
+        else:
+            log_test("Missing requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Missing requester - wrong status code")
+    except Exception as e:
+        log_test("Missing requester", "FAIL", f"Exception: {e}")
+        failed_tests.append("Missing requester - exception")
+    
+    # Test 6: Wrong requester (authorization)
+    print("\n🔒 TEST 6: Wrong requester (authorization)")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": VALID_BASE64_IMAGE,
+                "requester_telegram_id": INVALID_REQUESTER_ID  # Wrong requester
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 403:
+            log_test("Wrong requester", "PASS", f"Status: {response.status_code}, Response: {response.json()}")
+            passed_tests += 1
+        else:
+            log_test("Wrong requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Wrong requester - wrong status code")
+    except Exception as e:
+        log_test("Wrong requester", "FAIL", f"Exception: {e}")
+        failed_tests.append("Wrong requester - exception")
+    
+    # Test 7: Invalid format
+    print("\n🖼️ TEST 7: Invalid format")
+    total_tests += 1
+    try:
+        response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": "not-a-data-url",
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            data = response.json()
+            if "формат" in data.get("detail", "").lower() or "data:image" in data.get("detail", ""):
+                log_test("Invalid format", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
+            else:
+                log_test("Invalid format", "FAIL", f"Wrong error message: {data}")
+                failed_tests.append("Invalid format - wrong error message")
+        else:
+            log_test("Invalid format", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Invalid format - wrong status code")
+    except Exception as e:
+        log_test("Invalid format", "FAIL", f"Exception: {e}")
+        failed_tests.append("Invalid format - exception")
+    
+    # Test 8: Get graffiti for non-existent user
+    print("\n👤 TEST 8: Get graffiti for non-existent user")
+    total_tests += 1
+    try:
+        non_existent_id = 999999
+        response = requests.get(
+            f"{BACKEND_URL}/profile/{non_existent_id}/graffiti",
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("graffiti_data") == "" and data.get("graffiti_updated_at") is None:
+                log_test("Get non-existent user", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
+            else:
+                log_test("Get non-existent user", "FAIL", f"Wrong default values: {data}")
+                failed_tests.append("Get non-existent user - wrong default values")
+        else:
+            log_test("Get non-existent user", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Get non-existent user - wrong status code")
+    except Exception as e:
+        log_test("Get non-existent user", "FAIL", f"Exception: {e}")
+        failed_tests.append("Get non-existent user - exception")
+    
+    # Test 9: Save valid data and then GET (sequence test)
+    print("\n🔄 TEST 9: Save and GET sequence")
+    total_tests += 1
+    try:
+        # First save
+        save_response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": VALID_BASE64_IMAGE,
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
+        
+        if save_response.status_code == 200:
+            # Then get
+            get_response = requests.get(
+                f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+                timeout=10
+            )
             
-            if rewards:
-                # Find referral reward
-                referral_reward = None
-                for reward in rewards:
-                    if reward.get("action") == "referral":
-                        referral_reward = reward
-                        break
-                
-                if referral_reward:
-                    referral_xp = referral_reward.get("xp", 0)
-                    self.log_test("XP rewards info - referral XP", referral_xp == 100, 
-                                f"Referral XP: {referral_xp} (should be 100)")
-                    
-                    # Check all required fields
-                    required_fields = ["action", "xp", "label", "emoji", "limit"]
-                    all_rewards_valid = all(
-                        all(field in reward for field in required_fields) 
-                        for reward in rewards
-                    )
-                    self.log_test("XP rewards info - all fields", all_rewards_valid, 
-                                f"Found {len(rewards)} rewards with all required fields")
+            if get_response.status_code == 200:
+                data = get_response.json()
+                if data.get("graffiti_data") == VALID_BASE64_IMAGE and data.get("graffiti_updated_at"):
+                    log_test("Save and GET sequence", "PASS", f"GET Status: {get_response.status_code}, Data matches")
+                    passed_tests += 1
                 else:
-                    self.log_test("XP rewards info - referral not found", False, 
-                                "Referral reward not found in rewards list")
+                    log_test("Save and GET sequence", "FAIL", f"Data mismatch: {data}")
+                    failed_tests.append("Save and GET sequence - data mismatch")
             else:
-                self.log_test("XP rewards info - empty rewards", False, 
-                            "No rewards returned")
+                log_test("Save and GET sequence", "FAIL", f"GET failed: {get_response.status_code}")
+                failed_tests.append("Save and GET sequence - GET failed")
         else:
-            self.log_test("XP rewards info endpoint", False, 
-                        f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_xp_breakdown_endpoint(self):
-        """Test GET /api/users/{id}/xp-breakdown - should include new fields"""
-        print("\n=== Testing GET /api/users/{id}/xp-breakdown ===")
+            log_test("Save and GET sequence", "FAIL", f"Save failed: {save_response.status_code}")
+            failed_tests.append("Save and GET sequence - save failed")
+    except Exception as e:
+        log_test("Save and GET sequence", "FAIL", f"Exception: {e}")
+        failed_tests.append("Save and GET sequence - exception")
+    
+    # Test 10: Clear with valid requester
+    print("\n🧹 TEST 10: Clear with valid requester")
+    total_tests += 1
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
+            json={
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        test_user_id = 123456
-        response = await self.make_request("GET", f"/users/{test_user_id}/xp-breakdown")
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            data = response["data"]
-            required_fields = ["xp", "breakdown", "level", "tier", "xp_current_level", 
-                             "xp_next_level", "xp_in_level", "xp_needed", "progress", 
-                             "stars", "title"]
-            
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if not missing_fields:
-                breakdown = data.get("breakdown", {})
-                expected_breakdown_keys = ["tasks", "task_on_time_bonus", "achievements", 
-                                         "visits", "streak_bonuses", "referrals", 
-                                         "group_tasks", "messages", "schedule_views", "bonus"]
-                
-                missing_breakdown = [key for key in expected_breakdown_keys if key not in breakdown]
-                
-                if not missing_breakdown:
-                    stars = data.get("stars", 0)
-                    title = data.get("title", "")
-                    xp_in_level = data.get("xp_in_level", 0)
-                    xp_needed = data.get("xp_needed", 0)
-                    
-                    self.log_test("XP breakdown - all fields", True, 
-                                f"Stars: {stars}, Title: '{title}', XP in level: {xp_in_level}")
-                    self.log_test("XP breakdown - breakdown structure", True, 
-                                f"All {len(expected_breakdown_keys)} breakdown categories present")
-                else:
-                    self.log_test("XP breakdown - missing breakdown keys", False, 
-                                f"Missing breakdown keys: {missing_breakdown}")
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and "had_graffiti" in data:
+                log_test("Clear with valid requester", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
             else:
-                self.log_test("XP breakdown - missing fields", False, 
-                            f"Missing: {missing_fields}")
+                log_test("Clear with valid requester", "FAIL", f"Missing had_graffiti field: {data}")
+                failed_tests.append("Clear with valid requester - missing had_graffiti")
         else:
-            self.log_test("XP breakdown endpoint", False, 
-                        f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_xp_history_endpoint(self):
-        """Test GET /api/users/{id}/xp-history - NEW ENDPOINT"""
-        print("\n=== Testing GET /api/users/{id}/xp-history ===")
+            log_test("Clear with valid requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Clear with valid requester - wrong status code")
+    except Exception as e:
+        log_test("Clear with valid requester", "FAIL", f"Exception: {e}")
+        failed_tests.append("Clear with valid requester - exception")
+    
+    # Test 11: Clear invalid JSON body
+    print("\n🚫 TEST 11: Clear invalid JSON body")
+    total_tests += 1
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
+            data="not-json",  # Invalid JSON
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
         
-        test_user_id = 123456
-        days = 14
-        response = await self.make_request("GET", f"/users/{test_user_id}/xp-history?days={days}")
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            data = response["data"]
-            required_fields = ["history", "days"]
-            
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if not missing_fields:
-                history = data.get("history", [])
-                returned_days = data.get("days", 0)
-                
-                # Validate history structure
-                history_valid = True
-                if history:
-                    for entry in history:
-                        required_entry_fields = ["date", "xp_earned", "events_count", "total_xp"]
-                        if not all(field in entry for field in required_entry_fields):
-                            history_valid = False
-                            break
-                
-                self.log_test("XP history endpoint - structure", True, 
-                            f"Days: {returned_days}, History entries: {len(history)}")
-                self.log_test("XP history endpoint - entry format", history_valid, 
-                            "All history entries have required fields")
+        if response.status_code == 400:
+            data = response.json()
+            if "JSON" in data.get("detail", "").upper() or "json" in data.get("detail", ""):
+                log_test("Clear invalid JSON", "PASS", f"Status: {response.status_code}, Response: {data}")
+                passed_tests += 1
             else:
-                self.log_test("XP history endpoint - missing fields", False, 
-                            f"Missing: {missing_fields}")
+                log_test("Clear invalid JSON", "FAIL", f"Wrong error message: {data}")
+                failed_tests.append("Clear invalid JSON - wrong error message")
         else:
-            self.log_test("XP history endpoint", False, 
-                        f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_daily_xp_endpoint(self):
-        """Test GET /api/users/{id}/daily-xp - NEW ENDPOINT"""
-        print("\n=== Testing GET /api/users/{id}/daily-xp ===")
+            log_test("Clear invalid JSON", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Clear invalid JSON - wrong status code")
+    except Exception as e:
+        log_test("Clear invalid JSON", "FAIL", f"Exception: {e}")
+        failed_tests.append("Clear invalid JSON - exception")
+    
+    # Test 12: Clear with wrong requester
+    print("\n🔒 TEST 12: Clear with wrong requester")
+    total_tests += 1
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
+            json={
+                "requester_telegram_id": INVALID_REQUESTER_ID  # Wrong requester
+            },
+            timeout=10
+        )
         
-        test_user_id = 123456
-        response = await self.make_request("GET", f"/users/{test_user_id}/daily-xp")
-        
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            data = response["data"]
-            required_fields = ["date", "total_xp_today", "by_action"]
-            
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if not missing_fields:
-                date = data.get("date", "")
-                total_xp_today = data.get("total_xp_today", 0)
-                by_action = data.get("by_action", {})
-                
-                # Validate date format (YYYY-MM-DD)
-                date_valid = len(date) == 10 and date.count("-") == 2
-                
-                self.log_test("Daily XP endpoint - structure", True, 
-                            f"Date: {date}, Total XP today: {total_xp_today}")
-                self.log_test("Daily XP endpoint - date format", date_valid, 
-                            f"Date format: {date}")
-                self.log_test("Daily XP endpoint - by_action", isinstance(by_action, dict), 
-                            f"By action breakdown: {len(by_action)} categories")
-            else:
-                self.log_test("Daily XP endpoint - missing fields", False, 
-                            f"Missing: {missing_fields}")
+        if response.status_code == 403:
+            log_test("Clear with wrong requester", "PASS", f"Status: {response.status_code}, Response: {response.json()}")
+            passed_tests += 1
         else:
-            self.log_test("Daily XP endpoint", False, 
-                        f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_recalculate_xp_endpoint(self):
-        """Test POST /api/users/{id}/recalculate-xp - should include stars, title"""
-        print("\n=== Testing POST /api/users/{id}/recalculate-xp ===")
+            log_test("Clear with wrong requester", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Clear with wrong requester - wrong status code")
+    except Exception as e:
+        log_test("Clear with wrong requester", "FAIL", f"Exception: {e}")
+        failed_tests.append("Clear with wrong requester - exception")
+    
+    # Test 13: Clear non-existent graffiti
+    print("\n❌ TEST 13: Clear non-existent graffiti")
+    total_tests += 1
+    try:
+        # First ensure no graffiti exists
+        clear_response = requests.post(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
+            json={
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        test_user_id = 123456
-        response = await self.make_request("POST", f"/users/{test_user_id}/recalculate-xp")
+        # Then try to clear again
+        response = requests.post(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
+            json={
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        if response["status_code"] == 200 and response["data"].get("status") == "ok":
-            data = response["data"]
-            required_fields = ["xp", "breakdown", "level", "tier", "xp_current_level", 
-                             "xp_next_level", "xp_in_level", "xp_needed", "progress", 
-                             "stars", "title"]
-            
-            missing_fields = [field for field in required_fields if field not in data]
-            
-            if not missing_fields:
-                stars = data.get("stars", 0)
-                title = data.get("title", "")
-                level = data.get("level", 0)
-                tier = data.get("tier", "")
-                
-                self.log_test("Recalculate XP - all fields", True, 
-                            f"Level {level}, Tier {tier}, Stars {stars}, Title '{title}'")
-                self.log_test("Recalculate XP - stars range", 1 <= stars <= 5, 
-                            f"Stars: {stars}")
-                self.log_test("Recalculate XP - title present", len(title) > 0, 
-                            f"Title: '{title}'")
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and data.get("had_graffiti") == False:
+                log_test("Clear non-existent", "PASS", f"Status: {response.status_code}, had_graffiti: {data.get('had_graffiti')}")
+                passed_tests += 1
             else:
-                self.log_test("Recalculate XP - missing fields", False, 
-                            f"Missing: {missing_fields}")
+                log_test("Clear non-existent", "FAIL", f"Wrong had_graffiti value: {data}")
+                failed_tests.append("Clear non-existent - wrong had_graffiti value")
         else:
-            self.log_test("Recalculate XP endpoint", False, 
-                        f"Status: {response['status_code']}, Data: {response['data']}")
-
-    async def test_legend_tier_verification(self):
-        """Test Legend tier with admin ID 765963392 and 92000 XP"""
-        print("\n=== Testing Legend Tier Verification ===")
+            log_test("Clear non-existent", "FAIL", f"Status: {response.status_code}, Response: {response.text}")
+            failed_tests.append("Clear non-existent - wrong status code")
+    except Exception as e:
+        log_test("Clear non-existent", "FAIL", f"Exception: {e}")
+        failed_tests.append("Clear non-existent - exception")
+    
+    # Test 14: Full sequence - Save, Get, Clear, Get again
+    print("\n🔄 TEST 14: Full sequence (Save → Get → Clear → Get)")
+    total_tests += 1
+    try:
+        # Step 1: Save
+        save_response = requests.put(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            json={
+                "graffiti_data": VALID_BASE64_IMAGE,
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        admin_id = 765963392
-        legend_xp = 92000
+        # Step 2: Get (should have data)
+        get1_response = requests.get(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            timeout=10
+        )
         
-        # Set XP to legend tier threshold
-        data = {"telegram_id": admin_id, "amount": legend_xp}
-        response = await self.make_request("POST", "/dev/set-xp", data)
+        # Step 3: Clear
+        clear_response = requests.post(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti/clear",
+            json={
+                "requester_telegram_id": TEST_TELEGRAM_ID
+            },
+            timeout=10
+        )
         
-        if response["status_code"] == 200:
-            # Get level info to verify legend tier
-            response = await self.make_request("GET", f"/users/{admin_id}/level")
+        # Step 4: Get again (should be empty)
+        get2_response = requests.get(
+            f"{BACKEND_URL}/profile/{TEST_TELEGRAM_ID}/graffiti",
+            timeout=10
+        )
+        
+        # Validate sequence
+        if (save_response.status_code == 200 and 
+            get1_response.status_code == 200 and 
+            clear_response.status_code == 200 and 
+            get2_response.status_code == 200):
             
-            if response["status_code"] == 200 and response["data"].get("status") == "ok":
-                data = response["data"]
-                tier = data.get("tier", "")
-                level = data.get("level", 0)
-                stars = data.get("stars", 0)
-                title = data.get("title", "")
+            get1_data = get1_response.json()
+            clear_data = clear_response.json()
+            get2_data = get2_response.json()
+            
+            if (get1_data.get("graffiti_data") == VALID_BASE64_IMAGE and
+                clear_data.get("had_graffiti") == True and
+                get2_data.get("graffiti_data") == "" and
+                get2_data.get("graffiti_updated_at") is None):
                 
-                legend_tier_correct = tier == "legend"
-                level_30_or_higher = level >= 30
-                stars_valid = 1 <= stars <= 5
-                title_legend = "легенда" in title.lower() or "legend" in title.lower()
-                
-                self.log_test("Legend tier - tier correct", legend_tier_correct, 
-                            f"Tier: {tier} (should be 'legend')")
-                self.log_test("Legend tier - level 30+", level_30_or_higher, 
-                            f"Level: {level} (should be 30+)")
-                self.log_test("Legend tier - stars", stars_valid, 
-                            f"Stars: {stars}")
-                self.log_test("Legend tier - title", title_legend, 
-                            f"Title: '{title}'")
+                log_test("Full sequence", "PASS", "Save → Get (has data) → Clear (had_graffiti=true) → Get (empty)")
+                passed_tests += 1
             else:
-                self.log_test("Legend tier verification", False, 
-                            f"Failed to get level after setting XP: {response['data']}")
+                log_test("Full sequence", "FAIL", f"Data validation failed. Get1: {get1_data}, Clear: {clear_data}, Get2: {get2_data}")
+                failed_tests.append("Full sequence - data validation failed")
         else:
-            self.log_test("Legend tier verification", False, 
-                        f"Failed to set XP: {response['data']}")
-
-    async def test_stars_system_verification(self):
-        """Test Stars system with different XP levels"""
-        print("\n=== Testing Stars System Verification ===")
-        
-        admin_id = 765963392
-        
-        # Test different XP levels and expected stars
-        test_cases = [
-            {"xp": 500, "expected_level": 4, "expected_tier": "base", "expected_stars_range": (4, 5)},
-            {"xp": 1500, "expected_level": 7, "expected_tier": "medium", "expected_stars_range": (2, 4)},
-            {"xp": 5000, "expected_level": 12, "expected_tier": "rare", "expected_stars_range": (1, 3)},
-        ]
-        
-        for i, test_case in enumerate(test_cases):
-            xp = test_case["xp"]
-            expected_level = test_case["expected_level"]
-            expected_tier = test_case["expected_tier"]
-            expected_stars_range = test_case["expected_stars_range"]
-            
-            # Set XP
-            data = {"telegram_id": admin_id, "amount": xp}
-            response = await self.make_request("POST", "/dev/set-xp", data)
-            
-            if response["status_code"] == 200:
-                # Get level info
-                response = await self.make_request("GET", f"/users/{admin_id}/level")
-                
-                if response["status_code"] == 200 and response["data"].get("status") == "ok":
-                    data = response["data"]
-                    level = data.get("level", 0)
-                    tier = data.get("tier", "")
-                    stars = data.get("stars", 0)
-                    
-                    level_correct = level == expected_level
-                    tier_correct = tier == expected_tier
-                    stars_in_range = expected_stars_range[0] <= stars <= expected_stars_range[1]
-                    
-                    self.log_test(f"Stars test {i+1} - level", level_correct, 
-                                f"XP {xp} → Level {level} (expected {expected_level})")
-                    self.log_test(f"Stars test {i+1} - tier", tier_correct, 
-                                f"XP {xp} → Tier {tier} (expected {expected_tier})")
-                    self.log_test(f"Stars test {i+1} - stars", stars_in_range, 
-                                f"XP {xp} → Stars {stars} (expected {expected_stars_range[0]}-{expected_stars_range[1]})")
-                else:
-                    self.log_test(f"Stars test {i+1}", False, 
-                                f"Failed to get level for XP {xp}")
-            else:
-                self.log_test(f"Stars test {i+1}", False, 
-                            f"Failed to set XP to {xp}")
-
-    async def run_all_tests(self):
-        """Run all Level System v3.0 tests"""
-        print("🚀 Starting RUDN Schedule Level System v3.0 Backend Testing")
-        print(f"Backend URL: {BACKEND_URL}")
-        
-        # Run all test methods
-        await self.test_user_level_endpoint()
-        await self.test_xp_rewards_info_endpoint()
-        await self.test_xp_breakdown_endpoint()
-        await self.test_xp_history_endpoint()
-        await self.test_daily_xp_endpoint()
-        await self.test_recalculate_xp_endpoint()
-        await self.test_legend_tier_verification()
-        await self.test_stars_system_verification()
-        
-        # Print summary
-        print(f"\n{'='*60}")
-        print(f"🏁 LEVEL SYSTEM v3.0 TEST SUMMARY")
-        print(f"{'='*60}")
-        print(f"Total Tests: {self.total_tests}")
-        print(f"✅ Passed: {self.passed_tests}")
-        print(f"❌ Failed: {self.failed_tests}")
-        print(f"Success Rate: {(self.passed_tests/self.total_tests*100):.1f}%")
-        
-        if self.failed_tests > 0:
-            print(f"\n❌ FAILED TESTS:")
-            for result in self.test_results:
-                if not result["passed"]:
-                    print(f"  - {result['test']}: {result['details']}")
-        
-        return self.failed_tests == 0
-
-async def main():
-    """Main test runner"""
-    async with LevelSystemTester() as tester:
-        success = await tester.run_all_tests()
-        return 0 if success else 1
+            log_test("Full sequence", "FAIL", f"HTTP errors: Save={save_response.status_code}, Get1={get1_response.status_code}, Clear={clear_response.status_code}, Get2={get2_response.status_code}")
+            failed_tests.append("Full sequence - HTTP errors")
+    except Exception as e:
+        log_test("Full sequence", "FAIL", f"Exception: {e}")
+        failed_tests.append("Full sequence - exception")
+    
+    # Summary
+    print("\n" + "=" * 60)
+    print("🏁 GRAFFITI API TESTING SUMMARY")
+    print("=" * 60)
+    print(f"Total Tests: {total_tests}")
+    print(f"Passed: {passed_tests}")
+    print(f"Failed: {len(failed_tests)}")
+    print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+    
+    if failed_tests:
+        print("\n❌ FAILED TESTS:")
+        for i, test in enumerate(failed_tests, 1):
+            print(f"  {i}. {test}")
+    else:
+        print("\n✅ ALL TESTS PASSED!")
+    
+    return passed_tests, total_tests, failed_tests
 
 if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    sys.exit(exit_code)
+    print("🚀 Starting Graffiti API Comprehensive Testing")
+    print(f"Backend URL: {BACKEND_URL}")
+    print(f"Test Telegram ID: {TEST_TELEGRAM_ID}")
+    print()
+    
+    passed, total, failed = test_graffiti_endpoints()
+    
+    # Exit with appropriate code
+    if len(failed) == 0:
+        print("\n🎉 All tests passed successfully!")
+        sys.exit(0)
+    else:
+        print(f"\n💥 {len(failed)} tests failed!")
+        sys.exit(1)

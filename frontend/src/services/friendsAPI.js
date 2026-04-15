@@ -258,6 +258,7 @@ export const friendsAPI = {
       return response.data;
     } catch (error) {
       handleError(error);
+      throw error; // Fix F6: пробрасываем ошибку вызывающему коду для обработки
     }
   },
 
