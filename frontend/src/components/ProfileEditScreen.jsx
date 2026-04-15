@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCheck, Palette } from 'lucide-react';
 import GroupSelector from './GroupSelector';
 import { userAPI, getBackendURL } from '../services/api';
 import friendsAPI from '../services/friendsAPI';
 
-const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy, onProfileUpdated }) => {
+const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy, onProfileUpdated, onOpenGraffitiEditor, headerGraffitiUrl }) => {
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [avatarMode, setAvatarMode] = useState('telegram'); // 'telegram' | 'custom' | 'none'
   const [customAvatar, setCustomAvatar] = useState(null);
@@ -555,6 +555,106 @@ const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, 
                   }}>
                     Используется короткое имя (@username) из Telegram
                   </span>
+                </motion.div>
+
+                {/* Граффити профиля */}
+                <motion.div
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.22 }}
+                >
+                  <label style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.4)',
+                    marginBottom: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    Граффити профиля
+                  </label>
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback) hapticFeedback('impact', 'medium');
+                      if (onOpenGraffitiEditor) onOpenGraffitiEditor();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '14px',
+                      background: headerGraffitiUrl
+                        ? 'rgba(248,185,76,0.06)'
+                        : 'rgba(255,255,255,0.04)',
+                      border: headerGraffitiUrl
+                        ? '1.5px solid rgba(248,185,76,0.2)'
+                        : '1.5px solid rgba(255,255,255,0.08)',
+                      cursor: 'pointer',
+                      gap: '12px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {/* Превью граффити */}
+                    <div style={{
+                      width: '56px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: '#111',
+                      flexShrink: 0,
+                      position: 'relative',
+                    }}>
+                      {headerGraffitiUrl ? (
+                        <img
+                          src={headerGraffitiUrl}
+                          alt=""
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Palette style={{ width: '18px', height: '18px', color: 'rgba(255,255,255,0.15)' }} />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        color: headerGraffitiUrl ? '#F8B94C' : 'rgba(255,255,255,0.5)',
+                      }}>
+                        {headerGraffitiUrl ? 'Изменить граффити' : 'Нарисовать граффити'}
+                      </div>
+                      <div style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 400,
+                        fontSize: '11px',
+                        color: 'rgba(255,255,255,0.25)',
+                        marginTop: '1px',
+                      }}>
+                        Кастомизация шапки профиля
+                      </div>
+                    </div>
+                    <Palette style={{
+                      width: '20px',
+                      height: '20px',
+                      color: headerGraffitiUrl ? '#F8B94C' : 'rgba(255,255,255,0.2)',
+                      flexShrink: 0,
+                    }} />
+                  </button>
                 </motion.div>
 
                 {/* Группа */}

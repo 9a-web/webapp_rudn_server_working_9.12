@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCheck, Copy, Award, ChevronRight, Undo2, Redo2, Eraser, Star, Lock } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, ShieldCheck, Copy, Award, ChevronRight, Star, Lock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
@@ -11,6 +11,7 @@ import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
 import LevelDetailModal from './LevelDetailModal';
 import LevelUpModal from './LevelUpModal';
+import GraffitiEditor from './GraffitiEditor';
 import { getTierColor, getTierName, getTierConfig, renderStars } from '../constants/levelConstants';
 
 const ADMIN_UIDS = ['765963392', '1311283832'];
@@ -60,462 +61,33 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [userAchievements, setUserAchievements] = useState([]);
   const [achievementsLoading, setAchievementsLoading] = useState(false);
 
-  // ========== GRAFFITI ==========
-  // Fix: Фиксированное логическое разрешение для кросс-девайсной совместимости
-  // Canvas ВСЕГДА работает в этом пространстве координат, независимо от ширины экрана
-  const GRAFFITI_LOGICAL_W = 500;
-  const GRAFFITI_LOGICAL_H = 260;
+  // ========== GRAFFITI (display only — editing moved to GraffitiEditor) ==========
+  const [headerGraffitiUrl, setHeaderGraffitiUrl] = useState(null);
+  const [showGraffitiEditor, setShowGraffitiEditor] = useState(false);
 
   const tabsContainerRef = useRef(null);
   const tabRefs = useRef({});
-  const graffitiCanvasRef = useRef(null);
-  const graffitiCtxRef = useRef(null);
-  const graffitiDrawing = useRef(false);
-  const graffitiLastPt = useRef(null);
-  const graffitiColor = useRef('#F8B94C');
-  const graffitiSize = useRef(4);
-  const graffitiToolRef = useRef('pen'); // 'pen' | 'eraser'
-  const graffitiLoadedImgRef = useRef(null); // Fix: для отмены загрузки Image при unmount
-  const graffitiCanvasReady = useRef(false); // Fix: предотвращаем двойную инициализацию
-  const graffitiDirty = useRef(false); // Fix F5: трекинг реальных изменений canvas
-  const graffitiSavingRef = useRef(false); // Fix F4: debounce — предотвращаем параллельные save
-  const graffitiLoadCancelledRef = useRef(false); // Fix F9: отмена загрузки при быстром переключении
-  const [graffitiEditMode, setGraffitiEditMode] = useState(false);
-  const [graffitiColorUI, setGraffitiColorUI] = useState('#F8B94C');
-  const [graffitiSizeUI, setGraffitiSizeUI] = useState(4);
-  const [graffitiToolUI, setGraffitiToolUI] = useState('pen');
-  const [graffitiHasContent, setGraffitiHasContent] = useState(false); // Fix: трекинг наличия контента
-  const [graffitiSaveStatus, setGraffitiSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
-  const [showClearConfirm, setShowClearConfirm] = useState(false); // Fix: подтверждение очистки
-  const [graffitiLoading, setGraffitiLoading] = useState(false); // Fix F8: индикатор загрузки с сервера
 
-  // Undo/Redo history
-  const graffitiHistory = useRef([]); // массив ImageData
-  const graffitiHistoryIdx = useRef(-1);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-
-  const GRAFFITI_COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
-  const PEN_SIZES = [2, 4, 8, 14];
-  const ERASER_SIZES = [8, 14, 22, 32];
-  const DEFAULT_PEN_SIZE = 4;
-  const DEFAULT_ERASER_SIZE = 14;
-
-  // Sync UI state → refs
-  useEffect(() => { graffitiColor.current = graffitiColorUI; }, [graffitiColorUI]);
-  useEffect(() => { graffitiSize.current = graffitiSizeUI; }, [graffitiSizeUI]);
-  useEffect(() => { graffitiToolRef.current = graffitiToolUI; }, [graffitiToolUI]);
-
-  // --- Проверка, есть ли что-то на canvas (не пустой ли) ---
-  // Fix F2: уменьшен шаг проверки с 16 до 4 (каждый пиксель по alpha-каналу)
-  // Старый шаг 16 пропускал мелкие точки 1-2px
-  const checkCanvasHasContent = useCallback(() => {
-    const canvas = graffitiCanvasRef.current;
-    const ctx = graffitiCtxRef.current;
-    if (!canvas || !ctx) { setGraffitiHasContent(false); return false; }
-    try {
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
-      // Проверяем alpha-канал каждого пикселя (каждый 4-й байт = alpha)
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] > 0) { setGraffitiHasContent(true); return true; }
-      }
-      setGraffitiHasContent(false);
-      return false;
-    } catch {
-      return false;
+  // Загрузка граффити для отображения в шапке
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      friendsAPI.getGraffiti(user.id)
+        .then(data => {
+          if (data?.graffiti_data) setHeaderGraffitiUrl(data.graffiti_data);
+          else setHeaderGraffitiUrl(null);
+        })
+        .catch(() => setHeaderGraffitiUrl(null));
     }
-  }, []);
+    if (!isOpen) setHeaderGraffitiUrl(null);
+  }, [isOpen, user?.id]);
 
-  // Init canvas — Fix: фиксированное логическое разрешение для кросс-девайсной совместимости
-  const setupCanvas = useCallback((canvas, skipSnapshot) => {
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    // Fix: Всегда используем фиксированное логическое разрешение
-    const targetW = GRAFFITI_LOGICAL_W * dpr;
-    const targetH = GRAFFITI_LOGICAL_H * dpr;
-    // Проверяем, нужно ли перенастраивать
-    const needsResize = canvas.width !== targetW || canvas.height !== targetH;
-    if (!needsResize && graffitiCtxRef.current) return;
-    canvas.width = targetW;
-    canvas.height = targetH;
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    graffitiCtxRef.current = ctx;
-    graffitiCanvasReady.current = true;
-    if (!skipSnapshot) {
-      saveSnapshot();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ========== END GRAFFITI ==========
 
   // Реакция на initialTab — открыть нужный таб извне
   useEffect(() => {
-    if (isOpen && initialTab) {
-      setActiveTab(initialTab);
-    }
+    if (isOpen && initialTab) setActiveTab(initialTab);
   }, [isOpen, initialTab]);
 
-  // --- Snapshot helpers ---
-  const saveSnapshot = useCallback(() => {
-    const canvas = graffitiCanvasRef.current;
-    const ctx = graffitiCtxRef.current;
-    if (!canvas || !ctx) return;
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // Обрезаем redo-историю после текущего индекса
-    const idx = graffitiHistoryIdx.current;
-    graffitiHistory.current = graffitiHistory.current.slice(0, idx + 1);
-    graffitiHistory.current.push(imgData);
-    // Ограничиваем историю 30 шагами
-    if (graffitiHistory.current.length > 30) {
-      graffitiHistory.current.shift();
-    }
-    graffitiHistoryIdx.current = graffitiHistory.current.length - 1;
-    setCanUndo(graffitiHistoryIdx.current > 0);
-    setCanRedo(false);
-    // Fix F5: Помечаем canvas как изменённый (dirty)
-    graffitiDirty.current = true;
-    // Fix: Обновляем флаг наличия контента
-    checkCanvasHasContent();
-  }, [checkCanvasHasContent]);
-
-  const graffitiUndo = useCallback(() => {
-    const idx = graffitiHistoryIdx.current;
-    if (idx <= 0) return;
-    graffitiHistoryIdx.current = idx - 1;
-    const canvas = graffitiCanvasRef.current;
-    const ctx = graffitiCtxRef.current;
-    if (!canvas || !ctx) return;
-    ctx.putImageData(graffitiHistory.current[graffitiHistoryIdx.current], 0, 0);
-    setCanUndo(graffitiHistoryIdx.current > 0);
-    setCanRedo(true);
-    checkCanvasHasContent();
-    if (hapticFeedback) hapticFeedback('impact', 'light');
-  }, [hapticFeedback, checkCanvasHasContent]);
-
-  const graffitiRedo = useCallback(() => {
-    const idx = graffitiHistoryIdx.current;
-    if (idx >= graffitiHistory.current.length - 1) return;
-    graffitiHistoryIdx.current = idx + 1;
-    const canvas = graffitiCanvasRef.current;
-    const ctx = graffitiCtxRef.current;
-    if (!canvas || !ctx) return;
-    ctx.putImageData(graffitiHistory.current[graffitiHistoryIdx.current], 0, 0);
-    setCanUndo(true);
-    setCanRedo(graffitiHistoryIdx.current < graffitiHistory.current.length - 1);
-    checkCanvasHasContent();
-    if (hapticFeedback) hapticFeedback('impact', 'light');
-  }, [hapticFeedback, checkCanvasHasContent]);
-
-  // --- Coordinate helper — Fix: масштабируем из CSS-координат в логические ---
-  const getXY = (e) => {
-    const canvas = graffitiCanvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    let cx, cy;
-    if (e.touches && e.touches.length > 0) {
-      cx = e.touches[0].clientX;
-      cy = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
-      cx = e.changedTouches[0].clientX;
-      cy = e.changedTouches[0].clientY;
-    } else {
-      cx = e.clientX;
-      cy = e.clientY;
-    }
-    // Fix: Масштабируем из CSS display-пикселей в логические координаты canvas
-    const scaleX = GRAFFITI_LOGICAL_W / rect.width;
-    const scaleY = GRAFFITI_LOGICAL_H / rect.height;
-    return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
-  };
-
-  // --- Native event listeners ---
-  useEffect(() => {
-    const canvas = graffitiCanvasRef.current;
-    if (!canvas) return;
-
-    const onDown = (e) => {
-      if (!graffitiEditMode) return;
-      e.preventDefault();
-      if (!graffitiCtxRef.current) setupCanvas(canvas);
-      graffitiDrawing.current = true;
-      const pt = getXY(e);
-      if (!pt) return;
-      graffitiLastPt.current = pt;
-      const ctx = graffitiCtxRef.current;
-      if (!ctx) return;
-      const isEraser = graffitiToolRef.current === 'eraser';
-      ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, graffitiSize.current / 2, 0, Math.PI * 2);
-      ctx.fillStyle = isEraser ? 'rgba(0,0,0,1)' : graffitiColor.current;
-      ctx.fill();
-    };
-
-    const onMove = (e) => {
-      if (!graffitiDrawing.current) return;
-      e.preventDefault();
-      const ctx = graffitiCtxRef.current;
-      if (!ctx) return;
-      const pt = getXY(e);
-      if (!pt) return;
-      const last = graffitiLastPt.current;
-      if (last) {
-        const isEraser = graffitiToolRef.current === 'eraser';
-        ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-        ctx.beginPath();
-        ctx.moveTo(last.x, last.y);
-        ctx.lineTo(pt.x, pt.y);
-        ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : graffitiColor.current;
-        ctx.lineWidth = graffitiSize.current;
-        ctx.stroke();
-      }
-      graffitiLastPt.current = pt;
-    };
-
-    const onUp = () => {
-      if (graffitiDrawing.current) {
-        graffitiDrawing.current = false;
-        graffitiLastPt.current = null;
-        // Восстанавливаем compositeOperation
-        const ctx = graffitiCtxRef.current;
-        if (ctx) ctx.globalCompositeOperation = 'source-over';
-        // Сохраняем snapshot для undo
-        saveSnapshot();
-      }
-    };
-
-    canvas.addEventListener('touchstart', onDown, { passive: false });
-    canvas.addEventListener('touchmove', onMove, { passive: false });
-    canvas.addEventListener('touchend', onUp);
-    canvas.addEventListener('touchcancel', onUp);
-    canvas.addEventListener('mousedown', onDown);
-    canvas.addEventListener('mousemove', onMove);
-    canvas.addEventListener('mouseup', onUp);
-    canvas.addEventListener('mouseleave', onUp);
-
-    return () => {
-      canvas.removeEventListener('touchstart', onDown);
-      canvas.removeEventListener('touchmove', onMove);
-      canvas.removeEventListener('touchend', onUp);
-      canvas.removeEventListener('touchcancel', onUp);
-      canvas.removeEventListener('mousedown', onDown);
-      canvas.removeEventListener('mousemove', onMove);
-      canvas.removeEventListener('mouseup', onUp);
-      canvas.removeEventListener('mouseleave', onUp);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graffitiEditMode, setupCanvas, saveSnapshot]);
-
-  // Fix: Очистка с подтверждением и сохранением на сервер (через friendsAPI)
-  const clearGraffiti = useCallback(async () => {
-    const canvas = graffitiCanvasRef.current;
-    const ctx = graffitiCtxRef.current;
-    if (!canvas || !ctx) return;
-    ctx.globalCompositeOperation = 'source-over';
-    // Fix: Используем логические размеры вместо canvas.width/dpr
-    ctx.clearRect(0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
-    // Fix F3: Полный сброс undo-истории — после явного "Да, стереть" нельзя undo назад
-    graffitiHistory.current = [];
-    graffitiHistoryIdx.current = -1;
-    setCanUndo(false);
-    setCanRedo(false);
-    // Сохраняем единственный "чистый" snapshot как начальное состояние
-    saveSnapshot();
-    // Fix F5: Помечаем dirty для сохранения на сервер
-    graffitiDirty.current = true;
-    setGraffitiHasContent(false);
-    setShowClearConfirm(false);
-    if (hapticFeedback) hapticFeedback('notification', 'success');
-    // Fix: Сразу удаляем на сервере через friendsAPI
-    if (user?.id) {
-      try {
-        await friendsAPI.clearGraffiti(user.id);
-        graffitiDirty.current = false; // Успешно синхронизировано с сервером
-      } catch (err) {
-        console.error('[Graffiti] Delete error:', err);
-      }
-    }
-  }, [saveSnapshot, hapticFeedback, user?.id]);
-
-  // Сохранение граффити на сервер — Fix: нормализация через offscreen canvas
-  // Fix F4: debounce через ref — предотвращаем параллельные save
-  // Fix F5: dirty-check — не сохраняем если ничего не менялось
-  const saveGraffitiToServer = useCallback(async () => {
-    const canvas = graffitiCanvasRef.current;
-    if (!canvas || !user?.id) return;
-    // Fix F5: Не сохраняем если ничего не изменилось
-    if (!graffitiDirty.current) {
-      return;
-    }
-    // Fix F4: Предотвращаем параллельные сохранения
-    if (graffitiSavingRef.current) {
-      return;
-    }
-    graffitiSavingRef.current = true;
-    setGraffitiSaveStatus('saving');
-    try {
-      // Fix: Нормализуем в offscreen canvas фиксированного размера (2x для качества)
-      const NORM_W = GRAFFITI_LOGICAL_W * 2;
-      const NORM_H = GRAFFITI_LOGICAL_H * 2;
-      const offscreen = document.createElement('canvas');
-      offscreen.width = NORM_W;
-      offscreen.height = NORM_H;
-      const offCtx = offscreen.getContext('2d');
-      // Рисуем текущий canvas в нормализованный
-      offCtx.drawImage(canvas, 0, 0, NORM_W, NORM_H);
-
-      let dataURL;
-      const testCanvas = document.createElement('canvas');
-      testCanvas.width = 1;
-      testCanvas.height = 1;
-      const supportsWebP = testCanvas.toDataURL('image/webp').startsWith('data:image/webp');
-      if (supportsWebP) {
-        dataURL = offscreen.toDataURL('image/webp', 0.85);
-      } else {
-        dataURL = offscreen.toDataURL('image/png');
-      }
-      
-      // Fix: Проверяем размер перед отправкой
-      if (dataURL.length > 3 * 1024 * 1024) {
-        if (supportsWebP) {
-          dataURL = offscreen.toDataURL('image/webp', 0.6);
-        }
-        if (dataURL.length > 3 * 1024 * 1024) {
-          console.warn('[Graffiti] Image too large even after compression');
-          setGraffitiSaveStatus('error');
-          setTimeout(() => setGraffitiSaveStatus('idle'), 3000);
-          graffitiSavingRef.current = false;
-          return;
-        }
-      }
-
-      await friendsAPI.saveGraffiti(user.id, dataURL);
-      graffitiDirty.current = false; // Fix F5: Сброс dirty после успешного save
-      setGraffitiSaveStatus('saved');
-      setTimeout(() => setGraffitiSaveStatus('idle'), 2000);
-    } catch (err) {
-      console.error('[Graffiti] Save error:', err);
-      setGraffitiSaveStatus('error');
-      setTimeout(() => setGraffitiSaveStatus('idle'), 3000);
-    } finally {
-      graffitiSavingRef.current = false; // Fix F4: Разблокируем следующее сохранение
-    }
-  }, [user?.id]);
-
-  // Загрузка граффити с сервера — Fix: contain-стиль масштабирование для обратной совместимости
-  // Fix F8: индикатор загрузки + Fix F9: cancellation flag + Fix F6: обработка ошибок
-  const loadGraffitiFromServer = useCallback(async () => {
-    const canvas = graffitiCanvasRef.current;
-    if (!canvas || !user?.id) return;
-    // Fix: Отменяем предыдущую загрузку
-    if (graffitiLoadedImgRef.current) {
-      graffitiLoadedImgRef.current.onload = null;
-      graffitiLoadedImgRef.current.onerror = null;
-      graffitiLoadedImgRef.current = null;
-    }
-    graffitiLoadCancelledRef.current = false;
-    setGraffitiLoading(true); // Fix F8: показываем индикатор загрузки
-    try {
-      const data = await friendsAPI.getGraffiti(user.id);
-      // Fix F9: Проверяем что загрузка не отменена
-      if (graffitiLoadCancelledRef.current) { setGraffitiLoading(false); return; }
-      if (!data || !data.graffiti_data) { setGraffitiLoading(false); return; }
-      // Рисуем сохранённое изображение на canvas
-      const img = new window.Image();
-      graffitiLoadedImgRef.current = img;
-      img.onload = () => {
-        // Fix F9: Проверяем отмену + что canvas всё ещё существует
-        if (graffitiLoadCancelledRef.current || !graffitiCanvasRef.current) {
-          setGraffitiLoading(false);
-          return;
-        }
-        const drawCtx = graffitiCtxRef.current;
-        if (!drawCtx) { setGraffitiLoading(false); return; }
-        // Fix: Contain-стиль масштабирование — сохраняем пропорции исходного изображения
-        const imgW = img.naturalWidth;
-        const imgH = img.naturalHeight;
-        if (imgW > 0 && imgH > 0) {
-          const imgAspect = imgW / imgH;
-          const canvasAspect = GRAFFITI_LOGICAL_W / GRAFFITI_LOGICAL_H;
-          let drawW, drawH, drawX, drawY;
-          // Если aspect ratio совпадает (или почти) — заполняем целиком
-          if (Math.abs(imgAspect - canvasAspect) < 0.05) {
-            drawW = GRAFFITI_LOGICAL_W;
-            drawH = GRAFFITI_LOGICAL_H;
-            drawX = 0;
-            drawY = 0;
-          } else if (imgAspect > canvasAspect) {
-            // Изображение шире canvas — вписываем по ширине
-            drawW = GRAFFITI_LOGICAL_W;
-            drawH = GRAFFITI_LOGICAL_W / imgAspect;
-            drawX = 0;
-            drawY = (GRAFFITI_LOGICAL_H - drawH) / 2;
-          } else {
-            // Изображение выше canvas — вписываем по высоте
-            drawH = GRAFFITI_LOGICAL_H;
-            drawW = GRAFFITI_LOGICAL_H * imgAspect;
-            drawX = (GRAFFITI_LOGICAL_W - drawW) / 2;
-            drawY = 0;
-          }
-          drawCtx.drawImage(img, drawX, drawY, drawW, drawH);
-        } else {
-          // Fallback
-          drawCtx.drawImage(img, 0, 0, GRAFFITI_LOGICAL_W, GRAFFITI_LOGICAL_H);
-        }
-        // Сохраняем snapshot для undo (это станет "начальным" состоянием)
-        saveSnapshot();
-        graffitiDirty.current = false; // Fix F5: загруженное состояние — не dirty
-        setGraffitiHasContent(true);
-        setGraffitiLoading(false);
-        graffitiLoadedImgRef.current = null;
-      };
-      img.onerror = () => {
-        console.error('[Graffiti] Failed to load image');
-        setGraffitiLoading(false);
-        graffitiLoadedImgRef.current = null;
-      };
-      img.src = data.graffiti_data;
-    } catch (err) {
-      // Fix F6: Обработка ошибок загрузки — показываем в консоль, скрываем loading
-      console.error('[Graffiti] Load error:', err);
-      setGraffitiLoading(false);
-    }
-  }, [user?.id, saveSnapshot]);
-
-  // Fix: Единый effect для инициализации + загрузки (убрали дубликат setupCanvas)
-  useEffect(() => {
-    if (activeTab === 'general' && isOpen && user?.id) {
-      let cancelled = false;
-      graffitiCanvasReady.current = false;
-      graffitiLoadCancelledRef.current = false; // Fix F9: сбрасываем флаг отмены
-      graffitiDirty.current = false; // Fix F5: начальное состояние — не dirty
-      const t = setTimeout(async () => {
-        if (cancelled) return;
-        // Единственная инициализация canvas
-        if (graffitiCanvasRef.current) {
-          setupCanvas(graffitiCanvasRef.current, true); // skipSnapshot = true, snapshot будет после загрузки
-        }
-        // Загружаем граффити с сервера
-        await loadGraffitiFromServer();
-        // Fix: используем ref-чтение checkCanvasHasContent вместо stale state
-        if (!checkCanvasHasContent()) {
-          saveSnapshot();
-          graffitiDirty.current = false; // Начальный пустой snapshot — не dirty
-        }
-      }, 250);
-      return () => {
-        cancelled = true;
-        graffitiLoadCancelledRef.current = true; // Fix F9: отмена загрузки
-        clearTimeout(t);
-      };
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, isOpen]);
-
-  // ========== END GRAFFITI ==========
 
   const isAdmin = useMemo(() => {
     if (!user?.id) return false;
@@ -576,73 +148,16 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     }
   }, [isOpen, user?.id, refreshProfile]);
 
-  // Bug 13: Очистка памяти граффити + Bug 11: Сброс друзей при закрытии
+  // Bug 11: Сброс состояния при закрытии профиля
   useEffect(() => {
     if (!isOpen) {
-      // Fix F9: Отменяем загрузку если в процессе
-      graffitiLoadCancelledRef.current = true;
-      // Fix: Отменяем загрузку изображения если в процессе
-      if (graffitiLoadedImgRef.current) {
-        graffitiLoadedImgRef.current.onload = null;
-        graffitiLoadedImgRef.current.onerror = null;
-        graffitiLoadedImgRef.current = null;
-      }
-      // Очищаем тяжелые объекты ImageData
-      graffitiHistory.current = [];
-      graffitiHistoryIdx.current = -1;
-      graffitiCanvasReady.current = false;
-      graffitiCtxRef.current = null;
-      graffitiDirty.current = false; // Fix F5: сброс dirty
-      graffitiSavingRef.current = false; // Fix F4: сброс saving lock
-      setCanUndo(false);
-      setCanRedo(false);
-      setGraffitiEditMode(false);
-      setGraffitiHasContent(false);
-      setGraffitiSaveStatus('idle');
-      setShowClearConfirm(false);
-      setGraffitiLoading(false); // Fix F8: сброс loading
-      // Сброс друзей для обновления при следующем открытии
       setFriendsList([]);
-      // Сброс данных профиля
       setProfileData(null);
       setActiveTab('general');
-      // Сброс загрузки аватара для корректного рендера при переоткрытии
       setImgLoaded(false);
+      setShowGraffitiEditor(false);
     }
   }, [isOpen]);
-
-  // Fix: Освобождаем память граффити при переключении с таба 'general' на другие
-  useEffect(() => {
-    if (activeTab !== 'general' && isOpen) {
-      // Fix F7: Сохраняем ТОЛЬКО если были реальные изменения (dirty)
-      if (graffitiEditMode && graffitiDirty.current) {
-        saveGraffitiToServer();
-      }
-      if (graffitiEditMode) {
-        setGraffitiEditMode(false);
-      }
-      setShowClearConfirm(false);
-      // Fix F9: Отменяем загрузку
-      graffitiLoadCancelledRef.current = true;
-      // Освобождаем ImageData объекты из памяти
-      graffitiHistory.current = [];
-      graffitiHistoryIdx.current = -1;
-      graffitiCanvasReady.current = false;
-      graffitiCtxRef.current = null;
-      graffitiDirty.current = false;
-      setCanUndo(false);
-      setCanRedo(false);
-      setGraffitiHasContent(false);
-      setGraffitiLoading(false);
-      // Отменяем загрузку граффити если в процессе
-      if (graffitiLoadedImgRef.current) {
-        graffitiLoadedImgRef.current.onload = null;
-        graffitiLoadedImgRef.current.onerror = null;
-        graffitiLoadedImgRef.current = null;
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
 
   // Блокировка скролла фона при открытом профиле
   useEffect(() => {
@@ -872,6 +387,46 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               alignItems: 'center',
             }}
           >
+
+          {/* ===== ШАПКА ПРОФИЛЯ с граффити-фоном ===== */}
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            overflow: 'hidden',
+          }}>
+            {/* Граффити как фоновый слой шапки */}
+            {headerGraffitiUrl && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 0,
+                opacity: 0.55,
+                pointerEvents: 'none',
+              }}>
+                <img
+                  src={headerGraffitiUrl}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center',
+                  }}
+                />
+                {/* Градиент для плавного перехода к чёрному фону внизу */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '60px',
+                  background: 'linear-gradient(to top, #000000, transparent)',
+                }} />
+              </div>
+            )}
 
           {/* Аватар */}
           <motion.div
@@ -1155,6 +710,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
           </motion.div>
+          </div>{/* ===== КОНЕЦ ШАПКИ С ГРАФФИТИ-ФОНОМ ===== */}
 
           {/* Табы — sticky при скролле */}
           <div
@@ -1249,478 +805,20 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}
                 >
-                  {/* Заголовок граффити */}
                   <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    textAlign: 'center',
+                    padding: '16px 0',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '13px',
+                    color: 'rgba(255,255,255,0.2)',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Pen style={{ width: '16px', height: '16px', color: '#F8B94C' }} />
-                      <span style={{
-                        fontFamily: "'Poppins', sans-serif",
-                        fontWeight: 600,
-                        fontSize: '14px',
-                        color: '#F4F3FC',
-                      }}>
-                        Граффити
-                      </span>
-                      {/* Fix: Индикатор сохранения */}
-                      {graffitiSaveStatus === 'saving' && (
-                        <span style={{
-                          fontFamily: "'Poppins', sans-serif",
-                          fontSize: '11px',
-                          color: 'rgba(248,185,76,0.7)',
-                          animation: 'pulse 1s infinite',
-                        }}>
-                          Сохранение...
-                        </span>
-                      )}
-                      {graffitiSaveStatus === 'saved' && (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0 }}
-                          style={{
-                            fontFamily: "'Poppins', sans-serif",
-                            fontSize: '11px',
-                            color: '#10B981',
-                          }}
-                        >
-                          ✓ Сохранено
-                        </motion.span>
-                      )}
-                      {graffitiSaveStatus === 'error' && (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          style={{
-                            fontFamily: "'Poppins', sans-serif",
-                            fontSize: '11px',
-                            color: '#EF4444',
-                          }}
-                        >
-                          Ошибка сохранения
-                        </motion.span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {graffitiEditMode && (
-                        <>
-                          {/* Undo */}
-                          <button
-                            onClick={graffitiUndo}
-                            disabled={!canUndo}
-                            style={{
-                              background: canUndo ? 'rgba(255,255,255,0.06)' : 'transparent',
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              borderRadius: '10px',
-                              padding: '5px 8px',
-                              cursor: canUndo ? 'pointer' : 'default',
-                              display: 'flex',
-                              alignItems: 'center',
-                              opacity: canUndo ? 1 : 0.3,
-                              transition: 'opacity 0.15s',
-                            }}
-                          >
-                            <Undo2 style={{ width: '14px', height: '14px', color: '#F4F3FC' }} />
-                          </button>
-                          {/* Redo */}
-                          <button
-                            onClick={graffitiRedo}
-                            disabled={!canRedo}
-                            style={{
-                              background: canRedo ? 'rgba(255,255,255,0.06)' : 'transparent',
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              borderRadius: '10px',
-                              padding: '5px 8px',
-                              cursor: canRedo ? 'pointer' : 'default',
-                              display: 'flex',
-                              alignItems: 'center',
-                              opacity: canRedo ? 1 : 0.3,
-                              transition: 'opacity 0.15s',
-                            }}
-                          >
-                            <Redo2 style={{ width: '14px', height: '14px', color: '#F4F3FC' }} />
-                          </button>
-                          {/* Очистить — Fix: с подтверждением */}
-                          <button
-                            onClick={() => {
-                              if (graffitiHasContent) {
-                                setShowClearConfirm(true);
-                              } else {
-                                clearGraffiti();
-                              }
-                              if (hapticFeedback) hapticFeedback('impact', 'light');
-                            }}
-                            style={{
-                              background: 'rgba(239,68,68,0.1)',
-                              border: '1px solid rgba(239,68,68,0.2)',
-                              borderRadius: '10px',
-                              padding: '5px 8px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Trash2 style={{ width: '14px', height: '14px', color: '#EF4444' }} />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => {
-                          if (graffitiEditMode) {
-                            // Fix F5: Сохраняем ТОЛЬКО если были реальные изменения (dirty)
-                            if (graffitiDirty.current) {
-                              saveGraffitiToServer();
-                            }
-                          }
-                          setGraffitiEditMode(prev => !prev);
-                          setShowClearConfirm(false); // скрываем подтверждение при переключении
-                          if (hapticFeedback) hapticFeedback('impact', 'light');
-                        }}
-                        style={{
-                          background: graffitiEditMode
-                            ? 'rgba(248,185,76,0.15)'
-                            : 'rgba(255,255,255,0.06)',
-                          border: graffitiEditMode
-                            ? '1px solid rgba(248,185,76,0.35)'
-                            : '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '10px',
-                          padding: '5px 12px',
-                          cursor: 'pointer',
-                          fontFamily: "'Poppins', sans-serif",
-                          fontWeight: 500,
-                          fontSize: '12px',
-                          color: graffitiEditMode ? '#F8B94C' : 'rgba(255,255,255,0.4)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          transition: 'all 0.2s ease',
-                        }}
-                      >
-                        <Pen style={{ width: '12px', height: '12px' }} />
-                        {graffitiEditMode ? 'Готово' : 'Рисовать'}
-                      </button>
-                    </div>
+                    {headerGraffitiUrl
+                      ? 'Граффити отображается в шапке профиля ✨'
+                      : 'Добавьте граффити через редактирование профиля 🎨'}
                   </div>
-
-                  {/* Fix: Диалог подтверждения очистки */}
-                  <AnimatePresence>
-                    {showClearConfirm && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{
-                          overflow: 'hidden',
-                          background: 'rgba(239,68,68,0.08)',
-                          border: '1px solid rgba(239,68,68,0.2)',
-                          borderRadius: '14px',
-                          padding: '12px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '10px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <AlertTriangle style={{ width: '16px', height: '16px', color: '#EF4444', flexShrink: 0 }} />
-                          <span style={{
-                            fontFamily: "'Poppins', sans-serif",
-                            fontWeight: 500,
-                            fontSize: '12px',
-                            color: 'rgba(255,255,255,0.7)',
-                          }}>
-                            Стереть всё граффити?
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                          <button
-                            onClick={() => setShowClearConfirm(false)}
-                            style={{
-                              background: 'rgba(255,255,255,0.06)',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              borderRadius: '10px',
-                              padding: '5px 12px',
-                              cursor: 'pointer',
-                              fontFamily: "'Poppins', sans-serif",
-                              fontWeight: 500,
-                              fontSize: '11px',
-                              color: 'rgba(255,255,255,0.5)',
-                            }}
-                          >
-                            Нет
-                          </button>
-                          <button
-                            onClick={clearGraffiti}
-                            style={{
-                              background: 'rgba(239,68,68,0.15)',
-                              border: '1px solid rgba(239,68,68,0.3)',
-                              borderRadius: '10px',
-                              padding: '5px 12px',
-                              cursor: 'pointer',
-                              fontFamily: "'Poppins', sans-serif",
-                              fontWeight: 500,
-                              fontSize: '11px',
-                              color: '#EF4444',
-                            }}
-                          >
-                            Да, стереть
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Canvas — Fix: aspect-ratio для пропорционального масштабирования */}
-                  <div style={{
-                    borderRadius: '20px',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: graffitiEditMode
-                      ? '1px solid rgba(248,185,76,0.25)'
-                      : '1px solid rgba(255,255,255,0.06)',
-                    overflow: 'hidden',
-                    aspectRatio: '500 / 260',
-                    maxWidth: '500px',
-                    width: '100%',
-                    margin: '0 auto',
-                    position: 'relative',
-                    transition: 'border-color 0.25s ease',
-                  }}>
-                    <canvas
-                      ref={graffitiCanvasRef}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        cursor: graffitiEditMode
-                          ? (graffitiToolUI === 'eraser' ? 'cell' : 'crosshair')
-                          : 'default',
-                        display: 'block',
-                        // Fix: touchAction зависит от режима — разрешаем скролл в режиме просмотра
-                        touchAction: graffitiEditMode ? 'none' : 'auto',
-                      }}
-                    />
-                    {/* Fix F8: Индикатор загрузки граффити с сервера */}
-                    {graffitiLoading && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none',
-                        background: 'rgba(0,0,0,0.15)',
-                        borderRadius: '20px',
-                      }}>
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          border: '2px solid rgba(248,185,76,0.3)',
-                          borderTop: '2px solid #F8B94C',
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite',
-                        }} />
-                      </div>
-                    )}
-                    {/* Fix F8: Placeholder только когда canvas пуст И НЕ загружается И НЕ в режиме рисования */}
-                    {!graffitiEditMode && !graffitiHasContent && !graffitiLoading && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none',
-                      }}>
-                        <span style={{
-                          fontFamily: "'Poppins', sans-serif",
-                          fontWeight: 500,
-                          fontSize: '13px',
-                          color: 'rgba(255,255,255,0.12)',
-                        }}>
-                          Нажмите «Рисовать» чтобы начать
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Тулбар — инструменты + палитра + размер кисти */}
-                  <AnimatePresence>
-                    {graffitiEditMode && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.25, ease: 'easeInOut' }}
-                        style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '8px' }}
-                      >
-                        {/* Строка 1: инструменты Pen / Eraser */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          paddingTop: '2px',
-                        }}>
-                          <button
-                            onClick={() => {
-                              setGraffitiToolUI('pen');
-                              // Fix F1: авто-сброс размера если текущий не подходит для pen
-                              if (!PEN_SIZES.includes(graffitiSizeUI)) {
-                                setGraffitiSizeUI(DEFAULT_PEN_SIZE);
-                              }
-                              if (hapticFeedback) hapticFeedback('impact', 'light');
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '6px 14px',
-                              borderRadius: '12px',
-                              cursor: 'pointer',
-                              fontFamily: "'Poppins', sans-serif",
-                              fontWeight: 500,
-                              fontSize: '12px',
-                              transition: 'all 0.15s ease',
-                              background: graffitiToolUI === 'pen'
-                                ? 'rgba(248,185,76,0.15)'
-                                : 'rgba(255,255,255,0.04)',
-                              border: graffitiToolUI === 'pen'
-                                ? '1px solid rgba(248,185,76,0.4)'
-                                : '1px solid rgba(255,255,255,0.08)',
-                              color: graffitiToolUI === 'pen' ? '#F8B94C' : 'rgba(255,255,255,0.4)',
-                            }}
-                          >
-                            <Pen style={{ width: '13px', height: '13px' }} />
-                            Кисть
-                          </button>
-                          <button
-                            onClick={() => {
-                              setGraffitiToolUI('eraser');
-                              // Fix F1: авто-сброс размера если текущий не подходит для eraser
-                              if (!ERASER_SIZES.includes(graffitiSizeUI)) {
-                                setGraffitiSizeUI(DEFAULT_ERASER_SIZE);
-                              }
-                              if (hapticFeedback) hapticFeedback('impact', 'light');
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '6px 14px',
-                              borderRadius: '12px',
-                              cursor: 'pointer',
-                              fontFamily: "'Poppins', sans-serif",
-                              fontWeight: 500,
-                              fontSize: '12px',
-                              transition: 'all 0.15s ease',
-                              background: graffitiToolUI === 'eraser'
-                                ? 'rgba(168,85,247,0.15)'
-                                : 'rgba(255,255,255,0.04)',
-                              border: graffitiToolUI === 'eraser'
-                                ? '1px solid rgba(168,85,247,0.4)'
-                                : '1px solid rgba(255,255,255,0.08)',
-                              color: graffitiToolUI === 'eraser' ? '#A855F7' : 'rgba(255,255,255,0.4)',
-                            }}
-                          >
-                            <Eraser style={{ width: '13px', height: '13px' }} />
-                            Ластик
-                          </button>
-                        </div>
-
-                        {/* Строка 2: палитра цветов (только для кисти) + размер */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                        }}>
-                          {graffitiToolUI === 'pen' ? (
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                              {GRAFFITI_COLORS.map((c) => (
-                                <button
-                                  key={c}
-                                  onClick={() => {
-                                    setGraffitiColorUI(c);
-                                    if (hapticFeedback) hapticFeedback('impact', 'light');
-                                  }}
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '50%',
-                                    backgroundColor: c,
-                                    border: graffitiColorUI === c
-                                      ? '2.5px solid #FFFFFF'
-                                      : '2px solid rgba(255,255,255,0.1)',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                    transform: graffitiColorUI === c ? 'scale(1.15)' : 'scale(1)',
-                                    boxShadow: graffitiColorUI === c ? `0 0 10px ${c}40` : 'none',
-                                    flexShrink: 0,
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <span style={{
-                              fontFamily: "'Poppins', sans-serif",
-                              fontWeight: 500,
-                              fontSize: '12px',
-                              color: 'rgba(255,255,255,0.3)',
-                              flex: 1,
-                            }}>
-                              Размер ластика →
-                            </span>
-                          )}
-                          {/* Размер кисти / ластика */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            flexShrink: 0,
-                          }}>
-                            {(graffitiToolUI === 'pen' ? PEN_SIZES : ERASER_SIZES).map((s) => (
-                              <button
-                                key={s}
-                                onClick={() => {
-                                  setGraffitiSizeUI(s);
-                                  if (hapticFeedback) hapticFeedback('impact', 'light');
-                                }}
-                                style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '50%',
-                                  background: graffitiSizeUI === s
-                                    ? (graffitiToolUI === 'pen' ? 'rgba(248,185,76,0.15)' : 'rgba(168,85,247,0.15)')
-                                    : 'rgba(255,255,255,0.04)',
-                                  border: graffitiSizeUI === s
-                                    ? (graffitiToolUI === 'pen' ? '1px solid rgba(248,185,76,0.4)' : '1px solid rgba(168,85,247,0.4)')
-                                    : '1px solid rgba(255,255,255,0.08)',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.15s ease',
-                                }}
-                              >
-                                <div style={{
-                                  width: `${Math.min(s + 2, 16)}px`,
-                                  height: `${Math.min(s + 2, 16)}px`,
-                                  borderRadius: '50%',
-                                  backgroundColor: graffitiSizeUI === s
-                                    ? (graffitiToolUI === 'pen' ? '#F8B94C' : '#A855F7')
-                                    : 'rgba(255,255,255,0.3)',
-                                }} />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </motion.div>
               ) : activeTab === 'friends' ? (
                 <motion.div
@@ -2303,11 +1401,31 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         profilePhoto={profilePhoto}
         hapticFeedback={hapticFeedback}
         onProfileUpdated={refreshProfile}
+        onOpenGraffitiEditor={() => {
+          setShowProfileEdit(false);
+          setTimeout(() => setShowGraffitiEditor(true), 200);
+        }}
+        headerGraffitiUrl={headerGraffitiUrl}
         onOpenPrivacy={() => {
           setShowProfileEdit(false);
           setTimeout(() => setShowProfileSettings(true), 200);
         }}
       />
+
+      <AnimatePresence>
+        {showGraffitiEditor && (
+          <GraffitiEditor
+            isOpen={showGraffitiEditor}
+            onClose={() => setShowGraffitiEditor(false)}
+            user={user}
+            userSettings={userSettings}
+            profilePhoto={profilePhoto}
+            hapticFeedback={hapticFeedback}
+            profileData={profileData}
+            onGraffitiSaved={(url) => setHeaderGraffitiUrl(url)}
+          />
+        )}
+      </AnimatePresence>
 
       {showDevices && (
         <div className="relative z-[350]">
