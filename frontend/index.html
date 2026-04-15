@@ -141,7 +141,10 @@
             var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
             return fetch(url, opts).then(function(r) {
-              return r.json().then(function(data) {
+              var clone = r.clone();
+              return clone.text().then(function(text) {
+                var data;
+                try { data = JSON.parse(text); } catch(e) { data = { detail: text || ('HTTP ' + r.status) }; }
                 if (!r.ok) {
                   var errMsg = data.detail || data.message || ('HTTP ' + r.status);
                   var err = new Error(errMsg);
