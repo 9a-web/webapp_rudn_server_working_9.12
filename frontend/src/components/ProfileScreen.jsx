@@ -1058,7 +1058,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   marginTop: '2px',
                 }}
               >
-                Ранг
+                Уровень
               </span>
             </div>
 
