@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Pen, Eraser, Undo2, Redo2, Trash2, AlertTriangle, Check } from 'lucide-react';
+import { ChevronLeft, Pen, Eraser, Undo2, Redo2, Trash2, AlertTriangle, Check, Smartphone, Tablet, Monitor, EyeOff } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
 
 /* ────────────────────────────────────────────────
@@ -790,9 +790,9 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
           {deviceZone !== 'off' && (() => {
             // Зоны: процент от canvas, который ВИДЕН на каждом устройстве
             const zones = {
-              mobile:  { left: 12.5, right: 12.5, top: 1,  bottom: 1,  color: '#F8B94C', label: '📱 Мобильная зона', radius: '12px' },
-              tablet:  { left: 2,    right: 2,    top: 8,  bottom: 8,  color: '#3B82F6', label: '📋 Планшетная зона', radius: '14px' },
-              desktop: { left: 0,    right: 0,    top: 20, bottom: 20, color: '#A855F7', label: '🖥 Десктопная зона', radius: '4px' },
+              mobile:  { left: 12.5, right: 12.5, top: 1,  bottom: 1,  color: '#F8B94C', label: 'Мобильная зона', radius: '12px' },
+              tablet:  { left: 2,    right: 2,    top: 8,  bottom: 8,  color: '#3B82F6', label: 'Планшетная зона', radius: '14px' },
+              desktop: { left: 0,    right: 0,    top: 20, bottom: 20, color: '#A855F7', label: 'Десктопная зона', radius: '4px' },
             };
             const z = zones[deviceZone];
             if (!z) return null;
@@ -899,10 +899,10 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
           padding: '8px 0 4px',
         }}>
           {[
-            { id: 'mobile',  icon: '📱', label: 'Моб.',    color: '#F8B94C' },
-            { id: 'tablet',  icon: '📋', label: 'Планшет', color: '#3B82F6' },
-            { id: 'desktop', icon: '🖥',  label: 'ПК',      color: '#A855F7' },
-            { id: 'off',     icon: '✕',  label: '',        color: '#888' },
+            { id: 'mobile',  Icon: Smartphone, label: 'Моб.',    color: '#F8B94C' },
+            { id: 'tablet',  Icon: Tablet,     label: 'Планшет', color: '#3B82F6' },
+            { id: 'desktop', Icon: Monitor,    label: 'ПК',      color: '#A855F7' },
+            { id: 'off',     Icon: EyeOff,     label: '',        color: '#888' },
           ].map((d) => {
             const isActive = deviceZone === d.id;
             return (
@@ -929,7 +929,12 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
                   transform: isActive ? 'scale(1.05)' : 'scale(1)',
                 }}
               >
-                <span style={{ fontSize: '12px', lineHeight: 1 }}>{d.icon}</span>
+                <d.Icon style={{
+                  width: '13px',
+                  height: '13px',
+                  color: isActive ? d.color : 'rgba(255,255,255,0.3)',
+                  transition: 'color 0.15s ease',
+                }} />
                 {d.label && (
                   <span style={{
                     fontFamily: "'Poppins', sans-serif",
