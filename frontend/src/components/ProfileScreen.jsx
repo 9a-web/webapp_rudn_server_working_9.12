@@ -516,47 +516,144 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Level — кликабельный бейдж со звёздами и пульсацией */}
-            <div
-              onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
-                background: (profileData?.tier || 'base') === 'legend'
-                  ? getTierConfig(profileData?.tier).gradient
-                  : (profileData?.tier || 'base') === 'premium'
-                    ? getTierConfig(profileData?.tier).gradient
-                    : getTierColor(profileData?.tier),
-                cursor: 'pointer',
-                transition: 'transform 0.15s ease',
-                animation: (profileData?.tier === 'legend' || profileData?.tier === 'premium') ? 'levelPulse 2s ease-in-out infinite' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "'Poppins', sans-serif",
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  color: '#1c1c1c',
-                }}
-              >
-                LV. {profileData?.level ?? 1}
-              </span>
-              {(profileData?.stars || 0) > 0 && (
-                <span style={{
-                  fontFamily: "'Poppins', sans-serif",
-                  fontSize: '10px',
-                  color: '#1c1c1c',
-                  opacity: 0.7,
-                  letterSpacing: '1px',
-                }}>
-                  {renderStars(profileData?.stars)}
-                </span>
-              )}
-            </div>
+            {/* Level — кликабельный бейдж с shimmer, анимированными звёздами и XP мини-баром */}
+            {(() => {
+              const currentTier = profileData?.tier || 'base';
+              const tc = getTierConfig(currentTier);
+              const isHighTier = currentTier === 'legend' || currentTier === 'premium';
+              const starCount = Math.min(profileData?.stars || 0, 4);
+              const xpProg = profileData?.xp_progress ?? 0;
+              return (
+                <div
+                  onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s ease',
+                  }}
+                >
+                  {/* Badge pill */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      overflow: 'hidden',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      background: isHighTier ? tc.gradient : tc.color,
+                      animation: isHighTier ? 'levelPulse 2s ease-in-out infinite' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    {/* (b) Shimmer overlay */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        pointerEvents: 'none',
+                        overflow: 'hidden',
+                        borderRadius: '20px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-20%',
+                          left: '-50%',
+                          width: '45%',
+                          height: '140%',
+                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
+                          animation: 'badgeShimmer 2.8s ease-in-out infinite',
+                          animationDelay: '0.5s',
+                        }}
+                      />
+                    </div>
+
+                    {/* Level text */}
+                    <span
+                      style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        color: '#1c1c1c',
+                        position: 'relative',
+                        zIndex: 1,
+                      }}
+                    >
+                      LV. {profileData?.level ?? 1}
+                    </span>
+
+                    {/* (c) Animated stars with stagger */}
+                    {starCount > 0 && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          gap: '1px',
+                          position: 'relative',
+                          zIndex: 1,
+                        }}
+                      >
+                        {Array.from({ length: starCount }).map((_, i) => (
+                          <motion.span
+                            key={i}
+                            initial={{ opacity: 0, scale: 0.3 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{
+                              delay: 0.3 + i * 0.12,
+                              type: 'spring',
+                              stiffness: 400,
+                              damping: 12,
+                            }}
+                            style={{
+                              fontFamily: "'Poppins', sans-serif",
+                              fontSize: '10px',
+                              color: '#1c1c1c',
+                              display: 'inline-block',
+                              animation: `starTwinkle ${1.8 + i * 0.2}s ease-in-out infinite`,
+                              animationDelay: `${1 + i * 0.3}s`,
+                            }}
+                          >
+                            ★
+                          </motion.span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* (d) XP mini progress bar */}
+                  <div
+                    style={{
+                      width: '80%',
+                      height: '3px',
+                      borderRadius: '2px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.10)',
+                      marginTop: '4px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}
+                  >
+                    <motion.div
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${Math.max(xpProg * 100, 2)}%` }}
+                      transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
+                      style={{
+                        height: '100%',
+                        borderRadius: '2px',
+                        background: tc.gradient,
+                        boxShadow: `0 0 6px ${tc.color}55`,
+                        animation: 'xpBarGlow 2s ease-in-out infinite',
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </motion.div>
 
           {/* Юзернейм или имя */}
@@ -653,38 +750,99 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               </span>
             </div>
 
-            {/* Уровень — реальный тир из backend + звёзды */}
-            <div className="flex flex-col items-center" onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }} style={{ cursor: 'pointer' }}>
-              <span
-                style={{
-                  fontFamily: "'Poppins', sans-serif",
-                  fontWeight: 600,
-                  fontSize: '24px',
-                  lineHeight: 1.2,
-                  ...((['premium', 'legend'].includes((profileData?.tier || 'base').toLowerCase())) ? {
-                    background: getTierConfig(profileData?.tier).gradient,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  } : {
-                    color: getTierColor(profileData?.tier),
-                  }),
-                }}
-              >
-                {getTierName(profileData?.tier)}
-              </span>
-              <span
-                style={{
-                  fontFamily: "'Poppins', sans-serif",
-                  fontWeight: 500,
-                  fontSize: '14px',
-                  color: '#FFFFFF',
-                  marginTop: '2px',
-                }}
-              >
-                Уровень
-              </span>
-            </div>
+            {/* Уровень — реальный тир из backend + анимированные звёзды + XP бар */}
+            {(() => {
+              const currentTier = profileData?.tier || 'base';
+              const tc = getTierConfig(currentTier);
+              const isHighTier = currentTier === 'legend' || currentTier === 'premium';
+              const starCount = Math.min(profileData?.stars || 0, 4);
+              const xpProg = profileData?.xp_progress ?? 0;
+              return (
+                <div className="flex flex-col items-center" onClick={() => { setShowLevelDetail(true); if (hapticFeedback) hapticFeedback('impact', 'light'); }} style={{ cursor: 'pointer' }}>
+                  <span
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 600,
+                      fontSize: '24px',
+                      lineHeight: 1.2,
+                      ...(isHighTier ? {
+                        background: tc.gradient,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                      } : {
+                        color: tc.color,
+                      }),
+                    }}
+                  >
+                    {tc.nameRu}
+                  </span>
+                  {/* Animated stars row */}
+                  {starCount > 0 && (
+                    <div style={{ display: 'flex', gap: '2px', marginTop: '1px' }}>
+                      {Array.from({ length: starCount }).map((_, i) => (
+                        <motion.span
+                          key={i}
+                          initial={{ opacity: 0, scale: 0, y: 4 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{
+                            delay: 0.5 + i * 0.15,
+                            type: 'spring',
+                            stiffness: 350,
+                            damping: 14,
+                          }}
+                          style={{
+                            fontSize: '12px',
+                            color: tc.color,
+                            display: 'inline-block',
+                            animation: `starTwinkle ${2 + i * 0.25}s ease-in-out infinite`,
+                            animationDelay: `${1.5 + i * 0.4}s`,
+                            filter: `drop-shadow(0 0 2px ${tc.color}66)`,
+                          }}
+                        >
+                          ★
+                        </motion.span>
+                      ))}
+                    </div>
+                  )}
+                  <span
+                    style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      color: '#FFFFFF',
+                      marginTop: '2px',
+                    }}
+                  >
+                    Уровень
+                  </span>
+                  {/* XP mini progress bar */}
+                  <div
+                    style={{
+                      width: '52px',
+                      height: '3px',
+                      borderRadius: '2px',
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      marginTop: '4px',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <motion.div
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${Math.max(xpProg * 100, 2)}%` }}
+                      transition={{ duration: 1, ease: 'easeOut', delay: 0.6 }}
+                      style={{
+                        height: '100%',
+                        borderRadius: '2px',
+                        background: tc.gradient,
+                        boxShadow: `0 0 4px ${tc.color}44`,
+                        animation: 'xpBarGlow 2s ease-in-out infinite',
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* $RDN */}
             <div className="flex flex-col items-center">
