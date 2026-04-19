@@ -632,10 +632,24 @@ async def create_indexes():
         
         # ===== AUTH: users & auth_qr_sessions =====
         await safe_create_index(db.users, "uid", unique=True)
-        await safe_create_index(db.users, "email", unique=True, sparse=True)
-        await safe_create_index(db.users, "telegram_id", unique=True, sparse=True)
-        await safe_create_index(db.users, "vk_id", unique=True, sparse=True)
-        await safe_create_index(db.users, "username", unique=True, sparse=True)
+        # partialFilterExpression: индекс только для документов где поле существует и не null
+        # sparse=True alone недостаточно (не фильтрует null values)
+        await safe_create_index(
+            db.users, "email", unique=True,
+            partialFilterExpression={"email": {"$type": "string"}},
+        )
+        await safe_create_index(
+            db.users, "telegram_id", unique=True,
+            partialFilterExpression={"telegram_id": {"$type": "number"}},
+        )
+        await safe_create_index(
+            db.users, "vk_id", unique=True,
+            partialFilterExpression={"vk_id": {"$type": "string"}},
+        )
+        await safe_create_index(
+            db.users, "username", unique=True,
+            partialFilterExpression={"username": {"$type": "string"}},
+        )
         await safe_create_index(db.users, [("created_at", -1)])
 
         await safe_create_index(db.auth_qr_sessions, "qr_token", unique=True)
