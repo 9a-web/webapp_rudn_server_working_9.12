@@ -2,9 +2,9 @@
 Pydantic модели для API расписания РУДН
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr
 from typing import List, Optional, Union
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import uuid
 
@@ -2735,3 +2735,173 @@ class ReferralLinksAnalytics(BaseModel):
     clicks_by_source: List[dict] = []  # Клики по источникам
     recent_events: List[dict] = []  # Последние события
 
+
+
+# ========================================================================
+# 🔐 AUTH / USERS (multi-provider authentication + UID)
+# ========================================================================
+
+class AuthProvider(str, Enum):
+    """Доступные провайдеры авторизации"""
+    EMAIL = "email"
+    TELEGRAM = "telegram"
+    VK = "vk"
+    QR = "qr"
+
+
+class User(BaseModel):
+    """Модель пользователя в коллекции `users`.
+
+    Первичный публичный идентификатор — `uid` (9-значный numeric).
+    Может быть связан с несколькими провайдерами авторизации одновременно.
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    uid: str  # 9-digit numeric (100000000..999999999), unique
+    username: Optional[str] = None  # unique handle (optional, для отображения)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+    # Провайдеры авторизации
+    email: Optional[str] = None  # unique если задан
+    password_hash: Optional[str] = None  # bcrypt, только если есть email auth
+    telegram_id: Optional[int] = None  # unique если задан
+    vk_id: Optional[str] = None  # unique если задан (как строка)
+
+    auth_providers: List[str] = Field(default_factory=list)  # активные провайдеры
+    primary_auth: Optional[str] = None  # метод, которым зарегистрировались
+
+    email_verified: bool = False
+    is_active: bool = True
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_login_at: Optional[datetime] = None
+
+    # Академические данные (шаг 3 регистрации) — зеркало user_settings для удобства
+    facultet_id: Optional[str] = None
+    facultet_name: Optional[str] = None
+    level_id: Optional[str] = None
+    form_code: Optional[str] = None
+    kurs: Optional[str] = None
+    group_id: Optional[str] = None
+    group_name: Optional[str] = None
+
+    # Прогресс регистрации (для многошаговой формы)
+    # 1 = email/provider завершён, 2 = profile (username+имя), 3 = academic (факультет/группа), 0 = всё готово
+    registration_step: int = 0
+
+
+class UserPublic(BaseModel):
+    """Публичное представление пользователя (для /auth/me и списков).
+    Без password_hash и чувствительных данных.
+    """
+    uid: str
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None  # показывается только владельцу (через /auth/me)
+    telegram_id: Optional[int] = None
+    vk_id: Optional[str] = None
+    auth_providers: List[str] = Field(default_factory=list)
+    primary_auth: Optional[str] = None
+
+    facultet_id: Optional[str] = None
+    facultet_name: Optional[str] = None
+    kurs: Optional[str] = None
+    group_id: Optional[str] = None
+    group_name: Optional[str] = None
+
+    registration_step: int = 0
+    created_at: Optional[datetime] = None
+
+
+# --- Auth requests ---
+
+class RegisterEmailRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=128)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    # Для реферальной системы (опционально)
+    referral_code: Optional[str] = None
+
+
+class LoginEmailRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TelegramLoginRequest(BaseModel):
+    """Данные из Telegram Login Widget (stdin — https://core.telegram.org/widgets/login)."""
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    auth_date: int
+    hash: str
+    # Для реферальной системы
+    referral_code: Optional[str] = None
+
+
+class TelegramWebAppLoginRequest(BaseModel):
+    """Данные из Telegram WebApp initData (raw string)."""
+    init_data: str
+    referral_code: Optional[str] = None
+
+
+class VKLoginRequest(BaseModel):
+    """VK ID OAuth — обмен code на токен."""
+    code: str
+    device_id: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    code_verifier: Optional[str] = None  # PKCE
+    state: Optional[str] = None
+    referral_code: Optional[str] = None
+
+
+class QRInitResponse(BaseModel):
+    qr_token: str
+    qr_url: str  # URL который кодируется в QR
+    expires_at: datetime
+    status: str = "pending"
+
+
+class QRStatusResponse(BaseModel):
+    status: str  # pending / confirmed / expired
+    access_token: Optional[str] = None
+    user: Optional[UserPublic] = None
+    expires_at: Optional[datetime] = None
+
+
+class QRConfirmRequest(BaseModel):
+    qr_token: str
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserPublic
+    is_new_user: bool = False
+
+
+class UpdateProfileStepRequest(BaseModel):
+    """Используется для шагов 2 и 3 регистрационного визарда (а также для обычного редактирования)."""
+    username: Optional[str] = Field(default=None, min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_]+$")
+    first_name: Optional[str] = Field(default=None, max_length=64)
+    last_name: Optional[str] = Field(default=None, max_length=64)
+    facultet_id: Optional[str] = None
+    facultet_name: Optional[str] = None
+    level_id: Optional[str] = None
+    form_code: Optional[str] = None
+    kurs: Optional[str] = None
+    group_id: Optional[str] = None
+    group_name: Optional[str] = None
+    # Пометка о завершении шага (0 = регистрация окончена)
+    complete_step: Optional[int] = None
+
+
+class UsernameCheckResponse(BaseModel):
+    username: str
+    available: bool
+    reason: Optional[str] = None

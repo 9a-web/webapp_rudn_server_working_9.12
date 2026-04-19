@@ -274,6 +274,11 @@ from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
 from scheduler_v2 import get_scheduler_v2  # Новая улучшенная система
 from cache import cache
+from auth_routes import create_auth_router, migrate_user_settings_to_users
+from auth_utils import (
+    get_current_user_required,
+    get_current_user_optional,
+)
 from achievements import (
     get_all_achievements,
     get_user_achievements,
@@ -625,6 +630,25 @@ async def create_indexes():
         # Channel Stats History
         await safe_create_index(db.channel_stats_history, [("timestamp", 1)])
         
+        # ===== AUTH: users & auth_qr_sessions =====
+        await safe_create_index(db.users, "uid", unique=True)
+        await safe_create_index(db.users, "email", unique=True, sparse=True)
+        await safe_create_index(db.users, "telegram_id", unique=True, sparse=True)
+        await safe_create_index(db.users, "vk_id", unique=True, sparse=True)
+        await safe_create_index(db.users, "username", unique=True, sparse=True)
+        await safe_create_index(db.users, [("created_at", -1)])
+
+        await safe_create_index(db.auth_qr_sessions, "qr_token", unique=True)
+        await safe_create_index(db.auth_qr_sessions, [("status", 1)])
+        # TTL: auto-delete expired QR sessions after 10 min beyond expiration
+        await safe_create_index(db.auth_qr_sessions, "expires_at", expireAfterSeconds=600)
+
+        # TTL для profile_views (очищать старше 7 дней)
+        await safe_create_index(db.profile_views, "viewed_at", expireAfterSeconds=7 * 24 * 3600)
+        await safe_create_index(db.profile_views, [("viewed_telegram_id", 1), ("viewer_telegram_id", 1)])
+        # Mapping user_settings.uid
+        await safe_create_index(db.user_settings, "uid", sparse=True)
+        
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
         logger.error(f"❌ Failed to create database indexes: {e}")
@@ -677,6 +701,15 @@ async def startup_event():
         await cleanup_expired_sessions()
     except Exception as e:
         logger.warning(f"⚠️ Initial session cleanup failed: {e}")
+
+    # 6.5. 🔐 Миграция user_settings → users (для новой auth-системы)
+    if mongo_ok:
+        try:
+            migration_result = await migrate_user_settings_to_users(db)
+            if migration_result.get("created") or migration_result.get("updated"):
+                logger.info(f"✅ Auth migration completed: {migration_result}")
+        except Exception as e:
+            logger.error(f"❌ Auth migration failed: {e}", exc_info=True)
     
     # 7. Запускаем планировщик уведомлений V2
     try:
@@ -737,6 +770,10 @@ async def startup_event():
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+
+# ===== AUTH: подключаем роутер с /api/auth/* эндпоинтами =====
+auth_router = create_auth_router(db)
+api_router.include_router(auth_router)
 
 
 # Define Models (старые для совместимости)

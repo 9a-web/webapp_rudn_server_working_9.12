@@ -109,5 +109,24 @@ async def _fetch_bot_username():
 # Экспортируем активный токен для обратной совместимости
 TELEGRAM_BOT_TOKEN = get_telegram_bot_token()
 
+# ========== JWT / AUTH КОНФИГУРАЦИЯ ==========
+
+# JWT secret — обязательно переопределять в production
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "rudn-auth-default-secret-CHANGE-ME-IN-PROD-8f3a2b1c9d7e")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "30"))
+
+# VK OAuth
+VK_APP_ID = os.getenv("VK_APP_ID", "")
+VK_CLIENT_SECRET = os.getenv("VK_CLIENT_SECRET", "")
+VK_REDIRECT_URI = os.getenv("VK_REDIRECT_URI", "")
+
+# Публичный URL для shareable-ссылок (= REACT_APP_BACKEND_URL во frontend .env)
+# Используется для генерации `/u/{uid}` публичных ссылок
+# Источник истины — frontend .env (REACT_APP_BACKEND_URL), но и backend может его знать
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
+
 # Логируем текущую конфигурацию при импорте
 logger.info(f"📋 Конфигурация загружена: ENV={ENV}")
+if JWT_SECRET_KEY.startswith("rudn-auth-default"):
+    logger.warning("⚠️  JWT_SECRET_KEY использует дефолтное значение! Задайте свой в .env")
