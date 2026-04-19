@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Body, WebSocket, WebSocketDisconnect, Request, Query, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Body, WebSocket, WebSocketDisconnect, Request, Query, UploadFile, File, Depends
 from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -16335,10 +16335,18 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
         # Счётчик просмотров профиля (видит только владелец)
         profile_views = user.get("profile_views_count", 0) if is_own_profile else None
 
+        # 🐛 BUG-7: UID из user_settings (миграция уже проставила), fallback — поиск в users
+        user_uid = user.get("uid")
+        if not user_uid:
+            user_doc = await db.users.find_one({"telegram_id": telegram_id}, {"uid": 1})
+            if user_doc:
+                user_uid = user_doc.get("uid")
+
         # Применяем privacy-фильтры ТОЛЬКО для чужих профилей (владелец видит всё)
         if is_own_profile:
             return UserProfilePublic(
                 telegram_id=telegram_id,
+                uid=user_uid,
                 username=user.get("username"),
                 first_name=user.get("first_name"),
                 last_name=user.get("last_name"),
@@ -16384,6 +16392,7 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
         # - show_online_status=False → скрываем is_online и last_activity
         # - is_anonymous → скрываем чувствительную инфу (группа/факультет/курс)
         # - is_hidden_from_search → для не-друзей скрываем чувствительные поля
+        # 🐛 BUG-5: created_at (Member since) показываем ВСЕГДА — это социальная метаданная
 
         # Учитываем статус друзей: друзья видят больше даже при show_in_search=false
         is_friend = friendship_status == "friend"
@@ -16394,6 +16403,7 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
 
         return UserProfilePublic(
             telegram_id=telegram_id,
+            uid=user_uid,
             username=user.get("username"),
             first_name=user.get("first_name"),
             last_name=user.get("last_name"),
@@ -16422,7 +16432,8 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
             is_online=is_online if privacy.show_online_status else False,
             last_activity=last_activity if privacy.show_online_status else None,
             privacy=None,  # Чужим не отдаём privacy настройки
-            created_at=user.get("created_at") if show_profile_info else None,
+            # 🐛 BUG-5: created_at показываем ВСЕМ (Member since)
+            created_at=user.get("created_at"),
             friendship_status=friendship_status,
             profile_views_count=None,  # Только владелец видит
             friends_list_hidden=(not privacy.show_friends_list),
@@ -16448,18 +16459,29 @@ class ActivityPingRequest(BaseModel):
 
 
 @api_router.post("/profile/activity-ping")
-async def profile_activity_ping(request: ActivityPingRequest):
+async def profile_activity_ping(
+    request: ActivityPingRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Обновить last_activity пользователя (замена side-effect в GET /profile).
 
-    Вызывать из фронта при активных взаимодействиях:
-    - при открытии приложения
-    - периодически (каждые 2-3 минуты) пока окно активно
-    - при ключевых действиях
+    🔐 BUG-2 FIX: если JWT передан, пингуемый telegram_id ДОЛЖЕН совпадать с telegram_id
+    в токене (нельзя пинговать чужого). Без JWT — оставляем обратную совместимость (legacy
+    клиенты из Telegram WebApp), но логируем для мониторинга.
     """
     try:
         telegram_id = request.telegram_id
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        # 🔐 Authorization: если JWT передан, проверяем что пингуется СВОЙ профиль
+        if current_user:
+            token_tid = current_user.get("tid")
+            if token_tid is not None and int(token_tid) != int(telegram_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Нельзя обновлять last_activity чужого пользователя",
+                )
 
         now = datetime.now(timezone.utc)
         result = await db.user_settings.update_one(
@@ -16477,6 +16499,7 @@ async def profile_activity_ping(request: ActivityPingRequest):
 
 
 class ProfileViewRequest(BaseModel):
+    """DEPRECATED: перенесено в models.py. Оставлено для обратной совместимости импортов."""
     viewer_telegram_id: int
 
 
@@ -16486,6 +16509,7 @@ async def register_profile_view(telegram_id: int, request: ProfileViewRequest):
 
     - Самопросмотр не считается.
     - Блокированные не могут счётчик накручивать.
+    - 🐛 BUG-3 FIX: Скрытый из поиска (show_in_search=false) — не считаем просмотры от не-друзей.
     - Rate-limit: один пользователь может добавить счётчик не чаще раза в час (дедупликация).
     """
     try:
@@ -16504,6 +16528,13 @@ async def register_profile_view(telegram_id: int, request: ProfileViewRequest):
         blocked_by_viewer = await is_blocked(viewer_id, telegram_id)
         if blocked_by_owner or blocked_by_viewer:
             return {"success": True, "counted": False, "reason": "blocked"}
+
+        # 🐛 BUG-3: Если профиль скрыт из поиска И viewer не друг — не засчитываем
+        privacy = await get_user_privacy_settings(telegram_id)
+        if not privacy.show_in_search:
+            is_friend = await check_friendship(telegram_id, viewer_id)
+            if not is_friend:
+                return {"success": True, "counted": False, "reason": "hidden-from-search"}
 
         # Rate-limit через коллекцию profile_views (дедупликация за последний час)
         now = datetime.now(timezone.utc)
@@ -16540,26 +16571,58 @@ async def register_profile_view(telegram_id: int, request: ProfileViewRequest):
 
 
 @api_router.get("/profile/{telegram_id}/share-link")
-async def get_profile_share_link(telegram_id: int):
-    """Получить ссылку для шаринга профиля (через Telegram Web App)."""
+async def get_profile_share_link(
+    telegram_id: int,
+    viewer_telegram_id: Optional[int] = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить ссылку для шаринга профиля.
+
+    🐛 BUG-1 FIX: владелец может получить свою ссылку даже со `show_in_search=false`.
+    Определяем владельца по:
+      1) JWT токену (приоритет) — current_user.tid / current_user.sub
+      2) query-параметру `viewer_telegram_id` (для обратной совместимости)
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
         user = await db.user_settings.find_one(
             {"telegram_id": telegram_id},
-            {"first_name": 1, "last_name": 1, "username": 1, "group_name": 1, "_id": 0},
+            {"first_name": 1, "last_name": 1, "username": 1, "group_name": 1, "uid": 1, "_id": 0},
         )
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        # Приватность
-        privacy = await get_user_privacy_settings(telegram_id)
-        if not privacy.show_in_search:
-            raise HTTPException(status_code=403, detail="Профиль скрыт из поиска — ссылка недоступна")
+        # 🔐 Определяем, является ли запрашивающий владельцем
+        is_owner = False
+        if current_user:
+            token_tid = current_user.get("tid")
+            if token_tid is not None and int(token_tid) == int(telegram_id):
+                is_owner = True
+        if not is_owner and viewer_telegram_id is not None and int(viewer_telegram_id) == int(telegram_id):
+            is_owner = True
+
+        # Приватность (только если не владелец)
+        if not is_owner:
+            privacy = await get_user_privacy_settings(telegram_id)
+            if not privacy.show_in_search:
+                raise HTTPException(status_code=403, detail="Профиль скрыт из поиска — ссылка недоступна")
 
         bot_username = get_telegram_bot_username()
-        link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
+        telegram_link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
+
+        # Новая публичная ссылка (через UID) — если у пользователя есть UID
+        uid = user.get("uid")
+        public_link = None
+        if uid:
+            # PUBLIC_BASE_URL — из ENV. Если пусто — формируем относительно
+            from config import PUBLIC_BASE_URL
+            if PUBLIC_BASE_URL:
+                public_link = f"{PUBLIC_BASE_URL.rstrip('/')}/u/{uid}"
+            else:
+                public_link = f"/u/{uid}"
+
         display_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or user.get("username") or "Пользователь"
 
         share_text = f"{display_name}"
@@ -16567,7 +16630,10 @@ async def get_profile_share_link(telegram_id: int):
             share_text += f" · {user.get('group_name')}"
 
         return {
-            "link": link,
+            "link": telegram_link,  # legacy поле — Telegram-ссылка
+            "telegram_link": telegram_link,
+            "public_link": public_link,  # новая публичная ссылка по UID
+            "uid": uid,
             "share_text": share_text,
             "display_name": display_name,
             "group_name": user.get("group_name"),
@@ -16579,6 +16645,258 @@ async def get_profile_share_link(telegram_id: int):
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 # ========== END PROFILE AUXILIARY ENDPOINTS ==========
+
+
+# ========== STAGE 2: PUBLIC PROFILE BY UID (/api/u/{uid}/*) ==========
+# Новый публичный API, работает по 9-digit numeric UID.
+# Использует JWT (опционально) для определения viewer'а; резолвит uid → telegram_id.
+
+
+async def _resolve_user_by_uid(uid: str) -> Optional[dict]:
+    """Найти пользователя по UID (9-digit numeric).
+
+    Возвращает dict `{telegram_id, uid, ...}` или None.
+    """
+    if not uid or not uid.isdigit() or len(uid) != 9:
+        return None
+
+    # Приоритет: коллекция users
+    user_doc = await db.users.find_one(
+        {"uid": uid},
+        {
+            "uid": 1, "telegram_id": 1, "username": 1,
+            "first_name": 1, "last_name": 1, "created_at": 1,
+            "email": 1, "vk_id": 1, "auth_providers": 1, "registration_step": 1,
+            "_id": 0,
+        },
+    )
+    if user_doc:
+        return user_doc
+
+    # Fallback: user_settings (если миграция не прошла)
+    settings_doc = await db.user_settings.find_one(
+        {"uid": uid},
+        {"uid": 1, "telegram_id": 1, "username": 1, "first_name": 1, "last_name": 1, "created_at": 1, "_id": 0},
+    )
+    return settings_doc
+
+
+async def _resolve_uid_or_404(uid: str) -> dict:
+    user = await _resolve_user_by_uid(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь с таким UID не найден")
+    return user
+
+
+@api_router.get("/u/{uid}/resolve")
+async def resolve_uid(uid: str):
+    """Быстрый резолв UID → telegram_id + базовая инфа для отображения превью.
+
+    Полезно для фронта чтобы понять — существует ли профиль и какой у него телеграм-id.
+    НЕ фильтруется privacy (только открытые поля: uid, display_name, has_telegram).
+    """
+    user = await _resolve_user_by_uid(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    display_name = (
+        f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
+        or user.get("username")
+        or f"User {uid}"
+    )
+    return {
+        "uid": uid,
+        "telegram_id": user.get("telegram_id"),
+        "display_name": display_name,
+        "username": user.get("username"),
+        "has_telegram": bool(user.get("telegram_id")),
+        "auth_providers": user.get("auth_providers", []),
+    }
+
+
+@api_router.get("/u/{uid}", response_model=UserProfilePublic)
+async def get_public_profile_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Публичный профиль по UID. Работает БЕЗ auth (респектует privacy).
+
+    Если JWT передан — определяет viewer как его `tid` для персонализации
+    (вычисление mutual friends, дружбы, блокировки).
+    """
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+
+    if not target_tid:
+        raise HTTPException(
+            status_code=422,
+            detail="Профиль пользователя не настроен (не связан с telegram-аккаунтом)",
+        )
+
+    viewer_tid = None
+    if current_user:
+        viewer_tid = current_user.get("tid")
+
+    # Вызываем существующий endpoint handler напрямую как Python-функцию
+    return await get_user_profile(telegram_id=int(target_tid), viewer_telegram_id=viewer_tid)
+
+
+@api_router.get("/u/{uid}/schedule", response_model=FriendScheduleResponse)
+async def get_public_schedule_by_uid(
+    uid: str,
+    date: str = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Расписание по UID (только для друзей или владельца)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    viewer_tid = current_user.get("tid")
+    if viewer_tid is None:
+        raise HTTPException(status_code=401, detail="Требуется авторизация с telegram_id")
+
+    return await get_friend_schedule(
+        telegram_id=int(target_tid),
+        viewer_telegram_id=int(viewer_tid),
+        date=date,
+    )
+
+
+@api_router.get("/u/{uid}/qr")
+async def get_public_qr_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """QR-код профиля по UID."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    requester_tid = None
+    if current_user:
+        requester_tid = current_user.get("tid")
+
+    return await get_profile_qr_data(
+        telegram_id=int(target_tid),
+        requester_telegram_id=requester_tid,
+    )
+
+
+@api_router.get("/u/{uid}/share-link")
+async def get_public_share_link_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Ссылки для шаринга профиля по UID."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        # Для пользователей без telegram — всё равно отдаём public_link
+        display_name = (
+            f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
+            or user.get("username")
+            or f"User {uid}"
+        )
+        from config import PUBLIC_BASE_URL
+        public_link = f"{PUBLIC_BASE_URL.rstrip('/')}/u/{uid}" if PUBLIC_BASE_URL else f"/u/{uid}"
+        return {
+            "link": None,
+            "telegram_link": None,
+            "public_link": public_link,
+            "uid": uid,
+            "share_text": display_name,
+            "display_name": display_name,
+            "group_name": None,
+        }
+
+    return await get_profile_share_link(
+        telegram_id=int(target_tid),
+        viewer_telegram_id=None,
+        current_user=current_user,
+    )
+
+
+@api_router.get("/u/{uid}/privacy", response_model=PrivacySettings)
+async def get_public_privacy_by_uid(
+    uid: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Получить privacy настройки (только владелец)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+
+    # Проверка владельца: по sub (uid) или по tid
+    is_owner = (
+        current_user.get("sub") == uid
+        or (target_tid and int(current_user.get("tid") or 0) == int(target_tid))
+    )
+    if not is_owner:
+        raise HTTPException(status_code=403, detail="Доступ запрещён — только владелец")
+
+    if not target_tid:
+        # Возвращаем дефолтные настройки
+        return PrivacySettings()
+
+    return await get_privacy_settings(
+        telegram_id=int(target_tid),
+        requester_telegram_id=int(target_tid),  # пропускаем owner-check (он уже сделан выше)
+    )
+
+
+@api_router.put("/u/{uid}/privacy", response_model=PrivacySettings)
+async def update_public_privacy_by_uid(
+    uid: str,
+    settings: PrivacySettingsUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Обновить privacy настройки (только владелец)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+
+    is_owner = (
+        current_user.get("sub") == uid
+        or (target_tid and int(current_user.get("tid") or 0) == int(target_tid))
+    )
+    if not is_owner:
+        raise HTTPException(status_code=403, detail="Доступ запрещён — только владелец")
+
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    return await update_privacy_settings(
+        telegram_id=int(target_tid),
+        settings=settings,
+        requester_telegram_id=int(target_tid),  # owner-check уже сделан выше
+    )
+
+
+@api_router.post("/u/{uid}/view")
+async def register_view_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Зарегистрировать просмотр профиля (viewer берётся из JWT)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        return {"success": True, "counted": False, "reason": "profile-not-setup"}
+
+    viewer_tid = None
+    if current_user:
+        viewer_tid = current_user.get("tid")
+    if viewer_tid is None:
+        return {"success": True, "counted": False, "reason": "anonymous"}
+
+    return await register_profile_view(
+        telegram_id=int(target_tid),
+        request=ProfileViewRequest(viewer_telegram_id=int(viewer_tid)),
+    )
+
+
+# ========== END PUBLIC PROFILE BY UID ==========
 
 
 

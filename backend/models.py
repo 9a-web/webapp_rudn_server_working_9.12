@@ -1893,6 +1893,7 @@ class UserBlock(BaseModel):
 class UserProfilePublic(BaseModel):
     """Публичный профиль пользователя"""
     telegram_id: int
+    uid: Optional[str] = None  # 9-digit numeric UID (новый публичный идентификатор)
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -2905,3 +2906,8 @@ class UsernameCheckResponse(BaseModel):
     username: str
     available: bool
     reason: Optional[str] = None
+
+
+class ProfileViewRequest(BaseModel):
+    """Тело запроса POST /api/profile/{telegram_id}/view"""
+    viewer_telegram_id: int
