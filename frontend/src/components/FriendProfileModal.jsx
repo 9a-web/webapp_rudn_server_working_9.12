@@ -23,6 +23,26 @@ const getAvatarGradient = (id) => {
   return gradients[Math.abs(id || 0) % gradients.length];
 };
 
+const formatRelativeTime = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = typeof iso === 'string' ? new Date(iso) : iso;
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'только что';
+    if (diffMin < 60) return `${diffMin} мин назад`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH} ч назад`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD} дн назад`;
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  } catch {
+    return '';
+  }
+};
+
 const FriendProfileModal = ({ 
   isOpen, onClose, friend, currentUserId, userSettings, onRemoveFriend, onToggleFavorite, onMessage
 }) => {
@@ -48,31 +68,61 @@ const FriendProfileModal = ({
     if (friend) setIsFavorite(friend.is_favorite || false);
   }, [friend]);
 
+  // Загрузка аватара: уважаем avatar_mode="custom" из профиля.
+  // Порядок: custom_avatar → telegram-proxy → fallback к инициалам.
   useEffect(() => {
-    if (isOpen && friend?.telegram_id) {
-      setAvatarError(false);
-      setAvatarUrl(`${getBackendURL()}/api/user-profile-photo-proxy/${friend.telegram_id}`);
-    }
-  }, [isOpen, friend?.telegram_id]);
+    if (!isOpen || !friend?.telegram_id) return;
+    setAvatarError(false);
+
+    let cancelled = false;
+
+    const loadAvatar = async () => {
+      try {
+        // Сначала пробуем custom avatar
+        const avatarRes = await friendsAPI.getCustomAvatar(friend.telegram_id, currentUserId);
+        if (cancelled) return;
+        if (avatarRes?.avatar_mode === 'custom' && avatarRes?.avatar_data) {
+          setAvatarUrl(avatarRes.avatar_data);
+          return;
+        }
+      } catch {/* noop */}
+      if (!cancelled) {
+        setAvatarUrl(`${getBackendURL()}/api/user-profile-photo-proxy/${friend.telegram_id}`);
+      }
+    };
+    loadAvatar();
+    return () => { cancelled = true; };
+  }, [isOpen, friend?.telegram_id, currentUserId]);
 
   useEffect(() => {
+    if (!isOpen || !friend?.telegram_id || !currentUserId) return;
+    let cancelled = false;
+    const controller = new AbortController();
+
     const loadProfile = async () => {
-      if (!isOpen || !friend?.telegram_id || !currentUserId) return;
       setIsLoading(true);
       try {
         const [profileData, mutualData] = await Promise.all([
           friendsAPI.getUserProfile(friend.telegram_id, currentUserId),
-          friendsAPI.getMutualFriends(currentUserId, friend.telegram_id)
+          friendsAPI.getMutualFriends(currentUserId, friend.telegram_id),
         ]);
+        if (cancelled) return;
         setProfile(profileData);
-        setMutualFriends(mutualData.mutual_friends || []);
+        setMutualFriends(mutualData?.mutual_friends || []);
+
+        // Регистрация просмотра (не блокирующая)
+        friendsAPI.registerProfileView(friend.telegram_id, currentUserId).catch(() => {});
       } catch (error) {
-        console.error('Error loading profile:', error);
+        if (!cancelled) console.error('Error loading profile:', error);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
     loadProfile();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [isOpen, friend?.telegram_id, currentUserId]);
 
   const loadSchedule = useCallback(async (date) => {
@@ -83,7 +133,28 @@ const FriendProfileModal = ({
       const scheduleData = await friendsAPI.getFriendSchedule(friend.telegram_id, currentUserId, dateStr);
       setSchedule(scheduleData);
     } catch (error) {
-      setSchedule({ error: true, message: error.message || 'Ошибка загрузки' });
+      // Различаем типы ошибок для понятных сообщений пользователю
+      let errorType = 'generic';
+      let message = 'Не удалось загрузить расписание';
+      if (error.status === 403) {
+        if (error.detail?.includes?.('не друзья') || error.detail?.includes?.('friends')) {
+          errorType = 'not_friends';
+          message = 'Вы не друзья с этим пользователем';
+        } else if (error.detail?.includes?.('скрыл') || error.detail?.includes?.('schedule')) {
+          errorType = 'hidden';
+          message = 'Пользователь скрыл своё расписание';
+        } else {
+          errorType = 'forbidden';
+          message = 'Нет доступа к расписанию';
+        }
+      } else if (error.status === 404) {
+        errorType = 'no_group';
+        message = 'У пользователя не настроена группа';
+      } else if (error.isNetworkError) {
+        errorType = 'network';
+        message = 'Нет подключения к сети';
+      }
+      setSchedule({ error: true, errorType, message });
     } finally {
       setScheduleLoading(false);
     }
@@ -123,11 +194,22 @@ const FriendProfileModal = ({
 
   const handleToggleFavorite = async () => {
     const newValue = !isFavorite;
-    setIsFavorite(newValue);
+    setIsFavorite(newValue); // оптимистично
     try {
       await onToggleFavorite?.(friend.telegram_id, newValue);
-    } catch (error) {
+    } catch {
+      // Ревертим локально; parent состояние перечитает friend prop при следующем рендере
       setIsFavorite(!newValue);
+    }
+  };
+
+  const handleRemoveFriendConfirmed = async () => {
+    try {
+      await onRemoveFriend?.(friend.telegram_id);
+      setShowRemoveConfirm(false);
+      onClose?.(); // Закрываем модалку — профиль больше не актуален
+    } catch {
+      setShowRemoveConfirm(false);
     }
   };
 
@@ -199,11 +281,11 @@ const FriendProfileModal = ({
                   </div>
                   {friend.username && <p className="text-[13px] text-gray-400 mt-0.5">@{friend.username}</p>}
                   <p className="text-[13px] text-purple-400 mt-1 font-medium">
-                    {friend.group_name || profile?.group_name || 'Группа не указана'}
+                    {profile?.group_name || friend.group_name || (profile?.friends_list_hidden ? '' : 'Группа не указана')}
                   </p>
-                  {(friend.facultet_name || profile?.facultet_name) && (
+                  {(profile?.facultet_name || friend.facultet_name) && (
                     <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                      {friend.facultet_name || profile?.facultet_name}
+                      {profile?.facultet_name || friend.facultet_name}
                     </p>
                   )}
                   {/* Level/Tier badge */}
@@ -246,11 +328,19 @@ const FriendProfileModal = ({
                       );
                     })()
                   )}
-                  {profile?.is_online && (
+                  {profile?.is_online ? (
                     <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-1">
                       <Wifi className="w-3 h-3" /> в сети
                     </span>
-                  )}
+                  ) : profile?.online_status_hidden ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 font-medium mt-1">
+                      <EyeOff className="w-3 h-3" /> статус скрыт
+                    </span>
+                  ) : profile?.last_activity ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 font-medium mt-1">
+                      был(а) {formatRelativeTime(profile.last_activity)}
+                    </span>
+                  ) : null}
                 </div>
 
                 <motion.button
@@ -285,19 +375,35 @@ const FriendProfileModal = ({
                   className="flex gap-3 mt-5"
                 >
                   <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
-                    <p className="text-xl font-bold text-white">{profile.friends_count || 0}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Друзей</p>
+                    {profile.friends_list_hidden ? (
+                      <>
+                        <EyeOff className="w-5 h-5 mx-auto text-gray-600 mb-0.5" />
+                        <p className="text-[10px] text-gray-600">Скрыто</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xl font-bold text-white">{profile.friends_count || 0}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Друзей</p>
+                      </>
+                    )}
                   </div>
                   <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
-                    <p className="text-xl font-bold text-white">{mutualFriends.length}</p>
+                    <p className="text-xl font-bold text-white">{mutualFriends.length || profile.mutual_friends_count || 0}</p>
                     <p className="text-[11px] text-gray-500 mt-0.5">Общих</p>
                   </div>
-                  {(profile.achievements_count > 0) && (
-                    <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
-                      <p className="text-xl font-bold text-white">{profile.achievements_count || 0}</p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Достижений</p>
-                    </div>
-                  )}
+                  <div className="flex-1 bg-white/[0.04] rounded-2xl p-3 text-center border border-white/[0.05]">
+                    {profile.achievements_hidden ? (
+                      <>
+                        <EyeOff className="w-5 h-5 mx-auto text-gray-600 mb-0.5" />
+                        <p className="text-[10px] text-gray-600">Скрыто</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xl font-bold text-white">{profile.achievements_count || 0}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Достижений</p>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               )}
               
@@ -545,15 +651,71 @@ const FriendProfileModal = ({
                       </div>
                     ) : schedule?.error ? (
                       <div className="text-center py-10">
-                        <EyeOff className="w-10 h-10 mx-auto text-gray-600 mb-3" />
-                        <p className="text-gray-400 text-[14px]">Расписание недоступно</p>
-                        <p className="text-[12px] text-gray-600 mt-1">{schedule.message}</p>
+                        {schedule.errorType === 'hidden' ? (
+                          <>
+                            <EyeOff className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+                            <p className="text-white text-[14px] font-medium">Расписание скрыто</p>
+                            <p className="text-[12px] text-gray-500 mt-1">Пользователь скрыл своё расписание в настройках приватности</p>
+                          </>
+                        ) : schedule.errorType === 'not_friends' ? (
+                          <>
+                            <Users className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+                            <p className="text-white text-[14px] font-medium">Доступно только друзьям</p>
+                            <p className="text-[12px] text-gray-500 mt-1">Добавьте пользователя в друзья чтобы видеть расписание</p>
+                          </>
+                        ) : schedule.errorType === 'no_group' ? (
+                          <>
+                            <AlertTriangle className="w-10 h-10 mx-auto text-amber-500/70 mb-3" />
+                            <p className="text-white text-[14px] font-medium">Группа не настроена</p>
+                            <p className="text-[12px] text-gray-500 mt-1">У пользователя не выбрана учебная группа</p>
+                          </>
+                        ) : schedule.errorType === 'network' ? (
+                          <>
+                            <Wifi className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+                            <p className="text-white text-[14px] font-medium">Нет связи</p>
+                            <p className="text-[12px] text-gray-500 mt-1">Проверьте подключение к сети</p>
+                            <button
+                              onClick={() => loadSchedule(selectedDate)}
+                              className="mt-4 px-4 py-2 bg-purple-500/15 text-purple-300 rounded-xl text-[12px] font-medium hover:bg-purple-500/25 transition-colors"
+                            >
+                              Повторить
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-10 h-10 mx-auto text-gray-600 mb-3" />
+                            <p className="text-white text-[14px] font-medium">Не удалось загрузить расписание</p>
+                            <p className="text-[12px] text-gray-500 mt-1">{schedule.message}</p>
+                            <button
+                              onClick={() => loadSchedule(selectedDate)}
+                              className="mt-4 px-4 py-2 bg-purple-500/15 text-purple-300 rounded-xl text-[12px] font-medium hover:bg-purple-500/25 transition-colors"
+                            >
+                              Повторить
+                            </button>
+                          </>
+                        )}
                       </div>
                     ) : groupedSchedule.length > 0 ? (
                       <>
                         <p className="text-[12px] text-gray-500 mb-1">
                           {schedule.friend_name} • {schedule.group_name}
+                          {schedule.same_group && (
+                            <span className="ml-2 text-emerald-400">· Одна группа</span>
+                          )}
                         </p>
+                        {/* Общие окна если разные группы */}
+                        {!schedule.same_group && schedule.common_breaks?.length > 0 && (
+                          <div className="bg-emerald-500/8 border border-emerald-500/15 rounded-2xl p-3 mb-3">
+                            <p className="text-[11px] font-semibold text-emerald-400 mb-1.5">Общие окна между парами</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {schedule.common_breaks.map((br, i) => (
+                                <span key={i} className="px-2 py-1 bg-emerald-500/10 rounded-md text-[11px] text-emerald-300">
+                                  {br.start}–{br.end} <span className="text-emerald-500/60">· {br.duration_min} мин</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {groupedSchedule.map((event, index) => {
                           const timeParts = event.time?.split(' - ') || [];
                           const startTime = timeParts[0] || event.time_start?.slice(0, 5) || '';
@@ -664,10 +826,7 @@ const FriendProfileModal = ({
                       </motion.button>
                       <motion.button
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                          onRemoveFriend?.(friend.telegram_id);
-                          setShowRemoveConfirm(false);
-                        }}
+                        onClick={handleRemoveFriendConfirmed}
                         className="flex-1 py-3.5 bg-red-500 text-white rounded-2xl font-semibold text-[14px] shadow-lg shadow-red-500/20"
                       >
                         Удалить

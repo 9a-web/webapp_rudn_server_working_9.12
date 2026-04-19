@@ -191,14 +191,18 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
     dirty.current = false; // FIX-3: сразу false, чтобы handleDone не пытался сохранить
     setHasContent(false);
     setShowClearConfirm(false);
-    if (hapticFeedback) hapticFeedback('notification', 'success');
+    // Haptic — только после успеха API вызова (ниже)
     if (user?.id) {
       try {
         await friendsAPI.clearGraffiti(user.id);
+        if (hapticFeedback) hapticFeedback('notification', 'success');
         if (onGraffitiSaved) onGraffitiSaved(null);
       } catch (err) {
         console.error('[GraffitiEditor] Clear error:', err);
+        if (hapticFeedback) hapticFeedback('notification', 'error');
       }
+    } else if (hapticFeedback) {
+      hapticFeedback('impact', 'light');
     }
     clearingRef.current = false;
   }, [saveSnapshot, hapticFeedback, user?.id, onGraffitiSaved]);
@@ -256,9 +260,12 @@ const GraffitiEditor = ({ isOpen, onClose, user, userSettings, profilePhoto, hap
       cancelledRef.current = false;
       setLoading(true);
       try {
-        const data = await friendsAPI.getGraffiti(user.id);
+        const data = await friendsAPI.getGraffiti(user.id, user.id);
         if (cancelledRef.current) { setLoading(false); resolve(false); return; }
-        if (!data?.graffiti_data)  { setLoading(false); resolve(false); return; }
+        // Валидация формата data URL (защита от битых данных)
+        const raw = data?.graffiti_data;
+        const isValid = raw && /^data:image\/(png|jpeg|jpg|webp);base64,/.test(raw);
+        if (!isValid) { setLoading(false); resolve(false); return; }
 
         const img = new window.Image();
         loadedImgRef.current = img;

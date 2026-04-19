@@ -22,6 +22,24 @@ const DEFAULT_ERASER = 14;
 const COLORS = ['#F8B94C', '#EF4444', '#3B82F6', '#10B981', '#A855F7', '#EC4899', '#FFFFFF', '#6B7280'];
 const MAX_HISTORY = 30;
 
+const formatWallUpdatedAt = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'только что';
+    if (diffMin < 60) return `${diffMin} мин назад`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH} ч назад`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD} дн назад`;
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  } catch { return ''; }
+};
+
 const WallGraffiti = ({ user, profileOwnerId, hapticFeedback }) => {
   const isOwner = String(user?.id) === String(profileOwnerId);
 
@@ -126,21 +144,44 @@ const WallGraffiti = ({ user, profileOwnerId, hapticFeedback }) => {
   }, []);
 
   // === Fetch wall graffiti ===
+  const [lastDrawnBy, setLastDrawnBy] = useState(null);   // telegram_id
+  const [lastDrawnName, setLastDrawnName] = useState(null);
+  const [lastDrawnAt, setLastDrawnAt] = useState(null);
+  const fetchAbortRef = useRef(null);
+
   const fetchData = useCallback(async () => {
     if (!profileOwnerId) return;
+
+    // Cancel previous fetch if in flight
+    if (fetchAbortRef.current) fetchAbortRef.current.aborted = true;
+    const token = { aborted: false };
+    fetchAbortRef.current = token;
+
     setDataLoading(true);
     try {
-      const res = await friendsAPI.getWallGraffiti(profileOwnerId);
-      setWallData(res?.wall_graffiti_data || null);
+      const res = await friendsAPI.getWallGraffiti(profileOwnerId, user?.id);
+      if (token.aborted) return;
+      // Валидация data-URL: принимаем только whitelist форматы
+      const data = res?.wall_graffiti_data || '';
+      const isValidDataUrl = data && /^data:image\/(png|jpeg|jpg|webp);base64,/.test(data);
+      setWallData(isValidDataUrl ? data : null);
       setAccessEnabled(!!res?.wall_graffiti_access);
+      setLastDrawnBy(res?.wall_graffiti_last_drawn_by || null);
+      setLastDrawnName(res?.wall_graffiti_last_drawn_name || null);
+      setLastDrawnAt(res?.wall_graffiti_updated_at || null);
     } catch (err) {
-      console.error('[WallGraffiti] Fetch error:', err);
+      if (!token.aborted) console.error('[WallGraffiti] Fetch error:', err);
     } finally {
-      setDataLoading(false);
+      if (!token.aborted) setDataLoading(false);
     }
-  }, [profileOwnerId]);
+  }, [profileOwnerId, user?.id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    return () => {
+      if (fetchAbortRef.current) fetchAbortRef.current.aborted = true;
+    };
+  }, [fetchData]);
 
   // === Toggle access ===
   const toggleAccess = useCallback(async () => {
@@ -300,6 +341,10 @@ const WallGraffiti = ({ user, profileOwnerId, hapticFeedback }) => {
       await friendsAPI.saveWallGraffiti(profileOwnerId, user.id, url);
       dirty.current = false;
       setWallData(url);
+      // Обновляем метаданные последнего рисования локально
+      setLastDrawnBy(user.id);
+      setLastDrawnName(null);  // Фронт не знает имя сам — refetch не обязателен
+      setLastDrawnAt(new Date().toISOString());
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
@@ -520,16 +565,62 @@ const WallGraffiti = ({ user, profileOwnerId, hapticFeedback }) => {
           }}
         >
           {wallData ? (
-            <img
-              src={wallData}
-              alt="Wall graffiti"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
+            <>
+              <img
+                src={wallData}
+                alt="Wall graffiti"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+              {/* Footer с автором граффити */}
+              {(lastDrawnName || lastDrawnAt) && (
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  padding: '10px 14px',
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  pointerEvents: 'none',
+                }}>
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,0.85)',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                    maxWidth: '60%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {lastDrawnName && lastDrawnBy === user?.id
+                      ? 'Вы нарисовали'
+                      : lastDrawnName
+                        ? `Нарисовал(а) ${lastDrawnName}`
+                        : null}
+                  </span>
+                  {lastDrawnAt && (
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 500,
+                      fontSize: '10px',
+                      color: 'rgba(255,255,255,0.6)',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                    }}>
+                      {formatWallUpdatedAt(lastDrawnAt)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
           ) : (
             <div style={{
               width: '100%',

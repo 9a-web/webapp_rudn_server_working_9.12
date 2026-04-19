@@ -19,13 +19,19 @@ const api = axios.create({
 // Обработка ошибок
 const handleError = (error) => {
   if (error.response) {
-    const detail = error.response.data.detail;
-    if (Array.isArray(detail)) {
-      throw new Error(detail.map(err => err.msg).join('; '));
-    }
-    throw new Error(detail || 'Ошибка сервера');
+    const detail = error.response.data?.detail;
+    const message = Array.isArray(detail)
+      ? detail.map(err => err.msg).join('; ')
+      : (detail || 'Ошибка сервера');
+    const err = new Error(message);
+    err.status = error.response.status;
+    err.detail = detail;
+    throw err;
   } else if (error.request) {
-    throw new Error('Ошибка сети');
+    const err = new Error('Ошибка сети. Проверьте подключение.');
+    err.status = 0;
+    err.isNetworkError = true;
+    throw err;
   }
   throw new Error(error.message);
 };
@@ -206,9 +212,43 @@ export const friendsAPI = {
     }
   },
 
-  getProfileQR: async (telegramId) => {
+  getProfileQR: async (telegramId, requesterTelegramId = null) => {
     try {
-      const response = await api.get(`/profile/${telegramId}/qr`);
+      const params = requesterTelegramId ? `?requester_telegram_id=${requesterTelegramId}` : '';
+      const response = await api.get(`/profile/${telegramId}/qr${params}`);
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  // Активность пользователя — заменяет side-effect на GET /profile
+  pingActivity: async (telegramId) => {
+    try {
+      const response = await api.post('/profile/activity-ping', { telegram_id: telegramId });
+      return response.data;
+    } catch (error) {
+      // Не кидаем — это не блокирующая ошибка
+      return null;
+    }
+  },
+
+  // Зарегистрировать просмотр профиля (счётчик у владельца)
+  registerProfileView: async (ownerTelegramId, viewerTelegramId) => {
+    try {
+      const response = await api.post(`/profile/${ownerTelegramId}/view`, {
+        viewer_telegram_id: viewerTelegramId,
+      });
+      return response.data;
+    } catch (error) {
+      return null; // не блокирующая
+    }
+  },
+
+  // Ссылка для шаринга профиля
+  getShareLink: async (telegramId) => {
+    try {
+      const response = await api.get(`/profile/${telegramId}/share-link`);
       return response.data;
     } catch (error) {
       handleError(error);
@@ -252,9 +292,10 @@ export const friendsAPI = {
 
   // ========== Header Граффити (шапка) ==========
 
-  getGraffiti: async (telegramId) => {
+  getGraffiti: async (telegramId, requesterTelegramId = null) => {
     try {
-      const response = await api.get(`/profile/${telegramId}/graffiti`);
+      const params = requesterTelegramId ? `?requester_telegram_id=${requesterTelegramId}` : '';
+      const response = await api.get(`/profile/${telegramId}/graffiti${params}`);
       return response.data;
     } catch (error) {
       handleError(error);
@@ -289,9 +330,10 @@ export const friendsAPI = {
 
   // ========== Wall Граффити (стена под шапкой) ==========
 
-  getWallGraffiti: async (telegramId) => {
+  getWallGraffiti: async (telegramId, requesterTelegramId = null) => {
     try {
-      const response = await api.get(`/profile/${telegramId}/wall-graffiti`);
+      const params = requesterTelegramId ? `?requester_telegram_id=${requesterTelegramId}` : '';
+      const response = await api.get(`/profile/${telegramId}/wall-graffiti${params}`);
       return response.data;
     } catch (error) {
       handleError(error);
@@ -338,9 +380,10 @@ export const friendsAPI = {
 
   // ========== Кастомный аватар ==========
 
-  getCustomAvatar: async (telegramId) => {
+  getCustomAvatar: async (telegramId, requesterTelegramId = null) => {
     try {
-      const response = await api.get(`/profile/${telegramId}/avatar`);
+      const params = requesterTelegramId ? `?requester_telegram_id=${requesterTelegramId}` : '';
+      const response = await api.get(`/profile/${telegramId}/avatar${params}`);
       return response.data;
     } catch (error) {
       handleError(error);

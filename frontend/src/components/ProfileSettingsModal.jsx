@@ -1,14 +1,18 @@
 /**
  * ProfileSettingsModal - Настройки приватности
- * Полноэкранный стиль, как ProfileEditScreen
+ * Полноэкранный стиль как ProfileEditScreen, с дебаунс-автосохранением
+ * и неблокирующим тостом о статусе.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChevronLeft, Eye, Users, Trophy, Calendar, Radio, ShieldCheck
+import {
+  ChevronLeft, Eye, Users, Trophy, Calendar, Radio, ShieldCheck,
+  CheckCircle2, AlertCircle, Loader2, Info,
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
+
+const DEBOUNCE_MS = 600;
 
 const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedback }) => {
   const telegramId = user?.id;
@@ -20,80 +24,97 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
     show_achievements: true,
     show_schedule: true,
   });
-  const [originalSettings, setOriginalSettings] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+  const [lastError, setLastError] = useState(null);
+
+  const debounceTimer = useRef(null);
+  const latestSettings = useRef(privacySettings);
+  const mountedRef = useRef(true);
+
+  // Обновляем ref при каждом изменении
+  useEffect(() => {
+    latestSettings.current = privacySettings;
+  }, [privacySettings]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
 
   // Загрузка настроек
   useEffect(() => {
     const load = async () => {
       if (!isOpen || !telegramId) return;
       setIsLoading(true);
-      setIsDirty(false);
+      setSaveStatus('idle');
+      setLastError(null);
       try {
         const data = await friendsAPI.getPrivacySettings(telegramId);
-        setPrivacySettings(data);
-        setOriginalSettings(JSON.stringify(data));
+        if (mountedRef.current) setPrivacySettings(data);
       } catch (err) {
         console.error('Error loading privacy settings:', err);
+        if (mountedRef.current) {
+          setLastError('Не удалось загрузить настройки');
+          setSaveStatus('error');
+        }
       } finally {
-        setIsLoading(false);
+        if (mountedRef.current) setIsLoading(false);
       }
     };
     load();
   }, [isOpen, telegramId]);
 
-  // Сохранение
-  const handleSave = async () => {
-    setIsSaving(true);
+  const doSave = useCallback(async (settings) => {
+    if (!telegramId) return;
+    setSaveStatus('saving');
     try {
-      await friendsAPI.updatePrivacySettings(telegramId, privacySettings);
+      await friendsAPI.updatePrivacySettings(telegramId, settings);
+      if (!mountedRef.current) return;
+      setSaveStatus('saved');
       hapticFeedback?.('notification', 'success');
-      setSaved(true);
-      setIsDirty(false);
-      setOriginalSettings(JSON.stringify(privacySettings));
-      setTimeout(() => setSaved(false), 2000);
+      // Сбрасываем "saved" через 1.5с — вернёмся в idle
+      setTimeout(() => {
+        if (mountedRef.current && saveStatus !== 'pending') setSaveStatus('idle');
+      }, 1500);
     } catch (err) {
       console.error('Error saving privacy:', err);
+      if (!mountedRef.current) return;
+      setLastError(err?.message || 'Ошибка сохранения');
+      setSaveStatus('error');
       hapticFeedback?.('notification', 'error');
-    } finally {
-      setIsSaving(false);
     }
-  };
+  }, [telegramId, hapticFeedback, saveStatus]);
+
+  const scheduleSave = useCallback((newSettings) => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    setSaveStatus('pending');
+    debounceTimer.current = setTimeout(() => {
+      doSave(newSettings);
+    }, DEBOUNCE_MS);
+  }, [doSave]);
 
   const toggle = (key) => {
     hapticFeedback?.('impact', 'light');
-    setPrivacySettings(prev => ({ ...prev, [key]: !prev[key] }));
-    setSaved(false);
-    setIsDirty(true);
+    setPrivacySettings(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      scheduleSave(next);
+      return next;
+    });
   };
 
-  // Bug 16: Автосохранение при закрытии с обратной связью пользователю
-  const [autoSaveError, setAutoSaveError] = useState(false);
-
   const handleClose = async () => {
-    if (isDirty && !isSaving) {
+    // Если есть отложенное сохранение — дождёмся
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
       try {
-        setAutoSaveError(false);
-        await friendsAPI.updatePrivacySettings(telegramId, privacySettings);
-        hapticFeedback?.('notification', 'success');
-        setIsDirty(false);
-      } catch (err) {
-        console.error('Auto-save privacy on close error:', err);
-        setAutoSaveError(true);
-        hapticFeedback?.('notification', 'error');
-        // Показываем ошибку на 2 секунды перед закрытием
-        setTimeout(() => {
-          setAutoSaveError(false);
-          setIsDirty(false);
-          onClose();
-        }, 2000);
-        return; // Не закрываем сразу — даём увидеть ошибку
-      }
+        await doSave(latestSettings.current);
+      } catch {/* noop, пользователь увидит toast */}
     }
-    setIsDirty(false);
     onClose();
   };
 
@@ -111,6 +132,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
       title: 'Показывать в поиске',
       description: 'Другие могут найти вас',
       activeColor: '#3B82F6',
+      warning: !privacySettings.show_in_search ? 'Профиль скрыт из поиска — QR-код и прямые ссылки недоступны для не-друзей' : null,
     },
     {
       key: 'show_friends_list',
@@ -211,12 +233,10 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
                 justifyContent: 'center',
                 padding: '48px 0',
               }}>
-                <div style={{
+                <Loader2 style={{
                   width: '32px',
                   height: '32px',
-                  border: '2px solid rgba(248,185,76,0.3)',
-                  borderTopColor: '#F8B94C',
-                  borderRadius: '50%',
+                  color: '#F8B94C',
                   animation: 'spin 0.8s linear infinite',
                 }} />
               </div>
@@ -226,137 +246,190 @@ const ProfileSettingsModal = ({ isOpen, onClose, user, userSettings, hapticFeedb
                 const isEnabled = privacySettings[item.key];
 
                 return (
-                  <motion.button
-                    key={item.key}
-                    initial={{ opacity: 0, x: -15 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.15 + idx * 0.05 }}
-                    onClick={() => toggle(item.key)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '14px',
-                      width: '100%',
-                      padding: '14px 16px',
-                      borderRadius: '16px',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: `1.5px solid ${isEnabled ? `${item.activeColor}25` : 'rgba(255,255,255,0.06)'}`,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'border-color 0.2s, background 0.2s',
-                    }}
-                  >
-                    {/* Иконка */}
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '12px',
-                      backgroundColor: isEnabled ? `${item.activeColor}15` : 'rgba(255,255,255,0.04)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      transition: 'background-color 0.2s',
-                    }}>
-                      <Icon style={{
-                        width: '18px',
-                        height: '18px',
-                        color: isEnabled ? item.activeColor : 'rgba(255,255,255,0.25)',
-                        transition: 'color 0.2s',
-                      }} />
-                    </div>
-
-                    {/* Текст */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{
-                        fontFamily: "'Poppins', sans-serif",
-                        fontWeight: 600,
-                        fontSize: '14px',
-                        color: '#F4F3FC',
-                        lineHeight: 1.2,
+                  <React.Fragment key={item.key}>
+                    <motion.button
+                      initial={{ opacity: 0, x: -15 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.15 + idx * 0.05 }}
+                      onClick={() => toggle(item.key)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        width: '100%',
+                        padding: '14px 16px',
+                        borderRadius: '16px',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: `1.5px solid ${isEnabled ? `${item.activeColor}25` : 'rgba(255,255,255,0.06)'}`,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'border-color 0.2s, background 0.2s',
+                      }}
+                    >
+                      {/* Иконка */}
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '12px',
+                        backgroundColor: isEnabled ? `${item.activeColor}15` : 'rgba(255,255,255,0.04)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'background-color 0.2s',
                       }}>
-                        {item.title}
-                      </span>
-                      <span style={{
-                        fontFamily: "'Poppins', sans-serif",
-                        fontWeight: 400,
-                        fontSize: '11px',
-                        color: 'rgba(255,255,255,0.3)',
-                        lineHeight: 1.2,
-                      }}>
-                        {item.description}
-                      </span>
-                    </div>
+                        <Icon style={{
+                          width: '18px',
+                          height: '18px',
+                          color: isEnabled ? item.activeColor : 'rgba(255,255,255,0.25)',
+                          transition: 'color 0.2s',
+                        }} />
+                      </div>
 
-                    {/* Toggle */}
-                    <div style={{
-                      width: '44px',
-                      height: '26px',
-                      borderRadius: '13px',
-                      padding: '3px',
-                      backgroundColor: isEnabled ? item.activeColor : 'rgba(255,255,255,0.1)',
-                      transition: 'background-color 0.25s ease',
-                      flexShrink: 0,
-                    }}>
+                      {/* Текст */}
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '14px',
+                          color: '#F4F3FC',
+                          lineHeight: 1.2,
+                        }}>
+                          {item.title}
+                        </span>
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 400,
+                          fontSize: '11px',
+                          color: 'rgba(255,255,255,0.3)',
+                          lineHeight: 1.3,
+                        }}>
+                          {item.description}
+                        </span>
+                      </div>
+
+                      {/* Toggle */}
+                      <div style={{
+                        width: '44px',
+                        height: '26px',
+                        borderRadius: '13px',
+                        padding: '3px',
+                        backgroundColor: isEnabled ? item.activeColor : 'rgba(255,255,255,0.1)',
+                        transition: 'background-color 0.25s ease',
+                        flexShrink: 0,
+                      }}>
+                        <motion.div
+                          animate={{ x: isEnabled ? 18 : 0 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '10px',
+                            backgroundColor: '#FFFFFF',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                          }}
+                        />
+                      </div>
+                    </motion.button>
+
+                    {/* Предупреждение под пунктом если активно */}
+                    {item.warning && (
                       <motion.div
-                        animate={{ x: isEnabled ? 18 : 0 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
                         style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '10px',
-                          backgroundColor: '#FFFFFF',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                          display: 'flex',
+                          gap: '8px',
+                          padding: '10px 14px',
+                          marginTop: '-2px',
+                          marginBottom: '6px',
+                          borderRadius: '12px',
+                          backgroundColor: 'rgba(251, 191, 36, 0.08)',
+                          border: '1px solid rgba(251, 191, 36, 0.15)',
+                          overflow: 'hidden',
                         }}
-                      />
-                    </div>
-                  </motion.button>
+                      >
+                        <Info style={{ width: '14px', height: '14px', color: '#FBBF24', flexShrink: 0, marginTop: '1px' }} />
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontSize: '11px',
+                          color: 'rgba(251, 191, 36, 0.8)',
+                          lineHeight: 1.4,
+                        }}>
+                          {item.warning}
+                        </span>
+                      </motion.div>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
           </div>
 
-          {/* Кнопка сохранения — фиксированная снизу, видна только при изменениях */}
+          {/* Toast со статусом сохранения — фиксированный снизу */}
           <AnimatePresence>
-            {(isDirty || saved) && (
+            {saveStatus !== 'idle' && (
               <motion.div
+                key={saveStatus}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.22 }}
                 style={{
                   position: 'absolute',
-                  bottom: 0,
+                  bottom: 24,
                   left: 0,
                   right: 0,
-                  padding: '16px 24px 32px',
-                  background: 'linear-gradient(transparent, #000000 30%)',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
                 }}
               >
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving || isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    borderRadius: '16px',
-                    border: 'none',
-                    cursor: isSaving || isLoading ? 'not-allowed' : 'pointer',
-                    fontFamily: "'Poppins', sans-serif",
-                    fontWeight: 600,
-                    fontSize: '15px',
-                    color: '#000000',
-                    background: saved
-                      ? '#22C55E'
-                      : isSaving || isLoading
-                        ? 'rgba(255,255,255,0.1)'
-                        : 'linear-gradient(135deg, #F8B94C 0%, #FFBE4E 100%)',
-                    transition: 'opacity 0.2s',
-                    opacity: isSaving || isLoading ? 0.5 : 1,
-                  }}
-                >
-                  {saved ? '✓ Сохранено' : isSaving ? 'Сохранение...' : autoSaveError ? '✗ Ошибка сохранения' : 'Сохранить изменения'}
-                </button>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  borderRadius: '999px',
+                  backgroundColor: saveStatus === 'error' ? 'rgba(239, 68, 68, 0.92)'
+                                 : saveStatus === 'saved' ? 'rgba(34, 197, 94, 0.92)'
+                                 : 'rgba(0, 0, 0, 0.85)',
+                  backdropFilter: 'blur(12px)',
+                  border: saveStatus === 'error' ? '1px solid rgba(239, 68, 68, 0.3)'
+                         : saveStatus === 'saved' ? '1px solid rgba(34, 197, 94, 0.3)'
+                         : '1px solid rgba(255,255,255,0.1)',
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '13px',
+                  color: '#FFFFFF',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+                }}>
+                  {saveStatus === 'pending' && (
+                    <>
+                      <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 0.8s linear infinite' }} />
+                      Изменения…
+                    </>
+                  )}
+                  {saveStatus === 'saving' && (
+                    <>
+                      <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 0.8s linear infinite' }} />
+                      Сохраняем…
+                    </>
+                  )}
+                  {saveStatus === 'saved' && (
+                    <>
+                      <CheckCircle2 style={{ width: '14px', height: '14px' }} />
+                      Сохранено
+                    </>
+                  )}
+                  {saveStatus === 'error' && (
+                    <>
+                      <AlertCircle style={{ width: '14px', height: '14px' }} />
+                      {lastError || 'Не удалось сохранить'}
+                    </>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

@@ -1940,6 +1940,17 @@ class UserProfilePublic(BaseModel):
     
     # Статус дружбы с текущим пользователем
     friendship_status: Optional[str] = None  # "friend", "pending_incoming", "pending_outgoing", "blocked", None
+    
+    # --- Расширенные поля (v2) ---
+    # Счётчик просмотров профиля (видит только владелец)
+    profile_views_count: Optional[int] = None
+    # Флаги приватности для UI (чтобы фронт мог показать "Скрыто по приватности" вместо пустоты)
+    friends_list_hidden: bool = False
+    achievements_hidden: bool = False
+    online_status_hidden: bool = False
+    schedule_hidden: bool = False
+    # Профиль скрыт из поиска (анонимный просмотр заблокирован, но владелец может смотреть)
+    is_hidden_from_search: bool = False
 
 
 class FriendCard(BaseModel):
@@ -2033,8 +2044,14 @@ class FriendScheduleResponse(BaseModel):
     friend_name: str
     group_name: Optional[str] = None
     schedule: List[dict]  # ScheduleEvent objects
-    common_classes: List[dict] = []  # Общие пары
-    common_breaks: List[str] = []  # Общие окна
+    common_classes: List[dict] = []  # Общие пары (по времени или в одной группе)
+    common_breaks: List[dict] = []  # Общие окна между парами
+    # Дополнительные метаданные
+    same_group: bool = False
+    viewer_group_name: Optional[str] = None
+    date: Optional[str] = None
+    day_name: Optional[str] = None
+    is_own_schedule: bool = False
 
 
 class PrivacySettingsUpdate(BaseModel):

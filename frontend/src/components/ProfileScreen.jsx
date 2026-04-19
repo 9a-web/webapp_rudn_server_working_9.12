@@ -148,8 +148,19 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
     if (isOpen && user?.id) {
       levelUpShownRef.current = false; // Сбрасываем при каждом открытии
       refreshProfile();
+      // Activity ping — заменяет старый side-effect в GET /profile
+      friendsAPI.pingActivity(user.id).catch(() => {});
     }
   }, [isOpen, user?.id, refreshProfile]);
+
+  // Периодический ping активности каждые 2 минуты, пока профиль открыт
+  useEffect(() => {
+    if (!isOpen || !user?.id) return;
+    const interval = setInterval(() => {
+      friendsAPI.pingActivity(user.id).catch(() => {});
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isOpen, user?.id]);
 
   // Bug 11: Сброс состояния при закрытии профиля
   useEffect(() => {
@@ -188,13 +199,22 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const sheetY = useMotionValue(0);
   const sheetBg = useTransform(sheetY, [0, 400], ['rgba(0,0,0,0.6)', 'rgba(0,0,0,0)']);
 
+  const [qrError, setQrError] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+
   const loadQRData = useCallback(async () => {
     if (!user?.id) return;
+    setQrLoading(true);
+    setQrError(null);
     try {
-      const data = await friendsAPI.getProfileQR(user.id);
+      // Передаём requester_telegram_id — владелец всегда получит QR даже если show_in_search=false
+      const data = await friendsAPI.getProfileQR(user.id, user.id);
       setQrData(data);
     } catch (err) {
       console.error('Failed to load QR data:', err);
+      setQrError(err?.message || 'Не удалось загрузить QR');
+    } finally {
+      setQrLoading(false);
     }
   }, [user?.id]);
 
@@ -1369,8 +1389,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 backgroundColor: '#FFFFFF',
                 borderRadius: '16px',
                 padding: '16px',
+                position: 'relative',
+                minWidth: '232px',
+                minHeight: '232px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}>
-                {qrData?.qr_data ? (
+                {qrData?.qr_data && !qrError ? (
                   <QRCodeSVG
                     value={qrData.qr_data}
                     size={200}
@@ -1378,6 +1404,41 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     fgColor="#000000"
                     level="M"
                   />
+                ) : qrError ? (
+                  <div style={{
+                    width: '200px',
+                    height: '200px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    color: '#555',
+                    fontFamily: "'Poppins', sans-serif",
+                    textAlign: 'center',
+                    padding: '8px',
+                  }}>
+                    <span style={{ fontSize: '28px' }}>⚠️</span>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#333' }}>Ошибка</span>
+                    <span style={{ fontSize: '11px', color: '#888', lineHeight: 1.3 }}>{qrError}</span>
+                    <button
+                      onClick={() => loadQRData()}
+                      style={{
+                        marginTop: '4px',
+                        padding: '6px 12px',
+                        borderRadius: '999px',
+                        background: '#F8B94C',
+                        border: 'none',
+                        fontFamily: "'Poppins', sans-serif",
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: '#fff',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Повторить
+                    </button>
+                  </div>
                 ) : (
                   <div style={{
                     width: '200px',
@@ -1389,7 +1450,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                     fontFamily: "'Poppins', sans-serif",
                     fontSize: '14px',
                   }}>
-                    Загрузка...
+                    {qrLoading ? 'Загрузка...' : '—'}
                   </div>
                 )}
               </div>
@@ -1403,6 +1464,45 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               }}>
                 Покажи друзьям для добавления
               </span>
+
+              {/* Кнопка "Поделиться" */}
+              {qrData?.qr_data && (
+                <button
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    const text = qrData.display_name ? `Добавь меня в друзья: ${qrData.display_name}` : 'Добавь меня в друзья';
+                    const url = qrData.qr_data;
+                    try {
+                      if (window.Telegram?.WebApp?.openTelegramLink) {
+                        window.Telegram.WebApp.openTelegramLink(
+                          `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+                        );
+                      } else if (navigator.share) {
+                        navigator.share({ title: 'Мой профиль', text, url });
+                      } else {
+                        navigator.clipboard?.writeText(url);
+                      }
+                    } catch (e) { console.warn('share failed', e); }
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '999px',
+                    background: 'linear-gradient(135deg, #F8B94C 0%, #FFD586 100%)',
+                    border: 'none',
+                    fontFamily: "'Poppins', sans-serif",
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#1A1A1A',
+                    cursor: 'pointer',
+                    boxShadow: '0 6px 18px rgba(248, 185, 76, 0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  Поделиться ссылкой
+                </button>
+              )}
             </motion.div>
           </motion.div>
         )}
