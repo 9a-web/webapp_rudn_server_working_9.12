@@ -63,8 +63,8 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
                 <Logo3D
                   size={112}
                   material="metal"
-                  animate="float"
-                  animateSpeed={1.2}
+                  animate="spin"
+                  animateSpeed={2}
                   smoothness={0.2}
                   metalness={0.85}
                   roughness={0.25}

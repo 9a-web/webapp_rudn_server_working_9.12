@@ -47,8 +47,8 @@ export const LoadingScreen = ({ message = 'Загрузка...' }) => {
           <Logo3D
             size={200}
             material="metal"
-            animate="float"
-            animateSpeed={1.4}
+            animate="spin"
+            animateSpeed={2}
             smoothness={0.2}
             metalness={0.9}
             roughness={0.25}
