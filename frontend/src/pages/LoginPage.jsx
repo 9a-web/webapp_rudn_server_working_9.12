@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AuthLayout from '../components/auth/AuthLayout';
 import EmailLoginForm from '../components/auth/EmailLoginForm';
 import TelegramLoginWidget from '../components/auth/TelegramLoginWidget';
+import TelegramWebAppLoginButton from '../components/auth/TelegramWebAppLoginButton';
 import VkLoginButton from '../components/auth/VkLoginButton';
 import QRLoginBlock from '../components/auth/QRLoginBlock';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,7 +36,14 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const continueUrl = searchParams.get('continue') || '/';
-  const { applyQRResult, loginTelegramWidget, isAuthenticated, needsOnboarding } = useAuth();
+  const { applyQRResult, loginTelegramWidget, loginTelegramWebApp, isAuthenticated, needsOnboarding } = useAuth();
+
+  // Определяем запущен ли сейчас WebApp внутри Telegram (наличие initData).
+  // Если да — вместо iframe-widget'а показываем кнопку «Войти через Telegram»,
+  // которая использует уже имеющийся initData (безопасно — бэкенд проверит HMAC).
+  const isInsideTelegram = typeof window !== 'undefined'
+    && !!window.Telegram?.WebApp?.initData
+    && window.Telegram.WebApp.initData.length > 0;
 
   useEffect(() => {
     authAPI.config().then(setConfig).catch((e) => setConfigError(e.message));
@@ -59,6 +67,12 @@ const LoginPage = () => {
     } catch (e) {
       alert('Telegram login: ' + e.message);
     }
+  };
+
+  const handleTelegramWebApp = async (initData, startParam) => {
+    // onSubmit из TelegramWebAppLoginButton — ошибки всплывают обратно в UI кнопки.
+    await loginTelegramWebApp(initData, startParam);
+    handleSuccess();
   };
 
   const handleQRSuccess = async ({ access_token, user }) => {
@@ -121,18 +135,29 @@ const LoginPage = () => {
 
           {tab === 'telegram' && (
             <div className="flex flex-col items-center gap-4 py-2">
-              <div className="text-center text-sm text-white/70">
-                Вход через официальный Telegram Login Widget
-              </div>
-              <TelegramLoginWidget
-                botUsername={config?.telegram_bot_username}
-                onAuth={handleTelegramWidget}
-              />
-              {!config && !configError && (
-                <div className="text-xs text-white/40">Получение конфигурации...</div>
-              )}
-              {configError && (
-                <div className="text-xs text-red-400">{configError}</div>
+              {isInsideTelegram ? (
+                <>
+                  <div className="text-center text-sm text-white/70">
+                    Вы уже в Telegram — данные профиля подгрузятся автоматически.
+                  </div>
+                  <TelegramWebAppLoginButton onSubmit={handleTelegramWebApp} />
+                </>
+              ) : (
+                <>
+                  <div className="text-center text-sm text-white/70">
+                    Вход через официальный Telegram Login Widget
+                  </div>
+                  <TelegramLoginWidget
+                    botUsername={config?.telegram_bot_username}
+                    onAuth={handleTelegramWidget}
+                  />
+                  {!config && !configError && (
+                    <div className="text-xs text-white/40">Получение конфигурации...</div>
+                  )}
+                  {configError && (
+                    <div className="text-xs text-red-400">{configError}</div>
+                  )}
+                </>
               )}
             </div>
           )}

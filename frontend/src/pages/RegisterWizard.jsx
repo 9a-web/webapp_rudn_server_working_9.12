@@ -18,6 +18,7 @@ import AuthInput from '../components/auth/AuthInput';
 import AuthButton from '../components/auth/AuthButton';
 import EmailRegisterForm from '../components/auth/EmailRegisterForm';
 import TelegramLoginWidget from '../components/auth/TelegramLoginWidget';
+import TelegramWebAppLoginButton from '../components/auth/TelegramWebAppLoginButton';
 import VkLoginButton from '../components/auth/VkLoginButton';
 import UsernameField from '../components/auth/UsernameField';
 import GroupSelector from '../components/GroupSelector';
@@ -57,7 +58,13 @@ const StepIndicator = ({ current, total }) => (
 // ================= STEP 1: Выбор способа авторизации =================
 const Step1AuthMethod = ({ config, onNext }) => {
   const [method, setMethod] = useState(null);
-  const { loginTelegramWidget } = useAuth();
+  const { loginTelegramWidget, loginTelegramWebApp } = useAuth();
+
+  // Внутри Telegram WebApp (есть initData) не показываем iframe-widget,
+  // а используем initData напрямую через кнопку «Войти через Telegram».
+  const isInsideTelegram = typeof window !== 'undefined'
+    && !!window.Telegram?.WebApp?.initData
+    && window.Telegram.WebApp.initData.length > 0;
 
   if (method === 'email') {
     return (
@@ -85,20 +92,37 @@ const Step1AuthMethod = ({ config, onNext }) => {
         >
           <ArrowLeft size={14} /> Назад
         </button>
-        <div className="text-center text-sm text-white/70">
-          Нажмите кнопку Telegram ниже — профиль создастся автоматически.
-        </div>
-        <TelegramLoginWidget
-          botUsername={config?.telegram_bot_username}
-          onAuth={async (data) => {
-            try {
-              const resp = await loginTelegramWidget(data);
-              onNext(resp);
-            } catch (e) {
-              alert('Telegram: ' + e.message);
-            }
-          }}
-        />
+        {isInsideTelegram ? (
+          <>
+            <div className="text-center text-sm text-white/70">
+              Данные Telegram-профиля подгрузятся автоматически.
+            </div>
+            <TelegramWebAppLoginButton
+              label="Войти через Telegram"
+              onSubmit={async (initData, startParam) => {
+                const resp = await loginTelegramWebApp(initData, startParam);
+                onNext(resp);
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <div className="text-center text-sm text-white/70">
+              Нажмите кнопку Telegram ниже — профиль создастся автоматически.
+            </div>
+            <TelegramLoginWidget
+              botUsername={config?.telegram_bot_username}
+              onAuth={async (data) => {
+                try {
+                  const resp = await loginTelegramWidget(data);
+                  onNext(resp);
+                } catch (e) {
+                  alert('Telegram: ' + e.message);
+                }
+              }}
+            />
+          </>
+        )}
       </div>
     );
   }
