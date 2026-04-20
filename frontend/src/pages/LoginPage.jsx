@@ -9,7 +9,6 @@ import { Mail, QrCode, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthLayout from '../components/auth/AuthLayout';
 import EmailLoginForm from '../components/auth/EmailLoginForm';
-import TelegramLoginWidget from '../components/auth/TelegramLoginWidget';
 import TelegramWebAppLoginButton from '../components/auth/TelegramWebAppLoginButton';
 import VkLoginButton from '../components/auth/VkLoginButton';
 import QRLoginBlock from '../components/auth/QRLoginBlock';
@@ -37,11 +36,11 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const continueUrl = searchParams.get('continue') || '/';
-  const { applyQRResult, loginTelegramWidget, loginTelegramWebApp, isAuthenticated, needsOnboarding } = useAuth();
+  const { applyQRResult, loginTelegramWebApp, isAuthenticated, needsOnboarding } = useAuth();
 
-  // Реактивно определяем, запущено ли приложение внутри Telegram WebApp.
-  // Если да — вместо iframe-widget'а показываем кнопку «Войти через Telegram».
-  const { inside: isInsideTelegram, initData: tgInitData } = useIsInsideTelegram();
+  // Для подсказки в UI («Вы уже в Telegram...»). Детекция мягкая — если false,
+  // кнопка всё равно рендерится и сама покажет нужную подсказку.
+  const { inside: isInsideTelegram } = useIsInsideTelegram();
 
   useEffect(() => {
     authAPI.config().then(setConfig).catch((e) => setConfigError(e.message));
@@ -56,15 +55,6 @@ const LoginPage = () => {
 
   const handleSuccess = () => {
     // Auth redirect будет автоматический через useEffect выше
-  };
-
-  const handleTelegramWidget = async (widgetData) => {
-    try {
-      await loginTelegramWidget(widgetData);
-      handleSuccess();
-    } catch (e) {
-      alert('Telegram login: ' + e.message);
-    }
   };
 
   const handleTelegramWebApp = async (initData, startParam) => {
@@ -133,29 +123,14 @@ const LoginPage = () => {
 
           {tab === 'telegram' && (
             <div className="flex flex-col items-center gap-4 py-2">
-              {isInsideTelegram ? (
-                <>
-                  <div className="text-center text-sm text-white/70">
-                    Вы уже в Telegram — данные профиля подгрузятся автоматически.
-                  </div>
-                  <TelegramWebAppLoginButton onSubmit={handleTelegramWebApp} />
-                </>
-              ) : (
-                <>
-                  <div className="text-center text-sm text-white/70">
-                    Вход через официальный Telegram Login Widget
-                  </div>
-                  <TelegramLoginWidget
-                    botUsername={config?.telegram_bot_username}
-                    onAuth={handleTelegramWidget}
-                  />
-                  {!config && !configError && (
-                    <div className="text-xs text-white/40">Получение конфигурации...</div>
-                  )}
-                  {configError && (
-                    <div className="text-xs text-red-400">{configError}</div>
-                  )}
-                </>
+              <div className="text-center text-sm text-white/70">
+                {isInsideTelegram
+                  ? 'Вы уже в Telegram — данные профиля подгрузятся автоматически.'
+                  : 'Вход через Telegram. Внутри бота — в один клик.'}
+              </div>
+              <TelegramWebAppLoginButton onSubmit={handleTelegramWebApp} />
+              {configError && (
+                <div className="text-xs text-red-400">{configError}</div>
               )}
             </div>
           )}

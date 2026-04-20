@@ -17,7 +17,6 @@ import AuthLayout from '../components/auth/AuthLayout';
 import AuthInput from '../components/auth/AuthInput';
 import AuthButton from '../components/auth/AuthButton';
 import EmailRegisterForm from '../components/auth/EmailRegisterForm';
-import TelegramLoginWidget from '../components/auth/TelegramLoginWidget';
 import TelegramWebAppLoginButton from '../components/auth/TelegramWebAppLoginButton';
 import VkLoginButton from '../components/auth/VkLoginButton';
 import UsernameField from '../components/auth/UsernameField';
@@ -59,9 +58,10 @@ const StepIndicator = ({ current, total }) => (
 // ================= STEP 1: Выбор способа авторизации =================
 const Step1AuthMethod = ({ config, onNext }) => {
   const [method, setMethod] = useState(null);
-  const { loginTelegramWidget, loginTelegramWebApp } = useAuth();
+  const { loginTelegramWebApp } = useAuth();
 
-  // Внутри Telegram WebApp не показываем iframe-widget — используем initData напрямую.
+  // Подсказка для UI — кнопка «Войти через Telegram» рендерится всегда;
+  // если юзер не в Telegram, сама кнопка покажет инструкцию открыть через бота.
   const { inside: isInsideTelegram } = useIsInsideTelegram();
 
   if (method === 'email') {
@@ -90,37 +90,18 @@ const Step1AuthMethod = ({ config, onNext }) => {
         >
           <ArrowLeft size={14} /> Назад
         </button>
-        {isInsideTelegram ? (
-          <>
-            <div className="text-center text-sm text-white/70">
-              Данные Telegram-профиля подгрузятся автоматически.
-            </div>
-            <TelegramWebAppLoginButton
-              label="Войти через Telegram"
-              onSubmit={async (initData, startParam) => {
-                const resp = await loginTelegramWebApp(initData, startParam);
-                onNext(resp);
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <div className="text-center text-sm text-white/70">
-              Нажмите кнопку Telegram ниже — профиль создастся автоматически.
-            </div>
-            <TelegramLoginWidget
-              botUsername={config?.telegram_bot_username}
-              onAuth={async (data) => {
-                try {
-                  const resp = await loginTelegramWidget(data);
-                  onNext(resp);
-                } catch (e) {
-                  alert('Telegram: ' + e.message);
-                }
-              }}
-            />
-          </>
-        )}
+        <div className="text-center text-sm text-white/70">
+          {isInsideTelegram
+            ? 'Данные Telegram-профиля подгрузятся автоматически.'
+            : 'Внутри бота регистрация пройдёт в один клик — откройте WebApp через @бота.'}
+        </div>
+        <TelegramWebAppLoginButton
+          label="Войти через Telegram"
+          onSubmit={async (initData, startParam) => {
+            const resp = await loginTelegramWebApp(initData, startParam);
+            onNext(resp);
+          }}
+        />
       </div>
     );
   }
