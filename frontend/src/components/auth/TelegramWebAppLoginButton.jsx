@@ -86,8 +86,34 @@ const TelegramWebAppLoginButton = ({ onSubmit, label = 'Войти через Te
       </button>
 
       {!initData && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          Не обнаружен Telegram WebApp. Откройте приложение через @бота.
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 space-y-1">
+          <div className="font-semibold">Нет данных Telegram WebApp</div>
+          <div className="text-amber-200/90">
+            {tg && tg.platform && tg.platform !== 'unknown' ? (
+              <>
+                Похоже, вы открыли страницу в встроенном браузере Telegram, а не как Mini App.
+                Чтобы войти автоматически — откройте приложение через <b>Menu Button</b> бота
+                или кнопку <b>WebApp</b> в меню.
+              </>
+            ) : (
+              <>
+                Скрипт Telegram SDK не передал initData. Откройте приложение через @бота,
+                а не по прямой ссылке.
+              </>
+            )}
+          </div>
+          {/* Диагностика — помогает понять, что именно поймал браузер */}
+          <details className="mt-1.5 text-amber-200/70">
+            <summary className="cursor-pointer select-none text-[11px] underline">Диагностика</summary>
+            <div className="mt-1 break-all font-mono text-[10px] leading-snug">
+              <div>hasTG: {String(!!tg)}</div>
+              <div>version: {tg?.version || '—'}</div>
+              <div>platform: {tg?.platform || '—'}</div>
+              <div>initDataLen: {(tg?.initData || '').length}</div>
+              <div>hasUser: {String(!!tg?.initDataUnsafe?.user)}</div>
+              <div>colorScheme: {tg?.colorScheme || '—'}</div>
+            </div>
+          </details>
         </div>
       )}
 
