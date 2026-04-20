@@ -11,7 +11,7 @@ import time
 from typing import Dict, Any, Optional
 
 # Backend URL from frontend/.env
-BACKEND_URL = "https://rudn-server-3.preview.emergentagent.com/api"
+BACKEND_URL = "https://rudn-server-app-1.preview.emergentagent.com/api"
 
 # Test data - existing user in database
 TEST_UID = "777000111"
@@ -192,7 +192,7 @@ class Stage2Tester:
             
             # Check link formats
             expected_telegram_link = f"https://t.me/{{bot}}/app?startapp=friend_{TEST_TELEGRAM_ID}"
-            expected_public_link = f"https://rudn-server-3.preview.emergentagent.com/u/{TEST_UID}"
+            expected_public_link = f"https://rudn-server-app-1.preview.emergentagent.com/u/{TEST_UID}"
             
             # For telegram_link, we just check it contains the friend parameter
             if f"friend_{TEST_TELEGRAM_ID}" in data.get("telegram_link", ""):
