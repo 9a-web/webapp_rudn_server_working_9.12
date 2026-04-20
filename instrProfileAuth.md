@@ -1,8 +1,8 @@
 # 📋 План реализации: Публичный профиль + Мульти-авторизация
 
 **Создан:** 2025-07-17  
-**Обновляется:** в реальном времени по мере выполнения  
-**Статус:** 🔄 В работе — Stage 1
+**Обновлён (аудит кода):** 2025-07 — синхронизация статусов с фактическим состоянием репозитория  
+**Статус:** 🔄 В работе — Stage 4 (Stage 1-3 завершены, Stage 5 частично)
 
 ---
 
@@ -218,7 +218,19 @@
 - [x] `auto_frontend_testing_agent` — все формы логина + регистрации
 - [x] Проверка Telegram WebApp автологина
 
-**Статус Stage 3:** ⏳ Не начато (начнём после Stage 1+2)
+**Статус Stage 3:** ✅ Завершено (подтверждено аудитом 2025-07)
+
+**Артефакты в репозитории:**
+- `frontend/src/contexts/AuthContext.jsx` (230 LOC) — провайдер + axios interceptor + 401 handler
+- `frontend/src/services/authAPI.js` (73 LOC) — API клиент `/api/auth/*`
+- `frontend/src/utils/authStorage.js` — localStorage wrapper + `isTokenValid`
+- `frontend/src/constants/publicBase.js` — `PUBLIC_BASE_URL = REACT_APP_BACKEND_URL`
+- `frontend/src/pages/LoginPage.jsx` (164 LOC) — 4 способа логина
+- `frontend/src/pages/RegisterWizard.jsx` (383 LOC) — многошаговая регистрация
+- `frontend/src/pages/VKCallbackPage.jsx` (113 LOC) — OAuth callback
+- `frontend/src/pages/QRConfirmPage.jsx` (109 LOC) — подтверждение QR
+- `frontend/src/components/auth/` — 10 компонентов (AuthButton, AuthGate, AuthInput, AuthLayout, EmailLoginForm, EmailRegisterForm, QRLoginBlock, TelegramLoginWidget, UsernameField, VkLoginButton)
+- `App.jsx` обёрнут в `AuthProvider`, корневой маршрут `/` защищён `AuthGate`, добавлены маршруты `/login`, `/register`, `/auth/vk/callback`, `/auth/qr/confirm`
 
 ---
 
@@ -236,12 +248,14 @@
 - [ ] В `ProfileScreen.jsx` / `ProfileModal.jsx` — кнопка «Копировать ссылку на профиль»
 - [ ] Формат: `${PUBLIC_BASE_URL}/u/{uid}`
 - [ ] Использовать `navigator.clipboard` + Telegram share (если в WebApp)
+- [ ] **Сейчас:** кнопка «Поделиться ссылкой» (ProfileScreen.jsx:1469-1506) использует устаревший `qrData.qr_data` — заменить на новый share-link из `/api/u/{uid}/share-link` или построить на клиенте из `PUBLIC_BASE_URL + "/u/" + uid`
 
 ### 4.3 Тестирование Stage 4
 - [ ] Открыть `/u/{uid}` в инкогнито → должен показать публичный профиль
 - [ ] Проверить уважение privacy-настроек
+- [ ] Проверить TTL-дедупликацию просмотров (коллекция `profile_views`, 7 дней)
 
-**Статус Stage 4:** ⏳ Не начато
+**Статус Stage 4:** ⏳ Не начато (Backend готов — фронтенд нужно дописать)
 
 ---
 
@@ -250,25 +264,29 @@
 **Цель:** Полноценная работа Telegram Login Widget + VK ID + QR.
 
 ### 5.1 Telegram Login Widget
-- [ ] Frontend: `TelegramLoginWidget.jsx` компонент (script + data-telegram-login)
-- [ ] Backend: HMAC проверка hash
-- [ ] Bot: `/setdomain` через BotFather — установить `REACT_APP_BACKEND_URL` (инструкция в README)
+- [x] Frontend: `TelegramLoginWidget.jsx` компонент (script + data-telegram-login + fallback-подсказка при отсутствии домена)
+- [x] Backend: HMAC проверка hash (`verify_telegram_login_widget_hash` в `auth_utils.py`)
+- [x] Backend: дополнительная валидация Telegram WebApp `initData` (`verify_telegram_webapp_init_data`) + endpoint `POST /api/auth/login/telegram-webapp`
+- [ ] Bot: `/setdomain` через BotFather — установить `REACT_APP_BACKEND_URL` (инструкция в README, требует действий пользователя вне кода)
 
 ### 5.2 VK ID OAuth
-- [ ] Frontend: кнопка «Войти через VK» → redirect
-- [ ] Backend: `/api/auth/vk-callback` — обмен code на token → профиль VK
-- [ ] Использовать существующие `VK_APP_ID`, `VK_CLIENT_SECRET` из `.env`
+- [x] Frontend: кнопка «Войти через VK» (`VkLoginButton.jsx`) → redirect на VK OAuth
+- [x] Frontend: страница `/auth/vk/callback` (`VKCallbackPage.jsx`) — обмен code через backend
+- [x] Backend: `POST /api/auth/login/vk` — обмен code на access_token + профиль VK
+- [x] Используются существующие `VK_APP_ID`, `VK_CLIENT_SECRET`, `VK_REDIRECT_URI` из `.env`
 
 ### 5.3 QR Cross-Device Login
-- [ ] Frontend `/login`: QR-код с `qr_token`
-- [ ] Polling статуса каждые 2 сек
-- [ ] Mobile app (Telegram WebApp) с камерой: скан → POST `/api/auth/login/qr/{token}/confirm`
-- [ ] После confirm: сайт получает JWT
+- [x] Frontend `/login`: QR-блок (`QRLoginBlock.jsx`) с `qr_token` + polling каждые ~2 сек
+- [x] Frontend: страница `/auth/qr/confirm` (`QRConfirmPage.jsx`) для подтверждения с авторизованного устройства
+- [x] Backend: `POST /api/auth/login/qr/init`, `GET /api/auth/login/qr/{token}/status`, `POST /api/auth/login/qr/{token}/confirm`
+- [x] Коллекция `auth_qr_sessions` / `qr_login_sessions` с TTL 5 минут
 
 ### 5.4 Тестирование Stage 5
-- [ ] E2E flow для каждого провайдера
+- [ ] E2E flow для каждого провайдера (auto_frontend_testing_agent)
+- [ ] Проверка реальной привязки домена Telegram Login Widget (после `/setdomain`)
+- [ ] Проверка VK OAuth с реальным `VK_APP_ID` и корректным redirect_uri
 
-**Статус Stage 5:** ⏳ Не начато
+**Статус Stage 5:** 🟡 Частично готово — код написан (frontend + backend), осталась настройка домена бота и E2E-тестирование
 
 ---
 
@@ -277,10 +295,16 @@
 ```
 [████████████] Stage 1: Backend Auth Foundation — ✅ Завершено
 [████████████] Stage 2: Public Profile by UID + Bugfixes — ✅ Завершено
-[            ] Stage 3: Frontend Auth Flow
-[            ] Stage 4: Public Profile Page
-[            ] Stage 5: External Integrations
+[████████████] Stage 3: Frontend Auth Flow — ✅ Завершено (подтверждено аудитом)
+[            ] Stage 4: Public Profile Page /u/{uid} — ⏳ Не начато (backend готов)
+[██████▒▒▒▒▒▒] Stage 5: External Integrations — 🟡 Код готов, нужно E2E + /setdomain
 ```
+
+### Ближайшие шаги
+
+1. **Stage 4** — создать `frontend/src/pages/PublicProfilePage.jsx`, добавить маршрут `/u/:uid` в `App.jsx` (БЕЗ `AuthGate` — публичная страница), заменить кнопку «Поделиться» в `ProfileScreen.jsx` на использование `${PUBLIC_BASE_URL}/u/${uid}` вместо `qrData.qr_data`.
+2. **Stage 5.1** — инструкция пользователю выполнить `/setdomain` в BotFather (это единственное, что осталось из кода).
+3. **Stage 5.4** — запустить `auto_frontend_testing_agent` для E2E-теста всех 4 auth-провайдеров.
 
 ---
 
@@ -299,3 +323,6 @@
 | 2025-07-17 | Stage 2: Добавлен helper `resolve_user_by_uid()` для унификации поиска |
 | 2025-07-17 | Stage 2: Исправлены BUG-1 (share-link для владельца), BUG-2 (activity-ping требует JWT), BUG-3 (view не считает для скрытых), BUG-4 (qr для анонимов), BUG-5 (created_at всем), BUG-7 (добавлены uid/username в UserProfilePublic), BUG-8 (TTL index 7 дней) |
 | 2025-07-17 | Stage 2: Backend успешно протестирован (27/27 tests passed, 100%) |
+| 2025-07 (аудит) | Stage 3: подтверждён как ✅ завершённый — исправлено противоречивое «Не начато» при всех отмеченных [x]. В репо присутствуют: `AuthContext.jsx` (230 LOC), `authAPI.js`, `authStorage.js`, `publicBase.js`, 4 страницы (`LoginPage`, `RegisterWizard`, `VKCallbackPage`, `QRConfirmPage`), 10 компонентов в `components/auth/`, `AuthGate` защищает `/` в `App.jsx` |
+| 2025-07 (аудит) | Stage 5: переквалифицирован в 🟡 «Частично готово» — frontend+backend код для Telegram Login Widget, VK ID OAuth и QR Cross-Device Login реализован; осталось `/setdomain` в BotFather и E2E-тестирование |
+| 2025-07 (аудит) | `AI_CONTEXT.md` обновлён: 15→20 backend файлов, 17 675→19 826 LOC server.py, 230→249 Pydantic моделей, 268→304 endpoints, 46→53 коллекции MongoDB (добавлены `users`, `auth_sessions`, `auth_qr_sessions`, `qr_login_sessions`, `profile_views`, `xp_events`), описана структура `pages/`, `components/auth/`, `AuthContext`, обновлены переменные `.env` (`JWT_*`, `TELEGRAM_BOT_USERNAME`) |
