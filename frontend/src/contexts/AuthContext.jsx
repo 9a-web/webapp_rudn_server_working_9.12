@@ -10,8 +10,18 @@
  *  - подгружает /me при маунте если есть валидный токен
  *  - устанавливает interceptor на axios (Authorization header)
  *  - слушает событие `auth:unauthorized` (401) → logout
+ *
+ * 🔒 Stage 6 hardening:
+ *  - При 500/network ошибке /me НЕ сбрасываем сессию (используем
+ *    закэшированного user'а, чтобы не разлогинивать пользователя при
+ *    кратковременном отказе backend).
+ *  - Только 401/403/404 → clearAuth.
+ *  - QR auto-confirm flag для seamless UX cross-device flow.
  */
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, {
+  createContext, useContext, useEffect, useState,
+  useCallback, useRef, useMemo,
+} from 'react';
 import axios from 'axios';
 import { authAPI } from '../services/authAPI';
 import {
@@ -28,6 +38,10 @@ export const useAuth = () => {
   return ctx;
 };
 
+// HTTP коды, при которых считаем токен невалидным и сбрасываем сессию.
+// 500/502/503/504/408/network errors — НЕ сбрасываем (это временный отказ).
+const AUTH_INVALIDATE_STATUSES = new Set([401, 403]);
+
 // --- Глобальный axios interceptor (ставится один раз) ---
 let _interceptorsInstalled = false;
 const installAxiosInterceptors = (onUnauthorized) => {
@@ -37,7 +51,9 @@ const installAxiosInterceptors = (onUnauthorized) => {
   axios.interceptors.request.use((config) => {
     const token = getToken();
     if (token && !config.headers?.Authorization) {
+      // eslint-disable-next-line no-param-reassign
       config.headers = config.headers || {};
+      // eslint-disable-next-line no-param-reassign
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -46,11 +62,12 @@ const installAxiosInterceptors = (onUnauthorized) => {
   axios.interceptors.response.use(
     (r) => r,
     (err) => {
-      if (err?.response?.status === 401 && getToken()) {
-        // Не на auth-эндпоинтах — иначе login/email при неверном пароле тоже сбрасывает сессию
+      const status = err?.response?.status;
+      if (status === 401 && getToken()) {
+        // На /login и /register 401 — это «неверный пароль», сессию не ломаем.
         const url = err.config?.url || '';
         if (!url.includes('/api/auth/login') && !url.includes('/api/auth/register')) {
-          try { onUnauthorized?.(); } catch {}
+          try { onUnauthorized?.(); } catch { /* noop */ }
         }
       }
       return Promise.reject(err);
@@ -67,38 +84,38 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState(null);
+  const [meError, setMeError] = useState(null); // network/500 errors при /me
   const didInitRef = useRef(false);
+
+  const clearLocalAuth = useCallback(() => {
+    clearAuth();
+    setTokenState(null);
+    setUserState(null);
+  }, []);
 
   const applyAuth = useCallback((newToken, newUser) => {
     setToken(newToken);
     setStoredUser(newUser);
     setTokenState(newToken);
     setUserState(newUser);
+    setMeError(null);
   }, []);
 
   const logout = useCallback(async () => {
     try { await authAPI.logout(); } catch { /* ignore */ }
-    clearAuth();
-    setTokenState(null);
-    setUserState(null);
-  }, []);
+    clearLocalAuth();
+  }, [clearLocalAuth]);
 
   // Install interceptors once on mount
   useEffect(() => {
     installAxiosInterceptors(() => {
-      clearAuth();
-      setTokenState(null);
-      setUserState(null);
+      clearLocalAuth();
     });
 
-    const onUnauth = () => {
-      clearAuth();
-      setTokenState(null);
-      setUserState(null);
-    };
+    const onUnauth = () => clearLocalAuth();
     window.addEventListener('auth:unauthorized', onUnauth);
     return () => window.removeEventListener('auth:unauthorized', onUnauth);
-  }, []);
+  }, [clearLocalAuth]);
 
   const refreshMe = useCallback(async () => {
     const t = getToken();
@@ -110,18 +127,28 @@ export const AuthProvider = ({ children }) => {
       const me = await authAPI.me();
       setUserState(me);
       setStoredUser(me);
+      setMeError(null);
       return me;
     } catch (e) {
-      if (e?.message?.includes('401') || /не найден|авторизац/i.test(e?.message || '')) {
-        clearAuth();
-        setTokenState(null);
-        setUserState(null);
+      // Опираемся на response.status (надёжнее чем regex по сообщению).
+      // axios-interceptor сам сбросит state при 401 — здесь дублируем для надёжности.
+      const status = e?.response?.status;
+      if (status && AUTH_INVALIDATE_STATUSES.has(status)) {
+        clearLocalAuth();
+      } else if (status === 404) {
+        // user удалён → токен бесполезен
+        clearLocalAuth();
+      } else {
+        // Сетевая или серверная ошибка — НЕ сбрасываем сессию,
+        // оставляем закэшированного user'а из localStorage. UX:
+        // пользователь не разлогинивается из-за кратковременного отказа.
+        setMeError(e?.message || 'Network error');
       }
       return null;
     } finally {
       setInitializing(false);
     }
-  }, []);
+  }, [clearLocalAuth]);
 
   // Initial /me fetch
   useEffect(() => {
@@ -132,15 +159,27 @@ export const AuthProvider = ({ children }) => {
       refreshMe();
     } else {
       if (token && !isTokenValid(token)) {
-        clearAuth();
-        setTokenState(null);
-        setUserState(null);
+        clearLocalAuth();
       }
       setInitializing(false);
     }
-  }, [token, refreshMe]);
+  }, [token, refreshMe, clearLocalAuth]);
 
   // --- Auth methods ---
+
+  const _stashUsernameConflict = (resp) => {
+    try {
+      if (resp?.suggested_username_taken) {
+        sessionStorage.setItem(
+          'auth:username_conflict',
+          JSON.stringify({
+            value: resp.suggested_username_taken,
+            ts: Date.now(),
+          }),
+        );
+      }
+    } catch { /* noop */ }
+  };
 
   const loginEmail = async (email, password) => {
     setLoading(true); setError(null);
@@ -157,23 +196,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const resp = await authAPI.registerEmail(email, password, first_name, last_name);
       applyAuth(resp.access_token, resp.user);
+      _stashUsernameConflict(resp);
       return resp;
     } catch (e) { setError(e.message); throw e; }
     finally { setLoading(false); }
-  };
-
-  const _stashUsernameConflict = (resp) => {
-    try {
-      if (resp?.suggested_username_taken) {
-        sessionStorage.setItem(
-          'auth:username_conflict',
-          JSON.stringify({
-            value: resp.suggested_username_taken,
-            ts: Date.now(),
-          })
-        );
-      }
-    } catch { /* noop */ }
   };
 
   const loginTelegramWidget = async (widgetData) => {
@@ -221,8 +247,8 @@ export const AuthProvider = ({ children }) => {
     return updated;
   };
 
-  const value = {
-    token, user, loading, initializing, error,
+  const value = useMemo(() => ({
+    token, user, loading, initializing, error, meError,
     isAuthenticated: !!token && !!user,
     needsOnboarding: !!user && (user.registration_step ?? 0) > 0,
     loginEmail,
@@ -235,7 +261,8 @@ export const AuthProvider = ({ children }) => {
     refreshMe,
     updateProfile,
     clearError: () => setError(null),
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [token, user, loading, initializing, error, meError]);
 
   return (
     <AuthContext.Provider value={value}>

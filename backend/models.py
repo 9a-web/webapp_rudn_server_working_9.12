@@ -2808,12 +2808,15 @@ class UserPublic(BaseModel):
 
     facultet_id: Optional[str] = None
     facultet_name: Optional[str] = None
+    level_id: Optional[str] = None
+    form_code: Optional[str] = None
     kurs: Optional[str] = None
     group_id: Optional[str] = None
     group_name: Optional[str] = None
 
     registration_step: int = 0
     created_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
 
 
 # --- Auth requests ---

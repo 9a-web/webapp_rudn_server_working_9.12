@@ -8,6 +8,9 @@
 - get_current_user_* — FastAPI dependencies
 - verify_telegram_login_widget_hash — валидация Telegram Login Widget
 - normalize_username — нормализация и валидация username
+- pseudo_tid_from_uid — псевдо-telegram_id для синхронизации user_settings
+- choose_primary_auth — детерминированный выбор primary_auth по приоритету
+- check_rate_limit — простой in-memory rate limiter (dual key: IP/email)
 """
 
 import hmac
@@ -15,8 +18,10 @@ import hashlib
 import logging
 import re
 import secrets
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any
+from time import monotonic
+from typing import Optional, Dict, Any, Iterable, Tuple
 
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -56,6 +61,50 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # Диапазон: 900 млн возможных UID (достаточно)
 UID_MIN = 100_000_000
 UID_MAX = 999_999_999
+
+# Диапазон значений псевдо-telegram_id (для email/VK/QR-регистраций без реального
+# Telegram-аккаунта). Используется как ключ в legacy-коллекции `user_settings`,
+# чтобы не ломать совместимость со старыми endpoints. 10^10 + uid гарантирует,
+# что значение находится ВНЕ диапазона реальных Telegram ID (которые ≤ 10^10).
+PSEUDO_TID_OFFSET = 10_000_000_000  # 10^10
+
+
+def pseudo_tid_from_uid(uid: str | int) -> int:
+    """Возвращает синтетический telegram_id для user_settings, гарантированно
+    не пересекающийся с реальными Telegram ID.
+
+    Пример: uid="123456789" → 10_123_456_789.
+    """
+    return PSEUDO_TID_OFFSET + int(uid)
+
+
+def is_pseudo_tid(tid: Optional[int]) -> bool:
+    """True если значение — наш синтетический ключ, а не реальный Telegram ID."""
+    if tid is None:
+        return False
+    try:
+        return int(tid) >= PSEUDO_TID_OFFSET
+    except (TypeError, ValueError):
+        return False
+
+
+def effective_tid_for_user(user_doc: dict) -> Optional[int]:
+    """Возвращает ключ для user_settings: реальный telegram_id если есть, иначе pseudo."""
+    if not user_doc:
+        return None
+    tid = user_doc.get("telegram_id")
+    if tid:
+        try:
+            return int(tid)
+        except (TypeError, ValueError):
+            pass
+    uid = user_doc.get("uid")
+    if not uid:
+        return None
+    try:
+        return pseudo_tid_from_uid(uid)
+    except (TypeError, ValueError):
+        return None
 
 
 async def generate_uid(db) -> str:
@@ -140,6 +189,73 @@ async def resolve_safe_username(
     return normalized, None
 
 
+# ----- Auth providers — приоритет / детерминированный выбор -----
+
+# Канонический список + приоритет (для выбора primary_auth при unlink).
+PROVIDERS: Tuple[str, ...] = ("email", "telegram", "vk")
+# Приоритет совпадает с порядком: email > telegram > vk.
+# Логика: email — самый «надёжный» (под контролем владельца, требует пароль),
+# telegram — второй (привязан к номеру телефона), vk — третий.
+
+
+def choose_primary_auth(active_providers: Iterable[str], fallback: str = "email") -> str:
+    """Возвращает наиболее приоритетный провайдер из списка `active_providers`.
+
+    Используется при unlink, чтобы детерминированно установить новый primary_auth.
+    """
+    active_set = set(active_providers or [])
+    for p in PROVIDERS:
+        if p in active_set:
+            return p
+    return fallback
+
+
+# ----- Rate Limiter (in-memory, общий) -----
+# Простой лимитер с двумя ключами (например, IP и email одновременно).
+# Для production желательно заменить на Redis/slowapi, но для in-process FastAPI
+# инстансов этого достаточно. Память автоматически освобождается через cutoff.
+
+_rate_limits: dict = defaultdict(list)  # bucket:key -> list[timestamps]
+
+
+def check_rate_limit(
+    key: str,
+    bucket: str,
+    max_requests: int,
+    window_seconds: int,
+) -> bool:
+    """Возвращает True если лимит НЕ превышен, False — превышен.
+
+    Имя bucket'а должно быть стабильным (например, `login_email_ip`,
+    `login_email_email`), key — уникальное значение в этом bucket'е (IP или email).
+    """
+    now = monotonic()
+    full_key = f"{bucket}:{key or 'unknown'}"
+    arr = _rate_limits[full_key]
+    cutoff = now - window_seconds
+    arr_filtered = [t for t in arr if t > cutoff]
+    if len(arr_filtered) >= max_requests:
+        _rate_limits[full_key] = arr_filtered
+        return False
+    arr_filtered.append(now)
+    _rate_limits[full_key] = arr_filtered
+    return True
+
+
+def get_client_ip(request: Request) -> str:
+    """Аккуратно достаёт client IP, учитывая X-Forwarded-For (за прокси/ingress)."""
+    if not request:
+        return "unknown"
+    # Уважаем X-Forwarded-For (если за прокси — первый элемент = реальный клиент)
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP", "")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+
 # ----- JWT -----
 
 
@@ -148,6 +264,7 @@ def create_jwt(
     telegram_id: Optional[int] = None,
     providers: Optional[list] = None,
     expire_days: Optional[int] = None,
+    jti: Optional[str] = None,
 ) -> str:
     """Создаёт JWT access token.
 
@@ -156,6 +273,7 @@ def create_jwt(
         telegram_id: telegram_id если привязан
         providers: список активных auth-провайдеров
         expire_days: переопределение срока жизни
+        jti: уникальный идентификатор токена (для будущего blacklist/sessions API)
     """
     now = datetime.now(timezone.utc)
     exp = now + timedelta(days=expire_days or JWT_EXPIRE_DAYS)
@@ -165,6 +283,7 @@ def create_jwt(
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
         "providers": providers or [],
+        "jti": jti or secrets.token_urlsafe(12),
     }
     if telegram_id:
         payload["tid"] = int(telegram_id)
@@ -179,34 +298,29 @@ def decode_jwt(token: str) -> Dict[str, Any]:
 
 # ----- FastAPI dependencies -----
 
-# Для endpoint'ов, где auth опциональна
-_bearer_scheme_optional = HTTPBearer(auto_error=False)
-# Для endpoint'ов, где auth обязательна
-_bearer_scheme_required = HTTPBearer(auto_error=True)
+# Один scheme — auto_error=False. `required` сам проверяет наличие токена и
+# бросает 401, если его нет. Это даёт возможность поддержать также `?access_token=`
+# query parameter (для случаев когда клиент не может выставить заголовок —
+# например, внутренние ссылки на изображения или legacy fetch без axios-interceptor).
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _extract_token(request: Request, credentials: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
+    if credentials and credentials.scheme and credentials.scheme.lower() == "bearer":
+        return credentials.credentials
+    return request.query_params.get("access_token")
 
 
 async def get_current_user_optional(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme_optional),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> Optional[Dict[str, Any]]:
-    """Опциональная аутентификация — возвращает payload или None.
-
-    Токен можно передать как:
-    - Authorization: Bearer <token>
-    - ?access_token=<token> (для случаев когда заголовки недоступны)
-    """
-    token: Optional[str] = None
-    if credentials and credentials.scheme.lower() == "bearer":
-        token = credentials.credentials
-    else:
-        token = request.query_params.get("access_token")
-
+    """Опциональная аутентификация — возвращает payload или None."""
+    token = _extract_token(request, credentials)
     if not token:
         return None
-
     try:
-        payload = decode_jwt(token)
-        return payload
+        return decode_jwt(token)
     except JWTError as e:
         logger.debug(f"Invalid JWT (optional): {e}")
         return None
@@ -214,18 +328,16 @@ async def get_current_user_optional(
 
 async def get_current_user_required(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme_optional),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> Dict[str, Any]:
     """Обязательная аутентификация — бросает 401 при отсутствии/невалидности токена."""
-    token: Optional[str] = None
-    if credentials and credentials.scheme.lower() == "bearer":
-        token = credentials.credentials
-    else:
-        token = request.query_params.get("access_token")
-
+    token = _extract_token(request, credentials)
     if not token:
-        raise HTTPException(status_code=401, detail="Требуется авторизация (токен отсутствует)")
-
+        raise HTTPException(
+            status_code=401,
+            detail="Требуется авторизация (токен отсутствует)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
         payload = decode_jwt(token)
         if not payload.get("sub"):
@@ -233,7 +345,11 @@ async def get_current_user_required(
         return payload
     except JWTError as e:
         logger.debug(f"Invalid JWT (required): {e}")
-        raise HTTPException(status_code=401, detail=f"Невалидный или истёкший токен")
+        raise HTTPException(
+            status_code=401,
+            detail="Невалидный или истёкший токен",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 # ----- Telegram Login Widget validation -----

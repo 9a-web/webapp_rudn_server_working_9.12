@@ -7,6 +7,14 @@
  *
  * Проверка идёт не только один раз, но и с небольшой задержкой — потому что
  * SDK иногда заполняет initData чуть позже монтирования React.
+ *
+ * Возвращаемое значение:
+ *   {
+ *     inside, isInside,        // bool — мы в Telegram?
+ *     initData, user, platform,
+ *     tg,                      // window.Telegram.WebApp instance (или null)
+ *     ready,                   // bool — окончательный ответ дан (поллинг завершён)
+ *   }
  */
 import { useEffect, useState } from 'react';
 
@@ -15,29 +23,36 @@ const NATIVE_PLATFORMS = new Set([
   'weba', 'webk',
 ]);
 
+// Таймаут поллинга — после этого считаем что SDK не загрузился (мы вне Telegram).
+const READY_TIMEOUT_MS = 1500;
+
 export const readTelegramWebAppContext = () => {
-  if (typeof window === 'undefined') return { inside: false, initData: '', user: null };
+  if (typeof window === 'undefined') {
+    return { inside: false, initData: '', user: null, platform: 'unknown', tg: null };
+  }
   const tg = window.Telegram?.WebApp;
-  if (!tg) return { inside: false, initData: '', user: null };
+  if (!tg) return { inside: false, initData: '', user: null, platform: 'unknown', tg: null };
 
   const initData = tg.initData || '';
   const platform = tg.platform || 'unknown';
   const user = tg.initDataUnsafe?.user || null;
 
-  // Основной критерий — непустой initData. Но если юзер открыл WebApp и
-  // SDK ещё не отработал HMAC (initData пустой), но platform уже native —
-  // всё равно считаем, что внутри Telegram и показываем соответствующий UI.
   const inside = (initData && initData.length > 0)
     || (platform !== 'unknown' && NATIVE_PLATFORMS.has(platform));
 
-  return { inside, initData, user, platform };
+  return { inside, initData, user, platform, tg };
 };
 
 const useIsInsideTelegram = () => {
   const [ctx, setCtx] = useState(() => readTelegramWebAppContext());
+  const [ready, setReady] = useState(() => {
+    // Если на mount уже всё ясно — ready=true сразу.
+    const initial = readTelegramWebAppContext();
+    return !!(initial.inside && initial.initData);
+  });
 
+  // Лог для отладки (один раз на изменение)
   useEffect(() => {
-    // Логируем один раз для отладки: видно в консоли Telegram WebApp.
     // eslint-disable-next-line no-console
     console.log('[useIsInsideTelegram]', {
       inside: ctx.inside,
@@ -45,34 +60,44 @@ const useIsInsideTelegram = () => {
       initDataLen: ctx.initData?.length || 0,
       hasUser: !!ctx.user,
       hasTG: typeof window !== 'undefined' && !!window.Telegram?.WebApp,
+      ready,
     });
-  }, [ctx.inside, ctx.initData, ctx.platform, ctx.user]);
+  }, [ctx.inside, ctx.initData, ctx.platform, ctx.user, ready]);
 
   useEffect(() => {
-    // Повторно проверяем через короткие интервалы — на случай, если
-    // telegram-web-app.js ещё не успел положить initData к моменту mount'а.
-    if (ctx.inside && ctx.initData) return undefined;
+    // Если уже определились — больше не поллим.
+    if (ready) return undefined;
 
     let cancelled = false;
-    const check = () => {
+    const check = (markReady = false) => {
       if (cancelled) return;
       const next = readTelegramWebAppContext();
-      if (next.inside !== ctx.inside || next.initData !== ctx.initData) {
+      const changed = next.inside !== ctx.inside || next.initData !== ctx.initData;
+      if (changed) {
         setCtx(next);
       }
+      if (markReady || (next.inside && next.initData)) {
+        setReady(true);
+      }
     };
-    const t1 = setTimeout(check, 100);
-    const t2 = setTimeout(check, 500);
-    const t3 = setTimeout(check, 1500);
+
+    const t1 = setTimeout(() => check(false), 100);
+    const t2 = setTimeout(() => check(false), 500);
+    const t3 = setTimeout(() => check(true), READY_TIMEOUT_MS);
+
     return () => {
       cancelled = true;
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [ctx.inside, ctx.initData]);
+  }, [ctx.inside, ctx.initData, ready]);
 
-  return ctx;
+  return {
+    ...ctx,
+    isInside: ctx.inside,
+    ready,
+  };
 };
 
 export default useIsInsideTelegram;

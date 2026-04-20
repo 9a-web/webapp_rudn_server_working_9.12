@@ -67,7 +67,9 @@ const TelegramLoginWidget = ({ botUsername, onAuth, size = 'large', requestAcces
       <div
         ref={containerRef}
         className="flex min-h-[44px] items-center justify-center"
+        role="region"
         aria-label="Telegram Login Widget"
+        aria-busy={!widgetLoaded && !error}
       />
       {!widgetLoaded && !error && (
         <div className="mt-2 flex items-center justify-center gap-2 text-xs text-white/40">

@@ -200,7 +200,10 @@ const Step2Profile = ({ user, onComplete, onBack }) => {
     } catch { /* noop */ }
   }, []);
 
-  const canSubmit = (usernameValid || !!username) && firstName.trim().length > 0;
+  // canSubmit: (a) username пустой ИЛИ valid, И (b) firstName заполнен.
+  // Это устраняет противоречие: раньше при невалидном username кнопка
+  // оставалась активной (`!!username` всегда true), а handleNext бросал error.
+  const canSubmit = (!username || usernameValid) && firstName.trim().length > 0;
 
   const handleNext = async () => {
     setError(null);

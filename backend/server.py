@@ -662,6 +662,11 @@ async def create_indexes():
         await safe_create_index(db.profile_views, [("viewed_telegram_id", 1), ("viewer_telegram_id", 1)])
         # Mapping user_settings.uid
         await safe_create_index(db.user_settings, "uid", sparse=True)
+
+        # Auth events log (security audit) - индекс для запросов и TTL 30 дней
+        await safe_create_index(db.auth_events, [("uid", 1), ("ts", -1)])
+        await safe_create_index(db.auth_events, [("event", 1), ("ts", -1)])
+        await safe_create_index(db.auth_events, "ts", expireAfterSeconds=30 * 24 * 3600)
         
         logger.info("✅ Database indexes created successfully")
     except Exception as e:

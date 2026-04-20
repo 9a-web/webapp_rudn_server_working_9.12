@@ -6,8 +6,14 @@
  * Поддерживает два режима (читает `vk_oauth_mode` из sessionStorage):
  *   - `login` (по умолчанию): обычный вход/регистрация → POST /api/auth/login/vk
  *   - `link` : привязка VK к уже авторизованному аккаунту → POST /api/auth/link/vk
+ *
+ * 🔒 Stage 6:
+ *  - `processedRef` guard защищает от повторного выполнения в React StrictMode
+ *    (useEffect срабатывает дважды → VK code одноразовый → второй обмен падает).
+ *  - Поддержка `?continue=...` через sessionStorage (vk_oauth_continue).
+ *  - Усилена CSRF-проверка state.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, XCircle, CheckCircle2 } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -24,10 +30,17 @@ const VKCallbackPage = () => {
   const [mode, setMode] = useState('login');
   const { loginVK, refreshMe } = useAuth();
 
+  // 🛡️ StrictMode guard — useEffect выполнится дважды в dev,
+  // а VK code одноразовый. Гарантируем единственный exchange.
+  const processedRef = useRef(false);
+
   useEffect(() => {
+    if (processedRef.current) return;
+    processedRef.current = true;
+
     const code = params.get('code');
     const state = params.get('state');
-    const device_id = params.get('device_id');
+    const deviceId = params.get('device_id');
     const vkError = params.get('error') || params.get('error_description');
 
     const savedMode = sessionStorage.getItem('vk_oauth_mode') || 'login';
@@ -45,32 +58,40 @@ const VKCallbackPage = () => {
       return;
     }
 
+    // CSRF: при login требуем совпадение state. При link допускаем отсутствие
+    // (ссылка может быть сгенерирована до рестарта вкладки).
     const savedState = sessionStorage.getItem('vk_oauth_state');
-    if (state && savedState && state !== savedState) {
+    if (savedState && state && state !== savedState) {
       setStatus('error');
-      setError('State не совпадает — возможна CSRF атака');
+      setError('State не совпадает — возможна CSRF-атака. Попробуйте войти ещё раз.');
+      return;
+    }
+    if (savedMode === 'login' && !savedState) {
+      // Сессия sessionStorage потеряна (другая вкладка/incognito) — отказ.
+      setStatus('error');
+      setError('Сессия VK OAuth не найдена. Откройте вход заново и попробуйте снова.');
       return;
     }
 
     const verifier = sessionStorage.getItem('vk_oauth_verifier') || undefined;
-    const redirect = sessionStorage.getItem('vk_oauth_redirect') || `${PUBLIC_BASE_URL}/auth/vk/callback`;
+    const redirect = sessionStorage.getItem('vk_oauth_redirect')
+      || `${PUBLIC_BASE_URL}/auth/vk/callback`;
     const referralCode = sessionStorage.getItem('vk_oauth_referral') || undefined;
+    const continueUrl = sessionStorage.getItem('vk_oauth_continue') || null;
 
     const cleanup = () => {
-      sessionStorage.removeItem('vk_oauth_state');
-      sessionStorage.removeItem('vk_oauth_verifier');
-      sessionStorage.removeItem('vk_oauth_redirect');
-      sessionStorage.removeItem('vk_oauth_mode');
-      sessionStorage.removeItem('vk_oauth_referral');
+      ['vk_oauth_state', 'vk_oauth_verifier', 'vk_oauth_redirect',
+        'vk_oauth_mode', 'vk_oauth_referral', 'vk_oauth_continue'].forEach((k) => {
+        try { sessionStorage.removeItem(k); } catch { /* noop */ }
+      });
     };
 
     (async () => {
       try {
         if (savedMode === 'link') {
-          // Привязка к существующему аккаунту (JWT уже есть)
           await authAPI.linkVK({
             code,
-            device_id: device_id || undefined,
+            device_id: deviceId || undefined,
             redirect_uri: redirect,
             code_verifier: verifier,
             state,
@@ -82,7 +103,7 @@ const VKCallbackPage = () => {
         } else {
           const resp = await loginVK({
             code,
-            device_id: device_id || undefined,
+            device_id: deviceId || undefined,
             redirect_uri: redirect,
             code_verifier: verifier,
             state,
@@ -91,7 +112,10 @@ const VKCallbackPage = () => {
           cleanup();
           setStatus('success');
           setTimeout(() => {
-            if ((resp.user?.registration_step ?? 0) > 0) {
+            // Если есть continueUrl — приоритет; иначе onboarding или /
+            if (continueUrl) {
+              navigate(continueUrl, { replace: true });
+            } else if ((resp.user?.registration_step ?? 0) > 0) {
               navigate('/register', { replace: true });
             } else {
               navigate('/', { replace: true });
@@ -100,10 +124,10 @@ const VKCallbackPage = () => {
         }
       } catch (e) {
         setStatus('error');
-        setError(e.message);
+        setError(e.message || 'Не удалось завершить вход через VK');
       }
     })();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isLink = mode === 'link';
@@ -115,8 +139,8 @@ const VKCallbackPage = () => {
         status === 'error'
           ? 'Произошла ошибка'
           : isLink
-          ? 'Привязка аккаунта'
-          : 'Обработка входа'
+            ? 'Привязка аккаунта'
+            : 'Обработка входа'
       }
     >
       {status === 'processing' && (
@@ -139,7 +163,7 @@ const VKCallbackPage = () => {
         <div className="space-y-4">
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <XCircle className="h-12 w-12 text-red-400" />
-            <div className="text-sm text-red-300">{error}</div>
+            <div className="text-sm text-red-300 break-words">{error}</div>
           </div>
           <AuthButton onClick={() => navigate(isLink ? '/' : '/login', { replace: true })}>
             {isLink ? 'Вернуться в приложение' : 'Вернуться к входу'}

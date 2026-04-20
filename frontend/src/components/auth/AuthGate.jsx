@@ -9,11 +9,17 @@
  *     показываем явный confirm-экран TelegramWebAppConfirm
  *     («Войти как {Имя} через Telegram?») — НЕ логиним молча.
  *  4. Иначе → редирект на /login с сохранением ?continue=.
+ *
+ * 🔒 Stage 6: используем `useIsInsideTelegram()` — он надёжно поллит SDK
+ * (initData может прийти позже монтирования компонента). Раньше использовался
+ * useMemo с пустой зависимостью, что приводило к ошибочному редиректу на /login
+ * для пользователей внутри Telegram, если SDK ещё не успел загрузить initData.
  */
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import useIsInsideTelegram from '../../hooks/useIsInsideTelegram';
 import TelegramWebAppConfirm from './TelegramWebAppConfirm';
 
 const FullPageLoader = ({ hint }) => (
@@ -30,19 +36,16 @@ const AuthGate = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Telegram WebApp detection (stable across renders)
-  const { tg, initData } = useMemo(() => {
-    if (typeof window === 'undefined') return { tg: null, initData: null };
-    const t = window.Telegram?.WebApp || null;
-    const d = t?.initData || null;
-    return { tg: t, initData: d && d.length > 0 ? d : null };
-  }, []);
-
-  const insideTelegram = !!initData;
+  // useIsInsideTelegram возвращает { isInside, tg, initData, ready }.
+  // `ready=true` означает что SDK полностью загружен (или таймаут истёк).
+  const { isInside, tg, initData, ready } = useIsInsideTelegram();
 
   // Редиректы (авторизован либо вообще не Telegram)
   useEffect(() => {
     if (initializing) return;
+    // Ждём окончательного определения isInside (избегаем фолса при медленном SDK)
+    if (!ready) return;
+
     if (isAuthenticated) {
       if (needsOnboarding && location.pathname !== '/register') {
         navigate('/register', { replace: true });
@@ -50,29 +53,28 @@ const AuthGate = ({ children }) => {
       return;
     }
     // Неавторизован
-    if (!insideTelegram) {
+    if (!isInside) {
       const cont = encodeURIComponent(location.pathname + location.search);
       navigate(`/login?continue=${cont}`, { replace: true });
     }
-    // Если insideTelegram и не авторизован — показываем confirm (ниже в рендере)
-  }, [initializing, isAuthenticated, needsOnboarding, insideTelegram,
-      location.pathname, location.search, navigate]);
+    // Если isInside и не авторизован — показываем confirm (ниже в рендере)
+  }, [initializing, ready, isAuthenticated, needsOnboarding, isInside,
+    location.pathname, location.search, navigate]);
 
   // --- Render states ---
 
-  if (initializing) {
-    return <FullPageLoader />;
+  if (initializing || !ready) {
+    return <FullPageLoader hint={!ready ? 'Проверяем окружение Telegram…' : undefined} />;
   }
 
   // Telegram WebApp confirm screen — явное согласие перед логином
-  if (!isAuthenticated && insideTelegram) {
+  if (!isAuthenticated && isInside) {
     return (
       <TelegramWebAppConfirm
         tg={tg}
         initData={initData}
         onConfirm={async (d, startParam) => {
           await loginTelegramWebApp(d, startParam);
-          // После успеха useEffect выше сделает редирект на /register или пропустит дальше.
         }}
       />
     );

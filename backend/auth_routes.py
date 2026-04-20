@@ -3,33 +3,52 @@ Auth routes — регистрация/логин через Email, Telegram, VK
 
 Экспортирует factory `create_auth_router(db)` → APIRouter с префиксом `/auth`.
 Также экспортирует `migrate_user_settings_to_users(db)` для миграции при старте.
+
+🔍 Stage 6 hardening (2026-04):
+  - Использование `pseudo_tid_from_uid` для синхронизации с `user_settings`
+    (значение вне диапазона реальных Telegram ID — нет коллизий).
+  - Хелпер `_remap_user_settings_tid` — при привязке реального Telegram переносим
+    данные из user_settings(pseudo_tid) → user_settings(real_tid) без потерь.
+  - Хелпер `_vk_exchange_code` — устранён дубликат VK OAuth обмена.
+  - Rate-limit на /login/email (IP + email).
+  - Детерминированный выбор primary_auth по приоритету (email > telegram > vk).
+  - QR session consumed-grace-period (30 сек) — устойчивость к потере ответа.
+  - Auth-event log в `auth_events` коллекцию для security audit.
+  - last_login_ip / last_login_ua сохраняются в user-документ.
 """
 
 import logging
 import re
-import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple, List
 
 import httpx
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import (
-    hash_password,
-    verify_password,
-    generate_uid,
+    PROVIDERS,
+    USERNAME_RESERVED as RESERVED_USERNAMES,
+    check_rate_limit,
+    choose_primary_auth,
     create_jwt,
+    decode_jwt,
+    effective_tid_for_user,
+    generate_uid,
+    get_client_ip,
+    get_current_user_optional,
+    get_current_user_required,
+    hash_password,
+    normalize_username,
+    pseudo_tid_from_uid,
+    resolve_safe_username,
+    verify_password,
     verify_telegram_login_widget_hash,
     verify_telegram_webapp_init_data,
-    get_current_user_required,
-    get_current_user_optional,
-    normalize_username,
-    resolve_safe_username,
 )
 from config import (
-    get_telegram_bot_token,
+    get_telegram_bot_token,  # noqa: F401  (используется в verify_*)
     get_telegram_bot_username,
     VK_APP_ID,
     VK_CLIENT_SECRET,
@@ -42,14 +61,14 @@ from models import (
     LinkTelegramWebAppRequest,
     LinkVKRequest,
     LoginEmailRequest,
-    QRConfirmRequest,
+    QRConfirmRequest,  # noqa: F401  (используется внутри QR flow)
     QRInitResponse,
     QRStatusResponse,
     RegisterEmailRequest,
     TelegramLoginRequest,
     TelegramWebAppLoginRequest,
     UpdateProfileStepRequest,
-    User,
+    User,  # noqa: F401  (документация модели)
     UserPublic,
     UsernameCheckResponse,
     VKLoginRequest,
@@ -59,32 +78,23 @@ logger = logging.getLogger(__name__)
 
 # ========== Константы ==========
 QR_SESSION_TTL_MINUTES = 5
-# Используем общий список из auth_utils (там же normalize_username).
-from auth_utils import USERNAME_RESERVED as RESERVED_USERNAMES
+QR_CONSUMED_GRACE_SECONDS = 30  # окно повторной отдачи токена при потере сети
 
-# ========== Rate Limiter (in-memory, per-IP) ==========
-# Простой лимитер для /register/email, чтобы избежать спама.
-# Для production можно заменить на Redis/slowapi.
-from collections import defaultdict
-from time import monotonic
+# Карта переходов registration_step (вместо запутанной тернарной логики).
+# Ключ: complete_step, который пользователь только что завершил.
+# Значение: следующий step (0 = всё готово).
+_STEP_TRANSITIONS: Dict[int, int] = {1: 2, 2: 3, 3: 0}
 
-_rate_limits: dict = defaultdict(list)  # ip -> list[timestamps]
-
-def _check_rate_limit(ip: str, bucket: str, max_requests: int, window_seconds: int) -> bool:
-    """Возвращает True если лимит НЕ превышен, False — превышен."""
-    now = monotonic()
-    key = f"{bucket}:{ip or 'unknown'}"
-    arr = _rate_limits[key]
-    # Удаляем старые
-    cutoff = now - window_seconds
-    _rate_limits[key] = [t for t in arr if t > cutoff]
-    if len(_rate_limits[key]) >= max_requests:
-        return False
-    _rate_limits[key].append(now)
-    return True
+# Rate-limit конфигурация: bucket → (max_requests, window_sec)
+_RATE_LIMITS = {
+    "register_email_ip": (5, 3600),    # 5 регистраций/час с IP
+    "login_email_ip": (10, 300),       # 10 попыток/5 мин с IP
+    "login_email_email": (20, 3600),   # 20 попыток/час на конкретный email
+}
 
 
 # ========== Helpers ==========
+
 
 def _user_to_public(user_doc: dict, include_email: bool = False) -> UserPublic:
     """Конвертирует Mongo-doc `users` → UserPublic."""
@@ -100,11 +110,147 @@ def _user_to_public(user_doc: dict, include_email: bool = False) -> UserPublic:
         primary_auth=user_doc.get("primary_auth"),
         facultet_id=user_doc.get("facultet_id"),
         facultet_name=user_doc.get("facultet_name"),
+        level_id=user_doc.get("level_id"),
+        form_code=user_doc.get("form_code"),
         kurs=user_doc.get("kurs"),
         group_id=user_doc.get("group_id"),
         group_name=user_doc.get("group_name"),
         registration_step=user_doc.get("registration_step", 0),
         created_at=user_doc.get("created_at"),
+        last_login_at=user_doc.get("last_login_at"),
+    )
+
+
+async def _log_auth_event(
+    db,
+    *,
+    event_type: str,
+    uid: Optional[str] = None,
+    provider: Optional[str] = None,
+    success: bool = True,
+    request: Optional[Request] = None,
+    extra: Optional[dict] = None,
+) -> None:
+    """Логирует событие авторизации в коллекцию auth_events (для security audit).
+
+    Не блокирует основной flow — ошибки записи поглощаются.
+    """
+    try:
+        doc = {
+            "id": str(uuid.uuid4()),
+            "event": event_type,
+            "uid": uid,
+            "provider": provider,
+            "success": success,
+            "ts": datetime.now(timezone.utc),
+        }
+        if request is not None:
+            doc["ip"] = get_client_ip(request)
+            doc["ua"] = request.headers.get("User-Agent", "")[:500]
+        if extra:
+            doc["extra"] = extra
+        await db.auth_events.insert_one(doc)
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"_log_auth_event suppressed error: {e}")
+
+
+async def _remap_user_settings_tid(
+    db,
+    uid: str,
+    old_tid: Optional[int],
+    new_tid: int,
+) -> None:
+    """Переносит документ user_settings со старого telegram_id на новый.
+
+    Сценарий: email/VK-юзер привязал реальный Telegram. У него был
+    `user_settings.telegram_id = pseudo_tid` — теперь нужно перенести данные
+    в `user_settings.telegram_id = real_tid`, чтобы legacy-endpoints
+    (`/api/profile/{telegram_id}/*`, `/api/user-settings/{id}`) работали.
+
+    Корректно обрабатывает edge-cases:
+      - Если old_tid == new_tid → no-op.
+      - Если уже есть документ с new_tid (Telegram-юзер ранее логинился) → merge.
+      - Если old_doc нет → просто проставляем uid в new_doc (если он есть).
+    """
+    if not new_tid:
+        return
+    try:
+        new_tid_int = int(new_tid)
+    except (TypeError, ValueError):
+        return
+    if old_tid is not None:
+        try:
+            old_tid_int = int(old_tid)
+        except (TypeError, ValueError):
+            old_tid_int = None
+    else:
+        old_tid_int = None
+
+    if old_tid_int == new_tid_int:
+        return
+
+    # 1) Получаем старый и новый документы
+    old_doc = (
+        await db.user_settings.find_one({"telegram_id": old_tid_int})
+        if old_tid_int is not None else None
+    )
+    new_doc = await db.user_settings.find_one({"telegram_id": new_tid_int})
+
+    if not old_doc and not new_doc:
+        # Нечего мигрировать — создадим минимальный stub под новый tid.
+        try:
+            await db.user_settings.insert_one({
+                "telegram_id": new_tid_int,
+                "uid": uid,
+                "created_at": datetime.now(timezone.utc),
+            })
+        except DuplicateKeyError:
+            pass
+        return
+
+    if old_doc and not new_doc:
+        # Простой случай: переименовываем telegram_id у старого документа.
+        try:
+            await db.user_settings.update_one(
+                {"telegram_id": old_tid_int},
+                {"$set": {"telegram_id": new_tid_int, "uid": uid}},
+            )
+            logger.info(
+                f"📦 user_settings remap: uid={uid} telegram_id {old_tid_int} → {new_tid_int}"
+            )
+        except DuplicateKeyError:
+            # Race — на новый tid кто-то уже записал. Падаем в merge-ветку.
+            new_doc = await db.user_settings.find_one({"telegram_id": new_tid_int})
+        else:
+            return
+
+    # Merge: old_doc + new_doc (new_doc приоритетнее, кроме незаполненных полей)
+    merged: Dict[str, Any] = {"uid": uid}
+    if old_doc:
+        for k, v in old_doc.items():
+            if k in ("_id", "telegram_id", "uid"):
+                continue
+            if v is None or v == "":
+                continue
+            # Не перезаписываем уже заполненные поля в new_doc
+            if new_doc and new_doc.get(k):
+                continue
+            merged[k] = v
+
+    await db.user_settings.update_one(
+        {"telegram_id": new_tid_int},
+        {"$set": merged},
+        upsert=True,
+    )
+    # Удаляем старый stub, если он существовал
+    if old_doc and old_tid_int is not None:
+        try:
+            await db.user_settings.delete_one({"telegram_id": old_tid_int})
+        except Exception:  # noqa: BLE001
+            pass
+
+    logger.info(
+        f"📦 user_settings merge-remap: uid={uid} telegram_id {old_tid_int} → {new_tid_int}"
     )
 
 
@@ -119,9 +265,14 @@ async def _create_new_user(
     last_name: Optional[str] = None,
     username: Optional[str] = None,
     primary_auth: str,
-    registration_step: int = 2,  # 2 = нужно заполнить профиль
+    registration_step: int = 2,
 ) -> dict:
-    """Создаёт новый `users` документ с уникальным UID. Возвращает вставленный doc."""
+    """Создаёт новый `users` документ с уникальным UID. Возвращает вставленный doc.
+
+    Параллельно создаёт зеркальный документ в `user_settings` (для совместимости
+    с legacy-endpoints). Если реального `telegram_id` нет — используется
+    pseudo-tid (10^10 + uid), который гарантированно вне диапазона Telegram ID.
+    """
     uid = await generate_uid(db)
     now = datetime.now(timezone.utc)
 
@@ -154,18 +305,9 @@ async def _create_new_user(
             detail="Такой пользователь уже существует (конфликт email/telegram_id/vk_id/uid)",
         )
 
-    # Параллельно создаём/обновляем запись в user_settings (для обратной совместимости).
-    # Для email/VK/QR-регистраций telegram_id может отсутствовать — в этом случае
-    # используем int(uid) как синтетический ключ, чтобы старые endpoints вроде
-    # GET /api/user-settings/{id} и дальнейшая загрузка в Home-компоненте работали
-    # сразу после регистрации. UID — 9-значный numeric, не конфликтует с реальными
-    # Telegram ID (которые обычно 10+ цифр).
+    # Зеркало в user_settings — реальный tid если есть, иначе pseudo-tid.
+    effective_tid = int(telegram_id) if telegram_id else pseudo_tid_from_uid(uid)
     try:
-        effective_tid = int(telegram_id) if telegram_id else int(uid)
-    except (TypeError, ValueError):
-        effective_tid = None
-
-    if effective_tid is not None:
         await db.user_settings.update_one(
             {"telegram_id": effective_tid},
             {
@@ -174,7 +316,7 @@ async def _create_new_user(
                     "created_at": now,
                 },
                 "$set": {
-                    "uid": uid,  # связь с новой коллекцией users
+                    "uid": uid,
                     "first_name": first_name,
                     "last_name": last_name,
                     "username": username,
@@ -182,39 +324,50 @@ async def _create_new_user(
             },
             upsert=True,
         )
+    except DuplicateKeyError as e:
+        # Не должно случаться (pseudo_tid детерминированный по uid, а uid уникален),
+        # но логируем — это сигнал об инконсистентности.
+        logger.error(
+            f"user_settings upsert collision for uid={uid} effective_tid={effective_tid}: {e}"
+        )
 
-    logger.info(f"✅ New user created: uid={uid} primary_auth={primary_auth} effective_tid={effective_tid}")
+    logger.info(
+        f"✅ New user created: uid={uid} primary_auth={primary_auth} "
+        f"effective_tid={effective_tid}"
+    )
     return doc
 
 
-async def _update_last_login(db, uid: str):
+async def _update_last_login(
+    db,
+    uid: str,
+    request: Optional[Request] = None,
+) -> None:
+    """Обновляет last_login_at + опционально last_login_ip/last_login_ua."""
     now = datetime.now(timezone.utc)
-    await db.users.update_one(
-        {"uid": uid},
-        {"$set": {"last_login_at": now, "updated_at": now}},
-    )
+    update: Dict[str, Any] = {"last_login_at": now, "updated_at": now}
+    if request is not None:
+        update["last_login_ip"] = get_client_ip(request)
+        update["last_login_ua"] = request.headers.get("User-Agent", "")[:500]
+    await db.users.update_one({"uid": uid}, {"$set": update})
 
 
 async def _issue_token(
     db,
     user_doc: dict,
+    *,
     is_new: bool = False,
     suggested_username_taken: Optional[str] = None,
+    request: Optional[Request] = None,
 ) -> AuthTokenResponse:
-    """Генерирует JWT для пользователя и возвращает AuthTokenResponse.
-
-    `suggested_username_taken` — если провайдер (Telegram/VK) предложил username,
-    который уже занят другим пользователем, сюда передаётся оригинал, чтобы UI
-    мог показать подсказку «@{name} занят — выберите свой». НИКОГДА не служит
-    основанием для линковки — это поле только информативное.
-    """
+    """Генерирует JWT для пользователя и возвращает AuthTokenResponse."""
     token = create_jwt(
         uid=user_doc["uid"],
         telegram_id=user_doc.get("telegram_id"),
         providers=user_doc.get("auth_providers", []),
     )
     if not is_new:
-        await _update_last_login(db, user_doc["uid"])
+        await _update_last_login(db, user_doc["uid"], request=request)
 
     return AuthTokenResponse(
         access_token=token,
@@ -225,14 +378,101 @@ async def _issue_token(
     )
 
 
+# ----- VK OAuth helper (общий для login/vk и link/vk) -----
+
+
+async def _vk_exchange_code(
+    *,
+    code: str,
+    redirect_uri: str,
+    device_id: Optional[str] = None,
+    code_verifier: Optional[str] = None,
+    state: Optional[str] = None,
+) -> Tuple[str, str, dict]:
+    """Обменивает VK OAuth code на access_token + получает профиль.
+
+    Возвращает: (access_token, vk_user_id_str, vk_profile_dict)
+
+    Raises:
+        HTTPException(401) — VK не вернул токен (просрочен code, неверные параметры).
+        HTTPException(502) — не удалось связаться с VK API.
+    """
+    token_data: Dict[str, Any] = {}
+
+    # Попытка 1: новый VK ID endpoint
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://id.vk.com/oauth2/auth",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "client_id": VK_APP_ID,
+                    "client_secret": VK_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "device_id": device_id or "",
+                    "code_verifier": code_verifier or "",
+                    "state": state or "",
+                },
+            )
+            token_data = resp.json() or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"VK ID endpoint failed: {e} — fallback to legacy")
+
+    # Попытка 2: legacy oauth.vk.com
+    if "access_token" not in token_data:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                legacy_resp = await client.get(
+                    "https://oauth.vk.com/access_token",
+                    params={
+                        "client_id": VK_APP_ID,
+                        "client_secret": VK_CLIENT_SECRET,
+                        "redirect_uri": redirect_uri,
+                        "code": code,
+                    },
+                )
+                token_data = legacy_resp.json() or {}
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"VK legacy endpoint failed: {e}")
+            raise HTTPException(status_code=502, detail=f"Ошибка связи с VK: {e}")
+
+    access_token = token_data.get("access_token")
+    vk_user_id = token_data.get("user_id")
+
+    if not access_token or not vk_user_id:
+        err = token_data.get("error_description") or token_data.get("error") or "unknown"
+        raise HTTPException(status_code=401, detail=f"VK не вернул токен: {err}")
+
+    # Получаем профиль
+    vk_profile: Dict[str, Any] = {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            prof_resp = await client.get(
+                "https://api.vk.com/method/users.get",
+                params={
+                    "access_token": access_token,
+                    "v": "5.131",
+                    "fields": "photo_200,screen_name,first_name,last_name",
+                },
+            )
+            prof = prof_resp.json() or {}
+            if "response" in prof and prof["response"]:
+                vk_profile = prof["response"][0]
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"VK users.get error: {e}")
+
+    return access_token, str(vk_user_id), vk_profile
+
+
 # ========== Миграция ==========
 
 
 async def migrate_user_settings_to_users(db) -> Dict[str, int]:
     """Миграция: для всех `user_settings` без uid — создаём `users` запись.
 
-    Вызывается при старте приложения.
-    Идемпотентна — повторный запуск не создаёт дубликатов.
+    Идемпотентна. Корректно обрабатывает дубли как по username, так и по
+    другим уникальным ключам (через анализ keyPattern).
     """
     created = 0
     updated = 0
@@ -254,7 +494,6 @@ async def migrate_user_settings_to_users(db) -> Dict[str, int]:
             # Уже есть user с таким telegram_id?
             existing = await db.users.find_one({"telegram_id": tg_id}, {"uid": 1})
             if existing and existing.get("uid"):
-                # Просто проставим uid в user_settings
                 await db.user_settings.update_one(
                     {"telegram_id": tg_id},
                     {"$set": {"uid": existing["uid"]}},
@@ -262,7 +501,6 @@ async def migrate_user_settings_to_users(db) -> Dict[str, int]:
                 updated += 1
                 continue
 
-            # Создаём user
             uid = await generate_uid(db)
             now = datetime.now(timezone.utc)
             new_doc = {
@@ -282,7 +520,7 @@ async def migrate_user_settings_to_users(db) -> Dict[str, int]:
                 "created_at": settings_doc.get("created_at") or now,
                 "updated_at": now,
                 "last_login_at": None,
-                "registration_step": 0,  # миграция = полностью настроенный профиль
+                "registration_step": 0,
                 "facultet_id": settings_doc.get("facultet_id"),
                 "facultet_name": settings_doc.get("facultet_name"),
                 "level_id": settings_doc.get("level_id"),
@@ -295,19 +533,46 @@ async def migrate_user_settings_to_users(db) -> Dict[str, int]:
             try:
                 await db.users.insert_one(new_doc)
                 created += 1
-            except DuplicateKeyError:
-                # username конфликт — убираем username и повторяем
-                new_doc["username"] = None
-                await db.users.insert_one(new_doc)
-                created += 1
+            except DuplicateKeyError as dup_err:
+                # Анализируем причину дубликата.
+                pattern = (getattr(dup_err, "details", None) or {}).get("keyPattern", {}) or {}
+                if "username" in pattern:
+                    new_doc["username"] = None
+                    try:
+                        await db.users.insert_one(new_doc)
+                        created += 1
+                    except DuplicateKeyError as second_err:
+                        logger.warning(
+                            f"Migration: still duplicate after username clear "
+                            f"telegram_id={tg_id}: {second_err}"
+                        )
+                        errors += 1
+                        continue
+                elif "telegram_id" in pattern:
+                    # Другой документ users уже забрал этот tg_id (race)
+                    other = await db.users.find_one({"telegram_id": tg_id}, {"uid": 1})
+                    if other and other.get("uid"):
+                        await db.user_settings.update_one(
+                            {"telegram_id": tg_id},
+                            {"$set": {"uid": other["uid"]}},
+                        )
+                        updated += 1
+                    else:
+                        errors += 1
+                    continue
+                else:
+                    logger.warning(
+                        f"Migration: unknown duplicate key for telegram_id={tg_id}: {pattern}"
+                    )
+                    errors += 1
+                    continue
 
-            # Обновляем user_settings с uid
             await db.user_settings.update_one(
                 {"telegram_id": tg_id},
                 {"$set": {"uid": uid}},
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             errors += 1
             logger.warning(f"Migration error for telegram_id={tg_id}: {e}")
 
@@ -329,9 +594,13 @@ def create_auth_router(db) -> APIRouter:
     @router.post("/register/email", response_model=AuthTokenResponse)
     async def register_email(req: RegisterEmailRequest, request: Request):
         """Шаг 1 регистрации через email/пароль."""
-        # Rate limit: 5 registrations per hour per IP
-        client_ip = request.client.host if request.client else None
-        if not _check_rate_limit(client_ip, "register_email", max_requests=5, window_seconds=3600):
+        client_ip = get_client_ip(request)
+        max_req, window = _RATE_LIMITS["register_email_ip"]
+        if not check_rate_limit(client_ip, "register_email_ip", max_req, window):
+            await _log_auth_event(
+                db, event_type="register_email", success=False, request=request,
+                extra={"reason": "rate_limited"},
+            )
             raise HTTPException(
                 status_code=429,
                 detail="Слишком много регистраций с этого IP. Попробуйте через час.",
@@ -355,42 +624,89 @@ def create_auth_router(db) -> APIRouter:
             first_name=req.first_name,
             last_name=req.last_name,
             primary_auth="email",
-            registration_step=2,  # → шаг 2: заполнить username/имя
+            registration_step=2,
         )
 
-        return await _issue_token(db, user_doc, is_new=True)
+        await _log_auth_event(
+            db, event_type="register_email", uid=user_doc["uid"],
+            provider="email", success=True, request=request,
+        )
+        return await _issue_token(db, user_doc, is_new=True, request=request)
 
     # ============= LOGIN (email) =============
 
     @router.post("/login/email", response_model=AuthTokenResponse)
-    async def login_email(req: LoginEmailRequest):
+    async def login_email(req: LoginEmailRequest, request: Request):
+        client_ip = get_client_ip(request)
         email_norm = req.email.strip().lower()
+
+        # Rate-limit двойной: per-IP и per-email — защита от brute-force
+        ip_max, ip_window = _RATE_LIMITS["login_email_ip"]
+        em_max, em_window = _RATE_LIMITS["login_email_email"]
+        if not check_rate_limit(client_ip, "login_email_ip", ip_max, ip_window):
+            await _log_auth_event(
+                db, event_type="login_email", success=False, request=request,
+                extra={"reason": "rate_limited_ip", "email": email_norm},
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="Слишком много попыток входа с этого IP. Попробуйте позже.",
+            )
+        if not check_rate_limit(email_norm, "login_email_email", em_max, em_window):
+            await _log_auth_event(
+                db, event_type="login_email", success=False, request=request,
+                extra={"reason": "rate_limited_email", "email": email_norm},
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="Слишком много попыток для этого email. Попробуйте позже.",
+            )
+
         user_doc = await db.users.find_one({"email": email_norm})
         if not user_doc or not user_doc.get("password_hash"):
+            await _log_auth_event(
+                db, event_type="login_email", success=False, request=request,
+                extra={"reason": "no_user", "email": email_norm},
+            )
             raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
         if not user_doc.get("is_active", True):
+            await _log_auth_event(
+                db, event_type="login_email", uid=user_doc["uid"],
+                success=False, request=request, extra={"reason": "inactive"},
+            )
             raise HTTPException(status_code=403, detail="Аккаунт деактивирован")
 
         if not verify_password(req.password, user_doc["password_hash"]):
+            await _log_auth_event(
+                db, event_type="login_email", uid=user_doc["uid"],
+                success=False, request=request, extra={"reason": "wrong_password"},
+            )
             raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
-        return await _issue_token(db, user_doc, is_new=False)
+        await _log_auth_event(
+            db, event_type="login_email", uid=user_doc["uid"],
+            provider="email", success=True, request=request,
+        )
+        return await _issue_token(db, user_doc, is_new=False, request=request)
 
     # ============= LOGIN (Telegram Login Widget) =============
 
     @router.post("/login/telegram", response_model=AuthTokenResponse)
-    async def login_telegram(req: TelegramLoginRequest):
+    async def login_telegram(req: TelegramLoginRequest, request: Request):
         """Логин через Telegram Login Widget (веб-сайт вне Telegram).
 
-        🔐 Аналогично `/login/telegram-webapp`: аутентификация СТРОГО по `telegram_id`.
-        Никакой авто-линковки по `username` — это уязвимость. Линковать Telegram
-        к существующему email/VK-аккаунту можно только явно через
-        `POST /api/auth/link/telegram`.
+        🔐 Аутентификация СТРОГО по `telegram_id`. Никакой авто-линковки по
+        `username` — это уязвимость. Линковать Telegram к существующему
+        email/VK-аккаунту можно только явно через POST /api/auth/link/telegram.
         """
         data = req.model_dump(exclude={"referral_code"}, exclude_none=True)
 
         if not verify_telegram_login_widget_hash(data):
+            await _log_auth_event(
+                db, event_type="login_telegram", success=False, request=request,
+                extra={"reason": "bad_hash"},
+            )
             raise HTTPException(status_code=401, detail="Невалидная подпись Telegram")
 
         tg_id = req.id
@@ -398,23 +714,21 @@ def create_auth_router(db) -> APIRouter:
         existing = await db.users.find_one({"telegram_id": tg_id})
 
         if existing:
-            # Повторный вход. Дополняем пустые поля (имена), username — только
-            # если у user'а его ещё нет И он свободен (case-insensitive).
-            update_fields: Dict[str, Any] = {
-                "updated_at": now,
-                "last_login_at": now,
-            }
+            update_fields: Dict[str, Any] = {"updated_at": now, "last_login_at": now}
             if req.first_name and not existing.get("first_name"):
                 update_fields["first_name"] = req.first_name
             if req.last_name and not existing.get("last_name"):
                 update_fields["last_name"] = req.last_name
 
+            # Username — пытаемся проставить если у user'а его нет
+            conflict_for_existing: Optional[str] = None
             if req.username and not existing.get("username"):
-                safe_username, _ = await resolve_safe_username(
+                safe_username, conflict_for_existing = await resolve_safe_username(
                     db, req.username, exclude_uid=existing["uid"]
                 )
                 if safe_username:
                     update_fields["username"] = safe_username
+                    conflict_for_existing = None  # успешно поставили — нет конфликта
 
             await db.users.update_one(
                 {"uid": existing["uid"]},
@@ -424,9 +738,17 @@ def create_auth_router(db) -> APIRouter:
                 },
             )
             user_doc = await db.users.find_one({"uid": existing["uid"]})
-            return await _issue_token(db, user_doc, is_new=False)
+            await _log_auth_event(
+                db, event_type="login_telegram", uid=user_doc["uid"],
+                provider="telegram", success=True, request=request,
+            )
+            return await _issue_token(
+                db, user_doc, is_new=False,
+                suggested_username_taken=conflict_for_existing,
+                request=request,
+            )
 
-        # Новый пользователь — username обрабатываем через resolve_safe_username.
+        # Новый пользователь
         safe_username, conflict = await resolve_safe_username(db, req.username)
         if conflict:
             logger.info(
@@ -444,42 +766,30 @@ def create_auth_router(db) -> APIRouter:
             registration_step=2,
         )
 
+        await _log_auth_event(
+            db, event_type="register_telegram", uid=user_doc["uid"],
+            provider="telegram", success=True, request=request,
+        )
         return await _issue_token(
-            db,
-            user_doc,
-            is_new=True,
-            suggested_username_taken=conflict,
+            db, user_doc, is_new=True,
+            suggested_username_taken=conflict, request=request,
         )
 
     # ============= LOGIN (Telegram WebApp initData) =============
 
     @router.post("/login/telegram-webapp", response_model=AuthTokenResponse)
-    async def login_telegram_webapp(req: TelegramWebAppLoginRequest):
+    async def login_telegram_webapp(req: TelegramWebAppLoginRequest, request: Request):
         """Логин через Telegram WebApp — пользователь уже в боте, верифицируем initData.
 
-        🔐 БЕЗОПАСНАЯ ЛОГИКА (после security-fix 2025):
-
-          Аутентификация производится ИСКЛЮЧИТЕЛЬНО по `telegram_id` — это единственный
-          идентификатор, который Telegram криптографически подтверждает. `username` —
-          это публичный handle, который пользователь может поменять в любой момент
-          и который не уникален во времени (освободившийся @name может занять другой
-          человек). Поэтому:
-
-          1. Есть user с таким `telegram_id` → логинимся в него.
-          2. Нет → ВСЕГДА создаём НОВЫЙ аккаунт. Если username от Telegram занят
-             другим пользователем (case-insensitive) — создаём без username и
-             возвращаем `suggested_username_taken` для UI-подсказки на Шаге 2.
-
-          ⚠️ НИКАКОГО авто-линкования по совпадению username! Это уязвимость захвата
-          аккаунта (B на Telegram с username `@name` не должен автоматически попадать
-          в аккаунт A, который зарегистрировался на сайте с тем же `@name`).
-
-          Для легитимного связывания существующего email/VK-аккаунта с Telegram
-          пользователь должен явно вызвать `POST /api/auth/link/telegram-webapp`,
-          будучи уже аутентифицированным в целевом аккаунте.
+        🔐 Аналогично /login/telegram: аутентификация по telegram_id. Auto-link
+        по username запрещён (см. подробности в коде /login/telegram).
         """
         parsed = verify_telegram_webapp_init_data(req.init_data)
         if not parsed or not parsed.get("user"):
+            await _log_auth_event(
+                db, event_type="login_telegram_webapp", success=False,
+                request=request, extra={"reason": "bad_initdata"},
+            )
             raise HTTPException(status_code=401, detail="Невалидные данные Telegram WebApp")
 
         tg_user = parsed["user"]
@@ -490,26 +800,45 @@ def create_auth_router(db) -> APIRouter:
         now = datetime.now(timezone.utc)
         existing = await db.users.find_one({"telegram_id": tg_id})
 
-        if existing:
-            # Case 1: обычный повторный login по telegram_id.
-            await db.users.update_one(
-                {"uid": existing["uid"]},
-                {
-                    "$set": {
-                        "last_login_at": now,
-                        "updated_at": now,
-                    },
-                    "$addToSet": {"auth_providers": "telegram"},
-                },
-            )
-            user_doc = await db.users.find_one({"uid": existing["uid"]})
-            return await _issue_token(db, user_doc, is_new=False)
-
-        # Case 2: НОВЫЙ аккаунт. Проверяем username-коллизию (НЕ для линковки!).
         tg_username = tg_user.get("username")
         tg_first = tg_user.get("first_name")
         tg_last = tg_user.get("last_name")
 
+        if existing:
+            update_fields: Dict[str, Any] = {"updated_at": now, "last_login_at": now}
+            if tg_first and not existing.get("first_name"):
+                update_fields["first_name"] = tg_first
+            if tg_last and not existing.get("last_name"):
+                update_fields["last_name"] = tg_last
+
+            conflict_for_existing: Optional[str] = None
+            if tg_username and not existing.get("username"):
+                safe_username, conflict_for_existing = await resolve_safe_username(
+                    db, tg_username, exclude_uid=existing["uid"]
+                )
+                if safe_username:
+                    update_fields["username"] = safe_username
+                    conflict_for_existing = None
+
+            await db.users.update_one(
+                {"uid": existing["uid"]},
+                {
+                    "$set": update_fields,
+                    "$addToSet": {"auth_providers": "telegram"},
+                },
+            )
+            user_doc = await db.users.find_one({"uid": existing["uid"]})
+            await _log_auth_event(
+                db, event_type="login_telegram_webapp", uid=user_doc["uid"],
+                provider="telegram", success=True, request=request,
+            )
+            return await _issue_token(
+                db, user_doc, is_new=False,
+                suggested_username_taken=conflict_for_existing,
+                request=request,
+            )
+
+        # Новый аккаунт
         safe_username, conflict = await resolve_safe_username(db, tg_username)
         if conflict:
             logger.info(
@@ -527,17 +856,19 @@ def create_auth_router(db) -> APIRouter:
             registration_step=2,
         )
 
+        await _log_auth_event(
+            db, event_type="register_telegram_webapp", uid=user_doc["uid"],
+            provider="telegram", success=True, request=request,
+        )
         return await _issue_token(
-            db,
-            user_doc,
-            is_new=True,
-            suggested_username_taken=conflict,
+            db, user_doc, is_new=True,
+            suggested_username_taken=conflict, request=request,
         )
 
     # ============= LOGIN (VK ID OAuth) =============
 
     @router.post("/login/vk", response_model=AuthTokenResponse)
-    async def login_vk(req: VKLoginRequest):
+    async def login_vk(req: VKLoginRequest, request: Request):
         """VK OAuth — обмен code → access_token → данные профиля."""
         if not VK_APP_ID or not VK_CLIENT_SECRET:
             raise HTTPException(status_code=500, detail="VK OAuth не сконфигурирован")
@@ -546,95 +877,51 @@ def create_auth_router(db) -> APIRouter:
         if not redirect_uri:
             raise HTTPException(status_code=400, detail="redirect_uri обязателен")
 
-        # Обмен code на токен через VK ID (новый VK ID endpoint)
-        # Для старого VK OAuth: https://oauth.vk.com/access_token
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            try:
-                # Пробуем VK ID endpoint
-                token_resp = await client.post(
-                    "https://id.vk.com/oauth2/auth",
-                    data={
-                        "grant_type": "authorization_code",
-                        "code": req.code,
-                        "client_id": VK_APP_ID,
-                        "client_secret": VK_CLIENT_SECRET,
-                        "redirect_uri": redirect_uri,
-                        "device_id": req.device_id or "",
-                        "code_verifier": req.code_verifier or "",
-                        "state": req.state or "",
-                    },
-                )
-                token_data = token_resp.json()
-            except Exception as e:
-                logger.error(f"VK token exchange error: {e}")
-                raise HTTPException(status_code=502, detail=f"Ошибка связи с VK: {e}")
-
-        if "access_token" not in token_data:
-            # Fallback на legacy oauth.vk.com
-            try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    legacy_resp = await client.get(
-                        "https://oauth.vk.com/access_token",
-                        params={
-                            "client_id": VK_APP_ID,
-                            "client_secret": VK_CLIENT_SECRET,
-                            "redirect_uri": redirect_uri,
-                            "code": req.code,
-                        },
-                    )
-                    token_data = legacy_resp.json()
-            except Exception as e:
-                logger.error(f"VK legacy token exchange error: {e}")
-
-        access_token = token_data.get("access_token")
-        vk_user_id = token_data.get("user_id")
-
-        if not access_token or not vk_user_id:
-            raise HTTPException(
-                status_code=401,
-                detail=f"VK не вернул токен: {token_data.get('error_description') or token_data.get('error') or 'unknown'}",
-            )
-
-        vk_id_str = str(vk_user_id)
-
-        # Получаем профиль
-        vk_profile = {}
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                prof_resp = await client.get(
-                    "https://api.vk.com/method/users.get",
-                    params={
-                        "access_token": access_token,
-                        "v": "5.131",
-                        "fields": "photo_200,screen_name,first_name,last_name",
-                    },
-                )
-                prof = prof_resp.json()
-                if "response" in prof and prof["response"]:
-                    vk_profile = prof["response"][0]
-        except Exception as e:
-            logger.warning(f"VK users.get error: {e}")
+            _access_token, vk_id_str, vk_profile = await _vk_exchange_code(
+                code=req.code,
+                redirect_uri=redirect_uri,
+                device_id=req.device_id,
+                code_verifier=req.code_verifier,
+                state=req.state,
+            )
+        except HTTPException:
+            await _log_auth_event(
+                db, event_type="login_vk", success=False, request=request,
+                extra={"reason": "vk_exchange_failed"},
+            )
+            raise
 
-        # Поиск/создание
         existing = await db.users.find_one({"vk_id": vk_id_str})
         is_new = False
-        conflict_username = None
+        conflict_username: Optional[str] = None
+        now = datetime.now(timezone.utc)
+
         if existing:
+            update_fields: Dict[str, Any] = {"last_login_at": now, "updated_at": now}
+            if vk_profile.get("first_name") and not existing.get("first_name"):
+                update_fields["first_name"] = vk_profile["first_name"]
+            if vk_profile.get("last_name") and not existing.get("last_name"):
+                update_fields["last_name"] = vk_profile["last_name"]
+
+            # Аналогично Telegram — пытаемся проставить username, если у user'а его нет
+            if vk_profile.get("screen_name") and not existing.get("username"):
+                safe_username, conflict_username = await resolve_safe_username(
+                    db, vk_profile.get("screen_name"), exclude_uid=existing["uid"]
+                )
+                if safe_username:
+                    update_fields["username"] = safe_username
+                    conflict_username = None
+
             await db.users.update_one(
                 {"uid": existing["uid"]},
                 {
-                    "$set": {
-                        "last_login_at": datetime.now(timezone.utc),
-                        "updated_at": datetime.now(timezone.utc),
-                    },
+                    "$set": update_fields,
                     "$addToSet": {"auth_providers": "vk"},
                 },
             )
             user_doc = await db.users.find_one({"uid": existing["uid"]})
         else:
-            # Новый user. VK screen_name обрабатываем через resolve_safe_username —
-            # не линкуем по совпадению screen_name (это не доказательство
-            # владения чужим аккаунтом), если занят → создаём без username.
             safe_username, conflict_username = await resolve_safe_username(
                 db, vk_profile.get("screen_name")
             )
@@ -654,11 +941,13 @@ def create_auth_router(db) -> APIRouter:
             )
             is_new = True
 
+        await _log_auth_event(
+            db, event_type=("register_vk" if is_new else "login_vk"),
+            uid=user_doc["uid"], provider="vk", success=True, request=request,
+        )
         return await _issue_token(
-            db,
-            user_doc,
-            is_new=is_new,
-            suggested_username_taken=conflict_username,
+            db, user_doc, is_new=is_new,
+            suggested_username_taken=conflict_username, request=request,
         )
 
     # ============= QR LOGIN =============
@@ -667,15 +956,15 @@ def create_auth_router(db) -> APIRouter:
     async def qr_init(request: Request):
         """Инициирует QR-login сессию.
 
-        Возвращает `qr_token` + `qr_url`. Сайт показывает QR, опрашивает `/status`
-        каждые 2 сек. Авторизованное устройство сканирует QR и вызывает `/confirm`.
+        Возвращает qr_token + expires_at. Сайт показывает QR, опрашивает /status
+        каждые 2 сек. Авторизованное устройство сканирует QR и вызывает /confirm.
         """
         qr_token = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(minutes=QR_SESSION_TTL_MINUTES)
 
-        ua = request.headers.get("User-Agent", "")
-        ip = request.client.host if request.client else None
+        ua = request.headers.get("User-Agent", "")[:500]
+        ip = get_client_ip(request)
 
         await db.auth_qr_sessions.insert_one({
             "id": str(uuid.uuid4()),
@@ -684,41 +973,52 @@ def create_auth_router(db) -> APIRouter:
             "user_agent": ua,
             "ip_address": ip,
             "confirmed_uid": None,
+            "issued_token": None,
+            "issued_at": None,
             "created_at": now,
             "expires_at": expires_at,
         })
 
-        # QR-URL — deep link на /auth/qr/{token} в приложении
-        # Клиент сам решает как формировать URL; дадим базовый формат
-        qr_url = f"qr-login:{qr_token}"
-
         return QRInitResponse(
             qr_token=qr_token,
-            qr_url=qr_url,
+            qr_url=f"qr-login:{qr_token}",
             expires_at=expires_at,
             status="pending",
         )
 
     @router.get("/login/qr/{qr_token}/status", response_model=QRStatusResponse)
     async def qr_status(qr_token: str):
+        """Проверяет статус QR-сессии.
+
+        Поведение:
+          - pending → возвращаем status=pending.
+          - confirmed → выдаём JWT и переводим в consumed (с сохранением токена).
+          - consumed (≤ 30 сек назад) → ОТДАЁМ тот же токен повторно
+            (защита от потери ответа на стороне клиента).
+          - consumed (> 30 сек) или expired → возвращаем expired.
+          - истекло время → переводим в expired.
+        """
         session = await db.auth_qr_sessions.find_one({"qr_token": qr_token})
         if not session:
             raise HTTPException(status_code=404, detail="QR-сессия не найдена")
 
         now = datetime.now(timezone.utc)
         expires_at = session.get("expires_at")
-        # Привести к aware
         if expires_at and expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
 
-        if session["status"] == "pending" and expires_at and now > expires_at:
+        status = session.get("status", "pending")
+
+        # Pending + истёк TTL → expired
+        if status == "pending" and expires_at and now > expires_at:
             await db.auth_qr_sessions.update_one(
                 {"qr_token": qr_token},
                 {"$set": {"status": "expired"}},
             )
             return QRStatusResponse(status="expired", expires_at=expires_at)
 
-        if session["status"] == "confirmed" and session.get("confirmed_uid"):
+        # Подтверждённая сессия — выдаём токен
+        if status == "confirmed" and session.get("confirmed_uid"):
             user_doc = await db.users.find_one({"uid": session["confirmed_uid"]})
             if user_doc:
                 token = create_jwt(
@@ -726,10 +1026,13 @@ def create_auth_router(db) -> APIRouter:
                     telegram_id=user_doc.get("telegram_id"),
                     providers=user_doc.get("auth_providers", []),
                 )
-                # Удаляем сессию после отдачи (one-time)
                 await db.auth_qr_sessions.update_one(
                     {"qr_token": qr_token},
-                    {"$set": {"status": "consumed"}},
+                    {"$set": {
+                        "status": "consumed",
+                        "issued_token": token,
+                        "issued_at": now,
+                    }},
                 )
                 await _update_last_login(db, user_doc["uid"])
                 return QRStatusResponse(
@@ -739,11 +1042,34 @@ def create_auth_router(db) -> APIRouter:
                     expires_at=expires_at,
                 )
 
-        return QRStatusResponse(status=session["status"], expires_at=expires_at)
+        # Consumed с grace-периодом — повторно отдаём тот же токен
+        if status == "consumed":
+            issued_at = session.get("issued_at")
+            if issued_at and issued_at.tzinfo is None:
+                issued_at = issued_at.replace(tzinfo=timezone.utc)
+            if (
+                issued_at
+                and (now - issued_at).total_seconds() <= QR_CONSUMED_GRACE_SECONDS
+                and session.get("issued_token")
+                and session.get("confirmed_uid")
+            ):
+                user_doc = await db.users.find_one({"uid": session["confirmed_uid"]})
+                if user_doc:
+                    return QRStatusResponse(
+                        status="confirmed",
+                        access_token=session["issued_token"],
+                        user=_user_to_public(user_doc, include_email=True),
+                        expires_at=expires_at,
+                    )
+            # Grace истёк
+            return QRStatusResponse(status="expired", expires_at=expires_at)
+
+        return QRStatusResponse(status=status, expires_at=expires_at)
 
     @router.post("/login/qr/{qr_token}/confirm")
     async def qr_confirm(
         qr_token: str,
+        request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
         """Авторизованное устройство подтверждает QR-сессию."""
@@ -759,8 +1085,11 @@ def create_auth_router(db) -> APIRouter:
         if expires_at and now > expires_at:
             raise HTTPException(status_code=410, detail="QR-сессия истекла")
 
-        if session["status"] not in ("pending",):
-            raise HTTPException(status_code=409, detail=f"QR-сессия уже в статусе {session['status']}")
+        if session["status"] != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"QR-сессия уже в статусе {session['status']}",
+            )
 
         await db.auth_qr_sessions.update_one(
             {"qr_token": qr_token},
@@ -769,8 +1098,14 @@ def create_auth_router(db) -> APIRouter:
                     "status": "confirmed",
                     "confirmed_uid": current_user["sub"],
                     "confirmed_at": now,
+                    "confirmed_ip": get_client_ip(request),
+                    "confirmed_ua": request.headers.get("User-Agent", "")[:500],
                 }
             },
+        )
+        await _log_auth_event(
+            db, event_type="qr_confirm", uid=current_user["sub"],
+            provider="qr", success=True, request=request,
         )
         return {"success": True, "message": "QR подтверждён"}
 
@@ -786,15 +1121,23 @@ def create_auth_router(db) -> APIRouter:
     # ============= /logout =============
 
     @router.post("/logout")
-    async def logout(current_user: Dict[str, Any] = Depends(get_current_user_required)):
-        """Logout — клиент просто удаляет JWT. Опционально можно добавить blacklist."""
+    async def logout(
+        request: Request,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Logout — клиент удаляет JWT. Логируем для audit."""
+        await _log_auth_event(
+            db, event_type="logout", uid=current_user["sub"],
+            success=True, request=request,
+        )
         return {"success": True, "message": "Logged out. Delete the token on client side."}
 
-    # ============= Link additional provider =============
+    # ============= Link Email =============
 
     @router.post("/link/email")
     async def link_email(
         req: RegisterEmailRequest,
+        request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
         """Привязать email+пароль к существующему аккаунту."""
@@ -825,45 +1168,32 @@ def create_auth_router(db) -> APIRouter:
                 "$addToSet": {"auth_providers": "email"},
             },
         )
+        await _log_auth_event(
+            db, event_type="link_email", uid=user_doc["uid"],
+            provider="email", success=True, request=request,
+        )
         return {"success": True, "message": "Email привязан"}
 
-    # ============= Link Telegram (Widget) =============
+    # ============= Link Telegram (общий helper для widget+webapp) =============
 
-    @router.post("/link/telegram")
-    async def link_telegram(
-        req: LinkTelegramRequest,
-        current_user: Dict[str, Any] = Depends(get_current_user_required),
-    ):
-        """Привязать Telegram Login Widget к текущему авторизованному аккаунту.
-
-        🔐 Безопасность:
-        - Требует валидный JWT (ручная, явная привязка, а не авто-линк).
-        - Проверяет HMAC-подпись Telegram Widget.
-        - `telegram_id` должен быть свободен ИЛИ уже принадлежать текущему user (идемпотентно).
-        """
-        data = req.model_dump(exclude_none=True)
-        if not verify_telegram_login_widget_hash(data):
-            raise HTTPException(status_code=401, detail="Невалидная подпись Telegram")
-
-        user_doc = await db.users.find_one({"uid": current_user["sub"]})
-        if not user_doc:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-        tg_id = req.id
-
-        # Если уже привязан к этому user — идемпотентный ответ
+    async def _do_link_telegram(
+        user_doc: dict,
+        tg_id: int,
+        request: Request,
+        source: str,  # "widget" или "webapp"
+    ) -> dict:
+        """Обновляет users + переносит user_settings(pseudo_tid → real_tid)."""
+        # Идемпотентность
         if user_doc.get("telegram_id") == tg_id:
             return {"success": True, "message": "Telegram уже привязан", "telegram_id": tg_id}
 
-        # Если этот user уже имеет ДРУГОЙ telegram_id — блокируем
         if user_doc.get("telegram_id") and user_doc["telegram_id"] != tg_id:
             raise HTTPException(
                 status_code=409,
-                detail="К вашему аккаунту уже привязан другой Telegram. "
-                       "Сначала отвяжите текущий.",
+                detail="К вашему аккаунту уже привязан другой Telegram. Сначала отвяжите текущий.",
             )
 
-        # Проверяем, не занят ли tg_id другим пользователем
+        # Не занят ли tg_id другим аккаунтом
         other = await db.users.find_one(
             {"telegram_id": tg_id, "uid": {"$ne": user_doc["uid"]}},
             {"uid": 1},
@@ -883,7 +1213,15 @@ def create_auth_router(db) -> APIRouter:
             },
         )
 
-        logger.info(f"🔗 Manual link: uid={user_doc['uid']} ← telegram_id={tg_id}")
+        # 🔥 КРИТИЧЕСКИ ВАЖНО: переносим user_settings с pseudo_tid на real_tid.
+        old_tid = pseudo_tid_from_uid(user_doc["uid"])  # текущий ключ user_settings
+        await _remap_user_settings_tid(db, user_doc["uid"], old_tid, tg_id)
+
+        await _log_auth_event(
+            db, event_type=f"link_telegram_{source}", uid=user_doc["uid"],
+            provider="telegram", success=True, request=request,
+        )
+        logger.info(f"🔗 Manual link ({source}): uid={user_doc['uid']} ← telegram_id={tg_id}")
 
         updated = await db.users.find_one({"uid": user_doc["uid"]})
         return {
@@ -892,14 +1230,28 @@ def create_auth_router(db) -> APIRouter:
             "user": _user_to_public(updated, include_email=True).model_dump(mode="json"),
         }
 
-    # ============= Link Telegram (WebApp initData) =============
+    @router.post("/link/telegram")
+    async def link_telegram(
+        req: LinkTelegramRequest,
+        request: Request,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        data = req.model_dump(exclude_none=True)
+        if not verify_telegram_login_widget_hash(data):
+            raise HTTPException(status_code=401, detail="Невалидная подпись Telegram")
+
+        user_doc = await db.users.find_one({"uid": current_user["sub"]})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        return await _do_link_telegram(user_doc, req.id, request, source="widget")
 
     @router.post("/link/telegram-webapp")
     async def link_telegram_webapp(
         req: LinkTelegramWebAppRequest,
+        request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
-        """Привязать Telegram к текущему аккаунту через WebApp initData."""
         parsed = verify_telegram_webapp_init_data(req.init_data)
         if not parsed or not parsed.get("user"):
             raise HTTPException(status_code=401, detail="Невалидные данные Telegram WebApp")
@@ -913,50 +1265,14 @@ def create_auth_router(db) -> APIRouter:
         if not user_doc:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        # Идемпотентность
-        if user_doc.get("telegram_id") == tg_id:
-            return {"success": True, "message": "Telegram уже привязан", "telegram_id": tg_id}
-
-        if user_doc.get("telegram_id") and user_doc["telegram_id"] != tg_id:
-            raise HTTPException(
-                status_code=409,
-                detail="К вашему аккаунту уже привязан другой Telegram. "
-                       "Сначала отвяжите текущий.",
-            )
-
-        other = await db.users.find_one(
-            {"telegram_id": tg_id, "uid": {"$ne": user_doc["uid"]}},
-            {"uid": 1},
-        )
-        if other:
-            raise HTTPException(
-                status_code=409,
-                detail="Этот Telegram уже привязан к другому аккаунту.",
-            )
-
-        now = datetime.now(timezone.utc)
-        await db.users.update_one(
-            {"uid": user_doc["uid"]},
-            {
-                "$set": {"telegram_id": tg_id, "updated_at": now},
-                "$addToSet": {"auth_providers": "telegram"},
-            },
-        )
-
-        logger.info(f"🔗 Manual link (WebApp): uid={user_doc['uid']} ← telegram_id={tg_id}")
-
-        updated = await db.users.find_one({"uid": user_doc["uid"]})
-        return {
-            "success": True,
-            "message": "Telegram успешно привязан",
-            "user": _user_to_public(updated, include_email=True).model_dump(mode="json"),
-        }
+        return await _do_link_telegram(user_doc, tg_id, request, source="webapp")
 
     # ============= Link VK =============
 
     @router.post("/link/vk")
     async def link_vk(
         req: LinkVKRequest,
+        request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
         """Привязать VK ID к текущему аккаунту (через OAuth code)."""
@@ -971,52 +1287,13 @@ def create_auth_router(db) -> APIRouter:
         if not redirect_uri:
             raise HTTPException(status_code=400, detail="redirect_uri обязателен")
 
-        # Обмен code на токен (та же логика что в /login/vk)
-        token_data: Dict[str, Any] = {}
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                token_resp = await client.post(
-                    "https://id.vk.com/oauth2/auth",
-                    data={
-                        "grant_type": "authorization_code",
-                        "code": req.code,
-                        "client_id": VK_APP_ID,
-                        "client_secret": VK_CLIENT_SECRET,
-                        "redirect_uri": redirect_uri,
-                        "device_id": req.device_id or "",
-                        "code_verifier": req.code_verifier or "",
-                        "state": req.state or "",
-                    },
-                )
-                token_data = token_resp.json() or {}
-        except Exception as e:
-            logger.error(f"VK link: token exchange error: {e}")
-
-        if "access_token" not in token_data:
-            try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    legacy_resp = await client.get(
-                        "https://oauth.vk.com/access_token",
-                        params={
-                            "client_id": VK_APP_ID,
-                            "client_secret": VK_CLIENT_SECRET,
-                            "redirect_uri": redirect_uri,
-                            "code": req.code,
-                        },
-                    )
-                    token_data = legacy_resp.json() or {}
-            except Exception as e:
-                logger.error(f"VK link legacy token error: {e}")
-
-        vk_user_id = token_data.get("user_id")
-        if not token_data.get("access_token") or not vk_user_id:
-            raise HTTPException(
-                status_code=401,
-                detail=f"VK не вернул токен: "
-                       f"{token_data.get('error_description') or token_data.get('error') or 'unknown'}",
-            )
-
-        vk_id_str = str(vk_user_id)
+        _access_token, vk_id_str, _vk_profile = await _vk_exchange_code(
+            code=req.code,
+            redirect_uri=redirect_uri,
+            device_id=req.device_id,
+            code_verifier=req.code_verifier,
+            state=req.state,
+        )
 
         # Идемпотентность
         if user_doc.get("vk_id") == vk_id_str:
@@ -1047,6 +1324,10 @@ def create_auth_router(db) -> APIRouter:
             },
         )
 
+        await _log_auth_event(
+            db, event_type="link_vk", uid=user_doc["uid"],
+            provider="vk", success=True, request=request,
+        )
         logger.info(f"🔗 Manual link: uid={user_doc['uid']} ← vk_id={vk_id_str}")
 
         updated = await db.users.find_one({"uid": user_doc["uid"]})
@@ -1061,28 +1342,29 @@ def create_auth_router(db) -> APIRouter:
     @router.delete("/link/{provider}")
     async def unlink_provider(
         provider: str,
+        request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
         """Отвязать провайдер от аккаунта.
 
         Безопасность:
-        - Нельзя отвязать последний оставшийся способ входа (минимум 1 должен остаться).
-        - Для `email` требуется, чтобы был хотя бы один другой привязанный провайдер
-          (иначе пользователь потеряет доступ к аккаунту навсегда).
+          - Нельзя отвязать последний оставшийся способ входа.
+          - При отвязке primary_auth — переключаемся на провайдер согласно
+            детерминированному приоритету (email > telegram > vk).
         """
         provider = provider.strip().lower()
-        if provider not in ("email", "telegram", "vk"):
+        if provider not in PROVIDERS:
             raise HTTPException(
                 status_code=400,
-                detail="Провайдер должен быть: email, telegram или vk",
+                detail=f"Провайдер должен быть: {', '.join(PROVIDERS)}",
             )
 
         user_doc = await db.users.find_one({"uid": current_user["sub"]})
         if not user_doc:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        current_providers = set(user_doc.get("auth_providers") or [])
-        # Считаем реально активные провайдеры (не только по списку, но и по ID в документе)
+        current_providers: set = set(user_doc.get("auth_providers") or [])
+        # Реально активные провайдеры (по фактическим ID в документе)
         active: set = set()
         if user_doc.get("email") and user_doc.get("password_hash"):
             active.add("email")
@@ -1091,11 +1373,13 @@ def create_auth_router(db) -> APIRouter:
         if user_doc.get("vk_id"):
             active.add("vk")
 
-        # Если провайдер не привязан — ничего не делаем (идемпотентно)
         if provider not in active:
-            return {"success": True, "message": f"{provider} не был привязан", "auth_providers": list(current_providers)}
+            return {
+                "success": True,
+                "message": f"{provider} не был привязан",
+                "auth_providers": list(current_providers),
+            }
 
-        # Нельзя оставить 0 способов входа
         remaining = active - {provider}
         if not remaining:
             raise HTTPException(
@@ -1104,7 +1388,6 @@ def create_auth_router(db) -> APIRouter:
                        "Сначала привяжите другой провайдер.",
             )
 
-        unset_fields: Dict[str, Any] = {}  # noqa: F841  (reserved for future)
         set_none: Dict[str, Any] = {}
         if provider == "email":
             set_none = {"email": None, "password_hash": None}
@@ -1117,13 +1400,28 @@ def create_auth_router(db) -> APIRouter:
             "$set": {**set_none, "updated_at": datetime.now(timezone.utc)},
             "$pull": {"auth_providers": provider},
         }
-        # Если отвязываем primary_auth — переключаем на любой оставшийся
         if user_doc.get("primary_auth") == provider:
-            new_primary = next(iter(remaining))
+            new_primary = choose_primary_auth(remaining)
             update_doc["$set"]["primary_auth"] = new_primary
 
         await db.users.update_one({"uid": user_doc["uid"]}, update_doc)
 
+        # Если отвязали Telegram → user_settings.telegram_id остался реальным,
+        # но user больше не имеет реального tg_id. Переносим user_settings обратно
+        # на pseudo_tid, чтобы сохранить совместимость.
+        if provider == "telegram" and user_doc.get("telegram_id"):
+            new_pseudo = pseudo_tid_from_uid(user_doc["uid"])
+            await _remap_user_settings_tid(
+                db, user_doc["uid"],
+                old_tid=user_doc["telegram_id"],
+                new_tid=new_pseudo,
+            )
+
+        await _log_auth_event(
+            db, event_type="unlink_provider", uid=user_doc["uid"],
+            provider=provider, success=True, request=request,
+            extra={"remaining": sorted(remaining)},
+        )
         logger.info(
             f"🔓 Provider unlinked: uid={user_doc['uid']} provider={provider} "
             f"remaining={sorted(remaining)}"
@@ -1143,7 +1441,6 @@ def create_auth_router(db) -> APIRouter:
         username: str,
         current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
     ):
-        # Валидация формата + normalization через общий helper
         normalized = normalize_username(username)
         if not normalized:
             raw = (username or "").strip()
@@ -1157,12 +1454,10 @@ def create_auth_router(db) -> APIRouter:
                 username=username, available=False, reason=reason
             )
 
-        # Case-insensitive check: ищем регистронезависимо
         query: Dict[str, Any] = {
             "username": {"$regex": f"^{re.escape(normalized)}$", "$options": "i"}
         }
         if current_user:
-            # Собственный username — считается доступным
             query["uid"] = {"$ne": current_user["sub"]}
 
         existing = await db.users.find_one(query, {"_id": 1})
@@ -1171,7 +1466,7 @@ def create_auth_router(db) -> APIRouter:
 
         return UsernameCheckResponse(username=username, available=True)
 
-    # ============= Profile step (регистрационный визард) =============
+    # ============= Profile step =============
 
     @router.patch("/profile-step", response_model=UserPublic)
     async def update_profile_step(
@@ -1186,11 +1481,9 @@ def create_auth_router(db) -> APIRouter:
         complete_step = update_data.pop("complete_step", None)
 
         if "username" in update_data:
-            # Используем общий helper normalize_username — единая логика валидации.
             raw_username = update_data["username"]
             username = normalize_username(raw_username)
             if not username:
-                # Разбираем почему — для понятного сообщения.
                 stripped = (raw_username or "").strip()
                 if stripped.lower() in RESERVED_USERNAMES:
                     raise HTTPException(status_code=400, detail="Username зарезервирован")
@@ -1198,7 +1491,6 @@ def create_auth_router(db) -> APIRouter:
                     status_code=400,
                     detail="Username: 3-32 символа, только a-z, 0-9, _",
                 )
-            # Уникальность (case-insensitive)
             dup = await db.users.find_one({
                 "username": {"$regex": f"^{re.escape(username)}$", "$options": "i"},
                 "uid": {"$ne": user_doc["uid"]},
@@ -1212,12 +1504,9 @@ def create_auth_router(db) -> APIRouter:
 
         update_data["updated_at"] = datetime.now(timezone.utc)
 
-        # Обновляем шаг регистрации
         if complete_step is not None:
-            # complete_step = 3 → всё готово (step=0)
-            # complete_step = 2 → перешли на шаг 3 (step=3)
-            next_step = 3 if complete_step == 2 else (0 if complete_step >= 3 else complete_step + 1)
-            update_data["registration_step"] = next_step
+            # Явная карта переходов вместо запутанной тернарной логики
+            update_data["registration_step"] = _STEP_TRANSITIONS.get(complete_step, 0)
 
         try:
             await db.users.update_one(
@@ -1227,16 +1516,8 @@ def create_auth_router(db) -> APIRouter:
         except DuplicateKeyError:
             raise HTTPException(status_code=409, detail="Username занят")
 
-        # Синхронизация с user_settings (для обратной совместимости).
-        # effective_tid = telegram_id если есть, иначе int(uid) — чтобы email/VK/QR
-        # пользователи тоже имели user_settings-документ и фронтенд мог загружать
-        # их настройки через legacy GET /api/user-settings/{id}.
-        try:
-            effective_tid = (
-                int(user_doc["telegram_id"]) if user_doc.get("telegram_id") else int(user_doc["uid"])
-            )
-        except (TypeError, ValueError):
-            effective_tid = None
+        # Зеркало в user_settings — effective_tid реальный либо pseudo
+        effective_tid = effective_tid_for_user(user_doc)
 
         if effective_tid is not None:
             mirror = {k: v for k, v in update_data.items() if k in (
@@ -1245,7 +1526,6 @@ def create_auth_router(db) -> APIRouter:
                 "kurs", "group_id", "group_name",
             )}
             if mirror:
-                # upsert=True — создаём user_settings если его ещё нет
                 mirror["uid"] = user_doc["uid"]
                 await db.user_settings.update_one(
                     {"telegram_id": effective_tid},
@@ -1266,17 +1546,13 @@ def create_auth_router(db) -> APIRouter:
 
     @router.get("/config")
     async def auth_config():
-        """Публичная конфигурация для frontend:
-        - telegram_bot_username (для Telegram Login Widget)
-        - vk_app_id (для VK ID OAuth)
-        - vk_redirect_uri_default (ссылка на фронтовый VK callback)
-        - env
-        """
+        """Публичная конфигурация для frontend."""
         return {
             "telegram_bot_username": get_telegram_bot_username(),
             "vk_app_id": VK_APP_ID,
             "vk_redirect_uri_default": VK_REDIRECT_URI,
             "env": ENV,
+            "qr_login_ttl_minutes": QR_SESSION_TTL_MINUTES,
             "features": {
                 "email_verification": False,
                 "qr_login": True,
