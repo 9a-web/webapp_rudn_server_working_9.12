@@ -2,7 +2,8 @@
 
 **Создан:** 2025-07-17  
 **Обновлён (аудит кода):** 2025-07 — синхронизация статусов с фактическим состоянием репозитория  
-**Статус:** 🔄 В работе — Stage 4 (Stage 1-3 завершены, Stage 5 частично)
+**🔍 Повторный глубокий аудит + полный список багов:** 2026-04 (см. раздел «Stage 6» ниже)  
+**Статус:** 🔄 В работе — Stage 1-4 ✅, Stage 5 🟡, Stage 6 (hardening) 🔴 запланировано
 
 ---
 
@@ -354,3 +355,184 @@
 | 2025-07 (аудит) | Stage 5: переквалифицирован в 🟡 «Частично готово» — frontend+backend код для Telegram Login Widget, VK ID OAuth и QR Cross-Device Login реализован; осталось `/setdomain` в BotFather и E2E-тестирование |
 | 2025-07 (аудит) | `AI_CONTEXT.md` обновлён: 15→20 backend файлов, 17 675→19 826 LOC server.py, 230→249 Pydantic моделей, 268→304 endpoints, 46→53 коллекции MongoDB (добавлены `users`, `auth_sessions`, `auth_qr_sessions`, `qr_login_sessions`, `profile_views`, `xp_events`), описана структура `pages/`, `components/auth/`, `AuthContext`, обновлены переменные `.env` (`JWT_*`, `TELEGRAM_BOT_USERNAME`) |
 | 2025-07 | **Stage 4 завершён** 🎉 Создана публичная страница профиля `/u/:uid`: `frontend/src/pages/PublicProfilePage.jsx` (~480 LOC) со всеми состояниями (loading skeleton, 404, 422, hidden, loaded), richer UI с avatar gradient + level/tier badge + stats + XP bar + member-since chip + CTA-кнопками. Маршрут добавлен в `App.jsx` ВНЕ `AuthGate`. Кнопка «Поделиться» в `ProfileScreen.jsx` переведена на `buildProfileUrl()` с feedback «✓ Скопировано» и URL preview chip. Lint ✅, 404 state ✅, loaded profile (mobile + desktop) ✅ |
+| 2026-04 | **🔍 Глубокий повторный аудит** — проанализированы все 7 backend+frontend auth-файлов (`auth_utils.py` 353 LOC, `auth_routes.py` 1289 LOC, `models.py` auth-секция, `server.py /u/{uid}/*` блок, `AuthContext.jsx`, `authAPI.js`, `authStorage.js`, 4 страницы, 10 auth-компонентов). Выявлены **22 проблемы**, классифицированы по критичности (см. Stage 6 ниже) |
+
+---
+
+## 🔴 Stage 6 — Hardening: Bugfixes & Improvements (2026-04 аудит)
+
+**Цель:** Устранить все найденные в коде проблемы и довести auth-систему до production-grade качества.
+
+### 🧱 Классификация находок
+
+- **КРИТ (7 шт)** — архитектурные баги, приводящие к поломке данных или security-риску.
+- **ВЫС (5 шт)** — заметные UX/логические ошибки, ломающие сценарии.
+- **СРЕД (6 шт)** — некритичные баги и неудобства.
+- **МИН (4 шт)** — косметика и мелкие улучшения.
+
+---
+
+### 🔥 КРИТИЧЕСКИЕ
+
+#### BUG-6.1 — Коллизия `int(uid)` с реальным `telegram_id` в `user_settings`
+- **Где:** `auth_routes.py:164` (`_create_new_user`) и `auth_routes.py:1235-1237` (`profile-step`).
+- **Суть:** Для email/VK/QR регистраций в `user_settings.telegram_id` пишется `int(uid)`. UID = 9-значное число (100000000..999999999), в этом же диапазоне находятся реальные Telegram ID старых аккаунтов (2014-2017). При привязке реального Telegram с таким же 9-значным ID → `DuplicateKeyError` на unique-индексе `user_settings.telegram_id`.
+- **Фикс:** Использовать псевдо-ключ вне диапазона Telegram (`10**10 + int(uid)`, т.е. 11-значный) ИЛИ отрицательное значение (`-int(uid)`). Telegram IDs всегда положительные ≤ ~10^10.
+
+#### BUG-6.2 — После `/link/telegram*` и `/link/vk` не мигрируется `user_settings.telegram_id`
+- **Где:** `auth_routes.py:link_telegram`, `link_telegram_webapp`, `link_vk`.
+- **Суть:** `users.telegram_id` корректно обновляется, НО соответствующий документ `user_settings` остаётся привязан к псевдо-ключу (`int(uid)`). Legacy-endpoints типа `/api/profile/{telegram_id}/*` после линковки возвращают 404 для реального Telegram ID.
+- **Фикс:** Вынести helper `_remap_user_settings_tid(db, uid, old_tid, new_tid)` и вызывать его во всех трёх link-обработчиках. При `DuplicateKeyError` (если целевой user_settings уже есть) — merge.
+
+#### BUG-6.3 — Полный дубликат VK OAuth exchange-кода
+- **Где:** `auth_routes.py:551-596` (в `login_vk`) и `auth_routes.py:977-1009` (в `link_vk`).
+- **Суть:** ~45 строк логики (POST на `id.vk.com/oauth2/auth` + fallback на `oauth.vk.com` + парсинг ошибок) продублированы. Фикс одного — нужно не забыть второй.
+- **Фикс:** Вынести `_vk_exchange_code(code, redirect_uri, device_id, code_verifier, state) → (access_token, vk_user_id, vk_profile)` в helper-модуль. Обе функции используют.
+
+#### BUG-6.4 — VKCallbackPage двойной вызов в React StrictMode
+- **Где:** `frontend/src/pages/VKCallbackPage.jsx:27-107`.
+- **Суть:** В dev-mode (StrictMode) `useEffect` с пустыми зависимостями запускается дважды. VK `code` — одноразовый → второй обмен падает с ошибкой «code already used», статус = error даже после успешного первого обмена.
+- **Фикс:** Добавить `const processedRef = useRef(false)` guard в начале useEffect.
+
+#### BUG-6.5 — `refreshMe` «теряет» пользователя при временных 500/network-ошибках
+- **Где:** `AuthContext.jsx:103-124`.
+- **Суть:** Если `/api/auth/me` отдаёт 500 (кратковременная ошибка сервера) — `user` остаётся `null`, а token валиден → `isAuthenticated = false` → `AuthGate` редиректит на `/login`. Пользователь теряет сессию без вины.
+- **Фикс:** При non-401 ошибке — не сбрасывать stored user, оставлять `user = previousStoredUser`, `initializing = false`. Опционально: retry через 5 секунд. Только 401 → clearAuth.
+
+#### BUG-6.6 — Нет rate-limit на `/login/email` (brute-force уязвимость)
+- **Где:** `auth_routes.py:366-378`.
+- **Суть:** На `/register/email` есть rate-limit 5/час, на `/login/email` — нет. Злоумышленник может перебирать пароли неограниченно.
+- **Фикс:** Добавить `_check_rate_limit(ip, "login_email", 10, 300)` — максимум 10 попыток за 5 минут с IP. Плюс — отдельный лимит per-email `20/hour` для защиты от перебора по известному e-mail с разных IP.
+
+#### BUG-6.7 — `primary_auth` при unlink выбирается из `set` — недетерминированный порядок
+- **Где:** `auth_routes.py:1122` (`new_primary = next(iter(remaining))`).
+- **Суть:** `set` в Python не гарантирует порядок. Разные запуски могут дать разный `primary_auth`. Это влияет на UI-индикатор «Вы вошли через X».
+- **Фикс:** Приоритет: `email > telegram > vk`. Пример: `new_primary = next((p for p in ("email", "telegram", "vk") if p in remaining), "email")`.
+
+---
+
+### 🟠 ВЫСОКИЕ
+
+#### BUG-6.8 — QR Confirm требует ручного клика после возврата с логина
+- **Где:** `frontend/src/pages/QRConfirmPage.jsx:43-60`.
+- **Суть:** Если не авторизован — редирект на `/login?continue=/auth/qr/confirm?token=...`. После успешного входа пользователь возвращается, но должен **вручную** нажать «Подтвердить вход». Плохой UX для cross-device сценария.
+- **Фикс:** Если URL содержит `?auto=1` — автоматически вызвать `handleConfirm()` после первого рендера с `isAuthenticated=true`. На LoginPage при detekции `continue=/auth/qr/confirm` — добавить `&auto=1` к continue.
+
+#### BUG-6.9 — `AuthGate` использует свой `useMemo` с пустой зависимостью для Telegram SDK
+- **Где:** `frontend/src/components/auth/AuthGate.jsx:34-39`.
+- **Суть:** `useMemo(() => ..., [])` читает `window.Telegram.WebApp.initData` ровно один раз на mount. SDK иногда кладёт initData позже монтирования (см. комментарий в `useIsInsideTelegram.js`) → `insideTelegram=false` → редирект на `/login` вместо показа confirm-экрана.
+- **Фикс:** Использовать `useIsInsideTelegram()` хук (он уже поллит 3 раза: 100мс, 500мс, 1500мс).
+
+#### BUG-6.10 — `suggested_username_taken` не отдаётся при повторном login существующего Telegram-user
+- **Где:** `auth_routes.py:412-418` (telegram widget) и `:494-506` (webapp), path «existing».
+- **Суть:** Если user существует и БЕЗ username, а Telegram-username занят другим — тихо не устанавливаем username и **не** передаём `suggested_username_taken`. Пользователь не узнаёт, что его @name занят и имеет пустой username.
+- **Фикс:** В path «existing» тоже возвращать `suggested_username_taken=original_raw` (если `resolve_safe_username` вернул conflict).
+
+#### BUG-6.11 — QR session «consumed» — нет grace-периода для retry
+- **Где:** `auth_routes.py:qr_status:721-742`.
+- **Суть:** При получении статуса «confirmed» сервер отдаёт token и переводит сессию в «consumed». Если клиент потерял ответ (сеть, закрыл вкладку) — токен навсегда потерян, следующий polling вернёт status=consumed без данных.
+- **Фикс:** Вместо «consumed» хранить токен ещё 30 секунд. Retries в этом окне → same token. По истечении 30с — удалять (или ставить consumed=true).
+
+#### BUG-6.12 — `UserPublic` не содержит `level_id` и `form_code`
+- **Где:** `models.py:2795-2816` (`UserPublic`).
+- **Суть:** После login/me фронт получает `UserPublic` без `level_id`/`form_code`. Для корректного отображения «форма обучения / уровень» приходится делать дополнительный запрос в `user_settings`. Неконсистентно.
+- **Фикс:** Добавить оба поля в `UserPublic` и в `_user_to_public()`.
+
+---
+
+### 🟡 СРЕДНИЕ
+
+#### BUG-6.13 — Логика `registration_step` запутана (`next_step = 3 if complete == 2 else (0 if complete >= 3 else complete+1)`)
+- **Где:** `auth_routes.py:1219`.
+- **Фикс:** Заменить на явную карту `_STEP_TRANSITIONS = {1: 2, 2: 3, 3: 0}` и использовать `next_step = _STEP_TRANSITIONS.get(complete_step, 0)`.
+
+#### BUG-6.14 — `canSubmit` в RegisterWizard Step2 противоречив
+- **Где:** `frontend/src/pages/RegisterWizard.jsx:203`.
+- **Суть:** `canSubmit = (usernameValid || !!username) && firstName.trim().length > 0` — если username введён невалидно, `usernameValid=false`, но `!!username=true` → кнопка активна → клик → error.
+- **Фикс:** `canSubmit = (!username || usernameValid) && firstName.trim().length > 0`.
+
+#### BUG-6.15 — `clearAllLocalAuthData` не чистит `auth:username_conflict` и `vk_oauth_mode` в sessionStorage
+- **Где:** `frontend/src/utils/authStorage.js:56-81`.
+- **Фикс:** Добавить эти ключи в legacy-list + тотально очищать sessionStorage от auth:*.
+
+#### BUG-6.16 — Username-нормализация в UsernameField срезает caret-позицию
+- **Где:** `frontend/src/components/auth/UsernameField.jsx:59` (`e.target.value.toLowerCase()`).
+- **Суть:** При быстрой печати `toLowerCase` на каждом keystroke вызывает setState → React перерисовывает input → caret перемещается в конец. Незаметно на десктопе, но плохо на мобиле.
+- **Фикс:** Нормализовать только при blur + финальной проверке; в онлайн-событии оставлять как есть (и даже запрещать non-ASCII на лету через `onKeyDown`).
+
+#### BUG-6.17 — `_bearer_scheme_required` объявлен, но не используется
+- **Где:** `auth_utils.py:185`, нигде не вызывается.
+- **Суть:** Мёртвый код. `get_current_user_required` использует `_bearer_scheme_optional` и сам бросает 401 — это сделано правильно (поддерживает `?access_token=` query), но объявление `_bearer_scheme_required` вводит в заблуждение.
+- **Фикс:** Удалить.
+
+#### BUG-6.18 — Migration `migrate_user_settings_to_users` не обрабатывает случай «username занят»
+- **Где:** `auth_routes.py:295-302`.
+- **Суть:** При `DuplicateKeyError` (скорее всего конфликт username) — обнуляем username и повторяем. Но могут быть и другие дубли (telegram_id — если почему-то две записи в user_settings имеют один tg_id). Тогда второй insert тоже падает и migration зависает.
+- **Фикс:** Явно проверять, какой именно key дубликат через `e.details.get('keyPattern')` и обрабатывать специфично. Логировать.
+
+---
+
+### 🟢 МИНОРНЫЕ
+
+#### BUG-6.19 — `AuthInput` `rightSlot` и `isPassword` eye-icon могут накладываться
+- **Где:** `frontend/src/components/auth/AuthInput.jsx:38-49`.
+- **Фикс:** Косметика — если оба `rightSlot` и `isPassword`, отрисовать иконку глаза ПЕРЕД rightSlot и добавить gap.
+
+#### BUG-6.20 — `/auth/config` не отдаёт `qr_login_ttl_minutes` (frontend жёстко считает через `expires_at`)
+- **Суть:** Работает, но неявная связь. Если backend поменяет TTL, frontend не узнает.
+- **Фикс:** Добавить в config: `qr_login_ttl_minutes: 5`.
+
+#### BUG-6.21 — В `AuthContext.refreshMe` двойная обработка 401 (interceptor + catch)
+- **Суть:** При 401 срабатывает и axios-interceptor, и catch в refreshMe. Оба чистят state. Не критично, но можно упростить.
+- **Фикс:** Убрать проверку 401 в refreshMe, полагаться на interceptor.
+
+#### BUG-6.22 — В `VkLoginButton` и `TelegramLoginWidget` нет aria-*  атрибутов для a11y
+- **Фикс:** Добавить `aria-label` и proper semantics.
+
+---
+
+### 🚀 Улучшения (не баги, но апгрейд logic/UX)
+
+| # | Улучшение | Приоритет |
+|---|-----------|-----------|
+| IMP-1 | Логирование login attempts (успех/неудача + IP/UA) в отдельную коллекцию `auth_events` для security audit | СРЕД |
+| IMP-2 | Добавить `GET /api/auth/sessions` (список активных JWT по jti) + `DELETE /api/auth/sessions/{jti}` для logout из конкретной сессии | НИЗК (отложить) |
+| IMP-3 | `_issue_token` принимать `request: Request` и сохранять `last_login_ip` / `last_login_ua` | СРЕД |
+| IMP-4 | Вынести константы `PROVIDERS = ("email", "telegram", "vk")` и `PROVIDER_PRIORITY` | НИЗК |
+| IMP-5 | Показывать в `/auth/me` полное состояние для onboarding UI (например, `has_academic_data`) | НИЗК |
+| IMP-6 | Защита от CSRF для VK OAuth callback (сейчас есть `state` — но проверка только если `savedState` есть; при потере sessionStorage пропускается молча) | СРЕД |
+| IMP-7 | Graceful retry в `UsernameField` при 500/network | НИЗК |
+| IMP-8 | В migration скрипте добавить dry-run режим + вывод кол-ва потенциальных дублей | НИЗК |
+
+---
+
+### 📋 План исправлений Stage 6
+
+**Этап A (КРИТ, обязательные):**
+1. BUG-6.1 — pseudo_tid helper (`10**10 + int(uid)`).
+2. BUG-6.2 — `_remap_user_settings_tid` + вызовы в 3-х link-обработчиках.
+3. BUG-6.3 — `_vk_exchange_code` helper.
+4. BUG-6.4 — VKCallback `processedRef` guard.
+5. BUG-6.5 — не сбрасывать user при non-401 ошибках.
+6. BUG-6.6 — rate-limit на login.
+7. BUG-6.7 — приоритет provider'ов для primary_auth.
+
+**Этап B (ВЫС):**
+8. BUG-6.8 — auto-confirm QR после возврата с /login.
+9. BUG-6.9 — AuthGate использует useIsInsideTelegram.
+10. BUG-6.10 — suggested_username_taken для existing.
+11. BUG-6.11 — grace-период для consumed QR.
+12. BUG-6.12 — level_id/form_code в UserPublic.
+
+**Этап C (СРЕД):**
+13-18. BUG-6.13…6.18 пакетом.
+
+**Этап D (МИН + Improvements):**
+19-22 + IMP-1, IMP-3, IMP-6.
+
+---
+
+**Тестирование:**
+- Backend: `deep_testing_backend_v2` после Этапа A и после полного завершения.
+- Frontend: `auto_frontend_testing_agent` после Этапа B.
+- Lint: после каждого крупного этапа.
