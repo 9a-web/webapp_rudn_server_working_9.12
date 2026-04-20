@@ -32,11 +32,18 @@ const UsernameField = ({ value, onChange, onValidChange }) => {
   // idle | checking | available | taken | invalid
   const [reason, setReason] = useState(null);
   const timerRef = useRef(null);
+  // Stage 7: B-07 — защита от race condition при быстром изменении значения.
+  // seqRef — монотонно возрастающий счётчик; abortRef — AbortController для
+  // отмены in-flight request'а при следующем наборе символа.
+  const seqRef = useRef(0);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     if (!value) {
       setStatus('idle'); setReason(null);
       onValidChange?.(false);
+      // Stage 7: B-07 — отменить in-flight при очистке
+      abortRef.current?.abort?.();
       return undefined;
     }
     // Для проверки используем lowercase (backend всё равно case-insensitive)
@@ -45,22 +52,37 @@ const UsernameField = ({ value, onChange, onValidChange }) => {
       setStatus('invalid');
       setReason('3–32 символа, только a-z, 0-9, _');
       onValidChange?.(false);
+      abortRef.current?.abort?.();
       return undefined;
     }
     setStatus('checking'); setReason(null);
     clearTimeout(timerRef.current);
+    const mySeq = ++seqRef.current;
+    // Отменяем предыдущий in-flight request
+    abortRef.current?.abort?.();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     timerRef.current = setTimeout(async () => {
       try {
-        const res = await authAPI.checkUsername(normalized);
+        const res = await authAPI.checkUsername(normalized, { signal: ac.signal });
+        // Игнорируем ответ если пока ждали — уже другой запрос запущен
+        if (mySeq !== seqRef.current) return;
         if (res.available) {
           setStatus('available'); setReason(null); onValidChange?.(true);
         } else {
           setStatus('taken'); setReason(res.reason || 'Занято'); onValidChange?.(false);
         }
       } catch (e) {
+        // Stage 7: B-07 — если запрос отменён — ничего не делаем
+        if (e?.name === 'CanceledError' || e?.name === 'AbortError' || ac.signal.aborted) return;
+        if (mySeq !== seqRef.current) return;
         // 5xx/network — НЕ помечаем как invalid (UX); подсказываем повторить
         const code = e?.response?.status;
-        if (code && code >= 500) {
+        if (code === 429) {
+          setStatus('invalid');
+          setReason('Слишком часто. Подождите секунду.');
+        } else if (code && code >= 500) {
           setStatus('invalid');
           setReason('Сервис недоступен. Попробуйте ещё раз.');
         } else {
@@ -69,7 +91,10 @@ const UsernameField = ({ value, onChange, onValidChange }) => {
         onValidChange?.(false);
       }
     }, 400);
-    return () => clearTimeout(timerRef.current);
+    return () => {
+      clearTimeout(timerRef.current);
+      ac.abort();
+    };
   }, [value, onValidChange]);
 
   // Блокируем недопустимые символы на лету (включая Cyrillic, пробелы)

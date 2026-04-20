@@ -42,11 +42,16 @@ export const useAuth = () => {
 // 500/502/503/504/408/network errors — НЕ сбрасываем (это временный отказ).
 const AUTH_INVALIDATE_STATUSES = new Set([401, 403]);
 
+// Stage 7: B-19 — используем Symbol.for на window вместо module-level flag,
+// чтобы HMR/fast-refresh не ставил interceptors повторно (это было причиной
+// задвоения запросов при live-reload в dev).
+const INTERCEPTOR_MARKER = Symbol.for('app.auth.interceptors.v1');
+
 // --- Глобальный axios interceptor (ставится один раз) ---
-let _interceptorsInstalled = false;
 const installAxiosInterceptors = (onUnauthorized) => {
-  if (_interceptorsInstalled) return;
-  _interceptorsInstalled = true;
+  if (typeof window === 'undefined') return;
+  if (window[INTERCEPTOR_MARKER]) return;
+  window[INTERCEPTOR_MARKER] = true;
 
   axios.interceptors.request.use((config) => {
     const token = getToken();
@@ -68,6 +73,13 @@ const installAxiosInterceptors = (onUnauthorized) => {
         const url = err.config?.url || '';
         if (!url.includes('/api/auth/login') && !url.includes('/api/auth/register')) {
           try { onUnauthorized?.(); } catch { /* noop */ }
+          // Stage 7: B-14 — глобально сигналим приложению «сессия истекла».
+          // Подписчики (например, AuthGate) могут выполнить redirect на /login?reason=expired.
+          try {
+            window.dispatchEvent(
+              new CustomEvent('auth:session-expired', { detail: { status: 401 } }),
+            );
+          } catch { /* noop */ }
         }
       }
       return Promise.reject(err);

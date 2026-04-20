@@ -16619,6 +16619,7 @@ async def register_profile_view(telegram_id: int, request: ProfileViewRequest):
 @api_router.get("/profile/{telegram_id}/share-link")
 async def get_profile_share_link(
     telegram_id: int,
+    request: Request,
     viewer_telegram_id: Optional[int] = None,
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
@@ -16662,12 +16663,16 @@ async def get_profile_share_link(
         uid = user.get("uid")
         public_link = None
         if uid:
-            # PUBLIC_BASE_URL — из ENV. Если пусто — формируем относительно
+            # Stage 7: B-20 — если PUBLIC_BASE_URL пуст, используем хост
+            # из текущего request.url (защита от относительных ссылок в share-popup).
             from config import PUBLIC_BASE_URL
-            if PUBLIC_BASE_URL:
-                public_link = f"{PUBLIC_BASE_URL.rstrip('/')}/u/{uid}"
-            else:
-                public_link = f"/u/{uid}"
+            base = (PUBLIC_BASE_URL or "").rstrip("/")
+            if not base and request is not None:
+                try:
+                    base = f"{request.url.scheme}://{request.url.netloc}"
+                except Exception:
+                    base = ""
+            public_link = f"{base}/u/{uid}" if base else f"/u/{uid}"
 
         display_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or user.get("username") or "Пользователь"
 
@@ -16735,15 +16740,63 @@ async def _resolve_uid_or_404(uid: str) -> dict:
 
 
 @api_router.get("/u/{uid}/resolve")
-async def resolve_uid(uid: str):
+async def resolve_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Быстрый резолв UID → telegram_id + базовая инфа для отображения превью.
 
-    Полезно для фронта чтобы понять — существует ли профиль и какой у него телеграм-id.
-    НЕ фильтруется privacy (только открытые поля: uid, display_name, has_telegram).
+    Stage 7: B-06 — респектуем privacy:
+      - Если у пользователя show_in_search=False и viewer НЕ сам пользователь
+        и НЕ друг — возвращаем 404 (как будто пользователь не существует).
+      - Если viewer заблокирован пользователем — тоже 404.
     """
     user = await _resolve_user_by_uid(uid)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    target_tid = user.get("telegram_id")
+    viewer_tid = current_user.get("tid") if current_user else None
+    viewer_uid = current_user.get("sub") if current_user else None
+
+    # Privacy-проверка: self — всегда OK, остальные — проверяем show_in_search + блок
+    is_self = (viewer_uid == uid) or (viewer_tid and target_tid and viewer_tid == target_tid)
+    if not is_self and target_tid:
+        try:
+            # Настройки приватности
+            settings_doc = await db.user_settings.find_one({"telegram_id": target_tid})
+            privacy = await get_user_privacy_settings(target_tid, user_doc=settings_doc)
+
+            is_friend = False
+            if viewer_tid:
+                # Проверка дружбы (только если viewer авторизован)
+                try:
+                    friendship = await db.friendships.find_one({
+                        "$or": [
+                            {"user_id": viewer_tid, "friend_id": target_tid},
+                            {"user_id": target_tid, "friend_id": viewer_tid},
+                        ]
+                    })
+                    is_friend = bool(friendship)
+
+                    # Блокировка: если target заблокировал viewer → 404
+                    blocked = await db.blocked_users.find_one({
+                        "user_id": target_tid,
+                        "blocked_user_id": viewer_tid,
+                    })
+                    if blocked:
+                        raise HTTPException(status_code=404, detail="Пользователь не найден")
+                except HTTPException:
+                    raise
+                except Exception:
+                    pass
+
+            if not privacy.show_in_search and not is_friend:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"resolve_uid privacy check error for uid={uid}: {e}")
 
     display_name = (
         f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
@@ -16752,10 +16805,10 @@ async def resolve_uid(uid: str):
     )
     return {
         "uid": uid,
-        "telegram_id": user.get("telegram_id"),
+        "telegram_id": target_tid,
         "display_name": display_name,
         "username": user.get("username"),
-        "has_telegram": bool(user.get("telegram_id")),
+        "has_telegram": bool(target_tid),
         "auth_providers": user.get("auth_providers", []),
     }
 
@@ -16834,6 +16887,7 @@ async def get_public_qr_by_uid(
 @api_router.get("/u/{uid}/share-link")
 async def get_public_share_link_by_uid(
     uid: str,
+    request: Request,
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
     """Ссылки для шаринга профиля по UID."""
@@ -16846,8 +16900,15 @@ async def get_public_share_link_by_uid(
             or user.get("username")
             or f"User {uid}"
         )
+        # Stage 7: B-20 — fallback из request.url если PUBLIC_BASE_URL пуст
         from config import PUBLIC_BASE_URL
-        public_link = f"{PUBLIC_BASE_URL.rstrip('/')}/u/{uid}" if PUBLIC_BASE_URL else f"/u/{uid}"
+        base = (PUBLIC_BASE_URL or "").rstrip("/")
+        if not base:
+            try:
+                base = f"{request.url.scheme}://{request.url.netloc}"
+            except Exception:
+                base = ""
+        public_link = f"{base}/u/{uid}" if base else f"/u/{uid}"
         return {
             "link": None,
             "telegram_link": None,
@@ -16860,6 +16921,7 @@ async def get_public_share_link_by_uid(
 
     return await get_profile_share_link(
         telegram_id=int(target_tid),
+        request=request,
         viewer_telegram_id=None,
         current_user=current_user,
     )

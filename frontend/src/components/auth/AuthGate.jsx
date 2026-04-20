@@ -21,6 +21,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import useIsInsideTelegram from '../../hooks/useIsInsideTelegram';
 import TelegramWebAppConfirm from './TelegramWebAppConfirm';
+import { safeContinueUrl } from '../../utils/safeRedirect'; // Stage 7: B-01
 
 const FullPageLoader = ({ hint }) => (
   <div className="flex min-h-screen w-full items-center justify-center bg-[#0E0E10] text-white">
@@ -54,12 +55,28 @@ const AuthGate = ({ children }) => {
     }
     // Неавторизован
     if (!isInside) {
-      const cont = encodeURIComponent(location.pathname + location.search);
+      // Stage 7: B-01 — sanitize pathname+search перед тем как класть в ?continue
+      const safeCont = safeContinueUrl(location.pathname + location.search, '/');
+      const cont = encodeURIComponent(safeCont);
       navigate(`/login?continue=${cont}`, { replace: true });
     }
     // Если isInside и не авторизован — показываем confirm (ниже в рендере)
   }, [initializing, ready, isAuthenticated, needsOnboarding, isInside,
     location.pathname, location.search, navigate]);
+
+  // Stage 7: B-14 — слушаем глобальное событие «session expired» (его шлёт
+  // axios-interceptor при любом 401). Перенаправляем на /login с флагом
+  // reason=expired, чтобы LoginPage показал пользователю понятный баннер.
+  useEffect(() => {
+    const onExpired = () => {
+      if (isInside) return; // в Telegram WebApp перелогин автоматический
+      const safeCont = safeContinueUrl(location.pathname + location.search, '/');
+      const cont = encodeURIComponent(safeCont);
+      navigate(`/login?reason=expired&continue=${cont}`, { replace: true });
+    };
+    window.addEventListener('auth:session-expired', onExpired);
+    return () => window.removeEventListener('auth:session-expired', onExpired);
+  }, [isInside, location.pathname, location.search, navigate]);
 
   // --- Render states ---
 

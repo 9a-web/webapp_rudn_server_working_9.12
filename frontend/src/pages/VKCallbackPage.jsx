@@ -21,6 +21,7 @@ import AuthButton from '../components/auth/AuthButton';
 import { useAuth } from '../contexts/AuthContext';
 import { PUBLIC_BASE_URL } from '../constants/publicBase';
 import { authAPI } from '../services/authAPI';
+import { safeContinueUrl } from '../utils/safeRedirect'; // Stage 7: B-01
 
 const VKCallbackPage = () => {
   const [params] = useSearchParams();
@@ -77,7 +78,8 @@ const VKCallbackPage = () => {
     const redirect = sessionStorage.getItem('vk_oauth_redirect')
       || `${PUBLIC_BASE_URL}/auth/vk/callback`;
     const referralCode = sessionStorage.getItem('vk_oauth_referral') || undefined;
-    const continueUrl = sessionStorage.getItem('vk_oauth_continue') || null;
+    // Stage 7: B-01 — sanitize continue URL из sessionStorage
+    const continueUrl = safeContinueUrl(sessionStorage.getItem('vk_oauth_continue'), null);
 
     const cleanup = () => {
       ['vk_oauth_state', 'vk_oauth_verifier', 'vk_oauth_redirect',
@@ -123,6 +125,9 @@ const VKCallbackPage = () => {
           }, 300);
         }
       } catch (e) {
+        // Stage 7: B-09 — cleanup sessionStorage на ошибке, иначе следующая попытка
+        // упадёт с "State mismatch" из-за устаревших данных в storage.
+        cleanup();
         setStatus('error');
         setError(e.message || 'Не удалось завершить вход через VK');
       }

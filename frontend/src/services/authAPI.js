@@ -75,8 +75,11 @@ export const authAPI = {
   unlinkProvider: unwrap((provider) =>
     axios.delete(`${BASE}/link/${encodeURIComponent(provider)}`, withAuth())),
 
-  checkUsername: unwrap((username) =>
-    axios.get(`${BASE}/check-username/${encodeURIComponent(username)}`, withAuth())),
+  checkUsername: unwrap((username, opts = {}) =>
+    axios.get(
+      `${BASE}/check-username/${encodeURIComponent(username)}`,
+      { ...withAuth(), signal: opts.signal } // Stage 7: B-07 — AbortController support
+    )),
 
   updateProfileStep: unwrap((payload) =>
     axios.patch(`${BASE}/profile-step`, payload, withAuth())),

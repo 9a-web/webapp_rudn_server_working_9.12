@@ -16,6 +16,7 @@
 import hmac
 import hashlib
 import logging
+import os  # Stage 7: B-05 TRUST_PROXY_HOPS env-var
 import re
 import secrets
 from collections import defaultdict
@@ -214,8 +215,45 @@ def choose_primary_auth(active_providers: Iterable[str], fallback: str = "email"
 # Простой лимитер с двумя ключами (например, IP и email одновременно).
 # Для production желательно заменить на Redis/slowapi, но для in-process FastAPI
 # инстансов этого достаточно. Память автоматически освобождается через cutoff.
+#
+# Stage 7: B-17 — добавлен lazy GC, ограничение размера словаря + защита от
+# неограниченного роста при атаке через случайные ключи (IP spoofing).
 
 _rate_limits: dict = defaultdict(list)  # bucket:key -> list[timestamps]
+_RATE_LIMIT_MAX_KEYS = 100_000          # жёсткий потолок на кол-во активных ключей
+_rate_limit_gc_counter = 0              # инкрементируется при каждом вызове
+_RATE_LIMIT_GC_EVERY = 1000             # раз в N вызовов делаем proactive GC
+
+
+def _rate_limit_gc(now: float) -> None:
+    """Удаляет bucket:key с полностью устаревшими timestamps.
+
+    Вызывается проактивно каждые _RATE_LIMIT_GC_EVERY обращений к
+    check_rate_limit. Также делает аварийный dump при переполнении
+    _RATE_LIMIT_MAX_KEYS.
+    """
+    global _rate_limits
+    # Максимальное окно из всех buckets — 3600 сек (час). Ключи старше
+    # (now - 3600) уже никому не нужны.
+    cutoff = now - 3600
+    dead: list = []
+    for k, arr in _rate_limits.items():
+        if not arr or arr[-1] <= cutoff:
+            dead.append(k)
+    for k in dead:
+        _rate_limits.pop(k, None)
+
+    # Аварийный сброс при переполнении (anti-DoS через IP-spoofing)
+    if len(_rate_limits) > _RATE_LIMIT_MAX_KEYS:
+        # Оставляем только самые свежие 50% (по max timestamp)
+        items = sorted(
+            _rate_limits.items(),
+            key=lambda kv: (kv[1][-1] if kv[1] else 0),
+            reverse=True,
+        )
+        keep = dict(items[: _RATE_LIMIT_MAX_KEYS // 2])
+        _rate_limits.clear()
+        _rate_limits.update(keep)
 
 
 def check_rate_limit(
@@ -229,7 +267,16 @@ def check_rate_limit(
     Имя bucket'а должно быть стабильным (например, `login_email_ip`,
     `login_email_email`), key — уникальное значение в этом bucket'е (IP или email).
     """
+    global _rate_limit_gc_counter
     now = monotonic()
+    _rate_limit_gc_counter += 1
+    if _rate_limit_gc_counter >= _RATE_LIMIT_GC_EVERY:
+        _rate_limit_gc_counter = 0
+        try:
+            _rate_limit_gc(now)
+        except Exception:  # pragma: no cover
+            pass
+
     full_key = f"{bucket}:{key or 'unknown'}"
     arr = _rate_limits[full_key]
     cutoff = now - window_seconds
@@ -242,14 +289,35 @@ def check_rate_limit(
     return True
 
 
+# Stage 7: B-05 — ENV-управляемая защита от IP-spoofing через X-Forwarded-For.
+# Только TRUST_PROXY_HOPS последних прокси-элементов будут игнорироваться;
+# реальный клиент = элемент №(len(xff_list) - TRUST_PROXY_HOPS).
+# По умолчанию доверяем 1 хопу (типичный K8s ingress).
+try:
+    _TRUST_PROXY_HOPS = int(os.getenv("TRUST_PROXY_HOPS", "1"))
+except (TypeError, ValueError):
+    _TRUST_PROXY_HOPS = 1
+if _TRUST_PROXY_HOPS < 0:
+    _TRUST_PROXY_HOPS = 0
+
+
 def get_client_ip(request: Request) -> str:
-    """Аккуратно достаёт client IP, учитывая X-Forwarded-For (за прокси/ingress)."""
+    """Аккуратно достаёт client IP, учитывая X-Forwarded-For (за прокси/ingress).
+
+    Stage 7: B-05 — защита от IP-spoofing: если TRUST_PROXY_HOPS=N, то
+    берём элемент X-Forwarded-For из позиции (len-N-1), а не первый элемент
+    (который юзер может подменить через заголовок).
+    """
     if not request:
         return "unknown"
-    # Уважаем X-Forwarded-For (если за прокси — первый элемент = реальный клиент)
     xff = request.headers.get("X-Forwarded-For", "")
     if xff:
-        return xff.split(",")[0].strip()
+        parts = [p.strip() for p in xff.split(",") if p.strip()]
+        if parts:
+            # Выбираем элемент с учётом количества доверенных прокси.
+            # Если доверяем 1 хопу (наш ingress), то берём предпоследний.
+            idx = max(0, len(parts) - 1 - _TRUST_PROXY_HOPS)
+            return parts[idx]
     real_ip = request.headers.get("X-Real-IP", "")
     if real_ip:
         return real_ip.strip()

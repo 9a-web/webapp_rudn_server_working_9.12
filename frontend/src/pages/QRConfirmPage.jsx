@@ -23,6 +23,7 @@ import AuthLayout from '../components/auth/AuthLayout';
 import AuthButton from '../components/auth/AuthButton';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
+import { safeContinueUrl } from '../utils/safeRedirect'; // Stage 7: B-01
 
 const QRConfirmPage = () => {
   const [params] = useSearchParams();
@@ -66,7 +67,12 @@ const QRConfirmPage = () => {
 
   if (!isAuthenticated && token && status !== 'error') {
     // Логин с continue + auto=1, чтобы после возврата сразу подтвердить.
-    const continueTarget = `/auth/qr/confirm?token=${encodeURIComponent(token)}&auto=1`;
+    // Stage 7: B-01 — continueTarget строится программно (всегда internal path),
+    // но всё равно прогоняем через sanitizer для единообразия.
+    const continueTarget = safeContinueUrl(
+      `/auth/qr/confirm?token=${encodeURIComponent(token)}&auto=1`,
+      '/',
+    );
     return (
       <AuthLayout title="Вход по QR" subtitle="Сначала войдите в аккаунт">
         <div className="space-y-4">
@@ -139,7 +145,22 @@ const QRConfirmPage = () => {
             <XCircle className="h-12 w-12 text-red-400" />
             <div className="text-sm text-red-300 break-words max-w-xs">{error}</div>
           </div>
-          <AuthButton onClick={() => navigate('/')}>На главную</AuthButton>
+          {/* Stage 7: B-13 — добавлена кнопка retry; сбрасываем autoRef чтобы повтор работал */}
+          <AuthButton
+            onClick={() => {
+              setStatus('idle');
+              setError(null);
+              autoRef.current = false;
+              if (!auto) {
+                // Если нет auto-flag — вызываем confirm явно
+                handleConfirm();
+              }
+              // Если auto=1 — useEffect сам перезапустит handleConfirm
+            }}
+          >
+            Попробовать ещё раз
+          </AuthButton>
+          <AuthButton variant="secondary" onClick={() => navigate('/')}>На главную</AuthButton>
         </div>
       )}
     </AuthLayout>

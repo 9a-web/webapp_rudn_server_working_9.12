@@ -81,7 +81,25 @@ const QRLoginBlock = ({ onSuccess }) => {
       }
     };
 
-    pollRef.current = setInterval(poll, 2000);
+    // Stage 7: B-10 — управление частотой polling в зависимости от visibility.
+    // Если вкладка скрыта, замедляем polling до 10с (экономия батареи/трафика).
+    // При возвращении — сразу делаем poll и снова 2с интервал.
+    const startPoll = (intervalMs) => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(poll, intervalMs);
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        startPoll(10000);
+      } else {
+        // Сразу poll и ускоряем до 2с
+        poll();
+        startPoll(2000);
+      }
+    };
+    startPoll(document.hidden ? 10000 : 2000);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     const tick = () => {
       if (!expiresAt) return;
       const diff = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
@@ -93,7 +111,10 @@ const QRLoginBlock = ({ onSuccess }) => {
     };
     tick();
     tickRef.current = setInterval(tick, 1000);
-    return stopPolling;
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      stopPolling();
+    };
   }, [qrToken, status, expiresAt, stopPolling, onSuccess]);
 
   const handleCopyLink = async () => {

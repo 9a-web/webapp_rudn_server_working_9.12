@@ -234,8 +234,21 @@ export const friendsAPI = {
   },
 
   // Зарегистрировать просмотр профиля (счётчик у владельца)
+  // Stage 7: B-16 — client-side dedup через sessionStorage.
+  // Backend и так дедуплицирует по часу, но без client-side защиты
+  // каждый открытый таб шлёт запрос при каждой навигации — лишняя нагрузка.
   registerProfileView: async (ownerTelegramId, viewerTelegramId) => {
     try {
+      if (typeof window !== 'undefined' && ownerTelegramId && viewerTelegramId) {
+        const key = `pv:${ownerTelegramId}:${viewerTelegramId}`;
+        const now = Date.now();
+        // 1 час = 3600_000 мс (совпадает с backend cutoff)
+        const prev = Number(sessionStorage.getItem(key) || 0);
+        if (prev && now - prev < 3600_000) {
+          return null; // ещё в окне — не дублируем
+        }
+        sessionStorage.setItem(key, String(now));
+      }
       const response = await api.post(`/profile/${ownerTelegramId}/view`, {
         viewer_telegram_id: viewerTelegramId,
       });

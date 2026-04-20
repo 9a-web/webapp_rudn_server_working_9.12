@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
 """
-Comprehensive test suite for Stage 6 Hardening auth system changes.
+Comprehensive test suite for Stage 7 Hardening auth system changes.
 
-Tests both regression (all previous 23 tests) and new hardening features:
-- Pseudo-tid for email/VK/QR users
-- Rate-limit on login (IP + email)
-- QR consumed grace period
-- UserPublic extended fields
-- registration_step mapping
-- /auth/config with qr_login_ttl_minutes
-- suggested_username_taken for existing users
-- auth_events collection
-- last_login_ip/last_login_ua
-- Deterministic primary_auth selection
+Tests both regression (all previous tests) and new Stage 7 hardening features:
+PHASE 1 (P0 CRITICAL):
+- B-02 Rate limits — новые buckets (check-username, qr_confirm, etc.)
+- B-06 Privacy-фильтр /u/{uid}/resolve
+- B-03 Atomic qr_confirm — повторный confirm возвращает 409, не 500
+- B-05 TRUST_PROXY_HOPS — get_client_ip работает корректно
+
+PHASE 2 (P1):
+- B-12 max_length — POST /register/email с длинным first_name → 422
+- B-11 Empty string filter — пустые строки не затирают существующие значения
+- B-23 username explicit unset — пустая строка устанавливает username=null
+
+PHASE 3 (P2):
+- B-20 share-link fallback — PUBLIC_BASE_URL fallback из request.url
+
+REGRESSION:
+- Полный auth flow
+- GET /api/auth/config
+- POST /login/telegram-webapp с невалидным init_data → 401
+- QR flow
+- DELETE /api/auth/link/{provider} без JWT → 401
 """
 
 import asyncio
@@ -29,7 +39,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 
 # Configuration
-BASE_URL = "http://localhost:8001/api"
+BASE_URL = "http://localhost:8001/api"  # Use local URL since external URL routing is different
 MONGO_URL = "mongodb://localhost:27017"  # Will be read from backend/.env if available
 DB_NAME = "rudn_schedule"
 
@@ -495,7 +505,517 @@ async def test_logout():
         log_test("Logout", "FAIL", str(e))
 
 
-# ============ STAGE 6 HARDENING TESTS ============
+# ============ STAGE 7 HARDENING TESTS ============
+
+async def test_rate_limit_check_username_ip():
+    """Test B-02: Rate limit на check-username (121-й запрос с IP → 429)"""
+    try:
+        # Попробуем сделать много запросов check-username с одного IP
+        # Лимит: 120 запросов/минуту/IP
+        test_username = generate_test_username()
+        
+        # Делаем 120 запросов (должны пройти)
+        for i in range(120):
+            response = await client.get(f"{BASE_URL}/auth/check-username/{test_username}_{i}")
+            if response.status_code != 200:
+                log_test("Rate Limit Check Username IP", "FAIL", f"Request {i+1}: Expected 200, got {response.status_code}")
+                return
+        
+        # 121-й запрос должен быть заблокирован
+        response = await client.get(f"{BASE_URL}/auth/check-username/{test_username}_121")
+        
+        if response.status_code != 429:
+            log_test("Rate Limit Check Username IP", "FAIL", f"121st request: Expected 429, got {response.status_code}")
+            return
+        
+        log_test("Rate Limit Check Username IP", "PASS", "Rate limit working: 120 requests OK, 121st blocked with 429")
+        
+    except Exception as e:
+        log_test("Rate Limit Check Username IP", "FAIL", str(e))
+
+
+async def test_privacy_filter_resolve():
+    """Test B-06: Privacy-фильтр /u/{uid}/resolve"""
+    try:
+        # 1. Создаём пользователя через email регистрацию
+        user_data = await test_email_registration()
+        if not user_data:
+            return
+        
+        uid = user_data["uid"]
+        token = user_data["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # 2. Устанавливаем privacy show_in_search=false
+        # Сначала нужно получить telegram_id для privacy endpoint
+        if db is None:
+            log_test("Privacy Filter Resolve", "SKIP", "MongoDB not available for privacy setup")
+            return
+        
+        user_settings = await db.user_settings.find_one({"uid": uid})
+        if not user_settings:
+            log_test("Privacy Filter Resolve", "FAIL", f"No user_settings found for uid {uid}")
+            return
+        
+        telegram_id = user_settings.get("telegram_id")
+        if not telegram_id:
+            log_test("Privacy Filter Resolve", "FAIL", f"No telegram_id in user_settings for uid {uid}")
+            return
+        
+        # Устанавливаем privacy через PUT /api/u/{uid}/privacy
+        privacy_response = await client.put(f"{BASE_URL}/u/{uid}/privacy", 
+                                          headers=headers,
+                                          json={"show_in_search": False})
+        
+        if privacy_response.status_code != 200:
+            log_test("Privacy Filter Resolve", "FAIL", f"Privacy setup failed: {privacy_response.status_code}: {privacy_response.text}")
+            return
+        
+        # 3. GET /api/u/{uid}/resolve БЕЗ JWT → должен вернуть 404
+        response = await client.get(f"{BASE_URL}/u/{uid}/resolve")
+        
+        if response.status_code != 404:
+            log_test("Privacy Filter Resolve", "FAIL", f"Expected 404 without JWT, got {response.status_code}")
+            return
+        
+        # 4. GET /api/u/{uid}/resolve С JWT того же юзера → должен вернуть 200 (is_self)
+        response = await client.get(f"{BASE_URL}/u/{uid}/resolve", headers=headers)
+        
+        if response.status_code != 200:
+            log_test("Privacy Filter Resolve", "FAIL", f"Expected 200 with own JWT, got {response.status_code}")
+            return
+        
+        log_test("Privacy Filter Resolve", "PASS", "Privacy filter working: 404 without JWT, 200 with own JWT")
+        
+    except Exception as e:
+        log_test("Privacy Filter Resolve", "FAIL", str(e))
+
+
+async def test_atomic_qr_confirm():
+    """Test B-03: Atomic qr_confirm — повторный confirm возвращает 409, не 500"""
+    try:
+        # 1. POST /api/auth/login/qr/init → получить qr_token
+        response = await client.post(f"{BASE_URL}/auth/login/qr/init")
+        
+        if response.status_code != 200:
+            log_test("Atomic QR Confirm", "FAIL", f"QR init failed: {response.status_code}: {response.text}")
+            return
+        
+        qr_data = response.json()
+        qr_token = qr_data.get("qr_token")
+        
+        if not qr_token:
+            log_test("Atomic QR Confirm", "FAIL", "No qr_token in init response")
+            return
+        
+        # 2. Зарегистрировать юзера, получить JWT
+        user_data = await test_email_registration()
+        if not user_data:
+            log_test("Atomic QR Confirm", "FAIL", "Could not get JWT for QR confirmation")
+            return
+        
+        headers = {"Authorization": f"Bearer {user_data['access_token']}"}
+        
+        # 3. POST /api/auth/login/qr/{token}/confirm (с JWT) → 200
+        response = await client.post(f"{BASE_URL}/auth/login/qr/{qr_token}/confirm", headers=headers)
+        
+        if response.status_code != 200:
+            log_test("Atomic QR Confirm", "FAIL", f"First confirm failed: {response.status_code}: {response.text}")
+            return
+        
+        # 4. Повторный POST /api/auth/login/qr/{token}/confirm (с тем же JWT) → 409
+        response = await client.post(f"{BASE_URL}/auth/login/qr/{qr_token}/confirm", headers=headers)
+        
+        if response.status_code != 409:
+            log_test("Atomic QR Confirm", "FAIL", f"Second confirm: Expected 409, got {response.status_code}")
+            return
+        
+        log_test("Atomic QR Confirm", "PASS", "Atomic QR confirm working: first confirm 200, second confirm 409")
+        
+    except Exception as e:
+        log_test("Atomic QR Confirm", "FAIL", str(e))
+
+
+async def test_max_length_validation():
+    """Test B-12: max_length — POST /register/email с first_name длиной 200 символов → 422"""
+    try:
+        # Создаём first_name длиной 200 символов
+        long_first_name = "a" * 200
+        email = generate_test_email()
+        
+        response = await client.post(f"{BASE_URL}/auth/register/email", json={
+            "email": email,
+            "password": "testpass123",
+            "first_name": long_first_name,
+            "last_name": "User"
+        })
+        
+        if response.status_code != 422:
+            log_test("Max Length Validation", "FAIL", f"Expected 422 for 200-char first_name, got {response.status_code}")
+            return
+        
+        log_test("Max Length Validation", "PASS", "Max length validation working: 200-char first_name returns 422")
+        
+    except Exception as e:
+        log_test("Max Length Validation", "FAIL", str(e))
+
+
+async def test_empty_string_filter():
+    """Test B-11: Empty string filter — пустая строка не затирает существующее значение first_name"""
+    try:
+        # 1. Регистрируем пользователя с first_name
+        user_data = await test_email_registration()
+        if not user_data:
+            return
+        
+        headers = {"Authorization": f"Bearer {user_data['access_token']}"}
+        
+        # 2. Устанавливаем first_name через profile-step
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 1,
+                                        "first_name": "TestName",
+                                        "username": generate_test_username()
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Empty String Filter", "FAIL", f"Profile step setup failed: {response.status_code}: {response.text}")
+            return
+        
+        # 3. Проверяем что first_name установлен
+        response = await client.get(f"{BASE_URL}/auth/me", headers=headers)
+        if response.status_code != 200:
+            log_test("Empty String Filter", "FAIL", f"GET /me failed: {response.status_code}")
+            return
+        
+        user_before = response.json()
+        if user_before.get("first_name") != "TestName":
+            log_test("Empty String Filter", "FAIL", f"Expected first_name='TestName', got {user_before.get('first_name')}")
+            return
+        
+        # 4. PATCH /auth/profile-step с first_name="" (пустая строка)
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 1,
+                                        "first_name": "",  # пустая строка
+                                        "username": user_before.get("username")
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Empty String Filter", "FAIL", f"Empty string patch failed: {response.status_code}: {response.text}")
+            return
+        
+        # 5. Проверяем что first_name НЕ затёрся (остался "TestName")
+        response = await client.get(f"{BASE_URL}/auth/me", headers=headers)
+        if response.status_code != 200:
+            log_test("Empty String Filter", "FAIL", f"GET /me after empty string failed: {response.status_code}")
+            return
+        
+        user_after = response.json()
+        if user_after.get("first_name") != "TestName":
+            log_test("Empty String Filter", "FAIL", f"first_name was overwritten! Expected 'TestName', got {user_after.get('first_name')}")
+            return
+        
+        log_test("Empty String Filter", "PASS", "Empty string filter working: first_name preserved after empty string patch")
+        
+    except Exception as e:
+        log_test("Empty String Filter", "FAIL", str(e))
+
+
+async def test_username_explicit_unset():
+    """Test B-23: username explicit unset — пустая строка устанавливает username=null"""
+    try:
+        # 1. Регистрируем пользователя и устанавливаем username
+        user_data = await test_email_registration()
+        if not user_data:
+            return
+        
+        headers = {"Authorization": f"Bearer {user_data['access_token']}"}
+        test_username = generate_test_username()
+        
+        # 2. Устанавливаем username
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 1,
+                                        "username": test_username,
+                                        "first_name": "Test"
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Username Explicit Unset", "FAIL", f"Username setup failed: {response.status_code}: {response.text}")
+            return
+        
+        # 3. Проверяем что username установлен
+        response = await client.get(f"{BASE_URL}/auth/me", headers=headers)
+        if response.status_code != 200:
+            log_test("Username Explicit Unset", "FAIL", f"GET /me failed: {response.status_code}")
+            return
+        
+        user_before = response.json()
+        if user_before.get("username") != test_username:
+            log_test("Username Explicit Unset", "FAIL", f"Expected username='{test_username}', got {user_before.get('username')}")
+            return
+        
+        # 4. PATCH /auth/profile-step с username="" → устанавливает username=null
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 1,
+                                        "username": "",  # пустая строка для explicit unset
+                                        "first_name": "Test"
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Username Explicit Unset", "FAIL", f"Username unset failed: {response.status_code}: {response.text}")
+            return
+        
+        # 5. Проверяем что username стал null
+        response = await client.get(f"{BASE_URL}/auth/me", headers=headers)
+        if response.status_code != 200:
+            log_test("Username Explicit Unset", "FAIL", f"GET /me after unset failed: {response.status_code}")
+            return
+        
+        user_after = response.json()
+        if user_after.get("username") is not None:
+            log_test("Username Explicit Unset", "FAIL", f"Expected username=null, got {user_after.get('username')}")
+            return
+        
+        log_test("Username Explicit Unset", "PASS", "Username explicit unset working: empty string sets username=null")
+        
+    except Exception as e:
+        log_test("Username Explicit Unset", "FAIL", str(e))
+
+
+async def test_share_link_fallback():
+    """Test B-20: share-link fallback — public_link начинается с http(s)://"""
+    try:
+        # 1. Регистрируем пользователя
+        user_data = await test_email_registration()
+        if not user_data:
+            return
+        
+        headers = {"Authorization": f"Bearer {user_data['access_token']}"}
+        uid = user_data["uid"]
+        
+        # 2. Получаем telegram_id для share-link endpoint
+        if db is None:
+            log_test("Share Link Fallback", "SKIP", "MongoDB not available for telegram_id lookup")
+            return
+        
+        user_settings = await db.user_settings.find_one({"uid": uid})
+        if not user_settings:
+            log_test("Share Link Fallback", "FAIL", f"No user_settings found for uid {uid}")
+            return
+        
+        telegram_id = user_settings.get("telegram_id")
+        if not telegram_id:
+            log_test("Share Link Fallback", "FAIL", f"No telegram_id in user_settings for uid {uid}")
+            return
+        
+        # 3. GET /api/profile/{tid}/share-link (в test env где PUBLIC_BASE_URL пустой)
+        response = await client.get(f"{BASE_URL}/profile/{telegram_id}/share-link", headers=headers)
+        
+        if response.status_code != 200:
+            log_test("Share Link Fallback", "FAIL", f"Share link request failed: {response.status_code}: {response.text}")
+            return
+        
+        data = response.json()
+        public_link = data.get("public_link")
+        
+        if not public_link:
+            log_test("Share Link Fallback", "FAIL", "No public_link in response")
+            return
+        
+        # 4. Проверяем что public_link начинается с http(s):// (не относительный /u/{uid})
+        if not (public_link.startswith("http://") or public_link.startswith("https://")):
+            log_test("Share Link Fallback", "FAIL", f"public_link should start with http(s)://, got: {public_link}")
+            return
+        
+        log_test("Share Link Fallback", "PASS", f"Share link fallback working: public_link = {public_link}")
+        
+    except Exception as e:
+        log_test("Share Link Fallback", "FAIL", str(e))
+
+
+# ============ REGRESSION TESTS (Updated for Stage 7) ============
+
+async def test_full_auth_flow_regression():
+    """Test полный auth flow: register → login → me → check-username → profile-step → logout"""
+    try:
+        # 1. POST /register/email
+        email = generate_test_email()
+        response = await client.post(f"{BASE_URL}/auth/register/email", json={
+            "email": email,
+            "password": "testpass123",
+            "first_name": "Test",
+            "last_name": "User"
+        })
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Register failed: {response.status_code}")
+            return
+        
+        register_data = response.json()
+        uid = register_data["user"]["uid"]
+        
+        # 2. POST /login/email
+        response = await client.post(f"{BASE_URL}/auth/login/email", json={
+            "email": email,
+            "password": "testpass123"
+        })
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Login failed: {response.status_code}")
+            return
+        
+        login_data = response.json()
+        token = login_data["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # 3. GET /me
+        response = await client.get(f"{BASE_URL}/auth/me", headers=headers)
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"GET /me failed: {response.status_code}")
+            return
+        
+        # 4. GET /check-username/{test}
+        test_username = generate_test_username()
+        response = await client.get(f"{BASE_URL}/auth/check-username/{test_username}")
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Check username failed: {response.status_code}")
+            return
+        
+        # 5. PATCH /profile-step (complete_step=1,2,3)
+        # Step 1
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 1,
+                                        "username": test_username,
+                                        "first_name": "Test"
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Profile step 1 failed: {response.status_code}")
+            return
+        
+        # Step 2
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 2,
+                                        "username": test_username
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Profile step 2 failed: {response.status_code}")
+            return
+        
+        # Step 3
+        response = await client.patch(f"{BASE_URL}/auth/profile-step", 
+                                    headers=headers,
+                                    json={
+                                        "complete_step": 3,
+                                        "facultet_id": "test_faculty",
+                                        "level_id": "test_level",
+                                        "kurs": 1,
+                                        "group_id": "test_group",
+                                        "group_name": "Test Group"
+                                    })
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Profile step 3 failed: {response.status_code}")
+            return
+        
+        # 6. POST /logout
+        response = await client.post(f"{BASE_URL}/auth/logout", headers=headers)
+        
+        if response.status_code != 200:
+            log_test("Full Auth Flow Regression", "FAIL", f"Logout failed: {response.status_code}")
+            return
+        
+        log_test("Full Auth Flow Regression", "PASS", "Full auth flow completed successfully")
+        
+    except Exception as e:
+        log_test("Full Auth Flow Regression", "FAIL", str(e))
+
+
+async def test_telegram_webapp_invalid_init_data():
+    """Test POST /login/telegram-webapp с невалидным init_data → 401 (не 500)"""
+    try:
+        response = await client.post(f"{BASE_URL}/auth/login/telegram-webapp", json={
+            "init_data": "invalid_init_data_string"
+        })
+        
+        if response.status_code != 401:
+            log_test("Telegram WebApp Invalid InitData", "FAIL", f"Expected 401, got {response.status_code}")
+            return
+        
+        log_test("Telegram WebApp Invalid InitData", "PASS", "Invalid init_data correctly returns 401")
+        
+    except Exception as e:
+        log_test("Telegram WebApp Invalid InitData", "FAIL", str(e))
+
+
+async def test_qr_login_init_status():
+    """Test QR login: POST /login/qr/init → qr_token, expires_at; GET /login/qr/{token}/status → status="pending" """
+    try:
+        # 1. POST /login/qr/init
+        response = await client.post(f"{BASE_URL}/auth/login/qr/init")
+        
+        if response.status_code != 200:
+            log_test("QR Login Init Status", "FAIL", f"QR init failed: {response.status_code}")
+            return
+        
+        data = response.json()
+        required_fields = ["qr_token", "expires_at"]
+        
+        for field in required_fields:
+            if field not in data:
+                log_test("QR Login Init Status", "FAIL", f"Missing field in init response: {field}")
+                return
+        
+        qr_token = data["qr_token"]
+        
+        # 2. GET /login/qr/{token}/status
+        response = await client.get(f"{BASE_URL}/auth/login/qr/{qr_token}/status")
+        
+        if response.status_code != 200:
+            log_test("QR Login Init Status", "FAIL", f"QR status failed: {response.status_code}")
+            return
+        
+        status_data = response.json()
+        if status_data.get("status") != "pending":
+            log_test("QR Login Init Status", "FAIL", f"Expected status='pending', got {status_data.get('status')}")
+            return
+        
+        log_test("QR Login Init Status", "PASS", "QR init and status working correctly")
+        
+    except Exception as e:
+        log_test("QR Login Init Status", "FAIL", str(e))
+
+
+async def test_delete_link_without_jwt():
+    """Test DELETE /api/auth/link/{provider} без JWT → 401"""
+    try:
+        providers = ["email", "telegram", "vk"]
+        
+        for provider in providers:
+            response = await client.delete(f"{BASE_URL}/auth/link/{provider}")
+            
+            if response.status_code != 401:
+                log_test("Delete Link Without JWT", "FAIL", f"DELETE /auth/link/{provider}: Expected 401, got {response.status_code}")
+                return
+        
+        log_test("Delete Link Without JWT", "PASS", "All DELETE /auth/link/* endpoints require JWT")
+        
+    except Exception as e:
+        log_test("Delete Link Without JWT", "FAIL", str(e))
 
 async def test_pseudo_tid_in_user_settings():
     """Test that email users get pseudo-tid in user_settings"""
@@ -830,7 +1350,7 @@ async def test_last_login_fields():
 
 async def run_all_tests():
     """Run all tests in sequence"""
-    print("🧪 Starting Stage 6 Hardening Auth Tests...")
+    print("🧪 Starting Stage 7 Hardening Auth Tests...")
     print(f"🎯 Target: {BASE_URL}")
     
     # Setup
@@ -845,21 +1365,35 @@ async def run_all_tests():
     print("-" * 30)
     
     await test_auth_config()
-    await test_email_registration()
-    await test_email_login()
-    await test_auth_me()
-    await test_check_username()
-    await test_profile_step_transitions()
-    await test_qr_login_flow()
-    await test_logout()
-    await test_rate_limit_register_email()
+    await test_full_auth_flow_regression()
+    await test_telegram_webapp_invalid_init_data()
+    await test_qr_login_init_status()
+    await test_delete_link_without_jwt()
     
-    # B. Stage 6 Hardening Tests
-    print("\n🔒 B. STAGE 6 HARDENING TESTS")
+    # B. Stage 7 Hardening Tests
+    print("\n🔒 B. STAGE 7 HARDENING TESTS")
+    print("-" * 30)
+    
+    print("\n🔴 PHASE 1 (P0 CRITICAL):")
+    await test_rate_limit_check_username_ip()
+    await test_privacy_filter_resolve()
+    await test_atomic_qr_confirm()
+    
+    print("\n🟡 PHASE 2 (P1):")
+    await test_max_length_validation()
+    await test_empty_string_filter()
+    await test_username_explicit_unset()
+    
+    print("\n🟢 PHASE 3 (P2):")
+    await test_share_link_fallback()
+    
+    # C. Previous Stage 6 Tests (for regression)
+    print("\n📊 C. STAGE 6 REGRESSION TESTS")
     print("-" * 30)
     
     await test_pseudo_tid_in_user_settings()
     await test_rate_limit_login_ip()
+    await test_rate_limit_register_email()
     await test_telegram_webapp_security()
     await test_telegram_widget_security()
     await test_vk_login_security()
@@ -898,10 +1432,10 @@ async def run_all_tests():
     
     # Overall result
     if test_results["failed"] == 0:
-        print(f"\n🎉 ALL TESTS PASSED! Stage 6 Hardening is working correctly.")
+        print(f"\n🎉 ALL TESTS PASSED! Stage 7 Hardening is working correctly.")
         return True
     else:
-        print(f"\n⚠️ {test_results['failed']} tests failed. Stage 6 Hardening needs attention.")
+        print(f"\n⚠️ {test_results['failed']} tests failed. Stage 7 Hardening needs attention.")
         return False
 
 

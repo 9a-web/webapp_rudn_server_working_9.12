@@ -15,6 +15,7 @@ import QRLoginBlock from '../components/auth/QRLoginBlock';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import useIsInsideTelegram from '../hooks/useIsInsideTelegram';
+import { safeContinueUrl } from '../utils/safeRedirect'; // Stage 7: B-01
 
 const VK_LOGO = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -35,7 +36,9 @@ const LoginPage = () => {
   const [configError, setConfigError] = useState(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const continueUrl = searchParams.get('continue') || '/';
+  // Stage 7: B-01 — sanitize continue URL для предотвращения Open Redirect
+  const continueUrl = safeContinueUrl(searchParams.get('continue'), '/');
+  const reason = searchParams.get('reason'); // Stage 7: B-14 — session expired flag
   const { applyQRResult, loginTelegramWebApp, isAuthenticated, needsOnboarding } = useAuth();
 
   // Для подсказки в UI («Вы уже в Telegram...»). Детекция мягкая — если false,
@@ -79,6 +82,13 @@ const LoginPage = () => {
         </div>
       }
     >
+      {/* Stage 7: B-14 — session expired banner */}
+      {reason === 'expired' && (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+          Ваша сессия истекла. Войдите снова.
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="mb-5 grid grid-cols-4 gap-1 rounded-xl bg-white/5 p-1">
         {TABS.map(({ key, label, icon: Icon }) => {

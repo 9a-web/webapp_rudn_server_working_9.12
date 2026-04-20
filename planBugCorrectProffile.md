@@ -8,6 +8,43 @@
 
 ---
 
+## 🚀 PROGRESS TRACKER (обновляется в реальном времени)
+
+**Запущен:** 2026-04-20 | **Агент-исполнитель:** Emergent AI
+
+### Фаза 1 — P0 Critical
+- [x] **B-01** Open Redirect в LoginPage → `safeRedirect.js` + 4 страницы
+- [x] **B-02** Rate-limit на QR/link/profile-step/check-username endpoints
+- [x] **B-03** Атомарный QR confirm через `find_one_and_update`
+- [x] **B-04** Race recovery в `_create_new_user` (DuplicateKeyError)
+- [x] **B-05** Безопасный `get_client_ip` (TRUST_PROXY_HOPS)
+- [x] **B-06** Privacy-фильтр в `/u/{uid}/resolve`
+- [x] **B-07** AbortController + seqRef в `UsernameField`
+
+### Фаза 2 — P1 Important
+- [x] **B-08** TTL-индексы на auth_qr_sessions/profile_views/auth_events
+- [x] **B-09** Cleanup sessionStorage в VKCallbackPage на ошибке
+- [x] **B-10** QR polling на `visibilitychange`
+- [x] **B-11** Фильтр пустых строк в `update_profile_step`
+- [x] **B-12** `max_length` для first/last_name в `RegisterEmailRequest`
+- [x] **B-13** Retry-кнопка в `QRConfirmPage`
+- [x] **B-14** Global redirect на 401 через CustomEvent
+- [x] **B-15** `hash_email_for_log` вместо plain email в `auth_events`
+- [x] **B-16** Client-side dedup `/view` через sessionStorage
+- [x] **B-17** Memory-safe `_rate_limits` с GC
+
+### Фаза 3 — P2 Polish
+- [x] **B-18** Верификация imports `_user_to_public`/`_STEP_TRANSITIONS`
+- [x] **B-19** `Symbol.for` маркер для axios interceptors (HMR-safe)
+- [x] **B-20** Fallback `PUBLIC_BASE_URL` из `request.url`
+- [x] **B-21** ~~Объединено с B-17~~
+- [x] **B-22** Limit размера `extra` в `_log_auth_event`
+- [x] **B-23** `field_validator` для username unset
+
+---
+
+---
+
 ## 📚 Оглавление
 
 1. [Объём аудита](#1-объём-аудита)

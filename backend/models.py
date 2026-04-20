@@ -2824,44 +2824,48 @@ class UserPublic(BaseModel):
 class RegisterEmailRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=128)
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    # Stage 7: B-12 — max_length для защиты от огромных payload'ов
+    first_name: Optional[str] = Field(default=None, max_length=64)
+    last_name: Optional[str] = Field(default=None, max_length=64)
     # Для реферальной системы (опционально)
-    referral_code: Optional[str] = None
+    referral_code: Optional[str] = Field(default=None, max_length=64)
 
 
 class LoginEmailRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., max_length=128)  # Stage 7: B-12
 
 
 class TelegramLoginRequest(BaseModel):
     """Данные из Telegram Login Widget (stdin — https://core.telegram.org/widgets/login)."""
     id: int
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    username: Optional[str] = None
-    photo_url: Optional[str] = None
+    # Stage 7: B-12 — лимиты на длины строк (Telegram сам не гарантирует)
+    first_name: Optional[str] = Field(default=None, max_length=128)
+    last_name: Optional[str] = Field(default=None, max_length=128)
+    username: Optional[str] = Field(default=None, max_length=64)
+    photo_url: Optional[str] = Field(default=None, max_length=1024)
     auth_date: int
-    hash: str
+    hash: str = Field(..., max_length=256)
     # Для реферальной системы
-    referral_code: Optional[str] = None
+    referral_code: Optional[str] = Field(default=None, max_length=64)
 
 
 class TelegramWebAppLoginRequest(BaseModel):
     """Данные из Telegram WebApp initData (raw string)."""
-    init_data: str
-    referral_code: Optional[str] = None
+    # Stage 7: B-12 — initData обычно < 4KB, но ставим разумный потолок
+    init_data: str = Field(..., max_length=8192)
+    referral_code: Optional[str] = Field(default=None, max_length=64)
 
 
 class VKLoginRequest(BaseModel):
     """VK ID OAuth — обмен code на токен."""
-    code: str
-    device_id: Optional[str] = None
-    redirect_uri: Optional[str] = None
-    code_verifier: Optional[str] = None  # PKCE
-    state: Optional[str] = None
-    referral_code: Optional[str] = None
+    # Stage 7: B-12 — разумные лимиты на OAuth-поля
+    code: str = Field(..., max_length=2048)
+    device_id: Optional[str] = Field(default=None, max_length=256)
+    redirect_uri: Optional[str] = Field(default=None, max_length=1024)
+    code_verifier: Optional[str] = Field(default=None, max_length=256)  # PKCE
+    state: Optional[str] = Field(default=None, max_length=256)
+    referral_code: Optional[str] = Field(default=None, max_length=64)
 
 
 class QRInitResponse(BaseModel):
