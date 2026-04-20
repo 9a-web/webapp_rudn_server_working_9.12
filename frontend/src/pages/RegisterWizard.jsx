@@ -24,6 +24,7 @@ import UsernameField from '../components/auth/UsernameField';
 import GroupSelector from '../components/GroupSelector';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
+import useIsInsideTelegram from '../hooks/useIsInsideTelegram';
 
 // Progress индикатор
 const StepIndicator = ({ current, total }) => (
@@ -60,11 +61,8 @@ const Step1AuthMethod = ({ config, onNext }) => {
   const [method, setMethod] = useState(null);
   const { loginTelegramWidget, loginTelegramWebApp } = useAuth();
 
-  // Внутри Telegram WebApp (есть initData) не показываем iframe-widget,
-  // а используем initData напрямую через кнопку «Войти через Telegram».
-  const isInsideTelegram = typeof window !== 'undefined'
-    && !!window.Telegram?.WebApp?.initData
-    && window.Telegram.WebApp.initData.length > 0;
+  // Внутри Telegram WebApp не показываем iframe-widget — используем initData напрямую.
+  const { inside: isInsideTelegram } = useIsInsideTelegram();
 
   if (method === 'email') {
     return (

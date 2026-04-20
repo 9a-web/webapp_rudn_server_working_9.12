@@ -11,14 +11,15 @@
  */
 import React, { useMemo, useState } from 'react';
 import { MessageCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import useIsInsideTelegram from '../../hooks/useIsInsideTelegram';
 
 const TelegramWebAppLoginButton = ({ onSubmit, label = 'Войти через Telegram' }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  // Реактивно читаем initData и user — SDK может заполнить чуть позже mount'а.
+  const { initData, user: tgUser } = useIsInsideTelegram();
   const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
-  const initData = tg?.initData || '';
-  const tgUser = tg?.initDataUnsafe?.user || null;
 
   const displayName = useMemo(() => {
     if (!tgUser) return '';

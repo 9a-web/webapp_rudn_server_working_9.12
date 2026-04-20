@@ -15,6 +15,7 @@ import VkLoginButton from '../components/auth/VkLoginButton';
 import QRLoginBlock from '../components/auth/QRLoginBlock';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
+import useIsInsideTelegram from '../hooks/useIsInsideTelegram';
 
 const VK_LOGO = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -38,12 +39,9 @@ const LoginPage = () => {
   const continueUrl = searchParams.get('continue') || '/';
   const { applyQRResult, loginTelegramWidget, loginTelegramWebApp, isAuthenticated, needsOnboarding } = useAuth();
 
-  // Определяем запущен ли сейчас WebApp внутри Telegram (наличие initData).
-  // Если да — вместо iframe-widget'а показываем кнопку «Войти через Telegram»,
-  // которая использует уже имеющийся initData (безопасно — бэкенд проверит HMAC).
-  const isInsideTelegram = typeof window !== 'undefined'
-    && !!window.Telegram?.WebApp?.initData
-    && window.Telegram.WebApp.initData.length > 0;
+  // Реактивно определяем, запущено ли приложение внутри Telegram WebApp.
+  // Если да — вместо iframe-widget'а показываем кнопку «Войти через Telegram».
+  const { inside: isInsideTelegram, initData: tgInitData } = useIsInsideTelegram();
 
   useEffect(() => {
     authAPI.config().then(setConfig).catch((e) => setConfigError(e.message));
