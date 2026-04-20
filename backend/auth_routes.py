@@ -6,6 +6,7 @@ Auth routes — регистрация/логин через Email, Telegram, VK
 """
 
 import logging
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -412,7 +413,19 @@ def create_auth_router(db) -> APIRouter:
 
     @router.post("/login/telegram-webapp", response_model=AuthTokenResponse)
     async def login_telegram_webapp(req: TelegramWebAppLoginRequest):
-        """Логин через Telegram WebApp — пользователь уже в боте, просто верифицируем initData."""
+        """Логин через Telegram WebApp — пользователь уже в боте, просто верифицируем initData.
+
+        Логика:
+          1. Есть user с таким `telegram_id` → обычный login.
+          2. Нет → проверяем совпадение username из Telegram с существующим аккаунтом.
+             - Если такой email/VK-аккаунт существует и у него нет telegram_id →
+               автоматически привязываем (account linking) и логиним в него.
+             - Если username занят ДРУГИМ аккаунтом с уже привязанным telegram_id
+               (т.е. это разные люди с одинаковым username) → создаём нового user
+               БЕЗ username, чтобы не падать на 409; пользователь сможет задать
+               свой username на шаге 2 онбординга.
+             - Если username свободен → создаём нового с этим username.
+        """
         parsed = verify_telegram_webapp_init_data(req.init_data)
         if not parsed or not parsed.get("user"):
             raise HTTPException(status_code=401, detail="Невалидные данные Telegram WebApp")
@@ -422,31 +435,111 @@ def create_auth_router(db) -> APIRouter:
         if not tg_id:
             raise HTTPException(status_code=400, detail="user.id отсутствует в initData")
 
+        now = datetime.now(timezone.utc)
         existing = await db.users.find_one({"telegram_id": tg_id})
         is_new = False
+
         if existing:
+            # Case 1: обычный повторный login.
             await db.users.update_one(
                 {"uid": existing["uid"]},
                 {
                     "$set": {
-                        "last_login_at": datetime.now(timezone.utc),
-                        "updated_at": datetime.now(timezone.utc),
+                        "last_login_at": now,
+                        "updated_at": now,
                     },
                     "$addToSet": {"auth_providers": "telegram"},
                 },
             )
             user_doc = await db.users.find_one({"uid": existing["uid"]})
-        else:
-            user_doc = await _create_new_user(
-                db,
-                telegram_id=tg_id,
-                first_name=tg_user.get("first_name"),
-                last_name=tg_user.get("last_name"),
-                username=tg_user.get("username"),
-                primary_auth="telegram",
-                registration_step=2,
+            return await _issue_token(db, user_doc, is_new=False)
+
+        # Case 2: первый вход через Telegram — проверяем конфликт по username.
+        tg_username = tg_user.get("username")
+        tg_first = tg_user.get("first_name")
+        tg_last = tg_user.get("last_name")
+        username_owner = None
+        if tg_username:
+            # case-insensitive поиск — username в БД может быть в любом регистре
+            username_owner = await db.users.find_one(
+                {"username": {"$regex": f"^{re.escape(tg_username)}$", "$options": "i"}}
             )
-            is_new = True
+
+        if username_owner and not username_owner.get("telegram_id"):
+            # Auto-link: у существующего email/VK-юзера свободен слот telegram_id,
+            # username совпал → считаем это тем же человеком, привязываем.
+            owner_uid = username_owner["uid"]
+            logger.info(
+                f"🔗 Account linking: uid={owner_uid} получает telegram_id={tg_id} "
+                f"через совпадение username='{tg_username}'"
+            )
+            set_fields = {
+                "telegram_id": tg_id,
+                "last_login_at": now,
+                "updated_at": now,
+            }
+            # Дополняем пустые имена данными из Telegram
+            if not username_owner.get("first_name") and tg_first:
+                set_fields["first_name"] = tg_first
+            if not username_owner.get("last_name") and tg_last:
+                set_fields["last_name"] = tg_last
+
+            try:
+                await db.users.update_one(
+                    {"uid": owner_uid},
+                    {
+                        "$set": set_fields,
+                        "$addToSet": {"auth_providers": "telegram"},
+                    },
+                )
+            except DuplicateKeyError:
+                # На всякий случай — если параллельно создался другой user с tg_id.
+                raise HTTPException(
+                    status_code=409,
+                    detail="Не удалось привязать Telegram — попробуйте ещё раз.",
+                )
+
+            # Переносим user_settings со синтетического ключа (int(uid)) на реальный tg_id.
+            try:
+                synth_tid = int(owner_uid)
+            except (TypeError, ValueError):
+                synth_tid = None
+            if synth_tid and synth_tid != tg_id:
+                # Проверяем что документа с tg_id ещё нет (чтобы не сломать unique key).
+                already_has_tg = await db.user_settings.find_one({"telegram_id": tg_id})
+                if not already_has_tg:
+                    await db.user_settings.update_one(
+                        {"telegram_id": synth_tid},
+                        {"$set": {"telegram_id": tg_id}},
+                        upsert=False,
+                    )
+            # Гарантируем, что документ user_settings с tg_id существует.
+            await db.user_settings.update_one(
+                {"telegram_id": tg_id},
+                {
+                    "$setOnInsert": {"telegram_id": tg_id, "created_at": now},
+                    "$set": {"uid": owner_uid},
+                },
+                upsert=True,
+            )
+
+            user_doc = await db.users.find_one({"uid": owner_uid})
+            return await _issue_token(db, user_doc, is_new=False)
+
+        # Case 3: username занят другим юзером с уже привязанным telegram_id (разные люди) —
+        # создаём нового БЕЗ username (пользователь выберет свой на шаге 2).
+        safe_username = None if username_owner else tg_username
+
+        user_doc = await _create_new_user(
+            db,
+            telegram_id=tg_id,
+            first_name=tg_first,
+            last_name=tg_last,
+            username=safe_username,
+            primary_auth="telegram",
+            registration_step=2,
+        )
+        is_new = True
 
         return await _issue_token(db, user_doc, is_new=is_new)
 
