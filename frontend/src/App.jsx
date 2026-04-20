@@ -54,6 +54,20 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useFaviconBadge } from './hooks/useFaviconBadge';
 import ReferralModal from './components/ReferralModal';
 
+// --- Stage 3: Auth ---
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import AuthGate from './components/auth/AuthGate';
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterWizard = lazy(() => import('./pages/RegisterWizard'));
+const VKCallbackPage = lazy(() => import('./pages/VKCallbackPage'));
+const QRConfirmPage = lazy(() => import('./pages/QRConfirmPage'));
+
+const AuthLoadingFallback = () => (
+  <div className="flex min-h-screen items-center justify-center bg-[#0E0E10] text-white/60 text-sm">
+    Загрузка...
+  </div>
+);
+
 const Home = () => {
   const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
   const { theme } = useTheme(); // Use Theme Context
@@ -2614,15 +2628,30 @@ function App() {
       <div className="App">
         <ThemeProvider>
           <TelegramProvider>
-            <PlayerProvider>
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/status-tester" element={<StatusTester />} />
-                  <Route path="/streak-demo" element={<StreakRewardPreview />} />
-                </Routes>
-              </BrowserRouter>
-            </PlayerProvider>
+            <AuthProvider>
+              <PlayerProvider>
+                <BrowserRouter>
+                  <Suspense fallback={<AuthLoadingFallback />}>
+                    <Routes>
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route path="/register" element={<RegisterWizard />} />
+                      <Route path="/auth/vk/callback" element={<VKCallbackPage />} />
+                      <Route path="/auth/qr/confirm" element={<QRConfirmPage />} />
+                      <Route
+                        path="/"
+                        element={
+                          <AuthGate>
+                            <Home />
+                          </AuthGate>
+                        }
+                      />
+                      <Route path="/status-tester" element={<StatusTester />} />
+                      <Route path="/streak-demo" element={<StreakRewardPreview />} />
+                    </Routes>
+                  </Suspense>
+                </BrowserRouter>
+              </PlayerProvider>
+            </AuthProvider>
           </TelegramProvider>
         </ThemeProvider>
       </div>

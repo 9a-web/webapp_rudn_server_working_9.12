@@ -27,9 +27,11 @@ from auth_utils import (
 )
 from config import (
     get_telegram_bot_token,
+    get_telegram_bot_username,
     VK_APP_ID,
     VK_CLIENT_SECRET,
     VK_REDIRECT_URI,
+    ENV,
 )
 from models import (
     AuthTokenResponse,
@@ -52,6 +54,27 @@ logger = logging.getLogger(__name__)
 # ========== Константы ==========
 QR_SESSION_TTL_MINUTES = 5
 RESERVED_USERNAMES = {"admin", "root", "system", "support", "api", "auth", "login", "register", "rudn", "null", "undefined", "me"}
+
+# ========== Rate Limiter (in-memory, per-IP) ==========
+# Простой лимитер для /register/email, чтобы избежать спама.
+# Для production можно заменить на Redis/slowapi.
+from collections import defaultdict
+from time import monotonic
+
+_rate_limits: dict = defaultdict(list)  # ip -> list[timestamps]
+
+def _check_rate_limit(ip: str, bucket: str, max_requests: int, window_seconds: int) -> bool:
+    """Возвращает True если лимит НЕ превышен, False — превышен."""
+    now = monotonic()
+    key = f"{bucket}:{ip or 'unknown'}"
+    arr = _rate_limits[key]
+    # Удаляем старые
+    cutoff = now - window_seconds
+    _rate_limits[key] = [t for t in arr if t > cutoff]
+    if len(_rate_limits[key]) >= max_requests:
+        return False
+    _rate_limits[key].append(now)
+    return True
 
 
 # ========== Helpers ==========
@@ -275,8 +298,16 @@ def create_auth_router(db) -> APIRouter:
     # ============= REGISTER (email) =============
 
     @router.post("/register/email", response_model=AuthTokenResponse)
-    async def register_email(req: RegisterEmailRequest):
+    async def register_email(req: RegisterEmailRequest, request: Request):
         """Шаг 1 регистрации через email/пароль."""
+        # Rate limit: 5 registrations per hour per IP
+        client_ip = request.client.host if request.client else None
+        if not _check_rate_limit(client_ip, "register_email", max_requests=5, window_seconds=3600):
+            raise HTTPException(
+                status_code=429,
+                detail="Слишком много регистраций с этого IP. Попробуйте через час.",
+            )
+
         email_norm = req.email.strip().lower()
 
         existing = await db.users.find_one({"email": email_norm})
@@ -784,5 +815,28 @@ def create_auth_router(db) -> APIRouter:
 
         updated = await db.users.find_one({"uid": user_doc["uid"]})
         return _user_to_public(updated, include_email=True)
+
+    # ============= Public auth config =============
+
+    @router.get("/config")
+    async def auth_config():
+        """Публичная конфигурация для frontend:
+        - telegram_bot_username (для Telegram Login Widget)
+        - vk_app_id (для VK ID OAuth)
+        - vk_redirect_uri_default (ссылка на фронтовый VK callback)
+        - env
+        """
+        return {
+            "telegram_bot_username": get_telegram_bot_username(),
+            "vk_app_id": VK_APP_ID,
+            "vk_redirect_uri_default": VK_REDIRECT_URI,
+            "env": ENV,
+            "features": {
+                "email_verification": False,
+                "qr_login": True,
+                "vk_login": bool(VK_APP_ID and VK_CLIENT_SECRET),
+                "telegram_login": True,
+            },
+        }
 
     return router
