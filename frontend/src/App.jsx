@@ -70,9 +70,35 @@ const AuthLoadingFallback = () => (
 );
 
 const Home = () => {
-  const { user, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
+  const { user: rawTgUser, isReady, showAlert, hapticFeedback, startParam } = useTelegram();
+  const { user: authUser } = useAuth();
   const { theme } = useTheme(); // Use Theme Context
   const { t } = useTranslation();
+
+  // 🔗 Bridge: AuthContext (Email/Telegram/VK/QR) → legacy `user`-shape, ожидаемый остальным Home.
+  // После регистрации по Email у tgUser отсутствует telegram_id (он — «guest device_id»),
+  // поэтому предпочитаем identity из authUser. UID (9-значный numeric) используем
+  // как синтетический telegram_id, если реального нет — бэкенд делает upsert в user_settings
+  // с тем же ключом в auth_routes.py.
+  const user = React.useMemo(() => {
+    if (authUser) {
+      const telegramId = authUser.telegram_id
+        || (authUser.uid ? parseInt(String(authUser.uid), 10) : null);
+      if (telegramId) {
+        return {
+          id: telegramId,
+          first_name: authUser.first_name || rawTgUser?.first_name || 'Пользователь',
+          last_name: authUser.last_name || rawTgUser?.last_name || '',
+          username: authUser.username || rawTgUser?.username || '',
+          photo_url: rawTgUser?.photo_url,
+          uid: authUser.uid,
+          is_linked: true,
+          is_guest: false,
+        };
+      }
+    }
+    return rawTgUser;
+  }, [authUser, rawTgUser]);
   // TEST: Greeting Notification
   const [testGreetingHour, setTestGreetingHour] = useState(null);
   const [greetingKey, setGreetingKey] = useState(0);

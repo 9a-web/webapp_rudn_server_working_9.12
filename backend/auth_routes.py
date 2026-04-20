@@ -147,13 +147,23 @@ async def _create_new_user(
             detail="Такой пользователь уже существует (конфликт email/telegram_id/vk_id/uid)",
         )
 
-    # Параллельно создаём/обновляем запись в user_settings (для обратной совместимости)
-    if telegram_id:
+    # Параллельно создаём/обновляем запись в user_settings (для обратной совместимости).
+    # Для email/VK/QR-регистраций telegram_id может отсутствовать — в этом случае
+    # используем int(uid) как синтетический ключ, чтобы старые endpoints вроде
+    # GET /api/user-settings/{id} и дальнейшая загрузка в Home-компоненте работали
+    # сразу после регистрации. UID — 9-значный numeric, не конфликтует с реальными
+    # Telegram ID (которые обычно 10+ цифр).
+    try:
+        effective_tid = int(telegram_id) if telegram_id else int(uid)
+    except (TypeError, ValueError):
+        effective_tid = None
+
+    if effective_tid is not None:
         await db.user_settings.update_one(
-            {"telegram_id": telegram_id},
+            {"telegram_id": effective_tid},
             {
                 "$setOnInsert": {
-                    "telegram_id": telegram_id,
+                    "telegram_id": effective_tid,
                     "created_at": now,
                 },
                 "$set": {
@@ -166,7 +176,7 @@ async def _create_new_user(
             upsert=True,
         )
 
-    logger.info(f"✅ New user created: uid={uid} primary_auth={primary_auth}")
+    logger.info(f"✅ New user created: uid={uid} primary_auth={primary_auth} effective_tid={effective_tid}")
     return doc
 
 
@@ -799,18 +809,36 @@ def create_auth_router(db) -> APIRouter:
         except DuplicateKeyError:
             raise HTTPException(status_code=409, detail="Username занят")
 
-        # Синхронизация с user_settings (для обратной совместимости) если есть telegram_id
-        if user_doc.get("telegram_id"):
+        # Синхронизация с user_settings (для обратной совместимости).
+        # effective_tid = telegram_id если есть, иначе int(uid) — чтобы email/VK/QR
+        # пользователи тоже имели user_settings-документ и фронтенд мог загружать
+        # их настройки через legacy GET /api/user-settings/{id}.
+        try:
+            effective_tid = (
+                int(user_doc["telegram_id"]) if user_doc.get("telegram_id") else int(user_doc["uid"])
+            )
+        except (TypeError, ValueError):
+            effective_tid = None
+
+        if effective_tid is not None:
             mirror = {k: v for k, v in update_data.items() if k in (
                 "first_name", "last_name", "username",
                 "facultet_id", "facultet_name", "level_id", "form_code",
                 "kurs", "group_id", "group_name",
             )}
             if mirror:
+                # upsert=True — создаём user_settings если его ещё нет
+                mirror["uid"] = user_doc["uid"]
                 await db.user_settings.update_one(
-                    {"telegram_id": user_doc["telegram_id"]},
-                    {"$set": mirror},
-                    upsert=False,
+                    {"telegram_id": effective_tid},
+                    {
+                        "$set": mirror,
+                        "$setOnInsert": {
+                            "telegram_id": effective_tid,
+                            "created_at": datetime.now(timezone.utc),
+                        },
+                    },
+                    upsert=True,
                 )
 
         updated = await db.users.find_one({"uid": user_doc["uid"]})
