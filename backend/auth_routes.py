@@ -513,17 +513,29 @@ def create_auth_router(db) -> APIRouter:
                         {"$set": {"telegram_id": tg_id}},
                         upsert=False,
                     )
-            # Гарантируем, что документ user_settings с tg_id существует.
+            # Гарантируем, что документ user_settings с tg_id существует, и
+            # переносим туда academic-поля из users, если они там есть
+            # (email-регистрация до bug-fix могла сохранить group_id только в users).
+            linked_user_doc = await db.users.find_one({"uid": owner_uid})
+            mirror_fields = {"uid": owner_uid}
+            for fld in ("first_name", "last_name", "username",
+                        "facultet_id", "facultet_name",
+                        "level_id", "form_code", "kurs",
+                        "group_id", "group_name"):
+                val = linked_user_doc.get(fld)
+                if val is not None:
+                    mirror_fields[fld] = val
+
             await db.user_settings.update_one(
                 {"telegram_id": tg_id},
                 {
                     "$setOnInsert": {"telegram_id": tg_id, "created_at": now},
-                    "$set": {"uid": owner_uid},
+                    "$set": mirror_fields,
                 },
                 upsert=True,
             )
 
-            user_doc = await db.users.find_one({"uid": owner_uid})
+            user_doc = linked_user_doc
             return await _issue_token(db, user_doc, is_new=False)
 
         # Case 3: username занят другим юзером с уже привязанным telegram_id (разные люди) —
