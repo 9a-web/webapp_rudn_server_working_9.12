@@ -49,6 +49,38 @@ export const clearAuth = () => {
 };
 
 /**
+ * Полная очистка ВСЕХ данных пользователя в localStorage.
+ * Используется при удалении аккаунта — чистит и новые (Stage 3 JWT),
+ * и старые ключи (user_settings, telegram_user, session_token и т.д.).
+ */
+export const clearAllLocalAuthData = () => {
+  clearAuth();
+  const legacyKeys = [
+    'telegram_user',
+    'synced_user',
+    'user_settings',
+    'session_token',
+    'linked_telegram_id',
+    'vk_oauth_state',
+    'vk_oauth_verifier',
+    'vk_oauth_redirect',
+    'vk_oauth_referral',
+  ];
+  try {
+    legacyKeys.forEach((k) => localStorage.removeItem(k));
+    // Префиксные ключи: user_settings_*
+    const keys = Object.keys(localStorage);
+    keys.forEach((k) => {
+      if (k.startsWith('user_settings_')) {
+        try { localStorage.removeItem(k); } catch {}
+      }
+    });
+    // sessionStorage — VK OAuth остатки
+    legacyKeys.forEach((k) => { try { sessionStorage.removeItem(k); } catch {} });
+  } catch {}
+};
+
+/**
  * Клиентская валидация JWT. Только для UX — реальная проверка на backend.
  */
 export const isTokenValid = (token) => {

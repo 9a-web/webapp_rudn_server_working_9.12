@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
 import { getBackendURL, achievementsAPI } from '../services/api';
+import { clearAllLocalAuthData } from '../utils/authStorage';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProfileEditScreen from './ProfileEditScreen';
 import DevicesModal from './DevicesModal';
@@ -1928,15 +1929,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                       });
                       if (response.ok) {
                         if (hapticFeedback) hapticFeedback('notification', 'success');
-                        localStorage.removeItem('telegram_user');
-                        localStorage.removeItem('synced_user');
-                        localStorage.removeItem('user_settings');
-                        localStorage.removeItem('session_token');
-                        localStorage.removeItem('linked_telegram_id');
-                        localStorage.removeItem(`user_settings_${user.id}`);
+                        // Полная очистка всех локальных данных (JWT + legacy)
+                        clearAllLocalAuthData();
                         setShowDeleteConfirm(false);
                         onClose();
-                        window.location.reload();
+                        // Переходим на страницу входа (AuthGate больше не пропустит без JWT)
+                        window.location.replace('/login');
                       } else {
                         throw new Error('Ошибка удаления');
                       }

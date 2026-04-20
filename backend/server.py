@@ -1293,6 +1293,47 @@ async def delete_user_account(telegram_id: int):
         # 22. Удаляем подключения ЛК
         await db.lk_connections.delete_many({"telegram_id": telegram_id})
         
+        # 23. Stage 1/2 Auth — удаляем запись users и связанные данные
+        # Сначала находим uid пользователя чтобы удалить связанные записи
+        user_doc = await db.users.find_one({"telegram_id": telegram_id})
+        user_uid = user_doc.get("uid") if user_doc else None
+        
+        # Удаляем саму запись users
+        result = await db.users.delete_one({"telegram_id": telegram_id})
+        deleted_counts["users"] = result.deleted_count
+        
+        # Удаляем активные auth сессии (JWT)
+        try:
+            result = await db.auth_sessions.delete_many({"telegram_id": telegram_id})
+            deleted_counts["auth_sessions"] = result.deleted_count
+        except Exception:
+            pass
+        
+        if user_uid:
+            try:
+                # Дублирующая очистка auth_sessions по uid (на случай если telegram_id был None)
+                result = await db.auth_sessions.delete_many({"uid": user_uid})
+                deleted_counts["auth_sessions_by_uid"] = result.deleted_count
+            except Exception:
+                pass
+            try:
+                # Удаляем просмотры профиля (и как viewer, и как viewed)
+                result = await db.profile_views.delete_many({
+                    "$or": [
+                        {"viewer_uid": user_uid},
+                        {"viewed_uid": user_uid},
+                    ]
+                })
+                deleted_counts["profile_views"] = result.deleted_count
+            except Exception:
+                pass
+            try:
+                # Удаляем QR-сессии логина, созданные этим пользователем
+                result = await db.qr_login_sessions.delete_many({"confirmed_by_uid": user_uid})
+                deleted_counts["qr_sessions"] = result.deleted_count
+            except Exception:
+                pass
+        
         logger.info(f"✅ Аккаунт пользователя {telegram_id} полностью удален. Статистика: {deleted_counts}")
         
         return SuccessResponse(

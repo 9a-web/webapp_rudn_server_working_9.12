@@ -10,6 +10,7 @@ import ProfileSettingsModal from './ProfileSettingsModal';
 import { friendsAPI } from '../services/friendsAPI';
 import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
 import { getBackendURL } from '../services/api';
+import { clearAllLocalAuthData } from '../utils/authStorage';
 import { fetchBotInfo } from '../utils/botInfo';
 
 // Admin UIDs для доступа к специальным функциям
@@ -1478,21 +1479,16 @@ export const ProfileModal = ({
                                 if (response.ok) {
                                   if (hapticFeedback) hapticFeedback('notification', 'success');
                                   
-                                  // Очищаем все данные из localStorage
-                                  localStorage.removeItem('telegram_user');
-                                  localStorage.removeItem('synced_user');
-                                  localStorage.removeItem('user_settings');
-                                  localStorage.removeItem('session_token');
-                                  localStorage.removeItem('linked_telegram_id');
-                                  localStorage.removeItem(`user_settings_${user.id}`);
+                                  // Полная очистка всех локальных данных (JWT Stage 3 + legacy Telegram/user_settings)
+                                  clearAllLocalAuthData();
                                   
                                   // Закрываем все модалки
                                   setShowDeleteConfirm(false);
                                   setShowSettings(false);
                                   onClose();
                                   
-                                  // Перезагружаем страницу для показа Welcome Screen
-                                  window.location.reload();
+                                  // Переход на /login — AuthGate без JWT покажет логин
+                                  window.location.replace('/login');
                                 } else {
                                   throw new Error('Ошибка удаления');
                                 }
