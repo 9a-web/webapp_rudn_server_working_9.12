@@ -1,32 +1,46 @@
 # 3dsvg Integration — Fix Notes (2026-04)
 
-## Problem
-User installed `3dsvg` package via npm and pasted code from 3dsvg.design
-(see /tmp/import3Dlogo.txt). The 3D logo "wouldn't load".
+## User's Issue
+> Installed `3dsvg` package from 3dsvg.design to render RUDN logo in 3D.
+> It "wouldn't load".
 
-## Root Causes Found
-1. **Package never actually imported anywhere in src/** — user added `3dsvg` to
-   package.json but no file imported `SVG3D`.
-2. **Vite duplicated React**: 3dsvg was pre-bundled in `.vite/deps` with its
-   own React copy, producing "Invalid hook call / Cannot read properties of
-   null (useState)". Fixed via `resolve.dedupe` + `optimizeDeps.include` in
-   `vite.config.js`.
+## Root Causes
+1. **Not imported**: `3dsvg` was in package.json but no source file imported `SVG3D`.
+2. **Vite duplicate React**: pre-bundled `3dsvg` got its own React copy → "Invalid hook call / useState null".
+3. **SVG too heavy**: RUDN logo = 82 KB / 2459 bezier commands → ExtrudeGeometry
+   triangulation froze browser for 10+ sec.
 
-## Fix Applied
-- `/app/frontend/vite.config.js` — added dedupe for react/react-dom/three/
-  @react-three/* and optimizeDeps.include for 3dsvg.
-- `/app/frontend/src/pages/Test3DLogoPage.jsx` — isolated test page with
-  controls (smoothness, material, animate) + simple demo SVG toggle.
-- `/app/frontend/public/rudn-logo-3d.svg` — extracted RUDN SVG asset.
-- `/app/frontend/src/App.jsx` — added `/test-3d-logo` route.
+## Fixes Applied
 
-## Result
-- ✅ Package works perfectly (simple demo SVG renders in ~1 sec).
-- ⚠️ Real RUDN logo SVG is 82 KB / 1 path / ~2700 curves — too heavy for
-  real-time ExtrudeGeometry triangulation. Browser freezes during geometry
-  build even with smoothness=0. This is an SVG complexity problem, NOT a
-  package bug.
+### 1. Vite config (fix React duplication)
+`/app/frontend/vite.config.js`:
+```js
+resolve: { dedupe: ['react','react-dom','three','@react-three/fiber','@react-three/drei'] },
+optimizeDeps: { include: ['3dsvg','@react-three/fiber','@react-three/drei','three'] }
+```
 
-## Recommendation for User
-- Simplify RUDN SVG via SVGO / Inkscape Simplify Paths before using with 3dsvg.
-- Or pre-bake GLB in Blender for real production usage.
+### 2. Test page with SVG source selector
+`/app/frontend/src/pages/Test3DLogoPage.jsx` at `/test-3d-logo`.
+Three SVG options: simple demo / simplified RUDN / original RUDN.
+Controls: smoothness slider, material select, animate select.
+
+### 3. Geometric SVG simplification
+`/app/scripts/simplify_svg_geometrically.cjs` — flattens beziers to polylines
+and runs Ramer-Douglas-Peucker (simplify-js) to cut point count 5-10×.
+
+Result on RUDN logo (tolerance=1.5):
+- Size: 82 KB → 17 KB (20%)
+- Commands: 2459 → 1448 (59%)
+- Points: 13316 → 1448 (11% = **9× fewer**)
+- Visual quality: indistinguishable from original
+
+## Artifacts
+- `/app/frontend/public/rudn-logo-3d.svg` — original from user (82 KB)
+- `/app/frontend/public/rudn-logo-3d-simplified.svg` — optimized (17 KB)
+- `/app/frontend/public/svg-compare.html` — side-by-side visual comparison
+- `/app/scripts/simplify_svg_geometrically.cjs` — reusable CLI tool
+- `/app/scripts/README_svg_simplify.md` — docs for the CLI
+
+## Verified Working
+- `/test-3d-logo` → "Логотип РУДН, упрощённый" + smoothness=0.2 + material=metal
+  → renders in <1 sec, status "готово ✓", no console errors.

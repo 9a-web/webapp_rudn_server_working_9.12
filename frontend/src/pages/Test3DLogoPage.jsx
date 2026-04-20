@@ -17,8 +17,8 @@ const Test3DLogoPage = () => {
   const [smoothness, setSmoothness] = useState(0.2); // Начинаем с дешёвого варианта
   const [material, setMaterial] = useState('metal');
   const [animate, setAnimate] = useState('spin');
-  // Переключатель простой демо-SVG vs реальный логотип РУДН
-  const [useSimpleDemo, setUseSimpleDemo] = useState(false);
+  // Источник SVG: simple / simplified / original
+  const [svgSource, setSvgSource] = useState('simplified');
 
   // Простая демо-SVG для быстрой проверки работоспособности пакета
   // (пара простых форм - triangle + circle, рендерится за миллисекунды)
@@ -26,6 +26,13 @@ const Test3DLogoPage = () => {
     <circle cx="128" cy="128" r="90" fill="#9b8cff"/>
     <path d="M128 60 L190 170 L66 170 Z" fill="#ffffff"/>
   </svg>`;
+
+  // Карта источников → пропсы для SVG3D
+  const svgSourceMap = {
+    simple: { prop: { svg: simpleDemoSvg }, label: 'Простой демо-SVG (мгновенно)' },
+    simplified: { prop: { svg: '/rudn-logo-3d-simplified.svg' }, label: 'Логотип РУДН, упрощённый (17 KB, 5× меньше)' },
+    original: { prop: { svg: '/rudn-logo-3d.svg' }, label: 'Логотип РУДН, ОРИГИНАЛ (82 KB — очень медленно!)' },
+  };
 
   const handleMount = () => {
     setErrorMsg('');
@@ -73,7 +80,7 @@ const Test3DLogoPage = () => {
         <code style={{ color: '#9b8cff' }}>3dsvg</code>
       </h1>
       <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 18, textAlign: 'center' }}>
-        Источник: <code>/rudn-logo-3d.svg</code>&nbsp;&nbsp;•&nbsp;&nbsp;Статус:&nbsp;
+        Источник: <code>{svgSource === 'simple' ? 'simpleDemoSvg' : svgSourceMap[svgSource].prop.svg}</code>&nbsp;&nbsp;•&nbsp;&nbsp;Статус:&nbsp;
         <StatusBadge status={status} />
       </p>
 
@@ -88,14 +95,20 @@ const Test3DLogoPage = () => {
           maxWidth: 600,
         }}
       >
-        <label style={{ ...labelStyle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={useSimpleDemo}
-            onChange={(e) => setUseSimpleDemo(e.target.checked)}
+        <label style={{ ...labelStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 4, minWidth: 240 }}>
+          источник SVG:
+          <select
+            value={svgSource}
+            onChange={(e) => setSvgSource(e.target.value)}
             disabled={mounted}
-          />
-          простой демо-SVG (быстро)
+            style={{ ...selectStyle, width: '100%' }}
+          >
+            {Object.entries(svgSourceMap).map(([key, v]) => (
+              <option key={key} value={key}>
+                {v.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label style={labelStyle}>
           smoothness: <b>{smoothness.toFixed(2)}</b>
@@ -194,7 +207,7 @@ const Test3DLogoPage = () => {
               }
             >
               <SVG3DLazy
-                {...(useSimpleDemo ? { svg: simpleDemoSvg } : { svg: '/rudn-logo-3d.svg' })}
+                {...svgSourceMap[svgSource].prop}
                 smoothness={smoothness}
                 material={material}
                 metalness={0.9}
