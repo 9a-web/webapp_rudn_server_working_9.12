@@ -2,17 +2,19 @@
  * AuthGate — защитник роутов.
  *
  * Логика:
- *  1. Если инициализация ещё не завершена → loading screen
- *  2. Если пользователь уже залогинен через наш JWT → пропускаем дальше
- *  3. Если есть Telegram WebApp initData (внутри бота) → auto-login через /api/auth/login/telegram-webapp
- *     (прозрачно, без UI — существующие Telegram-пользователи получат JWT автоматически)
- *  4. Иначе → редирект на /login (с сохранением оригинального URL как ?continue)
- *  5. Если user.registration_step > 0 → редирект на /register
+ *  1. Пока инициализация не завершена → loading screen.
+ *  2. Пользователь уже залогинен (JWT) → пропускаем дальше
+ *     (при needsOnboarding — редирект на /register).
+ *  3. Мы внутри Telegram WebApp (initData есть), но не залогинены →
+ *     показываем явный confirm-экран TelegramWebAppConfirm
+ *     («Войти как {Имя} через Telegram?») — НЕ логиним молча.
+ *  4. Иначе → редирект на /login с сохранением ?continue=.
  */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import TelegramWebAppConfirm from './TelegramWebAppConfirm';
 
 const FullPageLoader = ({ hint }) => (
   <div className="flex min-h-screen w-full items-center justify-center bg-[#0E0E10] text-white">
@@ -24,57 +26,56 @@ const FullPageLoader = ({ hint }) => (
 );
 
 const AuthGate = ({ children }) => {
-  const { isAuthenticated, needsOnboarding, initializing, loginTelegramWebApp, user } = useAuth();
+  const { isAuthenticated, needsOnboarding, initializing, loginTelegramWebApp } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [tgAutologinTried, setTgAutologinTried] = useState(false);
-  const [tgAutologinBusy, setTgAutologinBusy] = useState(false);
-  const attemptedRef = useRef(false);
 
-  // Попытка Telegram WebApp auto-login
+  // Telegram WebApp detection (stable across renders)
+  const { tg, initData } = useMemo(() => {
+    if (typeof window === 'undefined') return { tg: null, initData: null };
+    const t = window.Telegram?.WebApp || null;
+    const d = t?.initData || null;
+    return { tg: t, initData: d && d.length > 0 ? d : null };
+  }, []);
+
+  const insideTelegram = !!initData;
+
+  // Редиректы (авторизован либо вообще не Telegram)
   useEffect(() => {
-    if (attemptedRef.current) return;
     if (initializing) return;
-    if (isAuthenticated) return;
-    attemptedRef.current = true;
-
-    const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
-    const initData = tg?.initData;
-
-    if (initData && initData.length > 0) {
-      setTgAutologinBusy(true);
-      const startParam = tg?.initDataUnsafe?.start_param;
-      loginTelegramWebApp(initData, startParam)
-        .catch((e) => {
-          console.warn('[AuthGate] Telegram WebApp auto-login failed:', e.message);
-        })
-        .finally(() => {
-          setTgAutologinBusy(false);
-          setTgAutologinTried(true);
-        });
-    } else {
-      setTgAutologinTried(true);
-    }
-  }, [initializing, isAuthenticated, loginTelegramWebApp]);
-
-  // Редиректы
-  useEffect(() => {
-    if (initializing || tgAutologinBusy) return;
-    if (!tgAutologinTried) return;
-
-    if (!isAuthenticated) {
-      const cont = encodeURIComponent(location.pathname + location.search);
-      navigate(`/login?continue=${cont}`, { replace: true });
+    if (isAuthenticated) {
+      if (needsOnboarding && location.pathname !== '/register') {
+        navigate('/register', { replace: true });
+      }
       return;
     }
-
-    if (needsOnboarding && location.pathname !== '/register') {
-      navigate('/register', { replace: true });
+    // Неавторизован
+    if (!insideTelegram) {
+      const cont = encodeURIComponent(location.pathname + location.search);
+      navigate(`/login?continue=${cont}`, { replace: true });
     }
-  }, [initializing, tgAutologinBusy, tgAutologinTried, isAuthenticated, needsOnboarding, location.pathname, location.search, navigate]);
+    // Если insideTelegram и не авторизован — показываем confirm (ниже в рендере)
+  }, [initializing, isAuthenticated, needsOnboarding, insideTelegram,
+      location.pathname, location.search, navigate]);
 
-  if (initializing || tgAutologinBusy) {
-    return <FullPageLoader hint={tgAutologinBusy ? 'Telegram авторизация...' : null} />;
+  // --- Render states ---
+
+  if (initializing) {
+    return <FullPageLoader />;
+  }
+
+  // Telegram WebApp confirm screen — явное согласие перед логином
+  if (!isAuthenticated && insideTelegram) {
+    return (
+      <TelegramWebAppConfirm
+        tg={tg}
+        initData={initData}
+        onConfirm={async (d, startParam) => {
+          await loginTelegramWebApp(d, startParam);
+          // После успеха useEffect выше сделает редирект на /register или пропустит дальше.
+        }}
+      />
+    );
   }
 
   if (!isAuthenticated) {
