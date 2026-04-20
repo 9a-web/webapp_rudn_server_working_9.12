@@ -2884,6 +2884,35 @@ class AuthTokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserPublic
     is_new_user: bool = False
+    # Если при регистрации через Telegram/VK username-подсказка провайдера
+    # была занята другим пользователем — сюда кладём оригинал (для UI-подсказки
+    # «ник @{value} уже занят, выберите свой»). Ничего ПО username не линкуем!
+    suggested_username_taken: Optional[str] = None
+
+
+class LinkTelegramRequest(BaseModel):
+    """Привязка Telegram Login Widget к существующему аккаунту."""
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    auth_date: int
+    hash: str
+
+
+class LinkTelegramWebAppRequest(BaseModel):
+    """Привязка Telegram WebApp initData к существующему аккаунту."""
+    init_data: str
+
+
+class LinkVKRequest(BaseModel):
+    """Привязка VK ID OAuth к существующему аккаунту."""
+    code: str
+    device_id: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    code_verifier: Optional[str] = None
+    state: Optional[str] = None
 
 
 class UpdateProfileStepRequest(BaseModel):

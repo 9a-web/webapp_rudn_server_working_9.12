@@ -7,11 +7,13 @@
 - create_jwt/decode_jwt — JSON Web Tokens
 - get_current_user_* — FastAPI dependencies
 - verify_telegram_login_widget_hash — валидация Telegram Login Widget
+- normalize_username — нормализация и валидация username
 """
 
 import hmac
 import hashlib
 import logging
+import re
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
@@ -69,6 +71,73 @@ async def generate_uid(db) -> str:
             return candidate
     # Если 20 раз подряд коллизия — что-то не так, но fallback
     raise RuntimeError("Не удалось сгенерировать уникальный UID после 20 попыток")
+
+
+# ----- Username normalization -----
+
+# Паттерн публичного username (совпадает с UpdateProfileStepRequest в models.py).
+USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
+USERNAME_RESERVED = {
+    "admin", "root", "system", "support", "api", "auth", "login",
+    "register", "rudn", "null", "undefined", "me", "settings",
+    "profile", "users", "user", "telegram", "vk", "email",
+}
+
+
+def normalize_username(raw: Optional[str]) -> Optional[str]:
+    """Нормализует username в lowercase + валидирует формат.
+
+    Возвращает:
+        - нормализованный username (lowercase, 3-32 символа a-z0-9_) — если валиден;
+        - None — если `raw` пустой, не проходит валидацию, зарезервирован.
+
+    Используется при регистрации через Telegram/VK (где username приходит
+    с провайдера) и при ручном выборе username пользователем.
+    """
+    if not raw:
+        return None
+    candidate = str(raw).strip().lower()
+    if not candidate:
+        return None
+    if not USERNAME_PATTERN.match(candidate):
+        return None
+    if candidate in USERNAME_RESERVED:
+        return None
+    return candidate
+
+
+async def resolve_safe_username(
+    db,
+    raw: Optional[str],
+    exclude_uid: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    """Возвращает (safe_username, conflict_original).
+
+    - Нормализует `raw`.
+    - Если не валидный формат → (None, None).
+    - Если нормализованное username уже занят другим uid
+      (case-insensitive) → (None, original_raw) — вызывающий может показать
+      UI «ник занят, выберите другой».
+    - Иначе → (normalized, None).
+
+    Используется для безопасной регистрации через Telegram/VK: если username
+    из провайдера конфликтует с существующим — не пытаемся привязаться, а
+    создаём нового user с пустым username и просим выбрать свой.
+    """
+    normalized = normalize_username(raw)
+    if not normalized:
+        return None, None
+
+    query: Dict[str, Any] = {
+        "username": {"$regex": f"^{re.escape(normalized)}$", "$options": "i"},
+    }
+    if exclude_uid:
+        query["uid"] = {"$ne": exclude_uid}
+
+    existing = await db.users.find_one(query, {"_id": 1, "uid": 1})
+    if existing:
+        return None, raw  # конфликт — возвращаем оригинал, чтобы показать пользователю
+    return normalized, None
 
 
 # ----- JWT -----

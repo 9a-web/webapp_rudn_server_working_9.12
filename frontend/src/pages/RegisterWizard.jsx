@@ -183,7 +183,22 @@ const Step2Profile = ({ user, onComplete, onBack }) => {
   const [usernameValid, setUsernameValid] = useState(!!user?.username);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [conflictHint, setConflictHint] = useState(null);
   const { updateProfile } = useAuth();
+
+  // Читаем sessionStorage-подсказку о занятом username из Telegram/VK
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('auth:username_conflict');
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      // TTL 10 минут — не показываем старые
+      if (obj?.value && (Date.now() - (obj.ts || 0)) < 10 * 60 * 1000) {
+        setConflictHint(obj.value);
+      }
+      sessionStorage.removeItem('auth:username_conflict');
+    } catch { /* noop */ }
+  }, []);
 
   const canSubmit = (usernameValid || !!username) && firstName.trim().length > 0;
 
@@ -212,6 +227,15 @@ const Step2Profile = ({ user, onComplete, onBack }) => {
       <div className="mb-3 text-center text-sm text-white/70">
         Расскажите о себе — эти данные увидят друзья.
       </div>
+
+      {conflictHint && (
+        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-relaxed text-amber-200">
+          <span className="font-semibold">Ник </span>
+          <span className="font-mono font-semibold">@{conflictHint}</span>
+          <span> из Telegram/VK уже занят другим пользователем. </span>
+          <span>Выберите другой ник — он будет виден друзьям и в поиске.</span>
+        </div>
+      )}
 
       <UsernameField value={username} onChange={setUsername} onValidChange={setUsernameValid} />
       <div className="grid grid-cols-2 gap-3">

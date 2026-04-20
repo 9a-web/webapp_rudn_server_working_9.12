@@ -162,11 +162,26 @@ export const AuthProvider = ({ children }) => {
     finally { setLoading(false); }
   };
 
+  const _stashUsernameConflict = (resp) => {
+    try {
+      if (resp?.suggested_username_taken) {
+        sessionStorage.setItem(
+          'auth:username_conflict',
+          JSON.stringify({
+            value: resp.suggested_username_taken,
+            ts: Date.now(),
+          })
+        );
+      }
+    } catch { /* noop */ }
+  };
+
   const loginTelegramWidget = async (widgetData) => {
     setLoading(true); setError(null);
     try {
       const resp = await authAPI.loginTelegramWidget(widgetData);
       applyAuth(resp.access_token, resp.user);
+      _stashUsernameConflict(resp);
       return resp;
     } catch (e) { setError(e.message); throw e; }
     finally { setLoading(false); }
@@ -177,6 +192,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const resp = await authAPI.loginTelegramWebApp(init_data, referral_code);
       applyAuth(resp.access_token, resp.user);
+      _stashUsernameConflict(resp);
       return resp;
     } catch (e) { setError(e.message); throw e; }
     finally { setLoading(false); }
@@ -187,6 +203,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const resp = await authAPI.loginVK(payload);
       applyAuth(resp.access_token, resp.user);
+      _stashUsernameConflict(resp);
       return resp;
     } catch (e) { setError(e.message); throw e; }
     finally { setLoading(false); }

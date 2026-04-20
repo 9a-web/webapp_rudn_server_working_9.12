@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCheck, Copy, Award, ChevronRight, Star, Lock } from 'lucide-react';
+import { ChevronLeft, Trophy, Settings, QrCode, X, Sliders, Smartphone, Users, Link2, Snowflake, Trash2, AlertTriangle, GraduationCap, Pen, ShieldCheck, Copy, Award, ChevronRight, Star, Lock, KeyRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { friendsAPI } from '../services/friendsAPI';
 import { getReferralCode, getReferralStats } from '../services/referralAPI';
@@ -8,6 +8,7 @@ import { getBackendURL, achievementsAPI } from '../services/api';
 import { clearAllLocalAuthData } from '../utils/authStorage';
 import ProfileSettingsModal from './ProfileSettingsModal';
 import ProfileEditScreen from './ProfileEditScreen';
+import LinkedAccountsModal from './LinkedAccountsModal';
 import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
 import LevelDetailModal from './LevelDetailModal';
@@ -35,6 +36,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
 
   // Sub-modals
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [showLinkedAccounts, setShowLinkedAccounts] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
   const [showLKModal, setShowLKModal] = useState(false);
@@ -310,6 +312,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
       sublabel: 'Управление видимостью данных',
       color: '#FFBE4E',
       action: () => { closeSheet(); setTimeout(() => setShowProfileSettings(true), 200); },
+    },
+    {
+      id: 'linked',
+      icon: KeyRound,
+      label: 'Способы входа',
+      sublabel: 'Email, Telegram, VK',
+      color: '#22C55E',
+      action: () => { closeSheet(); setTimeout(() => setShowLinkedAccounts(true), 200); },
     },
     {
       id: 'devices',
@@ -1732,6 +1742,12 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             userSettings={userSettings}
             hapticFeedback={hapticFeedback}
           />
+        </div>
+      )}
+
+      {showLinkedAccounts && (
+        <div className="relative z-[360]">
+          <LinkedAccountsModal onClose={() => setShowLinkedAccounts(false)} />
         </div>
       )}
 

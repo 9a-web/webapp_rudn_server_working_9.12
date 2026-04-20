@@ -62,6 +62,19 @@ export const authAPI = {
   linkEmail: unwrap((email, password) =>
     axios.post(`${BASE}/link/email`, { email, password }, withAuth())),
 
+  linkTelegramWidget: unwrap((widgetData) =>
+    axios.post(`${BASE}/link/telegram`, widgetData, withAuth())),
+
+  linkTelegramWebApp: unwrap((init_data) =>
+    axios.post(`${BASE}/link/telegram-webapp`, { init_data }, withAuth())),
+
+  linkVK: unwrap(({ code, device_id, redirect_uri, code_verifier, state }) =>
+    axios.post(`${BASE}/link/vk`,
+      { code, device_id, redirect_uri, code_verifier, state }, withAuth())),
+
+  unlinkProvider: unwrap((provider) =>
+    axios.delete(`${BASE}/link/${encodeURIComponent(provider)}`, withAuth())),
+
   checkUsername: unwrap((username) =>
     axios.get(`${BASE}/check-username/${encodeURIComponent(username)}`, withAuth())),
 

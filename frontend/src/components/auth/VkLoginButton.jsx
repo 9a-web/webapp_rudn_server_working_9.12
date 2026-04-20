@@ -35,7 +35,7 @@ const _sha256 = async (input) => {
 
 const VK_ID_AUTHORIZE = 'https://id.vk.com/authorize';
 
-const VkLoginButton = ({ appId, redirectUri, referralCode, disabled }) => {
+const VkLoginButton = ({ appId, redirectUri, referralCode, disabled, mode = 'login', label }) => {
   const [preparing, setPreparing] = useState(false);
 
   const handleClick = useCallback(async () => {
@@ -55,6 +55,7 @@ const VkLoginButton = ({ appId, redirectUri, referralCode, disabled }) => {
       sessionStorage.setItem('vk_oauth_state', state);
       sessionStorage.setItem('vk_oauth_verifier', codeVerifier);
       sessionStorage.setItem('vk_oauth_redirect', finalRedirect);
+      sessionStorage.setItem('vk_oauth_mode', mode);
       if (referralCode) sessionStorage.setItem('vk_oauth_referral', referralCode);
 
       const params = new URLSearchParams({
@@ -73,7 +74,7 @@ const VkLoginButton = ({ appId, redirectUri, referralCode, disabled }) => {
       alert('Не удалось запустить VK OAuth: ' + e.message);
       setPreparing(false);
     }
-  }, [appId, redirectUri, referralCode]);
+  }, [appId, redirectUri, referralCode, mode]);
 
   return (
     <AuthButton
@@ -83,7 +84,7 @@ const VkLoginButton = ({ appId, redirectUri, referralCode, disabled }) => {
       icon={VK_LOGO}
       onClick={handleClick}
     >
-      Войти через VK ID
+      {label || (mode === 'link' ? 'Привязать VK ID' : 'Войти через VK ID')}
     </AuthButton>
   );
 };

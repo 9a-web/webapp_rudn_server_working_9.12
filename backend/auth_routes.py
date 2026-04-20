@@ -25,6 +25,8 @@ from auth_utils import (
     verify_telegram_webapp_init_data,
     get_current_user_required,
     get_current_user_optional,
+    normalize_username,
+    resolve_safe_username,
 )
 from config import (
     get_telegram_bot_token,
@@ -36,6 +38,9 @@ from config import (
 )
 from models import (
     AuthTokenResponse,
+    LinkTelegramRequest,
+    LinkTelegramWebAppRequest,
+    LinkVKRequest,
     LoginEmailRequest,
     QRConfirmRequest,
     QRInitResponse,
@@ -54,7 +59,8 @@ logger = logging.getLogger(__name__)
 
 # ========== Константы ==========
 QR_SESSION_TTL_MINUTES = 5
-RESERVED_USERNAMES = {"admin", "root", "system", "support", "api", "auth", "login", "register", "rudn", "null", "undefined", "me"}
+# Используем общий список из auth_utils (там же normalize_username).
+from auth_utils import USERNAME_RESERVED as RESERVED_USERNAMES
 
 # ========== Rate Limiter (in-memory, per-IP) ==========
 # Простой лимитер для /register/email, чтобы избежать спама.
@@ -189,8 +195,19 @@ async def _update_last_login(db, uid: str):
     )
 
 
-async def _issue_token(db, user_doc: dict, is_new: bool = False) -> AuthTokenResponse:
-    """Генерирует JWT для пользователя и возвращает AuthTokenResponse."""
+async def _issue_token(
+    db,
+    user_doc: dict,
+    is_new: bool = False,
+    suggested_username_taken: Optional[str] = None,
+) -> AuthTokenResponse:
+    """Генерирует JWT для пользователя и возвращает AuthTokenResponse.
+
+    `suggested_username_taken` — если провайдер (Telegram/VK) предложил username,
+    который уже занят другим пользователем, сюда передаётся оригинал, чтобы UI
+    мог показать подсказку «@{name} занят — выберите свой». НИКОГДА не служит
+    основанием для линковки — это поле только информативное.
+    """
     token = create_jwt(
         uid=user_doc["uid"],
         telegram_id=user_doc.get("telegram_id"),
@@ -204,6 +221,7 @@ async def _issue_token(db, user_doc: dict, is_new: bool = False) -> AuthTokenRes
         token_type="bearer",
         user=_user_to_public(user_doc, include_email=True),
         is_new_user=is_new,
+        suggested_username_taken=suggested_username_taken,
     )
 
 
@@ -363,68 +381,102 @@ def create_auth_router(db) -> APIRouter:
 
     @router.post("/login/telegram", response_model=AuthTokenResponse)
     async def login_telegram(req: TelegramLoginRequest):
+        """Логин через Telegram Login Widget (веб-сайт вне Telegram).
+
+        🔐 Аналогично `/login/telegram-webapp`: аутентификация СТРОГО по `telegram_id`.
+        Никакой авто-линковки по `username` — это уязвимость. Линковать Telegram
+        к существующему email/VK-аккаунту можно только явно через
+        `POST /api/auth/link/telegram`.
+        """
         data = req.model_dump(exclude={"referral_code"}, exclude_none=True)
 
         if not verify_telegram_login_widget_hash(data):
             raise HTTPException(status_code=401, detail="Невалидная подпись Telegram")
 
         tg_id = req.id
+        now = datetime.now(timezone.utc)
         existing = await db.users.find_one({"telegram_id": tg_id})
-        is_new = False
+
         if existing:
-            # Уже есть user — обновим данные и выдадим JWT
-            update_fields = {
-                "updated_at": datetime.now(timezone.utc),
-                "last_login_at": datetime.now(timezone.utc),
+            # Повторный вход. Дополняем пустые поля (имена), username — только
+            # если у user'а его ещё нет И он свободен (case-insensitive).
+            update_fields: Dict[str, Any] = {
+                "updated_at": now,
+                "last_login_at": now,
             }
+            if req.first_name and not existing.get("first_name"):
+                update_fields["first_name"] = req.first_name
+            if req.last_name and not existing.get("last_name"):
+                update_fields["last_name"] = req.last_name
+
             if req.username and not existing.get("username"):
-                # Автоматически сохраним Telegram username как initial (проверив уникальность)
-                dup = await db.users.find_one({"username": req.username, "uid": {"$ne": existing["uid"]}})
-                if not dup:
-                    update_fields["username"] = req.username
-            if req.first_name:
-                update_fields["first_name"] = existing.get("first_name") or req.first_name
-            if req.last_name:
-                update_fields["last_name"] = existing.get("last_name") or req.last_name
-            if "telegram" not in existing.get("auth_providers", []):
-                await db.users.update_one(
-                    {"uid": existing["uid"]},
-                    {"$addToSet": {"auth_providers": "telegram"}},
+                safe_username, _ = await resolve_safe_username(
+                    db, req.username, exclude_uid=existing["uid"]
                 )
+                if safe_username:
+                    update_fields["username"] = safe_username
 
-            await db.users.update_one({"uid": existing["uid"]}, {"$set": update_fields})
-            user_doc = await db.users.find_one({"uid": existing["uid"]})
-        else:
-            # Новый user
-            user_doc = await _create_new_user(
-                db,
-                telegram_id=tg_id,
-                first_name=req.first_name,
-                last_name=req.last_name,
-                username=req.username,
-                primary_auth="telegram",
-                registration_step=2,
+            await db.users.update_one(
+                {"uid": existing["uid"]},
+                {
+                    "$set": update_fields,
+                    "$addToSet": {"auth_providers": "telegram"},
+                },
             )
-            is_new = True
+            user_doc = await db.users.find_one({"uid": existing["uid"]})
+            return await _issue_token(db, user_doc, is_new=False)
 
-        return await _issue_token(db, user_doc, is_new=is_new)
+        # Новый пользователь — username обрабатываем через resolve_safe_username.
+        safe_username, conflict = await resolve_safe_username(db, req.username)
+        if conflict:
+            logger.info(
+                f"ℹ️ Telegram username '@{req.username}' занят. "
+                f"Создаём новый аккаунт tg_id={tg_id} БЕЗ username."
+            )
+
+        user_doc = await _create_new_user(
+            db,
+            telegram_id=tg_id,
+            first_name=req.first_name,
+            last_name=req.last_name,
+            username=safe_username,
+            primary_auth="telegram",
+            registration_step=2,
+        )
+
+        return await _issue_token(
+            db,
+            user_doc,
+            is_new=True,
+            suggested_username_taken=conflict,
+        )
 
     # ============= LOGIN (Telegram WebApp initData) =============
 
     @router.post("/login/telegram-webapp", response_model=AuthTokenResponse)
     async def login_telegram_webapp(req: TelegramWebAppLoginRequest):
-        """Логин через Telegram WebApp — пользователь уже в боте, просто верифицируем initData.
+        """Логин через Telegram WebApp — пользователь уже в боте, верифицируем initData.
 
-        Логика:
-          1. Есть user с таким `telegram_id` → обычный login.
-          2. Нет → проверяем совпадение username из Telegram с существующим аккаунтом.
-             - Если такой email/VK-аккаунт существует и у него нет telegram_id →
-               автоматически привязываем (account linking) и логиним в него.
-             - Если username занят ДРУГИМ аккаунтом с уже привязанным telegram_id
-               (т.е. это разные люди с одинаковым username) → создаём нового user
-               БЕЗ username, чтобы не падать на 409; пользователь сможет задать
-               свой username на шаге 2 онбординга.
-             - Если username свободен → создаём нового с этим username.
+        🔐 БЕЗОПАСНАЯ ЛОГИКА (после security-fix 2025):
+
+          Аутентификация производится ИСКЛЮЧИТЕЛЬНО по `telegram_id` — это единственный
+          идентификатор, который Telegram криптографически подтверждает. `username` —
+          это публичный handle, который пользователь может поменять в любой момент
+          и который не уникален во времени (освободившийся @name может занять другой
+          человек). Поэтому:
+
+          1. Есть user с таким `telegram_id` → логинимся в него.
+          2. Нет → ВСЕГДА создаём НОВЫЙ аккаунт. Если username от Telegram занят
+             другим пользователем (case-insensitive) — создаём без username и
+             возвращаем `suggested_username_taken` для UI-подсказки на Шаге 2.
+
+          ⚠️ НИКАКОГО авто-линкования по совпадению username! Это уязвимость захвата
+          аккаунта (B на Telegram с username `@name` не должен автоматически попадать
+          в аккаунт A, который зарегистрировался на сайте с тем же `@name`).
+
+          Для легитимного связывания существующего email/VK-аккаунта с Telegram
+          пользователь должен явно вызвать `POST /api/auth/link/telegram-webapp`,
+          будучи уже аутентифицированным в целевом аккаунте.
         """
         parsed = verify_telegram_webapp_init_data(req.init_data)
         if not parsed or not parsed.get("user"):
@@ -437,10 +489,9 @@ def create_auth_router(db) -> APIRouter:
 
         now = datetime.now(timezone.utc)
         existing = await db.users.find_one({"telegram_id": tg_id})
-        is_new = False
 
         if existing:
-            # Case 1: обычный повторный login.
+            # Case 1: обычный повторный login по telegram_id.
             await db.users.update_one(
                 {"uid": existing["uid"]},
                 {
@@ -454,93 +505,17 @@ def create_auth_router(db) -> APIRouter:
             user_doc = await db.users.find_one({"uid": existing["uid"]})
             return await _issue_token(db, user_doc, is_new=False)
 
-        # Case 2: первый вход через Telegram — проверяем конфликт по username.
+        # Case 2: НОВЫЙ аккаунт. Проверяем username-коллизию (НЕ для линковки!).
         tg_username = tg_user.get("username")
         tg_first = tg_user.get("first_name")
         tg_last = tg_user.get("last_name")
-        username_owner = None
-        if tg_username:
-            # case-insensitive поиск — username в БД может быть в любом регистре
-            username_owner = await db.users.find_one(
-                {"username": {"$regex": f"^{re.escape(tg_username)}$", "$options": "i"}}
-            )
 
-        if username_owner and not username_owner.get("telegram_id"):
-            # Auto-link: у существующего email/VK-юзера свободен слот telegram_id,
-            # username совпал → считаем это тем же человеком, привязываем.
-            owner_uid = username_owner["uid"]
+        safe_username, conflict = await resolve_safe_username(db, tg_username)
+        if conflict:
             logger.info(
-                f"🔗 Account linking: uid={owner_uid} получает telegram_id={tg_id} "
-                f"через совпадение username='{tg_username}'"
+                f"ℹ️ Telegram username '@{tg_username}' занят другим пользователем. "
+                f"Создаём новый аккаунт для tg_id={tg_id} БЕЗ username."
             )
-            set_fields = {
-                "telegram_id": tg_id,
-                "last_login_at": now,
-                "updated_at": now,
-            }
-            # Дополняем пустые имена данными из Telegram
-            if not username_owner.get("first_name") and tg_first:
-                set_fields["first_name"] = tg_first
-            if not username_owner.get("last_name") and tg_last:
-                set_fields["last_name"] = tg_last
-
-            try:
-                await db.users.update_one(
-                    {"uid": owner_uid},
-                    {
-                        "$set": set_fields,
-                        "$addToSet": {"auth_providers": "telegram"},
-                    },
-                )
-            except DuplicateKeyError:
-                # На всякий случай — если параллельно создался другой user с tg_id.
-                raise HTTPException(
-                    status_code=409,
-                    detail="Не удалось привязать Telegram — попробуйте ещё раз.",
-                )
-
-            # Переносим user_settings со синтетического ключа (int(uid)) на реальный tg_id.
-            try:
-                synth_tid = int(owner_uid)
-            except (TypeError, ValueError):
-                synth_tid = None
-            if synth_tid and synth_tid != tg_id:
-                # Проверяем что документа с tg_id ещё нет (чтобы не сломать unique key).
-                already_has_tg = await db.user_settings.find_one({"telegram_id": tg_id})
-                if not already_has_tg:
-                    await db.user_settings.update_one(
-                        {"telegram_id": synth_tid},
-                        {"$set": {"telegram_id": tg_id}},
-                        upsert=False,
-                    )
-            # Гарантируем, что документ user_settings с tg_id существует, и
-            # переносим туда academic-поля из users, если они там есть
-            # (email-регистрация до bug-fix могла сохранить group_id только в users).
-            linked_user_doc = await db.users.find_one({"uid": owner_uid})
-            mirror_fields = {"uid": owner_uid}
-            for fld in ("first_name", "last_name", "username",
-                        "facultet_id", "facultet_name",
-                        "level_id", "form_code", "kurs",
-                        "group_id", "group_name"):
-                val = linked_user_doc.get(fld)
-                if val is not None:
-                    mirror_fields[fld] = val
-
-            await db.user_settings.update_one(
-                {"telegram_id": tg_id},
-                {
-                    "$setOnInsert": {"telegram_id": tg_id, "created_at": now},
-                    "$set": mirror_fields,
-                },
-                upsert=True,
-            )
-
-            user_doc = linked_user_doc
-            return await _issue_token(db, user_doc, is_new=False)
-
-        # Case 3: username занят другим юзером с уже привязанным telegram_id (разные люди) —
-        # создаём нового БЕЗ username (пользователь выберет свой на шаге 2).
-        safe_username = None if username_owner else tg_username
 
         user_doc = await _create_new_user(
             db,
@@ -551,9 +526,13 @@ def create_auth_router(db) -> APIRouter:
             primary_auth="telegram",
             registration_step=2,
         )
-        is_new = True
 
-        return await _issue_token(db, user_doc, is_new=is_new)
+        return await _issue_token(
+            db,
+            user_doc,
+            is_new=True,
+            suggested_username_taken=conflict,
+        )
 
     # ============= LOGIN (VK ID OAuth) =============
 
@@ -639,6 +618,7 @@ def create_auth_router(db) -> APIRouter:
         # Поиск/создание
         existing = await db.users.find_one({"vk_id": vk_id_str})
         is_new = False
+        conflict_username = None
         if existing:
             await db.users.update_one(
                 {"uid": existing["uid"]},
@@ -652,18 +632,34 @@ def create_auth_router(db) -> APIRouter:
             )
             user_doc = await db.users.find_one({"uid": existing["uid"]})
         else:
+            # Новый user. VK screen_name обрабатываем через resolve_safe_username —
+            # не линкуем по совпадению screen_name (это не доказательство
+            # владения чужим аккаунтом), если занят → создаём без username.
+            safe_username, conflict_username = await resolve_safe_username(
+                db, vk_profile.get("screen_name")
+            )
+            if conflict_username:
+                logger.info(
+                    f"ℹ️ VK screen_name '{conflict_username}' занят — создаём аккаунт без username."
+                )
+
             user_doc = await _create_new_user(
                 db,
                 vk_id=vk_id_str,
                 first_name=vk_profile.get("first_name"),
                 last_name=vk_profile.get("last_name"),
-                username=vk_profile.get("screen_name"),
+                username=safe_username,
                 primary_auth="vk",
                 registration_step=2,
             )
             is_new = True
 
-        return await _issue_token(db, user_doc, is_new=is_new)
+        return await _issue_token(
+            db,
+            user_doc,
+            is_new=is_new,
+            suggested_username_taken=conflict_username,
+        )
 
     # ============= QR LOGIN =============
 
@@ -831,6 +827,315 @@ def create_auth_router(db) -> APIRouter:
         )
         return {"success": True, "message": "Email привязан"}
 
+    # ============= Link Telegram (Widget) =============
+
+    @router.post("/link/telegram")
+    async def link_telegram(
+        req: LinkTelegramRequest,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Привязать Telegram Login Widget к текущему авторизованному аккаунту.
+
+        🔐 Безопасность:
+        - Требует валидный JWT (ручная, явная привязка, а не авто-линк).
+        - Проверяет HMAC-подпись Telegram Widget.
+        - `telegram_id` должен быть свободен ИЛИ уже принадлежать текущему user (идемпотентно).
+        """
+        data = req.model_dump(exclude_none=True)
+        if not verify_telegram_login_widget_hash(data):
+            raise HTTPException(status_code=401, detail="Невалидная подпись Telegram")
+
+        user_doc = await db.users.find_one({"uid": current_user["sub"]})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        tg_id = req.id
+
+        # Если уже привязан к этому user — идемпотентный ответ
+        if user_doc.get("telegram_id") == tg_id:
+            return {"success": True, "message": "Telegram уже привязан", "telegram_id": tg_id}
+
+        # Если этот user уже имеет ДРУГОЙ telegram_id — блокируем
+        if user_doc.get("telegram_id") and user_doc["telegram_id"] != tg_id:
+            raise HTTPException(
+                status_code=409,
+                detail="К вашему аккаунту уже привязан другой Telegram. "
+                       "Сначала отвяжите текущий.",
+            )
+
+        # Проверяем, не занят ли tg_id другим пользователем
+        other = await db.users.find_one(
+            {"telegram_id": tg_id, "uid": {"$ne": user_doc["uid"]}},
+            {"uid": 1},
+        )
+        if other:
+            raise HTTPException(
+                status_code=409,
+                detail="Этот Telegram уже привязан к другому аккаунту.",
+            )
+
+        now = datetime.now(timezone.utc)
+        await db.users.update_one(
+            {"uid": user_doc["uid"]},
+            {
+                "$set": {"telegram_id": tg_id, "updated_at": now},
+                "$addToSet": {"auth_providers": "telegram"},
+            },
+        )
+
+        logger.info(f"🔗 Manual link: uid={user_doc['uid']} ← telegram_id={tg_id}")
+
+        updated = await db.users.find_one({"uid": user_doc["uid"]})
+        return {
+            "success": True,
+            "message": "Telegram успешно привязан",
+            "user": _user_to_public(updated, include_email=True).model_dump(mode="json"),
+        }
+
+    # ============= Link Telegram (WebApp initData) =============
+
+    @router.post("/link/telegram-webapp")
+    async def link_telegram_webapp(
+        req: LinkTelegramWebAppRequest,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Привязать Telegram к текущему аккаунту через WebApp initData."""
+        parsed = verify_telegram_webapp_init_data(req.init_data)
+        if not parsed or not parsed.get("user"):
+            raise HTTPException(status_code=401, detail="Невалидные данные Telegram WebApp")
+
+        tg_user = parsed["user"]
+        tg_id = tg_user.get("id")
+        if not tg_id:
+            raise HTTPException(status_code=400, detail="user.id отсутствует в initData")
+
+        user_doc = await db.users.find_one({"uid": current_user["sub"]})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # Идемпотентность
+        if user_doc.get("telegram_id") == tg_id:
+            return {"success": True, "message": "Telegram уже привязан", "telegram_id": tg_id}
+
+        if user_doc.get("telegram_id") and user_doc["telegram_id"] != tg_id:
+            raise HTTPException(
+                status_code=409,
+                detail="К вашему аккаунту уже привязан другой Telegram. "
+                       "Сначала отвяжите текущий.",
+            )
+
+        other = await db.users.find_one(
+            {"telegram_id": tg_id, "uid": {"$ne": user_doc["uid"]}},
+            {"uid": 1},
+        )
+        if other:
+            raise HTTPException(
+                status_code=409,
+                detail="Этот Telegram уже привязан к другому аккаунту.",
+            )
+
+        now = datetime.now(timezone.utc)
+        await db.users.update_one(
+            {"uid": user_doc["uid"]},
+            {
+                "$set": {"telegram_id": tg_id, "updated_at": now},
+                "$addToSet": {"auth_providers": "telegram"},
+            },
+        )
+
+        logger.info(f"🔗 Manual link (WebApp): uid={user_doc['uid']} ← telegram_id={tg_id}")
+
+        updated = await db.users.find_one({"uid": user_doc["uid"]})
+        return {
+            "success": True,
+            "message": "Telegram успешно привязан",
+            "user": _user_to_public(updated, include_email=True).model_dump(mode="json"),
+        }
+
+    # ============= Link VK =============
+
+    @router.post("/link/vk")
+    async def link_vk(
+        req: LinkVKRequest,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Привязать VK ID к текущему аккаунту (через OAuth code)."""
+        if not VK_APP_ID or not VK_CLIENT_SECRET:
+            raise HTTPException(status_code=500, detail="VK OAuth не сконфигурирован")
+
+        user_doc = await db.users.find_one({"uid": current_user["sub"]})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        redirect_uri = req.redirect_uri or VK_REDIRECT_URI
+        if not redirect_uri:
+            raise HTTPException(status_code=400, detail="redirect_uri обязателен")
+
+        # Обмен code на токен (та же логика что в /login/vk)
+        token_data: Dict[str, Any] = {}
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                token_resp = await client.post(
+                    "https://id.vk.com/oauth2/auth",
+                    data={
+                        "grant_type": "authorization_code",
+                        "code": req.code,
+                        "client_id": VK_APP_ID,
+                        "client_secret": VK_CLIENT_SECRET,
+                        "redirect_uri": redirect_uri,
+                        "device_id": req.device_id or "",
+                        "code_verifier": req.code_verifier or "",
+                        "state": req.state or "",
+                    },
+                )
+                token_data = token_resp.json() or {}
+        except Exception as e:
+            logger.error(f"VK link: token exchange error: {e}")
+
+        if "access_token" not in token_data:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    legacy_resp = await client.get(
+                        "https://oauth.vk.com/access_token",
+                        params={
+                            "client_id": VK_APP_ID,
+                            "client_secret": VK_CLIENT_SECRET,
+                            "redirect_uri": redirect_uri,
+                            "code": req.code,
+                        },
+                    )
+                    token_data = legacy_resp.json() or {}
+            except Exception as e:
+                logger.error(f"VK link legacy token error: {e}")
+
+        vk_user_id = token_data.get("user_id")
+        if not token_data.get("access_token") or not vk_user_id:
+            raise HTTPException(
+                status_code=401,
+                detail=f"VK не вернул токен: "
+                       f"{token_data.get('error_description') or token_data.get('error') or 'unknown'}",
+            )
+
+        vk_id_str = str(vk_user_id)
+
+        # Идемпотентность
+        if user_doc.get("vk_id") == vk_id_str:
+            return {"success": True, "message": "VK уже привязан", "vk_id": vk_id_str}
+
+        if user_doc.get("vk_id") and user_doc["vk_id"] != vk_id_str:
+            raise HTTPException(
+                status_code=409,
+                detail="К вашему аккаунту уже привязан другой VK. Сначала отвяжите текущий.",
+            )
+
+        other = await db.users.find_one(
+            {"vk_id": vk_id_str, "uid": {"$ne": user_doc["uid"]}},
+            {"uid": 1},
+        )
+        if other:
+            raise HTTPException(
+                status_code=409,
+                detail="Этот VK уже привязан к другому аккаунту.",
+            )
+
+        now = datetime.now(timezone.utc)
+        await db.users.update_one(
+            {"uid": user_doc["uid"]},
+            {
+                "$set": {"vk_id": vk_id_str, "updated_at": now},
+                "$addToSet": {"auth_providers": "vk"},
+            },
+        )
+
+        logger.info(f"🔗 Manual link: uid={user_doc['uid']} ← vk_id={vk_id_str}")
+
+        updated = await db.users.find_one({"uid": user_doc["uid"]})
+        return {
+            "success": True,
+            "message": "VK успешно привязан",
+            "user": _user_to_public(updated, include_email=True).model_dump(mode="json"),
+        }
+
+    # ============= Unlink provider =============
+
+    @router.delete("/link/{provider}")
+    async def unlink_provider(
+        provider: str,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Отвязать провайдер от аккаунта.
+
+        Безопасность:
+        - Нельзя отвязать последний оставшийся способ входа (минимум 1 должен остаться).
+        - Для `email` требуется, чтобы был хотя бы один другой привязанный провайдер
+          (иначе пользователь потеряет доступ к аккаунту навсегда).
+        """
+        provider = provider.strip().lower()
+        if provider not in ("email", "telegram", "vk"):
+            raise HTTPException(
+                status_code=400,
+                detail="Провайдер должен быть: email, telegram или vk",
+            )
+
+        user_doc = await db.users.find_one({"uid": current_user["sub"]})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        current_providers = set(user_doc.get("auth_providers") or [])
+        # Считаем реально активные провайдеры (не только по списку, но и по ID в документе)
+        active: set = set()
+        if user_doc.get("email") and user_doc.get("password_hash"):
+            active.add("email")
+        if user_doc.get("telegram_id"):
+            active.add("telegram")
+        if user_doc.get("vk_id"):
+            active.add("vk")
+
+        # Если провайдер не привязан — ничего не делаем (идемпотентно)
+        if provider not in active:
+            return {"success": True, "message": f"{provider} не был привязан", "auth_providers": list(current_providers)}
+
+        # Нельзя оставить 0 способов входа
+        remaining = active - {provider}
+        if not remaining:
+            raise HTTPException(
+                status_code=409,
+                detail="Нельзя отвязать последний способ входа. "
+                       "Сначала привяжите другой провайдер.",
+            )
+
+        unset_fields: Dict[str, Any] = {}  # noqa: F841  (reserved for future)
+        set_none: Dict[str, Any] = {}
+        if provider == "email":
+            set_none = {"email": None, "password_hash": None}
+        elif provider == "telegram":
+            set_none = {"telegram_id": None}
+        elif provider == "vk":
+            set_none = {"vk_id": None}
+
+        update_doc: Dict[str, Any] = {
+            "$set": {**set_none, "updated_at": datetime.now(timezone.utc)},
+            "$pull": {"auth_providers": provider},
+        }
+        # Если отвязываем primary_auth — переключаем на любой оставшийся
+        if user_doc.get("primary_auth") == provider:
+            new_primary = next(iter(remaining))
+            update_doc["$set"]["primary_auth"] = new_primary
+
+        await db.users.update_one({"uid": user_doc["uid"]}, update_doc)
+
+        logger.info(
+            f"🔓 Provider unlinked: uid={user_doc['uid']} provider={provider} "
+            f"remaining={sorted(remaining)}"
+        )
+
+        updated = await db.users.find_one({"uid": user_doc["uid"]})
+        return {
+            "success": True,
+            "message": f"{provider} отвязан",
+            "user": _user_to_public(updated, include_email=True).model_dump(mode="json"),
+        }
+
     # ============= Username check =============
 
     @router.get("/check-username/{username}", response_model=UsernameCheckResponse)
@@ -838,24 +1143,24 @@ def create_auth_router(db) -> APIRouter:
         username: str,
         current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
     ):
-        username_norm = username.strip().lower()
-
-        if len(username_norm) < 3 or len(username_norm) > 32:
+        # Валидация формата + normalization через общий helper
+        normalized = normalize_username(username)
+        if not normalized:
+            raw = (username or "").strip()
+            if len(raw) < 3 or len(raw) > 32:
+                reason = "Длина должна быть 3-32 символа"
+            elif raw.lower() in RESERVED_USERNAMES:
+                reason = "Зарезервировано"
+            else:
+                reason = "Только a-z, 0-9, _"
             return UsernameCheckResponse(
-                username=username, available=False, reason="Длина должна быть 3-32 символа"
+                username=username, available=False, reason=reason
             )
-
-        import re
-        if not re.match(r"^[a-zA-Z0-9_]+$", username_norm):
-            return UsernameCheckResponse(
-                username=username, available=False, reason="Только a-z, 0-9, _"
-            )
-
-        if username_norm in RESERVED_USERNAMES:
-            return UsernameCheckResponse(username=username, available=False, reason="Зарезервировано")
 
         # Case-insensitive check: ищем регистронезависимо
-        query = {"username": {"$regex": f"^{re.escape(username_norm)}$", "$options": "i"}}
+        query: Dict[str, Any] = {
+            "username": {"$regex": f"^{re.escape(normalized)}$", "$options": "i"}
+        }
         if current_user:
             # Собственный username — считается доступным
             query["uid"] = {"$ne": current_user["sub"]}
@@ -881,11 +1186,19 @@ def create_auth_router(db) -> APIRouter:
         complete_step = update_data.pop("complete_step", None)
 
         if "username" in update_data:
-            username = update_data["username"].strip().lower()
-            if username in RESERVED_USERNAMES:
-                raise HTTPException(status_code=400, detail="Username зарезервирован")
-            # Уникальность
-            import re
+            # Используем общий helper normalize_username — единая логика валидации.
+            raw_username = update_data["username"]
+            username = normalize_username(raw_username)
+            if not username:
+                # Разбираем почему — для понятного сообщения.
+                stripped = (raw_username or "").strip()
+                if stripped.lower() in RESERVED_USERNAMES:
+                    raise HTTPException(status_code=400, detail="Username зарезервирован")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Username: 3-32 символа, только a-z, 0-9, _",
+                )
+            # Уникальность (case-insensitive)
             dup = await db.users.find_one({
                 "username": {"$regex": f"^{re.escape(username)}$", "$options": "i"},
                 "uid": {"$ne": user_doc["uid"]},
