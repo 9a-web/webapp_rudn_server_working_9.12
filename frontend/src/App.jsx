@@ -62,6 +62,7 @@ const RegisterWizard = lazy(() => import('./pages/RegisterWizard'));
 const VKCallbackPage = lazy(() => import('./pages/VKCallbackPage'));
 const QRConfirmPage = lazy(() => import('./pages/QRConfirmPage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
+const Test3DLogoPage = lazy(() => import('./pages/Test3DLogoPage'));
 
 const AuthLoadingFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-[#0E0E10] text-white/60 text-sm">
@@ -2676,6 +2677,7 @@ function App() {
                       />
                       <Route path="/status-tester" element={<StatusTester />} />
                       <Route path="/streak-demo" element={<StreakRewardPreview />} />
+                      <Route path="/test-3d-logo" element={<Test3DLogoPage />} />
                     </Routes>
                   </Suspense>
                 </BrowserRouter>

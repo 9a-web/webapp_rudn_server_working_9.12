@@ -13,6 +13,21 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // ВАЖНО: гарантируем единственный экземпляр React/three для всех зависимостей
+      // (фикс для пакетов типа `3dsvg` - они имели свой React при Vite prebundle
+      // и падали с "Invalid hook call / Cannot read properties of null (useState)")
+      dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei'],
+    },
+
+    optimizeDeps: {
+      // Принудительно пре-бандлим `3dsvg` вместе с его peer-deps, чтобы
+      // пакет использовал ТОТ ЖЕ инстанс React/three что и приложение.
+      include: [
+        '3dsvg',
+        '@react-three/fiber',
+        '@react-three/drei',
+        'three',
+      ],
     },
     
     build: {
