@@ -1,21 +1,22 @@
 # Test credentials
 
-## Stage 7 Hardening Test Credentials (Created during testing)
+## Stage 7 testing (2026-04-20)
 
-### Email Users Created:
-- Multiple test users created with pattern: test_[8chars]@example.com
-- Password: testpass123
-- Note: Due to rate limiting (5 registrations/hour/IP), many tests hit 429 errors
+Test users created by testing agent during Stage 7 verification:
+- Pattern: `stage7_*@test.com` / `Test1234`
+- Pattern: `stage7_b23_retest_*@test.com` / `Test1234`
 
-### Test Results:
-- 27 tests executed
-- 15 tests passed (85% success rate)
-- Rate limits working correctly (confirmed by 429 responses)
-- Main issue: B-23 username explicit unset needs fix in Pydantic validation
+Used for: B-23 username explicit unset regression test, B-06 privacy filter.
 
-### Key Working Features:
-- B-02 Rate limits: check-username 120/min/IP enforced
-- B-03 Atomic QR confirm: repeat confirm returns 409
-- B-11 Empty string filter: preserves existing values
-- B-12 Max length validation: 200-char first_name returns 422
-- All security endpoints working correctly
+## Default test credentials for manual QA
+
+Register new users on-the-fly via:
+```
+POST /api/auth/register/email
+{
+  "email": "manual_qa_{random}@test.com",
+  "password": "Test1234",
+  "first_name": "Manual",
+  "last_name": "QA"
+}
+```
