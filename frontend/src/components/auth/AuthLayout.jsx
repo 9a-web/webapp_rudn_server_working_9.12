@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { motion } from 'framer-motion';
+import Logo3D from '../Logo3D';
 
 const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
   return (
@@ -39,8 +40,36 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
         >
           {showLogo && (
             <div className="mb-8 flex flex-col items-center text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg shadow-indigo-500/40">
-                <span className="font-bold text-xl text-white tracking-tight">РУ</span>
+              {/* 3D-логотип РУДН (упрощённый SVG → мгновенный рендер).
+                  Fallback на 2D <img> если WebGL недоступен или 3D упал. */}
+              <div
+                className="relative mb-4"
+                style={{
+                  width: 112,
+                  height: 112,
+                  filter: 'drop-shadow(0 10px 30px rgba(99, 102, 241, 0.45))',
+                }}
+              >
+                {/* Мягкое свечение за логотипом */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background:
+                      'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)',
+                    filter: 'blur(24px)',
+                  }}
+                />
+                <Logo3D
+                  size={112}
+                  material="metal"
+                  animate="float"
+                  animateSpeed={1.2}
+                  smoothness={0.2}
+                  metalness={0.85}
+                  roughness={0.25}
+                  lightPosition={[-0.5, 2, 4]}
+                />
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-white">{title || 'РУДН Расписание'}</h1>
               {subtitle && (

@@ -17,19 +17,18 @@
  */
 import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import useIsInsideTelegram from '../../hooks/useIsInsideTelegram';
 import TelegramWebAppConfirm from './TelegramWebAppConfirm';
 import { safeContinueUrl } from '../../utils/safeRedirect'; // Stage 7: B-01
+import LoadingScreen from '../LoadingScreen';
 
+/**
+ * FullPageLoader — тонкая обёртка над LoadingScreen с 3D-логотипом РУДН.
+ * Параметр `hint` используется как текст под логотипом.
+ */
 const FullPageLoader = ({ hint }) => (
-  <div className="flex min-h-screen w-full items-center justify-center bg-[#0E0E10] text-white">
-    <div className="flex flex-col items-center gap-3">
-      <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
-      {hint && <div className="text-xs text-white/50">{hint}</div>}
-    </div>
-  </div>
+  <LoadingScreen message={hint || 'Загрузка...'} />
 );
 
 const AuthGate = ({ children }) => {
