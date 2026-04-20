@@ -14,7 +14,7 @@ import AuthLayout from '../components/auth/AuthLayout';
 import AuthButton from '../components/auth/AuthButton';
 import { useAuth } from '../contexts/AuthContext';
 import { PUBLIC_BASE_URL } from '../constants/publicBase';
-import authAPI from '../services/authAPI';
+import { authAPI } from '../services/authAPI';
 
 const VKCallbackPage = () => {
   const [params] = useSearchParams();

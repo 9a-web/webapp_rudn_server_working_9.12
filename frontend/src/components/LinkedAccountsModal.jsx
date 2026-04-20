@@ -16,7 +16,7 @@ import {
   CheckCircle2, AlertTriangle, Loader2, Eye, EyeOff, Lock,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import authAPI from '../services/authAPI';
+import { authAPI } from '../services/authAPI';
 import useIsInsideTelegram from '../hooks/useIsInsideTelegram';
 import TelegramLoginWidget from './auth/TelegramLoginWidget';
 import VkLoginButton from './auth/VkLoginButton';
