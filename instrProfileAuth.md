@@ -255,7 +255,35 @@
 - [ ] Проверить уважение privacy-настроек
 - [ ] Проверить TTL-дедупликацию просмотров (коллекция `profile_views`, 7 дней)
 
-**Статус Stage 4:** ⏳ Не начато (Backend готов — фронтенд нужно дописать)
+**Статус Stage 4:** ✅ Завершено (2025-07)
+
+**Артефакты:**
+- `frontend/src/pages/PublicProfilePage.jsx` (~480 LOC) — публичная страница с:
+  - Состояниями: loading skeleton, 404, 422 (not configured), hidden (auth required), generic error
+  - Hero-блоком: avatar gradient + initials, name, username, group/faculty, level/tier badge, online status, friendship badge
+  - Статистикой: Друзей / Общих / Достижений (с индикацией «Скрыто» по privacy-флагам)
+  - XP progress bar (цвета tier)
+  - Meta: member-since chip, profile_views (для владельца)
+  - CTA: «Открыть в Telegram», «Поделиться», «Копировать ссылку» (с feedback «Скопировано»)
+  - URL preview (моно-шрифт)
+  - Login CTA для анонимных с `?continue=/u/{uid}`
+  - Авто-регистрация просмотра через `POST /api/u/{uid}/view` (только для авторизованных, 1200 мс задержка)
+  - Document.title + meta description (SEO-friendly)
+  - Responsive (max-width 640px, работает mobile + desktop)
+- `frontend/src/App.jsx` — добавлен lazy-route `/u/:uid` ВНЕ `AuthGate`
+- `frontend/src/components/ProfileScreen.jsx`:
+  - Импортирован `buildProfileUrl` из `constants/publicBase`
+  - Кнопка «Поделиться ссылкой» теперь формирует URL `${PUBLIC_BASE_URL}/u/${profileData.uid || qrData.uid}` (с fallback)
+  - Добавлено feedback-состояние `copiedProfileLink` → зелёная кнопка «✓ Скопировано» на 1.8 сек
+  - Добавлен URL-preview chip под кнопкой (моно-шрифт, копирует в буфер по клику)
+  - Fallback copy через `document.execCommand('copy')` для старых WebView
+
+**Тестирование:**
+- [x] Lint ✅ (все 3 файла без замечаний)
+- [x] Route resolve (200) ✅
+- [x] 404 state ✅ (скриншот подтверждён)
+- [x] Loaded profile state ✅ (mobile + desktop)
+- [x] Backend `/api/u/{uid}` → корректная отдача публичного профиля (200 для существующего UID, 404 для несуществующего)
 
 ---
 
@@ -295,16 +323,15 @@
 ```
 [████████████] Stage 1: Backend Auth Foundation — ✅ Завершено
 [████████████] Stage 2: Public Profile by UID + Bugfixes — ✅ Завершено
-[████████████] Stage 3: Frontend Auth Flow — ✅ Завершено (подтверждено аудитом)
-[            ] Stage 4: Public Profile Page /u/{uid} — ⏳ Не начато (backend готов)
+[████████████] Stage 3: Frontend Auth Flow — ✅ Завершено
+[████████████] Stage 4: Public Profile Page /u/{uid} — ✅ Завершено (2025-07)
 [██████▒▒▒▒▒▒] Stage 5: External Integrations — 🟡 Код готов, нужно E2E + /setdomain
 ```
 
 ### Ближайшие шаги
 
-1. **Stage 4** — создать `frontend/src/pages/PublicProfilePage.jsx`, добавить маршрут `/u/:uid` в `App.jsx` (БЕЗ `AuthGate` — публичная страница), заменить кнопку «Поделиться» в `ProfileScreen.jsx` на использование `${PUBLIC_BASE_URL}/u/${uid}` вместо `qrData.qr_data`.
-2. **Stage 5.1** — инструкция пользователю выполнить `/setdomain` в BotFather (это единственное, что осталось из кода).
-3. **Stage 5.4** — запустить `auto_frontend_testing_agent` для E2E-теста всех 4 auth-провайдеров.
+1. **Stage 5.1** — инструкция пользователю выполнить `/setdomain` в BotFather (единственное, что осталось из кода для Telegram Login Widget).
+2. **Stage 5.4** — запустить `auto_frontend_testing_agent` для E2E-теста всех 4 auth-провайдеров + Public Profile flow.
 
 ---
 
@@ -326,3 +353,4 @@
 | 2025-07 (аудит) | Stage 3: подтверждён как ✅ завершённый — исправлено противоречивое «Не начато» при всех отмеченных [x]. В репо присутствуют: `AuthContext.jsx` (230 LOC), `authAPI.js`, `authStorage.js`, `publicBase.js`, 4 страницы (`LoginPage`, `RegisterWizard`, `VKCallbackPage`, `QRConfirmPage`), 10 компонентов в `components/auth/`, `AuthGate` защищает `/` в `App.jsx` |
 | 2025-07 (аудит) | Stage 5: переквалифицирован в 🟡 «Частично готово» — frontend+backend код для Telegram Login Widget, VK ID OAuth и QR Cross-Device Login реализован; осталось `/setdomain` в BotFather и E2E-тестирование |
 | 2025-07 (аудит) | `AI_CONTEXT.md` обновлён: 15→20 backend файлов, 17 675→19 826 LOC server.py, 230→249 Pydantic моделей, 268→304 endpoints, 46→53 коллекции MongoDB (добавлены `users`, `auth_sessions`, `auth_qr_sessions`, `qr_login_sessions`, `profile_views`, `xp_events`), описана структура `pages/`, `components/auth/`, `AuthContext`, обновлены переменные `.env` (`JWT_*`, `TELEGRAM_BOT_USERNAME`) |
+| 2025-07 | **Stage 4 завершён** 🎉 Создана публичная страница профиля `/u/:uid`: `frontend/src/pages/PublicProfilePage.jsx` (~480 LOC) со всеми состояниями (loading skeleton, 404, 422, hidden, loaded), richer UI с avatar gradient + level/tier badge + stats + XP bar + member-since chip + CTA-кнопками. Маршрут добавлен в `App.jsx` ВНЕ `AuthGate`. Кнопка «Поделиться» в `ProfileScreen.jsx` переведена на `buildProfileUrl()` с feedback «✓ Скопировано» и URL preview chip. Lint ✅, 404 state ✅, loaded profile (mobile + desktop) ✅ |

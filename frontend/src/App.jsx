@@ -61,6 +61,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterWizard = lazy(() => import('./pages/RegisterWizard'));
 const VKCallbackPage = lazy(() => import('./pages/VKCallbackPage'));
 const QRConfirmPage = lazy(() => import('./pages/QRConfirmPage'));
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 
 const AuthLoadingFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-[#0E0E10] text-white/60 text-sm">
@@ -2637,6 +2638,8 @@ function App() {
                       <Route path="/register" element={<RegisterWizard />} />
                       <Route path="/auth/vk/callback" element={<VKCallbackPage />} />
                       <Route path="/auth/qr/confirm" element={<QRConfirmPage />} />
+                      {/* Публичный профиль по UID — БЕЗ AuthGate (Stage 4) */}
+                      <Route path="/u/:uid" element={<PublicProfilePage />} />
                       <Route
                         path="/"
                         element={

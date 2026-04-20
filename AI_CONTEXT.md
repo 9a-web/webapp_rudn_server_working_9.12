@@ -42,7 +42,7 @@
 | Backend LOC (server.py) | **19 826** |
 | models.py LOC / классов | **2 913 / 249** |
 | Frontend компонентов | **~119** (90 top-level + 17 journal + 13 music + 10 auth + 1 icons) |
-| Frontend pages (SPA) | **4** (LoginPage, RegisterWizard, VKCallbackPage, QRConfirmPage) |
+| Frontend pages (SPA) | **5** (LoginPage, RegisterWizard, VKCallbackPage, QRConfirmPage, PublicProfilePage) |
 | API endpoints | **304** |
 | MongoDB коллекций | **53** |
 | Services (API клиенты) | **12** |
@@ -85,11 +85,12 @@
 ├── frontend/                    # React 19 frontend (Vite + react-router-dom)
 │   └── src/
 │       ├── App.jsx              # Главный компонент + Routes (/, /login, /register, /auth/vk/callback, /auth/qr/confirm)
-│       ├── pages/               # 🆕 SPA страницы авторизации
+│       ├── pages/               # 🆕 SPA страницы
 │       │   ├── LoginPage.jsx
 │       │   ├── RegisterWizard.jsx         # Многошаговая регистрация
 │       │   ├── VKCallbackPage.jsx         # OAuth callback VK ID
-│       │   └── QRConfirmPage.jsx          # Подтверждение QR-сессии
+│       │   ├── QRConfirmPage.jsx          # Подтверждение QR-сессии
+│       │   └── PublicProfilePage.jsx      # 🆕 Публичная страница /u/:uid (Stage 4)
 │       ├── components/          # 90 top-level + поддиректории
 │       │   ├── auth/            # 🆕 10 компонентов авторизации
 │       │   │   ├── AuthButton.jsx
@@ -533,7 +534,7 @@ VITE_ENV=test
 - Многошаговая регистрация: выбор провайдера → username/имя → учебные данные
 - `publicBase.js` экспортирует `PUBLIC_BASE_URL = REACT_APP_BACKEND_URL`
 
-### 2. 🔗 Публичный профиль по UID (Stage 2 плана)
+### 2. 🔗 Публичный профиль по UID (Stage 2+4 плана)
 **Backend:**
 - 8 endpoint'ов `/api/u/{uid}/*` (resolve, профиль, schedule, qr, share-link, privacy, view)
 - Helper `resolve_user_by_uid()` (fallback на legacy `user_settings` по telegram_id)
@@ -541,9 +542,18 @@ VITE_ENV=test
 - Старые `/api/profile/{telegram_id}/*` сохранены для обратной совместимости
 - Исправлены BUG-1…BUG-8 (share-link для владельца, activity-ping с JWT, view не считается для скрытых, qr для анонимов, created_at всем, Pydantic v2 `model_dump`, добавлены `uid`/`username` в `UserProfilePublic`)
 
-**Frontend:**
-- ⚠️ **Stage 4 не завершён**: нет `PublicProfilePage.jsx` и маршрута `/u/:uid`
-- Кнопка "Поделиться ссылкой" в `ProfileScreen.jsx` пока использует `qrData.qr_data` (legacy)
+**Frontend (Stage 4 завершён 2025-07):**
+- ✅ `frontend/src/pages/PublicProfilePage.jsx` (~480 LOC) — полноценная публичная страница
+- ✅ Маршрут `/u/:uid` в `App.jsx` ВНЕ `AuthGate` (доступно БЕЗ авторизации)
+- ✅ Состояния: loading skeleton, 404, 422 (not configured), hidden (auth required), loaded
+- ✅ Hero: avatar gradient + initials, name, username, group/faculty, level/tier badge, online, friendship badge
+- ✅ Stats grid (Друзей / Общих / Достижений) с индикацией «Скрыто» по privacy-флагам
+- ✅ XP progress bar (цвета tier), member-since chip, profile_views (для владельца)
+- ✅ CTA: «Открыть в Telegram», «Поделиться» (Telegram/Web Share/clipboard), «Копировать» (с feedback «✓ Скопировано»)
+- ✅ URL preview chip, auto-регистрация просмотра (`POST /api/u/{uid}/view`)
+- ✅ Document.title + meta description для SEO
+- ✅ Responsive (mobile + desktop центрирование)
+- ✅ Кнопка «Поделиться ссылкой» в `ProfileScreen.jsx` теперь использует `buildProfileUrl(uid)` вместо legacy `qrData.qr_data` + URL preview chip
 
 ### 3. 🎖 Система уровней/XP
 - `level_system.py` — начисление XP за активности
@@ -570,7 +580,6 @@ VITE_ENV=test
 
 | Stage | Статус | Что осталось |
 |-------|--------|--------------|
-| **Stage 4** — Публичная страница `/u/{uid}` | ⏳ Не начато | `PublicProfilePage.jsx` + маршрут React Router + переключение кнопки "Поделиться" на `{PUBLIC_BASE_URL}/u/{uid}` |
 | **Stage 5** — Внешние интеграции | ⚠️ Частично (frontend+backend готов) | E2E тестирование всех 4 провайдеров, настройка `/setdomain` в BotFather |
 
 ---

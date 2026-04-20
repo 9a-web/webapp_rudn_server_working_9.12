@@ -15,6 +15,7 @@ import LevelUpModal from './LevelUpModal';
 import GraffitiEditor from './GraffitiEditor';
 import WallGraffiti from './WallGraffiti';
 import { getTierColor, getTierName, getTierConfig, renderStars } from '../constants/levelConstants';
+import { buildProfileUrl } from '../constants/publicBase';
 
 const ADMIN_UIDS = ['765963392', '1311283832'];
 
@@ -47,6 +48,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   // Bug 9: Актуальные данные профиля с сервера
   const [profileData, setProfileData] = useState(null);
   
+  // === Share profile link (Stage 4) ===
+  const [copiedProfileLink, setCopiedProfileLink] = useState(false);
+
   // === Система уровней ===
   const [showLevelDetail, setShowLevelDetail] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -1466,44 +1470,114 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                 Покажи друзьям для добавления
               </span>
 
-              {/* Кнопка "Поделиться" */}
-              {qrData?.qr_data && (
-                <button
-                  onClick={() => {
-                    if (hapticFeedback) hapticFeedback('impact', 'light');
-                    const text = qrData.display_name ? `Добавь меня в друзья: ${qrData.display_name}` : 'Добавь меня в друзья';
-                    const url = qrData.qr_data;
-                    try {
-                      if (window.Telegram?.WebApp?.openTelegramLink) {
-                        window.Telegram.WebApp.openTelegramLink(
-                          `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
-                        );
-                      } else if (navigator.share) {
-                        navigator.share({ title: 'Мой профиль', text, url });
-                      } else {
-                        navigator.clipboard?.writeText(url);
-                      }
-                    } catch (e) { console.warn('share failed', e); }
-                  }}
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: '999px',
-                    background: 'linear-gradient(135deg, #F8B94C 0%, #FFD586 100%)',
-                    border: 'none',
-                    fontFamily: "'Poppins', sans-serif",
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#1A1A1A',
-                    cursor: 'pointer',
-                    boxShadow: '0 6px 18px rgba(248, 185, 76, 0.35)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  Поделиться ссылкой
-                </button>
-              )}
+              {/* Кнопка "Поделиться" (Stage 4: ссылка на публичный профиль /u/{uid}) */}
+              {(() => {
+                const profileUid = profileData?.uid || qrData?.uid;
+                if (!profileUid) return null;
+                const publicUrl = buildProfileUrl(profileUid);
+                const shareText = qrData?.display_name
+                  ? `Профиль ${qrData.display_name} в RUDN Schedule`
+                  : 'Мой профиль в RUDN Schedule';
+
+                const copyToClipboard = async () => {
+                  try {
+                    await navigator.clipboard.writeText(publicUrl);
+                  } catch {
+                    // Fallback для старых браузеров / WebView
+                    const el = document.createElement('textarea');
+                    el.value = publicUrl;
+                    el.setAttribute('readonly', '');
+                    el.style.position = 'absolute';
+                    el.style.left = '-9999px';
+                    document.body.appendChild(el);
+                    el.select();
+                    try { document.execCommand('copy'); } catch { /* noop */ }
+                    document.body.removeChild(el);
+                  }
+                  setCopiedProfileLink(true);
+                  setTimeout(() => setCopiedProfileLink(false), 1800);
+                };
+
+                const doShare = async () => {
+                  if (hapticFeedback) hapticFeedback('impact', 'light');
+                  try {
+                    if (window.Telegram?.WebApp?.openTelegramLink) {
+                      window.Telegram.WebApp.openTelegramLink(
+                        `https://t.me/share/url?url=${encodeURIComponent(publicUrl)}&text=${encodeURIComponent(shareText)}`
+                      );
+                      return;
+                    }
+                    if (navigator.share) {
+                      await navigator.share({ title: 'Мой профиль', text: shareText, url: publicUrl });
+                      return;
+                    }
+                  } catch {
+                    // user cancelled — fall through to copy
+                  }
+                  await copyToClipboard();
+                };
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+                    <button
+                      onClick={doShare}
+                      style={{
+                        padding: '12px 24px',
+                        borderRadius: '999px',
+                        background: copiedProfileLink
+                          ? 'linear-gradient(135deg, #22c55e 0%, #86efac 100%)'
+                          : 'linear-gradient(135deg, #F8B94C 0%, #FFD586 100%)',
+                        border: 'none',
+                        fontFamily: "'Poppins', sans-serif",
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: '#1A1A1A',
+                        cursor: 'pointer',
+                        boxShadow: copiedProfileLink
+                          ? '0 6px 18px rgba(34, 197, 94, 0.35)'
+                          : '0 6px 18px rgba(248, 185, 76, 0.35)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'background 0.25s ease, box-shadow 0.25s ease',
+                      }}
+                    >
+                      {copiedProfileLink ? '✓ Скопировано' : 'Поделиться ссылкой'}
+                    </button>
+
+                    {/* Превью URL + кнопка быстрой копии */}
+                    <button
+                      type="button"
+                      onClick={copyToClipboard}
+                      title="Скопировать ссылку"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 10px',
+                        borderRadius: '10px',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        cursor: 'pointer',
+                        fontFamily: 'monospace',
+                        fontSize: '11px',
+                        color: 'rgba(255,255,255,0.55)',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      <Copy size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
+                      <span style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '220px',
+                      }}>
+                        {publicUrl.replace(/^https?:\/\//, '')}
+                      </span>
+                    </button>
+                  </div>
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}
