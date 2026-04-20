@@ -7,6 +7,7 @@ from typing import List, Optional, Union
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import uuid
+import re  # Stage 7: B-23 — regex для username validator
 
 
 # ============ Модели для видео данных ============
@@ -2924,18 +2925,43 @@ class LinkVKRequest(BaseModel):
 
 class UpdateProfileStepRequest(BaseModel):
     """Используется для шагов 2 и 3 регистрационного визарда (а также для обычного редактирования)."""
-    username: Optional[str] = Field(default=None, min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_]+$")
+    # Stage 7: B-23 — username принимает либо None (unchanged), либо "" (explicit
+    # unset → username=null в БД), либо валидную строку 3-32 символа.
+    # Field сам по себе не умеет такое выразить → ослабляем ограничение и
+    # используем field_validator (см. ниже).
+    username: Optional[str] = Field(default=None, max_length=32)
     first_name: Optional[str] = Field(default=None, max_length=64)
     last_name: Optional[str] = Field(default=None, max_length=64)
-    facultet_id: Optional[str] = None
-    facultet_name: Optional[str] = None
-    level_id: Optional[str] = None
-    form_code: Optional[str] = None
-    kurs: Optional[str] = None
-    group_id: Optional[str] = None
-    group_name: Optional[str] = None
+    facultet_id: Optional[str] = Field(default=None, max_length=64)
+    facultet_name: Optional[str] = Field(default=None, max_length=256)
+    level_id: Optional[str] = Field(default=None, max_length=64)
+    form_code: Optional[str] = Field(default=None, max_length=64)
+    kurs: Optional[str] = Field(default=None, max_length=16)
+    group_id: Optional[str] = Field(default=None, max_length=64)
+    group_name: Optional[str] = Field(default=None, max_length=128)
     # Пометка о завершении шага (0 = регистрация окончена)
-    complete_step: Optional[int] = None
+    complete_step: Optional[int] = Field(default=None, ge=0, le=10)
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def _validate_username(cls, v):
+        """Stage 7: B-23 — разрешаем 3 варианта:
+        - None → поле не менять (exclude_unset всё равно его уберёт)
+        - '' или '   ' → explicit unset (→ username=null)
+        - '3-32 символа' → валидный username (regex-валидация — в handler).
+        """
+        if v is None:
+            return None
+        if isinstance(v, str):
+            stripped = v.strip()
+            if stripped == "":
+                return ""  # сигнал «unset», handler распознает
+            if len(stripped) < 3:
+                raise ValueError("Username: 3-32 символа, только a-z, 0-9, _")
+            if not re.match(r"^[a-zA-Z0-9_]+$", stripped):
+                raise ValueError("Username: только a-z, 0-9, _")
+            return stripped
+        return v
 
 
 class UsernameCheckResponse(BaseModel):
