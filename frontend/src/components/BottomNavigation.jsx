@@ -1,0 +1,399 @@
+import React, { useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react';
+import { Compass, NotebookText, BookOpenCheck, AudioLines, Users, Undo2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+
+// ─── Animated Compass: стрелка плавно прокручивается ───
+const AnimatedCompass = ({ className, strokeWidth = 2, isActive }) => {
+  const [spinKey, setSpinKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setSpinKey(k => k + 1);
+  }, [isActive]);
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Корпус компаса — статичный */}
+      <circle cx="12" cy="12" r="10" />
+      {/* Стрелка компаса — вращается */}
+      <motion.g
+        key={spinKey}
+        initial={{ rotate: 0 }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
+        style={{ transformOrigin: '12px 12px' }}
+      >
+        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+      </motion.g>
+    </svg>
+  );
+};
+
+// ─── Animated AudioLines: визуализатор — палочки пульсируют ───
+const AnimatedAudioLines = ({ className, strokeWidth = 2, isActive }) => {
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setAnimKey(k => k + 1);
+  }, [isActive]);
+
+  const bars = [
+    { x: 2,  y1: 10, y2: 13, target: [7, 17]  },
+    { x: 6,  y1: 6,  y2: 17, target: [3, 20]  },
+    { x: 10, y1: 3,  y2: 21, target: [8, 16]  },
+    { x: 14, y1: 8,  y2: 15, target: [4, 19]  },
+    { x: 18, y1: 5,  y2: 18, target: [9, 14]  },
+    { x: 22, y1: 10, y2: 13, target: [6, 18]  },
+  ];
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {bars.map((bar, i) => (
+        <motion.line
+          key={`${animKey}-${i}`}
+          x1={bar.x}
+          x2={bar.x}
+          initial={{ y1: bar.y1, y2: bar.y2 }}
+          animate={isActive
+            ? { y1: [bar.y1, bar.target[0], bar.y1], y2: [bar.y2, bar.target[1], bar.y2] }
+            : { y1: bar.y1, y2: bar.y2 }
+          }
+          transition={isActive
+            ? { duration: 0.6, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }
+            : { duration: 0.3 }
+          }
+        />
+      ))}
+    </svg>
+  );
+};
+
+// ─── Animated NotebookText: карандаш пишет строки ───
+const AnimatedNotebook = ({ className, strokeWidth = 2, isActive }) => {
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setAnimKey(k => k + 1);
+  }, [isActive]);
+
+  const lines = [
+    { d: 'M9.5 8h5',   delay: 0 },
+    { d: 'M9.5 12H16', delay: 0.15 },
+    { d: 'M9.5 16H14', delay: 0.3 },
+  ];
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Блокнот */}
+      <rect width="16" height="20" x="4" y="2" rx="2" />
+      {/* Кольца */}
+      <path d="M2 6h4" />
+      <path d="M2 10h4" />
+      <path d="M2 14h4" />
+      <path d="M2 18h4" />
+      {/* Строки — рисуются одна за другой */}
+      {lines.map((line, i) => (
+        <motion.path
+          key={`${animKey}-${i}`}
+          d={line.d}
+          initial={isActive ? { pathLength: 0 } : false}
+          animate={{ pathLength: 1 }}
+          transition={isActive
+            ? { duration: 0.3, delay: line.delay, ease: [0.4, 0, 0.2, 1] }
+            : { duration: 0 }
+          }
+        />
+      ))}
+    </svg>
+  );
+};
+
+// ─── Animated BookOpenCheck: страница перелистывается, затем галочка ───
+const AnimatedBookCheck = ({ className, strokeWidth = 2, isActive }) => {
+  const [animKey, setAnimKey] = useState(0);
+
+  useEffect(() => {
+    if (isActive) setAnimKey(k => k + 1);
+  }, [isActive]);
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Книга */}
+      <path d="M22 6V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4 4 4 0 0 0-4-4H3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h6a3 3 0 0 1 3 3 3 3 0 0 1 3-3h6a1 1 0 0 0 1-1v-1.3" />
+      {/* Корешок */}
+      <path d="M12 21V7" />
+
+      {/* Страница — перелистывается справа налево */}
+      {isActive && (
+        <motion.path
+          key={`page-${animKey}`}
+          d="M13 6 h7 v10 h-7"
+          fill="currentColor"
+          fillOpacity={0.12}
+          stroke="none"
+          initial={{ scaleX: 1, opacity: 0.7 }}
+          animate={{ scaleX: [-1, -0.3, 0], opacity: [0.7, 0.5, 0] }}
+          transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+          style={{ transformOrigin: '12px 11px' }}
+        />
+      )}
+
+      {/* Галочка — рисуется после перелистывания */}
+      <motion.path
+        d="m16 12 2 2 4-4"
+        key={`check-${animKey}`}
+        initial={isActive ? { pathLength: 0, opacity: 0 } : false}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={isActive
+          ? { pathLength: { duration: 0.35, delay: 0.4, ease: [0.65, 0, 0.35, 1] }, opacity: { duration: 0.1, delay: 0.4 } }
+          : { duration: 0 }
+        }
+      />
+    </svg>
+  );
+};
+
+export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, hapticFeedback, isHidden = false, onBackFromFriends }) => {
+  const { t } = useTranslation();
+
+  const tabs = [
+    { id: 'home', icon: Compass, shortLabel: t('bottomNav.homeShort', 'Главная'), gradient: 'from-green-400 to-cyan-400', color: '#34d399' },
+    { id: 'tasks', icon: NotebookText, shortLabel: 'Продуктивность', gradient: 'from-yellow-400 to-orange-400', color: '#fbbf24' },
+    { id: 'journal', icon: BookOpenCheck, shortLabel: t('bottomNav.journalShort', 'Журнал'), gradient: 'from-indigo-400 to-blue-400', color: '#818cf8' },
+    { id: 'music', icon: AudioLines, shortLabel: t('bottomNav.musicShort', 'Музыка'), gradient: 'from-pink-400 to-red-400', color: '#f472b6' },
+  ];
+
+  const outerRef = useRef(null);
+  const tabRefs = useRef({});
+  const backBtnRef = useRef(null);
+  const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
+
+  const measure = useCallback(() => {
+    const outer = outerRef.current;
+    if (!outer) return;
+    const targetEl = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
+    if (!targetEl) return;
+    const oRect = outer.getBoundingClientRect();
+    const tRect = targetEl.getBoundingClientRect();
+    setPillStyle({ left: tRect.left - oRect.left, width: tRect.width });
+  }, [activeTab]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [activeTab, measure]);
+
+  useEffect(() => {
+    const targetEl = activeTab === 'friends' ? backBtnRef.current : tabRefs.current[activeTab];
+    if (!targetEl) return;
+
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(targetEl);
+
+    const t1 = setTimeout(measure, 50);
+    const t2 = setTimeout(measure, 150);
+    const t3 = setTimeout(measure, 300);
+
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('resize', measure);
+    };
+  }, [activeTab, measure]);
+
+  const handleTabClick = useCallback((tabId) => {
+    if (hapticFeedback?.impactOccurred) {
+      try { hapticFeedback.impactOccurred('light'); } catch (e) {}
+    }
+    onTabChange?.(tabId);
+  }, [hapticFeedback, onTabChange]);
+
+  const activeTabData = activeTab === 'friends'
+    ? { id: 'friends', color: '#ef4444' }
+    : tabs.find(t => t.id === activeTab);
+
+  const showBackButton = activeTab === 'friends' && onBackFromFriends;
+
+  return (
+    <motion.nav
+      initial={{ y: 100, opacity: 0, x: '-50%' }}
+      animate={{ y: isHidden ? 100 : 0, opacity: isHidden ? 0 : 1, x: '-50%' }}
+      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      className="fixed bottom-6 z-50"
+      style={{ left: '50%', overflow: 'visible' }}
+    >
+      {/* Outer wrapper — pill измеряется относительно него */}
+      <div ref={outerRef} className="relative flex items-center gap-1.5" style={{ height: '50px' }}>
+
+        {/* Glow за pill */}
+        <motion.div
+          className="absolute pointer-events-none blur-2xl"
+          animate={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.width > 0 ? 0.3 : 0 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          style={{
+            top: 0, height: '100%', borderRadius: '9999px', zIndex: 0,
+            background: activeTabData ? `linear-gradient(135deg, ${activeTabData.color}, ${activeTabData.color}88)` : 'transparent',
+          }}
+        />
+
+        {/* Sliding pill — перемещается между вкладками И кнопкой */}
+        <motion.div
+          className="absolute bg-white/[0.07] border border-white/[0.1] pointer-events-none"
+          animate={{ left: pillStyle.left, width: pillStyle.width }}
+          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          style={{ top: '4px', height: '42px', borderRadius: '9999px', zIndex: 2 }}
+        />
+
+        {/* Main nav bar */}
+        <div className="relative" style={{ height: '50px' }}>
+          {/* Background */}
+          <div
+            className="absolute inset-0 border border-white/10"
+            style={{
+              borderRadius: '9999px', overflow: 'hidden',
+              backgroundColor: 'rgba(28, 28, 30, 0.7)',
+              backdropFilter: 'blur(40px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+            }}
+          />
+
+          {/* Tabs */}
+          <div className="relative h-full px-2 py-1">
+            <div className="flex items-center justify-center gap-0 h-full">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+
+                return (
+                  <button
+                    key={tab.id}
+                    ref={(el) => { tabRefs.current[tab.id] = el; }}
+                    onClick={() => handleTabClick(tab.id)}
+                    className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150"
+                    style={{
+                      height: '42px',
+                      paddingLeft: isActive ? '6px' : '8px',
+                      paddingRight: isActive ? '14px' : '8px',
+                      borderRadius: '9999px',
+                      minWidth: isActive ? '42px' : '38px',
+                    }}
+                  >
+                    <div className="relative z-10 flex items-center gap-2">
+                      {isActive ? (
+                        <div className={`bg-gradient-to-br ${tab.gradient} p-0.5 rounded-xl`}>
+                          <div className="bg-[#1C1C1E] rounded-xl p-1.5">
+                            {tab.id === 'home' ? (
+                              <AnimatedCompass className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
+                            ) : tab.id === 'tasks' ? (
+                              <AnimatedNotebook className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
+                            ) : tab.id === 'music' ? (
+                              <AnimatedAudioLines className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
+                            ) : tab.id === 'journal' ? (
+                              <AnimatedBookCheck className="w-5 h-5 text-white" strokeWidth={2.5} isActive={true} />
+                            ) : (
+                              <Icon className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2">
+                          {tab.id === 'home' ? (
+                            <AnimatedCompass className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
+                          ) : tab.id === 'tasks' ? (
+                            <AnimatedNotebook className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
+                          ) : tab.id === 'music' ? (
+                            <AnimatedAudioLines className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
+                          ) : tab.id === 'journal' ? (
+                            <AnimatedBookCheck className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} isActive={false} />
+                          ) : (
+                            <Icon className="w-5 h-5 text-[#999999] transition-colors duration-300" strokeWidth={2} />
+                          )}
+                        </div>
+                      )}
+
+                      {isActive && (
+                        <span className="text-white text-[13px] font-semibold whitespace-nowrap">
+                          {tab.shortLabel}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Круглая кнопка "Назад" — справа от навбара */}
+        <AnimatePresence>
+          {showBackButton && (
+            <motion.button
+              ref={backBtnRef}
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              onClick={() => {
+                if (hapticFeedback?.impactOccurred) {
+                  try { hapticFeedback.impactOccurred('light'); } catch (e) {}
+                }
+                onBackFromFriends();
+              }}
+              className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150 border border-white/10"
+              style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(28, 28, 30, 0.7)',
+                backdropFilter: 'blur(40px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                flexShrink: 0,
+                zIndex: 3,
+              }}
+            >
+              <Undo2 className="w-5 h-5" style={{ color: '#ef4444' }} strokeWidth={2.5} />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.nav>
+  );
+});

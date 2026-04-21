@@ -1,0 +1,1552 @@
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link2, Copy, Users, TrendingUp, Award, ChevronRight, Settings, Trash2, AlertTriangle, X, Snowflake, CheckCircle, QrCode, Smartphone, RefreshCw, Clock, Loader2, Monitor, Sliders } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { getReferralCode, getReferralStats } from '../services/referralAPI';
+import { ReferralTree } from './ReferralTree';
+import LKConnectionModal from './LKConnectionModal';
+import DevicesModal from './DevicesModal';
+import ProfileSettingsModal from './ProfileSettingsModal';
+import { friendsAPI } from '../services/friendsAPI';
+import { createWebSession, createSessionWebSocket } from '../services/webSessionAPI';
+import { getBackendURL } from '../services/api';
+import { clearAllLocalAuthData } from '../utils/authStorage';
+import { fetchBotInfo } from '../utils/botInfo';
+
+// Admin UIDs для доступа к специальным функциям
+const ADMIN_UIDS = ['765963392', '1311283832'];
+
+// Функция для получения корректного ФИО
+// Если full_name содержит "Персональные данные" (ошибка парсинга), 
+// используем отдельные поля last_name, first_name, patronymic
+const getDisplayName = (lkData) => {
+  if (!lkData) return null;
+  
+  // Если full_name корректное (не содержит "Персональные данные")
+  if (lkData.full_name && !lkData.full_name.includes('Персональные данные')) {
+    return lkData.full_name;
+  }
+  
+  // Собираем ФИО из отдельных полей
+  const nameParts = [];
+  if (lkData.last_name) nameParts.push(lkData.last_name);
+  if (lkData.first_name) nameParts.push(lkData.first_name);
+  if (lkData.patronymic) nameParts.push(lkData.patronymic);
+  
+  return nameParts.length > 0 ? nameParts.join(' ') : null;
+};
+
+export const ProfileModal = ({ 
+  isOpen, 
+  onClose, 
+  user, 
+  userSettings,
+  profilePhoto,
+  hapticFeedback,
+  onThemeChange
+}) => {
+  const modalRef = useRef(null);
+  const lkDataUpdatedRef = useRef(false); // Флаг: данные ЛК обновлены через callback
+  const [referralData, setReferralData] = useState(null);
+  const [referralStats, setReferralStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showReferrals, setShowReferrals] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [newYearThemeMode, setNewYearThemeMode] = useState('auto'); // 'auto', 'always', 'off'
+  const [themeLoading, setThemeLoading] = useState(false);
+  const [showLKModal, setShowLKModal] = useState(false);
+  const [lkConnected, setLkConnected] = useState(false);
+  const [lkData, setLkData] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrData, setQrData] = useState(null);
+  const [showDevicesModal, setShowDevicesModal] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [botUsername, setBotUsername] = useState('bot');
+
+  // Загрузка username бота
+  useEffect(() => {
+    fetchBotInfo().then(info => setBotUsername(info.username));
+  }, []);
+
+  // Проверка на админа
+  const isAdmin = useMemo(() => {
+    if (!user?.id) return false;
+    return ADMIN_UIDS.includes(String(user.id));
+  }, [user?.id]);
+
+  // Состояния для связки Telegram профиля
+  const [showTelegramLink, setShowTelegramLink] = useState(false);
+  const [telegramLinkSession, setTelegramLinkSession] = useState(null);
+  const [telegramLinkStatus, setTelegramLinkStatus] = useState('idle'); // idle, loading, pending, linked, expired, error
+  const [telegramLinkTimeLeft, setTelegramLinkTimeLeft] = useState(null);
+  const [telegramLinkError, setTelegramLinkError] = useState(null);
+  const telegramLinkWsRef = useRef(null);
+  const telegramLinkTimerRef = useRef(null);
+
+  // Проверяем, является ли пользователь гостем (без привязки к Telegram)
+  const isGuestUser = useMemo(() => {
+    // Если пользователь связан через QR-код - он НЕ гость
+    if (user?.is_linked) return false;
+    return user?.is_guest || user?.device_id;
+  }, [user]);
+
+  // Проверяем, является ли пользователь "полноценным" (из Telegram или связанным)
+  const isFullUser = useMemo(() => {
+    return !!window.Telegram?.WebApp?.initDataUnsafe?.user || user?.is_linked;
+  }, [user]);
+
+  // Проверяем, открыто ли в Telegram WebApp
+  const isTelegramWebApp = useMemo(() => {
+    return !!window.Telegram?.WebApp?.initDataUnsafe?.user;
+  }, []);
+
+  // Загрузка реферальных данных и QR при открытии
+  useEffect(() => {
+    const loadReferralData = async () => {
+      if (!isOpen || !user?.id) return;
+      
+      setLoading(true);
+      try {
+        const [codeData, statsData, qrDataResult] = await Promise.all([
+          getReferralCode(user.id),
+          getReferralStats(user.id),
+          friendsAPI.getProfileQR(user.id).catch(() => null)
+        ]);
+        
+        setReferralData(codeData);
+        setReferralStats(statsData);
+        setQrData(qrDataResult);
+      } catch (error) {
+        console.error('Ошибка загрузки реферальных данных:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReferralData();
+  }, [isOpen, user]);
+
+  // Загрузка настроек темы при открытии
+  useEffect(() => {
+    let isCancelled = false;
+    
+    const loadThemeSettings = async () => {
+      if (!isOpen || !user?.id) return;
+
+      try {
+        const backendUrl = getBackendURL();
+        const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`);
+        
+        if (isCancelled) return;
+        
+        if (response.ok) {
+          // Читаем тело ответа безопасно через text() + JSON.parse()
+          const responseText = await response.text();
+          let data = {};
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            data = {};
+          }
+          
+          if (!isCancelled) {
+            setNewYearThemeMode(data.new_year_theme_mode || 'auto');
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки настроек темы:', error);
+      }
+    };
+
+    loadThemeSettings();
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, user]);
+
+  // Проверка статуса ЛК РУДН при открытии (только если данные не были обновлены через callback)
+  useEffect(() => {
+    let isCancelled = false;
+    
+    const checkLKStatus = async () => {
+      // Не запрашиваем если данные уже были обновлены через onConnectionChange
+      if (!isOpen || !user?.id || lkDataUpdatedRef.current) return;
+
+      try {
+        const backendUrl = getBackendURL();
+        const response = await fetch(`${backendUrl}/api/lk/data/${user.id}`);
+        
+        // ВАЖНО: Проверяем ПОСЛЕ получения ответа, не были ли данные обновлены через callback
+        // во время ожидания ответа (race condition fix)
+        if (isCancelled || lkDataUpdatedRef.current) return;
+        
+        if (response.ok) {
+          // Читаем тело ответа безопасно через text() + JSON.parse()
+          const responseText = await response.text();
+          let data = {};
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            data = {};
+          }
+          
+          // Повторная проверка перед обновлением состояния
+          if (!isCancelled && !lkDataUpdatedRef.current) {
+            setLkConnected(data.lk_connected || false);
+            setLkData(data.personal_data || null);
+          }
+        } else {
+          // Повторная проверка перед обновлением состояния
+          if (!isCancelled && !lkDataUpdatedRef.current) {
+            setLkConnected(false);
+            setLkData(null);
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка проверки статуса ЛК:', error);
+        // Повторная проверка перед обновлением состояния
+        if (!isCancelled && !lkDataUpdatedRef.current) {
+          setLkConnected(false);
+          setLkData(null);
+        }
+      }
+    };
+
+    checkLKStatus();
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, user]);
+  
+  // Сброс флага при закрытии ProfileModal
+  useEffect(() => {
+    if (!isOpen) {
+      lkDataUpdatedRef.current = false;
+      // Очищаем сессию связки при закрытии
+      if (telegramLinkWsRef.current) {
+        telegramLinkWsRef.current.close();
+        telegramLinkWsRef.current = null;
+      }
+      if (telegramLinkTimerRef.current) {
+        clearInterval(telegramLinkTimerRef.current);
+        telegramLinkTimerRef.current = null;
+      }
+      setShowTelegramLink(false);
+      setTelegramLinkSession(null);
+      setTelegramLinkStatus('idle');
+    }
+  }, [isOpen]);
+
+  // Создание сессии для связки Telegram
+  const createTelegramLinkSession = useCallback(async () => {
+    setTelegramLinkStatus('loading');
+    setTelegramLinkError(null);
+    
+    try {
+      const sessionData = await createWebSession();
+      console.log('📱 Created Telegram link session:', sessionData);
+      setTelegramLinkSession(sessionData);
+      setTelegramLinkStatus('pending');
+      
+      // Вычисляем оставшееся время
+      // Сервер возвращает UTC время без "Z", добавляем для правильного парсинга
+      let expiresAtStr = sessionData.expires_at;
+      if (!expiresAtStr.endsWith('Z') && !expiresAtStr.includes('+')) {
+        expiresAtStr += 'Z';
+      }
+      const expiresAt = new Date(expiresAtStr);
+      const now = new Date();
+      const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      console.log('📱 Session expires in:', diff, 'seconds');
+      setTelegramLinkTimeLeft(diff);
+      
+      // Запускаем таймер обратного отсчёта
+      if (telegramLinkTimerRef.current) {
+        clearInterval(telegramLinkTimerRef.current);
+      }
+      telegramLinkTimerRef.current = setInterval(() => {
+        setTelegramLinkTimeLeft(prev => {
+          if (prev <= 1) {
+            setTelegramLinkStatus('expired');
+            clearInterval(telegramLinkTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      // Подключаемся к WebSocket
+      if (telegramLinkWsRef.current) {
+        telegramLinkWsRef.current.close();
+      }
+      
+      // Сохраняем session_token для использования в callback
+      const currentSessionToken = sessionData.session_token;
+      
+      telegramLinkWsRef.current = createSessionWebSocket(sessionData.session_token, {
+        onConnected: () => {
+          console.log('✅ WebSocket connected for Telegram link');
+        },
+        onLinked: (userData) => {
+          console.log('🎉 Telegram profile linked!', userData);
+          setTelegramLinkStatus('linked');
+          
+          // Сохраняем данные пользователя в localStorage
+          localStorage.setItem('telegram_user', JSON.stringify({
+            id: userData.telegram_id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            username: userData.username,
+            photo_url: userData.photo_url
+          }));
+          
+          // Сохраняем session_token для идентификации устройства
+          localStorage.setItem('session_token', currentSessionToken);
+          
+          if (userData.user_settings) {
+            localStorage.setItem('user_settings', JSON.stringify(userData.user_settings));
+          }
+          
+          // Haptic feedback
+          if (hapticFeedback) hapticFeedback('notification', 'success');
+          
+          // Перезагружаем страницу через 2 секунды
+          console.log('🔄 Scheduling page reload in 2 seconds...');
+          setTimeout(() => {
+            console.log('🔄 Reloading page now...');
+            window.location.reload();
+          }, 2000);
+        },
+        onExpired: () => {
+          console.log('⏰ Telegram link session expired');
+          setTelegramLinkStatus('expired');
+        },
+        onError: (message) => {
+          console.error('❌ Telegram link error:', message);
+          setTelegramLinkError(message);
+          setTelegramLinkStatus('error');
+        }
+      });
+      
+    } catch (err) {
+      console.error('Failed to create Telegram link session:', err);
+      setTelegramLinkError('Не удалось создать сессию');
+      setTelegramLinkStatus('error');
+    }
+  }, [hapticFeedback]);
+
+  // Форматирование времени
+  const formatLinkTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Изменение режима новогодней темы
+  const changeNewYearThemeMode = async (mode) => {
+    if (!user?.id || themeLoading) return;
+
+    setThemeLoading(true);
+
+    try {
+      const backendUrl = getBackendURL();
+      const response = await fetch(`${backendUrl}/api/user-settings/${user.id}/theme`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          new_year_theme_mode: mode
+        })
+      });
+
+      if (response.ok) {
+        setNewYearThemeMode(mode);
+        if (onThemeChange) {
+          onThemeChange(mode);
+        }
+        if (hapticFeedback) hapticFeedback('impact', 'medium');
+      } else {
+        throw new Error('Ошибка при сохранении настроек темы');
+      }
+    } catch (error) {
+      console.error('Ошибка при обновлении настроек темы:', error);
+      if (hapticFeedback) hapticFeedback('notification', 'error');
+    } finally {
+      setThemeLoading(false);
+    }
+  };
+
+  // Закрытие при клике вне модального окна
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+
+    // Закрытие при нажатии ESC
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  // Копирование реферальной ссылки (используем Web App ссылку)
+  const copyReferralLink = async () => {
+    // Приоритет: Web App ссылка, иначе обычная ссылка
+    const linkToCopy = referralData?.referral_link_webapp || referralData?.referral_link;
+    if (!linkToCopy) return;
+    
+    try {
+      await navigator.clipboard.writeText(linkToCopy);
+      setCopiedLink(true);
+      if (hapticFeedback) hapticFeedback('impact', 'medium');
+      
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (error) {
+      console.error('Ошибка копирования:', error);
+      // Фоллбэк для старых браузеров
+      const textArea = document.createElement('textarea');
+      textArea.value = linkToCopy;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
+  if (!user) return null;
+
+  // Проверяем, зашел ли пользователь через Telegram или связан через QR-код
+  const isTelegramUser = (typeof window !== 'undefined' && 
+                          window.Telegram?.WebApp?.initDataUnsafe?.user) || 
+                          user?.is_linked;
+  
+  // Формируем полное имя
+  const fullName = isTelegramUser 
+    ? ([user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь')
+    : 'Авторизуйтесь через';
+  
+  // Получаем username
+  const username = isTelegramUser && user.username ? `@${user.username}` : '';
+
+  // Получаем название группы
+  const groupName = isTelegramUser 
+    ? (userSettings?.group_name || userSettings?.group_id || 'Группа не выбрана')
+    : null;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Overlay с затемнением - скрываем когда открыто окно устройств или настроек */}
+          {!showDevicesModal && !showProfileSettings && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-[100]"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+              onClick={onClose}
+            />
+          )}
+
+          {/* Модальное окно профиля - скрываем когда открыто окно устройств или настроек */}
+          {!showDevicesModal && !showProfileSettings && (
+            <motion.div
+              ref={modalRef}
+              initial={{ opacity: 0, scale: 0.85, y: -10 }}
+            animate={{ 
+              opacity: 1, 
+              scale: 1, 
+              y: 0,
+              transition: {
+                type: "spring",
+                damping: 25,
+                stiffness: 400
+              }
+            }}
+            exit={{ 
+              opacity: 0, 
+              scale: 0.85,
+              y: -10,
+              transition: { duration: 0.15 }
+            }}
+            className="fixed z-[101] flex flex-col items-center overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-800/30"
+            style={{
+              top: '68px',
+              right: '20px',
+              width: '290px',
+              maxHeight: 'calc(100vh - 88px)',
+              padding: '28px 20px',
+              borderRadius: '28px',
+              backgroundColor: 'rgba(42, 42, 42, 0.75)',
+              backdropFilter: 'blur(40px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+              boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            {/* Аватар пользователя */}
+            <div 
+              className="relative mb-4"
+              style={{
+                width: '88px',
+                height: '88px',
+              }}
+            >
+              <div
+                className="w-full h-full rounded-full overflow-hidden"
+                style={{
+                  border: '3px solid rgba(255, 255, 255, 0.12)',
+                  background: isTelegramUser 
+                    ? 'linear-gradient(145deg, #404050, #2D2D3A)'
+                    : 'linear-gradient(145deg, #667eea 0%, #764ba2 100%)',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+                }}
+              >
+                {isTelegramUser ? (
+                  profilePhoto ? (
+                    <img 
+                      src={profilePhoto} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div 
+                      className="w-full h-full flex items-center justify-center text-4xl font-bold aspect-square"
+                      style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#FFFFFF',
+                        minWidth: '88px',
+                        minHeight: '88px',
+                      }}
+                    >
+                      {user.first_name?.[0]?.toUpperCase() || '👤'}
+                    </div>
+                  )
+                ) : (
+                  <div 
+                    className="w-full h-full flex items-center justify-center text-4xl aspect-square"
+                    style={{
+                      color: '#FFFFFF',
+                      minWidth: '88px',
+                      minHeight: '88px',
+                    }}
+                  >
+                    🔒
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Имя пользователя с градиентом */}
+            {isTelegramUser ? (
+              <h2 
+                className="text-[19px] font-bold text-center mb-3 leading-tight px-2"
+                style={{
+                  background: 'linear-gradient(100deg, #9AB8E8 0%, #D4A5E8 35%, #FFB4D1 70%, #FFFFFF 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  filter: 'drop-shadow(0 2px 8px rgba(154, 184, 232, 0.25))',
+                  fontWeight: '700',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {fullName}
+              </h2>
+            ) : (
+              <div className="text-center mb-3 px-2">
+                <p 
+                  className="text-[16px] font-semibold mb-1.5"
+                  style={{
+                    color: '#E8E8F0',
+                    fontWeight: '600',
+                  }}
+                >
+                  {fullName}
+                </p>
+                <a
+                  href={`https://t.me/${botUsername}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[17px] font-bold inline-block"
+                  style={{
+                    background: 'linear-gradient(100deg, #9AB8E8 0%, #D4A5E8 35%, #FFB4D1 70%, #FFFFFF 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    filter: 'drop-shadow(0 2px 8px rgba(154, 184, 232, 0.25))',
+                    fontWeight: '700',
+                    textDecoration: 'none',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                >
+                  @{botUsername}
+                </a>
+              </div>
+            )}
+
+            {/* Username и группа */}
+            {isTelegramUser && (
+              <div className="flex items-center justify-center gap-2 w-full flex-wrap mb-4">
+                {username && (
+                  <span
+                    className="text-sm font-medium"
+                    style={{ 
+                      color: '#FFB4D1',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {username}
+                  </span>
+                )}
+                
+                {username && groupName && (
+                  <span style={{ color: '#555566', fontSize: '14px' }}>•</span>
+                )}
+
+                {groupName && (
+                  <div
+                    className="px-3 py-1.5 rounded-lg text-[13px] font-medium"
+                    style={{
+                      backgroundColor: '#3A3A48',
+                      color: '#E8E8F0',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {groupName}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Кнопка настроить профиль - первая кнопка после аватарки и имени */}
+            {isTelegramUser && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="w-full"
+              >
+                <button
+                  onClick={() => {
+                    setShowProfileSettings(true);
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all active:scale-95"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)' }}
+                  >
+                    <Sliders className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      Настроить профиль
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Конфиденциальность и дизайн
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-purple-400" />
+                </button>
+              </motion.div>
+            )}
+
+            {/* Подключение ЛК РУДН - только для главного админа */}
+            {isTelegramUser && String(user?.id) === '765963392' && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    setShowLKModal(true);
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all active:scale-95"
+                  style={{
+                    backgroundColor: lkConnected 
+                      ? 'rgba(34, 197, 94, 0.1)' 
+                      : 'rgba(99, 102, 241, 0.1)',
+                    border: lkConnected 
+                      ? '1px solid rgba(34, 197, 94, 0.3)' 
+                      : '1px solid rgba(99, 102, 241, 0.3)',
+                  }}
+                >
+                  <div 
+                    className="w-9 h-9 rounded-xl flex items-center justify-center"
+                    style={{
+                      backgroundColor: lkConnected 
+                        ? 'rgba(34, 197, 94, 0.2)' 
+                        : 'rgba(99, 102, 241, 0.2)',
+                    }}
+                  >
+                    {lkConnected ? (
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <Link2 className="w-4 h-4 text-indigo-400" />
+                    )}
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className={`text-sm font-semibold ${lkConnected ? 'text-green-400' : 'text-indigo-300'}`}>
+                      {lkConnected ? 'Подключено' : 'Подключить ЛК РУДН'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {lkConnected 
+                        ? (getDisplayName(lkData) || 'lk.rudn.ru') 
+                        : 'Синхронизация данных'}
+                    </p>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 ${lkConnected ? 'text-green-400' : 'text-indigo-400'}`} />
+                </button>
+              </motion.div>
+            )}
+
+            {/* QR-код для добавления в друзья */}
+            {isTelegramUser && qrData && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.11 }}
+                className="w-full mt-3"
+              >
+                <button
+                  onClick={() => {
+                    setShowQRCode(!showQRCode);
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+                  >
+                    <QrCode className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      QR-код профиля
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Для быстрого добавления в друзья
+                    </p>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-indigo-400 transition-transform ${showQRCode ? 'rotate-90' : ''}`} />
+                </button>
+
+                {/* QR-код (раскрывающийся) */}
+                <AnimatePresence>
+                  {showQRCode && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-3 p-4 rounded-xl bg-white flex flex-col items-center">
+                        <QRCodeSVG
+                          value={qrData.qr_data}
+                          size={180}
+                          level="M"
+                          includeMargin={false}
+                          bgColor="#FFFFFF"
+                          fgColor="#1F2937"
+                        />
+                        <p className="mt-3 text-sm font-medium text-gray-800 text-center">
+                          {qrData.display_name}
+                        </p>
+                        <p className="text-xs text-gray-500 text-center mt-1">
+                          Отсканируй для добавления в друзья
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {/* Устройства - показываем для авторизованных пользователей (Telegram или связанных) */}
+            {isTelegramUser && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    setShowDevicesModal(true);
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.15) 100%)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}
+                  >
+                    <Monitor className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      Устройства
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Управление подключёнными устройствами
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-green-400" />
+                </button>
+              </motion.div>
+            )}
+
+            {/* Связка с Telegram - показываем ТОЛЬКО для гостевых пользователей (не связанных) */}
+            {isGuestUser && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    if (!showTelegramLink) {
+                      setShowTelegramLink(true);
+                      createTelegramLinkSession();
+                    } else {
+                      setShowTelegramLink(false);
+                    }
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center gap-3 transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}
+                  >
+                    <Smartphone className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-white">
+                      Подключить Telegram
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Синхронизация профиля через QR-код
+                    </p>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-blue-400 transition-transform ${showTelegramLink ? 'rotate-90' : ''}`} />
+                </button>
+
+                {/* QR-код для связки (раскрывающийся) */}
+                <AnimatePresence>
+                  {showTelegramLink && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-3 p-4 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                        {/* Загрузка */}
+                        {telegramLinkStatus === 'loading' && (
+                          <div className="flex flex-col items-center py-8">
+                            <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-3" />
+                            <p className="text-gray-400 text-sm">Создание сессии...</p>
+                          </div>
+                        )}
+
+                        {/* QR-код */}
+                        {telegramLinkStatus === 'pending' && telegramLinkSession && (
+                          <div className="flex flex-col items-center">
+                            <div className="bg-white p-3 rounded-xl shadow-lg mb-3">
+                              <QRCodeSVG
+                                value={telegramLinkSession.qr_url}
+                                size={160}
+                                level="H"
+                                includeMargin={false}
+                                bgColor="#ffffff"
+                                fgColor="#1a1a1a"
+                              />
+                            </div>
+                            
+                            {/* Таймер */}
+                            <div className="flex items-center gap-2 text-gray-400 text-xs mb-3">
+                              <Clock className="w-3 h-3" />
+                              <span>Действителен: {formatLinkTime(telegramLinkTimeLeft || 0)}</span>
+                            </div>
+
+                            {/* Инструкция */}
+                            <div className="w-full bg-gray-700/30 rounded-lg p-3">
+                              <ol className="text-xs text-gray-300 space-y-1.5">
+                                <li className="flex gap-2">
+                                  <span className="text-blue-400 font-bold">1.</span>
+                                  <span>Откройте Telegram</span>
+                                </li>
+                                <li className="flex gap-2">
+                                  <span className="text-blue-400 font-bold">2.</span>
+                                  <span>Отсканируйте QR-код камерой</span>
+                                </li>
+                                <li className="flex gap-2">
+                                  <span className="text-blue-400 font-bold">3.</span>
+                                  <span>Подтвердите подключение</span>
+                                </li>
+                              </ol>
+                            </div>
+
+                            {/* Ссылка на бота */}
+                            <a
+                              href={telegramLinkSession.qr_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 text-blue-400 hover:text-blue-300 text-xs underline"
+                            >
+                              Или откройте в Telegram напрямую
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Успешно подключено */}
+                        {telegramLinkStatus === 'linked' && (
+                          <div className="flex flex-col items-center py-6">
+                            <div className="w-14 h-14 bg-green-500/20 rounded-full flex items-center justify-center mb-3">
+                              <CheckCircle className="w-7 h-7 text-green-500" />
+                            </div>
+                            <p className="text-white font-medium mb-1">Профиль подключен!</p>
+                            <p className="text-gray-400 text-xs">Страница перезагрузится...</p>
+                          </div>
+                        )}
+
+                        {/* Сессия истекла */}
+                        {telegramLinkStatus === 'expired' && (
+                          <div className="flex flex-col items-center py-6">
+                            <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center mb-3">
+                              <Clock className="w-6 h-6 text-yellow-500" />
+                            </div>
+                            <p className="text-white font-medium mb-1">Время истекло</p>
+                            <p className="text-gray-400 text-xs mb-3">QR-код больше не действителен</p>
+                            <button
+                              onClick={() => createTelegramLinkSession()}
+                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Создать новый
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Ошибка */}
+                        {telegramLinkStatus === 'error' && (
+                          <div className="flex flex-col items-center py-6">
+                            <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mb-3">
+                              <AlertTriangle className="w-6 h-6 text-red-500" />
+                            </div>
+                            <p className="text-white font-medium mb-1">Ошибка</p>
+                            <p className="text-gray-400 text-xs mb-3">{telegramLinkError || 'Попробуйте снова'}</p>
+                            <button
+                              onClick={() => createTelegramLinkSession()}
+                              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                              Попробовать снова
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {/* Реферальная программа */}
+            {isTelegramUser && referralData && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                {/* Заголовок */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-sm font-semibold text-white">
+                    Реферальная программа
+                  </h3>
+                </div>
+
+                {/* Реферальный код */}
+                <div
+                  className="mb-3 p-3 rounded-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(196, 163, 255, 0.15) 100%)',
+                    border: '1px solid rgba(167, 139, 250, 0.3)',
+                  }}
+                >
+                  <p className="text-xs text-gray-400 mb-1">Ваш код</p>
+                  <p className="text-lg font-bold text-purple-300 font-mono">
+                    {referralData.referral_code}
+                  </p>
+                </div>
+
+                {/* Кнопка копирования ссылки */}
+                <button
+                  onClick={copyReferralLink}
+                  className="w-full p-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={{
+                    background: copiedLink 
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
+                  }}
+                >
+                  {copiedLink ? (
+                    <>
+                      <Award className="w-4 h-4 text-white" />
+                      <span className="text-sm font-semibold text-white">Скопировано!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-white" />
+                      <span className="text-sm font-semibold text-white">Копировать ссылку</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Статистика */}
+                {referralStats && (
+                  <div className="mt-4 space-y-2">
+                    {/* Общая статистика */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                          border: '1px solid rgba(52, 211, 153, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Уровень 1</p>
+                        <p className="text-lg font-bold text-green-400">
+                          {referralStats.level_1_count}
+                        </p>
+                      </div>
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                          border: '1px solid rgba(96, 165, 250, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Уровень 2</p>
+                        <p className="text-lg font-bold text-blue-400">
+                          {referralStats.level_2_count}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(167, 139, 250, 0.1)',
+                          border: '1px solid rgba(167, 139, 250, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Уровень 3</p>
+                        <p className="text-lg font-bold text-purple-400">
+                          {referralStats.level_3_count}
+                        </p>
+                      </div>
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                          border: '1px solid rgba(251, 191, 36, 0.2)',
+                        }}
+                      >
+                        <p className="text-xs text-gray-400">Заработано</p>
+                        <p className="text-lg font-bold text-yellow-400">
+                          {referralStats.total_referral_points}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Кнопка показать рефералов */}
+                    {(referralStats.level_1_count + referralStats.level_2_count + referralStats.level_3_count) > 0 && (
+                      <button
+                        onClick={() => {
+                          setShowReferrals(!showReferrals);
+                          if (hapticFeedback) hapticFeedback('impact', 'light');
+                        }}
+                        className="w-full p-2 rounded-lg flex items-center justify-between text-sm font-medium text-purple-300 hover:bg-purple-500/10 transition-colors"
+                      >
+                        <span>Мои рефералы</span>
+                        <ChevronRight
+                          className={`w-4 h-4 transition-transform ${showReferrals ? 'rotate-90' : ''}`}
+                        />
+                      </button>
+                    )}
+
+                    {/* Список рефералов */}
+                    <AnimatePresence>
+                      {showReferrals && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-2 space-y-2 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900/20"
+                        >
+                          {referralStats.level_1_referrals.length > 0 && (
+                            <div>
+                              <p className="text-xs text-green-400 font-semibold mb-1">
+                                Уровень 1 ({referralStats.level_1_referrals.length})
+                              </p>
+                              {referralStats.level_1_referrals.map((ref) => (
+                                <div
+                                  key={ref.telegram_id}
+                                  className="flex items-center justify-between p-2 rounded-lg mb-1"
+                                  style={{
+                                    backgroundColor: 'rgba(52, 211, 153, 0.08)',
+                                    border: '1px solid rgba(52, 211, 153, 0.15)',
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-xs font-bold text-white">
+                                      {ref.first_name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {ref.first_name || 'Пользователь'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-green-400 font-semibold">
+                                    +{ref.points_earned_for_referrer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {referralStats.level_2_referrals.length > 0 && (
+                            <div>
+                              <p className="text-xs text-blue-400 font-semibold mb-1">
+                                Уровень 2 ({referralStats.level_2_referrals.length})
+                              </p>
+                              {referralStats.level_2_referrals.map((ref) => (
+                                <div
+                                  key={ref.telegram_id}
+                                  className="flex items-center justify-between p-2 rounded-lg mb-1"
+                                  style={{
+                                    backgroundColor: 'rgba(96, 165, 250, 0.08)',
+                                    border: '1px solid rgba(96, 165, 250, 0.15)',
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-xs font-bold text-white">
+                                      {ref.first_name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {ref.first_name || 'Пользователь'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-blue-400 font-semibold">
+                                    +{ref.points_earned_for_referrer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {referralStats.level_3_referrals.length > 0 && (
+                            <div>
+                              <p className="text-xs text-purple-400 font-semibold mb-1">
+                                Уровень 3 ({referralStats.level_3_referrals.length})
+                              </p>
+                              {referralStats.level_3_referrals.map((ref) => (
+                                <div
+                                  key={ref.telegram_id}
+                                  className="flex items-center justify-between p-2 rounded-lg mb-1"
+                                  style={{
+                                    backgroundColor: 'rgba(167, 139, 250, 0.08)',
+                                    border: '1px solid rgba(167, 139, 250, 0.15)',
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-xs font-bold text-white">
+                                      {ref.first_name?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="text-xs text-white font-medium">
+                                      {ref.first_name || 'Пользователь'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-purple-400 font-semibold">
+                                    +{ref.points_earned_for_referrer}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Кнопка настроек */}
+            {isTelegramUser && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="w-full mt-4 pt-4"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+              >
+                <button
+                  onClick={() => {
+                    setShowSettings(true);
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                  }}
+                  className="w-full p-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                  style={{
+                    backgroundColor: 'rgba(75, 85, 99, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  <Settings className="w-4 h-4 text-gray-300" />
+                  <span className="text-sm font-medium text-gray-300">Настройки</span>
+                </button>
+              </motion.div>
+            )}
+          </motion.div>
+          )}
+
+          {/* Модальное окно настроек */}
+          <AnimatePresence>
+            {showSettings && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[102]"
+                  style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+                  onClick={() => setShowSettings(false)}
+                  onTouchStart={(e) => {
+                    // Закрываем только если касание было на самом overlay
+                    if (e.target === e.currentTarget) {
+                      setShowSettings(false);
+                    }
+                  }}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="fixed z-[103] inset-0 flex items-center justify-center p-4"
+                  onClick={() => setShowSettings(false)}
+                  onTouchStart={(e) => {
+                    // Предотвращаем закрытие при касании модалки
+                    if (e.target !== e.currentTarget) {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  <motion.div
+                    className="w-full max-w-[320px] p-4 sm:p-6 rounded-3xl max-h-[85vh] overflow-y-auto"
+                    style={{
+                      backgroundColor: 'rgba(42, 42, 42, 0.95)',
+                      backdropFilter: 'blur(40px)',
+                      WebkitBackdropFilter: 'blur(40px)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  >
+                  {/* Заголовок */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-gray-400" />
+                      Настройки
+                    </h3>
+                    <button
+                      onClick={() => setShowSettings(false)}
+                      className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <X className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Опции настроек */}
+                  <div className="space-y-3">
+                    {/* Новогодняя тема - три режима */}
+                    <div 
+                      className="w-full p-4 rounded-xl transition-all flex flex-col gap-3"
+                      style={{
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                          <Snowflake className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div className="text-left flex-1">
+                          <p className="text-sm font-semibold text-purple-300">Новогодняя тема</p>
+                          <p className="text-xs text-gray-500">Снежинки и праздничный декор</p>
+                        </div>
+                      </div>
+                      
+                      {/* Три кнопки выбора режима */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* Авто */}
+                        <button
+                          onClick={() => changeNewYearThemeMode('auto')}
+                          disabled={themeLoading}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                            newYearThemeMode === 'auto'
+                              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-base">🌙</span>
+                            <span>Авто</span>
+                          </div>
+                        </button>
+
+                        {/* Всегда */}
+                        <button
+                          onClick={() => changeNewYearThemeMode('always')}
+                          disabled={themeLoading}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                            newYearThemeMode === 'always'
+                              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-base">❄️</span>
+                            <span>Всегда</span>
+                          </div>
+                        </button>
+
+                        {/* Выкл */}
+                        <button
+                          onClick={() => changeNewYearThemeMode('off')}
+                          disabled={themeLoading}
+                          className={`px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                            newYearThemeMode === 'off'
+                              ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          } ${themeLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-base">🔒</span>
+                            <span>Выкл</span>
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Подсказка по текущему режиму */}
+                      <div className="text-xs text-gray-500 text-center px-2">
+                        {newYearThemeMode === 'auto' && '⚡ Автоматически зимой (дек/янв/фев)'}
+                        {newYearThemeMode === 'always' && '🎄 Снег падает круглый год'}
+                        {newYearThemeMode === 'off' && '🚫 Тема отключена'}
+                      </div>
+                    </div>
+
+                    {/* Удаление аккаунта */}
+                    <button
+                      onClick={() => {
+                        setShowDeleteConfirm(true);
+                        if (hapticFeedback) hapticFeedback('impact', 'medium');
+                      }}
+                      className="w-full p-4 rounded-xl flex items-center gap-3 transition-all active:scale-95"
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                      }}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                        <Trash2 className="w-5 h-5 text-red-400" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-red-400">Удалить аккаунт</p>
+                        <p className="text-xs text-gray-500">Все данные будут удалены</p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Подтверждение удаления */}
+                  <AnimatePresence>
+                    {showDeleteConfirm && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="mt-4 p-4 rounded-xl"
+                        style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                        }}
+                      >
+                        <div className="flex items-start gap-3 mb-4">
+                          <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-semibold text-red-400 mb-1">
+                              Вы уверены?
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              Это действие необратимо. Все ваши данные, задачи, достижения и статистика будут удалены навсегда.
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-300 transition-all active:scale-95"
+                            style={{
+                              backgroundColor: 'rgba(75, 85, 99, 0.4)',
+                            }}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id) return;
+                              setDeleteLoading(true);
+                              try {
+                                const backendUrl = getBackendURL();
+                                const response = await fetch(`${backendUrl}/api/user/${user.id}`, {
+                                  method: 'DELETE',
+                                });
+                                if (response.ok) {
+                                  if (hapticFeedback) hapticFeedback('notification', 'success');
+                                  
+                                  // Полная очистка всех локальных данных (JWT Stage 3 + legacy Telegram/user_settings)
+                                  clearAllLocalAuthData();
+                                  
+                                  // Закрываем все модалки
+                                  setShowDeleteConfirm(false);
+                                  setShowSettings(false);
+                                  onClose();
+                                  
+                                  // Переход на /login — AuthGate без JWT покажет логин
+                                  window.location.replace('/login');
+                                } else {
+                                  throw new Error('Ошибка удаления');
+                                }
+                              } catch (error) {
+                                console.error('Ошибка удаления аккаунта:', error);
+                                if (hapticFeedback) hapticFeedback('notification', 'error');
+                              } finally {
+                                setDeleteLoading(false);
+                              }
+                            }}
+                            disabled={deleteLoading}
+                            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+                            style={{
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            }}
+                          >
+                            {deleteLoading ? 'Удаление...' : 'Удалить'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          {/* Модальное окно подключения ЛК РУДН */}
+          <LKConnectionModal
+            isOpen={showLKModal}
+            onClose={() => setShowLKModal(false)}
+            telegramId={user?.id}
+            hapticFeedback={hapticFeedback}
+            onConnectionChange={(connected, data) => {
+              lkDataUpdatedRef.current = true; // Помечаем что данные обновлены через callback
+              setLkConnected(connected);
+              setLkData(data);
+            }}
+          />
+
+          {/* Модальное окно настроек профиля */}
+          <ProfileSettingsModal
+            isOpen={showProfileSettings}
+            onClose={() => setShowProfileSettings(false)}
+            user={user}
+            userSettings={userSettings}
+            hapticFeedback={hapticFeedback}
+          />
+
+          {/* Модальное окно управления устройствами */}
+          <DevicesModal
+            isOpen={showDevicesModal}
+            onClose={() => setShowDevicesModal(false)}
+            user={user}
+          />
+        </>
+      )}
+    </AnimatePresence>
+  );
+};

@@ -1,0 +1,275 @@
+# 📓 ДНЕВНИК РЕАЛИЗАЦИИ — Раздел "Журнал посещений"
+
+**Начало:** 2025-07-14
+**Статус:** В процессе
+
+---
+
+## ПОСЛЕДНИЕ ИЗМЕНЕНИЯ
+
+### 2025-12-08 — Импорт предметов и занятий из расписания
+
+#### ✅ Выполнено:
+
+**1. Импорт предметов из расписания:**
+- **Frontend (`CreateSubjectModal.jsx`)**:
+  - Добавлена вкладка "Из расписания"
+  - Загрузка уникальных предметов из расписания группы
+  - Отображение количества занятий и преподавателя для каждого предмета
+  - Мультиселект предметов с автоматическим назначением цветов
+  - Фильтрация уже добавленных предметов
+  
+- **Frontend (`JournalDetailModal.jsx`)**:
+  - Передача userSettings и existingSubjects в CreateSubjectModal
+  - Поддержка массового создания предметов через onCreateMultiple
+
+**2. Импорт занятий из расписания (предыдущее обновление):**
+- **Backend (`models.py`)**:
+  - Новые модели: `ScheduleSessionItem`, `CreateSessionsFromScheduleRequest`
+
+- **Backend (`server.py`)**:
+  - Новый endpoint: `POST /api/journals/{journal_id}/sessions/from-schedule`
+  - Массовое создание занятий из расписания
+  - Автоматический маппинг типов занятий (Лекция → lecture, Семинар → seminar, Лаб → lab)
+  - Защита от дублирования
+
+- **Frontend (`CreateSessionModal.jsx`)**:
+  - Добавлена вкладка "Из расписания"
+  - Загрузка расписания группы пользователя (текущая и следующая неделя)
+  - Фильтрация занятий по названию предмета
+  - Мультиселект занятий с галочками
+
+#### 📋 Как работает импорт предметов:
+1. Открыть журнал → Вкладка "Предметы" → Нажать "Добавить"
+2. Выбрать вкладку "Из расписания"
+3. Система загружает все предметы из расписания группы
+4. Выбрать нужные предметы галочками
+5. Нажать "Добавить выбранные"
+6. Предметы создаются с автоматическим назначением цветов
+
+#### 📋 Как работает импорт занятий:
+1. Пользователь открывает предмет в журнале
+2. Нажимает "Добавить занятие"
+3. Выбирает вкладку "Из расписания"
+4. Система загружает расписание группы
+5. Отображаются занятия по данному предмету
+6. Пользователь выбирает нужные занятия галочками
+7. Нажимает "Добавить выбранные"
+8. Занятия создаются автоматически с данными из расписания
+
+---
+
+### 2025-12-02 — Реферальная система через Web App ссылки
+
+#### ✅ Выполнено:
+1. **Backend (`server.py`)**:
+   - Обновлён endpoint `GET /api/referral/code/{telegram_id}` — теперь возвращает `referral_link_webapp`
+   - Новый endpoint: `POST /api/referral/process-webapp` — обработка реферального кода через Web App
+   - Добавлена функция `award_referral_bonus()` для начисления бонусов
+
+2. **Backend (`models.py`)**:
+   - Обновлена модель `ReferralCodeResponse` — добавлено поле `referral_link_webapp`
+   - Новые модели: `ProcessReferralRequest`, `ProcessReferralResponse`
+
+3. **Frontend (`TelegramContext.jsx`)**:
+   - Добавлено получение `startParam` из `window.Telegram.WebApp.initDataUnsafe.start_param`
+   - `startParam` экспортируется через контекст
+
+4. **Frontend (`App.jsx`)**:
+   - Добавлена обработка реферального кода из `startParam` при открытии приложения
+   - Автоматический вызов `processReferralWebApp()` при наличии `ref_` в startParam
+
+5. **Frontend (`referralAPI.js`)**:
+   - Добавлена функция `processReferralWebApp()`
+
+6. **Frontend (`ProfileModal.jsx`)**:
+   - Приоритет копирования `referral_link_webapp` вместо `referral_link`
+
+#### 📋 Формат реферальных ссылок:
+- **Старый формат (через /start):** `https://t.me/rudn_mosbot?start=ref_CODE`
+- **Новый формат (через Web App):** `https://t.me/rudn_mosbot/app?startapp=ref_CODE` ✅
+
+#### 🔗 Как работает:
+1. Пользователь открывает ссылку `t.me/rudn_mosbot/app?startapp=ref_28DB4CDB84`
+2. Telegram открывает Web App и передаёт `start_param = "ref_28DB4CDB84"`
+3. Frontend получает `startParam` через TelegramContext
+4. App.jsx отправляет запрос на `/api/referral/process-webapp`
+5. Backend создаёт связь реферала и начисляет бонусы
+
+---
+
+### 2025-12-02 — Переключение между тестовым и продакшн ботами
+
+#### ✅ Выполнено:
+1. **Новый файл `config.py`** — централизованное управление токенами ботов:
+   - Функция `get_telegram_bot_token()` — возвращает токен в зависимости от ENV
+   - Функция `is_test_environment()` / `is_production_environment()`
+   - Автоматическое логирование используемого бота
+
+2. **Обновлён `backend/.env`:**
+   - Добавлена переменная `ENV=test` (или `production`)
+   - Добавлена переменная `TEST_TELEGRAM_BOT_TOKEN` для тестового бота
+
+3. **Обновлены файлы для использования config.py:**
+   - `telegram_bot.py` — импорт и использование `get_telegram_bot_token()`
+   - `server.py` — все места с `bot_token` обновлены
+   - `notifications.py` — обновлён `get_notification_service()`
+
+#### 📋 Как переключаться:
+- Для тестирования: `ENV=test` в `.env` → используется `TEST_TELEGRAM_BOT_TOKEN`
+- Для продакшна: `ENV=production` в `.env` → используется `TELEGRAM_BOT_TOKEN`
+- После изменения `.env` нужен рестарт: `sudo supervisorctl restart backend`
+
+#### 📝 Логи подтверждения:
+```
+🤖 Используется TEST бот (ENV=test): 7331940900...
+🚀 Telegram Bot запущен в режиме: TEST
+✅ Telegram bot polling started successfully (ENV=test)
+```
+
+---
+
+## ПЛАН РЕАЛИЗАЦИИ
+
+### Фаза 1: Backend основа
+- [x] Создать модели в `models.py`
+- [x] Создать API endpoints в `server.py`
+- [x] Тестирование API
+
+### Фаза 2: Frontend — базовые компоненты
+- [x] JournalCard
+- [x] CreateJournalModal
+- [x] JournalDetailModal
+- [x] Интеграция в навигацию (JournalSection)
+
+### Фаза 3: Управление студентами
+- [x] AddStudentsModal (одиночное и массовое добавление)
+- [x] LinkStudentModal (привязка Telegram к ФИО)
+- [x] **Персональные ссылки для студентов** (NEW!)
+
+### Фаза 4: Занятия и посещаемость
+- [x] CreateSessionModal
+- [x] AttendanceModal (отметка посещаемости)
+
+### Фаза 5: Участник — личный журнал
+- [x] MyAttendanceView (внутри JournalDetailModal)
+
+### Фаза 6: Полировка
+- [x] Telegram Bot интеграция (приглашения через jstudent_{code})
+- [ ] Дополнительная статистика и аналитика
+
+---
+
+## ЖУРНАЛ ИЗМЕНЕНИЙ
+
+### 2025-12-02 — Персональные ссылки студентов
+
+#### ✅ Выполнено:
+1. **Backend (models.py)**:
+   - Добавлено поле `invite_code` в модель `JournalStudent` — уникальный 8-символьный код для каждого студента
+   - Добавлены поля `invite_code` и `invite_link` в `JournalStudentResponse`
+   - Добавлены модели: `StudentInviteLinkResponse`, `JoinStudentRequest`
+
+2. **Backend (server.py)**:
+   - Новый endpoint: `POST /api/journals/join-student/{invite_code}` — присоединение по персональной ссылке
+   - Новый endpoint: `POST /api/journals/{id}/students/{sid}/unlink` — отвязка студента от Telegram
+   - Обновлены endpoints добавления и получения студентов — теперь возвращают `invite_code` и `invite_link`
+
+3. **Backend (telegram_bot.py)**:
+   - Добавлена функция `join_user_to_journal_by_student_code()` — автоматическая привязка по персональной ссылке
+   - Обработка формата `jstudent_{invite_code}` в команде /start
+   - Сообщения для всех статусов: linked, occupied, already_linked, owner
+
+4. **Frontend (services/journalAPI.js)**:
+   - Добавлена функция `joinJournalByStudentCode()`
+   - Добавлена функция `unlinkStudent()`
+
+5. **Frontend (JournalDetailModal.jsx)**:
+   - Добавлена кнопка копирования персональной ссылки рядом с каждым студентом (иконка Link2)
+   - Индикация скопированной ссылки (зеленая галочка на 2 секунды)
+   - Разные цвета кнопки: синий для непривязанных, серый для привязанных
+
+#### 📋 Логика персональных ссылок:
+- При добавлении студента автоматически генерируется уникальный `invite_code` (8 символов)
+- Формат ссылки: `https://t.me/{bot}?start=jstudent_{invite_code}`
+- При переходе по ссылке:
+  - ✅ Успех: пользователь автоматически привязывается к студенту
+  - ⚠️ Занято: если место уже занято другим пользователем
+  - ℹ️ Уже привязан: если пользователь уже привязан к этому или другому студенту в журнале
+
+---
+
+### 2025-07-14
+
+#### ✅ Выполнено:
+1. **Backend (models.py)**:
+   - Добавлены модели: AttendanceJournal, JournalStudent, JournalSession, AttendanceRecord, JournalPendingMember
+   - Добавлены модели запросов и ответов
+
+2. **Backend (server.py)**:
+   - 20+ новых API endpoints для журналов:
+     - CRUD для журналов (/api/journals/*)
+     - Управление студентами (/api/journals/{id}/students/*)
+     - Управление занятиями (/api/journals/{id}/sessions/*)
+     - Отметка посещаемости (/api/journals/sessions/{id}/attendance)
+     - Статистика (/api/journals/{id}/stats)
+     - Приглашения (/api/journals/{id}/invite-link, /api/journals/join/*)
+
+3. **Frontend (services/journalAPI.js)**:
+   - Полный API сервис для работы с журналами
+
+4. **Frontend (components/journal/)**:
+   - JournalCard.jsx — карточка журнала
+   - CreateJournalModal.jsx — создание журнала
+   - JournalDetailModal.jsx — детальный вид журнала (для старосты и участника)
+   - AddStudentsModal.jsx — добавление студентов
+   - CreateSessionModal.jsx — создание занятия
+   - AttendanceModal.jsx — отметка посещаемости
+   - LinkStudentModal.jsx — привязка Telegram к ФИО
+
+5. **Frontend (JournalSection.jsx)**:
+   - Полная интеграция с API
+   - Разделение на "Мои журналы" и "Участник"
+
+#### 📝 Коллекции MongoDB:
+- `attendance_journals` — журналы
+- `journal_students` — студенты в журналах
+- `journal_sessions` — занятия
+- `attendance_records` — записи посещаемости
+- `journal_pending_members` — ожидающие привязки
+
+---
+
+## API ENDPOINTS
+
+```
+POST   /api/journals                      - создать журнал
+GET    /api/journals/{telegram_id}        - список журналов
+GET    /api/journals/detail/{journal_id}  - детали журнала
+PUT    /api/journals/{journal_id}         - обновить журнал
+DELETE /api/journals/{journal_id}         - удалить журнал
+POST   /api/journals/{journal_id}/invite-link  - сгенерировать ссылку
+POST   /api/journals/join/{invite_token}  - присоединиться (общая ссылка)
+POST   /api/journals/join-student/{invite_code} - присоединиться (персональная ссылка студента) [NEW!]
+
+POST   /api/journals/{id}/students        - добавить студента (с invite_code)
+POST   /api/journals/{id}/students/bulk   - массовое добавление
+GET    /api/journals/{id}/students        - список студентов (с invite_code и invite_link)
+PUT    /api/journals/{id}/students/{sid}  - обновить студента
+DELETE /api/journals/{id}/students/{sid}  - удалить студента
+POST   /api/journals/{id}/students/{sid}/link - привязать Telegram
+POST   /api/journals/{id}/students/{sid}/unlink - отвязать Telegram [NEW!]
+GET    /api/journals/{id}/pending-members - ожидающие привязки
+
+POST   /api/journals/{id}/sessions        - создать занятие
+GET    /api/journals/{id}/sessions        - список занятий
+PUT    /api/journals/sessions/{sid}       - обновить занятие
+DELETE /api/journals/sessions/{sid}       - удалить занятие
+
+POST   /api/journals/sessions/{sid}/attendance - отметить посещаемость
+GET    /api/journals/sessions/{sid}/attendance - получить посещаемость
+GET    /api/journals/{id}/my-attendance/{tid}  - мои посещения
+GET    /api/journals/{id}/stats           - статистика журнала
+```
+
+---

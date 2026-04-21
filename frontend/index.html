@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        <meta name="theme-color" content="#1C1C1E" />
+        <meta name="description" content="RUDN Schedule - Telegram WebApp" />
+        
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="/retro-logo-rudn.png" />
+        <link rel="apple-touch-icon" href="/retro-logo-rudn.png" />
+        
+        <!-- 🔄 Cache Control - разрешаем кэш для стабильности в Telegram WebView -->
+        <!-- Убраны no-store/must-revalidate чтобы WebView не перезагружал страницу при смене фокуса -->
+        
+        <!-- iOS Web App -->
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        
+        <!-- Google Fonts - Plus Jakarta Sans -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        
+        <!-- Telegram WebApp SDK (локальная копия — вещатель telegram.org может быть недоступен в Telegram WebView) -->
+        <script src="/telegram-web-app.js"></script>
+        
+        <!-- 🔇 Подавление console для пользователей (dev.* команды используют __console) -->
+        <script>
+          (function() {
+            if (typeof window === 'undefined') return;
+            // Сохраняем оригинальные методы
+            window.__console = {
+              log: console.log.bind(console),
+              debug: console.debug.bind(console),
+              warn: console.warn.bind(console),
+              info: console.info.bind(console),
+              error: console.error.bind(console),
+            };
+            // Подавляем все кроме error
+            var noop = function() {};
+            console.log = noop;
+            console.debug = noop;
+            console.warn = noop;
+            console.info = noop;
+            // console.error остаётся — ошибки важны
+          })();
+        </script>
+
+        <!-- 🛑 Полностью блокируем Vite HMR WebSocket и reload -->
+        <script>
+          (function() {
+            if (typeof window === 'undefined') return;
+            // Перехватываем WebSocket — блокируем Vite HMR соединения
+            var _OrigWS = window.WebSocket;
+            window.WebSocket = function(url, protocols) {
+              var protoStr = String(protocols || '');
+              var urlStr = String(url || '');
+              // Блокируем Vite HMR: протокол "vite-hmr" или URL с vite-токеном
+              if (protoStr.indexOf('vite-hmr') !== -1 || urlStr.indexOf('__vite') !== -1 || urlStr.indexOf('token=') !== -1) {
+                console.log('[HMR-BLOCK] Blocked Vite WS:', urlStr);
+                return { 
+                  send: function(){}, close: function(){}, 
+                  addEventListener: function(){}, removeEventListener: function(){},
+                  readyState: 3, CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3,
+                  onopen: null, onclose: null, onmessage: null, onerror: null,
+                  url: urlStr, protocol: '', extensions: '', bufferedAmount: 0, binaryType: 'blob'
+                };
+              }
+              if (protocols) return new _OrigWS(url, protocols);
+              return new _OrigWS(url);
+            };
+            window.WebSocket.prototype = _OrigWS.prototype;
+            window.WebSocket.CONNECTING = 0;
+            window.WebSocket.OPEN = 1;
+            window.WebSocket.CLOSING = 2;
+            window.WebSocket.CLOSED = 3;
+            // Блокируем событие full-reload от Vite
+            window.addEventListener('vite:beforeFullReload', function(e) {
+              e.preventDefault();
+              return false;
+            });
+          })();
+        </script>
+
+        <!-- ⭐️ Telegram Full Screen Initialization -->
+        <script>
+            // Инициализируем full screen сразу при загрузке
+            (function() {
+                console.log('🟢 [index.html] Начало инициализации Telegram WebApp');
+                
+                // Ждем загрузки Telegram WebApp API
+                var checkTelegram = setInterval(function() {
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        clearInterval(checkTelegram);
+                        
+                        var tg = window.Telegram.WebApp;
+                        console.log('🟢 [index.html] Telegram WebApp API загружен');
+                        console.log('📊 [index.html] Состояние до ready():', {
+                            isExpanded: tg.isExpanded,
+                            viewportHeight: tg.viewportHeight
+                        });
+                        
+                        // Вызываем ready
+                        tg.ready();
+                        console.log('✅ [index.html] tg.ready() вызван');
+                        
+                        // Разворачиваем на полный экран
+                        tg.expand();
+                        
+                        // Проверка через секунду
+                        setTimeout(function() {
+                            if (!tg.isExpanded) {
+                                console.log('🔄 [index.html] Повторный expand');
+                                tg.expand();
+                            }
+                            console.log('📏 [index.html] isExpanded:', tg.isExpanded, ', viewportHeight:', tg.viewportHeight);
+                        }, 1000);
+                    }
+                }, 10);
+            })();
+        </script>
+        
+        <title>RUDN Schedule</title>
+
+        <!-- 🛠 Dev Console -->
+        <script>
+        (function() {
+          var C = window.__console || console;
+          var _apiBase = '';
+          var _getUser = function() {
+            try { var s = localStorage.getItem('telegram_user'); if (s) return JSON.parse(s); } catch(e) {}
+            return null;
+          };
+          var _setShowStreakModal = null;
+          var _setStreakData = null;
+
+          function api(method, path, body) {
+            if (!_apiBase) { C.error('❌ API не настроен. Вызовите dev.setApi("https://...")'); return Promise.reject(new Error('API не настроен')); }
+            var url = _apiBase + '/api' + (path.charAt(0) === '/' ? path : '/' + path);
+            var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            return fetch(url, opts).then(function(r) {
+              return r.text().then(function(text) {
+                var data;
+                try { data = JSON.parse(text); } catch(e) { data = { detail: text || ('HTTP ' + r.status) }; }
+                if (!r.ok) {
+                  var errMsg = data.detail || data.message || ('HTTP ' + r.status);
+                  var err = new Error(errMsg);
+                  err.status = r.status;
+                  err.data = data;
+                  throw err;
+                }
+                return data;
+              });
+            });
+          }
+
+          function uid() {
+            var u = _getUser();
+            if (!u || !u.id) { C.error('❌ Пользователь не найден.'); return null; }
+            return u.id;
+          }
+
+          function log(e, m, d) { d !== undefined ? C.log(e + ' ' + m, d) : C.log(e + ' ' + m); }
+
+          window.dev = {
+            help: function() {
+              C.log(
+                '%c🛠 Dev Console%c\n\n' +
+                'dev.setApi(url)                    — задать backend URL\n' +
+                'dev.getUser()                      — текущий пользователь\n' +
+                'dev.getUserSettings()              — настройки юзера\n' +
+                'dev.createUser(id, "Имя")          — создать пользователя\n\n' +
+                'dev.addXP(amount)                  — добавить XP (админ)\n' +
+                'dev.setXP(amount)                  — установить XP (админ)\n' +
+                'dev.getLevel()                     — информация об уровне (админ)\n' +
+                'dev.resetStreak()                  — сбросить стрик (админ)\n\n' +
+                'dev.createFriend(targetId)          — создать друга\n' +
+                'dev.listFriends()                  — список друзей\n' +
+                'dev.removeFriend(targetId)          — удалить друга\n' +
+                'dev.sendFriendRequest(targetId)     — отправить запрос\n' +
+                'dev.listRequests()                 — запросы в друзья\n\n' +
+                'dev.addTask("Название")             — создать задачу\n' +
+                'dev.listTasks()                    — список задач\n' +
+                'dev.deleteTask(taskId)             — удалить задачу\n\n' +
+                'dev.showStreakModal()              — показать модалку стрика\n' +
+                'dev.hideStreakModal()              — скрыть модалку\n' +
+                'dev.recordVisit()                  — записать визит\n\n' +
+                'dev.clearUserData()                — удалить данные юзера\n' +
+                'dev.apiCall("GET", "/admin/stats") — произвольный вызов\n\n' +
+                'dev.enableLogs()                   — включить все console.log\n' +
+                'dev.disableLogs()                  — выключить обратно',
+                'font-size:14px;font-weight:bold;color:#F7D060', ''
+              );
+            },
+
+            enableLogs: function() {
+              console.log = C.log; console.debug = C.debug; console.warn = C.warn; console.info = C.info;
+              C.log('✅ Логи включены');
+            },
+
+            disableLogs: function() {
+              var noop = function(){};
+              console.log = noop; console.debug = noop; console.warn = noop; console.info = noop;
+              C.log('🔇 Логи выключены');
+            },
+
+            setApi: function(url) {
+              _apiBase = url.replace(/\/+$/, '');
+              try { localStorage.setItem('dev_api_base', _apiBase); } catch(e) {}
+              log('✅', 'API: ' + _apiBase);
+            },
+
+            getUser: function() { var u = _getUser(); if (!u) { C.error('❌ Нет пользователя'); return Promise.reject(new Error('Нет пользователя')); } log('👤', 'Пользователь:', u); return u; },
+
+            getUserSettings: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/user-settings/' + id).then(function(d) { log('⚙️', 'Настройки:', d); return d; }).catch(function(e) { log('❌', 'getUserSettings:', e.message || e); throw e; });
+            },
+
+            createUser: function(telegramId, firstName) {
+              return api('POST', '/user-settings', {
+                telegram_id: telegramId, first_name: firstName || 'Тест', last_name: 'Dev', username: 'dev_user_' + telegramId
+              }).then(function(d) { log('✅', 'Создан:', d); return d; }).catch(function(e) { log('❌', '', e); });
+            },
+
+            createFriend: function(targetId) {
+              var myId = uid(); if (!myId) return Promise.reject(new Error('Нет пользователя'));
+              if (!targetId) { C.error('❌ dev.createFriend(222222)'); return Promise.reject(new Error('Нет targetId')); }
+              return api('POST', '/user-settings', {
+                telegram_id: targetId, first_name: 'Друг_' + targetId, last_name: 'Тестовый', username: 'friend_' + targetId
+              }).catch(function(){}).then(function() {
+                log('📨', myId + ' → ' + targetId);
+                return api('POST', '/friends/request/' + targetId, { telegram_id: myId });
+              }).then(function(r) {
+                if (r && r.request_id) {
+                  return api('POST', '/friends/accept/' + r.request_id, { telegram_id: targetId });
+                }
+                return r;
+              }).then(function(r) { log('🤝', 'Друг добавлен!', r); return r; }).catch(function(e) { log('❌', '', e); });
+            },
+
+            listFriends: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/friends/' + id).then(function(d) { log('👥', '(' + (d.friends ? d.friends.length : 0) + '):', d.friends); return d.friends; }).catch(function(e) { log('❌', 'listFriends:', e.message || e); throw e; });
+            },
+
+            removeFriend: function(targetId) {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('DELETE', '/friends/' + targetId, { telegram_id: id })
+                .then(function(d) { log('🗑', 'Удалён:', d); return d; }).catch(function(e) { log('❌', 'removeFriend:', e.message || e); throw e; });
+            },
+
+            sendFriendRequest: function(targetId) {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('POST', '/friends/request/' + targetId, { telegram_id: id }).then(function(d) { log('📨', '', d); return d; }).catch(function(e) { log('❌', 'sendFriendRequest:', e.message || e); throw e; });
+            },
+
+            listRequests: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/friends/' + id + '/requests').then(function(d) { log('📬', '', d); return d; }).catch(function(e) { log('❌', 'listRequests:', e.message || e); throw e; });
+            },
+
+            addTask: function(text, opts) {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              var body = Object.assign({ telegram_id: id, text: text || 'Тестовая задача' }, opts || {});
+              return api('POST', '/tasks', body).then(function(d) { log('✅', 'Задача:', d); return d; }).catch(function(e) { log('❌', 'addTask:', e.message || e); throw e; });
+            },
+
+            listTasks: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/tasks/' + id).then(function(d) { log('📋', '(' + d.length + '):', d); return d; }).catch(function(e) { log('❌', 'listTasks:', e.message || e); throw e; });
+            },
+
+            deleteTask: function(taskId) {
+              if (!taskId) { C.error('❌ dev.deleteTask("id")'); return Promise.reject(new Error('Нет taskId')); }
+              return api('DELETE', '/tasks/' + taskId)
+                .then(function(d) { log('🗑', 'Задача удалена:', d); return d; }).catch(function(e) { log('❌', 'deleteTask:', e.message || e); throw e; });
+            },
+
+            showStreakModal: function() {
+              if (_setShowStreakModal) {
+                if (_setStreakData) {
+                  _setStreakData(function(prev) { return prev || {
+                    visit_streak_current: 3, visit_streak_max: 3, freeze_shields: 1,
+                    streak_continued: true, streak_reset: false, is_new_day: true, milestone_reached: 3,
+                    week_days: [{label:'Пн',dateNum:1,done:true},{label:'Вт',dateNum:2,done:true},{label:'Ср',dateNum:3,done:true},{label:'Чт',dateNum:4,done:false},{label:'Пт',dateNum:5,done:false},{label:'Сб',dateNum:6,done:false},{label:'Вс',dateNum:7,done:false}]
+                  }; });
+                }
+                _setShowStreakModal(true);
+                log('🔥', 'Модалка показана');
+              } else {
+                log('⚠️', 'Пройдите Welcome Screen');
+              }
+            },
+
+            hideStreakModal: function() {
+              if (_setShowStreakModal) { _setShowStreakModal(false); log('🔥', 'Скрыта'); }
+            },
+
+            recordVisit: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('POST', '/users/' + id + '/visit').then(function(d) { log('🔥', 'Визит:', d); if (_setStreakData) _setStreakData(d); return d; }).catch(function(e) { log('❌', 'recordVisit:', e.message || e); throw e; });
+            },
+
+            clearUserData: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('DELETE', '/user-settings/' + id)
+                .then(function(d) { log('🗑', 'Данные удалены:', d); return d; }).catch(function(e) { log('❌', 'clearUserData:', e.message || e); throw e; });
+            },
+
+            apiCall: function(method, path, body) {
+              return api(method || 'GET', path || '/', body).then(function(d) { log('📡', (method||'GET') + ' ' + path + ':', d); return d; }).catch(function(e) { log('❌', '', e); });
+            },
+
+            // ===== Админ-команды (XP/Level) =====
+            addXP: function(amount) {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              amount = parseInt(amount) || 100;
+              return api('POST', '/dev/add-xp', { telegram_id: id, amount: amount })
+                .then(function(d) { log('⭐', '+' + amount + ' XP:', d); return d; })
+                .catch(function(e) { log('❌', 'addXP:', e.message || e); throw e; });
+            },
+
+            setXP: function(amount) {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              amount = parseInt(amount) || 0;
+              return api('POST', '/dev/set-xp', { telegram_id: id, amount: amount })
+                .then(function(d) { log('⭐', 'XP = ' + amount + ':', d); return d; })
+                .catch(function(e) { log('❌', 'setXP:', e.message || e); throw e; });
+            },
+
+            getLevel: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('GET', '/dev/get-level/' + id)
+                .then(function(d) { log('📊', 'Уровень:', d); return d; })
+                .catch(function(e) { log('❌', 'getLevel:', e.message || e); throw e; });
+            },
+
+            resetStreak: function() {
+              var id = uid(); if (!id) return Promise.reject(new Error('Нет пользователя'));
+              return api('POST', '/dev/reset-streak', { telegram_id: id })
+                .then(function(d) { log('🔥', 'Стрик сброшен:', d); return d; })
+                .catch(function(e) { log('❌', 'resetStreak:', e.message || e); throw e; });
+            },
+
+            _bind: function(refs) {
+              if (refs.getUser) _getUser = refs.getUser;
+              if (refs.setShowStreakModal) _setShowStreakModal = refs.setShowStreakModal;
+              if (refs.setStreakData) _setStreakData = refs.setStreakData;
+              if (refs.apiBase) { _apiBase = refs.apiBase; try { localStorage.setItem('dev_api_base', _apiBase); } catch(e) {} }
+            }
+          };
+
+          try { var s = localStorage.getItem('dev_api_base'); if (s) _apiBase = s; } catch(e) {}
+        })();
+        </script>
+        <script>
+        // Emergent platform scripts - only load on Emergent domains (not on production)
+        if (window.location.hostname.includes('emergentagent.com') || window.location.hostname === 'localhost') {
+            var s1 = document.createElement('script');
+            s1.src = 'https://assets.emergent.sh/scripts/emergent-main.js';
+            document.head.appendChild(s1);
+            var s2 = document.createElement('script');
+            s2.src = 'https://unpkg.com/rrweb@latest/dist/rrweb.min.js';
+            document.head.appendChild(s2);
+            var s3 = document.createElement('script');
+            s3.src = 'https://d2adkz2s9zrlge.cloudfront.net/rrweb-recorder-20250919-1.js';
+            document.head.appendChild(s3);
+        }
+        </script>
+        <!--
+        These two scripts have been added for the Visual Edits, please do not edit or remove them
+        -->
+        <script>
+            // Only load visual edit scripts when inside an iframe and visual edits are enabled
+            if (window.self !== window.top && '%VITE_ENABLE_VISUAL_EDITS%' === 'true') {
+                // Load debug monitor script
+                var debugScript = document.createElement('script');
+                debugScript.src = 'https://assets.emergent.sh/scripts/debug-monitor.js';
+                document.head.appendChild(debugScript);
+
+                // Configure Tailwind
+                window.tailwind = window.tailwind || {};
+                tailwind.config = {
+                    corePlugins: { preflight: false },
+                };
+
+                // Load Tailwind CDN
+                var tailwindScript = document.createElement('script');
+                tailwindScript.src = 'https://cdn.tailwindcss.com';
+                document.head.appendChild(tailwindScript);
+            }
+        </script>
+    </head>
+    <body>
+        <noscript>You need to enable JavaScript to run this app.</noscript>
+        <div id="root"></div>
+        <!-- Vite Entry Point (Vite автоматически заменит при сборке) -->
+        <script type="module" src="/src/index.jsx"></script>
+        
+        <!-- PostHog Analytics -->
+        <script>
+            !(function (t, e) {
+                var o, n, p, r;
+                e.__SV ||
+                    ((window.posthog = e),
+                    (e._i = []),
+                    (e.init = function (i, s, a) {
+                        function g(t, e) {
+                            var o = e.split(".");
+                            2 == o.length && ((t = t[o[0]]), (e = o[1])),
+                                (t[e] = function () {
+                                    t.push(
+                                        [e].concat(
+                                            Array.prototype.slice.call(
+                                                arguments,
+                                                0,
+                                            ),
+                                        ),
+                                    );
+                                });
+                        }
+                        ((p = t.createElement("script")).type =
+                            "text/javascript"),
+                            (p.crossOrigin = "anonymous"),
+                            (p.async = !0),
+                            (p.src =
+                                s.api_host.replace(
+                                    ".i.posthog.com",
+                                    "-assets.i.posthog.com",
+                                ) + "/static/array.js"),
+                            (r =
+                                t.getElementsByTagName(
+                                    "script",
+                                )[0]).parentNode.insertBefore(p, r);
+                        var u = e;
+                        for (
+                            void 0 !== a ? (u = e[a] = []) : (a = "posthog"),
+                                u.people = u.people || [],
+                                u.toString = function (t) {
+                                    var e = "posthog";
+                                    return (
+                                        "posthog" !== a && (e += "." + a),
+                                        t || (e += " (stub)"),
+                                        e
+                                    );
+                                },
+                                u.people.toString = function () {
+                                    return u.toString(1) + ".people (stub)";
+                                },
+                                o =
+                                    "init me ws ys ps bs capture je Di ks register register_once register_for_session unregister unregister_for_session Ps getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Es $s createPersonProfile Is opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing Ss debug xs getPageViewId captureTraceFeedback captureTraceMetric".split(
+                                        " ",
+                                    ),
+                                n = 0;
+                            n < o.length;
+                            n++
+                        )
+                            g(u, o[n]);
+                        e._i.push([i, s, a]);
+                    }),
+                    (e.__SV = 1));
+            })(document, window.posthog || []);
+            posthog.init("phc_yJW1VjHGGwmCbbrtczfqqNxgBDbhlhOWcdzcIJEOTFE", {
+                api_host: "https://us.i.posthog.com",
+                person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well
+            });
+        </script>
+    </body>
+</html>

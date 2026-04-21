@@ -1,0 +1,104 @@
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig(({ mode }) => {
+  // Загружаем только VITE_ переменные (безопасные для клиента)
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
+    plugins: [react()],
+    
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+      // ВАЖНО: гарантируем единственный экземпляр React/three для всех зависимостей
+      // (фикс для пакетов типа `3dsvg` - они имели свой React при Vite prebundle
+      // и падали с "Invalid hook call / Cannot read properties of null (useState)")
+      dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei'],
+    },
+
+    optimizeDeps: {
+      // Принудительно пре-бандлим `3dsvg` вместе с его peer-deps, чтобы
+      // пакет использовал ТОТ ЖЕ инстанс React/three что и приложение.
+      include: [
+        '3dsvg',
+        '@react-three/fiber',
+        '@react-three/drei',
+        'three',
+      ],
+    },
+    
+    build: {
+      outDir: 'build',
+      sourcemap: false,
+      // esbuild вместо terser — в 10-50 раз меньше потребление памяти
+      minify: 'esbuild',
+      // drop console/debugger через esbuild (аналог terserOptions)
+      esbuild: {
+        drop: ['console', 'debugger'],
+      },
+      rollupOptions: {
+        output: {
+          // Хеширование файлов для обхода кэша Telegram
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+          // Разделение на чанки — снижает пиковое потребление памяти
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-router': ['react-router-dom'],
+            'vendor-charts': ['recharts'],
+            'vendor-motion': ['framer-motion'],
+            'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          },
+        },
+      },
+      chunkSizeWarningLimit: 1000,
+    },
+    
+    server: {
+      port: 3000,
+      host: true,
+      strictPort: true,
+      allowedHosts: true,
+      // Отключаем HMR — предотвращает перезагрузки в Telegram WebView
+      // при потере/восстановлении WebSocket соединения
+      hmr: false,
+      // Включаем file watcher для применения изменений при перезапуске
+      watch: {
+        usePolling: true,
+        interval: 1000,
+      },
+      // Проксируем /api/* запросы к бэкенду на порту 8001
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8001',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+      fs: {
+        allow: ['.'],
+      },
+    },
+    
+    preview: {
+      port: 3000,
+      host: true,
+    },
+    
+    // Поддержка обоих префиксов (VITE_ и REACT_APP_) для import.meta.env
+    envPrefix: ['VITE_', 'REACT_APP_'],
+    
+    define: {
+      // Передаём только нужные переменные, не весь process.env
+      'process.env.VITE_BACKEND_URL': JSON.stringify(env.VITE_BACKEND_URL || ''),
+      'process.env.REACT_APP_BACKEND_URL': JSON.stringify(env.VITE_BACKEND_URL || env.REACT_APP_BACKEND_URL || ''),
+      'process.env.VITE_ENABLE_VISUAL_EDITS': JSON.stringify(env.VITE_ENABLE_VISUAL_EDITS || 'false'),
+      'process.env.REACT_APP_ENABLE_VISUAL_EDITS': JSON.stringify(env.VITE_ENABLE_VISUAL_EDITS || env.REACT_APP_ENABLE_VISUAL_EDITS || 'false'),
+      'process.env.NODE_ENV': JSON.stringify(mode),
+    },
+  };
+});

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>SVG compare</title>
+  <style>
+    body { margin:0; background:#fff; font-family:system-ui,sans-serif; padding:16px; }
+    .row { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
+    .card { border:1px solid #ddd; padding:10px; border-radius:8px; text-align:center; }
+    .card img, .card object { width:280px; height:280px; background:#f3f4f6; display:block; }
+    .title { font-size:13px; font-weight:600; margin-bottom:8px; color:#111; }
+    .meta { font-size:11px; color:#666; margin-top:4px; }
+  </style>
+</head>
+<body>
+  <h1 style="font-size:16px; text-align:center;">Сравнение SVG: оригинал vs симплифицированный</h1>
+  <div class="row">
+    <div class="card">
+      <div class="title">Оригинал</div>
+      <img src="/rudn-logo-3d.svg" alt="original"/>
+      <div class="meta">82 487 байт · 2459 команд · 13316 вершин</div>
+    </div>
+    <div class="card">
+      <div class="title">Симплифицированный (tol=1.5)</div>
+      <img src="/rudn-logo-3d-simplified.svg" alt="simplified"/>
+      <div class="meta">16 650 байт (20% от ориг) · 1448 сегментов · 5.0× меньше</div>
+    </div>
+  </div>
+</body>
+</html>

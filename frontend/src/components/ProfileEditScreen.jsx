@@ -1,0 +1,953 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, Camera, Trash2, RotateCcw, Pencil, AlertTriangle, Cake, ShieldCheck, Palette } from 'lucide-react';
+import GroupSelector from './GroupSelector';
+import { userAPI, getBackendURL } from '../services/api';
+import friendsAPI from '../services/friendsAPI';
+
+const ProfileEditScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapticFeedback, onGroupChanged, onOpenPrivacy, onProfileUpdated, onOpenGraffitiEditor, headerGraffitiUrl }) => {
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
+  const [avatarMode, setAvatarMode] = useState('telegram'); // 'telegram' | 'custom' | 'none'
+  const [customAvatar, setCustomAvatar] = useState(null);
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Birthday state
+  const [birthDate, setBirthDate] = useState({ day: '', month: '', year: '' });
+  const [birthSource, setBirthSource] = useState(null);
+  const [birthLoading, setBirthLoading] = useState(false);
+  const [birthSaving, setBirthSaving] = useState(false);
+  const [birthError, setBirthError] = useState('');
+  const birthSaveTimerRef = useRef(null);
+  const dayRef = useRef(null);
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  // Bug 10: Загрузка кастомного аватара с сервера при открытии
+  useEffect(() => {
+    if (!isOpen || !user?.id) return;
+    const loadAvatar = async () => {
+      try {
+        const backendUrl = getBackendURL();
+        const res = await fetch(`${backendUrl}/api/profile/${user.id}/avatar`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.avatar_data && data.avatar_mode === 'custom') {
+            setCustomAvatar(data.avatar_data);
+            setAvatarMode('custom');
+          } else {
+            setAvatarMode(data.avatar_mode || 'telegram');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load custom avatar:', err);
+      }
+    };
+    loadAvatar();
+  }, [isOpen, user?.id]);
+
+  // Загрузка даты рождения при открытии
+  useEffect(() => {
+    if (!isOpen || !user?.id) return;
+    const loadBirthday = async () => {
+      setBirthLoading(true);
+      try {
+        const backendUrl = getBackendURL();
+        const res = await fetch(`${backendUrl}/api/user-settings/${user.id}/birthday`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.birth_date) {
+            const parts = data.birth_date.split('.');
+            if (parts.length >= 2) {
+              setBirthDate({
+                day: parts[0] || '',
+                month: parts[1] || '',
+                year: parts[2] && parts[2] !== '0000' ? parts[2] : '',
+              });
+              setBirthSource(data.source);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load birthday:', err);
+      } finally {
+        setBirthLoading(false);
+      }
+    };
+    loadBirthday();
+  }, [isOpen, user?.id]);
+
+  // Bug 12: Валидация и debounce сохранения даты рождения
+  const validateBirthDate = useCallback((bd) => {
+    const day = parseInt(bd.day);
+    const month = parseInt(bd.month);
+    const year = bd.year ? parseInt(bd.year) : 0;
+    
+    if (!bd.day || !bd.month) return ''; // Ещё не заполнено
+    if (isNaN(day) || isNaN(month)) return 'Некорректные данные';
+    if (day < 1 || day > 31) return 'День: 01–31';
+    if (month < 1 || month > 12) return 'Месяц: 01–12';
+    if (bd.year && (year < 1920 || year > new Date().getFullYear())) return `Год: 1920\u2013${new Date().getFullYear()}`;
+    
+    // Проверка дней в месяце
+    if (year > 0) {
+      const maxDays = new Date(year, month, 0).getDate();
+      if (day > maxDays) return `В месяце ${month} максимум ${maxDays} дней`;
+    }
+    return '';
+  }, []);
+
+  const saveBirthday = useCallback(async () => {
+    if (!birthDate.day || !birthDate.month || !user?.id) return;
+    
+    const validationError = validateBirthDate(birthDate);
+    if (validationError) {
+      setBirthError(validationError);
+      return;
+    }
+    setBirthError('');
+    
+    setBirthSaving(true);
+    try {
+      const dateStr = `${birthDate.day.padStart(2, '0')}.${birthDate.month.padStart(2, '0')}.${birthDate.year || '0000'}`;
+      const backendUrl = getBackendURL();
+      const res = await fetch(`${backendUrl}/api/user-settings/${user.id}/birthday`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birth_date: dateStr }),
+      });
+      if (res.ok) {
+        setBirthSource('saved');
+        if (hapticFeedback) hapticFeedback('notification', 'success');
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setBirthError(errorData.detail || 'Ошибка сохранения');
+      }
+    } catch (err) {
+      console.error('Failed to save birthday:', err);
+      if (hapticFeedback) hapticFeedback('notification', 'error');
+    } finally {
+      setBirthSaving(false);
+    }
+  }, [birthDate, user?.id, hapticFeedback, validateBirthDate]);
+
+  // Debounced save — вызывается после 1.5 сек паузы ввода
+  const debouncedSaveBirthday = useCallback(() => {
+    if (birthSaveTimerRef.current) clearTimeout(birthSaveTimerRef.current);
+    birthSaveTimerRef.current = setTimeout(() => {
+      saveBirthday();
+    }, 1500);
+  }, [saveBirthday]);
+
+  // Очистка таймера при unmount
+  useEffect(() => {
+    return () => {
+      if (birthSaveTimerRef.current) clearTimeout(birthSaveTimerRef.current);
+    };
+  }, []);
+
+  // Авто-переход между полями даты + debounced save
+  const handleDateInput = (field, value, maxLen, nextRef) => {
+    const cleaned = value.replace(/\D/g, '').slice(0, maxLen);
+    setBirthDate(prev => ({ ...prev, [field]: cleaned }));
+    setBirthError('');
+    if (cleaned.length === maxLen && nextRef?.current) {
+      nextRef.current.focus();
+    }
+    // Debounced save при каждом изменении
+    debouncedSaveBirthday();
+  };
+
+  if (!user) return null;
+
+  const initial = (user.first_name?.[0] || user.username?.[0] || '?').toUpperCase();
+  const displayName = (user.first_name || user.username || 'User').toUpperCase();
+  const groupName = userSettings?.group_name || 'Не выбрана';
+
+  // Текущий аватар
+  const currentAvatar = avatarMode === 'custom' ? customAvatar : avatarMode === 'telegram' ? profilePhoto : null;
+
+  // Bug 10: Сохранение аватара на сервер
+  const saveAvatarToServer = useCallback(async (avatarData, mode) => {
+    if (!user?.id) return;
+    setAvatarSaving(true);
+    try {
+      if (mode === 'custom' && avatarData) {
+        await friendsAPI.saveCustomAvatar(user.id, avatarData);
+      } else {
+        // Удаляем кастомный аватар (режим telegram или none)
+        await friendsAPI.deleteCustomAvatar(user.id);
+      }
+      // Fix Bug 11: Уведомляем родителя об обновлении профиля
+      if (onProfileUpdated) onProfileUpdated();
+    } catch (err) {
+      console.error('Failed to save avatar:', err);
+    } finally {
+      setAvatarSaving(false);
+    }
+  }, [user?.id, onProfileUpdated]);
+
+  // Компрессия изображения перед загрузкой
+  const compressImage = useCallback((dataUrl, maxWidth = 512, quality = 0.85) => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        
+        // Масштабируем если превышает maxWidth
+        if (width > maxWidth || height > maxWidth) {
+          const ratio = Math.min(maxWidth / width, maxWidth / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Пробуем JPEG для лучшей компрессии, PNG для прозрачности
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      };
+      img.onerror = () => resolve(dataUrl); // fallback
+      img.src = dataUrl;
+    });
+  }, []);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target.result;
+      // Сжимаем изображение перед загрузкой
+      const compressed = await compressImage(dataUrl, 512, 0.85);
+      setCustomAvatar(compressed);
+      setAvatarMode('custom');
+      setShowAvatarMenu(false);
+      if (hapticFeedback) hapticFeedback('notification', 'success');
+      // Сохраняем на сервер
+      saveAvatarToServer(compressed, 'custom');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteAvatar = () => {
+    setAvatarMode('none');
+    setCustomAvatar(null);
+    setShowAvatarMenu(false);
+    if (hapticFeedback) hapticFeedback('impact', 'medium');
+    saveAvatarToServer(null, 'none');
+  };
+
+  const handleRestoreTelegram = () => {
+    setAvatarMode('telegram');
+    setCustomAvatar(null);
+    setShowAvatarMenu(false);
+    if (hapticFeedback) hapticFeedback('impact', 'light');
+    saveAvatarToServer(null, 'telegram');
+  };
+
+  const handleGroupSelected = async (groupData) => {
+    setSaving(true);
+    try {
+      const settings = await userAPI.saveUserSettings({
+        telegram_id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        ...groupData,
+      });
+
+      if (onGroupChanged) onGroupChanged(settings);
+      setShowGroupSelector(false);
+      if (hapticFeedback) hapticFeedback('notification', 'success');
+    } catch (err) {
+      console.error('Error changing group:', err);
+      if (hapticFeedback) hapticFeedback('notification', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <AnimatePresence>
+        {isOpen && !showGroupSelector && (
+          <motion.div
+            key="profile-edit-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[350] flex flex-col"
+            style={{ backgroundColor: '#000000' }}
+          >
+            {/* Верхняя панель */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.25 }}
+              className="flex items-center justify-between px-4"
+              style={{ paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)' }}
+            >
+              <button onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'light');
+                onClose();
+              }}>
+                <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
+              </button>
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '16px',
+                color: '#F4F3FC',
+              }}>
+                Редактирование
+              </span>
+              <div style={{ width: '31px' }} />
+            </motion.div>
+
+            {/* Контент */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '32px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
+              {/* Аватар */}
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.15, type: 'spring', damping: 20 }}
+                style={{ position: 'relative', marginBottom: '12px' }}
+              >
+                <div
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    setShowAvatarMenu(!showAvatarMenu);
+                  }}
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '40px',
+                    overflow: 'hidden',
+                    border: '3px solid rgba(248,185,76,0.3)',
+                    cursor: 'pointer',
+                    position: 'relative',
+                  }}
+                >
+                  {currentAvatar ? (
+                    <img
+                      src={currentAvatar}
+                      alt="Avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <span className="text-white text-3xl font-bold">{initial}</span>
+                    </div>
+                  )}
+
+                  {/* Overlay камера */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0,0,0,0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: showAvatarMenu ? 1 : 0,
+                    transition: 'opacity 0.2s',
+                  }}>
+                    <Camera style={{ width: '28px', height: '28px', color: '#FFFFFF' }} />
+                  </div>
+                </div>
+
+                {/* Меню аватара */}
+                <AnimatePresence>
+                  {showAvatarMenu && (
+                    <motion.div
+                      key="avatar-menu"
+                      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        marginTop: '8px',
+                        background: '#1E1D1A',
+                        borderRadius: '16px',
+                        padding: '6px',
+                        minWidth: '220px',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                        zIndex: 10,
+                      }}
+                    >
+                      {/* Загрузить свою */}
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          width: '100%',
+                          textAlign: 'left',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        <Camera style={{ width: '18px', height: '18px', color: '#F8B94C' }} />
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 500,
+                          fontSize: '14px',
+                          color: '#F4F3FC',
+                        }}>Загрузить свою</span>
+                      </button>
+
+                      {/* Удалить */}
+                      <button
+                        onClick={handleDeleteAvatar}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          width: '100%',
+                          textAlign: 'left',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        <Trash2 style={{ width: '18px', height: '18px', color: '#EF4444' }} />
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 500,
+                          fontSize: '14px',
+                          color: '#EF4444',
+                        }}>Удалить фото</span>
+                      </button>
+
+                      {/* Вернуть из Telegram */}
+                      {avatarMode !== 'telegram' && (
+                        <button
+                          onClick={handleRestoreTelegram}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            width: '100%',
+                            textAlign: 'left',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                        >
+                          <RotateCcw style={{ width: '18px', height: '18px', color: '#3B82F6' }} />
+                          <span style={{
+                            fontFamily: "'Poppins', sans-serif",
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            color: '#3B82F6',
+                          }}>Вернуть из Telegram</span>
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+              </motion.div>
+
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 400,
+                fontSize: '12px',
+                color: 'rgba(255,255,255,0.3)',
+                marginBottom: '32px',
+              }}>
+                Нажмите на аватар для изменения
+              </span>
+
+              {/* Поля */}
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                {/* Имя (readonly) */}
+                <motion.div
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <label style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.4)',
+                    marginBottom: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    Имя
+                  </label>
+                  <div style={{
+                    padding: '14px 16px',
+                    borderRadius: '14px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1.5px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      color: 'rgba(255,255,255,0.35)',
+                    }}>
+                      @{user.username || 'user'}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 400,
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,0.25)',
+                    marginTop: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    Используется короткое имя (@username) из Telegram
+                  </span>
+                </motion.div>
+
+                {/* Граффити профиля */}
+                <motion.div
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.22 }}
+                >
+                  <label style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.4)',
+                    marginBottom: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    Граффити профиля
+                  </label>
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback) hapticFeedback('impact', 'medium');
+                      if (onOpenGraffitiEditor) onOpenGraffitiEditor();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '14px',
+                      background: headerGraffitiUrl
+                        ? 'rgba(248,185,76,0.06)'
+                        : 'rgba(255,255,255,0.04)',
+                      border: headerGraffitiUrl
+                        ? '1.5px solid rgba(248,185,76,0.2)'
+                        : '1.5px solid rgba(255,255,255,0.08)',
+                      cursor: 'pointer',
+                      gap: '12px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {/* Превью граффити */}
+                    <div style={{
+                      width: '56px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: '#111',
+                      flexShrink: 0,
+                      position: 'relative',
+                    }}>
+                      {headerGraffitiUrl ? (
+                        <img
+                          src={headerGraffitiUrl}
+                          alt=""
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Palette style={{ width: '18px', height: '18px', color: 'rgba(255,255,255,0.15)' }} />
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        color: headerGraffitiUrl ? '#F8B94C' : 'rgba(255,255,255,0.5)',
+                      }}>
+                        {headerGraffitiUrl ? 'Изменить граффити' : 'Нарисовать граффити'}
+                      </div>
+                      <div style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 400,
+                        fontSize: '11px',
+                        color: 'rgba(255,255,255,0.25)',
+                        marginTop: '1px',
+                      }}>
+                        Кастомизация шапки профиля
+                      </div>
+                    </div>
+                    <Palette style={{
+                      width: '20px',
+                      height: '20px',
+                      color: headerGraffitiUrl ? '#F8B94C' : 'rgba(255,255,255,0.2)',
+                      flexShrink: 0,
+                    }} />
+                  </button>
+                </motion.div>
+
+                {/* Группа */}
+                <motion.div
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.25 }}
+                >
+                  <label style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.4)',
+                    marginBottom: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    Группа
+                  </label>
+                  <button
+                    onClick={() => {
+                      if (hapticFeedback) hapticFeedback('impact', 'light');
+                      setShowGroupSelector(true);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '14px 16px',
+                      borderRadius: '14px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1.5px solid rgba(255,255,255,0.08)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'border-color 0.2s',
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      color: '#F8B94C',
+                    }}>
+                      {groupName}
+                    </span>
+                    <Pencil style={{ width: '16px', height: '16px', color: 'rgba(255,255,255,0.3)' }} />
+                  </button>
+
+                  {/* Предупреждение */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '6px',
+                    marginTop: '8px',
+                    paddingLeft: '4px',
+                  }}>
+                    <AlertTriangle style={{
+                      width: '13px',
+                      height: '13px',
+                      color: '#F8B94C',
+                      flexShrink: 0,
+                      marginTop: '1px',
+                    }} />
+                    <span style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 400,
+                      fontSize: '11px',
+                      color: 'rgba(255,255,255,0.35)',
+                      lineHeight: 1.4,
+                    }}>
+                      Смена группы повлияет на всё расписание, задачи и другие функции приложения
+                    </span>
+                  </div>
+                </motion.div>
+
+                {/* Дата рождения */}
+                <motion.div
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <label style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 500,
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.4)',
+                    marginBottom: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    paddingLeft: '4px',
+                  }}>
+                    <Cake style={{ width: '13px', height: '13px' }} />
+                    Дата рождения
+                    {birthSource === 'telegram' && (
+                      <span style={{
+                        fontSize: '10px',
+                        color: '#3B82F6',
+                        background: 'rgba(59,130,246,0.12)',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                      }}>из Telegram</span>
+                    )}
+                  </label>
+
+                  {birthLoading ? (
+                    <div style={{
+                      padding: '14px 16px',
+                      borderRadius: '14px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1.5px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <span style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontSize: '14px',
+                        color: 'rgba(255,255,255,0.25)',
+                      }}>Загрузка...</span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      {/* День */}
+                      <input
+                        ref={dayRef}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ДД"
+                        value={birthDate.day}
+                        onChange={(e) => handleDateInput('day', e.target.value, 2, monthRef)}
+                        style={{
+                          width: '52px',
+                          padding: '14px 0',
+                          borderRadius: '14px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: `1.5px solid ${birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                          color: '#F4F3FC',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
+                        onBlurCapture={(e) => { e.target.style.borderColor = birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'; }}
+                      />
+                      <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '18px', fontWeight: 600 }}>.</span>
+
+                      {/* Месяц */}
+                      <input
+                        ref={monthRef}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ММ"
+                        value={birthDate.month}
+                        onChange={(e) => handleDateInput('month', e.target.value, 2, yearRef)}
+                        style={{
+                          width: '52px',
+                          padding: '14px 0',
+                          borderRadius: '14px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: `1.5px solid ${birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                          color: '#F4F3FC',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
+                        onBlurCapture={(e) => { e.target.style.borderColor = birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'; }}
+                      />
+                      <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '18px', fontWeight: 600 }}>.</span>
+
+                      {/* Год */}
+                      <input
+                        ref={yearRef}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ГГГГ"
+                        value={birthDate.year}
+                        onChange={(e) => handleDateInput('year', e.target.value, 4, null)}
+                        style={{
+                          width: '72px',
+                          padding: '14px 0',
+                          borderRadius: '14px',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: `1.5px solid ${birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                          color: '#F4F3FC',
+                          fontFamily: "'Poppins', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = 'rgba(248,185,76,0.4)'}
+                        onBlurCapture={(e) => { e.target.style.borderColor = birthError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'; }}
+                      />
+
+                      {/* Статус сохранения */}
+                      {birthSaving && (
+                        <span style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontSize: '11px',
+                          color: 'rgba(255,255,255,0.3)',
+                        }}>...</span>
+                      )}
+                    </div>
+                  )}
+
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 400,
+                    fontSize: '11px',
+                    color: birthError ? '#EF4444' : 'rgba(255,255,255,0.25)',
+                    marginTop: '6px',
+                    display: 'block',
+                    paddingLeft: '4px',
+                  }}>
+                    {birthError 
+                      ? birthError
+                      : birthSource === 'telegram' 
+                        ? 'Получено из вашего профиля Telegram. Можете изменить' 
+                        : 'Укажите дату рождения для поздравлений от друзей'}
+                  </span>
+                </motion.div>
+
+                {/* Кнопка настроек приватности */}
+                <motion.button
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35 }}
+                  onClick={() => {
+                    if (hapticFeedback) hapticFeedback('impact', 'light');
+                    if (onOpenPrivacy) onOpenPrivacy();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '16px 18px',
+                    borderRadius: '16px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1.5px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'border-color 0.2s, background 0.2s',
+                    marginTop: '8px',
+                  }}
+                >
+                  <ShieldCheck style={{ width: '22px', height: '22px', color: '#FFBE4E', flexShrink: 0 }} />
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    color: '#F4F3FC',
+                  }}>
+                    Настройки приватности
+                  </span>
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* GroupSelector overlay */}
+      <AnimatePresence>
+        {isOpen && showGroupSelector && (
+          <motion.div
+            key="group-selector-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[360]"
+            style={{ backgroundColor: '#000000' }}
+          >
+            <GroupSelector
+              onGroupSelected={handleGroupSelected}
+              onCancel={() => setShowGroupSelector(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
+export default ProfileEditScreen;

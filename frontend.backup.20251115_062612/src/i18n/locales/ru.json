@@ -1,0 +1,107 @@
+{
+  "header": {
+    "title": "Rudn Schedule"
+  },
+  "menu": {
+    "title": "Меню",
+    "achievements": "Достижения",
+    "analytics": "Аналитика",
+    "notifications": "Уведомления",
+    "calendar": "Календарь",
+    "language": "Язык",
+    "footer": "RUDN Schedule"
+  },
+  "liveScheduleCard": {
+    "currentClass": "Сейчас идёт:",
+    "noClass": "Сейчас ничего не идёт!",
+    "timeLeft": "Осталось: {{minutes}} минут",
+    "relax": "Отдыхай! :)"
+  },
+  "liveScheduleSection": {
+    "title": "Live Schedule",
+    "group": "Группа: {{groupName}}",
+    "currentWeek": "Текущая неделя",
+    "nextWeek": "Следующая неделя",
+    "changeGroup": "Сменить группу",
+    "loading": "Загрузка расписания...",
+    "noClasses": "На этот день занятий нет"
+  },
+  "classStatus": {
+    "upcoming": "Предстоит",
+    "inProgress": "В процессе",
+    "finished": "Закончилась"
+  },
+  "classDetails": {
+    "auditory": "Аудитория:",
+    "teacher": "Преподаватель:"
+  },
+  "weekDays": {
+    "short": {
+      "sun": "Вс",
+      "mon": "Пн",
+      "tue": "Вт",
+      "wed": "Ср",
+      "thu": "Чт",
+      "fri": "Пт",
+      "sat": "Сб"
+    },
+    "full": {
+      "sunday": "Воскресенье",
+      "monday": "Понедельник",
+      "tuesday": "Вторник",
+      "wednesday": "Среда",
+      "thursday": "Четверг",
+      "friday": "Пятница",
+      "saturday": "Суббота"
+    }
+  },
+  "months": {
+    "january": "Январь",
+    "february": "Февраль",
+    "march": "Март",
+    "april": "Апрель",
+    "may": "Май",
+    "june": "Июнь",
+    "july": "Июль",
+    "august": "Август",
+    "september": "Сентябрь",
+    "october": "Октябрь",
+    "november": "Ноябрь",
+    "december": "Декабрь"
+  },
+  "groupSelector": {
+    "selectFaculty": "Выберите факультет",
+    "selectLevel": "Выберите уровень обучения",
+    "selectCourse": "Выберите курс",
+    "selectForm": "Выберите форму обучения",
+    "selectGroup": "Выберите группу",
+    "back": "Назад",
+    "cancel": "Отмена",
+    "noOptions": "Нет доступных вариантов",
+    "unavailable": "Недоступно"
+  },
+  "achievements": {
+    "title": "Достижения",
+    "totalPoints": "Всего очков",
+    "progress": "Прогресс",
+    "viewAll": "Посмотреть все",
+    "recent": "Последние достижения",
+    "points": "очков"
+  },
+  "sidebar": {
+    "quickActions": "Быстрые действия"
+  },
+  "bottomNav": {
+    "home": "Главная",
+    "tasks": "Список дел",
+    "journal": "Журнал"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "retry": "Повторить",
+    "error": "Ошибка",
+    "scheduleError": "Ошибка загрузки расписания: {{message}}",
+    "groupSelected": "Группа {{groupName}} выбрана!",
+    "settingsError": "Ошибка сохранения настроек: {{message}}"
+  }
+}

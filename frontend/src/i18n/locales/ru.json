@@ -1,0 +1,151 @@
+{
+  "header": {
+    "title": "Rudn Schedule"
+  },
+  "menu": {
+    "title": "Меню",
+    "achievements": "Достижения",
+    "analytics": "Аналитика",
+    "notifications": "Уведомления",
+    "calendar": "Календарь",
+    "language": "Язык",
+    "footer": "RUDN Schedule"
+  },
+  "liveScheduleCard": {
+    "currentClass": "Сейчас идёт:",
+    "noClass": "Сейчас ничего не идёт!",
+    "timeLeft": "Осталось: {{minutes}} минут",
+    "relax": "Отдыхай! :)"
+  },
+  "liveScheduleSection": {
+    "title": "Live Schedule",
+    "group": "Группа: {{groupName}}",
+    "currentWeek": "Текущая неделя",
+    "nextWeek": "Следующая неделя",
+    "changeGroup": "Сменить группу",
+    "loading": "Загрузка расписания...",
+    "noClasses": "На этот день занятий нет"
+  },
+  "classStatus": {
+    "upcoming": "Предстоит",
+    "inProgress": "В процессе",
+    "finished": "Закончилась",
+    "upcomingIn": "Начало через {{minutes}} мин"
+  },
+  "classDetails": {
+    "auditory": "Аудитория:",
+    "teacher": "Преподаватель:"
+  },
+  "weekDays": {
+    "short": {
+      "sun": "Вс",
+      "mon": "Пн",
+      "tue": "Вт",
+      "wed": "Ср",
+      "thu": "Чт",
+      "fri": "Пт",
+      "sat": "Сб"
+    },
+    "full": {
+      "sunday": "Воскресенье",
+      "monday": "Понедельник",
+      "tuesday": "Вторник",
+      "wednesday": "Среда",
+      "thursday": "Четверг",
+      "friday": "Пятница",
+      "saturday": "Суббота"
+    }
+  },
+  "months": {
+    "january": "Январь",
+    "february": "Февраль",
+    "march": "Март",
+    "april": "Апрель",
+    "may": "Май",
+    "june": "Июнь",
+    "july": "Июль",
+    "august": "Август",
+    "september": "Сентябрь",
+    "october": "Октябрь",
+    "november": "Ноябрь",
+    "december": "Декабрь"
+  },
+  "groupSelector": {
+    "selectFaculty": "Выберите факультет",
+    "selectLevel": "Выберите уровень обучения",
+    "selectCourse": "Выберите курс",
+    "selectForm": "Выберите форму обучения",
+    "selectGroup": "Выберите группу",
+    "back": "Назад",
+    "cancel": "Отмена",
+    "noOptions": "Нет доступных вариантов",
+    "unavailable": "Недоступно"
+  },
+  "achievements": {
+    "title": "Достижения",
+    "totalPoints": "Всего $RDN",
+    "progress": "Прогресс",
+    "viewAll": "Посмотреть все",
+    "recent": "Последние достижения",
+    "points": "$RDN"
+  },
+  "sidebar": {
+    "quickActions": "Быстрые действия"
+  },
+  "bottomNav": {
+    "home": "Главная",
+    "tasks": "Список дел",
+    "journal": "Журнал"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "retry": "Повторить",
+    "error": "Ошибка",
+    "scheduleError": "Ошибка загрузки расписания: {{message}}",
+    "groupSelected": "Группа {{groupName}} выбрана!",
+    "settingsError": "Ошибка сохранения настроек: {{message}}"
+  },
+  "journal": {
+    "title": "Журнал посещений",
+    "myJournals": "Мои журналы (Староста)",
+    "memberJournals": "Участник",
+    "create": "Создать журнал",
+    "noJournals": "У вас пока нет журналов",
+    "noMemberJournals": "Вы не состоите ни в одном журнале",
+    "stats": "Статистика",
+    "sessions": "Занятия",
+    "students": "Студенты",
+    "invite": "Пригласить",
+    "settings": "Настройки",
+    "createSession": "Новое занятие",
+    "addStudent": "Добавить студента",
+    "markAttendance": "Отметить",
+    "attendance": "Посещаемость",
+    "present": "Присутствовал",
+    "absent": "Отсутствовал",
+    "excused": "Уважительная",
+    "late": "Опоздал",
+    "unmarked": "Не отмечено",
+    "totalSessions": "Всего занятий",
+    "attendancePercent": "Посещаемость",
+    "copyLink": "Скопировать ссылку",
+    "linkCopied": "Ссылка скопирована!",
+    "deleteConfirm": "Вы уверены, что хотите удалить этот журнал?",
+    "leaveConfirm": "Вы уверены, что хотите выйти из журнала?",
+    "studentName": "ФИО студента",
+    "sessionTitle": "Тема занятия",
+    "sessionDate": "Дата",
+    "sessionType": "Тип занятия",
+    "lecture": "Лекция",
+    "seminar": "Семинар",
+    "lab": "Лабораторная",
+    "exam": "Экзамен",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "bulkAdd": "Массовое добавление",
+    "bulkAddPlaceholder": "Иванов Иван\nПетров Петр\nСидоров Сидор",
+    "linkTelegram": "Привязать Telegram",
+    "linked": "Привязан",
+    "notLinked": "Не привязан"
+  }
+}

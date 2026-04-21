@@ -1,0 +1,1386 @@
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Clock, ChevronDown, ChevronUp, Check, Trash2, MapPin, User, 
+  BookOpen, Info, X, GripVertical, Edit2, Plus, Copy, AlarmClock, Expand
+} from 'lucide-react';
+import { confettiExplosion } from '../utils/confetti';
+/**
+ * Timeline-вид планировщика с часами слева
+ * События отображаются как блоки на временной шкале
+ * Поддерживает: просмотр, редактирование, удаление, быстрое создание, перетаскивание
+ */
+
+const HOUR_HEIGHT = 60; // Высота одного часа в пикселях
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23
+
+// Парсинг времени HH:MM в минуты от начала дня
+const parseTime = (timeStr) => {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + (minutes || 0);
+};
+
+// Форматирование часа
+const formatHour = (hour) => {
+  return `${hour.toString().padStart(2, '0')}:00`;
+};
+
+// Форматирование минут в HH:MM
+const formatMinutesToTime = (minutes) => {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
+
+// Компонент карточки события на timeline
+const TimelineEventCard = ({ 
+  event, 
+  style, 
+  onToggleComplete, 
+  onDelete,
+  onEdit,
+  onMarkSkipped,
+  onTimeChange,
+  hapticFeedback,
+  isOverlapping,
+  overlapIndex,
+  totalOverlaps,
+  timelineRef,
+  hourHeight
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const longPressTimer = useRef(null);
+  const startY = useRef(0);
+  const cardRef = useRef(null);
+  const wasDragging = useRef(false); // Флаг для предотвращения открытия модалки после drag
+  
+  const isScheduleEvent = event.origin === 'schedule';
+  const isCompleted = event.completed;
+  const isSkipped = event.skipped;
+  const isUserEvent = event.origin === 'user';
+  
+  // Long press для активации перетаскивания
+  const handlePointerDown = (e) => {
+    if (isScheduleEvent) return; // Не перетаскиваем события из расписания
+    
+    // Захватываем pointer на самой карточке (не на e.target который может быть дочерним)
+    if (cardRef.current) {
+      try {
+        cardRef.current.setPointerCapture(e.pointerId);
+      } catch (err) {
+        // Fallback на e.target
+        e.target.setPointerCapture(e.pointerId);
+      }
+    }
+    startY.current = e.clientY;
+    
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+    
+    longPressTimer.current = setTimeout(() => {
+      console.log('🎯 Drag enabled for event:', event.text);
+      setIsDragging(true);
+      if (hapticFeedback) {
+        hapticFeedback('impact', 'heavy');
+      }
+    }, 300); // 0.3 секунды для активации перетаскивания
+  };
+  
+  const handlePointerMove = (e) => {
+    // Если таймер ещё не сработал и палец двигается - отменяем
+    if (!isDragging && longPressTimer.current) {
+      const deltaY = Math.abs(e.clientY - startY.current);
+      if (deltaY > 10) {
+        // Слишком большое движение - отменяем long press
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+        return;
+      }
+    }
+    
+    if (!isDragging) return;
+    
+    const deltaY = e.clientY - startY.current;
+    setDragOffset(deltaY);
+  };
+  
+  const handlePointerUp = (e) => {
+    // Освобождаем pointer capture
+    try {
+      if (cardRef.current) {
+        cardRef.current.releasePointerCapture(e.pointerId);
+      } else {
+        e.target.releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {
+      // Ignore - pointer may not be captured
+    }
+    
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    
+    // Если было перетаскивание - устанавливаем флаг чтобы не открывать модалку
+    if (isDragging) {
+      wasDragging.current = true;
+      // Сбрасываем флаг через небольшую задержку (после срабатывания onClick)
+      setTimeout(() => {
+        wasDragging.current = false;
+      }, 100);
+    }
+    
+    if (isDragging && dragOffset !== 0) {
+      console.log('📍 Drag ended, offset:', dragOffset);
+      
+      // Вычисляем новое время на основе смещения
+      const pixelsPerMinute = (hourHeight || HOUR_HEIGHT) / 60;
+      const minutesDelta = Math.round(dragOffset / pixelsPerMinute);
+      const currentStartMinutes = parseTime(event.time_start);
+      // Защита от пустого time_end - используем 60 минут по умолчанию
+      const currentEndMinutes = parseTime(event.time_end) || (currentStartMinutes + 60);
+      
+      // Сохраняем ТОЧНУЮ длительность события (разницу между началом и концом)
+      const duration = currentEndMinutes - currentStartMinutes;
+      
+      console.log('📏 Duration preserved:', duration, 'minutes');
+      
+      let newStartMinutes = currentStartMinutes + minutesDelta;
+      // Ограничиваем в пределах дня (0:00 - 24:00)
+      newStartMinutes = Math.max(0, Math.min(24 * 60 - Math.max(duration, 0), newStartMinutes));
+      // Округляем начало до 5 минут для удобства
+      newStartMinutes = Math.round(newStartMinutes / 5) * 5;
+      
+      // Конечное время = новое начало + ИСХОДНАЯ длительность (duration НЕ меняется!)
+      const newEndMinutes = newStartMinutes + duration;
+      
+      const newStartTime = formatMinutesToTime(newStartMinutes);
+      const newEndTime = formatMinutesToTime(Math.max(0, newEndMinutes));
+      
+      console.log('⏰ Time change:', event.time_start, '->', newStartTime, '| End:', event.time_end, '->', newEndTime, '| Duration kept:', duration, 'min');
+      
+      if (newStartTime !== event.time_start && onTimeChange) {
+        onTimeChange(event, newStartTime, newEndTime);
+      }
+    }
+    
+    setIsDragging(false);
+    setDragOffset(0);
+  };
+  
+  const handlePointerCancel = (e) => {
+    try {
+      if (cardRef.current) {
+        cardRef.current.releasePointerCapture(e.pointerId);
+      } else {
+        e.target.releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {
+      // Ignore - pointer may not be captured
+    }
+    
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    setIsDragging(false);
+    setDragOffset(0);
+  };
+  
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
+  
+  // Цвета в зависимости от типа события
+  const getEventColors = () => {
+    if (isScheduleEvent) {
+      return {
+        bg: 'bg-white',
+        bgLight: 'bg-blue-100',
+        border: 'border-blue-500',
+        text: 'text-gray-800',
+        textDark: 'text-blue-800',
+        accent: 'text-blue-600',
+      };
+    }
+    
+    const categoryColors = {
+      'study': { bg: 'bg-white', bgLight: 'bg-purple-100', border: 'border-purple-500', text: 'text-gray-800', textDark: 'text-purple-800', accent: 'text-purple-600' },
+      'personal': { bg: 'bg-white', bgLight: 'bg-green-100', border: 'border-green-500', text: 'text-gray-800', textDark: 'text-green-800', accent: 'text-green-600' },
+      'sport': { bg: 'bg-white', bgLight: 'bg-red-100', border: 'border-red-500', text: 'text-gray-800', textDark: 'text-red-800', accent: 'text-red-600' },
+      'work': { bg: 'bg-white', bgLight: 'bg-orange-100', border: 'border-orange-500', text: 'text-gray-800', textDark: 'text-orange-800', accent: 'text-orange-600' },
+      'meeting': { bg: 'bg-white', bgLight: 'bg-pink-100', border: 'border-pink-500', text: 'text-gray-800', textDark: 'text-pink-800', accent: 'text-pink-600' },
+    };
+    
+    return categoryColors[event.category] || categoryColors['personal'];
+  };
+  
+  const colors = getEventColors();
+  
+  const getCategoryLabel = (category) => {
+    const labels = {
+      'study': 'Учеба',
+      'personal': 'Личное',
+      'sport': 'Спорт',
+      'work': 'Работа',
+      'meeting': 'Встреча',
+    };
+    return labels[category] || category;
+  };
+
+  // Вычисляем ширину и позицию при наложении событий
+  const overlapStyle = isOverlapping ? {
+    width: `calc((100% - 8px) / ${totalOverlaps})`,
+    left: `calc(${overlapIndex} * (100% - 8px) / ${totalOverlaps})`,
+    zIndex: overlapIndex + 1, // Каждая следующая карточка выше предыдущей
+  } : {};
+
+  // Комбинированный стиль
+  const combinedStyle = {
+    ...style,
+    ...overlapStyle,
+    // При перетаскивании поднимаем карточку выше всех
+    ...(isDragging ? {
+      transform: `translateY(${dragOffset}px)`,
+      zIndex: 100,
+      boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+      transition: 'box-shadow 0.2s',
+    } : {})
+  };
+
+  return (
+    <>
+      {/* Карточка события на timeline */}
+      <div
+        ref={cardRef}
+        style={combinedStyle}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={!isDragging ? handlePointerCancel : undefined}
+        onPointerCancel={handlePointerCancel}
+        onClick={(e) => {
+          // Не открываем модалку если было перетаскивание
+          if (isDragging || wasDragging.current) return;
+          e.stopPropagation();
+          hapticFeedback && hapticFeedback('selection');
+          setIsExpanded(true);
+        }}
+        className={`
+          absolute rounded-lg cursor-pointer overflow-hidden select-none touch-none
+          border-l-4 ${colors.border} ${colors.bg}
+          shadow-md hover:shadow-lg transition-shadow
+          ${isDragging ? 'ring-2 ring-purple-400 scale-[1.02]' : ''}
+          ${(isCompleted || isSkipped) ? 'opacity-50' : ''}
+          ${isOverlapping ? '' : 'left-0 right-2'}
+          ${!isScheduleEvent ? 'cursor-grab active:cursor-grabbing' : ''}
+        `}
+      >
+        <div className="p-2 h-full flex flex-col">
+          {/* Название события */}
+          <h4 className={`text-xs font-semibold ${colors.text} leading-tight line-clamp-2 flex items-start gap-1`}>
+            {isCompleted && (
+              <Check className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
+            )}
+            {isSkipped && (
+              <X className="w-3 h-3 text-red-500 flex-shrink-0 mt-0.5" />
+            )}
+            <span className={isSkipped ? 'line-through' : ''}>{event.text}</span>
+          </h4>
+          
+          {/* Время (если высота позволяет) */}
+          {style.height >= 40 && (
+            <div className={`text-[10px] ${colors.accent} mt-auto`}>
+              {event.time_start} - {event.time_end}
+            </div>
+          )}
+        </div>
+        
+        {/* Индикатор раскрытия */}
+        <div className={`absolute bottom-1 right-1 ${colors.accent} opacity-60`}>
+          <Info className="w-3 h-3" />
+        </div>
+      </div>
+
+      {/* Модальное окно с подробной информацией - рендерится через Portal */}
+      {isExpanded && createPortal(
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4"
+            onClick={() => setIsExpanded(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`
+                w-full max-w-sm bg-white rounded-2xl overflow-hidden shadow-2xl
+              `}
+            >
+              {/* Заголовок */}
+              <div className={`${colors.bg} p-4`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2">
+                      {isCompleted && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 bg-green-500 rounded-full flex-shrink-0 mt-0.5">
+                          <Check className="w-3 h-3 text-white" />
+                        </span>
+                      )}
+                      {isSkipped && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 bg-red-500 rounded-full flex-shrink-0 mt-0.5">
+                          <X className="w-3 h-3 text-white" />
+                        </span>
+                      )}
+                      <h3 className={`text-lg font-bold ${colors.text} leading-tight break-words ${isSkipped ? 'line-through opacity-70' : ''}`}>
+                        {event.text}
+                      </h3>
+                    </div>
+                    <div className={`flex items-center gap-2 mt-2 ${colors.text} opacity-90`}>
+                      <Clock className="w-4 h-4 flex-shrink-0" />
+                      <span className="text-sm font-medium">
+                        {event.time_start} — {event.time_end}
+                      </span>
+                      {isCompleted && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-400/30 text-white font-medium ml-1">
+                          ✓ Выполнено
+                        </span>
+                      )}
+                      {isSkipped && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-400/30 text-white font-medium ml-1">
+                          ✗ Пропущено
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsExpanded(false)}
+                    className={`p-1 rounded-full ${colors.text} opacity-80 hover:opacity-100 hover:bg-white/20 flex-shrink-0`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                {/* Бейджи */}
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {isScheduleEvent && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
+                      📚 Пара
+                    </span>
+                  )}
+                  {event.category && isUserEvent && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
+                      {getCategoryLabel(event.category)}
+                    </span>
+                  )}
+                  {event.lessonType && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/20 text-white font-medium">
+                      {event.lessonType}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Детали */}
+              <div className="p-4 space-y-3">
+                {event.teacher && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <User className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 font-medium">Преподаватель</div>
+                      <div className="text-sm text-gray-800 font-medium">{event.teacher}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {event.auditory && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <MapPin className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 font-medium">Аудитория</div>
+                      <div className="text-sm text-gray-800 font-medium">{event.auditory}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {event.subject && isUserEvent && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <BookOpen className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 font-medium">Предмет</div>
+                      <div className="text-sm text-gray-800 font-medium">{event.subject}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {event.notes && (
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${colors.bgLight}`}>
+                      <Info className={`w-4 h-4 ${colors.textDark}`} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500 font-medium">Заметки</div>
+                      <div className="text-sm text-gray-700">{event.notes}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Если нет дополнительной информации */}
+                {!event.teacher && !event.auditory && !event.subject && !event.notes && (
+                  <div className="text-center py-4 text-gray-400 text-sm">
+                    Нет дополнительной информации
+                  </div>
+                )}
+              </div>
+              
+              {/* Кнопки действий */}
+              <div className="p-4 pt-0 flex gap-2">
+                {/* Кнопка редактирования */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'light');
+                    setIsExpanded(false);
+                    onEdit && onEdit(event);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl font-medium text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  {isUserEvent ? 'Редактировать' : 'Подробнее'}
+                </button>
+
+                {/* Кнопка завершения (только для пользовательских и не пропущенных) */}
+                {isUserEvent && !isSkipped && (
+                  <button
+                    onClick={() => {
+                      hapticFeedback && hapticFeedback('impact', 'light');
+                      onToggleComplete && onToggleComplete(event.id);
+                      setIsExpanded(false);
+                    }}
+                    className={`
+                      py-3 px-4 rounded-xl font-medium text-sm
+                      transition-all active:scale-95 flex items-center justify-center gap-2
+                      ${isCompleted 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }
+                    `}
+                    title={isCompleted ? 'Снять отметку выполнения' : 'Отметить выполненным'}
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Кнопка пропуска/снятия пропуска (только для пользовательских и не выполненных) */}
+                {isUserEvent && !isCompleted && (
+                  <button
+                    onClick={() => {
+                      hapticFeedback && hapticFeedback('impact', 'medium');
+                      onMarkSkipped && onMarkSkipped(event.id);
+                      setIsExpanded(false);
+                    }}
+                    className={`
+                      py-3 px-4 rounded-xl font-medium text-sm
+                      transition-all active:scale-95 flex items-center justify-center gap-2
+                      ${isSkipped 
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }
+                    `}
+                    title={isSkipped ? 'Снять статус пропущенного' : 'Отметить как пропущенное'}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Кнопка удаления */}
+                <button
+                  onClick={() => {
+                    hapticFeedback && hapticFeedback('impact', 'medium');
+                    onDelete && onDelete(event.id);
+                    setIsExpanded(false);
+                  }}
+                  className="py-3 px-4 rounded-xl font-medium text-sm bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
+  );
+};
+
+// ============================================================
+// Прогресс-бар дня (стекломорфизм)
+// ============================================================
+const DayProgressBar = ({ events }) => {
+  const total = events.length;
+  const completed = events.filter(e => e.completed).length;
+  const skipped = events.filter(e => e.skipped && !e.completed).length;
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const skippedPercent = total > 0 ? Math.round((skipped / total) * 100) : 0;
+  
+  const allDone = total > 0 && completed === total;
+  const prevAllDoneRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  
+  useEffect(() => {
+    // Пропускаем первый рендер (загрузка) — конфетти только при действии пользователя
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      prevAllDoneRef.current = allDone;
+      return;
+    }
+    // Конфетти при переходе: не все → все выполнены
+    if (allDone && !prevAllDoneRef.current) {
+      confettiExplosion();
+    }
+    prevAllDoneRef.current = allDone;
+  }, [allDone]);
+  
+  if (total === 0) return null;
+  
+  return (
+    <div className="px-4 py-2.5 border-b border-gray-200/60">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          Прогресс дня
+        </span>
+        <div className="flex items-center gap-1.5">
+          {skipped > 0 && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-red-100 text-red-600">
+              {skipped} пропущ.
+            </span>
+          )}
+          <span className={`text-xs font-bold tabular-nums ${allDone ? 'text-emerald-600' : 'text-gray-700'}`}>
+            {completed}/{total}
+          </span>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md
+            ${allDone 
+              ? 'bg-emerald-100 text-emerald-700' 
+              : percent > 50 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'bg-gray-100 text-gray-600'
+            }`}>
+            {percent}%
+          </span>
+        </div>
+      </div>
+      {/* Glass progress bar */}
+      <div className="relative h-2 rounded-full overflow-hidden"
+           style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.06) 100%)' }}>
+        <div className="absolute inset-0 rounded-full border border-black/[0.04]" />
+        {/* Combined bar: completed + skipped side by side */}
+        <div className="absolute inset-0 flex">
+          <motion.div
+            className="h-full relative overflow-hidden"
+            style={{
+              borderRadius: skippedPercent > 0 ? '9999px 4px 4px 9999px' : '9999px',
+              background: allDone
+                ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
+                : 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+            }}
+            initial={{ width: 0 }}
+            animate={{ width: `${percent}%` }}
+            transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.2 }}
+          >
+            <div className="absolute inset-0 opacity-40"
+                 style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
+          </motion.div>
+          {skippedPercent > 0 && (
+            <motion.div
+              className="h-full relative overflow-hidden"
+              style={{
+                borderRadius: percent > 0 ? '4px 9999px 9999px 4px' : '9999px',
+                background: 'linear-gradient(90deg, #ef4444 0%, #f87171 100%)',
+              }}
+              initial={{ width: 0 }}
+              animate={{ width: `${skippedPercent}%` }}
+              transition={{ type: 'spring', damping: 20, stiffness: 100, delay: 0.35 }}
+            >
+              <div className="absolute inset-0 opacity-40"
+                   style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// Long-press ghost preview + haptic
+// ============================================================
+const LongPressSlot = ({ hour, onQuickCreate, hapticFeedback, events }) => {
+  const timerRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const [ghostTime, setGhostTime] = useState(null);
+  const [pressing, setPressing] = useState(false);
+  const LONG_PRESS_MS = 400;
+
+  // Check if this hour is occupied by an event
+  const isOccupied = useMemo(() => {
+    const slotStart = hour * 60;
+    const slotEnd = slotStart + 60;
+    return events.some(e => {
+      const eStart = parseTime(e.time_start);
+      const eEnd = parseTime(e.time_end) || eStart + 60;
+      return eStart < slotEnd && eEnd > slotStart;
+    });
+  }, [hour, events]);
+
+  const calcTime = (clientY, rect) => {
+    const y = clientY - rect.top;
+    const minutesOffset = Math.floor((y / HOUR_HEIGHT) * 60);
+    const total = hour * 60 + minutesOffset;
+    const rounded = Math.round(total / 15) * 15;
+    return { start: rounded, end: rounded + 60 };
+  };
+
+  const startPress = (clientY, rect) => {
+    if (!onQuickCreate || isOccupied) return;
+    const time = calcTime(clientY, rect);
+    touchStartRef.current = { clientY };
+    setGhostTime(time);
+    setPressing(true);
+    timerRef.current = setTimeout(() => {
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      onQuickCreate(formatMinutesToTime(time.start), formatMinutesToTime(time.end));
+      setGhostTime(null);
+      setPressing(false);
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelPress = () => {
+    clearTimeout(timerRef.current);
+    setGhostTime(null);
+    setPressing(false);
+    touchStartRef.current = null;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return;
+    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.clientY);
+    if (dy > 10) cancelPress(); // Cancel if scrolling
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div
+      className="absolute left-0 right-0 flex group"
+      style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+      onTouchStart={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        startPress(e.touches[0].clientY, rect);
+      }}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
+      onTouchMove={handleTouchMove}
+      onMouseDown={(e) => {
+        if (e.button !== 0) return;
+        startPress(e.clientY, e.currentTarget.getBoundingClientRect());
+      }}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+    >
+      {/* Time label */}
+      <div className="w-14 flex-shrink-0 pl-2 pr-2 -translate-y-[25%]">
+        <span className="text-xs text-gray-400 font-medium">{formatHour(hour)}</span>
+      </div>
+      {/* Slot area */}
+      <div className={`flex-1 border-t border-gray-200/70 relative
+        ${onQuickCreate && !isOccupied ? 'cursor-pointer' : ''}
+        ${pressing ? 'bg-indigo-50/60' : onQuickCreate && !isOccupied ? 'hover:bg-blue-50/40' : ''}
+        transition-colors duration-150`}
+      >
+        {/* Ghost preview during long-press */}
+        <AnimatePresence>
+          {ghostTime && pressing && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0.8 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-x-1 rounded-lg border-2 border-dashed border-indigo-400/50 bg-indigo-100/40 flex items-center justify-center gap-1.5 pointer-events-none"
+              style={{
+                top: `${((ghostTime.start % 60) / 60) * 100}%`,
+                height: `${HOUR_HEIGHT}px`,
+              }}
+            >
+              <Plus className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-[11px] font-medium text-indigo-600">
+                {formatMinutesToTime(ghostTime.start)} — {formatMinutesToTime(ghostTime.end)}
+              </span>
+              {/* Pulsing ring */}
+              <motion.div
+                className="absolute inset-0 rounded-lg border-2 border-indigo-400/30"
+                animate={{ scale: [1, 1.02, 1], opacity: [0.5, 0.2, 0.5] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// Long-press slot for fullscreen (wider labels)
+const LongPressSlotFullscreen = ({ hour, onQuickCreate, hapticFeedback, events }) => {
+  const timerRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const [ghostTime, setGhostTime] = useState(null);
+  const [pressing, setPressing] = useState(false);
+  const LONG_PRESS_MS = 400;
+
+  const isOccupied = useMemo(() => {
+    const slotStart = hour * 60;
+    const slotEnd = slotStart + 60;
+    return events.some(e => {
+      const eStart = parseTime(e.time_start);
+      const eEnd = parseTime(e.time_end) || eStart + 60;
+      return eStart < slotEnd && eEnd > slotStart;
+    });
+  }, [hour, events]);
+
+  const calcTime = (clientY, rect) => {
+    const y = clientY - rect.top;
+    const minutesOffset = Math.floor((y / HOUR_HEIGHT) * 60);
+    const total = hour * 60 + minutesOffset;
+    const rounded = Math.round(total / 15) * 15;
+    return { start: rounded, end: rounded + 60 };
+  };
+
+  const startPress = (clientY, rect) => {
+    if (!onQuickCreate || isOccupied) return;
+    const time = calcTime(clientY, rect);
+    touchStartRef.current = { clientY };
+    setGhostTime(time);
+    setPressing(true);
+    timerRef.current = setTimeout(() => {
+      hapticFeedback && hapticFeedback('impact', 'medium');
+      onQuickCreate(formatMinutesToTime(time.start), formatMinutesToTime(time.end));
+      setGhostTime(null);
+      setPressing(false);
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelPress = () => {
+    clearTimeout(timerRef.current);
+    setGhostTime(null);
+    setPressing(false);
+    touchStartRef.current = null;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return;
+    const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.clientY);
+    if (dy > 10) cancelPress();
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div
+      className="absolute left-0 right-0 flex group"
+      style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+      onTouchStart={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        startPress(e.touches[0].clientY, rect);
+      }}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
+      onTouchMove={handleTouchMove}
+      onMouseDown={(e) => {
+        if (e.button !== 0) return;
+        startPress(e.clientY, e.currentTarget.getBoundingClientRect());
+      }}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+    >
+      <div className="w-16 flex-shrink-0 pl-3 pr-3 -translate-y-[25%]">
+        <span className="text-sm text-gray-400 font-medium">{formatHour(hour)}</span>
+      </div>
+      <div className={`flex-1 border-t border-gray-200/70 relative
+        ${onQuickCreate && !isOccupied ? 'cursor-pointer' : ''}
+        ${pressing ? 'bg-indigo-50/60' : onQuickCreate && !isOccupied ? 'hover:bg-blue-50/40' : ''}
+        transition-colors duration-150`}
+      >
+        <AnimatePresence>
+          {ghostTime && pressing && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0.8 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-x-1 rounded-lg border-2 border-dashed border-indigo-400/50 bg-indigo-100/40 flex items-center justify-center gap-1.5 pointer-events-none"
+              style={{
+                top: `${((ghostTime.start % 60) / 60) * 100}%`,
+                height: `${HOUR_HEIGHT}px`,
+              }}
+            >
+              <Plus className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-[11px] font-medium text-indigo-600">
+                {formatMinutesToTime(ghostTime.start)} — {formatMinutesToTime(ghostTime.end)}
+              </span>
+              <motion.div
+                className="absolute inset-0 rounded-lg border-2 border-indigo-400/30"
+                animate={{ scale: [1, 1.02, 1], opacity: [0.5, 0.2, 0.5] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+export const PlannerTimeline = React.forwardRef(({ 
+  events = [], 
+  onToggleComplete, 
+  onDelete,
+  onEdit,
+  onQuickCreate,
+  onMarkSkipped,
+  onTimeChange,
+  onExpand,
+  hapticFeedback,
+  currentDate 
+}, ref) => {
+  const timelineRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Expose scrollToTime method to parent
+  React.useImperativeHandle(ref, () => ({
+    scrollToTime: (timeStr) => {
+      if (!timelineRef.current || !timeStr) return;
+      const minutes = parseTime(timeStr);
+      const scrollTarget = Math.max(0, (minutes / 60 - 1)) * HOUR_HEIGHT;
+      timelineRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    }
+  }));
+  
+  // Обновление текущего времени каждую минуту
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Автопрокрутка к текущему времени или первому событию
+  useEffect(() => {
+    if (timelineRef.current) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      
+      // Если есть события, прокрутка к первому событию
+      if (events.length > 0) {
+        const firstEventTime = Math.min(...events.map(e => parseTime(e.time_start)));
+        const scrollTarget = Math.max(0, (firstEventTime / 60 - 1)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      } else {
+        // Иначе прокрутка к текущему времени
+        const scrollTarget = Math.max(0, (currentMinutes / 60 - 2)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      }
+    }
+  }, [events]);
+  
+  // Вычисление позиции текущего времени
+  const currentTimePosition = useMemo(() => {
+    const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    return (minutes / 60) * HOUR_HEIGHT;
+  }, [currentTime]);
+  
+  // Проверка, является ли сегодняшний день выбранным
+  const isToday = useMemo(() => {
+    if (!currentDate) return false;
+    // FIX: Используем локальную дату вместо UTC (toISOString даёт UTC)
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return currentDate === today;
+  }, [currentDate]);
+  
+  // Обработка наложения событий (FIX: Union-Find алгоритм для корректных групп)
+  const processedEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => parseTime(a.time_start) - parseTime(b.time_start));
+    
+    // Подготавливаем данные с минутами
+    const items = sorted.map((event, idx) => ({
+      ...event,
+      startMinutes: parseTime(event.time_start),
+      endMinutes: parseTime(event.time_end) || parseTime(event.time_start) + 60,
+      idx,
+    }));
+    
+    // Union-Find для корректного объединения пересекающихся групп
+    const parent = items.map((_, i) => i);
+    const find = (x) => {
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    };
+    const union = (a, b) => { parent[find(a)] = find(b); };
+    
+    // Находим ВСЕ пересечения и объединяем группы
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (items[j].startMinutes >= items[i].endMinutes) break; // sorted — дальше нет пересечений
+        // items[j].startMinutes < items[i].endMinutes → пересекаются
+        union(i, j);
+      }
+    }
+    
+    // Группируем и назначаем индексы
+    const groups = {};
+    items.forEach((item, i) => {
+      const root = find(i);
+      if (!groups[root]) groups[root] = [];
+      groups[root].push(i);
+    });
+    
+    return items.map((item, i) => {
+      const root = find(i);
+      const group = groups[root];
+      return {
+        ...item,
+        overlapGroup: root,
+        overlapIndex: group.indexOf(i),
+        totalOverlaps: group.length,
+        isOverlapping: group.length > 1,
+      };
+    });
+  }, [events]);
+
+  // Найти просроченные невыполненные события (только пользовательские)
+  const overdueEvents = useMemo(() => {
+    if (!isToday) return [];
+    
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    return events.filter(event => {
+      // Только пользовательские события (не из расписания)
+      if (event.origin === 'schedule') return false;
+      // Только невыполненные и не пропущенные
+      if (event.completed || event.skipped) return false;
+      // Время окончания прошло
+      const endMinutes = parseTime(event.time_end);
+      return endMinutes < currentMinutes;
+    });
+  }, [events, isToday]);
+
+  // Текущее просроченное событие для показа (первое в списке)
+  const [currentOverdueIndex, setCurrentOverdueIndex] = useState(0);
+  
+  // Сбрасываем индекс при изменении списка просроченных (безопасный способ)
+  const overdueEventsLength = overdueEvents.length;
+  const safeOverdueIndex = currentOverdueIndex >= overdueEventsLength ? 0 : currentOverdueIndex;
+  const currentOverdueEvent = overdueEvents[safeOverdueIndex] || null;
+
+  // Обработчик ответа на просроченное событие
+  const handleOverdueResponse = async (completed) => {
+    if (!currentOverdueEvent) return;
+    
+    hapticFeedback && hapticFeedback('impact', 'light');
+    
+    if (completed) {
+      // Отмечаем как выполненное
+      onToggleComplete && onToggleComplete(currentOverdueEvent.id);
+    } else {
+      // Отмечаем как пропущенное
+      onMarkSkipped && onMarkSkipped(currentOverdueEvent.id);
+    }
+    
+    // FIX: Переключаем на следующее просроченное событие
+    setCurrentOverdueIndex(prev => {
+      const nextIndex = prev + 1;
+      // Если индекс выходит за пределы — сбрасываем (все обработаны)
+      return nextIndex >= overdueEventsLength ? 0 : nextIndex;
+    });
+  };
+
+  return (
+    <div className="relative bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+      {/* Плашка с просроченным событием */}
+      <AnimatePresence>
+        {currentOverdueEvent && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200"
+          >
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-amber-600 font-medium mb-0.5 flex items-center gap-1">
+                    <AlarmClock className="w-3.5 h-3.5" />
+                    Событие прошло — выполнено?
+                  </p>
+                  <p className="text-sm text-gray-800 font-medium truncate">
+                    {currentOverdueEvent.text}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {currentOverdueEvent.time_start} – {currentOverdueEvent.time_end}
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleOverdueResponse(true)}
+                    className="px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 active:scale-95 transition-all shadow-sm"
+                  >
+                    Да
+                  </button>
+                  <button
+                    onClick={() => handleOverdueResponse(false)}
+                    className="px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 active:scale-95 transition-all shadow-sm"
+                  >
+                    Нет
+                  </button>
+                </div>
+              </div>
+              {overdueEvents.length > 1 && (
+                <p className="text-xs text-amber-500 mt-1">
+                  +{overdueEvents.length - 1} ещё
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Заголовок с датой */}
+      <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-100 to-gray-50 border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Расписание дня</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {events.length > 0 && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                {events.length} {events.length === 1 ? 'событие' : events.length < 5 ? 'события' : 'событий'}
+              </span>
+            )}
+            {onExpand && (
+              <button
+                onClick={() => {
+                  hapticFeedback && hapticFeedback('impact', 'light');
+                  onExpand();
+                }}
+                className="p-1.5 bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow hover:from-gray-300 hover:to-gray-400"
+                title="Развернуть"
+              >
+                <Expand className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Прогресс-бар дня */}
+      <DayProgressBar events={events} />
+      
+      {/* Timeline контейнер */}
+      <div 
+        ref={timelineRef}
+        className="relative overflow-y-auto scrollbar-hide bg-gray-50/50 overscroll-contain"
+        style={{ height: '400px', WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="relative pt-2" style={{ height: `${24 * HOUR_HEIGHT + 8}px` }}>
+          {/* Часовые линии — long-press для быстрого создания */}
+          {HOURS.map((hour) => (
+            <LongPressSlot
+              key={hour}
+              hour={hour}
+              onQuickCreate={onQuickCreate}
+              hapticFeedback={hapticFeedback}
+              events={events}
+            />
+          ))}
+          
+          {/* Индикатор текущего времени (только для сегодня и если есть события) */}
+          {isToday && events.length > 0 && (
+            <div
+              className="absolute left-14 right-0 z-20 flex items-center"
+              style={{ top: `${currentTimePosition}px` }}
+            >
+              <div className="w-2.5 h-2.5 bg-red-500 rounded-full -ml-1.5 shadow-md" />
+              <div className="flex-1 h-0.5 bg-red-500 shadow-sm" />
+            </div>
+          )}
+          
+          {/* События */}
+          <div className="absolute left-14 right-0 top-0 bottom-0">
+            <AnimatePresence>
+              {processedEvents.map((event) => {
+                const top = (event.startMinutes / 60) * HOUR_HEIGHT;
+                const height = Math.max(
+                  ((event.endMinutes - event.startMinutes) / 60) * HOUR_HEIGHT,
+                  30 // Минимальная высота
+                );
+                
+                return (
+                  <TimelineEventCard
+                    key={event.id}
+                    event={event}
+                    style={{ top: `${top}px`, height: `${height}px` }}
+                    onToggleComplete={onToggleComplete}
+                    onDelete={onDelete}
+                    onEdit={onEdit}
+                    onMarkSkipped={onMarkSkipped}
+                    onTimeChange={onTimeChange}
+                    hapticFeedback={hapticFeedback}
+                    isOverlapping={event.isOverlapping}
+                    overlapIndex={event.overlapIndex}
+                    totalOverlaps={event.totalOverlaps}
+                    hourHeight={HOUR_HEIGHT}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+      
+      {/* Пустое состояние */}
+      {events.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-5">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Clock className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-gray-500 text-sm font-medium">
+              Нет событий на этот день
+            </p>
+            <p className="text-gray-400 text-xs mt-1">
+              Удерживайте палец на времени для создания
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+// Полноэкранная версия Timeline планировщика
+export const FullscreenPlannerTimeline = React.forwardRef(({ 
+  events = [], 
+  onToggleComplete, 
+  onDelete,
+  onEdit,
+  onQuickCreate,
+  onMarkSkipped,
+  onTimeChange,
+  hapticFeedback,
+  currentDate 
+}, ref) => {
+  const timelineRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Expose scrollToTime method to parent
+  React.useImperativeHandle(ref, () => ({
+    scrollToTime: (timeStr) => {
+      if (!timelineRef.current || !timeStr) return;
+      const minutes = parseTime(timeStr);
+      const scrollTarget = Math.max(0, (minutes / 60 - 1)) * HOUR_HEIGHT;
+      timelineRef.current.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+    }
+  }));
+  
+  // Обновление текущего времени каждую минуту
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Автопрокрутка к текущему времени или первому событию
+  useEffect(() => {
+    if (timelineRef.current) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      
+      if (events.length > 0) {
+        const firstEventTime = Math.min(...events.map(e => parseTime(e.time_start)));
+        const scrollTarget = Math.max(0, (firstEventTime / 60 - 1)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      } else {
+        const scrollTarget = Math.max(0, (currentMinutes / 60 - 2)) * HOUR_HEIGHT;
+        timelineRef.current.scrollTop = scrollTarget;
+      }
+    }
+  }, [events]);
+  
+  // Вычисление позиции текущего времени
+  const currentTimePosition = useMemo(() => {
+    const minutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    return (minutes / 60) * HOUR_HEIGHT;
+  }, [currentTime]);
+  
+  // Проверка, является ли сегодняшний день выбранным
+  const isToday = useMemo(() => {
+    if (!currentDate) return false;
+    // FIX: Используем локальную дату вместо UTC (toISOString даёт UTC)
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return currentDate === today;
+  }, [currentDate]);
+  
+  // Обработка наложения событий (FIX: Union-Find алгоритм для корректных групп)
+  const processedEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => parseTime(a.time_start) - parseTime(b.time_start));
+    
+    const items = sorted.map((event, idx) => ({
+      ...event,
+      startMinutes: parseTime(event.time_start),
+      endMinutes: parseTime(event.time_end) || parseTime(event.time_start) + 60,
+      idx,
+    }));
+    
+    const parent = items.map((_, i) => i);
+    const find = (x) => {
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    };
+    const union = (a, b) => { parent[find(a)] = find(b); };
+    
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (items[j].startMinutes >= items[i].endMinutes) break;
+        union(i, j);
+      }
+    }
+    
+    const groups = {};
+    items.forEach((item, i) => {
+      const root = find(i);
+      if (!groups[root]) groups[root] = [];
+      groups[root].push(i);
+    });
+    
+    return items.map((item, i) => {
+      const root = find(i);
+      const group = groups[root];
+      return {
+        ...item,
+        overlapGroup: root,
+        overlapIndex: group.indexOf(i),
+        totalOverlaps: group.length,
+        isOverlapping: group.length > 1,
+      };
+    });
+  }, [events]);
+
+  return (
+    <div className="relative h-full flex flex-col">
+      {/* Прогресс-бар дня (fullscreen) */}
+      <DayProgressBar events={events} />
+      
+      <div 
+        ref={timelineRef}
+        className="relative overflow-y-auto flex-1 overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+      <div className="relative pt-2" style={{ height: `${24 * HOUR_HEIGHT + 8}px` }}>
+        {/* Часовые линии — long-press для быстрого создания */}
+        {HOURS.map((hour) => (
+          <LongPressSlotFullscreen
+            key={hour}
+            hour={hour}
+            onQuickCreate={onQuickCreate}
+            hapticFeedback={hapticFeedback}
+            events={events}
+          />
+        ))}
+        
+        {/* Индикатор текущего времени */}
+        {isToday && events.length > 0 && (
+          <div
+            className="absolute left-16 right-0 z-20 flex items-center"
+            style={{ top: `${currentTimePosition}px` }}
+          >
+            <div className="w-3 h-3 bg-red-500 rounded-full -ml-1.5 shadow-md" />
+            <div className="flex-1 h-0.5 bg-red-500 shadow-sm" />
+          </div>
+        )}
+        
+        {/* События */}
+        <div className="absolute left-16 right-0 top-0 bottom-0 pr-4">
+          <AnimatePresence>
+            {processedEvents.map((event) => {
+              const top = (event.startMinutes / 60) * HOUR_HEIGHT;
+              const height = Math.max(
+                ((event.endMinutes - event.startMinutes) / 60) * HOUR_HEIGHT,
+                40
+              );
+              
+              return (
+                <TimelineEventCard
+                  key={event.id}
+                  event={event}
+                  style={{ top: `${top}px`, height: `${height}px` }}
+                  onToggleComplete={onToggleComplete}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  onMarkSkipped={onMarkSkipped}
+                  onTimeChange={onTimeChange}
+                  hapticFeedback={hapticFeedback}
+                  isOverlapping={event.isOverlapping}
+                  overlapIndex={event.overlapIndex}
+                  totalOverlaps={event.totalOverlaps}
+                  hourHeight={HOUR_HEIGHT}
+                />
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+      
+      {/* Пустое состояние - фиксированное по центру экрана */}
+      {events.length === 0 && (
+        <div className="fixed inset-0 flex items-center justify-center bg-white/80 pointer-events-none z-10" style={{ top: '64px' }}>
+          <div className="text-center py-8 pointer-events-auto">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-10 h-10 text-gray-400" />
+            </div>
+            <p className="text-gray-500 font-medium">
+              Нет событий на этот день
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              Удерживайте палец на времени для создания
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+    </div>
+  );
+});
+
+export default PlannerTimeline;

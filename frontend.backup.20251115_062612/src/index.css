@@ -1,0 +1,373 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* GG Zaglav Font - Local */
+@font-face {
+  font-family: 'GG Zaglav';
+  src: url('./fonts/GGZaglav-Regular.woff2') format('woff2'),
+       url('./fonts/GGZaglav-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GG Zaglav';
+  src: url('./fonts/GGZaglav-Regular.woff2') format('woff2'),
+       url('./fonts/GGZaglav-Regular.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Color System - HSL Format */
+    --background: 210 11% 11%;  /* #1C1C1E - Deep dark gray */
+    --foreground: 0 0% 91%;     /* #E7E7E7 - Light gray */
+    
+    --card: 210 8% 16%;         /* #27272A - Card background */
+    --card-foreground: 0 0% 100%; /* #FFFFFF - White */
+    
+    --primary: 0 0% 100%;       /* #FFFFFF - White */
+    --primary-foreground: 0 0% 0%; /* #000000 - Black */
+    
+    --secondary: 0 0% 60%;      /* #999999 - Medium gray */
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 0 0% 20%;          /* Muted backgrounds */
+    --muted-foreground: 0 0% 60%; /* #999999 */
+    
+    --accent: 210 8% 20%;       /* Accent color */
+    --accent-foreground: 0 0% 91%;
+    
+    --border: 210 8% 25%;       /* Border color */
+    --input: 210 8% 25%;
+    --ring: 210 8% 30%;
+    
+    /* Gradient System */
+    --gradient-live: linear-gradient(135deg, #A3F7BF 0%, #FFE66D 25%, #FFB4D1 50%, #C4A3FF 75%, #80E8FF 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--card)), hsl(var(--background)));
+    
+    /* Shadows */
+    --shadow-card: 0 4px 20px -4px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 30px rgba(163, 247, 191, 0.2);
+    
+    /* Animations */
+    --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    
+    /* ⭐️ Telegram WebApp Full Screen Heights */
+    /* Эти переменные будут установлены из JavaScript (TelegramContext.js) */
+    --tg-viewport-height: 100vh;  /* Фактическая высота viewport в Telegram */
+    --tg-viewport-stable-height: 100vh;  /* Стабильная высота (не меняется при клавиатуре) */
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* ⭐️ ПОЛНОЭКРАННЫЙ РЕЖИМ для Telegram Web App */
+  height: 100%;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height (новый стандарт) */
+  height: var(--tg-viewport-height, 100vh); /* Приоритет Telegram viewport */
+  width: 100%;
+  width: 100vw;
+  overflow-x: hidden;
+  position: fixed; /* Фиксируем для предотвращения скролла на мобильных */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  
+  /* ⭐️ ПОЛНОЭКРАННЫЙ РЕЖИМ с учётом Telegram viewport */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height - учитывает mobile browser bars */
+  height: var(--tg-viewport-height, 100vh); /* ⭐️ Используем Telegram viewport */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: var(--tg-viewport-height, 100vh);
+  width: 100%;
+  width: 100vw;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-y: auto;
+  
+  /* ⭐️ НЕ используем safe area padding для чистого Full Screen */
+  /* Telegram Web App сам управляет safe area */
+  padding: 0;
+  
+  /* Отключаем bounce эффект на iOS */
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+  
+  /* Убираем возможность выделения текста (для app-like опыта) */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  
+  /* Отключаем tap highlight на мобильных */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+#root {
+  /* ⭐️ ПОЛНОЭКРАННЫЙ ROOT контейнер для Telegram Web App */
+  position: relative;
+  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--tg-viewport-height, 100vh); /* ⭐️ Используем Telegram viewport */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: var(--tg-viewport-height, 100vh);
+  width: 100%;
+  width: 100vw;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* ⭐️ Telegram Web App specific styles - FULLSCREEN MODE */
+.telegram-webapp {
+  position: relative;
+  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--tg-viewport-height, 100vh); /* ⭐️ Используем Telegram viewport */
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  min-height: var(--tg-viewport-height, 100vh);
+  width: 100%;
+  width: 100vw;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overflow-y: auto;
+  
+  /* Для Telegram WebApp */
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y pinch-zoom;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent));
+}
+
+/* Hide scrollbar for horizontal scroll */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: var(--gradient-live);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Gradient border */
+.gradient-border {
+  position: relative;
+  background: hsl(var(--card));
+  border-radius: 24px;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  padding: 2px;
+  background: var(--gradient-live);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.3;
+}
+
+/* Animation utilities */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-rotate {
+  animation: rotate 3s linear infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Easter Egg Gradient Animation */
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@layer base {
+  [data-debug-wrapper="true"] {
+    display: contents !important;
+  }
+
+  [data-debug-wrapper="true"] > * {
+    margin-left: inherit;
+    margin-right: inherit;
+    margin-top: inherit;
+    margin-bottom: inherit;
+    padding-left: inherit;
+    padding-right: inherit;
+    padding-top: inherit;
+    padding-bottom: inherit;
+    column-gap: inherit;
+    row-gap: inherit;
+    gap: inherit;
+    border-left-width: inherit;
+    border-right-width: inherit;
+    border-top-width: inherit;
+    border-bottom-width: inherit;
+    border-left-style: inherit;
+    border-right-style: inherit;
+    border-top-style: inherit;
+    border-bottom-style: inherit;
+    border-left-color: inherit;
+    border-right-color: inherit;
+    border-top-color: inherit;
+    border-bottom-color: inherit;
+  }
+}
+
+/* Safe Area Support for iOS devices with notch/Dynamic Island */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-inset-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+.h-safe-area-inset-bottom {
+  height: env(safe-area-inset-bottom);
+}
+
+/* Fullscreen Telegram WebApp utilities */
+.telegram-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Prevent iOS Safari bottom bar issues */
+@supports (-webkit-touch-callout: none) {
+  .telegram-webapp {
+    min-height: -webkit-fill-available;
+  }
+  
+  #root {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevent address bar from showing on scroll */
+@media screen and (max-width: 768px) {
+  html {
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Hide native iOS scrollbar indicators */
+@supports (-webkit-overflow-scrolling: touch) {
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}

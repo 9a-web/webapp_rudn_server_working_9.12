@@ -1,0 +1,712 @@
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Calendar, ChevronRight, ChevronDown, RefreshCw, Users, ChevronLeft, Share2, Settings } from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
+import { getWeekNumberForDate } from '../utils/dateUtils';
+import { groupScheduleItems } from '../utils/scheduleUtils';
+import { useTranslation } from 'react-i18next';
+import { fadeInUp, listItemVariants, buttonVariants, staggerContainer } from '../utils/animations';
+import { translateDiscipline, translateLessonType } from '../i18n/subjects';
+import { ShareScheduleModal } from './ShareScheduleModal';
+import { SharedScheduleView } from './SharedScheduleView';
+import { achievementsAPI } from '../services/api';
+
+export const LiveScheduleSection = ({ 
+  selectedDate, 
+  mockSchedule, 
+  weekNumber = 1,
+  onWeekChange,
+  groupName,
+  onChangeGroup,
+  hapticFeedback,
+  onDateSelect,
+  onCalendarClick,
+  telegramId,
+  onShareModalStateChange,
+  user,
+  onAdminPanelOpen,
+  onFriendPickerChange,
+  onSharedScheduleShareModalChange,
+  scheduleMode = 'personal',       // управляется из App.jsx
+  onScheduleModeChange,             // сеттер из App.jsx
+}) => {
+  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [teacherPickerOpen, setTeacherPickerOpen] = useState(null); // index карточки, где открыт список преподов
+  
+  // Запоминаем выбор преподавателя для сгруппированных пар (discipline+time → subItem index)
+  const [selectedSubItemMap, setSelectedSubItemMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem('schedule_teacher_choices');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
+  const getSelectedSubIndex = useCallback((classItem) => {
+    if (!classItem.subItems || classItem.subItems.length <= 1) return 0;
+    const key = `${classItem.discipline?.trim()}-${classItem.time?.trim()}`;
+    const savedTeacher = selectedSubItemMap[key];
+    if (savedTeacher) {
+      const idx = classItem.subItems.findIndex(s => s.teacher === savedTeacher);
+      if (idx >= 0) return idx;
+    }
+    return 0;
+  }, [selectedSubItemMap]);
+
+  const selectSubItem = useCallback((classItem, subIndex, e) => {
+    if (e) e.stopPropagation();
+    const key = `${classItem.discipline?.trim()}-${classItem.time?.trim()}`;
+    const teacherName = classItem.subItems?.[subIndex]?.teacher || '';
+    setSelectedSubItemMap(prev => {
+      const next = { ...prev, [key]: teacherName };
+      try { localStorage.setItem('schedule_teacher_choices', JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (hapticFeedback) hapticFeedback('selection');
+  }, [hapticFeedback]);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [swipeDirection, setSwipeDirection] = useState(0);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [sharedShareTrigger, setSharedShareTrigger] = useState(0);
+  const { t, i18n } = useTranslation();
+  
+  // Debug: логируем user.id для проверки доступа к админ панели
+  useEffect(() => {
+    if (user) {
+      const isAdmin = String(user.id) === '765963392' || String(user.id) === '1311283832';
+      console.log('👤 Admin Panel Check:', { 
+        userId: user.id, 
+        userIdType: typeof user.id,
+        isAdmin 
+      });
+    }
+  }, [user]);
+  
+  // Motion values для swipe индикатора
+  const x = useMotionValue(0);
+  const opacity = useTransform(x, [-100, 0, 100], [0.5, 0, 0.5]);
+  const scale = useTransform(x, [-100, 0, 100], [1.2, 1, 1.2]);
+  
+  // Refs для swipe detection
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchEndY = useRef(0);
+  const swipeContainerRef = useRef(null);
+
+  // Update current time every 10 seconds for real-time status updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000); // Update every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Уведомляем родительский компонент о состоянии ShareScheduleModal
+  useEffect(() => {
+    if (onShareModalStateChange) {
+      onShareModalStateChange(isShareModalOpen);
+    }
+  }, [isShareModalOpen, onShareModalStateChange]);
+
+  // Определяем, к какой неделе относится выбранная дата
+  const selectedWeekNumber = getWeekNumberForDate(selectedDate);
+
+  // Format date for display
+  const dayNumber = selectedDate.getDate();
+  const dayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
+  
+  // Format date for the button (e.g., "2 марта")
+  const monthGenitive = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+  ][selectedDate.getMonth()];
+  const dateButton = `${dayNumber} ${monthGenitive}`;
+
+  // Function to determine class status
+  const getClassStatus = (classItem) => {
+    const now = new Date(); // Всегда используем актуальное время
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Проверяем, что выбранный день - сегодня
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Сбрасываем время для корректного сравнения дат
+    
+    const selectedDay = new Date(selectedDate);
+    selectedDay.setHours(0, 0, 0, 0);
+    
+    const isToday = selectedDay.getTime() === today.getTime();
+
+    const timeRange = classItem.time.split('-');
+    if (timeRange.length !== 2) return { status: t('classStatus.upcoming'), color: '#FF6B6B' };
+
+    const [startHour, startMin] = timeRange[0].trim().split(':').map(Number);
+    const [endHour, endMin] = timeRange[1].trim().split(':').map(Number);
+    const startTime = startHour * 60 + startMin;
+    const endTime = endHour * 60 + endMin;
+
+    // Если выбран прошлый день - все пары закончились
+    if (selectedDay < today) {
+      return { status: t('classStatus.finished'), color: '#76EF83' };
+    }
+
+    // Если выбран будущий день - все пары предстоят
+    if (selectedDay > today) {
+      return { status: t('classStatus.upcoming'), color: '#FF6B6B' };
+    }
+
+    // Если сегодня - проверяем по времени
+    if (isToday) {
+      if (currentMinutes >= endTime) {
+        // Пара закончилась
+        return { status: t('classStatus.finished'), color: '#76EF83' };
+      } else if (currentMinutes >= startTime && currentMinutes < endTime) {
+        // Пара идёт сейчас
+        return { status: t('classStatus.inProgress'), color: '#FFC83F' };
+      } else {
+        // Пара ещё не началась
+        return { status: t('classStatus.upcoming'), color: '#FF6B6B' };
+      }
+    }
+
+    // Fallback - не должен достигаться при корректной логике
+    return { status: t('classStatus.upcoming'), color: '#FF6B6B' };
+  };
+
+  const toggleExpand = async (index) => {
+    if (hapticFeedback) hapticFeedback('selection');
+    
+    const isExpanding = expandedIndex !== index;
+    setExpandedIndex(expandedIndex === index ? null : index);
+    if (!isExpanding) setTeacherPickerOpen(null); // закрываем picker при сворачивании
+    
+    // 🔍 ТРЕКИНГ ДЕТАЛЬНОГО ПРОСМОТРА
+    // Считаем только когда карточка разворачивается (не сворачивается)
+    if (isExpanding && telegramId) {
+      try {
+        const result = await achievementsAPI.trackAction(telegramId, 'detailed_view', {
+          schedule_index: index,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Если есть новые достижения, можно показать уведомление
+        // (обрабатывается в родительском компоненте через onNewAchievement)
+        if (result.new_achievements && result.new_achievements.length > 0) {
+          console.log('🎉 Новое достижение за детальный просмотр!', result.new_achievements[0]);
+        }
+      } catch (error) {
+        console.error('Ошибка трекинга детального просмотра:', error);
+      }
+    }
+  };
+  
+  // Навигация между днями
+  const navigateDay = useCallback((direction) => {
+    if (!onDateSelect) return;
+    
+    const newDate = new Date(selectedDate);
+    newDate.setDate(selectedDate.getDate() + direction);
+    
+    if (hapticFeedback) hapticFeedback('impact', 'medium');
+    onDateSelect(newDate);
+  }, [selectedDate, onDateSelect, hapticFeedback]);
+  
+  // Обработчики свайпов
+  const handleTouchStart = useCallback((e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    touchEndX.current = e.touches[0].clientX;
+  }, []);
+  
+  const handleTouchMove = useCallback((e) => {
+    touchEndX.current = e.touches[0].clientX;
+    touchEndY.current = e.touches[0].clientY;
+    
+    const deltaX = touchEndX.current - touchStartX.current;
+    const deltaY = Math.abs(touchEndY.current - touchStartY.current);
+    
+    // Обновляем motion value для визуальной обратной связи
+    // Только когда горизонтальное движение БОЛЬШЕ вертикального
+    if (Math.abs(deltaX) > deltaY && Math.abs(deltaX) > 10) {
+      // Блокируем вертикальный скролл только при явном горизонтальном свайпе
+      e.preventDefault();
+      x.set(deltaX);
+      
+      // Показываем индикатор направления
+      if (deltaX > 30) {
+        setSwipeDirection(1); // Right - previous day
+      } else if (deltaX < -30) {
+        setSwipeDirection(-1); // Left - next day
+      } else {
+        setSwipeDirection(0);
+      }
+    }
+    // При вертикальном движении НЕ вызываем preventDefault - позволяем скроллу работать
+  }, [x]);
+  
+  const handleTouchEnd = useCallback(() => {
+    const deltaX = touchEndX.current - touchStartX.current;
+    const deltaY = Math.abs(touchEndY.current - touchStartY.current);
+    const threshold = 80; // Минимальное расстояние для срабатывания
+    
+    // Проверяем, что горизонтальное движение больше вертикального
+    if (Math.abs(deltaX) > deltaY && Math.abs(deltaX) > threshold) {
+      if (deltaX > 0) {
+        // Свайп вправо - предыдущий день
+        navigateDay(-1);
+      } else {
+        // Свайп влево - следующий день
+        navigateDay(1);
+      }
+    }
+    
+    // Сброс
+    animate(x, 0, { duration: 0.3, ease: 'easeOut' });
+    setSwipeDirection(0);
+  }, [x, navigateDay]);
+  
+  // Подключаем обработчики
+  useEffect(() => {
+    const element = swipeContainerRef.current;
+    if (!element) return;
+    
+    element.addEventListener('touchstart', handleTouchStart, { passive: true });
+    element.addEventListener('touchmove', handleTouchMove, { passive: false });
+    element.addEventListener('touchend', handleTouchEnd, { passive: true });
+    
+    return () => {
+      element.removeEventListener('touchstart', handleTouchStart);
+      element.removeEventListener('touchmove', handleTouchMove);
+      element.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
+
+  // Фильтруем расписание по выбранному дню
+  const currentDayName = selectedDate.toLocaleDateString('ru-RU', { weekday: 'long' });
+  const formattedDayName = currentDayName.charAt(0).toUpperCase() + currentDayName.slice(1);
+  const rawTodaySchedule = mockSchedule.filter(item => item.day === formattedDayName);
+
+  // Группируем предметы с одинаковым названием и временем
+  const todaySchedule = useMemo(() => {
+    return groupScheduleItems(rawTodaySchedule);
+  }, [rawTodaySchedule]);
+
+  return (
+    <div className="bg-white rounded-t-[40px] mt-6 min-h-screen">
+      <div className="px-6 md:px-8 lg:px-10 xl:px-12 pt-8 md:pt-10 lg:pt-12 pb-6">
+        {/* Header section */}
+        <div className="flex items-start justify-between mb-4 md:mb-6">
+          <div>
+            <h2 
+              className="font-bold mb-1 text-2xl md:text-3xl lg:text-4xl"
+              style={{ 
+                color: '#1C1C1C',
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                lineHeight: '1.2'
+              }}
+            >
+              {t('liveScheduleSection.title')}
+            </h2>
+            {groupName && (
+              <p 
+                className="mt-1 text-sm md:text-base"
+                style={{ 
+                  color: '#666666',
+                  fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight: 500
+                }}
+              >
+                {t('liveScheduleSection.group', { groupName })}
+              </p>
+            )}
+          </div>
+          
+          {/* Date button - opens calendar */}
+          <div className="flex items-center gap-2">
+            {/* Shared schedule toggle button */}
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                onScheduleModeChange(scheduleMode === 'shared' ? 'personal' : 'shared');
+              }}
+              className={`p-2.5 md:p-3 rounded-full transition-all duration-300 active:scale-95 border ${
+                scheduleMode === 'shared'
+                  ? 'bg-indigo-500 border-indigo-400/30 shadow-lg shadow-indigo-500/20'
+                  : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+              }`}
+              title="Совместное расписание"
+            >
+              <Users className={`w-4 h-4 md:w-5 md:h-5 ${scheduleMode === 'shared' ? 'text-white' : 'text-gray-600'}`} />
+            </button>
+            
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                if (onCalendarClick) onCalendarClick();
+              }}
+              className="flex items-center gap-1.5 min-[425px]:gap-2 px-3 min-[425px]:px-4 md:px-5 py-2 min-[425px]:py-2.5 md:py-3 rounded-[30px] transition-all duration-300 hover:opacity-80 active:scale-95 border border-white/10 whitespace-nowrap"
+              style={{ 
+                backgroundColor: '#1c1c1c'
+              }}
+            >
+              <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white flex-shrink-0" />
+              <span 
+                className="text-xs min-[425px]:text-sm md:text-base font-medium text-white"
+                style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+              >
+                {dateButton}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Week selector */}
+        {onWeekChange && (
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                onWeekChange(1);
+              }}
+              disabled={selectedWeekNumber === null}
+              className={`flex-1 py-2 px-2.5 min-[425px]:px-4 rounded-xl text-xs min-[425px]:text-sm font-medium whitespace-nowrap transition-all ${
+                selectedWeekNumber === 1
+                  ? 'bg-black text-white' 
+                  : selectedWeekNumber === null
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t('liveScheduleSection.currentWeek')}
+            </button>
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                onWeekChange(2);
+              }}
+              disabled={selectedWeekNumber === null}
+              className={`flex-1 py-2 px-2.5 min-[425px]:px-4 rounded-xl text-xs min-[425px]:text-sm font-medium whitespace-nowrap transition-all ${
+                selectedWeekNumber === 2
+                  ? 'bg-black text-white' 
+                  : selectedWeekNumber === null
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t('liveScheduleSection.nextWeek')}
+            </button>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-2 mb-4">
+          {/* Change group button */}
+          {onChangeGroup && (
+            <button
+              onClick={() => {
+                if (hapticFeedback) hapticFeedback('impact', 'medium');
+                onChangeGroup();
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 min-[425px]:gap-2 py-2.5 px-2.5 min-[425px]:px-4 rounded-xl text-xs min-[425px]:text-sm font-medium whitespace-nowrap bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+            >
+              <Users className="w-4 h-4 flex-shrink-0" />
+              {t('liveScheduleSection.changeGroup')}
+            </button>
+          )}
+          
+          {/* Share button */}
+          <button
+            onClick={() => {
+              if (hapticFeedback) hapticFeedback('impact', 'medium');
+              if (scheduleMode === 'shared') {
+                setSharedShareTrigger(prev => prev + 1);
+              } else {
+                setIsShareModalOpen(true);
+              }
+            }}
+            className="flex-1 flex items-center justify-center gap-1.5 min-[425px]:gap-2 py-2.5 px-2.5 min-[425px]:px-4 rounded-xl text-xs min-[425px]:text-sm font-medium whitespace-nowrap bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg transition-all"
+          >
+            <Share2 className="w-4 h-4 flex-shrink-0" />
+            {scheduleMode === 'shared' ? 'Поделиться окнами' : 'Поделиться'}
+          </button>
+        </div>
+
+        {/* Совместное расписание */}
+        {scheduleMode === 'shared' && telegramId && (
+          <SharedScheduleView 
+            telegramId={telegramId}
+            selectedDate={selectedDate}
+            weekNumber={weekNumber}
+            onClose={() => onScheduleModeChange('personal')}
+            hapticFeedback={hapticFeedback}
+            onFriendPickerChange={onFriendPickerChange}
+            onShareModalChange={onSharedScheduleShareModalChange}
+            externalShareTrigger={sharedShareTrigger}
+          />
+        )}
+
+        {/* Schedule list with swipe container */}
+        {scheduleMode === 'personal' && (
+        <div className="relative" ref={swipeContainerRef}>
+          {/* Swipe indicators */}
+          <AnimatePresence>
+            {swipeDirection !== 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute top-1/2 z-10 pointer-events-none"
+                style={{
+                  left: swipeDirection === 1 ? '20px' : 'auto',
+                  right: swipeDirection === -1 ? '20px' : 'auto',
+                  transform: 'translateY(-50%)'
+                }}
+              >
+                <motion.div
+                  style={{ opacity, scale }}
+                  className="flex items-center justify-center w-12 h-12 rounded-full bg-black/20 backdrop-blur-sm"
+                >
+                  {swipeDirection === 1 ? (
+                    <ChevronLeft className="w-6 h-6 text-white" />
+                  ) : (
+                    <ChevronRight className="w-6 h-6 text-white" />
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* Schedule content */}
+          {todaySchedule.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-base md:text-lg">
+                {mockSchedule.length === 0 
+                  ? t('liveScheduleSection.loading')
+                  : t('liveScheduleSection.noClasses')}
+              </p>
+            </div>
+          ) : (
+            <motion.div 
+              className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-3 md:gap-4"
+              initial="initial"
+              animate="animate"
+              variants={staggerContainer}
+            >
+              {todaySchedule.map((classItem, index) => {
+              const { status, color } = getClassStatus(classItem);
+              const isExpanded = expandedIndex === index;
+
+              return (
+                <motion.div 
+                  key={index}
+                  variants={listItemVariants}
+                  custom={index}
+                  className="rounded-2xl md:rounded-3xl p-4 md:p-5 transition-all duration-300 cursor-pointer hover:shadow-md border border-white/20"
+                  style={{ 
+                    backgroundColor: 'rgba(245, 245, 245, 0.85)',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+                  }}
+                  onClick={() => toggleExpand(index)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p 
+                        className="font-bold mb-2 text-base md:text-lg"
+                        style={{ 
+                          color: '#2C2C2C',
+                          fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
+                        }}
+                      >
+                        {translateDiscipline(classItem.discipline, i18n.language)}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div 
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span 
+                          className="font-medium"
+                          style={{ 
+                            fontSize: '13px',
+                            color: color,
+                            fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
+                          }}
+                        >
+                          {status}
+                        </span>
+                        <span 
+                          style={{ 
+                            fontSize: '13px',
+                            color: '#3B3B3B',
+                            fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
+                          }}
+                        >
+                          , {classItem.time}
+                        </span>
+                        {classItem.lessonType && (
+                          <span 
+                            className="px-2 py-0.5 rounded text-xs"
+                            style={{ 
+                              backgroundColor: 'rgba(224, 224, 224, 0.8)',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
+                              color: '#555555',
+                              fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif'
+                            }}
+                          >
+                            {translateLessonType(classItem.lessonType, i18n.language)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Выбранный преподаватель и аудитория (только при раскрытии, только для множественных) */}
+                      {isExpanded && classItem.subItems && classItem.subItems.length > 1 && (() => {
+                        const selIdx = getSelectedSubIndex(classItem);
+                        const selected = classItem.subItems[selIdx] || classItem.subItems[0];
+                        const isPickerOpen = teacherPickerOpen === index;
+                        return (
+                          <div className="mt-2">
+                            {selected.auditory && (
+                              <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                                {t('classDetails.auditory')} <span style={{ color: '#3B3B3B' }}>{selected.auditory}</span>
+                              </p>
+                            )}
+                            {selected.teacher && (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                                  {t('classDetails.teacher')} <span style={{ color: '#3B3B3B' }}>{selected.teacher}</span>
+                                </p>
+                                <span 
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium"
+                                  style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#6366f1' }}
+                                >
+                                  {classItem.subItems.length} вар.
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTeacherPickerOpen(isPickerOpen ? null : index);
+                                    if (hapticFeedback) hapticFeedback('selection');
+                                  }}
+                                  className="inline-flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-90"
+                                  style={{ 
+                                    backgroundColor: isPickerOpen ? 'rgba(99,102,241,0.15)' : 'rgba(0,0,0,0.05)',
+                                  }}
+                                >
+                                  <Settings 
+                                    className="w-3.5 h-3.5 transition-transform duration-200" 
+                                    style={{ 
+                                      color: isPickerOpen ? '#6366f1' : '#888',
+                                      transform: isPickerOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    }} 
+                                  />
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Выпадающий список преподавателей — по клику на шестерёнку */}
+                            {isPickerOpen && (
+                              <div className="mt-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="space-y-1.5">
+                                  {classItem.subItems.map((subItem, subIndex) => {
+                                    const isSelected = selIdx === subIndex;
+                                    return (
+                                      <div
+                                        key={subIndex}
+                                        onClick={(e) => selectSubItem(classItem, subIndex, e)}
+                                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer active:scale-[0.98]"
+                                        style={{
+                                          backgroundColor: isSelected ? 'rgba(99,102,241,0.08)' : 'rgba(0,0,0,0.02)',
+                                          border: isSelected ? '1.5px solid rgba(99,102,241,0.3)' : '1.5px solid transparent',
+                                        }}
+                                      >
+                                        <div 
+                                          className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                                          style={{ borderColor: isSelected ? '#6366f1' : '#ccc' }}
+                                        >
+                                          {isSelected && (
+                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366f1' }} />
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[13px] font-medium truncate" style={{ color: isSelected ? '#4338ca' : '#3B3B3B' }}>
+                                            {subItem.teacher || 'Не указан'}
+                                          </p>
+                                          {subItem.auditory && (
+                                            <p className="text-[11px] truncate" style={{ color: '#999' }}>
+                                              {subItem.auditory}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Expanded details для одиночных subItems (без выбора) */}
+                      {isExpanded && classItem.subItems && classItem.subItems.length === 1 && (
+                        <div className="mt-3 space-y-2 animate-in fade-in duration-200">
+                          {classItem.subItems[0].auditory && (
+                            <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                              {t('classDetails.auditory')} <span style={{ color: '#3B3B3B' }}>{classItem.subItems[0].auditory}</span>
+                            </p>
+                          )}
+                          {classItem.subItems[0].teacher && (
+                            <p style={{ fontSize: '13px', color: '#999999', fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+                              {t('classDetails.teacher')} <span style={{ color: '#3B3B3B' }}>{classItem.subItems[0].teacher}</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Chevron icon */}
+                    {isExpanded ? (
+                      <ChevronDown className="w-6 h-6 flex-shrink-0 mt-1" style={{ color: '#1C1C1C' }} />
+                    ) : (
+                      <ChevronRight className="w-6 h-6 flex-shrink-0 mt-1" style={{ color: '#1C1C1C' }} />
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
+        </div>
+        )}
+        {/* end of scheduleMode === 'personal' */}
+        
+        {/* Admin Panel Link - показывается только для admin IDs: 765963392, 1311283832 */}
+        {user && (String(user.id) === '765963392' || String(user.id) === '1311283832') && (
+          <div className="mt-8 mb-6 text-center">
+            <p 
+              onClick={() => {
+                hapticFeedback?.('medium');
+                onAdminPanelOpen?.();
+              }}
+              className="text-sm text-gray-400 cursor-pointer hover:text-purple-500 transition-colors active:text-purple-600"
+              style={{ userSelect: 'none' }}
+            >
+              📊 Админ панель
+            </p>
+          </div>
+        )}
+        </div>
+
+      {/* Share Schedule Modal */}
+      <ShareScheduleModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        schedule={mockSchedule}
+        selectedDate={selectedDate}
+        groupName={groupName}
+        hapticFeedback={hapticFeedback}
+        telegramId={telegramId}
+      />
+    </div>
+  );
+};

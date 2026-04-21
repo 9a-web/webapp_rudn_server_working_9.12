@@ -1,0 +1,3083 @@
+33[0;32m
+╔════════════════════════════════════════╗
+║   RUDN Schedule Server Diagnostic     ║
+║           Version 1.0                 ║
+╚════════════════════════════════════════╝
+33[0m
+
+33[0;34m============================================33[0m
+33[0;34m1. ОБЩАЯ ИНФОРМАЦИЯ О СИСТЕМЕ33[0m
+33[0;34m============================================33[0m
+
+--- Операционная система ---
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+VERSION_ID="22.04"
+VERSION="22.04.5 LTS (Jammy Jellyfish)"
+VERSION_CODENAME=jammy
+
+--- Свободное место на диске ---
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        20G   11G  8.9G  55% /
+
+--- Использование памяти ---
+               total        used        free      shared  buff/cache   available
+Mem:           866Mi       448Mi        58Mi       3.0Mi       359Mi       245Mi
+Swap:          1.0Gi       201Mi       822Mi
+
+--- Текущий пользователь и директория ---
+Пользователь: root
+Текущая директория: /var/www/rudn-schedule.ru
+
+33[0;34m============================================33[0m
+33[0;34m2. ПОИСК ПРОЕКТА RUDN SCHEDULE33[0m
+33[0;34m============================================33[0m
+
+Ищем проект в /var/www и /home...
+Найден проект: /var/www/rudn-schedule.ru/frontend/node_modules
+Найден проект: /var/www/rudn-schedule.ru/frontend/node_modules
+Найден проект: /var/www/rudn-schedule.ru/frontend/node_modules
+Найден проект: /var/www/rudn-schedule.ru/frontend/node_modules
+Найден проект: /var/www/rudn-schedule.ru/frontend/node_modules
+
+33[0;32m📁 Рабочая директория проекта: /var/www/rudn-schedule.ru/frontend/node_modules33[0m
+
+33[0;34m============================================33[0m
+33[0;34m3. СТРУКТУРА ПРОЕКТА33[0m
+33[0;34m============================================33[0m
+
+--- Содержимое корневой директории ---
+total 3.8M
+drwxr-xr-x 896 root     root      36K Oct 27 10:07 .
+drwxr-xr-x   7 www-data www-data 4.0K Oct 27 10:06 ..
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 .bin
+-rw-r--r--   1 root     root     175K Oct 27 10:07 .yarn-integrity
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @alloc
+drwxr-xr-x 126 root     root      12K Oct 27 10:06 @babel
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @bcoe
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @craco
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @cspotcode
+drwxr-xr-x  18 root     root     4.0K Oct 27 10:06 @csstools
+drwxr-xr-x   9 root     root     4.0K Oct 27 10:06 @eslint
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:06 @eslint-community
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:06 @humanfs
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:06 @humanwhocodes
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @isaacs
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:06 @istanbuljs
+drwxr-xr-x  14 root     root     4.0K Oct 27 10:06 @jest
+drwxr-xr-x   8 root     root     4.0K Oct 27 10:06 @jridgewell
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @leichtgewicht
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @nicolo-ribaudo
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:06 @nodelib
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @pkgjs
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @pmmmwh
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:06 @rollup
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @rtsao
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @rushstack
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @sinclair
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:06 @sinonjs
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @surma
+drwxr-xr-x  16 root     root     4.0K Oct 27 10:06 @svgr
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @tootallnate
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @trysound
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:06 @tsconfig
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:06 @twa-dev
+drwxr-xr-x  44 root     root     4.0K Oct 27 10:06 @types
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:06 @typescript-eslint
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:06 @ungap
+drwxr-xr-x  17 root     root     4.0K Oct 27 10:06 @webassemblyjs
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:06 @xtuc
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 abab
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 accepts
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 acorn
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 acorn-globals
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 acorn-import-phases
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 acorn-jsx
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 acorn-walk
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 address
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 adjust-sourcemap-loader
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 agent-base
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 ajv
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ajv-keywords
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ansi-escapes
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ansi-html
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ansi-html-community
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ansi-regex
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ansi-styles
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 any-promise
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 anymatch
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 arg
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 argparse
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 aria-query
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array-buffer-byte-length
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 array-flatten
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array-includes
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 array-union
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array.prototype.findlast
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array.prototype.findlastindex
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array.prototype.flat
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array.prototype.flatmap
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 array.prototype.reduce
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 array.prototype.tosorted
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 arraybuffer.prototype.slice
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 asap
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ast-types-flow
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 async
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 async-function
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 asynckit
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 at-least-node
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 autoprefixer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 available-typed-arrays
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 axe-core
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 axios
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 axobject-query
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 babel-jest
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 babel-loader
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 babel-plugin-istanbul
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 babel-plugin-jest-hoist
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 babel-plugin-macros
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 babel-plugin-named-asset-import
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 babel-plugin-polyfill-corejs2
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 babel-plugin-polyfill-corejs3
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 babel-plugin-polyfill-regenerator
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 babel-plugin-transform-react-remove-prop-types
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 babel-preset-current-node-syntax
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 babel-preset-jest
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 babel-preset-react-app
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 balanced-match
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 baseline-browser-mapping
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 batch
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 bfj
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 big.js
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 binary-extensions
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 bluebird
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 body-parser
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 bonjour-service
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 boolbase
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 brace-expansion
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 braces
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 browser-process-hrtime
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 browserslist
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 bser
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 buffer-from
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 builtin-modules
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 bytes
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 call-bind
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 call-bind-apply-helpers
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 call-bound
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 callsites
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 camel-case
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 camelcase
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 camelcase-css
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 caniuse-api
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 caniuse-lite
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 case-sensitive-paths-webpack-plugin
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 chalk
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 char-regex
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 check-types
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 chokidar
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 chrome-trace-event
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ci-info
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 cjs-module-lexer
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 clean-css
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 cliui
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 clone-deep
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 co
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 coa
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 collect-v8-coverage
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 color-convert
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 color-name
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 colord
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 colorette
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 combined-stream
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 commander
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 common-tags
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 commondir
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 compressible
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 compression
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 concat-map
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 confusing-browser-globals
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 connect-history-api-fallback
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 content-disposition
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 content-type
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 convert-source-map
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 cookie
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 cookie-signature
+drwxr-xr-x  12 root     root     4.0K Oct 27 10:07 core-js
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 core-js-compat
+drwxr-xr-x  12 root     root     4.0K Oct 27 10:07 core-js-pure
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 core-util-is
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 cosmiconfig
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 cosmiconfig-typescript-loader
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 cra-template
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 create-require
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 cross-spawn
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 crypto-random-string
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 css-blank-pseudo
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 css-declaration-sorter
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 css-has-pseudo
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 css-loader
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 css-minimizer-webpack-plugin
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 css-prefers-color-scheme
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 css-select
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 css-select-base-adapter
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 css-tree
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 css-what
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 cssdb
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 cssesc
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 cssnano
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 cssnano-preset-default
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 cssnano-utils
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 csso
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 cssom
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 cssstyle
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 damerau-levenshtein
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 data-urls
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 data-view-buffer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 data-view-byte-length
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 data-view-byte-offset
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 debug
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 decimal.js
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 dedent
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 deep-is
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 deepmerge
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 default-gateway
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 define-data-property
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 define-lazy-prop
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 define-properties
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 delayed-stream
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 depd
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 destroy
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 detect-newline
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 detect-node
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 detect-port-alt
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 didyoumean
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 diff
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 diff-sequences
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 dir-glob
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 dlv
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 dns-packet
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 doctrine
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 dom-converter
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 dom-serializer
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 domelementtype
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 domexception
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 domhandler
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 domutils
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 dot-case
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 dotenv
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 dotenv-expand
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 dunder-proto
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 duplexer
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 eastasianwidth
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ee-first
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 ejs
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 electron-to-chromium
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 emittery
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 emoji-regex
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 emojis-list
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 encodeurl
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 enhanced-resolve
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 entities
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 error-ex
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 error-stack-parser
+drwxr-xr-x  16 root     root     4.0K Oct 27 10:07 es-abstract
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 es-array-method-boxes-properly
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 es-define-property
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 es-errors
+drwxr-xr-x  25 root     root     4.0K Oct 27 10:07 es-iterator-helpers
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 es-module-lexer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 es-object-atoms
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 es-set-tostringtag
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 es-shim-unscopables
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 es-to-primitive
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 escalade
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 escape-html
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 escape-string-regexp
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 escodegen
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 eslint
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 eslint-import-resolver-node
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 eslint-module-utils
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 eslint-plugin-import
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 eslint-plugin-jsx-a11y
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 eslint-plugin-react
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 eslint-scope
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 eslint-visitor-keys
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 espree
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 esprima
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 esquery
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 esrecurse
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 estraverse
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 estree-walker
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 esutils
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 etag
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 eventemitter3
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 events
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 execa
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 exit
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 expect
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 express
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 fast-deep-equal
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 fast-glob
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 fast-json-stable-stringify
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 fast-levenshtein
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 fast-uri
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 fastq
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 faye-websocket
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 fb-watchman
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 file-entry-cache
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 file-loader
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 filelist
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 filesize
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 fill-range
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 finalhandler
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 find-cache-dir
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 find-up
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 flat
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 flat-cache
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 flatted
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 follow-redirects
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 for-each
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 foreground-child
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 fork-ts-checker-webpack-plugin
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 form-data
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 forwarded
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 fraction.js
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 framer-motion
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 fresh
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 fs-extra
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 fs-monkey
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 fs.realpath
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 function-bind
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 function.prototype.name
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 functions-have-names
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 generator-function
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 gensync
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 get-caller-file
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 get-intrinsic
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 get-own-enumerable-property-symbols
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 get-package-type
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 get-proto
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 get-stream
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 get-symbol-description
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 glob
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 glob-parent
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 glob-to-regexp
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 global-modules
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 global-prefix
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 globals
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 globalthis
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 globby
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 gopd
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 graceful-fs
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 graphemer
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 gzip-size
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 handle-thing
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 harmony-reflect
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 has-bigints
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 has-flag
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 has-property-descriptors
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 has-proto
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 has-symbols
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 has-tostringtag
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 hasown
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 he
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 hoopy
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 hpack.js
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 html-encoding-sniffer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 html-entities
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 html-escaper
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 html-minifier-terser
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 html-parse-stringify
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 html-webpack-plugin
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 htmlparser2
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 http-deceiver
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 http-errors
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 http-parser-js
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 http-proxy
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 http-proxy-agent
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 http-proxy-middleware
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 https-proxy-agent
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 human-signals
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 i18next
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 i18next-browser-languagedetector
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 iconv-lite
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 icss-utils
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 idb
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 identity-obj-proxy
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ignore
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 immer
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 import-fresh
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 import-local
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 imurmurhash
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 inflight
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 inherits
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ini
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 internal-slot
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ipaddr.js
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-array-buffer
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-arrayish
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 is-async-function
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-bigint
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-binary-path
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-boolean-object
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-callable
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 is-core-module
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-data-view
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-date-object
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-docker
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-extglob
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-finalizationregistry
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-fullwidth-code-point
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-generator-fn
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 is-generator-function
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-glob
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-map
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-module
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-negative-zero
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-number
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-number-object
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-obj
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-path-inside
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-plain-obj
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-plain-object
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-potential-custom-element-name
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 is-regex
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-regexp
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-root
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-set
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-shared-array-buffer
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-stream
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-string
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-symbol
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-typed-array
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 is-typedarray
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-weakmap
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-weakref
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 is-weakset
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 is-wsl
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 isarray
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 isexe
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 isobject
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 istanbul-lib-coverage
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 istanbul-lib-instrument
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 istanbul-lib-report
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 istanbul-lib-source-maps
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 istanbul-reports
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 iterator.prototype
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jackspeak
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 jake
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 jest
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-changed-files
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-circus
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 jest-cli
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-config
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-diff
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-docblock
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-each
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-environment-jsdom
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-environment-node
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-get-type
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-haste-map
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-jasmine2
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-leak-detector
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-matcher-utils
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-message-util
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-mock
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 jest-pnp-resolver
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-regex-util
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jest-resolve
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-resolve-dependencies
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-runner
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jest-runtime
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-serializer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jest-snapshot
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-util
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 jest-validate
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jest-watch-typeahead
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jest-watcher
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jest-worker
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 jiti
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 js-tokens
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 js-yaml
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jsdom
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 jsesc
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 json-buffer
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 json-parse-even-better-errors
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 json-schema
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 json-schema-traverse
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 json-stable-stringify-without-jsonify
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 json5
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 jsonfile
+drwxr-xr-x   8 root     root     4.0K Oct 27 10:07 jsonpath
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 jsonpointer
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 jsx-ast-utils
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 keyv
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 kind-of
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 kleur
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 klona
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 language-subtag-registry
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 language-tags
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 launch-editor
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 leven
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 levn
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 lilconfig
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 lines-and-columns
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 loader-runner
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 loader-utils
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 locate-path
+drwxr-xr-x   3 root     root      20K Oct 27 10:07 lodash
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 lodash.debounce
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 lodash.memoize
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 lodash.merge
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 lodash.sortby
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 lodash.uniq
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 loose-envify
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 lower-case
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 lru-cache
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 lucide-react
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 magic-string
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 make-dir
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 make-error
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 makeerror
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 math-intrinsics
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 mdn-data
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 media-typer
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 memfs
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 merge-descriptors
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 merge-stream
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 merge2
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 methods
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 micromatch
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 mime
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 mime-db
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 mime-types
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 mimic-fn
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 mini-css-extract-plugin
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 minimalistic-assert
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 minimatch
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 minimist
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 minipass
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 mkdirp
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 motion-dom
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 motion-utils
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 ms
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 multicast-dns
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 mz
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 nanoid
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 natural-compare
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 natural-compare-lite
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 negotiator
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 neo-async
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 no-case
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 node-forge
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 node-int64
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 node-releases
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 normalize-path
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 normalize-range
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 normalize-url
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 npm-run-path
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 nth-check
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 nwsapi
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 object-assign
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 object-hash
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 object-inspect
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 object-keys
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 object.assign
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 object.entries
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 object.fromentries
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 object.getownpropertydescriptors
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 object.groupby
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 object.values
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 obuf
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 on-finished
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 on-headers
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 once
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 onetime
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 open
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 optionator
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 own-keys
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 p-limit
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 p-locate
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 p-retry
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 p-try
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 package-json-from-dist
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 param-case
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 parent-module
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 parse-json
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 parse5
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 parseurl
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 pascal-case
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 path-exists
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 path-is-absolute
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 path-key
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 path-parse
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 path-scurry
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 path-to-regexp
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 path-type
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 performance-now
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 picocolors
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 picomatch
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 pify
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 pirates
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 pkg-dir
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 pkg-up
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 possible-typed-array-names
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-attribute-case-insensitive
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-browser-comments
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-calc
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-clamp
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-color-functional-notation
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-color-hex-alpha
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-color-rebeccapurple
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-colormin
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-convert-values
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-custom-media
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-custom-properties
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-custom-selectors
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-dir-pseudo-class
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-discard-comments
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-discard-duplicates
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-discard-empty
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-discard-overridden
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-double-position-gradients
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-env-function
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-flexbugs-fixes
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-focus-visible
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-focus-within
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-font-variant
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-gap-properties
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-image-set-function
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-import
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 postcss-initial
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-js
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-lab-function
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-load-config
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-loader
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-logical
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-media-minmax
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-merge-longhand
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-merge-rules
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-minify-font-values
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-minify-gradients
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-minify-params
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-minify-selectors
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-modules-extract-imports
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-modules-local-by-default
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-modules-scope
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-modules-values
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-nested
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-nesting
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-normalize
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-charset
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-display-values
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-positions
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-repeat-style
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-string
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-timing-functions
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-normalize-unicode
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-url
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-normalize-whitespace
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-opacity-percentage
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-ordered-values
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-overflow-shorthand
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-page-break
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-place
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-preset-env
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-pseudo-class-any-link
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-reduce-initial
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-reduce-transforms
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 postcss-replace-overflow-wrap
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-selector-not
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-selector-parser
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 postcss-svgo
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 postcss-unique-selectors
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 postcss-value-parser
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 prelude-ls
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 pretty-bytes
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 pretty-error
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 pretty-format
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 process-nextick-args
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 promise
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 prompts
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 prop-types
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 proxy-addr
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 proxy-from-env
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 psl
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 punycode
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 q
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 qs
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 querystringify
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 queue-microtask
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 raf
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 randombytes
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 range-parser
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 raw-body
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 react-app-polyfill
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react-dev-utils
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react-dom
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react-error-overlay
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 react-i18next
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 react-is
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react-refresh
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react-router
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 react-router-dom
+drwxr-xr-x   9 root     root     4.0K Oct 27 10:07 react-scripts
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 read-cache
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 readable-stream
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 readdirp
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 recursive-readdir
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 reflect.getprototypeof
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 regenerate
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 regenerate-unicode-properties
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 regenerator-runtime
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 regex-parser
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 regexp.prototype.flags
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 regexpu-core
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 regjsgen
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 regjsparser
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 relateurl
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 renderkid
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 require-directory
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 require-from-string
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 requires-port
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 resolve
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 resolve-cwd
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 resolve-from
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 resolve-url-loader
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 resolve.exports
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 retry
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 reusify
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 rimraf
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 rollup
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 rollup-plugin-terser
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 run-parallel
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 safe-array-concat
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 safe-buffer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 safe-push-apply
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 safe-regex-test
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 safer-buffer
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 sanitize.css
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 sass-loader
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 sax
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 saxes
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 scheduler
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 schema-utils
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 select-hose
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 selfsigned
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 semver
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 send
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 serialize-javascript
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 serve-index
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 serve-static
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 set-cookie-parser
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 set-function-length
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 set-function-name
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 set-proto
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 setprototypeof
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 shallow-clone
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 shebang-command
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 shebang-regex
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 shell-quote
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 side-channel
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 side-channel-list
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 side-channel-map
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 side-channel-weakmap
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 signal-exit
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 sisteransi
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 slash
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 sockjs
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 source-list-map
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 source-map
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 source-map-js
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 source-map-loader
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 source-map-support
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 sourcemap-codec
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 spdy
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 spdy-transport
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 sprintf-js
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 stable
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 stack-utils
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 stackframe
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 static-eval
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 statuses
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 stop-iteration-iterator
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 string-length
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 string-natural-compare
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 string-width
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 string-width-cjs
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 string.prototype.includes
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 string.prototype.matchall
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 string.prototype.repeat
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 string.prototype.trim
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 string.prototype.trimend
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 string.prototype.trimstart
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 string_decoder
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 stringify-object
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 strip-ansi
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 strip-ansi-cjs
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 strip-bom
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 strip-comments
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 strip-final-newline
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 strip-json-comments
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 style-loader
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 stylehacks
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 sucrase
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 supports-color
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 supports-hyperlinks
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 supports-preserve-symlinks-flag
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 svg-parser
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 svgo
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 symbol-tree
+drwxr-xr-x  10 root     root     4.0K Oct 27 10:07 tailwindcss
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 tapable
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 temp-dir
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 tempy
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 terminal-link
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 terser
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 terser-webpack-plugin
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 test-exclude
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 text-table
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 thenify
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 thenify-all
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 throat
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 thunky
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 tmpl
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 to-regex-range
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 toidentifier
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 tough-cookie
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 tr46
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 tryer
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ts-interface-checker
+drwxr-xr-x  12 root     root     4.0K Oct 27 10:07 ts-node
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 tsconfig-paths
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 tslib
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 tsutils
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 type-check
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 type-detect
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 type-fest
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 type-is
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 typed-array-buffer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 typed-array-byte-length
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 typed-array-byte-offset
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 typed-array-length
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 typedarray-to-buffer
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 unbox-primitive
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 underscore
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 undici-types
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 unicode-canonical-property-names-ecmascript
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 unicode-match-property-ecmascript
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 unicode-match-property-value-ecmascript
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 unicode-property-aliases-ecmascript
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 unique-string
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 universalify
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 unpipe
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 unquote
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 upath
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 update-browserslist-db
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 uri-js
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 url-parse
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 use-sync-external-store
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 util-deprecate
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 util.promisify
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 utila
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 utils-merge
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 uuid
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 v8-compile-cache-lib
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 v8-to-istanbul
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 vary
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 void-elements
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 w3c-hr-time
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 w3c-xmlserializer
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 walker
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 watchpack
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 wbuf
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 webidl-conversions
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 webpack
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 webpack-dev-middleware
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 webpack-dev-server
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 webpack-manifest-plugin
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 webpack-merge
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 webpack-sources
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 websocket-driver
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 websocket-extensions
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 whatwg-encoding
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 whatwg-fetch
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 whatwg-mimetype
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 whatwg-url
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 which
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 which-boxed-primitive
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 which-builtin-type
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 which-collection
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 which-typed-array
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 wildcard
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 word-wrap
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-background-sync
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-broadcast-update
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-build
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 workbox-cacheable-response
+drwxr-xr-x   7 root     root     4.0K Oct 27 10:07 workbox-core
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-expiration
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-google-analytics
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 workbox-navigation-preload
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-precaching
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-range-requests
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 workbox-recipes
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-routing
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 workbox-strategies
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-streams
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 workbox-sw
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-webpack-plugin
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 workbox-window
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 wrap-ansi
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 wrap-ansi-cjs
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 wrappy
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 write-file-atomic
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 ws
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 xml-name-validator
+drwxr-xr-x   4 root     root     4.0K Oct 27 10:07 xmlchars
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 y18n
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 yallist
+drwxr-xr-x   5 root     root     4.0K Oct 27 10:07 yaml
+drwxr-xr-x   6 root     root     4.0K Oct 27 10:07 yargs
+drwxr-xr-x   3 root     root     4.0K Oct 27 10:07 yargs-parser
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 yn
+drwxr-xr-x   2 root     root     4.0K Oct 27 10:07 yocto-queue
+
+--- Структура проекта (2 уровня) ---
+.
+./.bin
+./@alloc
+./@alloc/quick-lru
+./@babel
+./@babel/code-frame
+./@babel/compat-data
+./@babel/core
+./@babel/generator
+./@babel/helper-annotate-as-pure
+./@babel/helper-compilation-targets
+./@babel/helper-create-class-features-plugin
+./@babel/helper-create-regexp-features-plugin
+./@babel/helper-define-polyfill-provider
+./@babel/helper-globals
+./@babel/helper-member-expression-to-functions
+./@babel/helper-module-imports
+./@babel/helper-module-transforms
+./@babel/helper-optimise-call-expression
+./@babel/helper-plugin-utils
+./@babel/helper-remap-async-to-generator
+./@babel/helper-replace-supers
+./@babel/helper-skip-transparent-expression-wrappers
+./@babel/helper-string-parser
+./@babel/helper-validator-identifier
+./@babel/helper-validator-option
+./@babel/helper-wrap-function
+./@babel/helpers
+./@babel/parser
+./@babel/plugin-bugfix-firefox-class-in-computed-class-key
+./@babel/plugin-bugfix-safari-class-field-initializer-scope
+./@babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression
+./@babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining
+./@babel/plugin-bugfix-v8-static-class-fields-redefine-readonly
+./@babel/plugin-proposal-class-properties
+./@babel/plugin-proposal-decorators
+./@babel/plugin-proposal-nullish-coalescing-operator
+./@babel/plugin-proposal-numeric-separator
+./@babel/plugin-proposal-optional-chaining
+./@babel/plugin-proposal-private-methods
+./@babel/plugin-proposal-private-property-in-object
+./@babel/plugin-syntax-async-generators
+./@babel/plugin-syntax-bigint
+./@babel/plugin-syntax-class-properties
+./@babel/plugin-syntax-class-static-block
+./@babel/plugin-syntax-decorators
+./@babel/plugin-syntax-flow
+./@babel/plugin-syntax-import-assertions
+./@babel/plugin-syntax-import-attributes
+./@babel/plugin-syntax-import-meta
+./@babel/plugin-syntax-json-strings
+./@babel/plugin-syntax-jsx
+./@babel/plugin-syntax-logical-assignment-operators
+./@babel/plugin-syntax-nullish-coalescing-operator
+./@babel/plugin-syntax-numeric-separator
+./@babel/plugin-syntax-object-rest-spread
+./@babel/plugin-syntax-optional-catch-binding
+./@babel/plugin-syntax-optional-chaining
+./@babel/plugin-syntax-private-property-in-object
+./@babel/plugin-syntax-top-level-await
+./@babel/plugin-syntax-typescript
+./@babel/plugin-syntax-unicode-sets-regex
+./@babel/plugin-transform-arrow-functions
+./@babel/plugin-transform-async-generator-functions
+./@babel/plugin-transform-async-to-generator
+./@babel/plugin-transform-block-scoped-functions
+./@babel/plugin-transform-block-scoping
+./@babel/plugin-transform-class-properties
+./@babel/plugin-transform-class-static-block
+./@babel/plugin-transform-classes
+./@babel/plugin-transform-computed-properties
+./@babel/plugin-transform-destructuring
+./@babel/plugin-transform-dotall-regex
+./@babel/plugin-transform-duplicate-keys
+./@babel/plugin-transform-duplicate-named-capturing-groups-regex
+./@babel/plugin-transform-dynamic-import
+./@babel/plugin-transform-explicit-resource-management
+./@babel/plugin-transform-exponentiation-operator
+./@babel/plugin-transform-export-namespace-from
+./@babel/plugin-transform-flow-strip-types
+./@babel/plugin-transform-for-of
+./@babel/plugin-transform-function-name
+./@babel/plugin-transform-json-strings
+./@babel/plugin-transform-literals
+./@babel/plugin-transform-logical-assignment-operators
+./@babel/plugin-transform-member-expression-literals
+./@babel/plugin-transform-modules-amd
+./@babel/plugin-transform-modules-commonjs
+./@babel/plugin-transform-modules-systemjs
+./@babel/plugin-transform-modules-umd
+./@babel/plugin-transform-named-capturing-groups-regex
+./@babel/plugin-transform-new-target
+./@babel/plugin-transform-nullish-coalescing-operator
+./@babel/plugin-transform-numeric-separator
+./@babel/plugin-transform-object-rest-spread
+./@babel/plugin-transform-object-super
+./@babel/plugin-transform-optional-catch-binding
+./@babel/plugin-transform-optional-chaining
+./@babel/plugin-transform-parameters
+./@babel/plugin-transform-private-methods
+./@babel/plugin-transform-private-property-in-object
+./@babel/plugin-transform-property-literals
+./@babel/plugin-transform-react-constant-elements
+./@babel/plugin-transform-react-display-name
+./@babel/plugin-transform-react-jsx
+./@babel/plugin-transform-react-jsx-development
+./@babel/plugin-transform-react-pure-annotations
+./@babel/plugin-transform-regenerator
+./@babel/plugin-transform-regexp-modifiers
+./@babel/plugin-transform-reserved-words
+./@babel/plugin-transform-runtime
+./@babel/plugin-transform-shorthand-properties
+./@babel/plugin-transform-spread
+./@babel/plugin-transform-sticky-regex
+./@babel/plugin-transform-template-literals
+./@babel/plugin-transform-typeof-symbol
+./@babel/plugin-transform-typescript
+./@babel/plugin-transform-unicode-escapes
+./@babel/plugin-transform-unicode-property-regex
+./@babel/plugin-transform-unicode-regex
+./@babel/plugin-transform-unicode-sets-regex
+./@babel/preset-env
+./@babel/preset-modules
+./@babel/preset-react
+./@babel/preset-typescript
+./@babel/runtime
+./@babel/template
+./@babel/traverse
+./@babel/types
+./@bcoe
+./@bcoe/v8-coverage
+./@craco
+./@craco/craco
+./@cspotcode
+./@cspotcode/source-map-support
+./@csstools
+./@csstools/normalize.css
+./@csstools/postcss-cascade-layers
+./@csstools/postcss-color-function
+./@csstools/postcss-font-format-keywords
+./@csstools/postcss-hwb-function
+./@csstools/postcss-ic-unit
+./@csstools/postcss-is-pseudo-class
+./@csstools/postcss-nested-calc
+./@csstools/postcss-normalize-display-values
+./@csstools/postcss-oklab-function
+./@csstools/postcss-progressive-custom-properties
+./@csstools/postcss-stepped-value-functions
+./@csstools/postcss-text-decoration-shorthand
+./@csstools/postcss-trigonometric-functions
+./@csstools/postcss-unset-value
+./@csstools/selector-specificity
+./@eslint
+./@eslint-community
+./@eslint-community/eslint-utils
+./@eslint-community/regexpp
+./@eslint/config-array
+./@eslint/config-helpers
+./@eslint/core
+./@eslint/eslintrc
+./@eslint/js
+./@eslint/object-schema
+./@eslint/plugin-kit
+./@humanfs
+./@humanfs/core
+./@humanfs/node
+./@humanwhocodes
+./@humanwhocodes/config-array
+./@humanwhocodes/module-importer
+./@humanwhocodes/object-schema
+./@humanwhocodes/retry
+./@isaacs
+./@isaacs/cliui
+./@istanbuljs
+./@istanbuljs/load-nyc-config
+./@istanbuljs/schema
+./@jest
+./@jest/console
+./@jest/core
+./@jest/environment
+./@jest/fake-timers
+./@jest/globals
+./@jest/reporters
+./@jest/schemas
+./@jest/source-map
+./@jest/test-result
+./@jest/test-sequencer
+./@jest/transform
+./@jest/types
+./@jridgewell
+./@jridgewell/gen-mapping
+./@jridgewell/remapping
+./@jridgewell/resolve-uri
+./@jridgewell/source-map
+./@jridgewell/sourcemap-codec
+./@jridgewell/trace-mapping
+./@leichtgewicht
+./@leichtgewicht/ip-codec
+./@nicolo-ribaudo
+./@nicolo-ribaudo/eslint-scope-5-internals
+./@nodelib
+./@nodelib/fs.scandir
+./@nodelib/fs.stat
+./@nodelib/fs.walk
+./@pkgjs
+./@pkgjs/parseargs
+./@pmmmwh
+./@pmmmwh/react-refresh-webpack-plugin
+./@rollup
+./@rollup/plugin-babel
+./@rollup/plugin-node-resolve
+./@rollup/plugin-replace
+./@rollup/pluginutils
+./@rtsao
+./@rtsao/scc
+./@rushstack
+./@rushstack/eslint-patch
+./@sinclair
+./@sinclair/typebox
+./@sinonjs
+./@sinonjs/commons
+./@sinonjs/fake-timers
+./@surma
+./@surma/rollup-plugin-off-main-thread
+./@svgr
+./@svgr/babel-plugin-add-jsx-attribute
+./@svgr/babel-plugin-remove-jsx-attribute
+./@svgr/babel-plugin-remove-jsx-empty-expression
+./@svgr/babel-plugin-replace-jsx-attribute-value
+./@svgr/babel-plugin-svg-dynamic-title
+./@svgr/babel-plugin-svg-em-dimensions
+./@svgr/babel-plugin-transform-react-native-svg
+./@svgr/babel-plugin-transform-svg-component
+./@svgr/babel-preset
+./@svgr/core
+./@svgr/hast-util-to-babel-ast
+./@svgr/plugin-jsx
+./@svgr/plugin-svgo
+./@svgr/webpack
+./@tootallnate
+./@tootallnate/once
+./@trysound
+./@trysound/sax
+./@tsconfig
+./@tsconfig/node10
+./@tsconfig/node12
+./@tsconfig/node14
+./@tsconfig/node16
+./@twa-dev
+./@twa-dev/sdk
+./@twa-dev/types
+./@types
+./@types/babel__core
+./@types/babel__generator
+./@types/babel__template
+./@types/babel__traverse
+./@types/body-parser
+./@types/bonjour
+./@types/connect
+./@types/connect-history-api-fallback
+./@types/eslint
+./@types/eslint-scope
+./@types/estree
+./@types/express
+./@types/express-serve-static-core
+./@types/graceful-fs
+./@types/html-minifier-terser
+./@types/http-errors
+./@types/http-proxy
+./@types/istanbul-lib-coverage
+./@types/istanbul-lib-report
+./@types/istanbul-reports
+./@types/json-schema
+./@types/json5
+./@types/mime
+./@types/node
+./@types/node-forge
+./@types/parse-json
+./@types/prettier
+./@types/q
+./@types/qs
+./@types/range-parser
+./@types/resolve
+./@types/retry
+./@types/semver
+./@types/send
+./@types/serve-index
+./@types/serve-static
+./@types/sockjs
+./@types/stack-utils
+./@types/trusted-types
+./@types/ws
+./@types/yargs
+./@types/yargs-parser
+./@typescript-eslint
+./@typescript-eslint/scope-manager
+./@typescript-eslint/types
+./@typescript-eslint/typescript-estree
+./@typescript-eslint/visitor-keys
+./@ungap
+./@ungap/structured-clone
+./@webassemblyjs
+./@webassemblyjs/ast
+./@webassemblyjs/floating-point-hex-parser
+./@webassemblyjs/helper-api-error
+./@webassemblyjs/helper-buffer
+./@webassemblyjs/helper-numbers
+./@webassemblyjs/helper-wasm-bytecode
+./@webassemblyjs/helper-wasm-section
+./@webassemblyjs/ieee754
+./@webassemblyjs/leb128
+./@webassemblyjs/utf8
+./@webassemblyjs/wasm-edit
+./@webassemblyjs/wasm-gen
+./@webassemblyjs/wasm-opt
+./@webassemblyjs/wasm-parser
+./@webassemblyjs/wast-printer
+./@xtuc
+./@xtuc/ieee754
+./@xtuc/long
+./abab
+./abab/lib
+./accepts
+./acorn
+./acorn-globals
+./acorn-import-phases
+./acorn-import-phases/src
+./acorn-jsx
+./acorn-walk
+./acorn/bin
+./address
+./address/lib
+./adjust-sourcemap-loader
+./adjust-sourcemap-loader/codec
+./adjust-sourcemap-loader/lib
+./agent-base
+./agent-base/src
+./ajv
+./ajv-keywords
+./ajv-keywords/keywords
+./ajv/lib
+./ajv/scripts
+./ansi-escapes
+./ansi-html
+./ansi-html-community
+./ansi-html-community/bin
+./ansi-html/bin
+./ansi-regex
+./ansi-styles
+./any-promise
+./any-promise/register
+./anymatch
+./arg
+./argparse
+./argparse/lib
+./aria-query
+./aria-query/lib
+./array-buffer-byte-length
+./array-buffer-byte-length/test
+./array-flatten
+./array-includes
+./array-includes/test
+./array-union
+./array.prototype.findlast
+./array.prototype.findlast/test
+./array.prototype.findlastindex
+./array.prototype.findlastindex/test
+./array.prototype.flat
+./array.prototype.flat/test
+./array.prototype.flatmap
+./array.prototype.flatmap/test
+./array.prototype.reduce
+./array.prototype.reduce/test
+./array.prototype.tosorted
+./array.prototype.tosorted/test
+./arraybuffer.prototype.slice
+./arraybuffer.prototype.slice/test
+./asap
+./ast-types-flow
+./ast-types-flow/lib
+./async
+./async-function
+./async-function/test
+./async/internal
+./asynckit
+./asynckit/lib
+./at-least-node
+./autoprefixer
+./autoprefixer/bin
+./autoprefixer/data
+./autoprefixer/lib
+./available-typed-arrays
+./available-typed-arrays/test
+./axe-core
+./axe-core/locales
+./axios
+./axios/lib
+./axobject-query
+./axobject-query/lib
+./babel-jest
+./babel-loader
+./babel-loader/lib
+./babel-plugin-istanbul
+./babel-plugin-istanbul/lib
+./babel-plugin-jest-hoist
+./babel-plugin-macros
+./babel-plugin-named-asset-import
+./babel-plugin-polyfill-corejs2
+./babel-plugin-polyfill-corejs2/esm
+./babel-plugin-polyfill-corejs2/lib
+./babel-plugin-polyfill-corejs3
+./babel-plugin-polyfill-corejs3/core-js-compat
+./babel-plugin-polyfill-corejs3/esm
+./babel-plugin-polyfill-corejs3/lib
+./babel-plugin-polyfill-regenerator
+./babel-plugin-polyfill-regenerator/esm
+./babel-plugin-polyfill-regenerator/lib
+./babel-plugin-transform-react-remove-prop-types
+./babel-plugin-transform-react-remove-prop-types/lib
+./babel-plugin-transform-react-remove-prop-types/src
+./babel-preset-current-node-syntax
+./babel-preset-current-node-syntax/src
+./babel-preset-jest
+./babel-preset-react-app
+./balanced-match
+./baseline-browser-mapping
+./batch
+./bfj
+./bfj/src
+./bfj/test
+./big.js
+./binary-extensions
+./bluebird
+./bluebird/js
+./body-parser
+./body-parser/lib
+./bonjour-service
+./bonjour-service/types
+./boolbase
+./brace-expansion
+./braces
+./braces/lib
+./browser-process-hrtime
+./browserslist
+./bser
+./buffer-from
+./builtin-modules
+./bytes
+./call-bind
+./call-bind-apply-helpers
+./call-bind-apply-helpers/test
+./call-bind/test
+./call-bound
+./call-bound/test
+./callsites
+./camel-case
+./camelcase
+./camelcase-css
+./caniuse-api
+./caniuse-lite
+./caniuse-lite/data
+./case-sensitive-paths-webpack-plugin
+./chalk
+./chalk/source
+./char-regex
+./check-types
+./check-types/src
+./chokidar
+./chokidar/lib
+./chokidar/types
+./chrome-trace-event
+./ci-info
+./cjs-module-lexer
+./clean-css
+./clean-css/lib
+./cliui
+./clone-deep
+./co
+./coa
+./coa/lib
+./collect-v8-coverage
+./color-convert
+./color-name
+./colord
+./colord/plugins
+./colorette
+./combined-stream
+./combined-stream/lib
+./commander
+./commander/typings
+./common-tags
+./common-tags/es
+./common-tags/lib
+./commondir
+./commondir/example
+./commondir/test
+./compressible
+./compression
+./concat-map
+./concat-map/example
+./concat-map/test
+./confusing-browser-globals
+./connect-history-api-fallback
+./connect-history-api-fallback/lib
+./content-disposition
+./content-type
+./convert-source-map
+./cookie
+./cookie-signature
+./core-js
+./core-js-compat
+./core-js-pure
+./core-js-pure/actual
+./core-js-pure/es
+./core-js-pure/features
+./core-js-pure/full
+./core-js-pure/internals
+./core-js-pure/modules
+./core-js-pure/proposals
+./core-js-pure/stable
+./core-js-pure/stage
+./core-js-pure/web
+./core-js/actual
+./core-js/es
+./core-js/features
+./core-js/full
+./core-js/internals
+./core-js/modules
+./core-js/proposals
+./core-js/stable
+./core-js/stage
+./core-js/web
+./core-util-is
+./core-util-is/lib
+./cosmiconfig
+./cosmiconfig-typescript-loader
+./cra-template
+./cra-template/template
+./create-require
+./cross-spawn
+./cross-spawn/lib
+./crypto-random-string
+./css-blank-pseudo
+./css-declaration-sorter
+./css-declaration-sorter/orders
+./css-declaration-sorter/src
+./css-has-pseudo
+./css-loader
+./css-minimizer-webpack-plugin
+./css-minimizer-webpack-plugin/types
+./css-prefers-color-scheme
+./css-select
+./css-select-base-adapter
+./css-select-base-adapter/test
+./css-select/lib
+./css-tree
+./css-tree/data
+./css-tree/lib
+./css-what
+./css-what/lib
+./cssdb
+./cssesc
+./cssesc/bin
+./cssesc/man
+./cssnano
+./cssnano-preset-default
+./cssnano-preset-default/src
+./cssnano-preset-default/types
+./cssnano-utils
+./cssnano-utils/src
+./cssnano-utils/types
+./cssnano/src
+./cssnano/types
+./csso
+./csso/lib
+./cssom
+./cssom/lib
+./cssstyle
+./cssstyle/lib
+./damerau-levenshtein
+./damerau-levenshtein/scripts
+./damerau-levenshtein/test
+./data-urls
+./data-urls/lib
+./data-view-buffer
+./data-view-buffer/test
+./data-view-byte-length
+./data-view-byte-length/test
+./data-view-byte-offset
+./data-view-byte-offset/test
+./debug
+./debug/src
+./decimal.js
+./dedent
+./deep-is
+./deep-is/example
+./deep-is/test
+./deepmerge
+./default-gateway
+./define-data-property
+./define-data-property/test
+./define-lazy-prop
+./define-properties
+./delayed-stream
+./delayed-stream/lib
+./depd
+./depd/lib
+./destroy
+./detect-newline
+./detect-node
+./detect-port-alt
+./detect-port-alt/.vscode
+./detect-port-alt/bin
+./detect-port-alt/lib
+./didyoumean
+./diff
+./diff-sequences
+./diff-sequences/perf
+./diff/lib
+./dir-glob
+./dlv
+./dns-packet
+./doctrine
+./doctrine/lib
+./dom-converter
+./dom-converter/lib
+./dom-serializer
+./dom-serializer/lib
+./domelementtype
+./domelementtype/lib
+./domexception
+./domexception/lib
+./domhandler
+./domhandler/lib
+./domutils
+./domutils/lib
+./dot-case
+./dotenv
+./dotenv-expand
+./dotenv-expand/lib
+./dotenv/lib
+./dotenv/types
+./dunder-proto
+./dunder-proto/test
+./duplexer
+./duplexer/test
+./eastasianwidth
+./ee-first
+./ejs
+./ejs/bin
+./ejs/lib
+./electron-to-chromium
+./emittery
+./emoji-regex
+./emoji-regex/es2015
+./emojis-list
+./encodeurl
+./enhanced-resolve
+./enhanced-resolve/lib
+./entities
+./entities/lib
+./error-ex
+./error-stack-parser
+./es-abstract
+./es-abstract/2015
+./es-abstract/2016
+./es-abstract/2017
+./es-abstract/2018
+./es-abstract/2019
+./es-abstract/2020
+./es-abstract/2021
+./es-abstract/2022
+./es-abstract/2023
+./es-abstract/2024
+./es-abstract/2025
+./es-abstract/5
+./es-abstract/helpers
+./es-abstract/operations
+./es-array-method-boxes-properly
+./es-array-method-boxes-properly/test
+./es-define-property
+./es-define-property/test
+./es-errors
+./es-errors/test
+./es-iterator-helpers
+./es-iterator-helpers/Iterator
+./es-iterator-helpers/Iterator.concat
+./es-iterator-helpers/Iterator.from
+./es-iterator-helpers/Iterator.prototype
+./es-iterator-helpers/Iterator.prototype.constructor
+./es-iterator-helpers/Iterator.prototype.drop
+./es-iterator-helpers/Iterator.prototype.every
+./es-iterator-helpers/Iterator.prototype.filter
+./es-iterator-helpers/Iterator.prototype.find
+./es-iterator-helpers/Iterator.prototype.flatMap
+./es-iterator-helpers/Iterator.prototype.forEach
+./es-iterator-helpers/Iterator.prototype.map
+./es-iterator-helpers/Iterator.prototype.reduce
+./es-iterator-helpers/Iterator.prototype.some
+./es-iterator-helpers/Iterator.prototype.take
+./es-iterator-helpers/Iterator.prototype.toArray
+./es-iterator-helpers/Iterator.zip
+./es-iterator-helpers/Iterator.zipKeyed
+./es-iterator-helpers/IteratorHelperPrototype
+./es-iterator-helpers/WrapForValidIteratorPrototype
+./es-iterator-helpers/aos
+./es-iterator-helpers/test
+./es-module-lexer
+./es-module-lexer/types
+./es-object-atoms
+./es-object-atoms/test
+./es-set-tostringtag
+./es-set-tostringtag/test
+./es-shim-unscopables
+./es-shim-unscopables/test
+./es-to-primitive
+./es-to-primitive/helpers
+./es-to-primitive/test
+./escalade
+./escalade/sync
+./escape-html
+./escape-string-regexp
+./escodegen
+./escodegen/bin
+./eslint
+./eslint-import-resolver-node
+./eslint-module-utils
+./eslint-plugin-import
+./eslint-plugin-import/config
+./eslint-plugin-import/docs
+./eslint-plugin-import/lib
+./eslint-plugin-import/memo-parser
+./eslint-plugin-jsx-a11y
+./eslint-plugin-jsx-a11y/__mocks__
+./eslint-plugin-jsx-a11y/__tests__
+./eslint-plugin-jsx-a11y/docs
+./eslint-plugin-jsx-a11y/lib
+./eslint-plugin-react
+./eslint-plugin-react/configs
+./eslint-plugin-react/lib
+./eslint-scope
+./eslint-scope/lib
+./eslint-visitor-keys
+./eslint-visitor-keys/lib
+./eslint/bin
+./eslint/conf
+./eslint/lib
+./eslint/messages
+./espree
+./espree/lib
+./esprima
+./esprima/bin
+./esquery
+./esrecurse
+./estraverse
+./estree-walker
+./estree-walker/src
+./estree-walker/types
+./esutils
+./esutils/lib
+./etag
+./eventemitter3
+./eventemitter3/umd
+./events
+./events/tests
+./execa
+./execa/lib
+./exit
+./exit/lib
+./exit/test
+./expect
+./express
+./express/lib
+./fast-deep-equal
+./fast-deep-equal/es6
+./fast-glob
+./fast-glob/out
+./fast-json-stable-stringify
+./fast-json-stable-stringify/benchmark
+./fast-json-stable-stringify/example
+./fast-json-stable-stringify/test
+./fast-levenshtein
+./fast-uri
+./fast-uri/benchmark
+./fast-uri/lib
+./fast-uri/test
+./fast-uri/types
+./fastq
+./fastq/test
+./faye-websocket
+./faye-websocket/lib
+./fb-watchman
+./file-entry-cache
+./file-loader
+./filelist
+./filesize
+./filesize/lib
+./fill-range
+./finalhandler
+./find-cache-dir
+./find-up
+./flat
+./flat-cache
+./flat-cache/src
+./flat/test
+./flatted
+./flatted/cjs
+./flatted/esm
+./flatted/php
+./flatted/python
+./flatted/types
+./follow-redirects
+./for-each
+./for-each/test
+./foreground-child
+./fork-ts-checker-webpack-plugin
+./fork-ts-checker-webpack-plugin/lib
+./form-data
+./form-data/lib
+./forwarded
+./fraction.js
+./framer-motion
+./framer-motion/client
+./framer-motion/dom
+./framer-motion/m
+./framer-motion/mini
+./fresh
+./fs-extra
+./fs-extra/lib
+./fs-monkey
+./fs-monkey/docs
+./fs-monkey/lib
+./fs.realpath
+./function-bind
+./function-bind/test
+./function.prototype.name
+./function.prototype.name/helpers
+./function.prototype.name/test
+./functions-have-names
+./functions-have-names/test
+./generator-function
+./generator-function/test
+./gensync
+./gensync/test
+./get-caller-file
+./get-intrinsic
+./get-intrinsic/test
+./get-own-enumerable-property-symbols
+./get-own-enumerable-property-symbols/lib
+./get-package-type
+./get-proto
+./get-proto/test
+./get-stream
+./get-symbol-description
+./get-symbol-description/test
+./glob
+./glob-parent
+./glob-to-regexp
+./global-modules
+./global-prefix
+./globals
+./globalthis
+./globalthis/test
+./globby
+./gopd
+./gopd/test
+./graceful-fs
+./graphemer
+./graphemer/lib
+./gzip-size
+./handle-thing
+./handle-thing/lib
+./handle-thing/test
+./harmony-reflect
+./has-bigints
+./has-bigints/test
+./has-flag
+./has-property-descriptors
+./has-property-descriptors/test
+./has-proto
+./has-proto/test
+./has-symbols
+./has-symbols/test
+./has-tostringtag
+./has-tostringtag/test
+./hasown
+./he
+./he/bin
+./he/man
+./hoopy
+./hpack.js
+./hpack.js/bin
+./hpack.js/lib
+./hpack.js/test
+./hpack.js/tools
+./html-encoding-sniffer
+./html-encoding-sniffer/lib
+./html-entities
+./html-entities/src
+./html-escaper
+./html-escaper/cjs
+./html-escaper/esm
+./html-escaper/test
+./html-minifier-terser
+./html-minifier-terser/src
+./html-parse-stringify
+./html-webpack-plugin
+./html-webpack-plugin/lib
+./htmlparser2
+./htmlparser2/lib
+./http-deceiver
+./http-deceiver/lib
+./http-deceiver/test
+./http-errors
+./http-parser-js
+./http-proxy
+./http-proxy-agent
+./http-proxy-middleware
+./http-proxy/lib
+./https-proxy-agent
+./human-signals
+./i18next
+./i18next-browser-languagedetector
+./i18next/typescript
+./iconv-lite
+./iconv-lite/encodings
+./iconv-lite/lib
+./icss-utils
+./icss-utils/src
+./idb
+./identity-obj-proxy
+./identity-obj-proxy/src
+./ignore
+./immer
+./immer/compat
+./immer/src
+./import-fresh
+./import-local
+./import-local/fixtures
+./imurmurhash
+./inflight
+./inherits
+./ini
+./internal-slot
+./internal-slot/test
+./ipaddr.js
+./ipaddr.js/lib
+./is-array-buffer
+./is-array-buffer/test
+./is-arrayish
+./is-async-function
+./is-async-function/test
+./is-bigint
+./is-bigint/test
+./is-binary-path
+./is-boolean-object
+./is-boolean-object/test
+./is-callable
+./is-callable/test
+./is-core-module
+./is-core-module/test
+./is-data-view
+./is-data-view/test
+./is-date-object
+./is-date-object/test
+./is-docker
+./is-extglob
+./is-finalizationregistry
+./is-finalizationregistry/test
+./is-fullwidth-code-point
+./is-generator-fn
+./is-generator-function
+./is-generator-function/test
+./is-glob
+./is-map
+./is-map/test
+./is-module
+./is-negative-zero
+./is-negative-zero/test
+./is-number
+./is-number-object
+./is-number-object/test
+./is-obj
+./is-path-inside
+./is-plain-obj
+./is-plain-object
+./is-potential-custom-element-name
+./is-regex
+./is-regex/test
+./is-regexp
+./is-root
+./is-set
+./is-set/test
+./is-shared-array-buffer
+./is-shared-array-buffer/test
+./is-stream
+./is-string
+./is-string/test
+./is-symbol
+./is-symbol/test
+./is-typed-array
+./is-typed-array/test
+./is-typedarray
+./is-weakmap
+./is-weakmap/test
+./is-weakref
+./is-weakref/test
+./is-weakset
+./is-weakset/test
+./is-wsl
+./isarray
+./isexe
+./isexe/test
+./isobject
+./istanbul-lib-coverage
+./istanbul-lib-coverage/lib
+./istanbul-lib-instrument
+./istanbul-lib-instrument/src
+./istanbul-lib-report
+./istanbul-lib-report/lib
+./istanbul-lib-source-maps
+./istanbul-lib-source-maps/lib
+./istanbul-reports
+./istanbul-reports/lib
+./iterator.prototype
+./iterator.prototype/test
+./jackspeak
+./jake
+./jake/bin
+./jake/lib
+./jake/test
+./jest
+./jest-changed-files
+./jest-circus
+./jest-cli
+./jest-cli/bin
+./jest-config
+./jest-diff
+./jest-docblock
+./jest-each
+./jest-environment-jsdom
+./jest-environment-node
+./jest-get-type
+./jest-haste-map
+./jest-jasmine2
+./jest-leak-detector
+./jest-matcher-utils
+./jest-message-util
+./jest-mock
+./jest-pnp-resolver
+./jest-regex-util
+./jest-resolve
+./jest-resolve-dependencies
+./jest-runner
+./jest-runtime
+./jest-serializer
+./jest-snapshot
+./jest-util
+./jest-validate
+./jest-watch-typeahead
+./jest-watcher
+./jest-worker
+./jest/bin
+./jiti
+./jiti/bin
+./jiti/lib
+./js-tokens
+./js-yaml
+./js-yaml/bin
+./js-yaml/lib
+./jsdom
+./jsdom/lib
+./jsesc
+./jsesc/bin
+./jsesc/man
+./json-buffer
+./json-buffer/test
+./json-parse-even-better-errors
+./json-schema
+./json-schema-traverse
+./json-schema-traverse/spec
+./json-schema/lib
+./json-stable-stringify-without-jsonify
+./json-stable-stringify-without-jsonify/example
+./json-stable-stringify-without-jsonify/test
+./json5
+./json5/lib
+./jsonfile
+./jsonpath
+./jsonpath/bin
+./jsonpath/generated
+./jsonpath/include
+./jsonpath/lib
+./jsonpath/test
+./jsonpointer
+./jsx-ast-utils
+./jsx-ast-utils/__tests__
+./jsx-ast-utils/lib
+./jsx-ast-utils/src
+./keyv
+./keyv/src
+./kind-of
+./kleur
+./klona
+./klona/full
+./klona/json
+./klona/lite
+./language-subtag-registry
+./language-subtag-registry/data
+./language-tags
+./language-tags/lib
+./launch-editor
+./launch-editor/editor-info
+./leven
+./levn
+./levn/lib
+./lilconfig
+./lilconfig/src
+./lines-and-columns
+./loader-runner
+./loader-runner/lib
+./loader-utils
+./loader-utils/lib
+./locate-path
+./lodash
+./lodash.debounce
+./lodash.memoize
+./lodash.merge
+./lodash.sortby
+./lodash.uniq
+./lodash/fp
+./loose-envify
+./lower-case
+./lru-cache
+./lucide-react
+./magic-string
+./make-dir
+./make-error
+./makeerror
+./makeerror/lib
+./math-intrinsics
+./math-intrinsics/constants
+./math-intrinsics/test
+./mdn-data
+./mdn-data/api
+./mdn-data/css
+./mdn-data/l10n
+./media-typer
+./memfs
+./memfs/lib
+./merge-descriptors
+./merge-stream
+./merge2
+./methods
+./micromatch
+./mime
+./mime-db
+./mime-types
+./mime/src
+./mimic-fn
+./mini-css-extract-plugin
+./mini-css-extract-plugin/types
+./minimalistic-assert
+./minimatch
+./minimist
+./minimist/example
+./minimist/test
+./minipass
+./mkdirp
+./mkdirp/bin
+./motion-dom
+./motion-utils
+./ms
+./multicast-dns
+./mz
+./nanoid
+./nanoid/async
+./nanoid/bin
+./nanoid/non-secure
+./nanoid/url-alphabet
+./natural-compare
+./natural-compare-lite
+./negotiator
+./negotiator/lib
+./neo-async
+./no-case
+./node-forge
+./node-forge/flash
+./node-forge/lib
+./node-int64
+./node-releases
+./node-releases/data
+./normalize-path
+./normalize-range
+./normalize-url
+./npm-run-path
+./nth-check
+./nth-check/lib
+./nwsapi
+./nwsapi/src
+./object-assign
+./object-hash
+./object-inspect
+./object-inspect/example
+./object-inspect/test
+./object-keys
+./object-keys/test
+./object.assign
+./object.assign/test
+./object.entries
+./object.entries/test
+./object.fromentries
+./object.fromentries/test
+./object.getownpropertydescriptors
+./object.getownpropertydescriptors/test
+./object.groupby
+./object.groupby/test
+./object.values
+./object.values/test
+./obuf
+./obuf/test
+./on-finished
+./on-headers
+./once
+./onetime
+./open
+./optionator
+./optionator/lib
+./own-keys
+./own-keys/test
+./p-limit
+./p-locate
+./p-retry
+./p-try
+./param-case
+./parent-module
+./parse-json
+./parse5
+./parse5/lib
+./parseurl
+./pascal-case
+./path-exists
+./path-is-absolute
+./path-key
+./path-parse
+./path-scurry
+./path-to-regexp
+./path-type
+./performance-now
+./performance-now/lib
+./performance-now/src
+./performance-now/test
+./picocolors
+./picomatch
+./picomatch/lib
+./pify
+./pirates
+./pirates/lib
+./pkg-dir
+./pkg-up
+./possible-typed-array-names
+./possible-typed-array-names/test
+./postcss
+./postcss-attribute-case-insensitive
+./postcss-browser-comments
+./postcss-calc
+./postcss-calc/src
+./postcss-calc/types
+./postcss-clamp
+./postcss-color-functional-notation
+./postcss-color-hex-alpha
+./postcss-color-rebeccapurple
+./postcss-colormin
+./postcss-colormin/src
+./postcss-colormin/types
+./postcss-convert-values
+./postcss-convert-values/src
+./postcss-convert-values/types
+./postcss-custom-media
+./postcss-custom-properties
+./postcss-custom-selectors
+./postcss-dir-pseudo-class
+./postcss-discard-comments
+./postcss-discard-comments/src
+./postcss-discard-comments/types
+./postcss-discard-duplicates
+./postcss-discard-duplicates/src
+./postcss-discard-duplicates/types
+./postcss-discard-empty
+./postcss-discard-empty/src
+./postcss-discard-empty/types
+./postcss-discard-overridden
+./postcss-discard-overridden/src
+./postcss-double-position-gradients
+./postcss-env-function
+./postcss-flexbugs-fixes
+./postcss-flexbugs-fixes/bugs
+./postcss-focus-visible
+./postcss-focus-within
+./postcss-font-variant
+./postcss-gap-properties
+./postcss-image-set-function
+./postcss-import
+./postcss-import/lib
+./postcss-initial
+./postcss-initial/.vscode
+./postcss-initial/lib
+./postcss-initial/~
+./postcss-js
+./postcss-lab-function
+./postcss-load-config
+./postcss-load-config/src
+./postcss-loader
+./postcss-logical
+./postcss-media-minmax
+./postcss-merge-longhand
+./postcss-merge-longhand/src
+./postcss-merge-longhand/types
+./postcss-merge-rules
+./postcss-merge-rules/src
+./postcss-merge-rules/types
+./postcss-minify-font-values
+./postcss-minify-font-values/src
+./postcss-minify-font-values/types
+./postcss-minify-gradients
+./postcss-minify-gradients/src
+./postcss-minify-gradients/types
+./postcss-minify-params
+./postcss-minify-params/src
+./postcss-minify-params/types
+./postcss-minify-selectors
+./postcss-minify-selectors/src
+./postcss-minify-selectors/types
+./postcss-modules-extract-imports
+./postcss-modules-extract-imports/src
+./postcss-modules-local-by-default
+./postcss-modules-local-by-default/src
+./postcss-modules-scope
+./postcss-modules-scope/src
+./postcss-modules-values
+./postcss-modules-values/src
+./postcss-nested
+./postcss-nesting
+./postcss-normalize
+./postcss-normalize-charset
+./postcss-normalize-charset/src
+./postcss-normalize-charset/types
+./postcss-normalize-display-values
+./postcss-normalize-display-values/src
+./postcss-normalize-display-values/types
+./postcss-normalize-positions
+./postcss-normalize-positions/src
+./postcss-normalize-positions/types
+./postcss-normalize-repeat-style
+./postcss-normalize-repeat-style/src
+./postcss-normalize-repeat-style/types
+./postcss-normalize-string
+./postcss-normalize-string/src
+./postcss-normalize-string/types
+./postcss-normalize-timing-functions
+./postcss-normalize-timing-functions/src
+./postcss-normalize-timing-functions/types
+./postcss-normalize-unicode
+./postcss-normalize-unicode/src
+./postcss-normalize-unicode/types
+./postcss-normalize-url
+./postcss-normalize-url/src
+./postcss-normalize-url/types
+./postcss-normalize-whitespace
+./postcss-normalize-whitespace/src
+./postcss-normalize-whitespace/types
+./postcss-opacity-percentage
+./postcss-ordered-values
+./postcss-ordered-values/src
+./postcss-ordered-values/types
+./postcss-overflow-shorthand
+./postcss-page-break
+./postcss-place
+./postcss-preset-env
+./postcss-pseudo-class-any-link
+./postcss-reduce-initial
+./postcss-reduce-initial/src
+./postcss-reduce-initial/types
+./postcss-reduce-transforms
+./postcss-reduce-transforms/src
+./postcss-reduce-transforms/types
+./postcss-replace-overflow-wrap
+./postcss-selector-not
+./postcss-selector-parser
+./postcss-svgo
+./postcss-svgo/src
+./postcss-svgo/types
+./postcss-unique-selectors
+./postcss-unique-selectors/src
+./postcss-unique-selectors/types
+./postcss-value-parser
+./postcss-value-parser/lib
+./postcss/lib
+./prelude-ls
+./prelude-ls/lib
+./pretty-bytes
+./pretty-error
+./pretty-error/lib
+./pretty-error/src
+./pretty-error/test
+./pretty-format
+./process-nextick-args
+./promise
+./promise/domains
+./promise/lib
+./promise/setimmediate
+./promise/src
+./prompts
+./prompts/lib
+./prop-types
+./prop-types/lib
+./proxy-addr
+./proxy-from-env
+./psl
+./psl/data
+./psl/types
+./punycode
+./q
+./qs
+./qs/lib
+./qs/test
+./querystringify
+./queue-microtask
+./raf
+./randombytes
+./range-parser
+./raw-body
+./react
+./react-app-polyfill
+./react-dev-utils
+./react-dom
+./react-dom/cjs
+./react-error-overlay
+./react-error-overlay/lib
+./react-i18next
+./react-i18next/.husky
+./react-i18next/src
+./react-is
+./react-is/cjs
+./react-is/umd
+./react-refresh
+./react-refresh/cjs
+./react-router
+./react-router-dom
+./react-scripts
+./react-scripts/bin
+./react-scripts/config
+./react-scripts/lib
+./react-scripts/scripts
+./react-scripts/template
+./react-scripts/template-typescript
+./react/cjs
+./read-cache
+./readable-stream
+./readable-stream/lib
+./readdirp
+./recursive-readdir
+./reflect.getprototypeof
+./reflect.getprototypeof/test
+./regenerate
+./regenerate-unicode-properties
+./regenerate-unicode-properties/Binary_Property
+./regenerate-unicode-properties/General_Category
+./regenerate-unicode-properties/Property_of_Strings
+./regenerate-unicode-properties/Script
+./regenerate-unicode-properties/Script_Extensions
+./regenerator-runtime
+./regex-parser
+./regex-parser/lib
+./regexp.prototype.flags
+./regexp.prototype.flags/test
+./regexpu-core
+./regexpu-core/data
+./regjsgen
+./regjsparser
+./regjsparser/bin
+./relateurl
+./relateurl/lib
+./renderkid
+./renderkid/docs
+./renderkid/lib
+./require-directory
+./require-from-string
+./requires-port
+./resolve
+./resolve-cwd
+./resolve-from
+./resolve-url-loader
+./resolve-url-loader/docs
+./resolve-url-loader/lib
+./resolve.exports
+./resolve/bin
+./resolve/example
+./resolve/lib
+./resolve/test
+./retry
+./retry/example
+./retry/lib
+./reusify
+./reusify/benchmarks
+./rimraf
+./rollup
+./rollup-plugin-terser
+./run-parallel
+./safe-array-concat
+./safe-array-concat/test
+./safe-buffer
+./safe-push-apply
+./safe-push-apply/test
+./safe-regex-test
+./safe-regex-test/test
+./safer-buffer
+./sanitize.css
+./sass-loader
+./sax
+./sax/lib
+./saxes
+./scheduler
+./scheduler/cjs
+./schema-utils
+./schema-utils/declarations
+./select-hose
+./select-hose/lib
+./select-hose/test
+./selfsigned
+./selfsigned/test
+./semver
+./semver/bin
+./send
+./serialize-javascript
+./serve-index
+./serve-index/public
+./serve-static
+./set-cookie-parser
+./set-cookie-parser/lib
+./set-function-length
+./set-function-name
+./set-proto
+./set-proto/test
+./setprototypeof
+./setprototypeof/test
+./shallow-clone
+./shebang-command
+./shebang-regex
+./shell-quote
+./shell-quote/test
+./side-channel
+./side-channel-list
+./side-channel-list/test
+./side-channel-map
+./side-channel-map/test
+./side-channel-weakmap
+./side-channel-weakmap/test
+./side-channel/test
+./signal-exit
+./sisteransi
+./sisteransi/src
+./slash
+./sockjs
+./sockjs/lib
+./source-list-map
+./source-list-map/lib
+./source-map
+./source-map-js
+./source-map-js/lib
+./source-map-loader
+./source-map-support
+./source-map/lib
+./sourcemap-codec
+./spdy
+./spdy-transport
+./spdy-transport/lib
+./spdy/lib
+./spdy/test
+./sprintf-js
+./sprintf-js/demo
+./sprintf-js/src
+./sprintf-js/test
+./stable
+./stack-utils
+./stackframe
+./static-eval
+./static-eval/example
+./static-eval/test
+./statuses
+./stop-iteration-iterator
+./stop-iteration-iterator/test
+./string-length
+./string-natural-compare
+./string-width
+./string-width-cjs
+./string.prototype.includes
+./string.prototype.includes/tests
+./string.prototype.matchall
+./string.prototype.matchall/test
+./string.prototype.repeat
+./string.prototype.repeat/tests
+./string.prototype.trim
+./string.prototype.trim/test
+./string.prototype.trimend
+./string.prototype.trimend/test
+./string.prototype.trimstart
+./string.prototype.trimstart/test
+./string_decoder
+./string_decoder/lib
+./stringify-object
+./strip-ansi
+./strip-ansi-cjs
+./strip-bom
+./strip-comments
+./strip-comments/lib
+./strip-final-newline
+./strip-json-comments
+./style-loader
+./stylehacks
+./stylehacks/src
+./stylehacks/types
+./sucrase
+./sucrase/bin
+./sucrase/register
+./sucrase/ts-node-plugin
+./supports-color
+./supports-hyperlinks
+./supports-preserve-symlinks-flag
+./supports-preserve-symlinks-flag/test
+./svg-parser
+./svgo
+./svgo/bin
+./svgo/lib
+./svgo/plugins
+./symbol-tree
+./symbol-tree/lib
+./tailwindcss
+./tailwindcss/lib
+./tailwindcss/nesting
+./tailwindcss/peers
+./tailwindcss/scripts
+./tailwindcss/src
+./tailwindcss/stubs
+./tailwindcss/types
+./tapable
+./tapable/lib
+./temp-dir
+./tempy
+./terminal-link
+./terser
+./terser-webpack-plugin
+./terser-webpack-plugin/types
+./terser/bin
+./terser/lib
+./terser/tools
+./test-exclude
+./text-table
+./text-table/example
+./text-table/test
+./thenify
+./thenify-all
+./throat
+./thunky
+./tmpl
+./tmpl/lib
+./to-regex-range
+./toidentifier
+./tough-cookie
+./tough-cookie/lib
+./tr46
+./tr46/lib
+./tryer
+./tryer/lib
+./tryer/src
+./tryer/test
+./ts-interface-checker
+./ts-node
+./ts-node/esm
+./ts-node/node10
+./ts-node/node12
+./ts-node/node14
+./ts-node/node16
+./ts-node/register
+./ts-node/transpilers
+./tsconfig-paths
+./tsconfig-paths/lib
+./tsconfig-paths/src
+./tslib
+./tslib/modules
+./tsutils
+./tsutils/typeguard
+./tsutils/util
+./type-check
+./type-check/lib
+./type-detect
+./type-fest
+./type-fest/source
+./type-fest/ts41
+./type-is
+./typed-array-buffer
+./typed-array-buffer/test
+./typed-array-byte-length
+./typed-array-byte-length/test
+./typed-array-byte-offset
+./typed-array-byte-offset/test
+./typed-array-length
+./typed-array-length/test
+./typedarray-to-buffer
+./typedarray-to-buffer/test
+./unbox-primitive
+./unbox-primitive/test
+./underscore
+./underscore/amd
+./underscore/cjs
+./underscore/modules
+./undici-types
+./unicode-canonical-property-names-ecmascript
+./unicode-match-property-ecmascript
+./unicode-match-property-value-ecmascript
+./unicode-match-property-value-ecmascript/data
+./unicode-property-aliases-ecmascript
+./unique-string
+./universalify
+./unpipe
+./unquote
+./upath
+./update-browserslist-db
+./uri-js
+./url-parse
+./use-sync-external-store
+./use-sync-external-store/cjs
+./use-sync-external-store/shim
+./util-deprecate
+./util.promisify
+./utila
+./utila/lib
+./utila/test
+./utils-merge
+./uuid
+./v8-compile-cache-lib
+./v8-to-istanbul
+./v8-to-istanbul/lib
+./vary
+./void-elements
+./w3c-hr-time
+./w3c-hr-time/lib
+./w3c-xmlserializer
+./w3c-xmlserializer/lib
+./walker
+./walker/lib
+./watchpack
+./watchpack/lib
+./wbuf
+./wbuf/test
+./webidl-conversions
+./webidl-conversions/lib
+./webpack
+./webpack-dev-middleware
+./webpack-dev-middleware/types
+./webpack-dev-server
+./webpack-dev-server/bin
+./webpack-dev-server/client
+./webpack-dev-server/lib
+./webpack-dev-server/types
+./webpack-manifest-plugin
+./webpack-merge
+./webpack-sources
+./webpack-sources/lib
+./webpack/bin
+./webpack/hot
+./webpack/lib
+./webpack/schemas
+./websocket-driver
+./websocket-driver/lib
+./websocket-extensions
+./websocket-extensions/lib
+./whatwg-encoding
+./whatwg-encoding/lib
+./whatwg-fetch
+./whatwg-mimetype
+./whatwg-mimetype/lib
+./whatwg-url
+./which
+./which-boxed-primitive
+./which-boxed-primitive/test
+./which-builtin-type
+./which-builtin-type/test
+./which-collection
+./which-collection/test
+./which-typed-array
+./which-typed-array/test
+./which/bin
+./wildcard
+./wildcard/examples
+./wildcard/test
+./word-wrap
+./workbox-background-sync
+./workbox-background-sync/lib
+./workbox-background-sync/src
+./workbox-broadcast-update
+./workbox-broadcast-update/src
+./workbox-broadcast-update/utils
+./workbox-cacheable-response
+./workbox-cacheable-response/src
+./workbox-core
+./workbox-core/_private
+./workbox-core/models
+./workbox-core/src
+./workbox-core/utils
+./workbox-expiration
+./workbox-expiration/models
+./workbox-expiration/src
+./workbox-google-analytics
+./workbox-google-analytics/src
+./workbox-google-analytics/utils
+./workbox-navigation-preload
+./workbox-navigation-preload/src
+./workbox-precaching
+./workbox-precaching/src
+./workbox-precaching/utils
+./workbox-range-requests
+./workbox-range-requests/src
+./workbox-range-requests/utils
+./workbox-recipes
+./workbox-recipes/src
+./workbox-routing
+./workbox-routing/src
+./workbox-routing/utils
+./workbox-strategies
+./workbox-strategies/plugins
+./workbox-strategies/src
+./workbox-strategies/utils
+./workbox-streams
+./workbox-streams/src
+./workbox-streams/utils
+./workbox-sw
+./workbox-sw/controllers
+./workbox-webpack-plugin
+./workbox-webpack-plugin/src
+./workbox-window
+./workbox-window/src
+./workbox-window/utils
+./wrap-ansi
+./wrap-ansi-cjs
+./wrappy
+./write-file-atomic
+./ws
+./ws/lib
+./xml-name-validator
+./xml-name-validator/lib
+./xmlchars
+./xmlchars/xml
+./xmlchars/xmlns
+./y18n
+./yallist
+./yaml
+./yaml/browser
+./yaml/types
+./yargs
+./yargs-parser
+./yargs/helpers
+./yargs/lib
+./yargs/locales
+./yn
+./yocto-queue
+
+--- Размеры директорий ---
+7.1M	./fork-ts-checker-webpack-plugin
+7.2M	./react-dom
+7.4M	./webpack
+11M	./es-abstract
+16M	./core-js
+16M	./core-js-pure
+17M	./@babel
+19M	./react-scripts
+44M	./lucide-react
+344M	.
+
+33[0;34m============================================33[0m
+33[0;34m4. ПРОВЕРКА ВАЖНЫХ ФАЙЛОВ33[0m
+33[0;34m============================================33[0m
+
+33[0;31m❌ frontend/package.json НЕ найден33[0m
+33[0;31m❌ backend/requirements.txt НЕ найден33[0m
+33[0;31m❌ frontend/.env НЕ найден33[0m
+33[0;31m❌ backend/.env НЕ найден33[0m
+33[0;31m❌ backend/venv НЕ найден33[0m
+33[0;31m❌ frontend/node_modules НЕ найден33[0m
+33[0;31m❌ frontend/build НЕ найден33[0m
+
+33[0;34m============================================33[0m
+33[0;34m5. КОНФИГУРАЦИОННЫЕ ФАЙЛЫ33[0m
+33[0;34m============================================33[0m
+
+
+33[0;34m============================================33[0m
+33[0;34m6. УСТАНОВЛЕННОЕ ПО И ВЕРСИИ33[0m
+33[0;34m============================================33[0m
+
+33[0;32m✅ node: v20.19.533[0m
+33[0;32m✅ npm: 10.8.233[0m
+33[0;32m✅ yarn: 1.22.2233[0m
+33[0;32m✅ python3: Python 3.10.1233[0m
+33[0;31m❌ python3.11 не установлен33[0m
+33[0;32m✅ pip3: pip 22.0.2 from /usr/lib/python3/dist-packages/pip (python 3.10)33[0m
+33[0;32m✅ mongod: db version v6.0.2633[0m
+33[0;32m✅ nginx: nginx version: nginx/1.18.0 (Ubuntu)33[0m
+33[0;32m✅ git: git version 2.34.133[0m
+
+33[0;34m============================================33[0m
+33[0;34m7. СТАТУС СЕРВИСОВ33[0m
+33[0;34m============================================33[0m
+
+33[0;32m✅ Сервис mongod: active33[0m
+  └─ Последние 5 строк логов:
+     Oct 25 17:14:33 ruvds-3gfwy systemd[1]: Started MongoDB Database Server.
+     Oct 25 17:14:33 ruvds-3gfwy mongod[142998]: {"t":{"$date":"2025-10-25T17:14:33.872Z"},"s":"I",  "c":"CONTROL",  "id":7484500, "ctx":"-","msg":"Environment variable MONGODB_CONFIG_OVERRIDE_NOFORK == 1, overriding \"processManagement.fork\" to false"}
+
+33[0;31m❌ Сервис mongodb: inactive33[0m
+  └─ Последние 5 строк логов:
+     -- No entries --
+
+33[1;33m⚠️  Сервис rudn-backend не найден в systemd33[0m
+33[1;33m⚠️  Сервис rudn-frontend не найден в systemd33[0m
+33[0;32m✅ Сервис rudn-schedule-backend: active33[0m
+  └─ Последние 5 строк логов:
+     Oct 27 09:56:40 ruvds-3gfwy systemd[1]: Stopping RUDN Schedule Backend (FastAPI)...
+     Oct 27 09:56:42 ruvds-3gfwy systemd[1]: rudn-schedule-backend.service: Deactivated successfully.
+     Oct 27 09:56:42 ruvds-3gfwy systemd[1]: Stopped RUDN Schedule Backend (FastAPI).
+     Oct 27 09:56:42 ruvds-3gfwy systemd[1]: rudn-schedule-backend.service: Consumed 9min 37.657s CPU time.
+     Oct 27 09:56:42 ruvds-3gfwy systemd[1]: Started RUDN Schedule Backend (FastAPI).
+
+33[1;33m⚠️  Сервис rudn-schedule-frontend не найден в systemd33[0m
+33[0;31m❌ Сервис backend: inactive33[0m
+  └─ Последние 5 строк логов:
+     -- No entries --
+
+33[1;33m⚠️  Сервис frontend не найден в systemd33[0m
+33[0;32m✅ Сервис nginx: active33[0m
+  └─ Последние 5 строк логов:
+     Oct 25 22:36:45 ruvds-3gfwy systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+     Oct 25 23:41:28 ruvds-3gfwy systemd[1]: Reloading A high performance web server and a reverse proxy server...
+     Oct 25 23:41:28 ruvds-3gfwy systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+     Oct 27 09:57:08 ruvds-3gfwy systemd[1]: Reloading A high performance web server and a reverse proxy server...
+     Oct 27 09:57:09 ruvds-3gfwy systemd[1]: Reloaded A high performance web server and a reverse proxy server.
+
+
+--- Все сервисы с 'rudn' в названии ---
+  rudn-schedule-backend.service          loaded    active   running RUDN Schedule Backend (FastAPI)
+
+33[0;34m============================================33[0m
+33[0;34m8. ЗАПУЩЕННЫЕ ПРОЦЕССЫ33[0m
+33[0;34m============================================33[0m
+
+--- Node.js процессы ---
+Node.js процессы не найдены
+
+--- Python/Uvicorn процессы ---
+root         638  0.3 11.4 429412 101492 pts/1   Sl+  Oct15  51:58 python3 main.py
+www-data  172335  0.0  1.8  29488 16220 ?        Ss   09:56   0:00 /var/www/rudn-schedule.ru/backend/venv/bin/python3 /var/www/rudn-schedule.ru/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --workers 2
+www-data  172338  0.0  0.8  16316  7280 ?        S    09:56   0:00 /var/www/rudn-schedule.ru/backend/venv/bin/python3 -c from multiprocessing.resource_tracker import main;main(4)
+www-data  172339  0.3  8.9 476304 79540 ?        Sl   09:56   0:04 /var/www/rudn-schedule.ru/backend/venv/bin/python3 -c from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=5, pipe_handle=7) --multiprocessing-fork
+www-data  172345  0.3  9.1 476228 80856 ?        Sl   09:56   0:04 /var/www/rudn-schedule.ru/backend/venv/bin/python3 -c from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=5, pipe_handle=9) --multiprocessing-fork
+
+--- MongoDB процессы ---
+mongodb   142998  0.6  4.9 2597340 44292 ?       Ssl  Oct25  16:02 /usr/bin/mongod --config /etc/mongod.conf
+
+33[0;34m============================================33[0m
+33[0;34m9. ЗАНЯТЫЕ ПОРТЫ33[0m
+33[0;34m============================================33[0m
+
+Проверяем порты: 3000 (frontend), 8001 (backend), 27017 (mongodb), 80 (http), 443 (https)
+
+127.0.0.1:27017 142998/mongod
+0.0.0.0:80 153987/nginx:
+0.0.0.0:443 153987/nginx:
+0.0.0.0:8001 172335/python3
+:::80 153987/nginx:
+
+33[0;34m============================================33[0m
+33[0;34m10. КОНФИГУРАЦИЯ NGINX33[0m
+33[0;34m============================================33[0m
+
+--- Доступные сайты ---
+total 16
+drwxr-xr-x 2 root root 4096 Oct 25 20:05 .
+drwxr-xr-x 8 root root 4096 Oct 25 19:30 ..
+-rw-r--r-- 1 root root 2412 May 30  2023 default
+-rw-r--r-- 1 root root 2076 Oct 25 20:47 rudn-schedule.ru
+
+--- Включенные сайты ---
+total 8
+drwxr-xr-x 2 root root 4096 Oct 25 20:47 .
+drwxr-xr-x 8 root root 4096 Oct 25 19:30 ..
+lrwxrwxrwx 1 root root   34 Oct 25 17:16 default -> /etc/nginx/sites-available/default
+lrwxrwxrwx 1 root root   43 Oct 25 18:08 rudn-schedule.ru -> /etc/nginx/sites-available/rudn-schedule.ru
+
+--- Конфигурация rudn-schedule ---
+server {
+    listen 80;
+    server_name rudn-schedule.ru www.rudn-schedule.ru;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name rudn-schedule.ru www.rudn-schedule.ru;
+    
+    # Указываем папку со собранным frontend
+    root /var/www/rudn-schedule.ru/frontend/dist;
+    index index.html index.htm;
+    
+    # SSL сертификаты (уже настроены certbot)
+    ssl_certificate /etc/letsencrypt/live/rudn-schedule.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/rudn-schedule.ru/privkey.pem;
+    
+    # Настройки SSL
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+    
+    # SPA routing - важно для Vue/React приложений
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Кэширование статических файлов
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # API прокси (если нужно к backend)
+    location /api/ {
+        proxy_pass http://localhost:8001; # или порт вашего backend
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # Безопасность
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # Логи
+    access_log /var/log/nginx/rudn-schedule.ru.access.log;
+    error_log /var/log/nginx/rudn-schedule.ru.error.log;
+}
+
+--- Проверка синтаксиса Nginx ---
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+33[0;34m============================================33[0m
+33[0;34m11. ПРОВЕРКА ДОСТУПНОСТИ33[0m
+33[0;34m============================================33[0m
+
+--- Локальные порты ---
+HTTP 00033[0;31m❌ Frontend (localhost:3000) недоступен33[0m
+
+HTTP 200 - Backend (localhost:8001)
+
+
+--- Внешний домен ---
+HTTP 301 - http://rudn-schedule.ru
+
+HTTP 403 - https://rudn-schedule.ru (SSL)
+
+
+33[0;34m============================================33[0m
+33[0;34m12. ПОСЛЕДНИЕ ОШИБКИ ИЗ ЛОГОВ33[0m
+33[0;34m============================================33[0m
+
+--- Nginx Error Log (последние 20 строк) ---
+2025/10/25 19:43:22 [error] 147797#147797: *67 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 104.164.173.107, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:43:22 [error] 147797#147797: *66 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 104.164.126.114, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:43:26 [error] 147797#147797: *68 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 146.70.185.32, server: rudn-schedule.ru, request: "HEAD / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:43:27 [error] 147797#147797: *69 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 146.70.185.32, server: rudn-schedule.ru, request: "HEAD / HTTP/1.1", host: "www.rudn-schedule.ru"
+2025/10/25 19:43:32 [error] 147797#147797: *70 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 103.196.9.147, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:43:47 [crit] 147797#147797: *81 SSL_do_handshake() failed (SSL: error:0A00006C:SSL routines::bad key share) while SSL handshaking, client: 34.96.47.105, server: 0.0.0.0:443
+2025/10/25 19:44:04 [crit] 147797#147797: *92 SSL_do_handshake() failed (SSL: error:0A00006C:SSL routines::bad key share) while SSL handshaking, client: 34.96.47.138, server: 0.0.0.0:443
+2025/10/25 19:47:02 [crit] 147797#147797: *103 SSL_do_handshake() failed (SSL: error:0A00006C:SSL routines::bad key share) while SSL handshaking, client: 34.96.45.21, server: 0.0.0.0:443
+2025/10/25 19:49:20 [error] 147797#147797: *106 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 91.246.51.198, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:52:24 [error] 147797#147797: *107 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 13.217.6.192, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:52:24 [error] 147797#147797: *107 open() "/var/www/rudn-schedule.ru/favicon.ico" failed (2: No such file or directory), client: 13.217.6.192, server: rudn-schedule.ru, request: "GET /favicon.ico HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:52:25 [error] 147797#147797: *107 open() "/var/www/rudn-schedule.ru/favicon.png" failed (2: No such file or directory), client: 13.217.6.192, server: rudn-schedule.ru, request: "GET /favicon.png HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 19:52:32 [error] 147797#147797: *110 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 141.95.175.51, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 20:06:07 [error] 147797#147797: *115 directory index of "/var/www/rudn-schedule.ru/" is forbidden, client: 54.234.139.106, server: rudn-schedule.ru, request: "GET / HTTP/1.1", host: "rudn-schedule.ru"
+2025/10/25 20:06:08 [error] 147797#147797: *115 open() "/var/www/rudn-schedule.ru/favicon.ico" failed (2: No such file or directory), client: 54.234.139.106, server: rudn-schedule.ru, request: "GET /favicon.ico HTTP/1.1", host: "rudn-schedule.ru", referrer: "https://rudn-schedule.ru/"
+2025/10/25 20:06:10 [notice] 151068#151068: signal process started
+2025/10/25 22:36:44 [notice] 155481#155481: signal process started
+2025/10/25 23:41:28 [notice] 156305#156305: signal process started
+2025/10/26 15:01:11 [error] 156310#156310: *1307 client intended to send too large body: 10485761 bytes, client: 185.91.69.5, server: _, request: "POST / HTTP/1.1", host: "193.108.113.80"
+2025/10/27 09:57:08 [notice] 172390#172390: signal process started
+
+--- Системные ошибки (последний час) ---
+Oct 27 09:33:49 ruvds-3gfwy sshd[172116]: error: kex_exchange_identification: Connection closed by remote host
+Oct 27 10:07:26 ruvds-3gfwy sshd[172477]: error: kex_exchange_identification: banner line contains invalid characters
+Oct 27 10:07:26 ruvds-3gfwy sshd[172478]: error: kex_exchange_identification: banner line contains invalid characters
+Oct 27 10:07:26 ruvds-3gfwy sshd[172479]: error: kex_exchange_identification: banner line contains invalid characters
+
+33[0;34m============================================33[0m
+33[0;34m13. УСТАНОВЛЕННЫЕ ЗАВИСИМОСТИ33[0m
+33[0;34m============================================33[0m
+
+33[0;31m❌ frontend/node_modules не найден - зависимости не установлены33[0m
+
+--- Backend Python packages ---
+33[0;31m❌ Python venv не найден - зависимости не установлены33[0m
+
+33[0;34m============================================33[0m
+33[0;34m14. ИТОГОВАЯ СВОДКА33[0m
+33[0;34m============================================33[0m
+
+📋 Краткая сводка состояния системы:
+
+⚠️  Frontend зависимости не установлены
+⚠️  Backend зависимости не установлены
+33[1;33m⚠️  Обнаружено проблем: 233[0m
+
+33[0;32m============================================33[0m
+33[0;32mДиагностика завершена!33[0m
+33[0;32m============================================33[0m
+
+Результаты сохранены в текущей директории.
+Для сохранения в файл запустите:
+  ./diagnose_server.sh > diagnostic_report.txt 2>&1
+

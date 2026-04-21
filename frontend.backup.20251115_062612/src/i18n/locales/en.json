@@ -1,0 +1,107 @@
+{
+  "header": {
+    "title": "RUDN Schedule"
+  },
+  "menu": {
+    "title": "Menu",
+    "achievements": "Achievements",
+    "analytics": "Analytics",
+    "notifications": "Notifications",
+    "calendar": "Calendar",
+    "language": "Language",
+    "footer": "RUDN Schedule"
+  },
+  "liveScheduleCard": {
+    "currentClass": "Current class:",
+    "noClass": "No classes now!",
+    "timeLeft": "Time left: {{minutes}} minutes",
+    "relax": "Relax! :)"
+  },
+  "liveScheduleSection": {
+    "title": "Live Schedule",
+    "group": "Group: {{groupName}}",
+    "currentWeek": "Current week",
+    "nextWeek": "Next week",
+    "changeGroup": "Change group",
+    "loading": "Loading schedule...",
+    "noClasses": "No classes on this day"
+  },
+  "classStatus": {
+    "upcoming": "Upcoming",
+    "inProgress": "In Progress",
+    "finished": "Finished"
+  },
+  "classDetails": {
+    "auditory": "Room:",
+    "teacher": "Teacher:"
+  },
+  "weekDays": {
+    "short": {
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat"
+    },
+    "full": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    }
+  },
+  "months": {
+    "january": "January",
+    "february": "February",
+    "march": "March",
+    "april": "April",
+    "may": "May",
+    "june": "June",
+    "july": "July",
+    "august": "August",
+    "september": "September",
+    "october": "October",
+    "november": "November",
+    "december": "December"
+  },
+  "groupSelector": {
+    "selectFaculty": "Select faculty",
+    "selectLevel": "Select education level",
+    "selectCourse": "Select course",
+    "selectForm": "Select form of study",
+    "selectGroup": "Select group",
+    "back": "Back",
+    "cancel": "Cancel",
+    "noOptions": "No available options",
+    "unavailable": "Unavailable"
+  },
+  "achievements": {
+    "title": "Achievements",
+    "totalPoints": "Total Points",
+    "progress": "Progress",
+    "viewAll": "View All",
+    "recent": "Recent Achievements",
+    "points": "points"
+  },
+  "sidebar": {
+    "quickActions": "Quick Actions"
+  },
+  "bottomNav": {
+    "home": "Home",
+    "tasks": "To-Do List",
+    "journal": "Journal"
+  },
+  "common": {
+    "loading": "Loading...",
+    "retry": "Retry",
+    "error": "Error",
+    "scheduleError": "Error loading schedule: {{message}}",
+    "groupSelected": "Group {{groupName}} selected!",
+    "settingsError": "Error saving settings: {{message}}"
+  }
+}

@@ -1,0 +1,14 @@
+[0;1;32m●[0m rudn-schedule-backend.service - RUDN Schedule Backend (FastAPI)
+     Loaded: loaded (/etc/systemd/system/rudn-schedule-backend.service; enabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Sun 2025-11-16 20:11:02 UTC; 1s ago
+   Main PID: 5645 (uvicorn)
+      Tasks: 4 (limit: 977)
+     Memory: 64.6M
+        CPU: 1.229s
+     CGroup: /system.slice/rudn-schedule-backend.service
+             ├─5645 /var/www/rudn-schedule.ru/backend/venv/bin/python3 /var/www/rudn-schedule.ru/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --workers 2
+             ├─5647 /var/www/rudn-schedule.ru/backend/venv/bin/python3 -c "from multiprocessing.resource_tracker import main;main(4)"
+             ├─5648 /var/www/rudn-schedule.ru/backend/venv/bin/python3 -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=5, pipe_handle=7)" --multiprocessing-fork
+             └─5649 /var/www/rudn-schedule.ru/backend/venv/bin/python3 -c "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=5, pipe_handle=9)" --multiprocessing-fork
+
+Nov 16 20:11:02 ruvds-3gfwy systemd[1]: Started RUDN Schedule Backend (FastAPI).

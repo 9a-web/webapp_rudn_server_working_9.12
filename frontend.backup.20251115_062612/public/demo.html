@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progress Bar Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1A1A1A;
+            color: white;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        .demo-card {
+            background: #343434;
+            border-radius: 24px;
+            padding: 32px;
+            width: 100%;
+            max-width: 400px;
+            margin: 20px 0;
+        }
+        
+        .circle-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+        }
+        
+        .glow {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(163, 247, 191, 0.3) 0%, rgba(255, 230, 109, 0.2) 25%, rgba(255, 180, 209, 0.2) 50%, rgba(196, 163, 255, 0.2) 75%, rgba(128, 232, 255, 0.3) 100%);
+            filter: blur(20px);
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+        
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: rotate(-90deg);
+        }
+        
+        .time-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            background: #343434;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            z-index: 10;
+            animation: box-glow 2.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { 
+                transform: scale(1);
+                opacity: 0.4;
+            }
+            50% { 
+                transform: scale(1.15);
+                opacity: 0.7;
+            }
+        }
+        
+        @keyframes box-glow {
+            0%, 100% { 
+                box-shadow: 0 0 0 rgba(163, 247, 191, 0);
+            }
+            50% { 
+                box-shadow: 0 0 20px rgba(163, 247, 191, 0.3);
+            }
+        }
+        
+        .controls {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 20px 0;
+            accent-color: #A3F7BF;
+        }
+        
+        .info {
+            text-align: center;
+            color: #999999;
+            margin-top: 20px;
+        }
+        
+        h2 {
+            color: #A3F7BF;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            color: #FFE66D;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="color: #A3F7BF;">🎯 Progress Bar Demo</h1>
+    <p style="color: #999999;">Измените слайдер чтобы увидеть прогресс занятия</p>
+    
+    <div class="demo-card">
+        <h2>Идёт занятие: Высшая математика</h2>
+        <div class="progress-text">Прогресс: <span id="progressPercent">50</span>%</div>
+        
+        <div class="circle-container">
+            <div class="glow"></div>
+            
+            <svg width="120" height="120">
+                <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#A3F7BF" />
+                        <stop offset="25%" stop-color="#FFE66D" />
+                        <stop offset="50%" stop-color="#FFB4D1" />
+                        <stop offset="75%" stop-color="#C4A3FF" />
+                        <stop offset="100%" stop-color="#80E8FF" />
+                    </linearGradient>
+                </defs>
+                <circle
+                    cx="60"
+                    cy="60"
+                    r="42"
+                    stroke="rgba(255, 255, 255, 0.1)"
+                    stroke-width="4"
+                    fill="none"
+                />
+                <circle
+                    id="progressCircle"
+                    cx="60"
+                    cy="60"
+                    r="42"
+                    stroke="url(#progressGradient)"
+                    stroke-width="5"
+                    fill="none"
+                    stroke-linecap="round"
+                    style="filter: drop-shadow(0 0 8px rgba(163, 247, 191, 0.6)); transition: stroke-dashoffset 1s cubic-bezier(0.25, 0.1, 0.25, 1);"
+                />
+            </svg>
+            
+            <div class="time-display" id="timeDisplay">15:23</div>
+        </div>
+        
+        <div class="controls">
+            <label style="color: #FFFFFF;">⏱️ Осталось минут: <span id="minutesLeft">45</span></label>
+            <input type="range" id="minutesSlider" min="1" max="90" value="45">
+            <div class="info">
+                <small>1 мин ← → 90 мин</small>
+            </div>
+        </div>
+    </div>
+    
+    <div style="max-width: 400px; text-align: center; color: #666; margin-top: 20px;">
+        <p>✨ Обратите внимание на:</p>
+        <ul style="text-align: left; color: #999;">
+            <li>Плавное заполнение progress bar</li>
+            <li>Пульсирующее свечение</li>
+            <li>Градиентная окраска кольца</li>
+            <li>Box-shadow анимация центрального круга</li>
+        </ul>
+    </div>
+
+    <script>
+        const slider = document.getElementById('minutesSlider');
+        const minutesLeftText = document.getElementById('minutesLeft');
+        const progressCircle = document.getElementById('progressCircle');
+        const progressPercent = document.getElementById('progressPercent');
+        const timeDisplay = document.getElementById('timeDisplay');
+        
+        const circleRadius = 42;
+        const circleCircumference = 2 * Math.PI * circleRadius;
+        
+        // Set initial dash array
+        progressCircle.style.strokeDasharray = circleCircumference;
+        
+        function updateProgress() {
+            const minutesLeft = parseInt(slider.value);
+            const totalClassDuration = 90;
+            const elapsed = totalClassDuration - minutesLeft;
+            const progressPercentage = Math.max(0, Math.min(100, (elapsed / totalClassDuration) * 100));
+            
+            const offset = circleCircumference - (circleCircumference * progressPercentage) / 100;
+            progressCircle.style.strokeDashoffset = offset;
+            
+            minutesLeftText.textContent = minutesLeft;
+            progressPercent.textContent = Math.round(progressPercentage);
+        }
+        
+        slider.addEventListener('input', updateProgress);
+        
+        // Update time every second
+        function updateTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            timeDisplay.textContent = `${hours}:${minutes}`;
+        }
+        
+        updateProgress();
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

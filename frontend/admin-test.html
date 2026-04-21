@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Panel Test</title>
+  <script>
+    // Mock Telegram WebApp SDK
+    window.Telegram = {
+      WebApp: {
+        ready: function() {},
+        expand: function() {},
+        enableClosingConfirmation: function() {},
+        disableClosingConfirmation: function() {},
+        MainButton: { show: function(){}, hide: function(){}, setText: function(){}, onClick: function(){}, offClick: function(){} },
+        BackButton: { show: function(){}, hide: function(){}, onClick: function(){}, offClick: function(){} },
+        HapticFeedback: { impactOccurred: function(){}, notificationOccurred: function(){}, selectionChanged: function(){} },
+        themeParams: { bg_color: '#1a1a2e', text_color: '#ffffff', hint_color: '#888888', button_color: '#8b5cf6', button_text_color: '#ffffff', secondary_bg_color: '#16162a' },
+        initDataUnsafe: { user: { id: 765963392, first_name: 'Admin', last_name: 'Test', username: 'admin' } },
+        initData: 'test',
+        colorScheme: 'dark',
+        viewportHeight: 800,
+        viewportStableHeight: 800,
+        isExpanded: true,
+        platform: 'web',
+        version: '7.0',
+        onEvent: function() {},
+        offEvent: function() {},
+        setHeaderColor: function() {},
+        setBackgroundColor: function() {},
+      }
+    };
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/admin-test.jsx"></script>
+</body>
+</html>

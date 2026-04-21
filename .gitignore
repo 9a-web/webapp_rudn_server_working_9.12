@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+backend/venv/
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Build (если не хотите загружать)
+frontend/dist/
+frontend/build/
+
+# Environment files - НЕ загружать в репозиторий
+.env
+*.env
+backend/.env
+frontend/.env# Environment files - НЕ загружать в репозиторий
+.env
+*.env
+backend/.env
+frontend/.env
+
+# Logs
+*.log
+frontend/.env
+.env

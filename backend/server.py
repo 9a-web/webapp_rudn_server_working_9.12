@@ -1,0 +1,20290 @@
+from fastapi import FastAPI, APIRouter, HTTPException, Body, WebSocket, WebSocketDisconnect, Request, Query, UploadFile, File, Depends
+from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import (
+    ServerSelectionTimeoutError,
+    ConnectionFailure,
+    AutoReconnect,
+    NetworkTimeout,
+    OperationFailure,
+)
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+import uuid
+from datetime import datetime, timedelta, timezone
+from itertools import groupby
+import httpx
+import aiohttp
+import asyncio
+import threading
+import psutil
+import platform
+import subprocess as _subprocess
+import time as _time_module
+
+# Импорт модулей парсера и моделей
+from rudn_parser import (
+    get_facultets,
+    get_filter_data,
+    extract_options,
+    get_schedule
+)
+from models import (
+    Faculty,
+    FilterDataRequest,
+    FilterDataResponse,
+    FilterOption,
+    ScheduleRequest,
+    ScheduleResponse,
+    ScheduleEvent,
+    UserSettings,
+    UserSettingsCreate,
+    UserSettingsResponse,
+    ErrorResponse,
+    SuccessResponse,
+    NotificationSettingsUpdate,
+    NotificationSettingsResponse,
+    NotificationStatsResponse,
+    ThemeMode,
+    ThemeSettingsUpdate,
+    ThemeSettingsResponse,
+    Achievement,
+    UserAchievement,
+    UserAchievementResponse,
+    UserStats,
+    UserStatsResponse,
+    TrackActionRequest,
+    NewAchievementsResponse,
+    WeatherResponse,
+    BotInfo,
+    Task,
+    TaskCreate,
+    TaskUpdate,
+    TaskResponse,
+    YouTubeInfoResponse,
+    VKVideoInfoResponse,
+    TaskProductivityStats,
+    TaskReorderItem,
+    TaskReorderRequest,
+    TaskSubtask,
+    TaskSubtaskCreate,
+    TaskSubtaskUpdate,
+    GroupTask,
+    GroupTaskCreate,
+    GroupTaskResponse,
+    GroupTaskParticipant,
+    GroupTaskComment,
+    GroupTaskCommentCreate,
+    GroupTaskCommentResponse,
+    GroupTaskInvite,
+    GroupTaskInviteCreate,
+    GroupTaskInviteResponse,
+    GroupTaskCompleteRequest,
+    Room,
+    RoomCreate,
+    RoomResponse,
+    RoomParticipant,
+    RoomInviteLinkResponse,
+    RoomJoinRequest,
+    RoomTaskCreate,
+    AdminStatsResponse,
+    UserActivityPoint,
+    HourlyActivityPoint,
+    FeatureUsageStats,
+    TopUser,
+    AdminSendNotificationRequest,
+    FacultyStats,
+    CourseStats,
+    Subtask,
+    SubtaskCreate,
+    SubtaskUpdate,
+    GroupTaskUpdate,
+    RoomActivity,
+    RoomActivityResponse,
+    RoomStatsResponse,
+    ParticipantRoleUpdate,
+    RoomUpdate,
+    RoomAddFriendsRequest,
+    RoomFriendToAdd,
+    RoomTaskReorderRequest,
+    KickParticipantRequest,
+    TransferOwnershipRequest,
+    GroupTaskCommentUpdate,
+    GroupTaskPinRequest,
+    ReferralUser,
+    ReferralStats,
+    ReferralTreeNode,
+    ReferralCodeResponse,
+    ReferralConnection,
+    ProcessReferralRequest,
+    PlannerSyncRequest,
+    PlannerSyncResponse,
+    PlannerDayRequest,
+    PlannerDayResponse,
+    ProcessReferralResponse,
+    # Модели для журнала посещений
+    AttendanceJournal,
+    JournalCreate,
+    JournalStudent,
+    JournalStudentCreate,
+    JournalStudentBulkCreate,
+    JournalStudentsFromFriendsCreate,
+    JournalStudentFromFriend,
+    JournalStudentLink,
+    JournalSubject,
+    JournalSubjectCreate,
+    JournalSession,
+    JournalSessionCreate,
+    ScheduleSessionItem,
+    CreateSessionsFromScheduleRequest,
+    AttendanceRecord,
+    AttendanceRecordCreate,
+    AttendanceBulkCreate,
+    JournalPendingMember,
+    JournalJoinRequest,
+    JournalJoinApplication,
+    ProcessJournalApplicationRequest,
+    JournalResponse,
+    JournalStudentResponse,
+    JournalSessionResponse,
+    AttendanceRecordResponse,
+    JournalStatsResponse,
+    SubjectStatsResponse,
+    JournalInviteLinkResponse,
+    StudentInviteLinkResponse,
+    JoinStudentRequest,
+    ProcessJournalInviteRequest,
+    MyAttendanceResponse,
+    JournalSettings,
+    # Модели для отслеживания реферальных событий
+    ReferralEvent,
+    ReferralEventResponse,
+    ReferralStatsDetailResponse,
+    # Модели для истории уведомлений
+    NotificationHistoryItem,
+    NotificationHistoryResponse,
+    # Модели для ЛК РУДН
+    LKCredentialsRequest,
+    LKPersonalData,
+    LKConnectionResponse,
+    LKDataResponse,
+    LKStatusResponse,
+    # Модели для системы друзей
+    FriendshipStatus,
+    PrivacySettings,
+    FriendRequest,
+    FriendRequestCreate,
+    Friend,
+    UserBlock,
+    UserProfilePublic,
+    FriendCard,
+    FriendRequestCard,
+    FriendsListResponse,
+    FriendRequestsResponse,
+    FriendSearchResult,
+    FriendSearchResponse,
+    ProcessFriendInviteRequest,
+    ProcessFriendInviteResponse,
+    MutualFriendsResponse,
+    FriendScheduleResponse,
+    PrivacySettingsUpdate,
+    FriendActionResponse,
+    # Модели для системы сообщений
+    MessageType,
+    ReactionInfo,
+    ReplyInfo,
+    MessageCreate,
+    MessageEdit,
+    MessageReaction,
+    MessagePin,
+    MessageForward,
+    ScheduleShareMessage,
+    MusicShareMessage,
+    TaskFromMessage,
+    TypingIndicator,
+    MessageResponse,
+    ConversationCreate,
+    ConversationParticipant,
+    ConversationResponse,
+    ConversationsListResponse,
+    MessagesListResponse,
+    MessagesUnreadCountResponse,
+    MessageActionResponse,
+    # Модели для системы уведомлений
+    NotificationType,
+    NotificationCategory,
+    NotificationPriority,
+    InAppNotification,
+    InAppNotificationCreate,
+    NotificationCard,
+    NotificationsListResponse,
+    ExtendedNotificationSettings,
+    ExtendedNotificationSettingsUpdate,
+    UnreadCountResponse,
+    # Модели для веб-сессий (связка Telegram профиля)
+    WebSessionStatus,
+    WebSession,
+    WebSessionCreate,
+    WebSessionResponse,
+    WebSessionLinkRequest,
+    WebSessionLinkResponse,
+    WebSessionCreateRequest,
+    DeviceInfo,
+    DevicesListResponse,
+    # Модели для совместного прослушивания музыки
+    ListeningRoomControlMode,
+    ListeningRoomParticipant,
+    ListeningRoomTrack,
+    ListeningRoomState,
+    ListeningRoom,
+    CreateListeningRoomRequest,
+    CreateListeningRoomResponse,
+    JoinListeningRoomRequest,
+    JoinListeningRoomResponse,
+    ListeningRoomResponse,
+    UpdateListeningRoomSettingsRequest,
+    ListeningRoomSyncEvent,
+    # Модели для админских реферальных ссылок
+    AdminReferralLinkCreate,
+    AdminReferralLinkUpdate,
+    AdminReferralLink,
+    ReferralLinkEvent,
+    AdminReferralTrackRequest,
+    AdminReferralLinkResponse,
+    ReferralLinksAnalytics,
+    # Модели для стрик-механики
+    VisitResponse,
+    # Модели для совместного расписания
+    SharedScheduleCreate,
+    SharedScheduleAddParticipant,
+    SharedScheduleResponse,
+    # Модели для Dev-команд
+    DevAddXPRequest,
+    DevSetXPRequest,
+    DevResetStreakRequest,
+    DevCommandRequest,
+)
+from notifications import get_notification_service
+from scheduler import get_scheduler  # Старая система (резерв)
+from scheduler_v2 import get_scheduler_v2  # Новая улучшенная система
+from cache import cache
+from auth_routes import create_auth_router, migrate_user_settings_to_users
+from auth_utils import (
+    get_current_user_required,
+    get_current_user_optional,
+)
+from achievements import (
+    get_all_achievements,
+    get_user_achievements,
+    track_user_action,
+    get_or_create_user_stats,
+    mark_achievements_as_seen,
+    check_and_award_achievements
+)
+from level_system import (
+    calculate_level_info, award_xp, safe_award_xp,
+    recalculate_xp_for_user, get_xp_breakdown_readonly,
+    XP_REWARDS, XP_REWARDS_INFO, DAILY_XP_LIMITS,
+    consume_pending_level_up, check_daily_xp_limit,
+    get_xp_history, get_daily_xp_progress,
+    LEVEL_TITLES, TIER_THRESHOLDS as LEVEL_TIER_THRESHOLDS,
+    get_stars_in_tier, get_level_title,
+)
+from weather import get_moscow_weather
+from config import get_telegram_bot_token, get_telegram_bot_username, is_test_environment, ENV
+from lk_parser import RUDNLKParser
+
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# Configure logging early (DEBUG для test, INFO для production)
+_log_level = logging.DEBUG if ENV != "production" else logging.INFO
+logging.basicConfig(
+    level=_log_level,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+logger.info(f"📋 Logging level: {logging.getLevelName(_log_level)} (ENV={ENV})")
+
+# MongoDB connection (с улучшенной отказоустойчивостью)
+mongo_url = os.environ['MONGO_URL']
+_db_name = os.environ['DB_NAME']
+
+# --- Флаг состояния MongoDB (для middleware и health-check) ---
+_mongo_healthy: bool = False
+_mongo_last_error: str = ""
+_mongo_last_check: float = 0.0
+
+def _create_mongo_client() -> AsyncIOMotorClient:
+    """Создаёт Motor-клиент с параметрами, повышающими устойчивость к сбоям."""
+    return AsyncIOMotorClient(
+        mongo_url,
+        maxPoolSize=50,
+        minPoolSize=5,
+        # Даём MongoDB до 30 с на восстановление, прежде чем считать операцию неудачной
+        serverSelectionTimeoutMS=30000,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=30000,
+        # Быстрее обнаруживаем восстановление (по умолчанию 10 с)
+        heartbeatFrequencyMS=5000,
+        retryWrites=True,
+        retryReads=True,
+    )
+
+client = _create_mongo_client()
+db = client[_db_name]
+
+
+# ============ Утилиты MongoDB: retry при запуске и watchdog ============
+
+async def _wait_for_mongodb(max_attempts: int = 30, delay: float = 2.0) -> bool:
+    """
+    Ожидает доступности MongoDB при старте приложения.
+    Пробует до *max_attempts* раз с интервалом *delay* секунд.
+    Возвращает True если подключились, False — если не дождались.
+    """
+    global _mongo_healthy, _mongo_last_error, _mongo_last_check
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await client.admin.command("ping")
+            _mongo_healthy = True
+            _mongo_last_error = ""
+            _mongo_last_check = _time_module.time()
+            logger.info(f"✅ MongoDB доступна (попытка {attempt}/{max_attempts})")
+            return True
+        except Exception as exc:
+            _mongo_healthy = False
+            _mongo_last_error = str(exc)
+            _mongo_last_check = _time_module.time()
+            logger.warning(
+                f"⏳ MongoDB недоступна (попытка {attempt}/{max_attempts}): {exc}"
+            )
+            # Пробуем перезапустить mongod, если он на этом же сервере
+            if attempt % 5 == 0:
+                _try_restart_mongod()
+            await asyncio.sleep(delay)
+
+    logger.error(
+        f"❌ MongoDB не стала доступна после {max_attempts} попыток ({max_attempts * delay}s). "
+        "Приложение продолжит работу и будет пытаться переподключиться."
+    )
+    return False
+
+
+def _try_restart_mongod():
+    """Безопасная попытка перезапустить mongod через systemctl / supervisorctl."""
+    for cmd in (
+        ["sudo", "systemctl", "restart", "mongod"],
+        ["sudo", "supervisorctl", "restart", "mongodb"],
+    ):
+        try:
+            result = _subprocess.run(
+                cmd, capture_output=True, timeout=15, text=True,
+            )
+            if result.returncode == 0:
+                logger.info(f"🔄 MongoDB перезапущена: {' '.join(cmd)}")
+                return
+        except Exception:
+            continue
+    logger.debug("ℹ️ Автоматический перезапуск MongoDB не удался (команда не найдена или нет прав)")
+
+
+async def _mongodb_watchdog():
+    """
+    Фоновая задача — каждые 30 секунд проверяет MongoDB.
+    При обнаружении проблемы пытается перезапустить mongod и уведомляет в логах.
+    """
+    global _mongo_healthy, _mongo_last_error, _mongo_last_check
+    await asyncio.sleep(10)  # ждём инициализацию приложения
+    logger.info("🛡️ MongoDB Watchdog запущен (интервал: 30 с)")
+    consecutive_failures = 0
+
+    while True:
+        try:
+            await client.admin.command("ping")
+            if not _mongo_healthy:
+                logger.info("✅ MongoDB восстановлена!")
+            _mongo_healthy = True
+            _mongo_last_error = ""
+            consecutive_failures = 0
+        except Exception as exc:
+            consecutive_failures += 1
+            _mongo_healthy = False
+            _mongo_last_error = str(exc)
+            logger.error(
+                f"🔴 MongoDB Watchdog: соединение потеряно "
+                f"(ошибка #{consecutive_failures}): {exc}"
+            )
+            # Каждые 3 неудачных проверки пробуем перезапустить
+            if consecutive_failures % 3 == 0:
+                _try_restart_mongod()
+        finally:
+            _mongo_last_check = _time_module.time()
+
+        await asyncio.sleep(30)
+
+# Global bot application instance
+bot_application = None
+
+# Create the main app without a prefix
+app = FastAPI(title="RUDN Schedule API", version="1.0.0")
+
+# Configure CORS middleware BEFORE adding routes
+cors_origins_str = os.environ.get('CORS_ORIGINS', '*')
+cors_origins_list = [origin.strip() for origin in cors_origins_str.split(',')]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=cors_origins_list,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+logger.info(f"CORS configured for origins: {cors_origins_list}")
+
+# Additional middleware: echo origin для совместимости credentials + быстрый preflight
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    origin = request.headers.get("origin", "")
+    
+    # Быстрый ответ на OPTIONS preflight
+    if request.method == "OPTIONS":
+        response = Response(content="OK", status_code=200)
+        response.headers["access-control-allow-origin"] = origin or "*"
+        response.headers["access-control-allow-methods"] = "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT"
+        response.headers["access-control-allow-headers"] = "*"
+        response.headers["access-control-allow-credentials"] = "true"
+        response.headers["access-control-max-age"] = "3600"
+        return response
+    
+    response = await call_next(request)
+    
+    # Echo origin для совместимости с credentials (спецификация запрещает * + credentials)
+    if origin:
+        response.headers["access-control-allow-origin"] = origin
+        response.headers["access-control-allow-credentials"] = "true"
+        
+    return response
+
+
+# ============ MongoDB Error Handling Middleware ============
+@app.middleware("http")
+async def mongodb_error_handler(request: Request, call_next):
+    """
+    Перехватывает ошибки MongoDB и возвращает 503 вместо падения приложения.
+    Позволяет приложению оставаться доступным даже если БД временно недоступна.
+    """
+    try:
+        response = await call_next(request)
+        return response
+    except (ServerSelectionTimeoutError, ConnectionFailure, AutoReconnect, NetworkTimeout) as exc:
+        logger.error(f"🔴 MongoDB ошибка при обработке {request.method} {request.url.path}: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "База данных временно недоступна. Попробуйте через несколько секунд.",
+                "error": "database_unavailable",
+                "retry_after": 5,
+            },
+            headers={"Retry-After": "5"},
+        )
+
+
+# ============ Database Indexes Optimization ============
+async def safe_create_index(collection, keys, **kwargs):
+    """Безопасное создание индекса — игнорирует конфликты с существующими индексами"""
+    try:
+        await collection.create_index(keys, **kwargs)
+    except Exception as e:
+        if "IndexOptionsConflict" in str(e) or "already exists" in str(e):
+            logger.debug(f"Index already exists for {collection.name}: {keys}")
+        else:
+            logger.warning(f"Index creation warning for {collection.name}: {e}")
+
+async def create_indexes():
+    """Create indexes for all collections to ensure scalability"""
+    try:
+        # User Settings
+        await safe_create_index(db.user_settings, "telegram_id", unique=True)
+        await safe_create_index(db.user_settings, "group_id")
+        
+        # Tasks - основной индекс для списка задач
+        await safe_create_index(db.tasks, [("telegram_id", 1), ("completed", 1)])
+        # Tasks - индекс для telegram_id отдельно (для сортировки по order)
+        await safe_create_index(db.tasks, "telegram_id")
+        # Tasks - составной индекс для планировщика (target_date запросы)
+        await safe_create_index(db.tasks, [("telegram_id", 1), ("target_date", 1)])
+        
+        # User Stats - индекс для быстрого поиска статистики достижений
+        await safe_create_index(db.user_stats, "telegram_id", unique=True)
+        
+        # XP Events - индексы для дневных лимитов и аудита
+        await safe_create_index(db.xp_events, [("telegram_id", 1), ("reason", 1), ("created_at", -1)])
+        await safe_create_index(db.xp_events, "created_at")
+        
+        # User Achievements - индекс для быстрой проверки достижений
+        await safe_create_index(db.user_achievements, "telegram_id")
+        await safe_create_index(db.user_achievements, [("telegram_id", 1), ("achievement_id", 1)], unique=True)
+        
+        # Rooms
+        await safe_create_index(db.rooms, "owner_id")
+        await safe_create_index(db.rooms, "participants.telegram_id")
+        await safe_create_index(db.rooms, "invite_token", unique=True)
+        
+        # Group Tasks
+        await safe_create_index(db.group_tasks, "room_id")
+        await safe_create_index(db.group_tasks, [("participants.telegram_id", 1), ("completed", 1)])
+        
+        # Journals & Attendance
+        await safe_create_index(db.journals, "owner_id")
+        await safe_create_index(db.journals, "invite_token", unique=True)
+        
+        await safe_create_index(db.journal_students, "journal_id")
+        await safe_create_index(db.journal_students, "telegram_id")
+        await safe_create_index(db.journal_students, "invite_code", unique=True)
+        
+        # Compound index for fast attendance lookups
+        await safe_create_index(db.attendance_records, [("journal_id", 1), ("session_id", 1)])
+        await safe_create_index(db.attendance_records, [("journal_id", 1), ("student_id", 1)])
+        
+        # Scheduled Notifications
+        await safe_create_index(db.scheduled_notifications, "notification_key", unique=True)
+        await safe_create_index(db.scheduled_notifications, [("date", 1), ("status", 1)])
+        
+        # Referral System
+        await safe_create_index(db.referral_events, "telegram_id")
+        await safe_create_index(db.referral_events, "referrer_id")
+        
+        # Notification History
+        await safe_create_index(db.notification_history, [("telegram_id", 1), ("sent_at", -1)])
+        
+        # Cover Cache (Deezer обложки)
+        await safe_create_index(db.cover_cache, "cache_key", unique=True)
+        await safe_create_index(db.cover_cache, "expires_at", expireAfterSeconds=0)
+        
+        # In-App Notifications
+        await safe_create_index(db.in_app_notifications, [("telegram_id", 1), ("created_at", -1)])
+        
+        # Friends system indexes
+        await safe_create_index(db.friends, [("user_telegram_id", 1), ("friend_telegram_id", 1)], unique=True)
+        await safe_create_index(db.friends, "user_telegram_id")
+        await safe_create_index(db.friends, "friend_telegram_id")
+        await safe_create_index(db.friend_requests, [("from_telegram_id", 1), ("to_telegram_id", 1), ("status", 1)])
+        await safe_create_index(db.friend_requests, [("to_telegram_id", 1), ("status", 1)])
+        await safe_create_index(db.user_blocks, [("blocker_telegram_id", 1), ("blocked_telegram_id", 1)], unique=True)
+        
+        # Messages system indexes
+        await safe_create_index(db.conversations, [("participant_ids", 1)])
+        await safe_create_index(db.conversations, [("updated_at", -1)])
+        await safe_create_index(db.messages, [("conversation_id", 1), ("created_at", -1)])
+        await safe_create_index(db.messages, [("sender_id", 1)])
+        await safe_create_index(db.messages, [("conversation_id", 1), ("sender_id", 1), ("read_at", 1)])
+        
+        # Schedule Cache - составной индекс для быстрого поиска кэша расписания
+        await safe_create_index(db.schedule_cache, [("group_id", 1), ("week_number", 1)], unique=True)
+        
+        # Server Metrics History - индекс по времени для запросов истории и TTL-очистки
+        await safe_create_index(db.server_metrics_history, [("timestamp", 1)])
+        
+        # Scheduled Notifications - дополнительные индексы (из второго startup)
+        await safe_create_index(db.scheduled_notifications, [("telegram_id", 1), ("date", 1)])
+        await safe_create_index(db.scheduled_notifications, [("status", 1), ("date", 1)])
+        await safe_create_index(db.scheduled_notifications, [("scheduled_time", 1)])
+        
+        # Sent Notifications (старая система)
+        await safe_create_index(db.sent_notifications, "notification_key", unique=True)
+        
+        # In-App Notifications - индекс для непрочитанных
+        await safe_create_index(db.in_app_notifications, [("telegram_id", 1), ("read", 1), ("dismissed", 1)])
+        
+        # Web Sessions - индексы для QR-авторизации
+        await safe_create_index(db.web_sessions, "session_token", unique=True)
+        await safe_create_index(db.web_sessions, [("telegram_id", 1), ("status", 1)])
+        
+        # Online Stats History - индекс по времени
+        await safe_create_index(db.online_stats_history, [("timestamp", 1)])
+        
+        # Admin Referral Links
+        await safe_create_index(db.admin_referral_links, "code", unique=True)
+        await safe_create_index(db.admin_referral_links, [("is_active", 1)])
+        await safe_create_index(db.admin_referral_links, [("created_at", -1)])
+        await safe_create_index(db.referral_link_events, [("link_id", 1), ("timestamp", -1)])
+        await safe_create_index(db.referral_link_events, [("link_code", 1)])
+        await safe_create_index(db.referral_link_events, [("event_type", 1)])
+        await safe_create_index(db.referral_link_events, [("timestamp", -1)])
+        await safe_create_index(db.referral_link_events, [("telegram_id", 1)])
+
+        # Share tokens для совместного расписания
+        await safe_create_index(db.schedule_share_tokens, "token", unique=True)
+        await safe_create_index(db.schedule_share_tokens, [("expires_at", 1)])
+        
+        # Channel Stats History
+        await safe_create_index(db.channel_stats_history, [("timestamp", 1)])
+        
+        # ===== AUTH: users & auth_qr_sessions =====
+        await safe_create_index(db.users, "uid", unique=True)
+        # partialFilterExpression: индекс только для документов где поле существует и не null
+        # sparse=True alone недостаточно (не фильтрует null values)
+        await safe_create_index(
+            db.users, "email", unique=True,
+            partialFilterExpression={"email": {"$type": "string"}},
+        )
+        await safe_create_index(
+            db.users, "telegram_id", unique=True,
+            partialFilterExpression={"telegram_id": {"$type": "number"}},
+        )
+        await safe_create_index(
+            db.users, "vk_id", unique=True,
+            partialFilterExpression={"vk_id": {"$type": "string"}},
+        )
+        await safe_create_index(
+            db.users, "username", unique=True,
+            partialFilterExpression={"username": {"$type": "string"}},
+        )
+        await safe_create_index(db.users, [("created_at", -1)])
+
+        await safe_create_index(db.auth_qr_sessions, "qr_token", unique=True)
+        await safe_create_index(db.auth_qr_sessions, [("status", 1)])
+        # TTL: auto-delete expired QR sessions after 10 min beyond expiration
+        await safe_create_index(db.auth_qr_sessions, "expires_at", expireAfterSeconds=600)
+
+        # TTL для profile_views (очищать старше 7 дней)
+        await safe_create_index(db.profile_views, "viewed_at", expireAfterSeconds=7 * 24 * 3600)
+        await safe_create_index(db.profile_views, [("viewed_telegram_id", 1), ("viewer_telegram_id", 1)])
+        # Mapping user_settings.uid
+        await safe_create_index(db.user_settings, "uid", sparse=True)
+
+        # Auth events log (security audit) - индекс для запросов и TTL 30 дней
+        await safe_create_index(db.auth_events, [("uid", 1), ("ts", -1)])
+        await safe_create_index(db.auth_events, [("event", 1), ("ts", -1)])
+        await safe_create_index(db.auth_events, "ts", expireAfterSeconds=30 * 24 * 3600)
+        
+        logger.info("✅ Database indexes created successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to create database indexes: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    """Единая точка инициализации при запуске приложения"""
+    logger.info("🚀 Starting RUDN Schedule API...")
+    
+    # 0. ⚡ Ожидаем доступности MongoDB (до 60 с с авто-перезапуском)
+    mongo_ok = await _wait_for_mongodb(max_attempts=30, delay=2.0)
+    if not mongo_ok:
+        logger.error(
+            "⚠️ MongoDB недоступна при старте! Приложение запускается без БД. "
+            "Watchdog будет пытаться восстановить подключение."
+        )
+    
+    # 0.1. 🛡️ Запускаем MongoDB Watchdog (фоновая проверка каждые 30 сек)
+    asyncio.create_task(_mongodb_watchdog())
+    
+    # 1. Setup Playwright browser symlinks for LK RUDN parser
+    import subprocess
+    try:
+        setup_script = "/app/scripts/setup_playwright.sh"
+        if os.path.exists(setup_script):
+            subprocess.run(["bash", setup_script], check=True, capture_output=True)
+            logger.info("✅ Playwright browser symlinks configured")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to setup Playwright symlinks: {e}")
+    
+    # 2. Initialize cover service for Deezer album art
+    try:
+        init_cover_service(db)
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to init cover service: {e}")
+    
+    # 3. Создаём индексы БД (в фоне, чтобы не блокировать старт)
+    if mongo_ok:
+        asyncio.create_task(create_indexes())
+    
+    # 4. Запускаем сбор метрик сервера (фоновый цикл)
+    asyncio.create_task(collect_server_metrics_loop())
+    
+    # 5. Получаем username бота через getMe
+    from config import _fetch_bot_username
+    await _fetch_bot_username()
+    
+    # 6. Очистка устаревших веб-сессий
+    try:
+        await cleanup_expired_sessions()
+    except Exception as e:
+        logger.warning(f"⚠️ Initial session cleanup failed: {e}")
+
+    # 6.5. 🔐 Миграция user_settings → users (для новой auth-системы)
+    if mongo_ok:
+        try:
+            migration_result = await migrate_user_settings_to_users(db)
+            if migration_result.get("created") or migration_result.get("updated"):
+                logger.info(f"✅ Auth migration completed: {migration_result}")
+        except Exception as e:
+            logger.error(f"❌ Auth migration failed: {e}", exc_info=True)
+    
+    # 7. Запускаем планировщик уведомлений V2
+    try:
+        scheduler_v2 = get_scheduler_v2(db)
+        scheduler_v2.start()
+        logger.info("✅ Notification Scheduler V2 started successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to start notification scheduler V2: {e}")
+        # Fallback на старую систему
+        try:
+            logger.info("Attempting fallback to old scheduler...")
+            scheduler = get_scheduler(db)
+            scheduler.start()
+            logger.info("⚠️ Fallback: Old notification scheduler started")
+        except Exception as fallback_error:
+            logger.error(f"❌ Fallback also failed: {fallback_error}")
+    
+    # 8. Запускаем Telegram бота как background task
+    try:
+        global bot_application
+        from telegram import Update
+        from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+        
+        import sys
+        sys.path.insert(0, '/app/backend')
+        from telegram_bot import start_command, users_command, clear_db_command, TELEGRAM_BOT_TOKEN
+        
+        active_token = get_telegram_bot_token()
+        
+        if active_token:
+            env_mode = "TEST" if is_test_environment() else "PRODUCTION"
+            logger.info(f"🤖 Запуск Telegram бота в режиме {env_mode}...")
+            
+            bot_application = Application.builder().token(active_token).build()
+            
+            bot_application.add_handler(CommandHandler("start", start_command))
+            bot_application.add_handler(CommandHandler("users", users_command))
+            bot_application.add_handler(CommandHandler("clear_db", clear_db_command))
+            
+            from telegram_bot import handle_revoke_device_callback
+            bot_application.add_handler(CallbackQueryHandler(handle_revoke_device_callback, pattern=r"^revoke_device_"))
+            
+            async def start_bot():
+                await bot_application.initialize()
+                await bot_application.start()
+                await bot_application.updater.start_polling(
+                    allowed_updates=Update.ALL_TYPES,
+                    drop_pending_updates=True
+                )
+                logger.info(f"✅ Telegram bot polling started successfully (ENV={ENV})")
+            
+            asyncio.create_task(start_bot())
+            logger.info(f"Telegram bot initialization started as background task (ENV={ENV})")
+        else:
+            logger.warning("Токен бота не найден, bot not started")
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}", exc_info=True)
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# ===== AUTH: подключаем роутер с /api/auth/* эндпоинтами =====
+auth_router = create_auth_router(db)
+api_router.include_router(auth_router)
+
+
+# Define Models (старые для совместимости)
+class StatusCheck(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_name: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class StatusCheckCreate(BaseModel):
+    client_name: str
+
+# ============ Старые эндпоинты ============
+@api_router.get("/")
+async def root():
+    return {"message": "RUDN Schedule API is running"}
+
+
+@api_router.get("/health")
+async def health_check():
+    """
+    Health-check эндпоинт для мониторинга.
+    Проверяет подключение к MongoDB и возвращает статус.
+    Полезен для load-balancer, Uptime Robot, и ваших мониторинговых систем.
+    """
+    mongo_ok = False
+    mongo_latency_ms = None
+    mongo_error = None
+    try:
+        t0 = _time_module.time()
+        await client.admin.command("ping")
+        mongo_latency_ms = round((_time_module.time() - t0) * 1000, 1)
+        mongo_ok = True
+    except Exception as exc:
+        mongo_error = str(exc)
+
+    status = "healthy" if mongo_ok else "degraded"
+    status_code = 200 if mongo_ok else 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": status,
+            "timestamp": datetime.utcnow().isoformat(),
+            "mongodb": {
+                "connected": mongo_ok,
+                "latency_ms": mongo_latency_ms,
+                "error": mongo_error,
+                "url_host": mongo_url.split("@")[-1].split("/")[0] if "@" in mongo_url else mongo_url.replace("mongodb://", "").split("/")[0],
+            },
+            "watchdog": {
+                "healthy": _mongo_healthy,
+                "last_error": _mongo_last_error or None,
+                "last_check_ago_s": round(_time_module.time() - _mongo_last_check, 1) if _mongo_last_check else None,
+            },
+        },
+    )
+
+
+@api_router.get("/bot-info")
+async def get_bot_info():
+    """Возвращает информацию о текущем Telegram боте (username, ENV)."""
+    from config import _bot_username_cache, ENV
+    username = _bot_username_cache.get("username", "bot")
+    return {
+        "username": username,
+        "first_name": _bot_username_cache.get("first_name", ""),
+        "bot_id": _bot_username_cache.get("id", 0),
+        "env": ENV,
+    }
+
+@api_router.post("/status", response_model=StatusCheck)
+async def create_status_check(input: StatusCheckCreate):
+    status_dict = input.dict()
+    status_obj = StatusCheck(**status_dict)
+    _ = await db.status_checks.insert_one(status_obj.dict())
+    return status_obj
+
+@api_router.get("/status", response_model=List[StatusCheck])
+async def get_status_checks():
+    status_checks = await db.status_checks.find().to_list(1000)
+    return [StatusCheck(**status_check) for status_check in status_checks]
+
+
+# ============ Эндпоинты для расписания ============
+
+@api_router.get("/faculties", response_model=List[Faculty])
+async def get_faculties():
+    """Получить список всех факультетов (с кешированием на 60 минут)"""
+    try:
+        # Проверяем кеш
+        cached_faculties = cache.get("faculties")
+        if cached_faculties:
+            return cached_faculties
+            
+        # Получаем из API РУДН
+        faculties = await get_facultets()
+        if not faculties:
+            raise HTTPException(
+                status_code=503,
+                detail="Временные технические проблемы на стороне rudn.ru. Расписание и выбор группы временно недоступны."
+            )
+        
+        # Сохраняем в кеш на 60 минут
+        cache.set("faculties", faculties, ttl_minutes=60)
+        return faculties
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении факультетов: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Временные технические проблемы на стороне rudn.ru. Расписание и выбор группы временно недоступны."
+        )
+
+
+@api_router.post("/filter-data", response_model=FilterDataResponse)
+async def get_filter_data_endpoint(request: FilterDataRequest):
+    """Получить данные фильтров (уровни, курсы, формы, группы)"""
+    try:
+        elements = await get_filter_data(
+            facultet_id=request.facultet_id,
+            level_id=request.level_id or "",
+            kurs=request.kurs or "",
+            form_code=request.form_code or ""
+        )
+        
+        response = FilterDataResponse(
+            levels=extract_options(elements, "level"),
+            courses=extract_options(elements, "kurs"),
+            forms=extract_options(elements, "form"),
+            groups=extract_options(elements, "group")
+        )
+        
+        return response
+    except Exception as e:
+        logger.error(f"Ошибка при получении данных фильтра: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/schedule", response_model=ScheduleResponse)
+async def get_schedule_endpoint(request: ScheduleRequest):
+    """Получить расписание для группы (с fallback на кэш)"""
+    try:
+        events = await get_schedule(
+            facultet_id=request.facultet_id,
+            level_id=request.level_id,
+            kurs=request.kurs,
+            form_code=request.form_code,
+            group_id=request.group_id,
+            week_number=request.week_number
+        )
+        
+        if events:
+            # Кэшируем расписание
+            cache_data = {
+                "id": str(uuid.uuid4()),
+                "group_id": request.group_id,
+                "week_number": request.week_number,
+                "events": [event for event in events],
+                "cached_at": datetime.utcnow(),
+                "expires_at": datetime.utcnow() + timedelta(hours=6)
+            }
+            
+            await db.schedule_cache.update_one(
+                {"group_id": request.group_id, "week_number": request.week_number},
+                {"$set": cache_data},
+                upsert=True
+            )
+            
+            # Планируем уведомления в фоне
+            try:
+                async def schedule_for_group():
+                    users = await db.user_settings.find({
+                        "group_id": request.group_id,
+                        "notifications_enabled": True
+                    }).to_list(None)
+                    
+                    if users:
+                        scheduler = get_scheduler_v2(db)
+                        for user in users:
+                            await scheduler.schedule_user_notifications(user['telegram_id'])
+                
+                asyncio.create_task(schedule_for_group())
+            except Exception as e:
+                logger.error(f"Failed to trigger group scheduling: {e}")
+            
+            return ScheduleResponse(
+                events=[ScheduleEvent(**event) for event in events],
+                group_id=request.group_id,
+                week_number=request.week_number
+            )
+        else:
+            # Пустой результат от RUDN API — пробуем кэш
+            cached = await db.schedule_cache.find_one({
+                "group_id": request.group_id,
+                "week_number": request.week_number
+            })
+            
+            if cached and cached.get("events"):
+                logger.info(f"RUDN API вернул пустой ответ, используем кэш для группы {request.group_id}")
+                return ScheduleResponse(
+                    events=[ScheduleEvent(**event) for event in cached["events"]],
+                    group_id=request.group_id,
+                    week_number=request.week_number
+                )
+            
+            # Нет ни данных, ни кэша — возвращаем пустое расписание
+            return ScheduleResponse(
+                events=[],
+                group_id=request.group_id,
+                week_number=request.week_number
+            )
+            
+    except Exception as e:
+        logger.error(f"Ошибка при получении расписания: {e}")
+        
+        # При ошибке — пробуем отдать кэш
+        try:
+            cached = await db.schedule_cache.find_one({
+                "group_id": request.group_id,
+                "week_number": request.week_number
+            })
+            if cached and cached.get("events"):
+                logger.info(f"Ошибка RUDN API, отдаём кэш для группы {request.group_id}")
+                return ScheduleResponse(
+                    events=[ScheduleEvent(**event) for event in cached["events"]],
+                    group_id=request.group_id,
+                    week_number=request.week_number
+                )
+        except Exception:
+            pass
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Эндпоинты для пользовательских настроек ============
+
+@api_router.get("/user-settings/{telegram_id}", response_model=UserSettingsResponse)
+async def get_user_settings(telegram_id: int):
+    """Получить настройки пользователя по Telegram ID"""
+    try:
+        user_data = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user_data:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Обновляем время последней активности
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"last_activity": datetime.utcnow()}}
+        )
+        
+        # Конвертируем _id в строку для поля id
+        if "_id" in user_data:
+            user_data["id"] = str(user_data["_id"])
+            del user_data["_id"]
+        
+        return UserSettingsResponse(**user_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении настроек пользователя: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/user-settings", response_model=UserSettingsResponse)
+async def save_user_settings(settings: UserSettingsCreate):
+    """Сохранить или обновить настройки пользователя"""
+    try:
+        # Проверяем, существует ли пользователь
+        existing_user = await db.user_settings.find_one({"telegram_id": settings.telegram_id})
+        
+        if existing_user:
+            # Обновляем существующего пользователя
+            update_data = settings.dict()
+            update_data["updated_at"] = datetime.utcnow()
+            update_data["last_activity"] = datetime.utcnow()
+            
+            await db.user_settings.update_one(
+                {"telegram_id": settings.telegram_id},
+                {"$set": update_data}
+            )
+            
+            # Пересчитываем уведомления при обновлении настроек (например, смена группы)
+            try:
+                scheduler = get_scheduler_v2(db)
+                await scheduler.schedule_user_notifications(settings.telegram_id)
+            except Exception as e:
+                logger.error(f"Failed to reschedule notifications on settings update: {e}")
+            
+            user_data = await db.user_settings.find_one({"telegram_id": settings.telegram_id})
+            return UserSettingsResponse(**user_data)
+        else:
+            # Создаем нового пользователя
+            user_settings = UserSettings(**settings.dict())
+            user_dict = user_settings.dict()
+            
+            await db.user_settings.insert_one(user_dict)
+            
+            # Если у нового пользователя включены уведомления (вдруг), планируем их
+            if user_settings.notifications_enabled:
+                try:
+                    scheduler = get_scheduler_v2(db)
+                    await scheduler.schedule_user_notifications(settings.telegram_id)
+                except Exception as e:
+                    logger.error(f"Failed to schedule notifications for new user: {e}")
+            
+            return UserSettingsResponse(**user_dict)
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении настроек пользователя: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/user-settings/{telegram_id}", response_model=SuccessResponse)
+async def delete_user_settings(telegram_id: int):
+    """Удалить настройки пользователя"""
+    try:
+        result = await db.user_settings.delete_one({"telegram_id": telegram_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return SuccessResponse(success=True, message="Настройки пользователя удалены")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении настроек пользователя: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.get("/user-settings/{telegram_id}/history", response_model=NotificationHistoryResponse)
+async def get_notification_history(telegram_id: int, limit: int = 20, offset: int = 0):
+    """Получить историю уведомлений пользователя"""
+    try:
+        total = await db.notification_history.count_documents({"telegram_id": telegram_id})
+        
+        history_cursor = db.notification_history.find({"telegram_id": telegram_id}) \
+            .sort("sent_at", -1) \
+            .skip(offset) \
+            .limit(limit)
+            
+        history = await history_cursor.to_list(None)
+        
+        # Конвертируем _id
+        for item in history:
+            if "_id" in item:
+                del item["_id"]
+                
+        return NotificationHistoryResponse(history=history, count=total)
+    except Exception as e:
+        logger.error(f"Ошибка при получении истории уведомлений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/user/{telegram_id}", response_model=SuccessResponse)
+async def delete_user_account(telegram_id: int):
+    """
+    Полное удаление аккаунта пользователя и всех связанных данных.
+    Удаляет: настройки, статистику, достижения, задачи, участие в комнатах.
+    """
+    try:
+        deleted_counts = {}
+        
+        # 1. Удаляем настройки пользователя
+        result = await db.user_settings.delete_one({"telegram_id": telegram_id})
+        deleted_counts["user_settings"] = result.deleted_count
+        
+        # 2. Удаляем статистику
+        result = await db.user_stats.delete_one({"telegram_id": telegram_id})
+        deleted_counts["user_stats"] = result.deleted_count
+        
+        # 3. Удаляем достижения
+        result = await db.user_achievements.delete_many({"telegram_id": telegram_id})
+        deleted_counts["user_achievements"] = result.deleted_count
+        
+        # 4. Удаляем личные задачи
+        result = await db.tasks.delete_many({"telegram_id": telegram_id})
+        deleted_counts["tasks"] = result.deleted_count
+        
+        # 5. Удаляем из участников комнат
+        await db.rooms.update_many(
+            {"participants.telegram_id": telegram_id},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        
+        # 6. Удаляем комнаты где пользователь владелец (и все связанные задачи)
+        owned_rooms = await db.rooms.find({"owner_id": telegram_id}).to_list(None)
+        for room in owned_rooms:
+            await db.group_tasks.delete_many({"room_id": room["room_id"]})
+        result = await db.rooms.delete_many({"owner_id": telegram_id})
+        deleted_counts["owned_rooms"] = result.deleted_count
+        
+        # 7. Удаляем из участников групповых задач
+        await db.group_tasks.update_many(
+            {"participants.telegram_id": telegram_id},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        
+        # 8. Удаляем из pending members журналов
+        await db.journal_pending_members.delete_many({"telegram_id": telegram_id})
+        
+        # 9. Удаляем связи со студентами журналов
+        await db.journal_students.update_many(
+            {"telegram_id": telegram_id},
+            {"$set": {"telegram_id": None, "is_linked": False}}
+        )
+        
+        # 10. Удаляем журналы где пользователь владелец
+        owned_journals = await db.attendance_journals.find({"owner_id": telegram_id}).to_list(None)
+        for journal in owned_journals:
+            await db.journal_students.delete_many({"journal_id": journal["journal_id"]})
+            await db.journal_sessions.delete_many({"journal_id": journal["journal_id"]})
+            await db.attendance_records.delete_many({"journal_id": journal["journal_id"]})
+        result = await db.attendance_journals.delete_many({"owner_id": telegram_id})
+        deleted_counts["owned_journals"] = result.deleted_count
+        
+        # 11. Удаляем реферальные события
+        await db.referral_events.delete_many({"telegram_id": telegram_id})
+        
+        # 12. Удаляем реферальные связи
+        await db.referral_connections.delete_many({
+            "$or": [
+                {"referrer_telegram_id": telegram_id},
+                {"referred_telegram_id": telegram_id}
+            ]
+        })
+        
+        # 13. Удаляем веб-сессии (привязанные устройства)
+        # Сначала закрываем активные WebSocket соединения
+        sessions = await db.web_sessions.find({"telegram_id": telegram_id}).to_list(length=100)
+        for session in sessions:
+            session_token = session.get("session_token")
+            if session_token and session_token in web_session_connections:
+                try:
+                    ws = web_session_connections[session_token]
+                    await ws.send_json({"event": "revoked", "message": "Аккаунт удалён"})
+                    await ws.close()
+                except:
+                    pass
+                finally:
+                    if session_token in web_session_connections:
+                        del web_session_connections[session_token]
+        
+        result = await db.web_sessions.delete_many({"telegram_id": telegram_id})
+        deleted_counts["web_sessions"] = result.deleted_count
+        
+        # 14. Удаляем VK токены
+        result = await db.user_vk_tokens.delete_many({"telegram_id": telegram_id})
+        deleted_counts["vk_tokens"] = result.deleted_count
+        
+        # 15. Удаляем избранные треки
+        result = await db.music_favorites.delete_many({"telegram_id": telegram_id})
+        deleted_counts["music_favorites"] = result.deleted_count
+        
+        # 16. Удаляем уведомления
+        await db.scheduled_notifications.delete_many({"telegram_id": telegram_id})
+        await db.notification_history.delete_many({"telegram_id": telegram_id})
+        await db.in_app_notifications.delete_many({"telegram_id": telegram_id})
+        
+        # 17. Удаляем друзей и запросы в друзья
+        await db.friends.delete_many({
+            "$or": [
+                {"user_telegram_id": telegram_id},
+                {"friend_telegram_id": telegram_id}
+            ]
+        })
+        await db.friend_requests.delete_many({
+            "$or": [
+                {"from_telegram_id": telegram_id},
+                {"to_telegram_id": telegram_id}
+            ]
+        })
+        
+        # 18. Удаляем блокировки
+        await db.user_blocks.delete_many({
+            "$or": [
+                {"blocker_telegram_id": telegram_id},
+                {"blocked_telegram_id": telegram_id}
+            ]
+        })
+        
+        # 19. Удаляем сообщения и чаты
+        await db.messages.delete_many({"sender_id": telegram_id})
+        # Удаляем из участников чатов
+        await db.conversations.update_many(
+            {"participants": telegram_id},
+            {"$pull": {"participants": telegram_id}}
+        )
+        # Удаляем пустые чаты (без участников)
+        await db.conversations.delete_many({"participants": {"$size": 0}})
+        
+        # 20. Удаляем историю прослушивания музыки
+        await db.music_history.delete_many({"telegram_id": telegram_id})
+        
+        # 21. Удаляем совместные расписания и токены
+        await db.shared_schedules.delete_many({"owner_id": telegram_id})
+        await db.shared_schedules.update_many(
+            {"participants": {"$elemMatch": {"telegram_id": telegram_id}}},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        await db.schedule_share_tokens.delete_many({"created_by": telegram_id})
+        
+        # 22. Удаляем подключения ЛК
+        await db.lk_connections.delete_many({"telegram_id": telegram_id})
+        
+        # 23. Stage 1/2 Auth — удаляем запись users и связанные данные
+        # Сначала находим uid пользователя чтобы удалить связанные записи
+        user_doc = await db.users.find_one({"telegram_id": telegram_id})
+        user_uid = user_doc.get("uid") if user_doc else None
+        
+        # Удаляем саму запись users
+        result = await db.users.delete_one({"telegram_id": telegram_id})
+        deleted_counts["users"] = result.deleted_count
+        
+        # Удаляем активные auth сессии (JWT)
+        try:
+            result = await db.auth_sessions.delete_many({"telegram_id": telegram_id})
+            deleted_counts["auth_sessions"] = result.deleted_count
+        except Exception:
+            pass
+        
+        if user_uid:
+            try:
+                # Дублирующая очистка auth_sessions по uid (на случай если telegram_id был None)
+                result = await db.auth_sessions.delete_many({"uid": user_uid})
+                deleted_counts["auth_sessions_by_uid"] = result.deleted_count
+            except Exception:
+                pass
+            try:
+                # Удаляем просмотры профиля (и как viewer, и как viewed)
+                result = await db.profile_views.delete_many({
+                    "$or": [
+                        {"viewer_uid": user_uid},
+                        {"viewed_uid": user_uid},
+                    ]
+                })
+                deleted_counts["profile_views"] = result.deleted_count
+            except Exception:
+                pass
+            try:
+                # Удаляем QR-сессии логина, созданные этим пользователем
+                result = await db.qr_login_sessions.delete_many({"confirmed_by_uid": user_uid})
+                deleted_counts["qr_sessions"] = result.deleted_count
+            except Exception:
+                pass
+        
+        logger.info(f"✅ Аккаунт пользователя {telegram_id} полностью удален. Статистика: {deleted_counts}")
+        
+        return SuccessResponse(
+            success=True, 
+            message=f"Аккаунт и все данные удалены. Удалено записей: {sum(deleted_counts.values())}"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при удалении аккаунта пользователя {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/schedule-cached/{group_id}/{week_number}", response_model=Optional[ScheduleResponse])
+async def get_cached_schedule(group_id: str, week_number: int):
+    """Получить кэшированное расписание"""
+    try:
+        cached = await db.schedule_cache.find_one({
+            "group_id": group_id,
+            "week_number": week_number,
+            "expires_at": {"$gt": datetime.utcnow()}
+        })
+        
+        if not cached:
+            return None
+        
+        return ScheduleResponse(
+            events=[ScheduleEvent(**event) for event in cached["events"]],
+            group_id=cached["group_id"],
+            week_number=cached["week_number"]
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при получении кэша: {e}")
+        return None
+
+
+# ============ Эндпоинты для управления уведомлениями ============
+
+@api_router.put("/user-settings/{telegram_id}/notifications", response_model=NotificationSettingsResponse)
+async def update_notification_settings(telegram_id: int, settings: NotificationSettingsUpdate):
+    """Обновить настройки уведомлений пользователя"""
+    try:
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Обновляем настройки уведомлений
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {
+                "notifications_enabled": settings.notifications_enabled,
+                "notification_time": settings.notification_time,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        # Если уведомления включены, отправляем тестовое уведомление и планируем реальные
+        test_notification_sent = None
+        test_notification_error = None
+        
+        if settings.notifications_enabled:
+            # 1. Отправляем тестовое (сразу)
+            try:
+                notification_service = get_notification_service()
+                success = await notification_service.send_test_notification(telegram_id)
+                test_notification_sent = success
+                if not success:
+                    test_notification_error = "Не удалось отправить тестовое уведомление. Убедитесь, что вы начали диалог с ботом командой /start"
+            except Exception as e:
+                logger.warning(f"Failed to send test notification: {e}")
+                test_notification_sent = False
+                test_notification_error = f"Ошибка: {str(e)}. Пожалуйста, начните диалог с ботом командой /start в Telegram"
+            
+            # 2. Планируем уведомления на сегодня (асинхронно)
+            try:
+                scheduler = get_scheduler_v2(db)
+                stats = await scheduler.schedule_user_notifications(telegram_id)
+                logger.info(f"Scheduled {stats.get('scheduled', 0)} notifications for user {telegram_id}")
+            except Exception as e:
+                logger.error(f"Failed to schedule notifications after enabling: {e}")
+        
+        return NotificationSettingsResponse(
+            notifications_enabled=settings.notifications_enabled,
+            notification_time=settings.notification_time,
+            telegram_id=telegram_id,
+            test_notification_sent=test_notification_sent,
+            test_notification_error=test_notification_error
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении настроек уведомлений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user-settings/{telegram_id}/notifications", response_model=NotificationSettingsResponse)
+async def get_notification_settings(telegram_id: int):
+    """Получить настройки уведомлений пользователя"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return NotificationSettingsResponse(
+            notifications_enabled=user.get("notifications_enabled", False),
+            notification_time=user.get("notification_time", 10),
+            telegram_id=telegram_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении настроек уведомлений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/user-settings/{telegram_id}/theme", response_model=ThemeSettingsResponse)
+async def update_theme_settings(telegram_id: int, settings: ThemeSettingsUpdate):
+    """Обновить настройки темы пользователя"""
+    try:
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Обновляем настройки темы
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {
+                "new_year_theme_mode": settings.new_year_theme_mode.value,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        return ThemeSettingsResponse(
+            new_year_theme_mode=settings.new_year_theme_mode.value,
+            telegram_id=telegram_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении настроек темы: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user-settings/{telegram_id}/theme", response_model=ThemeSettingsResponse)
+async def get_theme_settings(telegram_id: int):
+    """Получить настройки темы пользователя"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Миграция старых данных: если есть old boolean поле, конвертируем
+        theme_mode = user.get("new_year_theme_mode")
+        if theme_mode is None:
+            # Миграция: boolean -> enum
+            old_enabled = user.get("new_year_theme_enabled", True)
+            theme_mode = "always" if old_enabled else "off"
+            # Сохраняем новое значение
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"new_year_theme_mode": theme_mode}}
+            )
+        
+        return ThemeSettingsResponse(
+            new_year_theme_mode=theme_mode,
+            telegram_id=telegram_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении настроек темы: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.get("/user-settings/{telegram_id}/birthday")
+async def get_user_birthday(telegram_id: int):
+    """Получить дату рождения пользователя (из БД или Telegram)"""
+    try:
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        # Если есть в БД — возвращаем
+        if user and user.get("birth_date"):
+            return {"birth_date": user["birth_date"], "source": "saved"}
+        
+        # Пробуем получить из Telegram (Bot API getChat -> birthdate)
+        try:
+            from telegram import Bot
+            bot_token = get_telegram_bot_token()
+            if bot_token:
+                bot = Bot(token=bot_token)
+                chat = await bot.get_chat(telegram_id)
+                if hasattr(chat, 'birthdate') and chat.birthdate:
+                    bd = chat.birthdate
+                    day = str(bd.day).zfill(2)
+                    month = str(bd.month).zfill(2)
+                    year = str(bd.year) if bd.year else "0000"
+                    birth_str = f"{day}.{month}.{year}"
+                    
+                    # Сохраняем в БД
+                    await db.user_settings.update_one(
+                        {"telegram_id": telegram_id},
+                        {"$set": {"birth_date": birth_str}},
+                        upsert=False
+                    )
+                    return {"birth_date": birth_str, "source": "telegram"}
+        except Exception as tg_err:
+            logger.warning(f"Не удалось получить birthday из Telegram: {tg_err}")
+        
+        return {"birth_date": None, "source": None}
+    except Exception as e:
+        logger.error(f"Ошибка при получении birthday: {e}")
+        return {"birth_date": None, "source": None}
+
+
+@api_router.put("/user-settings/{telegram_id}/birthday")
+async def update_user_birthday(telegram_id: int, data: dict):
+    """Сохранить дату рождения пользователя"""
+    try:
+        birth_date = data.get("birth_date")
+        if not birth_date:
+            raise HTTPException(status_code=400, detail="birth_date is required")
+        
+        # Валидация формата даты ДД.ММ.ГГГГ
+        import re
+        if not re.match(r'^\d{2}\.\d{2}\.\d{4}$', birth_date):
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте ДД.ММ.ГГГГ")
+        
+        parts = birth_date.split('.')
+        day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+        
+        if month < 1 or month > 12:
+            raise HTTPException(status_code=400, detail="Месяц должен быть от 01 до 12")
+        if day < 1 or day > 31:
+            raise HTTPException(status_code=400, detail="День должен быть от 01 до 31")
+        if year != 0 and (year < 1920 or year > 2025):
+            raise HTTPException(status_code=400, detail="Год должен быть от 1920 до 2025")
+        
+        # Проверка дней в месяце (кроме year=0000)
+        if year != 0:
+            try:
+                from calendar import monthrange
+                max_day = monthrange(year, month)[1]
+                if day > max_day:
+                    raise HTTPException(status_code=400, detail=f"В месяце {month} максимум {max_day} дней")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Некорректная дата")
+        
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"birth_date": birth_date, "updated_at": datetime.utcnow()}},
+            upsert=False
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return {"success": True, "birth_date": birth_date}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении birthday: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.get("/notifications/stats", response_model=NotificationStatsResponse)
+async def get_notification_stats(date: Optional[str] = None):
+    """
+    Получить статистику уведомлений за день
+    
+    Args:
+        date: Дата в формате YYYY-MM-DD (по умолчанию - сегодня)
+    """
+    try:
+        scheduler_v2 = get_scheduler_v2(db)
+        stats = await scheduler_v2.get_notification_stats(date)
+        
+        if not stats:
+            # Возвращаем пустую статистику
+            from datetime import datetime
+            import pytz
+            today = datetime.now(pytz.timezone('Europe/Moscow')).strftime('%Y-%m-%d') if not date else date
+            return NotificationStatsResponse(
+                date=today,
+                total=0,
+                pending=0,
+                sent=0,
+                failed=0,
+                cancelled=0
+            )
+        
+        return NotificationStatsResponse(**stats)
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики уведомлений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Эндпоинты для системы уровней ============
+
+@api_router.get("/users/{telegram_id}/level")
+async def get_user_level(telegram_id: int):
+    """Получить информацию об уровне пользователя (v3 — stars, title)"""
+    try:
+        stats = await db.user_stats.find_one({"telegram_id": telegram_id})
+        xp = stats.get("xp", 0) if stats else 0
+        info = calculate_level_info(xp)
+        return {"status": "ok", **info}
+    except Exception as e:
+        logger.error(f"Error getting level for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/users/{telegram_id}/recalculate-xp")
+async def recalculate_user_xp(telegram_id: int):
+    """Ретроактивный пересчёт XP для пользователя"""
+    try:
+        result = await recalculate_xp_for_user(db, telegram_id)
+        return {"status": "ok", **result}
+    except Exception as e:
+        logger.error(f"Error recalculating XP for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/users/recalculate-xp-all")
+async def recalculate_all_xp():
+    """Ретроактивный пересчёт XP для ВСЕХ пользователей"""
+    try:
+        users = await db.user_stats.find({}).to_list(length=10000)
+        results = []
+        for user in users:
+            tid = user.get("telegram_id")
+            if tid:
+                result = await recalculate_xp_for_user(db, tid)
+                results.append({"telegram_id": tid, "xp": result["xp"], "level": result["level"], "tier": result["tier"]})
+        return {"status": "ok", "count": len(results), "results": results}
+    except Exception as e:
+        logger.error(f"Error recalculating all XP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/xp-rewards-info")
+async def get_xp_rewards_info():
+    """Получить таблицу XP-наград для отображения на фронтенде"""
+    return {"rewards": XP_REWARDS_INFO}
+
+
+@api_router.get("/users/{telegram_id}/pending-level-up")
+async def get_pending_level_up(telegram_id: int):
+    """Проверить и забрать pending level-up (consumed after read)"""
+    try:
+        pending = await consume_pending_level_up(db, telegram_id)
+        if pending:
+            return {"has_level_up": True, **pending}
+        return {"has_level_up": False}
+    except Exception as e:
+        logger.error(f"Error getting pending level-up for {telegram_id}: {e}")
+        return {"has_level_up": False}
+
+
+@api_router.get("/users/{telegram_id}/xp-breakdown")
+async def get_user_xp_breakdown(telegram_id: int):
+    """Получить детальную разбивку XP пользователя (read-only, v3 — stars, title, xp_in_level, xp_needed)"""
+    try:
+        result = await get_xp_breakdown_readonly(db, telegram_id)
+        return {
+            "status": "ok",
+            "xp": result["xp"],
+            "breakdown": result["breakdown"],
+            "level": result["level"],
+            "tier": result["tier"],
+            "xp_current_level": result["xp_current_level"],
+            "xp_next_level": result["xp_next_level"],
+            "xp_in_level": result["xp_in_level"],
+            "xp_needed": result["xp_needed"],
+            "progress": result["progress"],
+            "stars": result.get("stars", 1),
+            "title": result.get("title", ""),
+        }
+    except Exception as e:
+        logger.error(f"Error getting XP breakdown for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/users/{telegram_id}/xp-history")
+async def get_user_xp_history(telegram_id: int, days: int = 30):
+    """Получить историю XP по дням для графиков (v3)"""
+    try:
+        days = min(max(days, 7), 90)  # от 7 до 90 дней
+        history = await get_xp_history(db, telegram_id, days)
+        return {"status": "ok", "history": history, "days": days}
+    except Exception as e:
+        logger.error(f"Error getting XP history for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/users/{telegram_id}/daily-xp")
+async def get_user_daily_xp(telegram_id: int):
+    """Получить XP заработанный сегодня с разбивкой по действиям (v3)"""
+    try:
+        progress = await get_daily_xp_progress(db, telegram_id)
+        return {"status": "ok", **progress}
+    except Exception as e:
+        logger.error(f"Error getting daily XP for {telegram_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Dev-команды (админ-панель в поиске) ============
+
+ADMIN_IDS = [765963392, 1311283832]
+
+def _check_admin(telegram_id: int):
+    """Проверка на админа"""
+    if telegram_id not in ADMIN_IDS:
+        raise HTTPException(status_code=403, detail="Доступ запрещён: не админ")
+
+
+@api_router.post("/dev/add-xp")
+async def dev_add_xp(data: DevAddXPRequest):
+    """Добавить XP пользователю (только для админов, только для себя)"""
+    _check_admin(data.telegram_id)
+    try:
+        # Сохраняем в bonus_xp чтобы recalculate не затёр
+        await db.user_stats.update_one(
+            {"telegram_id": data.telegram_id},
+            {"$inc": {"bonus_xp": data.amount, "xp": data.amount}},
+            upsert=True
+        )
+        stats = await db.user_stats.find_one({"telegram_id": data.telegram_id})
+        total_xp = stats.get("xp", 0) if stats else data.amount
+        info = calculate_level_info(total_xp)
+        return {"status": "ok", "message": f"+{data.amount} XP (всего: {total_xp})", "xp": total_xp, **info}
+    except Exception as e:
+        logger.error(f"Dev add-xp error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/dev/set-xp")
+async def dev_set_xp(data: DevSetXPRequest):
+    """Установить XP пользователю (только для админов, только для себя)"""
+    _check_admin(data.telegram_id)
+    try:
+        # Считаем органический XP и вычисляем bonus
+        stats = await db.user_stats.find_one({"telegram_id": data.telegram_id})
+        current_xp = stats.get("xp", 0) if stats else 0
+        current_bonus = stats.get("bonus_xp", 0) if stats else 0
+        organic_xp = current_xp - current_bonus
+        new_bonus = max(0, data.amount - organic_xp)
+        
+        await db.user_stats.update_one(
+            {"telegram_id": data.telegram_id},
+            {"$set": {"xp": data.amount, "bonus_xp": new_bonus}},
+            upsert=True
+        )
+        info = calculate_level_info(data.amount)
+        return {"status": "ok", "message": f"XP установлен: {data.amount} (bonus: {new_bonus})", "xp": data.amount, **info}
+    except Exception as e:
+        logger.error(f"Dev set-xp error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/dev/get-level/{telegram_id}")
+async def dev_get_level(telegram_id: int):
+    """Получить информацию об уровне (для dev-команд)"""
+    _check_admin(telegram_id)
+    try:
+        stats = await db.user_stats.find_one({"telegram_id": telegram_id})
+        xp = stats.get("xp", 0) if stats else 0
+        info = calculate_level_info(xp)
+        streak = stats.get("visit_streak_current", 0) if stats else 0
+        max_streak = stats.get("visit_streak_max", 0) if stats else 0
+        return {
+            "status": "ok",
+            "streak": streak,
+            "max_streak": max_streak,
+            **info
+        }
+    except Exception as e:
+        logger.error(f"Dev get-level error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/dev/reset-streak")
+async def dev_reset_streak(data: DevResetStreakRequest):
+    """Сбросить стрик пользователя (только для админов, только для себя)"""
+    _check_admin(data.telegram_id)
+    try:
+        await db.user_stats.update_one(
+            {"telegram_id": data.telegram_id},
+            {"$set": {
+                "visit_streak_current": 0,
+                "visit_streak_max": 0,
+                "active_days": [],
+                "freeze_shields": 0,
+            }},
+            upsert=True
+        )
+        return {"status": "ok", "message": "Стрик сброшен"}
+    except Exception as e:
+        logger.error(f"Dev reset-streak error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/dev/execute")
+async def dev_execute_command(data: DevCommandRequest):
+    """Универсальный endpoint для dev-команд"""
+    _check_admin(data.telegram_id)
+    
+    command = data.command.lower().strip()
+    args = data.args or []
+    tid = data.telegram_id
+    
+    try:
+        if command == "help":
+            return {
+                "status": "ok",
+                "result": {
+                    "commands": [
+                        "dev.help() — список команд",
+                        "dev.getUser() — текущий пользователь",
+                        "dev.getLevel() — уровень и XP",
+                        "dev.addXP(amount) — добавить XP",
+                        "dev.setXP(amount) — установить XP",
+                        "dev.resetStreak() — сбросить стрик",
+                        "dev.recordVisit() — записать визит",
+                        "dev.listFriends() — список друзей",
+                        "dev.listRequests() — запросы в друзья",
+                        "dev.listTasks() — список задач",
+                        "dev.addTask(\"Название\") — создать задачу",
+                        "dev.createFriend(targetId) — создать друга",
+                        "dev.sendFriendRequest(targetId) — запрос дружбы",
+                        "dev.removeFriend(targetId) — удалить друга",
+                        "dev.deleteTask(taskId) — удалить задачу",
+                        "dev.showStreakModal() — показать модалку стрика",
+                        "dev.hideStreakModal() — скрыть модалку",
+                        "dev.clearUserData() — удалить данные",
+                        "dev.apiCall(\"METHOD\", \"/path\") — API вызов",
+                        "dev.enableLogs() — включить логи",
+                        "dev.disableLogs() — выключить логи",
+                    ]
+                }
+            }
+        
+        elif command == "getlevel":
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            xp = stats.get("xp", 0) if stats else 0
+            info = calculate_level_info(xp)
+            streak = stats.get("visit_streak_current", 0) if stats else 0
+            max_streak = stats.get("visit_streak_max", 0) if stats else 0
+            return {"status": "ok", "result": {**info, "streak": streak, "max_streak": max_streak}}
+        
+        elif command == "addxp":
+            amount = int(args[0]) if args else 100
+            if amount <= 0 or amount > 100000:
+                return {"status": "error", "message": "Сумма XP: 1–100000"}
+            # Сохраняем в bonus_xp чтобы recalculate не затёр
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$inc": {"bonus_xp": amount, "xp": amount}},
+                upsert=True
+            )
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            total_xp = stats.get("xp", 0) if stats else amount
+            info = calculate_level_info(total_xp)
+            return {"status": "ok", "result": info, "message": f"+{amount} XP (всего: {total_xp})"}
+        
+        elif command == "setxp":
+            amount = int(args[0]) if args else 0
+            if amount < 0 or amount > 1000000:
+                return {"status": "error", "message": "XP: 0–1000000"}
+            # Считаем органический XP и вычисляем bonus
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            current_xp = stats.get("xp", 0) if stats else 0
+            current_bonus = stats.get("bonus_xp", 0) if stats else 0
+            organic_xp = current_xp - current_bonus
+            new_bonus = max(0, amount - organic_xp)
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$set": {"xp": amount, "bonus_xp": new_bonus}},
+                upsert=True
+            )
+            info = calculate_level_info(amount)
+            return {"status": "ok", "result": info, "message": f"XP = {amount} (bonus: {new_bonus})"}
+        
+        elif command == "resetstreak":
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$set": {
+                    "visit_streak_current": 0,
+                    "visit_streak_max": 0,
+                    "active_days": [],
+                    "freeze_shields": 0,
+                }},
+                upsert=True
+            )
+            return {"status": "ok", "message": "Стрик сброшен"}
+        
+        elif command == "getuser":
+            settings = await db.user_settings.find_one({"telegram_id": tid})
+            if settings:
+                settings.pop("_id", None)
+            return {"status": "ok", "result": settings}
+        
+        elif command == "listfriends":
+            friends_data = await db.friends.find({
+                "$or": [{"user_id": tid}, {"friend_id": tid}]
+            }).to_list(length=200)
+            friend_ids = []
+            for f in friends_data:
+                fid = f["friend_id"] if f["user_id"] == tid else f["user_id"]
+                friend_ids.append(fid)
+            return {"status": "ok", "result": {"count": len(friend_ids), "friend_ids": friend_ids}}
+        
+        elif command == "listrequests":
+            incoming = await db.friend_requests.find({"to_id": tid, "status": "pending"}).to_list(length=100)
+            outgoing = await db.friend_requests.find({"from_id": tid, "status": "pending"}).to_list(length=100)
+            for r in incoming + outgoing:
+                r.pop("_id", None)
+            return {"status": "ok", "result": {"incoming": len(incoming), "outgoing": len(outgoing)}}
+        
+        elif command == "listtasks":
+            tasks = await db.tasks.find({"telegram_id": tid}).to_list(length=200)
+            for t in tasks:
+                t.pop("_id", None)
+            return {"status": "ok", "result": {"count": len(tasks), "tasks": tasks[:10]}}
+        
+        elif command == "addtask":
+            text = str(args[0]) if args else "Dev задача"
+            task = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": tid,
+                "text": text,
+                "completed": False,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            await db.tasks.insert_one(task)
+            task.pop("_id", None)
+            return {"status": "ok", "result": task, "message": f"Задача создана: {text}"}
+        
+        elif command == "recordvisit":
+            # Простой visit — вызов существующего endpoint логики
+            stats = await db.user_stats.find_one({"telegram_id": tid})
+            today = datetime.utcnow().strftime("%Y-%m-%d")
+            active_days = stats.get("active_days", []) if stats else []
+            if today not in active_days:
+                active_days.append(today)
+            streak = stats.get("visit_streak_current", 0) if stats else 0
+            await db.user_stats.update_one(
+                {"telegram_id": tid},
+                {"$set": {"active_days": active_days, "visit_streak_current": streak + 1},
+                 "$max": {"visit_streak_max": streak + 1}},
+                upsert=True
+            )
+            return {"status": "ok", "message": f"Визит записан. Стрик: {streak + 1}"}
+        
+        elif command == "clearuserdata":
+            await db.user_settings.delete_one({"telegram_id": tid})
+            await db.user_stats.delete_one({"telegram_id": tid})
+            return {"status": "ok", "message": "Данные пользователя удалены"}
+        
+        else:
+            return {"status": "error", "message": f"Неизвестная команда: {command}. Введите dev.help()"}
+    
+    except (ValueError, IndexError) as e:
+        return {"status": "error", "message": f"Ошибка аргументов: {str(e)}"}
+    except Exception as e:
+        logger.error(f"Dev execute error: command={command}, error={e}")
+        return {"status": "error", "message": str(e)}
+
+
+
+# ============ Эндпоинты для достижений ============
+
+@api_router.get("/achievements", response_model=List[Achievement])
+async def get_achievements():
+    """Получить список всех достижений"""
+    try:
+        achievements = get_all_achievements()
+        return achievements
+    except Exception as e:
+        logger.error(f"Ошибка при получении достижений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user-achievements/{telegram_id}", response_model=List[UserAchievementResponse])
+async def get_user_achievements_endpoint(telegram_id: int):
+    """Получить достижения пользователя"""
+    try:
+        achievements = await get_user_achievements(db, telegram_id)
+        return achievements
+    except Exception as e:
+        logger.error(f"Ошибка при получении достижений пользователя: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user-stats/{telegram_id}", response_model=UserStatsResponse)
+async def get_user_stats_endpoint(telegram_id: int):
+    """Получить статистику пользователя"""
+    try:
+        stats = await get_or_create_user_stats(db, telegram_id)
+        return UserStatsResponse(
+            telegram_id=stats.telegram_id,
+            groups_viewed=stats.groups_viewed,
+            friends_invited=stats.friends_invited,
+            schedule_views=stats.schedule_views,
+            detailed_views=stats.detailed_views,
+            night_usage_count=stats.night_usage_count,
+            early_usage_count=stats.early_usage_count,
+            # БАГ-ФИХ: возвращаем все поля для прогресс-баров
+            unique_groups=stats.unique_groups,
+            analytics_views=stats.analytics_views,
+            calendar_opens=stats.calendar_opens,
+            notifications_configured=stats.notifications_configured,
+            schedule_shares=stats.schedule_shares,
+            menu_items_visited=stats.menu_items_visited,
+            active_days=stats.active_days,
+            # Task-related
+            tasks_created_total=stats.tasks_created_total,
+            tasks_completed_total=stats.tasks_completed_total,
+            tasks_completed_today=stats.tasks_completed_today,
+            tasks_completed_early=stats.tasks_completed_early,
+            tasks_completed_on_time=stats.tasks_completed_on_time,
+            task_streak_current=stats.task_streak_current,
+            first_task_created=stats.first_task_created,
+            # Friends-related
+            friends_count=stats.friends_count,
+            friends_faculties_count=stats.friends_faculties_count,
+            users_invited=stats.users_invited,
+            # Streak
+            visit_streak_current=stats.visit_streak_current,
+            visit_streak_max=stats.visit_streak_max,
+            last_visit_date=stats.last_visit_date,
+            freeze_shields=stats.freeze_shields,
+            streak_claimed_today=stats.streak_claimed_today,
+            total_points=stats.total_points,
+            achievements_count=stats.achievements_count
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики пользователя: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/track-action", response_model=NewAchievementsResponse)
+async def track_action_endpoint(request: TrackActionRequest):
+    """Отследить действие пользователя и проверить достижения"""
+    try:
+        # Отслеживаем действие и проверяем достижения
+        new_achievements = await track_user_action(
+            db,
+            request.telegram_id,
+            request.action_type,
+            request.metadata
+        )
+        
+        # Начисляем XP за просмотр расписания (лимит 3/день)
+        if request.action_type == "view_schedule":
+            asyncio.create_task(safe_award_xp(
+                db, request.telegram_id,
+                XP_REWARDS["schedule_view"],
+                reason="schedule_view"
+            ))
+        
+        return new_achievements
+    except Exception as e:
+        logger.error(f"Ошибка при отслеживании действия: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/user-achievements/{telegram_id}/mark-seen", response_model=SuccessResponse)
+async def mark_achievements_seen_endpoint(telegram_id: int):
+    """Отметить все достижения как просмотренные"""
+    try:
+        await mark_achievements_as_seen(db, telegram_id)
+        return SuccessResponse(success=True, message="Достижения отмечены как просмотренные")
+    except Exception as e:
+        logger.error(f"Ошибка при отметке достижений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Эндпоинты для стрик-механики ============
+
+STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 365]
+
+@api_router.post("/users/{telegram_id}/visit", response_model=VisitResponse)
+async def record_user_visit(telegram_id: int):
+    """
+    Записать визит пользователя и обновить стрик.
+    Вызывается при каждом открытии приложения.
+    """
+    try:
+        import pytz
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        now_moscow = datetime.now(moscow_tz)
+        today_str = now_moscow.strftime('%Y-%m-%d')
+        
+        # Получаем или создаём статистику
+        stats = await get_or_create_user_stats(db, telegram_id)
+        
+        last_visit = stats.last_visit_date
+        current_streak = stats.visit_streak_current
+        max_streak = stats.visit_streak_max
+        freeze_shields = stats.freeze_shields
+        
+        streak_continued = False
+        streak_reset = False
+        freeze_used = False
+        is_new_day = False
+        milestone_reached = None
+        
+        if last_visit == today_str:
+            # Сегодня уже заходил — ничего не меняем
+            pass
+        else:
+            is_new_day = True
+            
+            if last_visit:
+                from datetime import date as date_type
+                last_date = date_type.fromisoformat(last_visit)
+                today_date = date_type.fromisoformat(today_str)
+                days_diff = (today_date - last_date).days
+                
+                if days_diff == 1:
+                    # Вчера заходил → +1 стрик
+                    current_streak += 1
+                    streak_continued = True
+                elif days_diff == 2:
+                    # Пропуск 1 дня
+                    if freeze_shields > 0:
+                        # Щит есть → стрик сохраняется
+                        freeze_shields -= 1
+                        current_streak += 1
+                        freeze_used = True
+                        streak_continued = True
+                    else:
+                        # Щит нет → стрик обнуляется
+                        current_streak = 1
+                        streak_reset = True
+                else:
+                    # Пропуск больше 1 дня → стрик обнуляется
+                    current_streak = 1
+                    streak_reset = True
+            else:
+                # Первый визит
+                current_streak = 1
+                is_new_day = True
+            
+            # Обновляем рекорд
+            if current_streak > max_streak:
+                max_streak = current_streak
+            
+            # Начисляем щит заморозки за каждые 7 дней стрика
+            if current_streak > 0 and current_streak % 7 == 0 and streak_continued:
+                freeze_shields += 1
+            
+            # Проверяем милестоны
+            if current_streak in STREAK_MILESTONES:
+                milestone_reached = current_streak
+            
+            # Обновляем в БД
+            update_data = {
+                "$set": {
+                    "visit_streak_current": current_streak,
+                    "visit_streak_max": max_streak,
+                    "last_visit_date": today_str,
+                    "freeze_shields": freeze_shields,
+                    "streak_claimed_today": False,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+            
+            # Добавляем в active_days если нет
+            update_data["$addToSet"] = {"active_days": today_str}
+            
+            await db.user_stats.update_one(
+                {"telegram_id": telegram_id},
+                update_data
+            )
+            
+            # Начисляем XP за ежедневный визит
+            xp_amount = XP_REWARDS["daily_visit"]
+            # Бонусы за milestones стрика (>= чтобы не пропустить при перескоке)
+            # Каждый milestone начисляется однократно — проверяем что именно сейчас пересекли порог
+            prev_streak = current_streak - 1 if streak_continued else 0
+            if current_streak >= 30 and prev_streak < 30:
+                xp_amount += XP_REWARDS["streak_30_bonus"]
+            elif current_streak >= 14 and prev_streak < 14:
+                xp_amount += XP_REWARDS["streak_14_bonus"]
+            elif current_streak >= 7 and prev_streak < 7:
+                xp_amount += XP_REWARDS["streak_7_bonus"]
+            asyncio.create_task(safe_award_xp(db, telegram_id, xp_amount, reason=f"daily_visit_streak_{current_streak}"))
+            
+            # Ограничиваем active_days до последних 400 записей для производительности
+            stats_doc = await db.user_stats.find_one({"telegram_id": telegram_id})
+            if stats_doc and len(stats_doc.get("active_days", [])) > 400:
+                trimmed_days = sorted(stats_doc["active_days"])[-365:]
+                await db.user_stats.update_one(
+                    {"telegram_id": telegram_id},
+                    {"$set": {"active_days": trimmed_days}}
+                )
+        
+        # Генерируем трекер недели
+        week_days = []
+        today_weekday = now_moscow.weekday()  # 0=Пн, 6=Вс
+        day_labels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+        
+        # Собираем active_days из stats
+        active_days_set = set(stats.active_days or [])
+        if is_new_day:
+            active_days_set.add(today_str)
+        
+        for i in range(7):
+            day_date = now_moscow - timedelta(days=today_weekday - i)
+            day_str = day_date.strftime('%Y-%m-%d')
+            week_days.append({
+                "label": day_labels[i],
+                "dateNum": day_date.day,
+                "done": day_str in active_days_set
+            })
+        
+        return VisitResponse(
+            visit_streak_current=current_streak,
+            visit_streak_max=max_streak,
+            freeze_shields=freeze_shields,
+            streak_continued=streak_continued,
+            streak_reset=streak_reset,
+            freeze_used=freeze_used,
+            milestone_reached=milestone_reached,
+            is_new_day=is_new_day,
+            week_days=week_days
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при записи визита: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/users/{telegram_id}/streak-claim", response_model=SuccessResponse)
+async def claim_streak_reward(telegram_id: int):
+    """Отметить награду за стрик как полученную (с защитой от дублей)"""
+    try:
+        # Атомарное обновление: только если streak_claimed_today ещё не True
+        result = await db.user_stats.update_one(
+            {"telegram_id": telegram_id, "streak_claimed_today": {"$ne": True}},
+            {"$set": {"streak_claimed_today": True, "updated_at": datetime.utcnow()}}
+        )
+        # matched_count == 0 означает что фильтр не нашёл документ с streak_claimed_today != True
+        # то есть награда уже была получена
+        if result.matched_count == 0:
+            return SuccessResponse(success=True, message="Награда уже была получена")
+        return SuccessResponse(success=True, message="Награда за стрик получена")
+    except Exception as e:
+        logger.error(f"Ошибка при получении награды за стрик: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Эндпоинты для погоды ============
+
+@api_router.get("/weather", response_model=WeatherResponse)
+async def get_weather_endpoint():
+    """Получить текущую погоду в Москве (с кешированием на 10 минут)"""
+    # Проверяем кеш
+    cached_weather = cache.get("weather")
+    if cached_weather:
+        return cached_weather
+    
+    try:
+        weather = await get_moscow_weather()
+        
+        if not weather:
+            # Возвращаем mock данные вместо ошибки
+            logger.warning("Weather API недоступен, возвращаем mock данные")
+            weather = WeatherResponse(
+                temperature=5,
+                feels_like=2,
+                humidity=85,
+                wind_speed=15,
+                description="Облачно",
+                icon="☁️"
+            )
+        
+        # Кешируем результат на 10 минут
+        cache.set("weather", weather, ttl_minutes=10)
+        return weather
+    except Exception as e:
+        logger.error(f"Ошибка при получении погоды: {e}")
+        # Возвращаем mock данные вместо ошибки
+        return WeatherResponse(
+            temperature=5,
+            feels_like=2,
+            humidity=85,
+            wind_speed=15,
+            description="Облачно",
+            icon="☁️"
+        )
+
+
+# ============ Эндпоинты для информации о боте ============
+
+@api_router.get("/bot-info", response_model=BotInfo)
+async def get_bot_info():
+    """Получить информацию о боте (username, id и т.д.) с кешированием на 1 час"""
+    # Проверяем кеш
+    cached_bot_info = cache.get("bot_info")
+    if cached_bot_info:
+        return cached_bot_info
+    
+    try:
+        from telegram import Bot
+        
+        bot_token = get_telegram_bot_token()
+        if not bot_token:
+            raise HTTPException(status_code=500, detail="Bot token не настроен")
+        
+        bot = Bot(token=bot_token)
+        me = await bot.get_me()
+        
+        bot_info = BotInfo(
+            username=me.username or "",
+            first_name=me.first_name,
+            id=me.id,
+            can_join_groups=me.can_join_groups or False,
+            can_read_all_group_messages=me.can_read_all_group_messages or False,
+            supports_inline_queries=me.supports_inline_queries or False
+        )
+        
+        # Кешируем на 1 час
+        cache.set("bot_info", bot_info, ttl_minutes=60)
+        return bot_info
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о боте: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/user-profile-photo/{telegram_id}")
+async def get_user_profile_photo(telegram_id: int):
+    """Получить URL фото профиля пользователя из Telegram"""
+    try:
+        from telegram import Bot
+        
+        bot_token = get_telegram_bot_token()
+        if not bot_token:
+            return JSONResponse({"photo_url": None})
+        
+        bot = Bot(token=bot_token)
+        
+        # Получаем фото профиля пользователя
+        photos = await bot.get_user_profile_photos(telegram_id, limit=1)
+        
+        if photos.total_count > 0:
+            # Берём самое большое фото (последнее в списке sizes)
+            photo = photos.photos[0][-1]
+            file = await bot.get_file(photo.file_id)
+            
+            # file.file_path может быть как полным URL, так и просто путём
+            # Проверяем, если это уже URL, используем его, иначе формируем полный URL
+            if file.file_path.startswith('http'):
+                full_url = file.file_path
+            else:
+                full_url = f"https://api.telegram.org/file/bot{bot_token}/{file.file_path}"
+            
+            logger.info(f"Profile photo URL for {telegram_id}: {full_url}")
+            return JSONResponse({"photo_url": full_url})
+        else:
+            return JSONResponse({"photo_url": None})
+            
+    except Exception as e:
+        logger.error(f"Ошибка при получении фото профиля: {e}")
+        return JSONResponse({"photo_url": None})
+
+
+@api_router.get("/user-profile-photo-proxy/{telegram_id}")
+async def get_user_profile_photo_proxy(telegram_id: int):
+    """Получить фото профиля пользователя через прокси (для обхода CORS)"""
+    try:
+        from telegram import Bot
+        
+        bot_token = get_telegram_bot_token()
+        if not bot_token:
+            raise HTTPException(status_code=404, detail="Bot token not configured")
+        
+        bot = Bot(token=bot_token)
+        
+        # Получаем фото профиля пользователя
+        photos = await bot.get_user_profile_photos(telegram_id, limit=1)
+        
+        if photos.total_count > 0:
+            # Берём самое большое фото (последнее в списке sizes)
+            photo = photos.photos[0][-1]
+            file = await bot.get_file(photo.file_id)
+            
+            # Формируем URL для загрузки
+            if file.file_path.startswith('http'):
+                image_url = file.file_path
+            else:
+                image_url = f"https://api.telegram.org/file/bot{bot_token}/{file.file_path}"
+            
+            # Загружаем изображение
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url)
+                if response.status_code == 200:
+                    # Возвращаем изображение с правильным content-type
+                    return StreamingResponse(
+                        iter([response.content]),
+                        media_type=response.headers.get('content-type', 'image/jpeg'),
+                        headers={
+                            'Cache-Control': 'public, max-age=86400',  # Кешируем на 24 часа
+                        }
+                    )
+        
+        raise HTTPException(status_code=404, detail="Profile photo not found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e).lower()
+        # User not found / Invalid user_id - это 404, не 500
+        if 'user not found' in error_msg or 'invalid user' in error_msg or 'bad request' in error_msg:
+            raise HTTPException(status_code=404, detail="User not found")
+        logger.error(f"Ошибка при проксировании фото профиля: {e}")
+        raise HTTPException(status_code=404, detail="Profile photo not available")
+
+
+# ============ YouTube API ============
+
+import re
+import yt_dlp
+
+# Кэш для YouTube информации (в памяти, чтобы не запрашивать повторно)
+youtube_cache = {}
+vk_video_cache = {}
+
+def extract_youtube_video_id(url: str) -> Optional[str]:
+    """Извлекает video_id из YouTube URL"""
+    patterns = [
+        r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})',
+        r'youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def extract_vk_video_id(url: str) -> Optional[str]:
+    """Извлекает video_id из VK Video URL"""
+    patterns = [
+        r'vk\.com/video(-?\d+_\d+)',  # vk.com/video-123_456
+        r'vk\.com/clip(-?\d+_\d+)',   # vk.com/clip-123_456
+        r'vkvideo\.ru/video(-?\d+_\d+)',  # vkvideo.ru/video-123_456
+        r'[?&]z=video(-?\d+_\d+)',  # ?z=video-123_456 или &z=video-123_456 (из любого пути: wall, videos, club, etc.)
+        r'vk\.com/.*video(-?\d+_\d+)',  # любой URL с video-123_456 (fallback)
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def find_vk_video_url_in_text(text: str) -> Optional[str]:
+    """Находит первую VK Video ссылку в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',  # vk.com/video-123_456
+        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',   # vk.com/clip-123_456
+        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',  # vkvideo.ru/video-123_456
+        r'https?://(?:www\.)?vk\.com/[^\s]*[?&]z=video-?\d+_\d+[^\s]*',  # любой путь с ?z=video (wall, videos, club, etc.)
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(0)
+    return None
+
+def find_all_vk_video_urls_in_text(text: str) -> List[str]:
+    """Находит ВСЕ VK Video ссылки в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?vk\.com/video-?\d+_\d+[^\s]*',  # vk.com/video-123_456
+        r'https?://(?:www\.)?vk\.com/clip-?\d+_\d+[^\s]*',   # vk.com/clip-123_456
+        r'https?://(?:www\.)?vkvideo\.ru/video-?\d+_\d+[^\s]*',  # vkvideo.ru/video-123_456
+        r'https?://(?:www\.)?vk\.com/[^\s]*[?&]z=video-?\d+_\d+[^\s]*',  # любой путь с ?z=video (wall, videos, club, etc.)
+    ]
+    urls = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        urls.extend(matches)
+    return list(set(urls))  # Убираем дубликаты
+
+def format_duration(seconds: int) -> str:
+    """Форматирует длительность в человекочитаемый формат"""
+    if seconds < 0:
+        return "0:00"
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+def find_youtube_url_in_text(text: str) -> Optional[str]:
+    """Находит первую YouTube ссылку в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://youtu\.be/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/embed/[a-zA-Z0-9_-]{11}[^\s]*',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(0)
+    return None
+
+def find_all_youtube_urls_in_text(text: str) -> List[str]:
+    """Находит ВСЕ YouTube ссылки в тексте"""
+    patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://youtu\.be/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]{11}[^\s]*',
+        r'https?://(?:www\.)?youtube\.com/embed/[a-zA-Z0-9_-]{11}[^\s]*',
+    ]
+    urls = []
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        urls.extend(matches)
+    return list(set(urls))  # Убираем дубликаты
+
+
+@api_router.get("/youtube/info", response_model=YouTubeInfoResponse)
+async def get_youtube_info(url: str):
+    """
+    Получить информацию о YouTube видео (название, длительность, превью)
+    """
+    try:
+        # Проверяем кэш
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            raise HTTPException(status_code=400, detail="Некорректная YouTube ссылка")
+        
+        if video_id in youtube_cache:
+            logger.info(f"🎬 YouTube info from cache: {video_id}")
+            return youtube_cache[video_id]
+        
+        logger.info(f"🎬 Fetching YouTube info for: {url}")
+        
+        # Используем yt-dlp для получения информации
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if not info:
+            raise HTTPException(status_code=404, detail="Видео не найдено")
+        
+        duration_seconds = info.get('duration', 0) or 0
+        
+        result = YouTubeInfoResponse(
+            url=url,
+            video_id=video_id,
+            title=info.get('title', 'Без названия'),
+            duration=format_duration(duration_seconds),
+            duration_seconds=duration_seconds,
+            thumbnail=info.get('thumbnail', f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"),
+            channel=info.get('channel', info.get('uploader', None))
+        )
+        
+        # Сохраняем в кэш
+        youtube_cache[video_id] = result
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о YouTube видео: {e}")
+        raise HTTPException(status_code=500, detail=f"Не удалось получить информацию о видео: {str(e)}")
+
+
+@api_router.get("/vkvideo/info", response_model=VKVideoInfoResponse)
+async def get_vk_video_info(url: str):
+    """
+    Получить информацию о VK видео (название, длительность, превью)
+    """
+    try:
+        # Проверяем кэш
+        video_id = extract_vk_video_id(url)
+        if not video_id:
+            raise HTTPException(status_code=400, detail="Некорректная VK Video ссылка")
+        
+        if video_id in vk_video_cache:
+            logger.info(f"🎬 VK Video info from cache: {video_id}")
+            return vk_video_cache[video_id]
+        
+        logger.info(f"🎬 Fetching VK Video info for: {url}")
+        
+        # Используем yt-dlp для получения информации (поддерживает VK)
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if not info:
+            raise HTTPException(status_code=404, detail="Видео не найдено")
+        
+        duration_seconds = info.get('duration', 0) or 0
+        
+        # Пытаемся получить превью
+        thumbnail = info.get('thumbnail')
+        if not thumbnail:
+            thumbnails = info.get('thumbnails', [])
+            if thumbnails:
+                thumbnail = thumbnails[-1].get('url', '')
+        
+        result = VKVideoInfoResponse(
+            url=url,
+            video_id=video_id,
+            title=info.get('title', 'Без названия'),
+            duration=format_duration(duration_seconds),
+            duration_seconds=duration_seconds,
+            thumbnail=thumbnail or '',
+            channel=info.get('channel', info.get('uploader', None))
+        )
+        
+        # Сохраняем в кэш
+        vk_video_cache[video_id] = result
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о VK видео: {e}")
+        raise HTTPException(status_code=500, detail=f"Не удалось получить информацию о видео: {str(e)}")
+
+
+async def enrich_task_with_youtube(task_dict: dict) -> dict:
+    """DEPRECATED: Используйте enrich_task_with_all_videos для поддержки нескольких ссылок"""
+    return task_dict
+
+
+async def enrich_task_with_vk_video(task_dict: dict) -> dict:
+    """DEPRECATED: Используйте enrich_task_with_all_videos для поддержки нескольких ссылок"""
+    return task_dict
+
+
+async def get_youtube_video_info(youtube_url: str) -> Optional[dict]:
+    """Получает информацию о YouTube видео по URL"""
+    video_id = extract_youtube_video_id(youtube_url)
+    if not video_id:
+        return None
+    
+    try:
+        # Проверяем кэш
+        if video_id in youtube_cache:
+            info = youtube_cache[video_id]
+            return {
+                'url': youtube_url,
+                'title': info.title,
+                'duration': info.duration,
+                'thumbnail': info.thumbnail,
+                'type': 'youtube'
+            }
+        
+        # Если нет в кэше - запрашиваем
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(youtube_url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if info:
+            duration_seconds = info.get('duration', 0) or 0
+            
+            result = YouTubeInfoResponse(
+                url=youtube_url,
+                video_id=video_id,
+                title=info.get('title', 'Без названия'),
+                duration=format_duration(duration_seconds),
+                duration_seconds=duration_seconds,
+                thumbnail=info.get('thumbnail', f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"),
+                channel=info.get('channel', info.get('uploader', None))
+            )
+            
+            # Сохраняем в кэш
+            youtube_cache[video_id] = result
+            
+            return {
+                'url': youtube_url,
+                'title': result.title,
+                'duration': result.duration,
+                'thumbnail': result.thumbnail,
+                'type': 'youtube'
+            }
+    except Exception as e:
+        logger.warning(f"Не удалось получить YouTube info: {e}")
+    
+    return None
+
+
+async def get_vk_video_info(vk_video_url: str) -> Optional[dict]:
+    """Получает информацию о VK видео по URL"""
+    video_id = extract_vk_video_id(vk_video_url)
+    if not video_id:
+        return None
+    
+    try:
+        # Проверяем кэш
+        if video_id in vk_video_cache:
+            info = vk_video_cache[video_id]
+            return {
+                'url': vk_video_url,
+                'title': info.title,
+                'duration': info.duration,
+                'thumbnail': info.thumbnail,
+                'type': 'vk'
+            }
+        
+        # Если нет в кэше - запрашиваем
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'skip_download': True,
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        def fetch_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(vk_video_url, download=False)
+        
+        info = await loop.run_in_executor(None, fetch_info)
+        
+        if info:
+            duration_seconds = info.get('duration', 0) or 0
+            thumbnail = info.get('thumbnail')
+            if not thumbnail:
+                thumbnails = info.get('thumbnails', [])
+                if thumbnails:
+                    thumbnail = thumbnails[-1].get('url', '')
+            
+            result = VKVideoInfoResponse(
+                url=vk_video_url,
+                video_id=video_id,
+                title=info.get('title', 'Без названия'),
+                duration=format_duration(duration_seconds),
+                duration_seconds=duration_seconds,
+                thumbnail=thumbnail or '',
+                channel=info.get('channel', info.get('uploader', None))
+            )
+            
+            # Сохраняем в кэш
+            vk_video_cache[video_id] = result
+            
+            return {
+                'url': vk_video_url,
+                'title': result.title,
+                'duration': result.duration,
+                'thumbnail': result.thumbnail,
+                'type': 'vk'
+            }
+    except Exception as e:
+        logger.warning(f"Не удалось получить VK Video info: {e}")
+    
+    return None
+
+
+async def enrich_task_with_all_videos(task_dict: dict) -> dict:
+    """Обогащает задачу информацией о ВСЕХ видео (YouTube и VK) в тексте"""
+    # Если videos уже заполнен клиентом - не перезаписываем
+    existing_videos = task_dict.get('videos', [])
+    if existing_videos and len(existing_videos) > 0:
+        return task_dict
+    
+    text = task_dict.get('text', '')
+    if not text:
+        task_dict['videos'] = []
+        return task_dict
+    
+    videos = []
+    
+    # Находим все YouTube ссылки
+    youtube_urls = find_all_youtube_urls_in_text(text)
+    for url in youtube_urls:
+        video_info = await get_youtube_video_info(url)
+        if video_info:
+            videos.append(video_info)
+    
+    # Находим все VK ссылки
+    vk_urls = find_all_vk_video_urls_in_text(text)
+    for url in vk_urls:
+        video_info = await get_vk_video_info(url)
+        if video_info:
+            videos.append(video_info)
+    
+    task_dict['videos'] = videos
+    return task_dict
+
+
+async def enrich_task_with_video(task_dict: dict) -> dict:
+    """Обогащает задачу информацией о видео (YouTube и VK) - новая версия с поддержкой нескольких ссылок"""
+    return await enrich_task_with_all_videos(task_dict)
+
+
+# ============ Эндпоинты для списка дел ============
+
+@api_router.get("/tasks/{telegram_id}", response_model=List[TaskResponse])
+async def get_user_tasks(telegram_id: int):
+    """Получить все задачи пользователя (исключая события планировщика)"""
+    try:
+        # Исключаем события планировщика (задачи с time_start И time_end)
+        # События планировщика получаются через /api/planner/{telegram_id}/{date}
+        query = {
+            "telegram_id": telegram_id,
+            "$or": [
+                {"time_start": {"$exists": False}},
+                {"time_start": None},
+                {"time_end": {"$exists": False}},
+                {"time_end": None}
+            ]
+        }
+        
+        # Сортируем по order (порядок drag & drop), затем по created_at
+        tasks = await db.tasks.find(query).sort([("order", 1), ("created_at", -1)]).to_list(1000)
+        
+        # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video() для каждой задачи
+        # Это убирает медленные сетевые запросы к YouTube/VK через yt_dlp
+        # Видео информация возвращается только если уже сохранена в документе
+        result = []
+        for task in tasks:
+            # Используем уже сохранённые videos, без сетевых запросов
+            if 'videos' not in task:
+                task['videos'] = []
+            progress_info = calculate_subtasks_progress(task.get("subtasks", []))
+            result.append(TaskResponse(**task, **progress_info))
+        
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка при получении задач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def calculate_subtasks_progress(subtasks: list) -> dict:
+    """Вычислить прогресс по подзадачам"""
+    if not subtasks:
+        return {"subtasks_progress": 0, "subtasks_completed": 0, "subtasks_total": 0}
+    
+    total = len(subtasks)
+    completed = sum(1 for s in subtasks if s.get("completed", False))
+    progress = round((completed / total) * 100) if total > 0 else 0
+    
+    return {
+        "subtasks_progress": progress,
+        "subtasks_completed": completed,
+        "subtasks_total": total
+    }
+
+
+@api_router.post("/tasks", response_model=TaskResponse)
+async def create_task(task_data: TaskCreate):
+    """Создать новую задачу"""
+    try:
+        # Получаем максимальный order для данного пользователя
+        max_order_task = await db.tasks.find_one(
+            {"telegram_id": task_data.telegram_id},
+            sort=[("order", -1)]
+        )
+        
+        # Присваиваем order = max + 1 (или 0, если задач нет)
+        next_order = (max_order_task.get("order", -1) + 1) if max_order_task else 0
+        
+        # Создаём подзадачи из переданных названий
+        subtasks = []
+        for i, subtask_title in enumerate(task_data.subtasks):
+            subtasks.append(TaskSubtask(
+                title=subtask_title,
+                order=i
+            ).model_dump())
+        
+        # Создаём задачу без поля subtasks из task_data (оно содержит только названия)
+        task_dict_data = task_data.model_dump()
+        task_dict_data.pop('subtasks', None)  # Удаляем строковые названия
+        
+        task = Task(**task_dict_data, order=next_order, subtasks=subtasks)
+        task_dict = task.model_dump()
+        
+        await db.tasks.insert_one(task_dict)
+        
+        # ОПТИМИЗАЦИЯ: Трекинг достижений fire-and-forget (не блокируем ответ)
+        asyncio.create_task(track_user_action(
+            db, 
+            task_data.telegram_id, 
+            "create_task",
+            metadata={}
+        ))
+        
+        # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video — убираем медленные yt_dlp запросы
+        # Видео обогащение происходит лениво при обновлении задачи
+        if 'videos' not in task_dict:
+            task_dict['videos'] = []
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(task_dict.get("subtasks", []))
+        
+        return TaskResponse(**task_dict, **progress_info)
+    except Exception as e:
+        logger.error(f"Ошибка при создании задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.put("/tasks/reorder", response_model=SuccessResponse)
+async def reorder_tasks(request: TaskReorderRequest):
+    """
+    Обновить порядок задач (batch update)
+    Принимает объект с массивом: {"tasks": [{"id": "task_id", "order": 0}, ...]}
+    ВАЖНО: Этот роут должен быть ПЕРЕД /tasks/{task_id} чтобы избежать конфликта
+    """
+    try:
+        logger.info(f"🔄 Reordering {len(request.tasks)} tasks...")
+        
+        # Обновляем order для каждой задачи
+        updated_count = 0
+        for task_order in request.tasks:
+            logger.info(f"  Updating task {task_order.id} to order {task_order.order}")
+            
+            result = await db.tasks.update_one(
+                {"id": task_order.id},
+                {"$set": {"order": task_order.order, "updated_at": datetime.utcnow()}}
+            )
+            
+            if result.modified_count > 0:
+                updated_count += 1
+                logger.info(f"    ✅ Task {task_order.id} updated")
+            else:
+                logger.warning(f"    ⚠️ Task {task_order.id} not found or not modified")
+        
+        logger.info(f"✅ Successfully updated {updated_count} out of {len(request.tasks)} tasks")
+        return SuccessResponse(success=True, message=f"Обновлен порядок {updated_count} задач")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при изменении порядка задач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/tasks/{task_id}", response_model=TaskResponse)
+async def update_task(task_id: str, task_update: TaskUpdate):
+    """Обновить задачу (все поля опциональны)"""
+    try:
+        # Проверяем существование задачи
+        existing_task = await db.tasks.find_one({"id": task_id})
+        
+        if not existing_task:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Проверяем, если задача отмечается как выполненная
+        was_incomplete = not existing_task.get("completed", False)
+        is_completing = task_update.completed is True and was_incomplete
+        is_uncompleting = task_update.completed is False and existing_task.get("completed", False)
+        xp_result = None
+        
+        # Обновляем только переданные поля
+        update_data = {}
+        if task_update.text is not None:
+            update_data["text"] = task_update.text
+        if task_update.completed is not None:
+            update_data["completed"] = task_update.completed
+            # Если задача выполняется - записываем время выполнения
+            if is_completing:
+                update_data["completed_at"] = datetime.utcnow()
+            # Если задача снимается с выполнения - очищаем время
+            elif is_uncompleting:
+                update_data["completed_at"] = None
+        if task_update.skipped is not None:
+            update_data["skipped"] = task_update.skipped
+        if task_update.category is not None:
+            update_data["category"] = task_update.category
+        if task_update.priority is not None:
+            update_data["priority"] = task_update.priority
+        if task_update.deadline is not None:
+            update_data["deadline"] = task_update.deadline
+        if task_update.target_date is not None:
+            update_data["target_date"] = task_update.target_date
+        if task_update.subject is not None:
+            update_data["subject"] = task_update.subject
+        if task_update.discipline_id is not None:
+            update_data["discipline_id"] = task_update.discipline_id
+        if task_update.order is not None:
+            update_data["order"] = task_update.order
+        
+        # FIX: Обновление заметок (ранее пропущено)
+        if task_update.notes is not None:
+            update_data["notes"] = task_update.notes
+        
+        # FIX: Обновление origin (ранее пропущено)
+        if task_update.origin is not None:
+            update_data["origin"] = task_update.origin
+        
+        # Обновление времени (для событий планировщика)
+        if task_update.time_start is not None:
+            update_data["time_start"] = task_update.time_start
+        if task_update.time_end is not None:
+            update_data["time_end"] = task_update.time_end
+        if task_update.is_fixed is not None:
+            update_data["is_fixed"] = task_update.is_fixed
+        
+        # Массив видео (новый формат)
+        if task_update.videos is not None:
+            update_data["videos"] = [v.model_dump() if hasattr(v, 'model_dump') else v for v in task_update.videos]
+        
+        update_data["updated_at"] = datetime.utcnow()
+        
+        await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": update_data}
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Если задача была выполнена, отслеживаем для достижений
+        if is_completing:
+            current_hour = datetime.utcnow().hour
+            
+            # Проверяем, выполнена ли в срок (до дедлайна или без дедлайна)
+            deadline = existing_task.get("deadline")
+            on_time = True  # По умолчанию считаем в срок
+            
+            if deadline:
+                # Если есть дедлайн, проверяем
+                if isinstance(deadline, str):
+                    deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+                on_time = datetime.utcnow() <= deadline
+            
+            # ОПТИМИЗАЦИЯ: Трекинг достижений fire-and-forget (не блокируем ответ)
+            asyncio.create_task(track_user_action(
+                db,
+                existing_task["telegram_id"],
+                "complete_task",
+                metadata={
+                    "hour": current_hour,
+                    "on_time": on_time
+                }
+            ))
+            
+            # Начисляем XP за выполнение задачи
+            xp_amount = XP_REWARDS["task_complete"]
+            if on_time:
+                xp_amount += XP_REWARDS["task_on_time_bonus"]
+            xp_result = await safe_award_xp(
+                db, existing_task["telegram_id"], xp_amount,
+                reason=f"task_complete{'_on_time' if on_time else ''}"
+            )
+        
+        # ОПТИМИЗАЦИЯ: НЕ вызываем enrich_task_with_video — убираем медленные yt_dlp запросы
+        if 'videos' not in updated_task:
+            updated_task['videos'] = []
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        # XP info при выполнении задачи
+        xp_awarded_amount = None
+        xp_info_data = None
+        if is_completing:
+            try:
+                xp_awarded_amount = xp_result.get("xp_awarded", 0) if xp_result else 0
+                xp_info_data = {
+                    "xp": xp_result.get("xp", 0),
+                    "level": xp_result.get("level", 1),
+                    "tier": xp_result.get("tier", "base"),
+                    "progress": xp_result.get("progress", 0),
+                    "xp_current_level": xp_result.get("xp_current_level", 0),
+                    "xp_next_level": xp_result.get("xp_next_level", 100),
+                    "leveled_up": xp_result.get("leveled_up", False),
+                    "old_level": xp_result.get("old_level"),
+                    "new_level": xp_result.get("new_level"),
+                    "old_tier": xp_result.get("old_tier"),
+                    "new_tier": xp_result.get("new_tier"),
+                }
+            except Exception as xp_err:
+                logger.warning(f"Failed to extract xp_info: {xp_err}")
+        
+        return TaskResponse(
+            **updated_task,
+            **progress_info,
+            xp_awarded=xp_awarded_amount,
+            xp_info=xp_info_data,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/tasks/{task_id}", response_model=SuccessResponse)
+async def delete_task(task_id: str):
+    """Удалить задачу"""
+    try:
+        result = await db.tasks.delete_one({"id": task_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        return SuccessResponse(success=True, message="Задача удалена")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Подзадачи для личных задач ============
+
+@api_router.post("/tasks/{task_id}/subtasks", response_model=TaskResponse)
+async def add_task_subtask(task_id: str, subtask: TaskSubtaskCreate):
+    """Добавить подзадачу к личной задаче"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.tasks.find_one({"id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Создаём новую подзадачу
+        new_subtask = TaskSubtask(
+            title=subtask.title,
+            order=len(task_doc.get("subtasks", []))
+        )
+        
+        # Добавляем подзадачу в массив
+        await db.tasks.update_one(
+            {"id": task_id},
+            {
+                "$push": {"subtasks": new_subtask.model_dump()},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/tasks/{task_id}/subtasks/{subtask_id}", response_model=TaskResponse)
+async def update_task_subtask(task_id: str, subtask_id: str, update_data: TaskSubtaskUpdate):
+    """Обновить подзадачу личной задачи"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.tasks.find_one({"id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Ищем подзадачу
+        subtasks = task_doc.get("subtasks", [])
+        subtask_index = next((i for i, s in enumerate(subtasks) if s.get("subtask_id") == subtask_id), None)
+        
+        if subtask_index is None:
+            raise HTTPException(status_code=404, detail="Подзадача не найдена")
+        
+        # Обновляем поля подзадачи
+        if update_data.title is not None:
+            subtasks[subtask_index]["title"] = update_data.title
+        if update_data.completed is not None:
+            subtasks[subtask_index]["completed"] = update_data.completed
+            if update_data.completed:
+                subtasks[subtask_index]["completed_at"] = datetime.utcnow()
+            else:
+                subtasks[subtask_index]["completed_at"] = None
+        
+        # Сохраняем изменения
+        await db.tasks.update_one(
+            {"id": task_id},
+            {
+                "$set": {
+                    "subtasks": subtasks,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/tasks/{task_id}/subtasks/{subtask_id}", response_model=TaskResponse)
+async def delete_task_subtask(task_id: str, subtask_id: str):
+    """Удалить подзадачу из личной задачи"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.tasks.find_one({"id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Удаляем подзадачу из массива
+        await db.tasks.update_one(
+            {"id": task_id},
+            {
+                "$pull": {"subtasks": {"subtask_id": subtask_id}},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.tasks.find_one({"id": task_id})
+        
+        # Добавляем статистику подзадач
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+class SubtaskReorderRequest(BaseModel):
+    subtask_ids: list[str]
+
+@api_router.put("/tasks/{task_id}/subtasks-reorder", response_model=TaskResponse)
+async def reorder_task_subtasks(task_id: str, request: SubtaskReorderRequest):
+    """Изменить порядок подзадач в личной задаче"""
+    try:
+        task_doc = await db.tasks.find_one({"id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+
+        current_subtasks = task_doc.get("subtasks", [])
+        subtask_map = {s["subtask_id"]: s for s in current_subtasks}
+
+        # Пересобираем в новом порядке
+        reordered = []
+        for sid in request.subtask_ids:
+            if sid in subtask_map:
+                st = subtask_map.pop(sid)
+                st["order"] = len(reordered)
+                reordered.append(st)
+        # Добавляем оставшиеся (на случай рассинхрона)
+        for st in subtask_map.values():
+            st["order"] = len(reordered)
+            reordered.append(st)
+
+        await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": {"subtasks": reordered, "updated_at": datetime.utcnow()}}
+        )
+
+        updated_task = await db.tasks.find_one({"id": task_id})
+        progress_info = calculate_subtasks_progress(updated_task.get("subtasks", []))
+        return TaskResponse(**updated_task, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при изменении порядка подзадач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.get("/tasks/{telegram_id}/productivity-stats", response_model=TaskProductivityStats)
+async def get_productivity_stats(telegram_id: int):
+    """Получить статистику продуктивности по задачам пользователя"""
+    try:
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Начало недели (понедельник)
+        week_start = today_start - timedelta(days=today_start.weekday())
+        
+        # Начало месяца
+        month_start = today_start.replace(day=1)
+        
+        # Получаем все выполненные задачи пользователя
+        completed_tasks = await db.tasks.find({
+            "telegram_id": telegram_id,
+            "completed": True
+        }).to_list(length=None)
+        
+        total_completed = len(completed_tasks)
+        
+        # Подсчёт выполненных за разные периоды
+        completed_today = 0
+        completed_this_week = 0
+        completed_this_month = 0
+        
+        # Собираем уникальные даты выполнения для расчёта streak
+        completion_dates = set()
+        
+        for task in completed_tasks:
+            completed_at = task.get("completed_at")
+            if completed_at:
+                if isinstance(completed_at, str):
+                    completed_at = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                
+                # Дата выполнения (без времени)
+                completion_date = completed_at.replace(hour=0, minute=0, second=0, microsecond=0)
+                completion_dates.add(completion_date.date())
+                
+                # Подсчёт по периодам
+                if completed_at >= today_start:
+                    completed_today += 1
+                if completed_at >= week_start:
+                    completed_this_week += 1
+                if completed_at >= month_start:
+                    completed_this_month += 1
+        
+        # Расчёт streak (серии дней подряд)
+        current_streak = 0
+        best_streak = 0
+        streak_dates = []
+        
+        if completion_dates:
+            # Сортируем даты по убыванию (от самой новой)
+            sorted_dates = sorted(completion_dates, reverse=True)
+            
+            # Проверяем текущий streak (начиная с сегодня или вчера)
+            today = now.date()
+            yesterday = (now - timedelta(days=1)).date()
+            
+            # Начинаем считать streak если сегодня или вчера была выполнена задача
+            if sorted_dates[0] == today or sorted_dates[0] == yesterday:
+                current_streak = 1
+                streak_dates.append(sorted_dates[0].isoformat())
+                
+                # Считаем последовательные дни
+                for i in range(1, len(sorted_dates)):
+                    expected_date = sorted_dates[i-1] - timedelta(days=1)
+                    if sorted_dates[i] == expected_date:
+                        current_streak += 1
+                        streak_dates.append(sorted_dates[i].isoformat())
+                    else:
+                        break
+            
+            # Находим лучший streak за всё время
+            temp_streak = 1
+            for i in range(1, len(sorted_dates)):
+                expected_date = sorted_dates[i-1] - timedelta(days=1)
+                if sorted_dates[i] == expected_date:
+                    temp_streak += 1
+                else:
+                    best_streak = max(best_streak, temp_streak)
+                    temp_streak = 1
+            best_streak = max(best_streak, temp_streak, current_streak)
+        
+        # Статистика по последним 7 дням
+        # FIX: Оптимизация O(N) вместо O(7*N) — предварительно группируем задачи по дням
+        day_counts = {}
+        for task in completed_tasks:
+            completed_at = task.get("completed_at")
+            if completed_at:
+                if isinstance(completed_at, str):
+                    completed_at = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                task_day = completed_at.date()
+                day_counts[task_day] = day_counts.get(task_day, 0) + 1
+        
+        daily_stats = []
+        for i in range(6, -1, -1):
+            day = (today_start - timedelta(days=i)).date()
+            day_name = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][day.weekday()]
+            day_count = day_counts.get(day, 0)
+            
+            daily_stats.append({
+                "date": day.isoformat(),
+                "day_name": day_name,
+                "count": day_count,
+                "has_completed": day in completion_dates
+            })
+        
+        return TaskProductivityStats(
+            total_completed=total_completed,
+            completed_today=completed_today,
+            completed_this_week=completed_this_week,
+            completed_this_month=completed_this_month,
+            current_streak=current_streak,
+            best_streak=best_streak,
+            streak_dates=streak_dates,
+            daily_stats=daily_stats
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики продуктивности: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Эндпоинты для планировщика (Planner) ============
+
+@api_router.post("/planner/sync", response_model=PlannerSyncResponse)
+async def sync_schedule_to_planner(request: PlannerSyncRequest):
+    """
+    Синхронизировать расписание в планировщик на конкретную дату.
+    Создает/обновляет Task записи для каждой пары из расписания.
+    """
+    try:
+        telegram_id = request.telegram_id
+        target_date_str = request.date  # YYYY-MM-DD
+        week_number = request.week_number
+        
+        # Проверяем существование пользователя и получаем его группу
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        group_id = user.get("group_id")
+        if not group_id:
+            raise HTTPException(status_code=400, detail="У пользователя не выбрана группа")
+        
+        # Получаем расписание из кэша или парсим
+        cached = await db.schedule_cache.find_one({
+            "group_id": group_id,
+            "week_number": week_number,
+            "expires_at": {"$gt": datetime.utcnow()}
+        })
+        
+        if not cached:
+            # Если кэш отсутствует, получаем расписание
+            try:
+                events = await get_schedule(
+                    facultet_id=user.get("facultet_id"),
+                    level_id=user.get("level_id"),
+                    kurs=user.get("kurs"),
+                    form_code=user.get("form_code"),
+                    group_id=group_id,
+                    week_number=week_number
+                )
+                # Кэшируем
+                cache_data = {
+                    "id": str(uuid.uuid4()),
+                    "group_id": group_id,
+                    "week_number": week_number,
+                    "events": [event for event in events],
+                    "cached_at": datetime.utcnow(),
+                    "expires_at": datetime.utcnow() + timedelta(hours=1)
+                }
+                await db.schedule_cache.update_one(
+                    {"group_id": group_id, "week_number": week_number},
+                    {"$set": cache_data},
+                    upsert=True
+                )
+                schedule_events = events
+            except Exception as e:
+                logger.error(f"Не удалось получить расписание: {e}")
+                raise HTTPException(status_code=500, detail="Не удалось получить расписание")
+        else:
+            schedule_events = cached.get("events", [])
+        
+        # Парсим дату для фильтрации по дню недели
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        # Определяем день недели на русском (для фильтрации)
+        day_names_ru = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        target_day_name = day_names_ru[target_date.weekday()]
+        
+        # Фильтруем события по дню недели и неделе
+        filtered_events = [
+            event for event in schedule_events
+            if event.get("day") == target_day_name and event.get("week") == week_number
+        ]
+        
+        # Создаем уникальные идентификаторы для каждого события (чтобы избежать дублей)
+        synced_tasks = []
+        synced_count = 0
+        
+        for event in filtered_events:
+            # Создаем уникальный идентификатор события на основе дня, времени и дисциплины
+            event_key = f"{target_date_str}_{event.get('time')}_{event.get('discipline')}"
+            
+            # Проверяем, существует ли уже такое событие
+            existing_task = await db.tasks.find_one({
+                "telegram_id": telegram_id,
+                "origin": "schedule",
+                "target_date": target_date,
+                "time_start": event.get("time").split("-")[0].strip() if "-" in event.get("time", "") else event.get("time"),
+                "text": event.get("discipline")
+            })
+            
+            if existing_task:
+                # Событие уже существует, пропускаем
+                continue
+            
+            # Парсим время (формат: "10:00-11:30")
+            time_parts = event.get("time", "").split("-")
+            time_start = time_parts[0].strip() if len(time_parts) > 0 else ""
+            time_end = time_parts[1].strip() if len(time_parts) > 1 else ""
+            
+            # Создаем новую задачу-событие
+            new_task = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": telegram_id,
+                "text": event.get("discipline", ""),
+                "completed": False,
+                "completed_at": None,
+                "skipped": False,
+                "category": "study",
+                "priority": "medium",
+                "deadline": None,
+                "target_date": target_date,
+                "subject": event.get("discipline"),
+                "discipline_id": None,
+                "notes": None,
+                "time_start": time_start,
+                "time_end": time_end,
+                "is_fixed": True,  # Пары - жесткие события
+                "origin": "schedule",
+                "order": 0,
+                "subtasks": [],
+                "videos": [],
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                # Дополнительные поля для отображения
+                "teacher": event.get("teacher", ""),
+                "auditory": event.get("auditory", ""),
+                "lessonType": event.get("lessonType", "")
+            }
+            
+            await db.tasks.insert_one(new_task)
+            synced_count += 1
+            
+            # FIX: Формируем ответ через TaskResponse(**dict) — проще и надёжнее
+            progress_info = calculate_subtasks_progress(new_task.get("subtasks", []))
+            task_response = TaskResponse(**new_task, **progress_info)
+            synced_tasks.append(task_response)
+        
+        return PlannerSyncResponse(
+            success=True,
+            synced_count=synced_count,
+            events=synced_tasks,
+            message=f"Синхронизировано {synced_count} событий на {target_date_str}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при синхронизации расписания в планировщик: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/planner/preview")
+async def get_schedule_preview_for_sync(request: PlannerSyncRequest):
+    """
+    Получить предварительный просмотр пар для синхронизации.
+    НЕ создает записи, только возвращает список пар на дату.
+    """
+    from models import ScheduleEventPreview, PlannerPreviewResponse
+    
+    try:
+        telegram_id = request.telegram_id
+        target_date_str = request.date
+        week_number = request.week_number
+        
+        # Проверяем существование пользователя и получаем его группу
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        group_id = user.get("group_id")
+        if not group_id:
+            raise HTTPException(status_code=400, detail="У пользователя не выбрана группа")
+        
+        # Получаем расписание из кэша или парсим
+        cached = await db.schedule_cache.find_one({
+            "group_id": group_id,
+            "week_number": week_number,
+            "expires_at": {"$gt": datetime.utcnow()}
+        })
+        
+        if not cached:
+            try:
+                events = await get_schedule(
+                    facultet_id=user.get("facultet_id"),
+                    level_id=user.get("level_id"),
+                    kurs=user.get("kurs"),
+                    form_code=user.get("form_code"),
+                    group_id=group_id,
+                    week_number=week_number
+                )
+                # Кэшируем
+                cache_data = {
+                    "id": str(uuid.uuid4()),
+                    "group_id": group_id,
+                    "week_number": week_number,
+                    "events": [event for event in events],
+                    "cached_at": datetime.utcnow(),
+                    "expires_at": datetime.utcnow() + timedelta(hours=1)
+                }
+                await db.schedule_cache.update_one(
+                    {"group_id": group_id, "week_number": week_number},
+                    {"$set": cache_data},
+                    upsert=True
+                )
+                schedule_events = events
+            except Exception as e:
+                logger.error(f"Не удалось получить расписание: {e}")
+                raise HTTPException(status_code=500, detail="Не удалось получить расписание")
+        else:
+            schedule_events = cached.get("events", [])
+        
+        # Парсим дату для фильтрации по дню недели
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        # Определяем день недели на русском
+        day_names_ru = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        target_day_name = day_names_ru[target_date.weekday()]
+        
+        # Фильтруем события по дню недели и неделе
+        filtered_events = [
+            event for event in schedule_events
+            if event.get("day") == target_day_name and event.get("week") == week_number
+        ]
+        
+        # Формируем preview список
+        preview_events = []
+        already_synced_count = 0
+        
+        for idx, event in enumerate(filtered_events):
+            # Парсим время
+            time_parts = event.get("time", "").split("-")
+            time_start = time_parts[0].strip() if len(time_parts) > 0 else ""
+            time_end = time_parts[1].strip() if len(time_parts) > 1 else ""
+            
+            # Проверяем, синхронизировано ли уже
+            existing_task = await db.tasks.find_one({
+                "telegram_id": telegram_id,
+                "origin": "schedule",
+                "target_date": target_date,
+                "time_start": time_start,
+                "text": event.get("discipline")
+            })
+            
+            is_synced = existing_task is not None
+            if is_synced:
+                already_synced_count += 1
+            
+            preview_event = ScheduleEventPreview(
+                id=f"{target_date_str}_{idx}_{time_start}",
+                discipline=event.get("discipline", ""),
+                time=event.get("time", ""),
+                time_start=time_start,
+                time_end=time_end,
+                teacher=event.get("teacher"),
+                auditory=event.get("auditory"),
+                lessonType=event.get("lessonType"),
+                selected=not is_synced,  # Не выбираем уже синхронизированные
+                already_synced=is_synced
+            )
+            preview_events.append(preview_event)
+        
+        return PlannerPreviewResponse(
+            success=True,
+            date=target_date_str,
+            day_name=target_day_name,
+            events=preview_events,
+            total_count=len(preview_events),
+            already_synced_count=already_synced_count,
+            message=f"Найдено {len(preview_events)} пар на {target_day_name}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении preview пар: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/planner/sync-selected", response_model=PlannerSyncResponse)
+async def sync_selected_schedule_events(request: dict):
+    """
+    Синхронизировать выбранные (и возможно отредактированные) пары в планировщик.
+    """
+    from models import PlannerSyncSelectedRequest, ScheduleEventToSync
+    
+    try:
+        telegram_id = request.get("telegram_id")
+        target_date_str = request.get("date")
+        events_data = request.get("events", [])
+        
+        if not telegram_id or not target_date_str:
+            raise HTTPException(status_code=400, detail="Не указан telegram_id или date")
+        
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Парсим дату
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        synced_tasks = []
+        synced_count = 0
+        
+        for event_data in events_data:
+            discipline = event_data.get("discipline", "")
+            time_start = event_data.get("time_start", "")
+            time_end = event_data.get("time_end", "")
+            teacher = event_data.get("teacher", "")
+            auditory = event_data.get("auditory", "")
+            lessonType = event_data.get("lessonType", "")
+            
+            # Проверяем, существует ли уже такое событие
+            existing_task = await db.tasks.find_one({
+                "telegram_id": telegram_id,
+                "origin": "schedule",
+                "target_date": target_date,
+                "time_start": time_start,
+                "text": discipline
+            })
+            
+            if existing_task:
+                # Событие уже существует, пропускаем
+                continue
+            
+            # Создаем новую задачу-событие
+            new_task = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": telegram_id,
+                "text": discipline,
+                "completed": False,
+                "completed_at": None,
+                "skipped": False,
+                "category": "study",
+                "priority": "medium",
+                "deadline": None,
+                "target_date": target_date,
+                "subject": discipline,
+                "discipline_id": None,
+                "notes": None,
+                "time_start": time_start,
+                "time_end": time_end,
+                "is_fixed": True,
+                "origin": "schedule",
+                "order": 0,
+                "subtasks": [],
+                "videos": [],
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "teacher": teacher,
+                "auditory": auditory,
+                "lessonType": lessonType
+            }
+            
+            await db.tasks.insert_one(new_task)
+            synced_count += 1
+            
+            # FIX: Формируем ответ через TaskResponse(**dict)
+            progress_info = calculate_subtasks_progress(new_task.get("subtasks", []))
+            task_response = TaskResponse(**new_task, **progress_info)
+            synced_tasks.append(task_response)
+        
+        return PlannerSyncResponse(
+            success=True,
+            synced_count=synced_count,
+            events=synced_tasks,
+            message=f"Синхронизировано {synced_count} событий на {target_date_str}"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при синхронизации выбранных пар: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/planner/events", response_model=TaskResponse)
+async def create_planner_event(task_data: TaskCreate):
+    """
+    Создать новое событие в планировщике (не задачу в списке дел).
+    События всегда имеют time_start и time_end.
+    """
+    try:
+        # Валидация: события должны иметь время
+        if not task_data.time_start or not task_data.time_end:
+            raise HTTPException(
+                status_code=400, 
+                detail="События должны иметь время начала и окончания"
+            )
+        
+        # Валидация: события должны иметь target_date
+        if not task_data.target_date:
+            raise HTTPException(
+                status_code=400, 
+                detail="События должны иметь дату (target_date)"
+            )
+        
+        # FIX: Конвертируем subtasks из List[str] в List[TaskSubtask]
+        subtasks = []
+        for i, subtask_title in enumerate(task_data.subtasks):
+            subtasks.append(TaskSubtask(
+                title=subtask_title,
+                order=i
+            ).model_dump())
+        
+        # FIX: Используем model_dump() вместо deprecated .dict()
+        task_dict_data = task_data.model_dump()
+        task_dict_data.pop('subtasks', None)  # Удаляем строковые названия
+        
+        task = Task(
+            **task_dict_data,
+            order=0,  # События не участвуют в drag&drop
+            subtasks=subtasks
+        )
+        task_dict = task.model_dump()
+        
+        # FIX: Гарантируем наличие videos
+        if 'videos' not in task_dict:
+            task_dict['videos'] = []
+        
+        await db.tasks.insert_one(task_dict)
+        
+        logger.info(f"Создано событие для пользователя {task_data.telegram_id}: {task_data.text}")
+        
+        # FIX: Добавляем прогресс подзадач
+        progress_info = calculate_subtasks_progress(task_dict.get("subtasks", []))
+        
+        return TaskResponse(**task_dict, **progress_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании события: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/planner/{telegram_id}/{date}", response_model=PlannerDayResponse)
+async def get_planner_day_events(telegram_id: int, date: str):
+    """
+    Получить все события (пары + пользовательские задачи) на конкретную дату.
+    Возвращает ТОЛЬКО события с установленным временем (time_start и time_end).
+    Задачи без времени не показываются в планировщике.
+    """
+    try:
+        # Парсим дату
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+        
+        # FIX: Упрощённый MongoDB-запрос (убраны избыточные $ne + $nin)
+        # Получаем только события с установленным временем на эту дату
+        tasks_cursor = db.tasks.find({
+            "telegram_id": telegram_id,
+            "target_date": {
+                "$gte": target_date - timedelta(hours=12),
+                "$lt": target_date + timedelta(days=1, hours=12)
+            },
+            # Только события с установленным временем (не null и не пустая строка)
+            "time_start": {"$exists": True, "$nin": [None, ""]},
+            "time_end": {"$exists": True, "$nin": [None, ""]}
+        })
+        
+        tasks = await tasks_cursor.to_list(length=None)
+        
+        # FIX: Формируем ответ с прогрессом подзадач и videos
+        events = []
+        for task in tasks:
+            # Гарантируем наличие videos
+            if 'videos' not in task:
+                task['videos'] = []
+            # Вычисляем прогресс подзадач
+            progress_info = calculate_subtasks_progress(task.get("subtasks", []))
+            task_response = TaskResponse(**task, **progress_info)
+            events.append(task_response)
+        
+        # Сортируем события по времени начала
+        events.sort(key=lambda x: x.time_start or "23:59")
+        
+        return PlannerDayResponse(
+            date=date,
+            events=events,
+            total_count=len(events)
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении событий планировщика: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ API для групповых задач ============
+
+@api_router.post("/group-tasks", response_model=GroupTaskResponse)
+async def create_group_task(task_data: GroupTaskCreate):
+    """Создать новую групповую задачу"""
+    try:
+        # Получаем информацию о создателе
+        creator_settings = await db.user_settings.find_one({"telegram_id": task_data.telegram_id})
+        if not creator_settings:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Создаём участника-владельца
+        owner_participant = GroupTaskParticipant(
+            telegram_id=task_data.telegram_id,
+            username=creator_settings.get('username'),
+            first_name=creator_settings.get('first_name', 'Пользователь'),
+            role='owner'
+        )
+        
+        # Создаём групповую задачу
+        group_task = GroupTask(
+            title=task_data.title,
+            description=task_data.description,
+            deadline=task_data.deadline,
+            category=task_data.category,
+            priority=task_data.priority,
+            owner_id=task_data.telegram_id,
+            room_id=task_data.room_id,
+            participants=[owner_participant],
+            status='created'
+        )
+        
+        # Сохраняем в БД
+        await db.group_tasks.insert_one(group_task.model_dump())
+        
+        # Создаём приглашения для указанных пользователей
+        for invited_user_id in task_data.invited_users:
+            invite = GroupTaskInvite(
+                task_id=group_task.task_id,
+                invited_by=task_data.telegram_id,
+                invited_user=invited_user_id,
+                status='pending'
+            )
+            await db.group_task_invites.insert_one(invite.model_dump())
+        
+        # Формируем ответ
+        total_participants = len(group_task.participants)
+        completed_participants = sum(1 for p in group_task.participants if p.completed)
+        completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
+        
+        return GroupTaskResponse(
+            **group_task.model_dump(),
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании групповой задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/group-tasks/{telegram_id}", response_model=List[GroupTaskResponse])
+async def get_user_group_tasks(telegram_id: int):
+    """Получить все групповые задачи пользователя"""
+    try:
+        # Находим все задачи, где пользователь является участником
+        tasks_cursor = db.group_tasks.find({
+            "participants.telegram_id": telegram_id
+        })
+        
+        tasks = []
+        async for task_doc in tasks_cursor:
+            # Проверяем статус и обновляем при необходимости
+            task = GroupTask(**task_doc)
+            
+            # Обновляем статус на overdue если дедлайн прошёл
+            if task.deadline and task.deadline < datetime.utcnow() and task.status not in ['completed', 'overdue']:
+                task.status = 'overdue'
+                await db.group_tasks.update_one(
+                    {"task_id": task.task_id},
+                    {"$set": {"status": "overdue"}}
+                )
+            
+            # Проверяем, все ли выполнили задачу
+            total_participants = len(task.participants)
+            completed_participants = sum(1 for p in task.participants if p.completed)
+            
+            if total_participants > 0 and completed_participants == total_participants and task.status != 'completed':
+                task.status = 'completed'
+                await db.group_tasks.update_one(
+                    {"task_id": task.task_id},
+                    {"$set": {"status": "completed"}}
+                )
+            elif completed_participants > 0 and task.status == 'created':
+                task.status = 'in_progress'
+                await db.group_tasks.update_one(
+                    {"task_id": task.task_id},
+                    {"$set": {"status": "in_progress"}}
+                )
+            
+            completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
+            
+            # Подсчитываем количество комментариев
+            comments_count = await db.group_task_comments.count_documents({"task_id": task.task_id})
+            
+            tasks.append(GroupTaskResponse(
+                **task.model_dump(),
+                completion_percentage=completion_percentage,
+                total_participants=total_participants,
+                completed_participants=completed_participants,
+                comments_count=comments_count
+            ))
+        
+        return tasks
+    except Exception as e:
+        logger.error(f"Ошибка при получении групповых задач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/group-tasks/detail/{task_id}", response_model=GroupTaskResponse)
+async def get_group_task_detail(task_id: str):
+    """Получить детальную информацию о групповой задаче"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        task = GroupTask(**task_doc)
+        
+        total_participants = len(task.participants)
+        completed_participants = sum(1 for p in task.participants if p.completed)
+        completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
+        
+        return GroupTaskResponse(
+            **task.model_dump(),
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении деталей групповой задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/group-tasks/{task_id}/invite", response_model=SuccessResponse)
+async def invite_to_group_task(task_id: str, invite_data: GroupTaskInviteCreate):
+    """Пригласить пользователя в групповую задачу"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        task = GroupTask(**task_doc)
+        
+        # Проверяем, что приглашающий является участником
+        is_participant = any(p.telegram_id == invite_data.telegram_id for p in task.participants)
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Только участники могут приглашать других")
+        
+        # Проверяем лимит участников
+        if len(task.participants) >= 10:
+            raise HTTPException(status_code=400, detail="Достигнут лимит участников (10)")
+        
+        # Проверяем, не приглашён ли уже пользователь
+        already_invited = await db.group_task_invites.find_one({
+            "task_id": task_id,
+            "invited_user": invite_data.invited_user,
+            "status": "pending"
+        })
+        if already_invited:
+            raise HTTPException(status_code=400, detail="Приглашение уже отправлено")
+        
+        # Проверяем, не является ли пользователь уже участником
+        is_already_participant = any(p.telegram_id == invite_data.invited_user for p in task.participants)
+        if is_already_participant:
+            raise HTTPException(status_code=400, detail="Пользователь уже является участником")
+        
+        # Создаём приглашение
+        invite = GroupTaskInvite(
+            task_id=task_id,
+            invited_by=invite_data.telegram_id,
+            invited_user=invite_data.invited_user,
+            status='pending'
+        )
+        
+        await db.group_task_invites.insert_one(invite.model_dump())
+        
+        return SuccessResponse(success=True, message="Приглашение отправлено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при приглашении в групповую задачу: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/group-tasks/invites/{telegram_id}", response_model=List[GroupTaskInviteResponse])
+async def get_user_invites(telegram_id: int):
+    """Получить все приглашения пользователя"""
+    try:
+        invites_cursor = db.group_task_invites.find({
+            "invited_user": telegram_id,
+            "status": "pending"
+        })
+        
+        invites = []
+        async for invite_doc in invites_cursor:
+            invite = GroupTaskInvite(**invite_doc)
+            
+            # Получаем информацию о задаче
+            task_doc = await db.group_tasks.find_one({"task_id": invite.task_id})
+            if not task_doc:
+                continue
+            
+            task = GroupTask(**task_doc)
+            
+            # Получаем информацию о пригласившем
+            inviter = next((p for p in task.participants if p.telegram_id == invite.invited_by), None)
+            inviter_name = inviter.first_name if inviter else "Пользователь"
+            
+            invites.append(GroupTaskInviteResponse(
+                invite_id=invite.invite_id,
+                task_id=invite.task_id,
+                task_title=task.title,
+                invited_by=invite.invited_by,
+                invited_by_name=inviter_name,
+                status=invite.status,
+                created_at=invite.created_at
+            ))
+        
+        return invites
+    except Exception as e:
+        logger.error(f"Ошибка при получении приглашений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/notifications/test", response_model=SuccessResponse)
+async def send_test_notification_endpoint(telegram_id: int = Body(..., embed=True)):
+    """Отправить тестовое уведомление о паре в Telegram"""
+    try:
+        service = get_notification_service()
+        
+        # Тестовые данные о паре
+        dummy_class = {
+            "discipline": "Тестовая пара (Test Subject)",
+            "time": "10:00 - 11:30",
+            "teacher": "Тестовый Преподаватель",
+            "auditory": "Кабинет 101",
+            "lessonType": "Лекция"
+        }
+        
+        success = await service.send_class_notification(
+            telegram_id=telegram_id,
+            class_info=dummy_class,
+            minutes_before=10
+        )
+        
+        if success:
+            return SuccessResponse(success=True, message="Тестовое уведомление отправлено в Telegram")
+        else:
+            # Даже если не удалось отправить в телеграм (например, бот заблокирован), возвращаем ошибку 500
+            raise HTTPException(status_code=500, detail="Не удалось отправить уведомление (возможно, бот заблокирован пользователем)")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при отправке тестового уведомления: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/notifications/test-inapp", response_model=SuccessResponse)
+async def create_test_inapp_notification(telegram_id: int = Body(..., embed=True)):
+    """Создать тестовое in-app уведомление для проверки анимации"""
+    try:
+        notification_id = await create_notification(
+            telegram_id=telegram_id,
+            notification_type=NotificationType.ANNOUNCEMENT,
+            category=NotificationCategory.SYSTEM,
+            title="🔔 Тестовое уведомление",
+            message="Это тестовое уведомление для проверки анимации колокольчика!",
+            emoji="🔔",
+            priority=NotificationPriority.HIGH,
+            send_push=False  # Не отправляем в Telegram
+        )
+        
+        if notification_id:
+            return SuccessResponse(success=True, message=f"Тестовое уведомление создано: {notification_id}")
+        else:
+            raise HTTPException(status_code=500, detail="Не удалось создать уведомление")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при создании тестового уведомления: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/group-tasks/{task_id}/accept", response_model=SuccessResponse)
+async def accept_group_task_invite(task_id: str, telegram_id: int = Body(..., embed=True)):
+    """Принять приглашение в групповую задачу"""
+    try:
+        # Находим приглашение
+        invite_doc = await db.group_task_invites.find_one({
+            "task_id": task_id,
+            "invited_user": telegram_id,
+            "status": "pending"
+        })
+        
+        if not invite_doc:
+            raise HTTPException(status_code=404, detail="Приглашение не найдено")
+        
+        # Получаем задачу
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        # Получаем информацию о пользователе
+        user_settings = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user_settings:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Создаём участника
+        new_participant = GroupTaskParticipant(
+            telegram_id=telegram_id,
+            username=user_settings.get('username'),
+            first_name=user_settings.get('first_name', 'Пользователь'),
+            role='member'
+        )
+        
+        # Добавляем участника в задачу
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {"$push": {"participants": new_participant.model_dump()}}
+        )
+        
+        # Обновляем статус приглашения
+        await db.group_task_invites.update_one(
+            {"_id": invite_doc["_id"]},
+            {
+                "$set": {
+                    "status": "accepted",
+                    "responded_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return SuccessResponse(success=True, message="Вы присоединились к групповой задаче")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при принятии приглашения: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/group-tasks/{task_id}/decline", response_model=SuccessResponse)
+async def decline_group_task_invite(task_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отклонить приглашение в групповую задачу"""
+    try:
+        # Находим приглашение
+        invite_doc = await db.group_task_invites.find_one({
+            "task_id": task_id,
+            "invited_user": telegram_id,
+            "status": "pending"
+        })
+        
+        if not invite_doc:
+            raise HTTPException(status_code=404, detail="Приглашение не найдено")
+        
+        # Обновляем статус приглашения
+        await db.group_task_invites.update_one(
+            {"_id": invite_doc["_id"]},
+            {
+                "$set": {
+                    "status": "declined",
+                    "responded_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        return SuccessResponse(success=True, message="Приглашение отклонено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при отклонении приглашения: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/group-tasks/{task_id}/complete", response_model=GroupTaskResponse)
+async def complete_group_task(task_id: str, complete_data: GroupTaskCompleteRequest):
+    """Отметить задачу выполненной/невыполненной"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        task = GroupTask(**task_doc)
+        
+        # Находим участника
+        participant_index = next((i for i, p in enumerate(task.participants) if p.telegram_id == complete_data.telegram_id), None)
+        
+        if participant_index is None:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником этой задачи")
+        
+        # Обновляем статус выполнения
+        update_data = {
+            f"participants.{participant_index}.completed": complete_data.completed,
+        }
+        
+        if complete_data.completed:
+            update_data[f"participants.{participant_index}.completed_at"] = datetime.utcnow()
+        else:
+            update_data[f"participants.{participant_index}.completed_at"] = None
+        
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {"$set": update_data}
+        )
+        
+        # Получаем обновлённую задачу
+        updated_task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        updated_task = GroupTask(**updated_task_doc)
+        
+        # Проверяем, все ли выполнили
+        total_participants = len(updated_task.participants)
+        completed_participants = sum(1 for p in updated_task.participants if p.completed)
+        
+        # Обновляем статус задачи
+        if completed_participants == total_participants:
+            await db.group_tasks.update_one(
+                {"task_id": task_id},
+                {"$set": {"status": "completed"}}
+            )
+            updated_task.status = "completed"
+        elif completed_participants > 0:
+            await db.group_tasks.update_one(
+                {"task_id": task_id},
+                {"$set": {"status": "in_progress"}}
+            )
+            updated_task.status = "in_progress"
+        else:
+            # Все сняли галочку - возвращаем в "created"
+            # Но проверяем дедлайн — если просрочен, ставим overdue
+            if updated_task.deadline and updated_task.deadline < datetime.utcnow():
+                new_status = "overdue"
+            else:
+                new_status = "created"
+            await db.group_tasks.update_one(
+                {"task_id": task_id},
+                {"$set": {"status": new_status}}
+            )
+            updated_task.status = new_status
+        
+        completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
+        
+        # Логируем активность
+        if updated_task.room_id:
+            participant = next((p for p in updated_task.participants if p.telegram_id == complete_data.telegram_id), None)
+            activity = RoomActivity(
+                room_id=updated_task.room_id,
+                user_id=complete_data.telegram_id,
+                username=participant.username if participant else "",
+                first_name=participant.first_name if participant else "User",
+                action_type="task_completed" if complete_data.completed else "task_uncompleted",
+                action_details={"task_title": updated_task.title, "task_id": task_id}
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
+        # FIX v3.1: Начисляем XP за выполнение групповой задачи (раньше отсутствовало!)
+        if complete_data.completed:
+            asyncio.create_task(safe_award_xp(
+                db, complete_data.telegram_id,
+                XP_REWARDS["group_task_complete"],
+                reason="group_task_complete"
+            ))
+        
+        # Подсчитываем количество комментариев
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        return GroupTaskResponse(
+            **updated_task.model_dump(),
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении статуса выполнения: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/group-tasks/{task_id}/leave", response_model=SuccessResponse)
+async def leave_group_task(task_id: str, telegram_id: int = Body(..., embed=True)):
+    """Покинуть групповую задачу"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        task = GroupTask(**task_doc)
+        
+        # Проверяем, что пользователь не владелец
+        if task.owner_id == telegram_id:
+            raise HTTPException(status_code=400, detail="Владелец не может покинуть задачу. Удалите задачу или передайте права другому участнику.")
+        
+        # Удаляем участника
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        
+        return SuccessResponse(success=True, message="Вы покинули групповую задачу")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при выходе из групповой задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/group-tasks/{task_id}", response_model=SuccessResponse)
+async def delete_group_task(task_id: str, telegram_id: int = Body(..., embed=True)):
+    """Удалить групповую задачу (только владелец)"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        task = GroupTask(**task_doc)
+        
+        # Проверяем, что пользователь является владельцем
+        if task.owner_id != telegram_id:
+            raise HTTPException(status_code=403, detail="Только владелец может удалить задачу")
+        
+        # Логируем активность перед удалением
+        if task.room_id:
+            activity = RoomActivity(
+                room_id=task.room_id,
+                user_id=telegram_id,
+                username="",
+                first_name="User",
+                action_type="task_deleted",
+                action_details={"task_title": task.title, "task_id": task_id}
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
+        # Удаляем задачу
+        await db.group_tasks.delete_one({"task_id": task_id})
+        
+        # Удаляем все приглашения
+        await db.group_task_invites.delete_many({"task_id": task_id})
+        
+        # Удаляем все комментарии
+        await db.group_task_comments.delete_many({"task_id": task_id})
+        
+        return SuccessResponse(success=True, message="Групповая задача удалена")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении групповой задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/group-tasks/{task_id}/comments", response_model=GroupTaskCommentResponse)
+async def create_group_task_comment(task_id: str, comment_data: GroupTaskCommentCreate):
+    """Добавить комментарий к групповой задаче"""
+    try:
+        # Проверяем существование задачи
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Групповая задача не найдена")
+        
+        task = GroupTask(**task_doc)
+        
+        # Проверяем, что пользователь является участником
+        participant = next((p for p in task.participants if p.telegram_id == comment_data.telegram_id), None)
+        if not participant:
+            raise HTTPException(status_code=403, detail="Только участники могут комментировать")
+        
+        # Создаём комментарий
+        comment = GroupTaskComment(
+            task_id=task_id,
+            telegram_id=comment_data.telegram_id,
+            username=participant.username,
+            first_name=participant.first_name,
+            text=comment_data.text
+        )
+        
+        await db.group_task_comments.insert_one(comment.model_dump())
+        
+        return GroupTaskCommentResponse(**comment.model_dump())
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании комментария: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/group-tasks/{task_id}/comments", response_model=List[GroupTaskCommentResponse])
+async def get_group_task_comments(task_id: str):
+    """Получить все комментарии групповой задачи"""
+    try:
+        comments_cursor = db.group_task_comments.find({"task_id": task_id}).sort("created_at", 1)
+        
+        comments = []
+        async for comment_doc in comments_cursor:
+            comments.append(GroupTaskCommentResponse(**comment_doc))
+        
+        return comments
+    except Exception as e:
+        logger.error(f"Ошибка при получении комментариев: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ============ API endpoints для комнат (Rooms) ============
+
+@api_router.post("/rooms", response_model=RoomResponse)
+async def create_room(room_data: RoomCreate):
+    """Создать новую комнату"""
+    try:
+        # Создаем участника-владельца
+        owner_participant = RoomParticipant(
+            telegram_id=room_data.telegram_id,
+            first_name="Owner",  # будет обновлено при первом обращении
+            role='owner'
+        )
+        
+        room = Room(
+            name=room_data.name,
+            description=room_data.description,
+            owner_id=room_data.telegram_id,
+            color=room_data.color,
+            participants=[owner_participant]
+        )
+        
+        await db.rooms.insert_one(room.model_dump())
+        
+        return RoomResponse(
+            **room.model_dump(),
+            total_participants=len(room.participants),
+            total_tasks=0,
+            completed_tasks=0,
+            completion_percentage=0
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при создании комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/rooms/{telegram_id}", response_model=List[RoomResponse])
+async def get_user_rooms(telegram_id: int):
+    """Получить все комнаты пользователя"""
+    try:
+        # Находим комнаты, где пользователь является участником
+        rooms_cursor = db.rooms.find({
+            "participants.telegram_id": telegram_id
+        })
+        
+        rooms = []
+        async for room_doc in rooms_cursor:
+            # Подсчитываем задачи в комнате
+            total_tasks = await db.group_tasks.count_documents({"room_id": room_doc["room_id"]})
+            completed_tasks = await db.group_tasks.count_documents({
+                "room_id": room_doc["room_id"],
+                "status": "completed"
+            })
+            
+            completion_percentage = 0
+            if total_tasks > 0:
+                completion_percentage = int((completed_tasks / total_tasks) * 100)
+            
+            rooms.append(RoomResponse(
+                **room_doc,
+                total_participants=len(room_doc.get("participants", [])),
+                total_tasks=total_tasks,
+                completed_tasks=completed_tasks,
+                completion_percentage=completion_percentage
+            ))
+        
+        return rooms
+    except Exception as e:
+        logger.error(f"Ошибка при получении комнат: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/rooms/detail/{room_id}", response_model=RoomResponse)
+async def get_room_detail(room_id: str):
+    """Получить детальную информацию о комнате"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Подсчитываем задачи
+        total_tasks = await db.group_tasks.count_documents({"room_id": room_id})
+        completed_tasks = await db.group_tasks.count_documents({
+            "room_id": room_id,
+            "status": "completed"
+        })
+        
+        completion_percentage = 0
+        if total_tasks > 0:
+            completion_percentage = int((completed_tasks / total_tasks) * 100)
+        
+        return RoomResponse(
+            **room_doc,
+            total_participants=len(room_doc.get("participants", [])),
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks,
+            completion_percentage=completion_percentage
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении деталей комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def send_room_join_notifications_api(room_doc: dict, new_user_name: str, new_user_id: int):
+    """
+    Отправляет уведомления всем участникам комнаты и новому участнику о вступлении
+    """
+    try:
+        from telegram import Bot
+        
+        bot_token = get_telegram_bot_token()
+        if not bot_token:
+            logger.warning("⚠️ Токен бота не настроен, уведомления не отправлены")
+            return
+        
+        bot = Bot(token=bot_token)
+        room_name = room_doc.get("name", "комнату")
+        participants = room_doc.get("participants", [])
+        
+        # Отправляем уведомление новому участнику
+        try:
+            new_member_message = (
+                f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
+                f'\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
+                f'\n'
+                f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
+                f'\n'
+                f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
+            )
+            
+            await bot.send_message(
+                chat_id=new_user_id,
+                text=new_member_message,
+                parse_mode='HTML'
+            )
+            logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось отправить уведомление новому участнику {new_user_id}: {e}")
+        
+        # Отправляем уведомления всем существующим участникам (кроме нового)
+        for participant in participants:
+            participant_id = participant.get("telegram_id")
+            
+            # Пропускаем нового участника
+            if participant_id == new_user_id:
+                continue
+            
+            try:
+                existing_member_message = (
+                    f'<tg-emoji emoji-id="5170203290721321766">👋</tg-emoji> <b>Новый участник в комнате!</b>\n'
+                    f'\n'
+                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+                    f'<tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> К команде присоединился: <b>{new_user_name}</b>\n'
+                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Всего участников: {len(participants)}'
+                )
+                
+                await bot.send_message(
+                    chat_id=participant_id,
+                    text=existing_member_message,
+                    parse_mode='HTML'
+                )
+                logger.info(f"✅ Отправлено уведомление участнику {participant_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось отправить уведомление участнику {participant_id}: {e}")
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке уведомлений о присоединении к комнате: {e}")
+
+
+@api_router.post("/rooms/{room_id}/invite-link", response_model=RoomInviteLinkResponse)
+async def generate_room_invite_link(room_id: str, telegram_id: int = Body(..., embed=True)):
+    """Сгенерировать ссылку-приглашение в комнату"""
+    try:
+        # Проверяем существование комнаты
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, что пользователь является участником комнаты
+        is_participant = any(p["telegram_id"] == telegram_id for p in room_doc.get("participants", []))
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        # Получаем имя бота из конфига (зависит от ENV)
+        # Username бота определяется динамически через getMe
+        bot_username = get_telegram_bot_username()
+        
+        # Формируем ссылку с реферальным кодом (Web App формат для прямого открытия приложения)
+        invite_token = room_doc.get("invite_token")
+        invite_link = f"https://t.me/{bot_username}/app?startapp=room_{invite_token}_ref_{telegram_id}"
+        
+        return RoomInviteLinkResponse(
+            invite_link=invite_link,
+            invite_token=invite_token,
+            room_id=room_id,
+            bot_username=bot_username
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при генерации ссылки: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/rooms/join/{invite_token}", response_model=RoomResponse)
+async def join_room_by_token(invite_token: str, join_data: RoomJoinRequest):
+    """Присоединиться к комнате по токену приглашения"""
+    try:
+        # Находим комнату по токену
+        room_doc = await db.rooms.find_one({"invite_token": invite_token})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, не является ли пользователь уже участником
+        is_already_participant = any(
+            p["telegram_id"] == join_data.telegram_id 
+            for p in room_doc.get("participants", [])
+        )
+        
+        if is_already_participant:
+            # Возвращаем информацию о комнате
+            total_tasks = await db.group_tasks.count_documents({"room_id": room_doc["room_id"]})
+            completed_tasks = await db.group_tasks.count_documents({
+                "room_id": room_doc["room_id"],
+                "status": "completed"
+            })
+            
+            completion_percentage = 0
+            if total_tasks > 0:
+                completion_percentage = int((completed_tasks / total_tasks) * 100)
+            
+            return RoomResponse(
+                **room_doc,
+                total_participants=len(room_doc.get("participants", [])),
+                total_tasks=total_tasks,
+                completed_tasks=completed_tasks,
+                completion_percentage=completion_percentage
+            )
+        
+        # Добавляем нового участника
+        new_participant = RoomParticipant(
+            telegram_id=join_data.telegram_id,
+            username=join_data.username,
+            first_name=join_data.first_name,
+            role='member',
+            referral_code=join_data.referral_code
+        )
+        
+        await db.rooms.update_one(
+            {"invite_token": invite_token},
+            {
+                "$push": {"participants": new_participant.model_dump()},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Логируем реферальное событие (новый участник)
+        referral_event = ReferralEvent(
+            event_type="room_join",
+            telegram_id=join_data.telegram_id,
+            referrer_id=join_data.referral_code,
+            target_id=room_doc["room_id"],
+            target_name=room_doc.get("name", ""),
+            invite_token=invite_token,
+            is_new_member=True
+        )
+        await db.referral_events.insert_one(referral_event.model_dump())
+        logger.info(f"Referral event logged: room_join, user={join_data.telegram_id}, referrer={join_data.referral_code}, room={room_doc['room_id']}")
+        
+        # Автоматически добавляем пользователя во все групповые задачи комнаты
+        tasks_cursor = db.group_tasks.find({"room_id": room_doc["room_id"]})
+        async for task_doc in tasks_cursor:
+            # Проверяем, не является ли уже участником задачи
+            is_task_participant = any(
+                p["telegram_id"] == join_data.telegram_id 
+                for p in task_doc.get("participants", [])
+            )
+            
+            if not is_task_participant:
+                task_participant = GroupTaskParticipant(
+                    telegram_id=join_data.telegram_id,
+                    username=join_data.username,
+                    first_name=join_data.first_name,
+                    role='member'
+                )
+                
+                await db.group_tasks.update_one(
+                    {"task_id": task_doc["task_id"]},
+                    {
+                        "$push": {"participants": task_participant.model_dump()},
+                        "$set": {"updated_at": datetime.utcnow()}
+                    }
+                )
+        
+        # Получаем обновленную комнату
+        updated_room = await db.rooms.find_one({"invite_token": invite_token})
+        
+        total_tasks = await db.group_tasks.count_documents({"room_id": updated_room["room_id"]})
+        completed_tasks = await db.group_tasks.count_documents({
+            "room_id": updated_room["room_id"],
+            "status": "completed"
+        })
+        
+        completion_percentage = 0
+        if total_tasks > 0:
+            completion_percentage = int((completed_tasks / total_tasks) * 100)
+        
+        # Отправляем уведомления всем участникам комнаты о новом участнике
+        await send_room_join_notifications_api(
+            room_doc=updated_room,
+            new_user_name=join_data.first_name,
+            new_user_id=join_data.telegram_id
+        )
+        
+        return RoomResponse(
+            **updated_room,
+            total_participants=len(updated_room.get("participants", [])),
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks,
+            completion_percentage=completion_percentage
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при присоединении к комнате: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/rooms/{room_id}/add-friends", response_model=RoomResponse)
+async def add_friends_to_room(room_id: str, data: RoomAddFriendsRequest):
+    """Быстро добавить друзей в комнату"""
+    try:
+        # Проверяем существование комнаты
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, что пользователь является участником комнаты
+        is_participant = any(
+            p["telegram_id"] == data.telegram_id 
+            for p in room_doc.get("participants", [])
+        )
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        added_friends = []
+        existing_participant_ids = {p["telegram_id"] for p in room_doc.get("participants", [])}
+        
+        for friend in data.friends:
+            # Проверяем что друг еще не в комнате
+            if friend.telegram_id in existing_participant_ids:
+                continue
+            
+            # Проверяем что это действительно друг
+            is_friend = await db.friends.find_one({
+                "$or": [
+                    {"user1_id": data.telegram_id, "user2_id": friend.telegram_id},
+                    {"user1_id": friend.telegram_id, "user2_id": data.telegram_id}
+                ]
+            })
+            
+            if not is_friend:
+                continue  # Пропускаем если не друзья
+            
+            # Добавляем друга в комнату
+            new_participant = {
+                "telegram_id": friend.telegram_id,
+                "username": friend.username,
+                "first_name": friend.first_name,
+                "role": "member",
+                "joined_at": datetime.utcnow()
+            }
+            
+            added_friends.append(new_participant)
+            existing_participant_ids.add(friend.telegram_id)
+        
+        if not added_friends:
+            raise HTTPException(status_code=400, detail="Все выбранные друзья уже в комнате или не являются вашими друзьями")
+        
+        # Обновляем комнату
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$push": {"participants": {"$each": added_friends}}}
+        )
+        
+        # Записываем активность
+        # Получаем имя добавляющего
+        adder_info = next((p for p in room_doc.get("participants", []) if p["telegram_id"] == data.telegram_id), None)
+        for friend in added_friends:
+            activity = RoomActivity(
+                room_id=room_id,
+                user_id=data.telegram_id,
+                username=adder_info.get("username") if adder_info else None,
+                first_name=adder_info.get("first_name", "User") if adder_info else "User",
+                action_type="member_added",
+                action_details={
+                    "target_user_id": friend["telegram_id"],
+                    "target_user_name": friend["first_name"],
+                    "description": f"Добавлен участник {friend['first_name']}"
+                }
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
+        # Добавляем друзей ко всем существующим задачам комнаты
+        room_tasks = await db.group_tasks.find({"room_id": room_id}).to_list(200)
+        for task in room_tasks:
+            for friend in added_friends:
+                # Проверяем что друг еще не участник задачи
+                existing_task_participants = {p["telegram_id"] for p in task.get("participants", [])}
+                if friend["telegram_id"] in existing_task_participants:
+                    continue
+                
+                new_task_participant = GroupTaskParticipant(
+                    telegram_id=friend["telegram_id"],
+                    username=friend.get("username"),
+                    first_name=friend["first_name"],
+                    role='member'
+                )
+                
+                await db.group_tasks.update_one(
+                    {"task_id": task["task_id"]},
+                    {"$push": {"participants": new_task_participant.model_dump()}}
+                )
+        
+        # Отправляем уведомления
+        for friend in added_friends:
+            await send_room_join_notifications_api(
+                room_doc=room_doc,
+                new_user_name=friend["first_name"],
+                new_user_id=friend["telegram_id"]
+            )
+        
+        # Получаем обновленную комнату
+        updated_room = await db.rooms.find_one({"room_id": room_id})
+        
+        # Статистика задач
+        total_tasks = await db.group_tasks.count_documents({"room_id": room_id})
+        completed_tasks = 0
+        room_tasks = await db.group_tasks.find({"room_id": room_id}).to_list(200)
+        for task in room_tasks:
+            if task.get("status") == "completed":
+                completed_tasks += 1
+        completion_percentage = round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0)
+        
+        return RoomResponse(
+            **updated_room,
+            total_participants=len(updated_room.get("participants", [])),
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks,
+            completion_percentage=completion_percentage
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении друзей в комнату: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/rooms/{room_id}/tasks", response_model=GroupTaskResponse)
+async def create_task_in_room(room_id: str, task_data: RoomTaskCreate):
+    """Создать групповую задачу в комнате"""
+    try:
+        # Проверяем существование комнаты
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, что пользователь является участником комнаты
+        is_participant = any(p["telegram_id"] == task_data.telegram_id for p in room_doc.get("participants", []))
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        # Создаем владельца задачи
+        creator_info = next(
+            (p for p in room_doc.get("participants", []) if p["telegram_id"] == task_data.telegram_id),
+            None
+        )
+        
+        owner_participant = GroupTaskParticipant(
+            telegram_id=task_data.telegram_id,
+            username=creator_info.get("username") if creator_info else None,
+            first_name=creator_info.get("first_name", "User") if creator_info else "User",
+            role='owner'
+        )
+        
+        # Определяем список участников задачи
+        participants = [owner_participant]
+        
+        # Если assigned_to не указан или пустой - добавляем всех участников комнаты
+        # Если assigned_to указан - добавляем только выбранных участников
+        assigned_ids = task_data.assigned_to if task_data.assigned_to else None
+        
+        for room_participant in room_doc.get("participants", []):
+            participant_id = room_participant["telegram_id"]
+            # Пропускаем создателя (он уже добавлен как owner)
+            if participant_id == task_data.telegram_id:
+                continue
+            # Если есть список assigned_to, добавляем только выбранных
+            if assigned_ids is not None and participant_id not in assigned_ids:
+                continue
+            task_participant = GroupTaskParticipant(
+                telegram_id=participant_id,
+                username=room_participant.get("username"),
+                first_name=room_participant.get("first_name", "User"),
+                role='member'
+            )
+            participants.append(task_participant)
+        
+        # Создаем подзадачи из списка строк
+        subtasks = []
+        for i, subtask_title in enumerate(task_data.subtasks):
+            subtasks.append(Subtask(
+                title=subtask_title,
+                order=i
+            ))
+        
+        # Создаем групповую задачу
+        group_task = GroupTask(
+            title=task_data.title,
+            description=task_data.description,
+            deadline=task_data.deadline,
+            category=task_data.category,
+            priority=task_data.priority,
+            owner_id=task_data.telegram_id,
+            room_id=room_id,
+            participants=participants,
+            tags=task_data.tags,
+            subtasks=subtasks
+        )
+        
+        await db.group_tasks.insert_one(group_task.model_dump())
+        
+        # Логируем активность
+        activity = RoomActivity(
+            room_id=room_id,
+            user_id=task_data.telegram_id,
+            username=creator_info.get("username") if creator_info else "",
+            first_name=creator_info.get("first_name", "User") if creator_info else "User",
+            action_type="task_created",
+            action_details={"task_title": task_data.title, "task_id": group_task.task_id}
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        # Подсчитываем процент выполнения
+        total_participants = len(group_task.participants)
+        completed_participants = sum(1 for p in group_task.participants if p.completed)
+        completion_percentage = 0
+        if total_participants > 0:
+            completion_percentage = int((completed_participants / total_participants) * 100)
+        
+        comments_count = 0
+        
+        return GroupTaskResponse(
+            **group_task.model_dump(),
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании задачи в комнате: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/rooms/{room_id}/leave", response_model=SuccessResponse)
+async def leave_room(room_id: str, telegram_id: int = Body(..., embed=True)):
+    """Покинуть комнату"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, что пользователь не является владельцем
+        if room_doc.get("owner_id") == telegram_id:
+            raise HTTPException(
+                status_code=403, 
+                detail="Владелец не может покинуть комнату. Удалите комнату или передайте права владельца."
+            )
+        
+        # Удаляем участника из комнаты
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {
+                "$pull": {"participants": {"telegram_id": telegram_id}},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Удаляем участника из всех задач комнаты
+        await db.group_tasks.update_many(
+            {"room_id": room_id},
+            {
+                "$pull": {"participants": {"telegram_id": telegram_id}},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        return SuccessResponse(success=True, message="Вы успешно покинули комнату")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при выходе из комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/rooms/{room_id}", response_model=SuccessResponse)
+async def delete_room(room_id: str, telegram_id: int = Body(..., embed=True)):
+    """Удалить комнату (только владелец)"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем, что пользователь является владельцем
+        if room_doc.get("owner_id") != telegram_id:
+            raise HTTPException(status_code=403, detail="Только владелец может удалить комнату")
+        
+        # Сначала собираем ID задач ДЛЯ удаления комментариев
+        tasks_to_delete = await db.group_tasks.find({"room_id": room_id}).to_list(length=None)
+        task_ids = [task["task_id"] for task in tasks_to_delete]
+        
+        # Удаляем комментарии к задачам комнаты
+        if task_ids:
+            await db.group_task_comments.delete_many({"task_id": {"$in": task_ids}})
+            await db.group_task_invites.delete_many({"task_id": {"$in": task_ids}})
+        
+        # Теперь удаляем сами задачи
+        await db.group_tasks.delete_many({"room_id": room_id})
+        
+        # Удаляем активности комнаты
+        await db.room_activities.delete_many({"room_id": room_id})
+        
+        # Удаляем комнату
+        await db.rooms.delete_one({"room_id": room_id})
+        
+        return SuccessResponse(success=True, message="Комната успешно удалена")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.put("/rooms/{room_id}", response_model=RoomResponse)
+async def update_room(room_id: str, update_data: RoomUpdate, telegram_id: int = Body(..., embed=True)):
+    """Обновить комнату (название, описание, цвет) - только владелец или админ"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем права доступа (владелец или админ)
+        participant = next((p for p in room_doc.get("participants", []) if p["telegram_id"] == telegram_id), None)
+        if not participant or (participant["role"] not in ["owner", "admin"]):
+            raise HTTPException(status_code=403, detail="Недостаточно прав для редактирования комнаты")
+        
+        # Формируем обновления
+        updates = {"updated_at": datetime.utcnow()}
+        if update_data.name is not None:
+            updates["name"] = update_data.name
+        if update_data.description is not None:
+            updates["description"] = update_data.description
+        if update_data.color is not None:
+            updates["color"] = update_data.color
+        
+        # Обновляем комнату
+        await db.rooms.update_one({"room_id": room_id}, {"$set": updates})
+        
+        # Получаем обновленную комнату
+        updated_room = await db.rooms.find_one({"room_id": room_id})
+        
+        # Получаем статистику
+        tasks_cursor = db.group_tasks.find({"room_id": room_id})
+        all_tasks = await tasks_cursor.to_list(length=None)
+        total_tasks = len(all_tasks)
+        completed_tasks = sum(1 for task in all_tasks if task.get("status") == "completed")
+        completion_percentage = int((completed_tasks / total_tasks * 100)) if total_tasks > 0 else 0
+        
+        # Логируем активность
+        activity = RoomActivity(
+            room_id=room_id,
+            user_id=telegram_id,
+            first_name=participant.get("first_name", ""),
+            username=participant.get("username"),
+            action_type="room_updated",
+            action_details={"changes": updates}
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        return RoomResponse(
+            room_id=updated_room["room_id"],
+            name=updated_room["name"],
+            description=updated_room.get("description"),
+            owner_id=updated_room["owner_id"],
+            created_at=updated_room["created_at"],
+            updated_at=updated_room["updated_at"],
+            participants=[RoomParticipant(**p) for p in updated_room.get("participants", [])],
+            invite_token=updated_room["invite_token"],
+            color=updated_room.get("color", "blue"),
+            total_participants=len(updated_room.get("participants", [])),
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks,
+            completion_percentage=completion_percentage
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/rooms/{room_id}/participant-role", response_model=SuccessResponse)
+async def update_participant_role(role_update: ParticipantRoleUpdate):
+    """Изменить роль участника комнаты - только владелец или админ"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": role_update.room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем права изменяющего (владелец или админ)
+        changer = next((p for p in room_doc.get("participants", []) if p["telegram_id"] == role_update.changed_by), None)
+        if not changer or (changer["role"] not in ["owner", "admin"]):
+            raise HTTPException(status_code=403, detail="Недостаточно прав для изменения ролей")
+        
+        # Проверяем, что изменяемый участник существует
+        target = next((p for p in room_doc.get("participants", []) if p["telegram_id"] == role_update.telegram_id), None)
+        if not target:
+            raise HTTPException(status_code=404, detail="Участник не найден в комнате")
+        
+        # Нельзя изменить роль владельца
+        if target["role"] == "owner":
+            raise HTTPException(status_code=403, detail="Нельзя изменить роль владельца")
+        
+        # Валидация новой роли
+        valid_roles = ["owner", "admin", "moderator", "member", "viewer"]
+        if role_update.new_role not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Недопустимая роль. Допустимые: {', '.join(valid_roles)}")
+        
+        # Обновляем роль участника
+        await db.rooms.update_one(
+            {"room_id": role_update.room_id, "participants.telegram_id": role_update.telegram_id},
+            {"$set": {"participants.$.role": role_update.new_role, "updated_at": datetime.utcnow()}}
+        )
+        
+        # Логируем активность
+        activity = RoomActivity(
+            room_id=role_update.room_id,
+            user_id=role_update.changed_by,
+            first_name=changer.get("first_name", ""),
+            username=changer.get("username"),
+            action_type="role_changed",
+            action_details={
+                "target_user": role_update.telegram_id,
+                "target_name": target.get("first_name", ""),
+                "old_role": target.get("role"),
+                "new_role": role_update.new_role
+            }
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        return SuccessResponse(success=True, message=f"Роль участника изменена на {role_update.new_role}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при изменении роли участника: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.get("/rooms/{room_id}/tasks", response_model=List[GroupTaskResponse])
+async def get_room_tasks(
+    room_id: str,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    assigned_to: Optional[int] = None,
+    sort_by: Optional[str] = None  # 'deadline', 'priority', 'status', 'created'
+):
+    """Получить задачи комнаты с фильтрами и сортировкой"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Строим фильтр
+        query = {"room_id": room_id}
+        if status:
+            query["status"] = status
+        if priority:
+            query["priority"] = priority
+        if assigned_to:
+            query["participants.telegram_id"] = assigned_to
+        
+        # Определяем сортировку: закреплённые всегда вверху
+        sort_fields = [("pinned", -1)]  # pinned=True первыми
+        if sort_by == 'deadline':
+            sort_fields.append(("deadline", 1))
+        elif sort_by == 'priority':
+            sort_fields.append(("priority", -1))
+        elif sort_by == 'status':
+            sort_fields.append(("status", 1))
+        elif sort_by == 'created':
+            sort_fields.append(("created_at", -1))
+        else:
+            sort_fields.extend([("order", 1), ("created_at", -1)])
+        
+        tasks_cursor = db.group_tasks.find(query).sort(sort_fields)
+        
+        tasks = []
+        async for task_doc in tasks_cursor:
+            # Обновляем статус задачи если нужно
+            if task_doc.get("deadline") and task_doc.get("status") != "completed":
+                if datetime.utcnow() > task_doc["deadline"]:
+                    await db.group_tasks.update_one(
+                        {"task_id": task_doc["task_id"]},
+                        {"$set": {"status": "overdue"}}
+                    )
+                    task_doc["status"] = "overdue"
+            
+            # Проверяем завершенность задачи
+            participants = task_doc.get("participants", [])
+            if participants:
+                all_completed = all(p.get("completed", False) for p in participants)
+                if all_completed and task_doc.get("status") != "completed":
+                    await db.group_tasks.update_one(
+                        {"task_id": task_doc["task_id"]},
+                        {"$set": {"status": "completed"}}
+                    )
+                    task_doc["status"] = "completed"
+            
+            total_participants = len(participants)
+            completed_participants = sum(1 for p in participants if p.get("completed", False))
+            completion_percentage = 0
+            if total_participants > 0:
+                completion_percentage = int((completed_participants / total_participants) * 100)
+            
+            # Подсчитываем количество комментариев
+            comments_count = await db.group_task_comments.count_documents({"task_id": task_doc.get("task_id")})
+            
+            tasks.append(GroupTaskResponse(
+                **task_doc,
+                completion_percentage=completion_percentage,
+                total_participants=total_participants,
+                completed_participants=completed_participants,
+                comments_count=comments_count
+            ))
+        
+        return tasks
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении задач комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/group-tasks/{task_id}/update", response_model=GroupTaskResponse)
+async def update_group_task(task_id: str, update_data: GroupTaskUpdate):
+    """Обновить групповую задачу (название, описание, дедлайн, категорию, приоритет, теги, участников)"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Проверяем права (если telegram_id передан)
+        telegram_id = update_data.telegram_id
+        if telegram_id:
+            is_participant = any(p.get("telegram_id") == telegram_id for p in task_doc.get("participants", []))
+            is_owner = task_doc.get("owner_id") == telegram_id
+            
+            # Проверяем также по комнате (владелец/админ комнаты может редактировать)
+            is_room_admin = False
+            room_id = task_doc.get("room_id")
+            if room_id:
+                room_doc_check = await db.rooms.find_one({"room_id": room_id})
+                if room_doc_check:
+                    room_participant = next((p for p in room_doc_check.get("participants", []) if p.get("telegram_id") == telegram_id), None)
+                    if room_participant and room_participant.get("role") in ["owner", "admin"]:
+                        is_room_admin = True
+            
+            if not is_participant and not is_owner and not is_room_admin:
+                raise HTTPException(status_code=403, detail="Недостаточно прав для редактирования задачи")
+        
+        # Подготавливаем данные для обновления
+        update_fields = {}
+        if update_data.title is not None:
+            update_fields["title"] = update_data.title
+        if update_data.description is not None:
+            update_fields["description"] = update_data.description
+        if update_data.deadline is not None:
+            update_fields["deadline"] = update_data.deadline
+        if update_data.category is not None:
+            update_fields["category"] = update_data.category
+        if update_data.priority is not None:
+            update_fields["priority"] = update_data.priority
+        if update_data.status is not None:
+            update_fields["status"] = update_data.status
+        if update_data.tags is not None:
+            update_fields["tags"] = update_data.tags
+        
+        # Обработка изменения участников задачи
+        if update_data.assigned_to is not None:
+            room_id = task_doc.get("room_id")
+            if room_id:
+                room_doc = await db.rooms.find_one({"room_id": room_id})
+                if room_doc:
+                    owner_id = task_doc.get("owner_id")
+                    current_participants = task_doc.get("participants", [])
+                    
+                    # Сохраняем информацию о выполнении для текущих участников
+                    completion_status = {p["telegram_id"]: p.get("completed", False) for p in current_participants}
+                    completion_times = {p["telegram_id"]: p.get("completed_at") for p in current_participants}
+                    
+                    # Создаем новый список участников
+                    new_participants = []
+                    
+                    # Добавляем владельца задачи
+                    owner_info = next(
+                        (p for p in room_doc.get("participants", []) if p["telegram_id"] == owner_id),
+                        None
+                    )
+                    if owner_info:
+                        new_participants.append({
+                            "telegram_id": owner_id,
+                            "username": owner_info.get("username"),
+                            "first_name": owner_info.get("first_name", "User"),
+                            "role": "owner",
+                            "completed": completion_status.get(owner_id, False),
+                            "completed_at": completion_times.get(owner_id),
+                            "joined_at": datetime.utcnow()
+                        })
+                    
+                    # Если assigned_to пустой список - добавляем всех участников комнаты
+                    # Если assigned_to заполнен - добавляем только выбранных
+                    assigned_ids = update_data.assigned_to if update_data.assigned_to else None
+                    
+                    for room_participant in room_doc.get("participants", []):
+                        participant_id = room_participant["telegram_id"]
+                        if participant_id == owner_id:
+                            continue
+                        if assigned_ids is not None and len(assigned_ids) > 0 and participant_id not in assigned_ids:
+                            continue
+                        new_participants.append({
+                            "telegram_id": participant_id,
+                            "username": room_participant.get("username"),
+                            "first_name": room_participant.get("first_name", "User"),
+                            "role": "member",
+                            "completed": completion_status.get(participant_id, False),
+                            "completed_at": completion_times.get(participant_id),
+                            "joined_at": datetime.utcnow()
+                        })
+                    
+                    update_fields["participants"] = new_participants
+        
+        update_fields["updated_at"] = datetime.utcnow()
+        
+        # Обновляем задачу
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {"$set": update_fields}
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.group_tasks.find_one({"task_id": task_id})
+        
+        # Подсчитываем статистику
+        participants = updated_task.get("participants", [])
+        total_participants = len(participants)
+        completed_participants = sum(1 for p in participants if p.get("completed", False))
+        completion_percentage = 0
+        if total_participants > 0:
+            completion_percentage = int((completed_participants / total_participants) * 100)
+        
+        # Подсчитываем количество комментариев
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        # Логируем активность
+        if updated_task.get("room_id"):
+            activity = RoomActivity(
+                room_id=updated_task["room_id"],
+                user_id=updated_task["owner_id"],
+                username="",
+                first_name="User",
+                action_type="task_updated",
+                action_details={"task_title": updated_task["title"], "task_id": task_id}
+            )
+            await db.room_activities.insert_one(activity.model_dump())
+        
+        return GroupTaskResponse(
+            **updated_task,
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/group-tasks/{task_id}/subtasks", response_model=GroupTaskResponse)
+async def add_subtask(task_id: str, subtask: SubtaskCreate, telegram_id: int = Body(..., embed=True)):
+    """Добавить подзадачу"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Проверяем, что пользователь является участником задачи
+        is_participant = any(p.get("telegram_id") == telegram_id for p in task_doc.get("participants", []))
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Только участники могут добавлять подзадачи")
+        
+        # Создаем подзадачу
+        new_subtask = Subtask(
+            title=subtask.title,
+            order=len(task_doc.get("subtasks", []))
+        )
+        
+        # Добавляем подзадачу к задаче
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {
+                "$push": {"subtasks": new_subtask.model_dump()},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.group_tasks.find_one({"task_id": task_id})
+        
+        # Подсчитываем статистику
+        participants = updated_task.get("participants", [])
+        total_participants = len(participants)
+        completed_participants = sum(1 for p in participants if p.get("completed", False))
+        completion_percentage = 0
+        if total_participants > 0:
+            completion_percentage = int((completed_participants / total_participants) * 100)
+        
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        return GroupTaskResponse(
+            **updated_task,
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/group-tasks/{task_id}/subtasks/{subtask_id}", response_model=GroupTaskResponse)
+async def update_subtask(task_id: str, subtask_id: str, update_data: SubtaskUpdate):
+    """Обновить подзадачу (название, статус выполнения)"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Находим подзадачу
+        subtasks = task_doc.get("subtasks", [])
+        subtask_index = next((i for i, s in enumerate(subtasks) if s.get("subtask_id") == subtask_id), None)
+        
+        if subtask_index is None:
+            raise HTTPException(status_code=404, detail="Подзадача не найдена")
+        
+        # Обновляем подзадачу
+        if update_data.title is not None:
+            subtasks[subtask_index]["title"] = update_data.title
+        if update_data.completed is not None:
+            subtasks[subtask_index]["completed"] = update_data.completed
+            if update_data.completed:
+                subtasks[subtask_index]["completed_at"] = datetime.utcnow()
+                subtasks[subtask_index]["completed_by"] = getattr(update_data, 'completed_by', None)
+            else:
+                subtasks[subtask_index]["completed_at"] = None
+                subtasks[subtask_index]["completed_by"] = None
+        
+        # Сохраняем изменения
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {
+                "$set": {
+                    "subtasks": subtasks,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.group_tasks.find_one({"task_id": task_id})
+        
+        # Подсчитываем статистику
+        participants = updated_task.get("participants", [])
+        total_participants = len(participants)
+        completed_participants = sum(1 for p in participants if p.get("completed", False))
+        completion_percentage = 0
+        if total_participants > 0:
+            completion_percentage = int((completed_participants / total_participants) * 100)
+        
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        return GroupTaskResponse(
+            **updated_task,
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/group-tasks/{task_id}/subtasks/{subtask_id}", response_model=GroupTaskResponse)
+async def delete_subtask(task_id: str, subtask_id: str):
+    """Удалить подзадачу"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Удаляем подзадачу
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {
+                "$pull": {"subtasks": {"subtask_id": subtask_id}},
+                "$set": {"updated_at": datetime.utcnow()}
+            }
+        )
+        
+        # Получаем обновленную задачу
+        updated_task = await db.group_tasks.find_one({"task_id": task_id})
+        
+        # Подсчитываем статистику
+        participants = updated_task.get("participants", [])
+        total_participants = len(participants)
+        completed_participants = sum(1 for p in participants if p.get("completed", False))
+        completion_percentage = 0
+        if total_participants > 0:
+            completion_percentage = int((completed_participants / total_participants) * 100)
+        
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        return GroupTaskResponse(
+            **updated_task,
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении подзадачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/rooms/{room_id}/activity", response_model=List[RoomActivityResponse])
+async def get_room_activity(room_id: str, limit: int = 50):
+    """Получить историю активности комнаты"""
+    try:
+        # Проверяем существование комнаты
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Получаем активности
+        activities_cursor = db.room_activities.find({"room_id": room_id}).sort("created_at", -1).limit(limit)
+        
+        activities = []
+        async for activity_doc in activities_cursor:
+            activities.append(RoomActivityResponse(**activity_doc))
+        
+        return activities
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении активности комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/rooms/{room_id}/stats", response_model=RoomStatsResponse)
+async def get_room_stats(room_id: str):
+    """Получить статистику комнаты"""
+    try:
+        # Проверяем существование комнаты
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Получаем все задачи комнаты
+        tasks_cursor = db.group_tasks.find({"room_id": room_id})
+        
+        total_tasks = 0
+        completed_tasks = 0
+        overdue_tasks = 0
+        in_progress_tasks = 0
+        
+        async for task in tasks_cursor:
+            total_tasks += 1
+            status = task.get("status", "created")
+            
+            if status == "completed":
+                completed_tasks += 1
+            elif status == "overdue":
+                overdue_tasks += 1
+            elif status == "in_progress":
+                in_progress_tasks += 1
+        
+        # Подсчитываем процент выполнения
+        completion_percentage = 0
+        if total_tasks > 0:
+            completion_percentage = int((completed_tasks / total_tasks) * 100)
+        
+        # Статистика по участникам - оптимизировано: одна загрузка всех задач
+        participants = room_doc.get("participants", [])
+        all_room_tasks = await db.group_tasks.find({"room_id": room_id}).to_list(length=None)
+        
+        # Предварительно подсчитываем статистику по каждому участнику
+        participant_created = {}  # telegram_id -> count
+        participant_completed = {}  # telegram_id -> count
+        
+        for task in all_room_tasks:
+            owner = task.get("owner_id")
+            participant_created[owner] = participant_created.get(owner, 0) + 1
+            
+            for p in task.get("participants", []):
+                pid = p.get("telegram_id")
+                if p.get("completed", False):
+                    participant_completed[pid] = participant_completed.get(pid, 0) + 1
+        
+        participants_stats = []
+        for participant in participants:
+            telegram_id = participant.get("telegram_id")
+            
+            participants_stats.append({
+                "telegram_id": telegram_id,
+                "username": participant.get("username"),
+                "first_name": participant.get("first_name"),
+                "role": participant.get("role"),
+                "tasks_created": participant_created.get(telegram_id, 0),
+                "tasks_completed": participant_completed.get(telegram_id, 0),
+                "joined_at": participant.get("joined_at")
+            })
+        
+        # Сортируем по количеству выполненных задач
+        participants_stats.sort(key=lambda x: x["tasks_completed"], reverse=True)
+        
+        # График активности по дням (последние 7 дней)
+        activity_chart = []
+        for i in range(7):
+            day_start = datetime.utcnow() - timedelta(days=i)
+            day_start = day_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            
+            day_activities = await db.room_activities.count_documents({
+                "room_id": room_id,
+                "created_at": {"$gte": day_start, "$lt": day_end}
+            })
+            
+            activity_chart.append({
+                "date": day_start.strftime("%Y-%m-%d"),
+                "activities": day_activities
+            })
+        
+        activity_chart.reverse()
+        
+        return RoomStatsResponse(
+            room_id=room_id,
+            total_tasks=total_tasks,
+            completed_tasks=completed_tasks,
+            overdue_tasks=overdue_tasks,
+            in_progress_tasks=in_progress_tasks,
+            completion_percentage=completion_percentage,
+            participants_stats=participants_stats,
+            activity_chart=activity_chart
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики комнаты: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/rooms/{room_id}/tasks-reorder", response_model=SuccessResponse)
+async def reorder_room_tasks(room_id: str, reorder_request: RoomTaskReorderRequest):
+    """Изменить порядок задач в комнате (drag & drop)"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Обновляем порядок для каждой задачи
+        for task_order in reorder_request.tasks:
+            task_id = task_order.get("task_id") if isinstance(task_order, dict) else getattr(task_order, "task_id", None)
+            order = task_order.get("order") if isinstance(task_order, dict) else getattr(task_order, "order", None)
+            if task_id is not None and order is not None:
+                await db.group_tasks.update_one(
+                    {"task_id": task_id},
+                    {"$set": {"order": order}}
+                )
+        
+        return SuccessResponse(success=True, message="Порядок задач обновлен")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при изменении порядка задач: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Kick участника из комнаты ============
+
+@api_router.delete("/rooms/{room_id}/participants/{target_id}", response_model=SuccessResponse)
+async def kick_participant(room_id: str, target_id: int, request: KickParticipantRequest):
+    """Исключить участника из комнаты (только owner/admin)"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        participants = room_doc.get("participants", [])
+        kicker = next((p for p in participants if p.get("telegram_id") == request.kicked_by), None)
+        target = next((p for p in participants if p.get("telegram_id") == target_id), None)
+        
+        if not kicker:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        if not target:
+            raise HTTPException(status_code=404, detail="Участник не найден в комнате")
+        
+        # Проверяем права
+        if kicker.get("role") not in ["owner", "admin"]:
+            raise HTTPException(status_code=403, detail="Только владелец или админ может исключать участников")
+        
+        # Нельзя исключить владельца
+        if target.get("role") == "owner":
+            raise HTTPException(status_code=403, detail="Нельзя исключить владельца комнаты")
+        
+        # Admin не может кикнуть другого admin
+        if kicker.get("role") == "admin" and target.get("role") == "admin":
+            raise HTTPException(status_code=403, detail="Админ не может исключить другого админа")
+        
+        # Удаляем участника
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$pull": {"participants": {"telegram_id": target_id}}}
+        )
+        
+        # Убираем его из assigned задач комнаты
+        await db.group_tasks.update_many(
+            {"room_id": room_id, "participants.telegram_id": target_id},
+            {"$pull": {"participants": {"telegram_id": target_id}}}
+        )
+        
+        # Логируем активность
+        activity = RoomActivity(
+            room_id=room_id,
+            user_id=request.kicked_by,
+            username=kicker.get("username"),
+            first_name=kicker.get("first_name", "User"),
+            action_type="member_kicked",
+            action_details={
+                "target_user_id": target_id,
+                "target_user_name": target.get("first_name", ""),
+                "reason": request.reason or "Без причины"
+            }
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        return SuccessResponse(success=True, message=f"Участник {target.get('first_name', '')} исключён из комнаты")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при исключении участника: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Передача прав владельца ============
+
+@api_router.put("/rooms/{room_id}/transfer-ownership", response_model=SuccessResponse)
+async def transfer_ownership(room_id: str, request: TransferOwnershipRequest):
+    """Передать права владельца комнаты другому участнику"""
+    try:
+        room_doc = await db.rooms.find_one({"room_id": room_id})
+        if not room_doc:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        participants = room_doc.get("participants", [])
+        current = next((p for p in participants if p.get("telegram_id") == request.current_owner), None)
+        new_owner = next((p for p in participants if p.get("telegram_id") == request.new_owner), None)
+        
+        if not current:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        if current.get("role") != "owner":
+            raise HTTPException(status_code=403, detail="Только владелец может передать права")
+        if not new_owner:
+            raise HTTPException(status_code=404, detail="Новый владелец не найден среди участников")
+        if request.current_owner == request.new_owner:
+            raise HTTPException(status_code=400, detail="Нельзя передать права самому себе")
+        
+        # Меняем роли
+        await db.rooms.update_one(
+            {"room_id": room_id, "participants.telegram_id": request.current_owner},
+            {"$set": {"participants.$.role": "admin"}}  # бывший owner становится admin
+        )
+        await db.rooms.update_one(
+            {"room_id": room_id, "participants.telegram_id": request.new_owner},
+            {"$set": {"participants.$.role": "owner"}}
+        )
+        # Обновляем owner_id комнаты
+        await db.rooms.update_one(
+            {"room_id": room_id},
+            {"$set": {"owner_id": request.new_owner, "updated_at": datetime.utcnow()}}
+        )
+        
+        # Логируем
+        activity = RoomActivity(
+            room_id=room_id,
+            user_id=request.current_owner,
+            username=current.get("username"),
+            first_name=current.get("first_name", "User"),
+            action_type="ownership_transferred",
+            action_details={
+                "new_owner_id": request.new_owner,
+                "new_owner_name": new_owner.get("first_name", "")
+            }
+        )
+        await db.room_activities.insert_one(activity.model_dump())
+        
+        return SuccessResponse(success=True, message=f"Права владельца переданы {new_owner.get('first_name', '')}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при передаче прав: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Редактирование/удаление комментариев ============
+
+@api_router.put("/group-tasks/{task_id}/comments/{comment_id}", response_model=GroupTaskCommentResponse)
+async def edit_comment(task_id: str, comment_id: str, update: GroupTaskCommentUpdate):
+    """Редактировать комментарий (только автор)"""
+    try:
+        comment_doc = await db.group_task_comments.find_one({"comment_id": comment_id, "task_id": task_id})
+        if not comment_doc:
+            raise HTTPException(status_code=404, detail="Комментарий не найден")
+        
+        if comment_doc.get("telegram_id") != update.telegram_id:
+            raise HTTPException(status_code=403, detail="Только автор может редактировать комментарий")
+        
+        if not update.text.strip():
+            raise HTTPException(status_code=400, detail="Текст комментария не может быть пустым")
+        
+        await db.group_task_comments.update_one(
+            {"comment_id": comment_id},
+            {"$set": {
+                "text": update.text.strip(),
+                "edited": True,
+                "edited_at": datetime.utcnow()
+            }}
+        )
+        
+        updated_doc = await db.group_task_comments.find_one({"comment_id": comment_id})
+        return GroupTaskCommentResponse(**updated_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при редактировании комментария: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/group-tasks/{task_id}/comments/{comment_id}", response_model=SuccessResponse)
+async def delete_comment(task_id: str, comment_id: str, telegram_id: int = Body(..., embed=True)):
+    """Удалить комментарий (автор или owner задачи)"""
+    try:
+        comment_doc = await db.group_task_comments.find_one({"comment_id": comment_id, "task_id": task_id})
+        if not comment_doc:
+            raise HTTPException(status_code=404, detail="Комментарий не найден")
+        
+        # Проверяем права: автор комментария или owner задачи
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        is_comment_author = comment_doc.get("telegram_id") == telegram_id
+        is_task_owner = task_doc and task_doc.get("owner_id") == telegram_id
+        
+        if not is_comment_author and not is_task_owner:
+            raise HTTPException(status_code=403, detail="Нет прав на удаление комментария")
+        
+        await db.group_task_comments.delete_one({"comment_id": comment_id})
+        return SuccessResponse(success=True, message="Комментарий удалён")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении комментария: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Закрепление задач ============
+
+@api_router.put("/group-tasks/{task_id}/pin", response_model=GroupTaskResponse)
+async def toggle_pin_task(task_id: str, pin_request: GroupTaskPinRequest):
+    """Закрепить/открепить задачу (owner задачи или owner/admin комнаты)"""
+    try:
+        task_doc = await db.group_tasks.find_one({"task_id": task_id})
+        if not task_doc:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+        
+        # Проверяем права
+        is_task_owner = task_doc.get("owner_id") == pin_request.telegram_id
+        is_room_admin = False
+        room_id = task_doc.get("room_id")
+        if room_id:
+            room_doc = await db.rooms.find_one({"room_id": room_id})
+            if room_doc:
+                room_participant = next((p for p in room_doc.get("participants", []) if p.get("telegram_id") == pin_request.telegram_id), None)
+                if room_participant and room_participant.get("role") in ["owner", "admin"]:
+                    is_room_admin = True
+        
+        if not is_task_owner and not is_room_admin:
+            raise HTTPException(status_code=403, detail="Недостаточно прав для закрепления задачи")
+        
+        await db.group_tasks.update_one(
+            {"task_id": task_id},
+            {"$set": {"pinned": pin_request.pinned, "updated_at": datetime.utcnow()}}
+        )
+        
+        updated_task = await db.group_tasks.find_one({"task_id": task_id})
+        participants = updated_task.get("participants", [])
+        total_participants = len(participants)
+        completed_participants = sum(1 for p in participants if p.get("completed", False))
+        completion_percentage = int((completed_participants / total_participants * 100) if total_participants > 0 else 0)
+        comments_count = await db.group_task_comments.count_documents({"task_id": task_id})
+        
+        return GroupTaskResponse(
+            **updated_task,
+            completion_percentage=completion_percentage,
+            total_participants=total_participants,
+            completed_participants=completed_participants,
+            comments_count=comments_count
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при закреплении задачи: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Эндпоинты для реферальной системы ============
+
+def generate_referral_code(telegram_id: int) -> str:
+    """Генерирует уникальный реферальный код для пользователя"""
+    import hashlib
+    import secrets
+    
+    # Создаём код из telegram_id + случайная соль
+    salt = secrets.token_hex(4)
+    raw_string = f"{telegram_id}_{salt}"
+    hash_object = hashlib.sha256(raw_string.encode())
+    code = hash_object.hexdigest()[:10].upper()
+    
+    return code
+
+
+@api_router.get("/referral/code/{telegram_id}", response_model=ReferralCodeResponse)
+async def get_referral_code(telegram_id: int):
+    """
+    Получить или создать реферальный код пользователя
+    """
+    try:
+        # Получаем пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Если у пользователя ещё нет реферального кода - создаём
+        referral_code = user.get("referral_code")
+        if not referral_code:
+            referral_code = generate_referral_code(telegram_id)
+            
+            # Сохраняем код в базу
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"referral_code": referral_code}}
+            )
+            logger.info(f"✅ Создан реферальный код для пользователя {telegram_id}: {referral_code}")
+        
+        # Получаем имя бота из конфига (зависит от ENV)
+        # Username бота определяется динамически через getMe
+        bot_username = get_telegram_bot_username()
+        
+        # Формируем реферальные ссылки
+        # Старый формат через /start (для совместимости)
+        referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
+        # Новый формат через Web App (рекомендуемый)
+        referral_link_webapp = f"https://t.me/{bot_username}/app?startapp=ref_{referral_code}"
+        
+        return ReferralCodeResponse(
+            referral_code=referral_code,
+            referral_link=referral_link,
+            referral_link_webapp=referral_link_webapp,
+            bot_username=bot_username
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении реферального кода: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/referral/process-webapp", response_model=ProcessReferralResponse)
+async def process_referral_webapp(request: ProcessReferralRequest):
+    """
+    Обработать реферальный код через Web App.
+    Вызывается при открытии приложения по ссылке t.me/bot/app?startapp=ref_CODE
+    """
+    try:
+        telegram_id = request.telegram_id
+        referral_code = request.referral_code
+        
+        logger.info(f"🔗 Обработка реферального кода через Web App: {referral_code} для пользователя {telegram_id}")
+        
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            # Новый пользователь - создаём запись
+            logger.info(f"👤 Новый пользователь {telegram_id} через реферальную ссылку Web App")
+            
+            # Ищем пригласившего по реферальному коду
+            referrer = await db.user_settings.find_one({"referral_code": referral_code})
+            
+            if not referrer:
+                logger.warning(f"⚠️ Реферальный код {referral_code} не найден")
+                return ProcessReferralResponse(
+                    success=False,
+                    message="Реферальный код не найден"
+                )
+            
+            referrer_id = referrer.get("telegram_id")
+            
+            # Проверяем, что пользователь не пытается пригласить сам себя
+            if referrer_id == telegram_id:
+                return ProcessReferralResponse(
+                    success=False,
+                    message="Нельзя использовать собственный реферальный код"
+                )
+            
+            # Создаём нового пользователя с реферальной связью
+            new_user = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": telegram_id,
+                "username": request.username,
+                "first_name": request.first_name,
+                "last_name": request.last_name,
+                "referral_code": generate_referral_code(telegram_id),
+                "referred_by": referrer_id,
+                "invited_count": 0,
+                "referral_points_earned": 0,
+                "created_at": datetime.utcnow(),
+                "last_activity": datetime.utcnow()
+            }
+            
+            await db.user_settings.insert_one(new_user)
+            logger.info(f"✅ Создан новый пользователь {telegram_id} с реферером {referrer_id}")
+            
+            # Создаём реферальные связи
+            await create_referral_connections(telegram_id, referrer_id, db)
+            
+            # Начисляем бонусы пригласившему
+            bonus_points = 50
+            await award_referral_bonus(referrer_id, telegram_id, bonus_points, 1, db)
+            
+            # Увеличиваем счётчик приглашений
+            await db.user_settings.update_one(
+                {"telegram_id": referrer_id},
+                {"$inc": {"invited_count": 1}}
+            )
+            
+            referrer_name = referrer.get("first_name") or referrer.get("username") or "Пользователь"
+            
+            return ProcessReferralResponse(
+                success=True,
+                message=f"Вы присоединились по приглашению от {referrer_name}!",
+                referrer_name=referrer_name,
+                bonus_points=bonus_points
+            )
+        
+        else:
+            # Существующий пользователь
+            if user.get("referred_by"):
+                # Уже есть реферер
+                return ProcessReferralResponse(
+                    success=False,
+                    message="Вы уже присоединились по реферальной ссылке ранее"
+                )
+            
+            # Ищем пригласившего
+            referrer = await db.user_settings.find_one({"referral_code": referral_code})
+            
+            if not referrer:
+                return ProcessReferralResponse(
+                    success=False,
+                    message="Реферальный код не найден"
+                )
+            
+            referrer_id = referrer.get("telegram_id")
+            
+            if referrer_id == telegram_id:
+                return ProcessReferralResponse(
+                    success=False,
+                    message="Нельзя использовать собственный реферальный код"
+                )
+            
+            # Привязываем существующего пользователя к рефереру
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"referred_by": referrer_id}}
+            )
+            
+            # Создаём реферальные связи
+            await create_referral_connections(telegram_id, referrer_id, db)
+            
+            # Начисляем бонусы
+            bonus_points = 50
+            await award_referral_bonus(referrer_id, telegram_id, bonus_points, 1, db)
+            
+            # Увеличиваем счётчик приглашений
+            await db.user_settings.update_one(
+                {"telegram_id": referrer_id},
+                {"$inc": {"invited_count": 1}}
+            )
+            
+            referrer_name = referrer.get("first_name") or referrer.get("username") or "Пользователь"
+            
+            logger.info(f"✅ Пользователь {telegram_id} привязан к рефереру {referrer_id}")
+            
+            return ProcessReferralResponse(
+                success=True,
+                message=f"Вы присоединились по приглашению от {referrer_name}!",
+                referrer_name=referrer_name,
+                bonus_points=bonus_points
+            )
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка при обработке реферального кода Web App: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def get_referral_level(referrer_id: int, referred_id: int, db) -> int:
+    """
+    Определяет уровень нового реферала в цепочке
+    Returns: 1, 2, или 3 (уровень в реферальной цепочке)
+    """
+    # Ищем связь пригласившего с его referrer
+    referrer = await db.user_settings.find_one({"telegram_id": referrer_id})
+    
+    if not referrer or not referrer.get("referred_by"):
+        # Если у пригласившего нет своего referrer - новый пользователь будет уровня 1
+        return 1
+    
+    # Ищем связь на уровень выше
+    parent_referrer_id = referrer.get("referred_by")
+    parent_referrer = await db.user_settings.find_one({"telegram_id": parent_referrer_id})
+    
+    if not parent_referrer or not parent_referrer.get("referred_by"):
+        # Если у parent нет своего referrer - новый пользователь будет уровня 2
+        return 2
+    
+    # Иначе - уровень 3 (максимум)
+    return 3
+
+
+async def create_referral_connections(referred_id: int, referrer_id: int, db):
+    """
+    Создаёт связи реферала со всеми вышестоящими в цепочке (до 3 уровней)
+    """
+    connections = []
+    current_referrer_id = referrer_id
+    level = 1
+    
+    # Проходим по цепочке вверх максимум 3 уровня
+    while current_referrer_id and level <= 3:
+        # Создаём связь
+        connection = {
+            "id": str(uuid.uuid4()),
+            "referrer_telegram_id": current_referrer_id,
+            "referred_telegram_id": referred_id,
+            "level": level,
+            "created_at": datetime.utcnow(),
+            "points_earned": 0
+        }
+        connections.append(connection)
+        
+        # Ищем следующего в цепочке
+        current_referrer = await db.user_settings.find_one({"telegram_id": current_referrer_id})
+        if current_referrer and current_referrer.get("referred_by"):
+            current_referrer_id = current_referrer.get("referred_by")
+            level += 1
+        else:
+            break
+    
+    # Сохраняем все связи
+    if connections:
+        await db.referral_connections.insert_many(connections)
+        logger.info(f"✅ Создано {len(connections)} реферальных связей для пользователя {referred_id}")
+    
+    return connections
+
+
+async def award_referral_bonus(referrer_id: int, referred_id: int, points: int, level: int, database):
+    """
+    Начисляет бонусные баллы пригласившему за регистрацию реферала
+    """
+    try:
+        # Обновляем статистику пригласившего
+        stats = await database.user_stats.find_one({"telegram_id": referrer_id})
+        
+        if not stats:
+            # Создаём статистику если её нет
+            stats = {
+                "id": str(uuid.uuid4()),
+                "telegram_id": referrer_id,
+                "total_points": points,
+                "friends_invited": 1,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            await database.user_stats.insert_one(stats)
+        else:
+            # Обновляем существующую статистику
+            await database.user_stats.update_one(
+                {"telegram_id": referrer_id},
+                {
+                    "$inc": {
+                        "total_points": points,
+                        "friends_invited": 1
+                    },
+                    "$set": {"updated_at": datetime.utcnow()}
+                }
+            )
+        
+        # Обновляем заработанные баллы с рефералов в user_settings
+        await database.user_settings.update_one(
+            {"telegram_id": referrer_id},
+            {"$inc": {"referral_points_earned": points}}
+        )
+        
+        # Обновляем заработанные баллы в реферальной связи
+        await database.referral_connections.update_one(
+            {
+                "referrer_telegram_id": referrer_id,
+                "referred_telegram_id": referred_id,
+                "level": level
+            },
+            {"$inc": {"points_earned": points}}
+        )
+        
+        logger.info(f"💰 Начислено {points} баллов пользователю {referrer_id} за реферала {referred_id} (уровень {level})")
+        
+        # Начисляем XP за реферал (только для level-1 рефералов)
+        if level == 1:
+            asyncio.create_task(safe_award_xp(
+                database, referrer_id,
+                XP_REWARDS["referral"],
+                reason="referral"
+            ))
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка при начислении бонуса: {e}", exc_info=True)
+
+
+@api_router.get("/referral/stats/{telegram_id}", response_model=ReferralStats)
+async def get_referral_stats(telegram_id: int):
+    """
+    Получить статистику по рефералам пользователя
+    """
+    try:
+        # Получаем пользователя и его реферальный код
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        referral_code = user.get("referral_code")
+        if not referral_code:
+            # Создаём код если его нет
+            referral_code = generate_referral_code(telegram_id)
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$set": {"referral_code": referral_code}}
+            )
+        
+        # Получаем имя бота из конфига (зависит от ENV)
+        # Username бота определяется динамически через getMe
+        bot_username = get_telegram_bot_username()
+        referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
+        
+        # Получаем все реферальные связи пользователя
+        connections = await db.referral_connections.find({
+            "referrer_telegram_id": telegram_id
+        }).to_list(None)
+        
+        # Группируем по уровням
+        level_1_ids = [c["referred_telegram_id"] for c in connections if c["level"] == 1]
+        level_2_ids = [c["referred_telegram_id"] for c in connections if c["level"] == 2]
+        level_3_ids = [c["referred_telegram_id"] for c in connections if c["level"] == 3]
+        
+        # Получаем информацию о рефералах
+        async def get_referrals_info(telegram_ids, level):
+            if not telegram_ids:
+                return []
+            
+            users = await db.user_settings.find({
+                "telegram_id": {"$in": telegram_ids}
+            }).to_list(None)
+            
+            result = []
+            for u in users:
+                # Получаем статистику баллов реферала
+                stats = await db.user_stats.find_one({"telegram_id": u["telegram_id"]})
+                total_points = stats.get("total_points", 0) if stats else 0
+                
+                # Получаем сколько заработал для пригласившего
+                connection = next((c for c in connections if c["referred_telegram_id"] == u["telegram_id"] and c["level"] == level), None)
+                points_for_referrer = connection.get("points_earned", 0) if connection else 0
+                
+                result.append(ReferralUser(
+                    telegram_id=u["telegram_id"],
+                    username=u.get("username"),
+                    first_name=u.get("first_name"),
+                    last_name=u.get("last_name"),
+                    registered_at=u.get("created_at", datetime.utcnow()),
+                    level=level,
+                    total_points=total_points,
+                    points_earned_for_referrer=points_for_referrer
+                ))
+            
+            return result
+        
+        level_1_referrals = await get_referrals_info(level_1_ids, 1)
+        level_2_referrals = await get_referrals_info(level_2_ids, 2)
+        level_3_referrals = await get_referrals_info(level_3_ids, 3)
+        
+        # Подсчитываем заработанные баллы по уровням
+        level_1_points = sum(c.get("points_earned", 0) for c in connections if c["level"] == 1)
+        level_2_points = sum(c.get("points_earned", 0) for c in connections if c["level"] == 2)
+        level_3_points = sum(c.get("points_earned", 0) for c in connections if c["level"] == 3)
+        total_referral_points = level_1_points + level_2_points + level_3_points
+        
+        return ReferralStats(
+            telegram_id=telegram_id,
+            referral_code=referral_code,
+            referral_link=referral_link,
+            level_1_count=len(level_1_referrals),
+            level_2_count=len(level_2_referrals),
+            level_3_count=len(level_3_referrals),
+            total_referral_points=total_referral_points,
+            level_1_points=level_1_points,
+            level_2_points=level_2_points,
+            level_3_points=level_3_points,
+            level_1_referrals=level_1_referrals,
+            level_2_referrals=level_2_referrals,
+            level_3_referrals=level_3_referrals
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики рефералов: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/referral/tree/{telegram_id}")
+async def get_referral_tree(telegram_id: int):
+    """
+    Получить дерево рефералов пользователя (для визуализации)
+    """
+    try:
+        async def build_tree_node(user_telegram_id: int, current_level: int = 1, max_depth: int = 3) -> Optional[ReferralTreeNode]:
+            if current_level > max_depth:
+                return None
+            
+            # Получаем пользователя
+            user = await db.user_settings.find_one({"telegram_id": user_telegram_id})
+            if not user:
+                return None
+            
+            # Получаем статистику
+            stats = await db.user_stats.find_one({"telegram_id": user_telegram_id})
+            total_points = stats.get("total_points", 0) if stats else 0
+            
+            # Получаем прямых рефералов (level 1 от этого пользователя)
+            direct_referrals = await db.referral_connections.find({
+                "referrer_telegram_id": user_telegram_id,
+                "level": 1
+            }).to_list(None)
+            
+            # Рекурсивно строим детей
+            children = []
+            for ref in direct_referrals[:10]:  # Ограничиваем 10 на уровень для производительности
+                child_node = await build_tree_node(
+                    ref["referred_telegram_id"],
+                    current_level + 1,
+                    max_depth
+                )
+                if child_node:
+                    children.append(child_node)
+            
+            return ReferralTreeNode(
+                telegram_id=user["telegram_id"],
+                username=user.get("username"),
+                first_name=user.get("first_name"),
+                level=current_level,
+                total_points=total_points,
+                children=children,
+                registered_at=user.get("created_at", datetime.utcnow())
+            )
+        
+        # Строим дерево начиная с текущего пользователя
+        tree = await build_tree_node(telegram_id, 1, 3)
+        
+        if not tree:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        return tree
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при построении дерева рефералов: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/users-activity", response_model=List[UserActivityPoint])
+async def get_users_activity(days: Optional[int] = 30):
+    """
+    Получить активность регистраций пользователей по дням
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+        else:
+            # Если не указано, берем все записи
+            start_date = datetime(2020, 1, 1)
+        
+        # Агрегация по дням (Московское время)
+        pipeline = [
+            {
+                "$match": {
+                    "created_at": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$created_at",
+                            "timezone": "Europe/Moscow"
+                        }
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        activity = [
+            UserActivityPoint(date=result["_id"], count=result["count"])
+            for result in results
+        ]
+        
+        return activity
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении активности пользователей: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/hourly-activity", response_model=List[HourlyActivityPoint])
+async def get_hourly_activity(days: Optional[int] = 30):
+    """
+    Получить активность пользователей по часам
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+        else:
+            start_date = datetime(2020, 1, 1)
+        
+        # Агрегация по часам Московского времени (используем last_activity)
+        pipeline = [
+            {
+                "$match": {
+                    "last_activity": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$hour": {
+                            "date": "$last_activity",
+                            "timezone": "Europe/Moscow"
+                        }
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Заполняем все часы (0-23)
+        hourly_data = {i: 0 for i in range(24)}
+        for result in results:
+            hour = result["_id"]
+            if hour is not None:
+                hourly_data[hour] = result["count"]
+        
+        # Преобразуем результат (hour как integer 0-23)
+        activity = [
+            HourlyActivityPoint(hour=hour, count=count)
+            for hour, count in hourly_data.items()
+        ]
+        
+        return activity
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении почасовой активности: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/weekly-activity", response_model=List[dict])
+async def get_weekly_activity(days: Optional[int] = 30):
+    """
+    Получить активность пользователей по дням недели
+    """
+    try:
+        # Определяем временной диапазон
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+        else:
+            start_date = datetime(2020, 1, 1)
+        
+        # Агрегация по дням недели Московского времени (используем last_activity)
+        pipeline = [
+            {
+                "$match": {
+                    "last_activity": {"$gte": start_date}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$dayOfWeek": {
+                            "date": "$last_activity",
+                            "timezone": "Europe/Moscow"
+                        }
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"_id": 1}
+            }
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Маппинг дней недели (MongoDB: 1=Воскресенье, 2=Понедельник, ...)
+        day_names = {
+            1: "Вс",
+            2: "Пн",
+            3: "Вт",
+            4: "Ср",
+            5: "Чт",
+            6: "Пт",
+            7: "Сб"
+        }
+        
+        # Заполняем все дни
+        weekly_data = {day: 0 for day in range(1, 8)}
+        for result in results:
+            day = result["_id"]
+            if day is not None:
+                weekly_data[day] = result["count"]
+        
+        # Преобразуем результат (начинаем с понедельника)
+        activity = []
+        for day_num in [2, 3, 4, 5, 6, 7, 1]:  # Пн-Вс
+            activity.append({
+                "day": day_names[day_num],
+                "count": weekly_data[day_num]
+            })
+        
+        return activity
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении недельной активности: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/feature-usage", response_model=FeatureUsageStats)
+async def get_feature_usage(days: Optional[int] = None):
+    """
+    Получить статистику использования функций
+    """
+    try:
+        # Определяем временной диапазон для новых пользователей
+        if days:
+            date_filter = {"created_at": {"$gte": datetime.utcnow() - timedelta(days=days)}}
+        else:
+            date_filter = {}
+        
+        # Получаем список telegram_id пользователей в заданном диапазоне
+        if days:
+            users_cursor = db.user_settings.find(date_filter, {"telegram_id": 1})
+            users = await users_cursor.to_list(length=None)
+            telegram_ids = [user["telegram_id"] for user in users]
+            stats_filter = {"telegram_id": {"$in": telegram_ids}}
+        else:
+            stats_filter = {}
+        
+        # Агрегация статистики
+        pipeline = [
+            {"$match": stats_filter},
+            {
+                "$group": {
+                    "_id": None,
+                    "schedule_views": {"$sum": "$schedule_views"},
+                    "analytics_views": {"$sum": "$analytics_views"},
+                    "calendar_opens": {"$sum": "$calendar_opens"},
+                    "notifications_configured": {"$sum": "$notifications_configured"},
+                    "schedule_shares": {"$sum": "$schedule_shares"},
+                    "tasks_created": {"$sum": {"$ifNull": ["$tasks_created", 0]}},
+                    "achievements_earned": {"$sum": "$achievements_count"}
+                }
+            }
+        ]
+        
+        results = await db.user_stats.aggregate(pipeline).to_list(length=None)
+        
+        if results:
+            data = results[0]
+            return FeatureUsageStats(
+                schedule_views=data.get("schedule_views", 0),
+                analytics_views=data.get("analytics_views", 0),
+                calendar_opens=data.get("calendar_opens", 0),
+                notifications_configured=data.get("notifications_configured", 0),
+                schedule_shares=data.get("schedule_shares", 0),
+                tasks_created=data.get("tasks_created", 0),
+                achievements_earned=data.get("achievements_earned", 0)
+            )
+        else:
+            # Возвращаем нули, если нет данных
+            return FeatureUsageStats(
+                schedule_views=0,
+                analytics_views=0,
+                calendar_opens=0,
+                notifications_configured=0,
+                schedule_shares=0,
+                tasks_created=0,
+                achievements_earned=0
+            )
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики функций: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/top-users", response_model=List[TopUser])
+async def get_top_users(
+    metric: str = "points",
+    limit: int = 10
+):
+    """
+    Получить топ пользователей по заданной метрике
+    """
+    try:
+        # Доступные метрики
+        valid_metrics = {
+            "points": "total_points",
+            "achievements": "achievements_count",
+            "tasks": "tasks_created",
+            "schedule_views": "schedule_views"
+        }
+        
+        if metric not in valid_metrics:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Недопустимая метрика. Доступные: {', '.join(valid_metrics.keys())}"
+            )
+        
+        field_name = valid_metrics[metric]
+        
+        # Агрегация для получения топа
+        pipeline = [
+            {
+                "$match": {
+                    field_name: {"$gt": 0}
+                }
+            },
+            {
+                "$sort": {field_name: -1}
+            },
+            {
+                "$limit": limit
+            },
+            {
+                "$lookup": {
+                    "from": "user_settings",
+                    "localField": "telegram_id",
+                    "foreignField": "telegram_id",
+                    "as": "user_info"
+                }
+            },
+            {
+                "$unwind": "$user_info"
+            },
+            {
+                "$project": {
+                    "telegram_id": 1,
+                    "value": f"${field_name}",
+                    "username": "$user_info.username",
+                    "first_name": "$user_info.first_name",
+                    "group_name": "$user_info.group_name"
+                }
+            }
+        ]
+        
+        results = await db.user_stats.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        top_users = [
+            TopUser(
+                telegram_id=result["telegram_id"],
+                value=result["value"],
+                username=result.get("username"),
+                first_name=result.get("first_name"),
+                group_name=result.get("group_name")
+            )
+            for result in results
+        ]
+        
+        return top_users
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении топа пользователей: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/faculty-stats")
+async def get_faculty_stats(days: Optional[int] = None):
+    """
+    Получить статистику по факультетам (с опциональным фильтром по периоду регистрации)
+    """
+    try:
+        # Базовый фильтр
+        match_filter = {
+            "facultet_name": {"$ne": None, "$exists": True}
+        }
+        
+        # Фильтр по периоду
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+            match_filter["created_at"] = {"$gte": start_date}
+        
+        # Агрегация по факультетам
+        pipeline = [
+            {"$match": match_filter},
+            {
+                "$group": {
+                    "_id": "$facultet_name",
+                    "faculty_id_first": {"$first": "$facultet_id"},
+                    "users_count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"users_count": -1}}
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        # Преобразуем результат
+        faculty_stats = [
+            FacultyStats(
+                faculty_name=result["_id"],
+                faculty_id=result.get("faculty_id_first"),
+                users_count=result["users_count"]
+            )
+            for result in results
+        ]
+        
+        return faculty_stats
+    
+    except Exception as e:
+        import traceback
+        logger.error(f"Ошибка при получении статистики факультетов: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/course-stats", response_model=List[CourseStats])
+async def get_course_stats(days: Optional[int] = None):
+    """
+    Получить статистику по курсам (с опциональным фильтром по периоду)
+    """
+    try:
+        match_filter = {
+            "kurs": {"$ne": None, "$exists": True}
+        }
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+            match_filter["created_at"] = {"$gte": start_date}
+        
+        pipeline = [
+            {"$match": match_filter},
+            {
+                "$group": {
+                    "_id": "$kurs",
+                    "users_count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"_id": 1}}
+        ]
+        
+        results = await db.user_settings.aggregate(pipeline).to_list(length=None)
+        
+        course_stats = [
+            CourseStats(
+                course=result["_id"],
+                users_count=result["users_count"]
+            )
+            for result in results
+        ]
+        
+        return course_stats
+    
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики курсов: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/send-notification")
+async def admin_send_notification(data: AdminSendNotificationRequest):
+    """Отправить уведомление пользователю от имени администратора"""
+    try:
+        results = {
+            "telegram_id": data.telegram_id,
+            "in_app_sent": False,
+            "telegram_sent": False,
+            "errors": []
+        }
+        
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one({"telegram_id": data.telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Маппинг типов на NotificationType enum
+        type_mapping = {
+            "admin_message": NotificationType.ADMIN_MESSAGE,
+            "announcement": NotificationType.ANNOUNCEMENT,
+            "app_update": NotificationType.APP_UPDATE,
+            "schedule_changed": NotificationType.SCHEDULE_CHANGED,
+            "task_deadline": NotificationType.TASK_DEADLINE,
+            "achievement_earned": NotificationType.ACHIEVEMENT_EARNED,
+            "level_up": NotificationType.LEVEL_UP,
+            "room_invite": NotificationType.ROOM_INVITE,
+        }
+        
+        # Маппинг категорий
+        category_mapping = {
+            "system": NotificationCategory.SYSTEM,
+            "study": NotificationCategory.STUDY,
+            "achievements": NotificationCategory.ACHIEVEMENTS,
+            "rooms": NotificationCategory.ROOMS,
+            "social": NotificationCategory.SOCIAL,
+            "journal": NotificationCategory.JOURNAL,
+        }
+        
+        notification_type = type_mapping.get(data.notification_type, NotificationType.ADMIN_MESSAGE)
+        notification_category = category_mapping.get(data.category, NotificationCategory.SYSTEM)
+        
+        # Отправляем In-App уведомление
+        if data.send_in_app:
+            try:
+                notification = InAppNotification(
+                    telegram_id=data.telegram_id,
+                    type=notification_type,
+                    category=notification_category,
+                    priority=NotificationPriority.HIGH,
+                    title=data.title,
+                    message=data.message,
+                    emoji="",  # Не используем emoji, иконка определяется по типу
+                    data={"from_admin": True}
+                )
+                await db.in_app_notifications.insert_one(notification.model_dump())
+                results["in_app_sent"] = True
+                logger.info(f"📬 Admin notification sent in-app to {data.telegram_id}")
+            except Exception as e:
+                logger.error(f"Failed to send in-app notification: {e}")
+                results["errors"].append(f"In-App: {str(e)}")
+        
+        # Отправляем Telegram сообщение
+        if data.send_telegram:
+            try:
+                from notifications import get_notification_service
+                notification_service = get_notification_service()
+                
+                # Форматируем красивое сообщение для Telegram
+                type_emojis = {
+                    "admin_message": "📢",
+                    "announcement": "📣",
+                    "app_update": "✨",
+                    "schedule_changed": "📅",
+                    "task_deadline": "⏰",
+                    "achievement_earned": "🏆",
+                    "level_up": "⭐",
+                    "room_invite": "🏠",
+                }
+                msg_emoji = type_emojis.get(data.notification_type, "🔔")
+                
+                tg_lines = []
+                tg_lines.append(f"{msg_emoji}  <b>{data.title}</b>")
+                tg_lines.append("")
+                if data.message.strip():
+                    tg_lines.append(data.message.strip())
+                    tg_lines.append("")
+                tg_lines.append("<i>RUDN Go • Уведомление</i>")
+                
+                tg_text = "\n".join(tg_lines)
+                
+                await notification_service.send_message(data.telegram_id, tg_text)
+                results["telegram_sent"] = True
+                logger.info(f"📨 Admin message sent via Telegram to {data.telegram_id}")
+            except Exception as e:
+                logger.error(f"Failed to send Telegram message: {e}")
+                results["errors"].append(f"Telegram: {str(e)}")
+        
+        if not results["in_app_sent"] and not results["telegram_sent"]:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Не удалось отправить уведомление: {', '.join(results['errors'])}"
+            )
+        
+        return {
+            "status": "success",
+            "message": "Уведомление отправлено",
+            **results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending admin notification: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/stats", response_model=AdminStatsResponse)
+async def get_admin_stats(days: Optional[int] = None):
+    """Get general statistics for admin panel"""
+    now = datetime.utcnow()
+    start_date = None
+    if days:
+        start_date = now - timedelta(days=days)
+
+    # Helper to apply date filter
+    def date_filter(field_name="created_at"):
+        return {field_name: {"$gte": start_date}} if start_date else {}
+
+    # Порог для определения веб/гостевых пользователей
+    # Реальные Telegram ID: < 10 млрд (9-10 цифр)
+    # Device-generated ID: ~10^14 (13-15 цифр, из UUID hex)
+    WEB_GUEST_THRESHOLD = 10_000_000_000
+    
+    # 1. Total Users — считаем ВСЕХ + раздельно Telegram и веб
+    total_users = await db.user_settings.count_documents({})
+    telegram_users = await db.user_settings.count_documents({"telegram_id": {"$lt": WEB_GUEST_THRESHOLD}})
+    web_guest_users = await db.user_settings.count_documents({"telegram_id": {"$gte": WEB_GUEST_THRESHOLD}})
+    
+    # 2. Active Users Today
+    today_start = datetime(now.year, now.month, now.day)
+    active_users_today = await db.user_settings.count_documents({"last_activity": {"$gte": today_start}})
+    
+    # 3. New Users Week
+    week_ago = now - timedelta(days=7)
+    new_users_week = await db.user_settings.count_documents({"created_at": {"$gte": week_ago}})
+    
+    # 4. Tasks
+    total_tasks = await db.tasks.count_documents(date_filter("created_at"))
+    total_completed_tasks = await db.tasks.count_documents({"completed": True, **date_filter("created_at")})
+    
+    # 5. Achievements
+    total_achievements_earned = await db.user_achievements.count_documents(date_filter("earned_at"))
+    
+    # 6. Rooms
+    total_rooms = await db.rooms.count_documents(date_filter("created_at"))
+    
+    # Additional fields
+    week_start = now - timedelta(days=7)
+    active_users_week = await db.user_settings.count_documents({"last_activity": {"$gte": week_start}})
+    
+    month_start = now - timedelta(days=30)
+    active_users_month = await db.user_settings.count_documents({"last_activity": {"$gte": month_start}})
+    
+    new_users_today = await db.user_settings.count_documents({"created_at": {"$gte": today_start}})
+    
+    month_ago = now - timedelta(days=30)
+    new_users_month = await db.user_settings.count_documents({"created_at": {"$gte": month_ago}})
+    
+    # Total schedule views
+    schedule_views_result = await db.user_stats.aggregate([
+        {"$group": {"_id": None, "total": {"$sum": "$schedule_views"}}}
+    ]).to_list(1)
+    total_schedule_views = schedule_views_result[0]["total"] if schedule_views_result else 0
+
+    # 7. Referral events statistics (room joins)
+    total_room_joins = await db.referral_events.count_documents({"event_type": "room_join", "is_new_member": True})
+    room_joins_today = await db.referral_events.count_documents({
+        "event_type": "room_join", 
+        "is_new_member": True,
+        "created_at": {"$gte": today_start}
+    })
+    room_joins_week = await db.referral_events.count_documents({
+        "event_type": "room_join", 
+        "is_new_member": True,
+        "created_at": {"$gte": week_ago}
+    })
+    
+    # 8. Referral events statistics (journal joins)
+    total_journal_joins = await db.referral_events.count_documents({"event_type": "journal_join", "is_new_member": True})
+    journal_joins_today = await db.referral_events.count_documents({
+        "event_type": "journal_join", 
+        "is_new_member": True,
+        "created_at": {"$gte": today_start}
+    })
+    journal_joins_week = await db.referral_events.count_documents({
+        "event_type": "journal_join", 
+        "is_new_member": True,
+        "created_at": {"$gte": week_ago}
+    })
+    
+    # 9. Total journals
+    total_journals = await db.attendance_journals.count_documents(date_filter("created_at"))
+
+    # 10. Web-version statistics
+    # Всего linked веб-сессий
+    web_sessions_total = await db.web_sessions.count_documents({"status": "linked"})
+    
+    # Активные веб-сессии (linked + last_active < 10 мин назад)
+    web_threshold = now - timedelta(minutes=10)
+    web_sessions_active = await db.web_sessions.count_documents({
+        "status": "linked",
+        "last_active": {"$gte": web_threshold}
+    })
+    
+    # Уникальные пользователи веб-версии (все время)
+    web_unique_pipeline = [
+        {"$match": {"status": "linked", "telegram_id": {"$ne": None}}},
+        {"$group": {"_id": "$telegram_id"}},
+        {"$count": "total"}
+    ]
+    web_unique_result = await db.web_sessions.aggregate(web_unique_pipeline).to_list(1)
+    web_unique_users = web_unique_result[0]["total"] if web_unique_result else 0
+    
+    # Веб-пользователи сегодня (уникальные, с активностью сегодня)
+    web_today_pipeline = [
+        {"$match": {"status": "linked", "telegram_id": {"$ne": None}, "last_active": {"$gte": today_start}}},
+        {"$group": {"_id": "$telegram_id"}},
+        {"$count": "total"}
+    ]
+    web_today_result = await db.web_sessions.aggregate(web_today_pipeline).to_list(1)
+    web_users_today = web_today_result[0]["total"] if web_today_result else 0
+
+    return AdminStatsResponse(
+        total_users=total_users,
+        telegram_users=telegram_users,
+        web_guest_users=web_guest_users,
+        active_users_today=active_users_today,
+        active_users_week=active_users_week,
+        active_users_month=active_users_month,
+        new_users_today=new_users_today,
+        new_users_week=new_users_week,
+        new_users_month=new_users_month,
+        total_tasks=total_tasks,
+        total_completed_tasks=total_completed_tasks,
+        total_achievements_earned=total_achievements_earned,
+        total_rooms=total_rooms,
+        total_schedule_views=total_schedule_views,
+        # Referral statistics
+        total_room_joins=total_room_joins,
+        room_joins_today=room_joins_today,
+        room_joins_week=room_joins_week,
+        total_journal_joins=total_journal_joins,
+        journal_joins_today=journal_joins_today,
+        journal_joins_week=journal_joins_week,
+        total_journals=total_journals,
+        # Web-version statistics
+        web_sessions_total=web_sessions_total,
+        web_sessions_active=web_sessions_active,
+        web_unique_users=web_unique_users,
+        web_users_today=web_users_today
+    )
+
+
+@api_router.get("/admin/referral-stats", response_model=ReferralStatsDetailResponse)
+async def get_admin_referral_stats(days: Optional[int] = 30, limit: int = 10):
+    """
+    Получить детальную статистику реферальных событий.
+    
+    - **days**: Количество дней для анализа (по умолчанию 30)
+    - **limit**: Количество записей в топах и последних событиях (по умолчанию 10)
+    """
+    try:
+        now = datetime.utcnow()
+        today_start = datetime(now.year, now.month, now.day)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=days)
+        
+        # Общая статистика
+        total_events = await db.referral_events.count_documents({})
+        events_today = await db.referral_events.count_documents({"created_at": {"$gte": today_start}})
+        events_week = await db.referral_events.count_documents({"created_at": {"$gte": week_ago}})
+        events_month = await db.referral_events.count_documents({"created_at": {"$gte": month_ago}})
+        
+        # По типам - комнаты
+        room_joins_total = await db.referral_events.count_documents({"event_type": "room_join"})
+        room_joins_today = await db.referral_events.count_documents({
+            "event_type": "room_join",
+            "created_at": {"$gte": today_start}
+        })
+        room_joins_week = await db.referral_events.count_documents({
+            "event_type": "room_join", 
+            "created_at": {"$gte": week_ago}
+        })
+
+        # По типам - журналы
+        journal_joins_total = await db.referral_events.count_documents({"event_type": "journal_join"})
+        journal_joins_today = await db.referral_events.count_documents({
+            "event_type": "journal_join",
+            "created_at": {"$gte": today_start}
+        })
+        journal_joins_week = await db.referral_events.count_documents({
+            "event_type": "journal_join",
+            "created_at": {"$gte": week_ago}
+        })
+
+        # Новые участники
+        new_members_total = await db.referral_events.count_documents({"is_new_member": True})
+        new_members_today = await db.referral_events.count_documents({
+            "is_new_member": True,
+            "created_at": {"$gte": today_start}
+        })
+        new_members_week = await db.referral_events.count_documents({
+            "is_new_member": True,
+            "created_at": {"$gte": week_ago}
+        })
+
+        # Топ приглашающих
+        pipeline = [
+            {"$group": {"_id": "$referrer_id", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": limit}
+        ]
+        top_referrers_data = await db.referral_events.aggregate(pipeline).to_list(length=limit)
+        
+        top_referrers = []
+        for item in top_referrers_data:
+            if item["_id"]:
+                user = await db.user_settings.find_one({"telegram_id": item["_id"]})
+                name = "Unknown"
+                if user:
+                    name = user.get("first_name", "") + " " + (user.get("last_name", "") or "")
+                    if user.get("username"):
+                        name += f" (@{user['username']})"
+                
+                top_referrers.append({
+                    "referrer_id": item["_id"],
+                    "count": item["count"],
+                    "name": name.strip()
+                })
+
+        # Последние события
+        cursor = db.referral_events.find({}).sort("created_at", -1).limit(limit)
+        recent_events_data = await cursor.to_list(length=limit)
+        recent_events = []
+        for event in recent_events_data:
+            # Преобразуем ObjectId в str если нужно
+            event["id"] = str(event["_id"])
+            recent_events.append(event)
+
+        return {
+            "total_events": total_events,
+            "events_today": events_today,
+            "events_week": events_week,
+            "events_month": events_month,
+            "room_joins_total": room_joins_total,
+            "room_joins_today": room_joins_today,
+            "room_joins_week": room_joins_week,
+            "journal_joins_total": journal_joins_total,
+            "journal_joins_today": journal_joins_today,
+            "journal_joins_week": journal_joins_week,
+            "new_members_total": new_members_total,
+            "new_members_today": new_members_today,
+            "new_members_week": new_members_week,
+            "top_referrers": top_referrers,
+            "recent_events": recent_events
+        }
+    except Exception as e:
+        logger.error(f"Error getting referral stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Админские реферальные ссылки (Admin Referral Links) ============
+
+def generate_short_code(length: int = 8) -> str:
+    """Генерирует короткий уникальный код для ссылки"""
+    import secrets
+    import string
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(chars) for _ in range(length))
+
+
+@api_router.post("/admin/referral-links")
+async def create_admin_referral_link(data: AdminReferralLinkCreate):
+    """Создать новую реферальную ссылку"""
+    try:
+        code = data.code.strip().upper() if data.code else generate_short_code()
+        
+        existing = await db.admin_referral_links.find_one({"code": code})
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Ссылка с кодом '{code}' уже существует")
+        
+        bot_username = get_telegram_bot_username()
+        destination = data.destination_url.strip() if data.destination_url else f"https://t.me/{bot_username}/app?startapp=ref_{code}"
+        full_url = f"https://t.me/{bot_username}/app?startapp=adref_{code}"
+        
+        link = AdminReferralLink(
+            name=data.name.strip(),
+            description=data.description.strip() if data.description else "",
+            code=code,
+            destination_url=destination,
+            full_url=full_url,
+            campaign=data.campaign.strip() if data.campaign else "",
+            source=data.source.strip() if data.source else "",
+            medium=data.medium.strip() if data.medium else "",
+            tags=data.tags or [],
+            modal_config=data.modal_config.model_dump() if data.modal_config else None,
+        )
+        
+        await db.admin_referral_links.insert_one(link.model_dump())
+        logger.info(f"✅ Создана реферальная ссылка: {link.name} ({code})")
+        
+        return link.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании реферальной ссылки: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/referral-links")
+async def list_admin_referral_links(
+    skip: int = 0,
+    limit: int = 50,
+    is_active: Optional[bool] = None,
+    search: Optional[str] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc"
+):
+    """Получить список всех реферальных ссылок с подробной статистикой"""
+    try:
+        query = {}
+        if is_active is not None:
+            query["is_active"] = is_active
+        if search:
+            query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"code": {"$regex": search, "$options": "i"}},
+                {"campaign": {"$regex": search, "$options": "i"}},
+                {"source": {"$regex": search, "$options": "i"}},
+            ]
+        
+        sort_dir = -1 if sort_order == "desc" else 1
+        cursor = db.admin_referral_links.find(query).sort(sort_by, sort_dir).skip(skip).limit(limit)
+        links = await cursor.to_list(length=limit)
+        total = await db.admin_referral_links.count_documents(query)
+        
+        now = datetime.utcnow()
+        today_start = datetime(now.year, now.month, now.day)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+        
+        result = []
+        for link in links:
+            link["_id"] = str(link.get("_id", ""))
+            link_id = link["id"]
+            
+            # Подсчёт кликов по периодам
+            link["clicks_today"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "timestamp": {"$gte": today_start}
+            })
+            link["clicks_week"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "timestamp": {"$gte": week_ago}
+            })
+            link["clicks_month"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "timestamp": {"$gte": month_ago}
+            })
+            
+            # Актуальные счётчики из коллекции событий (не из кеша на ссылке)
+            link["total_clicks"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click"
+            })
+            link["unique_clicks"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "click", "is_unique": True
+            })
+            link["registrations"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "registration"
+            })
+            link["logins"] = await db.referral_link_events.count_documents({
+                "link_id": link_id, "event_type": "login"
+            })
+            
+            result.append(link)
+        
+        return {"links": result, "total": total}
+    except Exception as e:
+        logger.error(f"Ошибка при получении списка ссылок: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/referral-links/analytics")
+async def get_referral_links_analytics(days: int = 30):
+    """Получить аналитику по всем реферальным ссылкам"""
+    try:
+        now = datetime.utcnow()
+        today_start = datetime(now.year, now.month, now.day)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=days)
+        
+        total_links = await db.admin_referral_links.count_documents({})
+        active_links = await db.admin_referral_links.count_documents({"is_active": True})
+        
+        # Статистика по типам событий
+        total_clicks = await db.referral_link_events.count_documents({"event_type": "click"})
+        total_unique = await db.referral_link_events.count_documents({"event_type": "click", "is_unique": True})
+        total_registrations = await db.referral_link_events.count_documents({"event_type": "registration"})
+        total_logins = await db.referral_link_events.count_documents({"event_type": "login"})
+        
+        clicks_today = await db.referral_link_events.count_documents({"event_type": "click", "timestamp": {"$gte": today_start}})
+        clicks_week = await db.referral_link_events.count_documents({"event_type": "click", "timestamp": {"$gte": week_ago}})
+        clicks_month = await db.referral_link_events.count_documents({"event_type": "click", "timestamp": {"$gte": month_ago}})
+        
+        # Топ ссылки по кликам
+        top_pipeline = [
+            {"$match": {"event_type": "click"}},
+            {"$group": {
+                "_id": "$link_id", 
+                "total": {"$sum": 1}, 
+                "unique": {"$sum": {"$cond": ["$is_unique", 1, 0]}}
+            }},
+            {"$sort": {"total": -1}},
+            {"$limit": 10}
+        ]
+        top_data = await db.referral_link_events.aggregate(top_pipeline).to_list(length=10)
+        
+        top_links = []
+        for item in top_data:
+            link = await db.admin_referral_links.find_one({"id": item["_id"]})
+            if link:
+                regs = await db.referral_link_events.count_documents({"link_id": item["_id"], "event_type": "registration"})
+                logins = await db.referral_link_events.count_documents({"link_id": item["_id"], "event_type": "login"})
+                top_links.append({
+                    "link_id": item["_id"],
+                    "name": link.get("name", ""),
+                    "code": link.get("code", ""),
+                    "total_clicks": item["total"],
+                    "unique_clicks": item["unique"],
+                    "registrations": regs,
+                    "logins": logins
+                })
+        
+        # Клики, регистрации и входы по дням
+        days_pipeline = [
+            {"$match": {"timestamp": {"$gte": month_ago}}},
+            {"$group": {
+                "_id": {
+                    "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                    "event_type": "$event_type"
+                },
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id.date": 1}}
+        ]
+        days_data = await db.referral_link_events.aggregate(days_pipeline).to_list(length=days * 3)
+        
+        # Собираем данные по дням
+        days_map = {}
+        for d in days_data:
+            date = d["_id"]["date"]
+            etype = d["_id"]["event_type"]
+            if date not in days_map:
+                days_map[date] = {"date": date, "clicks": 0, "registrations": 0, "logins": 0}
+            if etype == "click":
+                days_map[date]["clicks"] = d["count"]
+            elif etype == "registration":
+                days_map[date]["registrations"] = d["count"]
+            elif etype == "login":
+                days_map[date]["logins"] = d["count"]
+        
+        clicks_by_day = sorted(days_map.values(), key=lambda x: x["date"])
+        
+        # Клики по источникам
+        source_pipeline = [
+            {"$match": {"event_type": "click"}},
+            {"$lookup": {
+                "from": "admin_referral_links",
+                "localField": "link_id",
+                "foreignField": "id",
+                "as": "link_info"
+            }},
+            {"$unwind": {"path": "$link_info", "preserveNullAndEmptyArrays": True}},
+            {"$group": {
+                "_id": {"$ifNull": ["$link_info.source", "direct"]},
+                "clicks": {"$sum": 1}
+            }},
+            {"$sort": {"clicks": -1}}
+        ]
+        source_data = await db.referral_link_events.aggregate(source_pipeline).to_list(length=20)
+        clicks_by_source = [{"source": s["_id"] or "direct", "clicks": s["clicks"]} for s in source_data]
+        
+        # Последние события (все типы)
+        recent_cursor = db.referral_link_events.find({}).sort("timestamp", -1).limit(20)
+        recent_data = await recent_cursor.to_list(length=20)
+        recent_events = []
+        for evt in recent_data:
+            evt["_id"] = str(evt.get("_id", ""))
+            link = await db.admin_referral_links.find_one({"id": evt.get("link_id")})
+            evt["link_name"] = link.get("name", "") if link else ""
+            recent_events.append(evt)
+        
+        return {
+            "total_links": total_links,
+            "active_links": active_links,
+            "total_clicks": total_clicks,
+            "total_unique_clicks": total_unique,
+            "total_registrations": total_registrations,
+            "total_logins": total_logins,
+            "clicks_today": clicks_today,
+            "clicks_week": clicks_week,
+            "clicks_month": clicks_month,
+            "top_links": top_links,
+            "clicks_by_day": clicks_by_day,
+            "clicks_by_source": clicks_by_source,
+            "recent_events": recent_events
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при получении аналитики: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/admin/referral-links/{link_id}")
+async def get_admin_referral_link(link_id: str):
+    """Получить детальную информацию о реферальной ссылке"""
+    try:
+        link = await db.admin_referral_links.find_one({"id": link_id})
+        if not link:
+            raise HTTPException(status_code=404, detail="Ссылка не найдена")
+        
+        link["_id"] = str(link.get("_id", ""))
+        
+        now = datetime.utcnow()
+        today_start = datetime(now.year, now.month, now.day)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+        
+        # Актуальные счётчики
+        link["total_clicks"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "click"})
+        link["unique_clicks"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "click", "is_unique": True})
+        link["registrations"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "registration"})
+        link["logins"] = await db.referral_link_events.count_documents({"link_id": link_id, "event_type": "login"})
+        
+        link["clicks_today"] = await db.referral_link_events.count_documents({
+            "link_id": link_id, "event_type": "click", "timestamp": {"$gte": today_start}
+        })
+        link["clicks_week"] = await db.referral_link_events.count_documents({
+            "link_id": link_id, "event_type": "click", "timestamp": {"$gte": week_ago}
+        })
+        link["clicks_month"] = await db.referral_link_events.count_documents({
+            "link_id": link_id, "event_type": "click", "timestamp": {"$gte": month_ago}
+        })
+        
+        # Все события по дням для этой ссылки
+        days_pipeline = [
+            {"$match": {"link_id": link_id, "timestamp": {"$gte": month_ago}}},
+            {"$group": {
+                "_id": {
+                    "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}},
+                    "event_type": "$event_type"
+                },
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id.date": 1}}
+        ]
+        days_data = await db.referral_link_events.aggregate(days_pipeline).to_list(length=90)
+        days_map = {}
+        for d in days_data:
+            date = d["_id"]["date"]
+            etype = d["_id"]["event_type"]
+            if date not in days_map:
+                days_map[date] = {"date": date, "clicks": 0, "registrations": 0, "logins": 0}
+            if etype == "click":
+                days_map[date]["clicks"] = d["count"]
+            elif etype == "registration":
+                days_map[date]["registrations"] = d["count"]
+            elif etype == "login":
+                days_map[date]["logins"] = d["count"]
+        link["events_by_day"] = sorted(days_map.values(), key=lambda x: x["date"])
+        
+        # Клики по устройствам
+        device_pipeline = [
+            {"$match": {"link_id": link_id, "event_type": "click"}},
+            {"$group": {"_id": "$device_type", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        device_data = await db.referral_link_events.aggregate(device_pipeline).to_list(length=10)
+        link["clicks_by_device"] = [{"device": d["_id"] or "unknown", "count": d["count"]} for d in device_data]
+        
+        # Последние 30 событий (все типы)
+        recent_cursor = db.referral_link_events.find({"link_id": link_id}).sort("timestamp", -1).limit(30)
+        recent = await recent_cursor.to_list(length=30)
+        for r in recent:
+            r["_id"] = str(r.get("_id", ""))
+        link["recent_events"] = recent
+        
+        # Список зарегистрированных пользователей
+        reg_cursor = db.referral_link_events.find({
+            "link_id": link_id, "event_type": "registration"
+        }).sort("timestamp", -1).limit(50)
+        reg_events = await reg_cursor.to_list(length=50)
+        for r in reg_events:
+            r["_id"] = str(r.get("_id", ""))
+        link["registered_users"] = reg_events
+        
+        return link
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при получении ссылки: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/admin/referral-links/{link_id}")
+async def update_admin_referral_link(link_id: str, data: AdminReferralLinkUpdate):
+    """Обновить реферальную ссылку"""
+    try:
+        link = await db.admin_referral_links.find_one({"id": link_id})
+        if not link:
+            raise HTTPException(status_code=404, detail="Ссылка не найдена")
+        
+        update_data = {}
+        if data.name is not None:
+            update_data["name"] = data.name.strip()
+        if data.description is not None:
+            update_data["description"] = data.description.strip()
+        if data.destination_url is not None:
+            update_data["destination_url"] = data.destination_url.strip()
+        if data.campaign is not None:
+            update_data["campaign"] = data.campaign.strip()
+        if data.source is not None:
+            update_data["source"] = data.source.strip()
+        if data.medium is not None:
+            update_data["medium"] = data.medium.strip()
+        if data.tags is not None:
+            update_data["tags"] = data.tags
+        if data.is_active is not None:
+            update_data["is_active"] = data.is_active
+        if data.modal_config is not None:
+            update_data["modal_config"] = data.modal_config.model_dump()
+        
+        update_data["updated_at"] = datetime.utcnow()
+        
+        await db.admin_referral_links.update_one({"id": link_id}, {"$set": update_data})
+        
+        updated = await db.admin_referral_links.find_one({"id": link_id})
+        updated["_id"] = str(updated.get("_id", ""))
+        
+        logger.info(f"✅ Обновлена реферальная ссылка: {link_id}")
+        return updated
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении ссылки: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/admin/referral-links/{link_id}")
+async def delete_admin_referral_link(link_id: str):
+    """Удалить реферальную ссылку и все её события"""
+    try:
+        link = await db.admin_referral_links.find_one({"id": link_id})
+        if not link:
+            raise HTTPException(status_code=404, detail="Ссылка не найдена")
+        
+        await db.admin_referral_links.delete_one({"id": link_id})
+        deleted_events = await db.referral_link_events.delete_many({"link_id": link_id})
+        
+        logger.info(f"✅ Удалена реферальная ссылка: {link.get('name')} ({link.get('code')}), событий удалено: {deleted_events.deleted_count}")
+        return {"success": True, "message": "Ссылка удалена", "deleted_events": deleted_events.deleted_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при удалении ссылки: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/referral-track")
+async def track_admin_referral_event(data: AdminReferralTrackRequest, request: Request):
+    """
+    Универсальный трекинг событий реферальных ссылок.
+    Вызывается фронтендом при:
+    - event_type="click" — пользователь открыл приложение по ссылке
+    - event_type="registration" — новый пользователь зарегистрировался
+    - event_type="login" — существующий пользователь вошёл
+    """
+    try:
+        code = data.code.strip().upper()
+        event_type = data.event_type
+        
+        if event_type not in ("click", "registration", "login"):
+            raise HTTPException(status_code=400, detail=f"Неверный event_type: {event_type}. Допустимые: click, registration, login")
+        
+        link = await db.admin_referral_links.find_one({"code": code})
+        if not link:
+            logger.warning(f"⚠️ Реферальная ссылка не найдена: {code}")
+            raise HTTPException(status_code=404, detail="Ссылка не найдена")
+        
+        if not link.get("is_active", True):
+            logger.info(f"⏸ Ссылка {code} неактивна, событие {event_type} игнорируется")
+            return {"success": False, "message": "Ссылка неактивна"}
+        
+        import hashlib
+        
+        client_ip = request.client.host if request.client else "unknown"
+        ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
+        user_agent = request.headers.get("user-agent", "")
+        referer = request.headers.get("referer", "")
+        
+        ua_lower = user_agent.lower()
+        device_type = "desktop"
+        if any(kw in ua_lower for kw in ["mobile", "android", "iphone", "ipad"]):
+            device_type = "mobile"
+        elif "tablet" in ua_lower:
+            device_type = "tablet"
+        
+        is_unique = False
+        should_record = True  # Записывать ли событие в БД
+        
+        if event_type == "click":
+            # Дедупликация клика: по IP за 24 часа — повторный клик НЕ записывается
+            day_ago = datetime.utcnow() - timedelta(hours=24)
+            existing = await db.referral_link_events.find_one({
+                "link_id": link["id"],
+                "event_type": "click",
+                "ip_hash": ip_hash,
+                "timestamp": {"$gte": day_ago}
+            })
+            if existing:
+                # Клик уже зафиксирован — пропускаем
+                logger.info(f"ℹ️ Повторный клик по ссылке {code} (IP уже был)")
+                return {"success": True, "event_type": "click", "is_unique": False, "link_name": link.get("name", ""), "duplicate": True}
+            is_unique = True
+            
+        elif event_type == "registration":
+            # Дедупликация регистрации: один пользователь на одну ссылку — навсегда
+            if data.telegram_id:
+                existing = await db.referral_link_events.find_one({
+                    "link_id": link["id"],
+                    "event_type": "registration",
+                    "telegram_id": data.telegram_id
+                })
+                if existing:
+                    logger.info(f"ℹ️ Повторная регистрация user={data.telegram_id} через ссылку {code}")
+                    return {"success": True, "message": "Уже зарегистрирован через эту ссылку", "is_unique": False, "duplicate": True}
+            is_unique = True
+            
+        elif event_type == "login":
+            # Дедупликация входа: один пользователь за 24 часа
+            if data.telegram_id:
+                day_ago = datetime.utcnow() - timedelta(hours=24)
+                existing = await db.referral_link_events.find_one({
+                    "link_id": link["id"],
+                    "event_type": "login",
+                    "telegram_id": data.telegram_id,
+                    "timestamp": {"$gte": day_ago}
+                })
+                if existing:
+                    logger.info(f"ℹ️ Повторный вход user={data.telegram_id} через ссылку {code}")
+                    return {"success": True, "message": "Вход уже зафиксирован", "is_unique": False, "duplicate": True}
+            is_unique = True
+        
+        event = ReferralLinkEvent(
+            link_id=link["id"],
+            link_code=code,
+            event_type=event_type,
+            ip_hash=ip_hash,
+            user_agent=user_agent[:500],
+            referer=referer[:500],
+            telegram_id=data.telegram_id,
+            telegram_username=data.telegram_username,
+            telegram_name=data.telegram_name,
+            device_type=device_type,
+            is_unique=is_unique,
+        )
+        
+        await db.referral_link_events.insert_one(event.model_dump())
+        
+        # Обновляем кешированные счётчики на ссылке (дубликаты уже отсеяны выше)
+        inc_data = {}
+        if event_type == "click":
+            inc_data["total_clicks"] = 1
+            inc_data["unique_clicks"] = 1
+        elif event_type == "registration":
+            inc_data["registrations"] = 1
+        elif event_type == "login":
+            inc_data["logins"] = 1
+        
+        if inc_data:
+            await db.admin_referral_links.update_one({"id": link["id"]}, {"$inc": inc_data})
+        
+        logger.info(f"📊 Событие {event_type} по ссылке {code}: tg_id={data.telegram_id}, unique={is_unique}, device={device_type}")
+        
+        return {
+            "success": True,
+            "event_type": event_type,
+            "is_unique": is_unique,
+            "link_name": link.get("name", "")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при трекинге события: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/r/{code}")
+async def redirect_referral_link(code: str, request: Request):
+    """Редирект по реферальной ссылке с отслеживанием клика"""
+    try:
+        link = await db.admin_referral_links.find_one({"code": code.upper()})
+        if not link or not link.get("is_active", True):
+            bot_username = get_telegram_bot_username()
+            return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
+        
+        import hashlib
+        
+        client_ip = request.client.host if request.client else "unknown"
+        ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()[:16]
+        user_agent = request.headers.get("user-agent", "")
+        referer = request.headers.get("referer", "")
+        
+        ua_lower = user_agent.lower()
+        device_type = "desktop"
+        if any(kw in ua_lower for kw in ["mobile", "android", "iphone", "ipad"]):
+            device_type = "mobile"
+        elif "tablet" in ua_lower:
+            device_type = "tablet"
+        
+        day_ago = datetime.utcnow() - timedelta(hours=24)
+        existing = await db.referral_link_events.find_one({
+            "link_id": link["id"],
+            "event_type": "click",
+            "ip_hash": ip_hash,
+            "timestamp": {"$gte": day_ago}
+        })
+        is_unique = existing is None
+        
+        event = ReferralLinkEvent(
+            link_id=link["id"],
+            link_code=code.upper(),
+            event_type="click",
+            ip_hash=ip_hash,
+            user_agent=user_agent[:500],
+            referer=referer[:500],
+            device_type=device_type,
+            is_unique=is_unique,
+        )
+        
+        await db.referral_link_events.insert_one(event.model_dump())
+        
+        inc_data = {"total_clicks": 1}
+        if is_unique:
+            inc_data["unique_clicks"] = 1
+        await db.admin_referral_links.update_one({"id": link["id"]}, {"$inc": inc_data})
+        
+        logger.info(f"🔗 Редирект по ссылке {code} → {link.get('destination_url')}")
+        
+        destination = link.get("destination_url", "")
+        if not destination:
+            bot_username = get_telegram_bot_username()
+            destination = f"https://t.me/{bot_username}"
+        
+        return RedirectResponse(url=destination, status_code=302)
+    except Exception as e:
+        logger.error(f"Ошибка при редиректе: {e}")
+        bot_username = get_telegram_bot_username()
+        return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
+
+
+@api_router.get("/admin/users")
+async def get_admin_users(limit: int = 50, skip: int = 0, search: Optional[str] = None, user_type: Optional[str] = None):
+    """Get list of users for admin panel with search and user_type filter.
+    user_type: 'telegram' | 'web' | None (all)
+    """
+    WEB_GUEST_THRESHOLD = 10_000_000_000
+    query = {}
+    
+    # Фильтр по типу пользователя
+    if user_type == "telegram":
+        query["telegram_id"] = {"$lt": WEB_GUEST_THRESHOLD}
+    elif user_type == "web":
+        query["telegram_id"] = {"$gte": WEB_GUEST_THRESHOLD}
+    
+    if search:
+        # Case-insensitive search by name, username, or group
+        or_conditions = [
+            {"username": {"$regex": search, "$options": "i"}},
+            {"first_name": {"$regex": search, "$options": "i"}},
+            {"last_name": {"$regex": search, "$options": "i"}},
+            {"group_name": {"$regex": search, "$options": "i"}}
+        ]
+        # Check if search is a number (telegram_id)
+        if search.isdigit():
+            or_conditions.append({"telegram_id": int(search)})
+        
+        if "telegram_id" in query:
+            # Combine type filter with search via $and
+            query = {"$and": [{"telegram_id": query["telegram_id"]}, {"$or": or_conditions}]}
+        else:
+            query["$or"] = or_conditions
+
+    cursor = db.user_settings.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    users = await cursor.to_list(length=limit)
+    
+    # Добавляем поле user_type к каждому юзеру
+    for u in users:
+        tid = u.get("telegram_id", 0)
+        u["user_type"] = "web" if tid >= WEB_GUEST_THRESHOLD else "telegram"
+        if "_id" in u:
+            u["_id"] = str(u["_id"])
+    
+    return users
+
+@api_router.get("/admin/journals", response_model=List[JournalResponse])
+async def get_admin_journals(limit: int = 50, skip: int = 0, search: Optional[str] = None):
+    """Get list of journals (classes) for admin panel"""
+    query = {}
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"group_name": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+
+    cursor = db.attendance_journals.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    journals = await cursor.to_list(length=limit)
+    
+    # Enrich with counts if needed, but the model has defaults. 
+    # The model expects some calculated fields like 'total_students', 'total_sessions'.
+    # We might need to compute them or ensure they are in the DB.
+    # Looking at the model, these are fields.
+    
+    result = []
+    for journal in journals:
+        # Calculate stats for accurate display
+        j_id = str(journal["journal_id"]) if "journal_id" in journal else str(journal["_id"])
+        
+        # Ensure journal_id is set (sometimes it's _id in mongo)
+        if "journal_id" not in journal:
+             journal["journal_id"] = str(journal["_id"])
+             
+        journal["total_students"] = await db.journal_students.count_documents({"journal_id": j_id})
+        journal["total_sessions"] = await db.journal_sessions.count_documents({"journal_id": j_id})
+        
+        result.append(journal)
+        
+    return result
+
+
+# ============ API для отслеживания онлайн пользователей в реальном времени ============
+
+@api_router.get("/admin/online-users")
+async def get_online_users(minutes: int = 5):
+    """
+    Получить список пользователей онлайн в реальном времени.
+    Пользователь считается онлайн если его last_activity было в течение указанных минут.
+    """
+    try:
+        threshold = datetime.utcnow() - timedelta(minutes=minutes)
+        
+        # Получаем пользователей с недавней активностью
+        pipeline = [
+            {
+                "$match": {
+                    "last_activity": {"$gte": threshold}
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "telegram_id": 1,
+                    "first_name": 1,
+                    "last_name": 1,
+                    "username": 1,
+                    "photo_url": 1,
+                    "faculty": 1,
+                    "course": 1,
+                    "last_activity": 1,
+                    "current_section": 1
+                }
+            },
+            {
+                "$sort": {"last_activity": -1}
+            },
+            {
+                "$limit": 100
+            }
+        ]
+        
+        online_users = await db.user_settings.aggregate(pipeline).to_list(100)
+        
+        # Форматируем данные
+        result = []
+        
+        # Получаем все активные web-сессии для определения платформы
+        web_threshold_online = datetime.utcnow() - timedelta(minutes=minutes)
+        active_web_sessions = await db.web_sessions.find({
+            "status": "linked",
+            "last_active": {"$gte": web_threshold_online}
+        }).to_list(1000)
+        web_user_ids = set()
+        web_session_info = {}
+        for ws in active_web_sessions:
+            tid = ws.get("telegram_id")
+            if tid:
+                web_user_ids.add(tid)
+                web_session_info[tid] = {
+                    "browser": ws.get("browser", ""),
+                    "os": ws.get("os", ""),
+                    "device_name": ws.get("device_name", "")
+                }
+        
+        for user in online_users:
+            last_activity = user.get("last_activity")
+            if last_activity:
+                seconds_ago = (datetime.utcnow() - last_activity).total_seconds()
+                if seconds_ago < 60:
+                    activity_text = "только что"
+                elif seconds_ago < 120:
+                    activity_text = "1 мин назад"
+                else:
+                    activity_text = f"{int(seconds_ago // 60)} мин назад"
+            else:
+                activity_text = "неизвестно"
+            
+            tid = user.get("telegram_id")
+            is_web = tid in web_user_ids
+            ws_info = web_session_info.get(tid, {})
+            
+            result.append({
+                "telegram_id": tid,
+                "first_name": user.get("first_name", ""),
+                "last_name": user.get("last_name", ""),
+                "username": user.get("username", ""),
+                "photo_url": user.get("photo_url"),
+                "faculty": user.get("faculty", ""),
+                "course": user.get("course"),
+                "last_activity": last_activity.isoformat() if last_activity else None,
+                "activity_text": activity_text,
+                "current_section": user.get("current_section", ""),
+                "platform": "web" if is_web else "telegram",
+                "browser": ws_info.get("browser", "") if is_web else "",
+                "os": ws_info.get("os", "") if is_web else "",
+                "device_name": ws_info.get("device_name", "") if is_web else ""
+            })
+        
+        # Также получаем общую статистику
+        total_online = await db.user_settings.count_documents({
+            "last_activity": {"$gte": threshold}
+        })
+        
+        # Онлайн за последний час
+        hour_threshold = datetime.utcnow() - timedelta(hours=1)
+        online_last_hour = await db.user_settings.count_documents({
+            "last_activity": {"$gte": hour_threshold}
+        })
+        
+        # Онлайн за последние 24 часа
+        day_threshold = datetime.utcnow() - timedelta(hours=24)
+        online_last_day = await db.user_settings.count_documents({
+            "last_activity": {"$gte": day_threshold}
+        })
+        
+        # Подсчёт по платформам
+        web_online = len([u for u in result if u.get("platform") == "web"])
+        tg_online = len([u for u in result if u.get("platform") == "telegram"])
+        
+        return {
+            "online_now": total_online,
+            "online_last_hour": online_last_hour,
+            "online_last_day": online_last_day,
+            "web_online": web_online,
+            "telegram_online": tg_online,
+            "users": result,
+            "threshold_minutes": minutes,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting online users: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/track-activity")
+async def track_user_activity(telegram_id: int, section: str = None):
+    """
+    Обновить активность пользователя (вызывается с фронтенда периодически).
+    """
+    try:
+        update_data = {"last_activity": datetime.utcnow()}
+        if section:
+            update_data["current_section"] = section
+            
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": update_data}
+        )
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error tracking activity: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ============ Telegram Channel Statistics ============
+
+@api_router.get("/admin/channel-stats")
+async def get_channel_stats(channel: str = "@rudngo"):
+    """Получить статистику Telegram-канала (подписчики, описание и т.д.)."""
+    try:
+        from config import get_telegram_bot_token
+        token = get_telegram_bot_token()
+        if not token:
+            raise HTTPException(status_code=500, detail="Bot token not configured")
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            # getChat — основная информация
+            chat_resp = await client.get(f"https://api.telegram.org/bot{token}/getChat", params={"chat_id": channel})
+            chat_data = chat_resp.json()
+            if not chat_data.get("ok"):
+                raise HTTPException(status_code=400, detail=chat_data.get("description", "Failed to get chat"))
+
+            chat = chat_data["result"]
+
+            # getChatMemberCount — количество подписчиков
+            count_resp = await client.get(f"https://api.telegram.org/bot{token}/getChatMemberCount", params={"chat_id": channel})
+            count_data = count_resp.json()
+            member_count = count_data.get("result", 0) if count_data.get("ok") else 0
+
+            # getFile — получаем URL аватарки канала
+            photo_url = None
+            photo_data = chat.get("photo")
+            if photo_data and photo_data.get("big_file_id"):
+                file_resp = await client.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": photo_data["big_file_id"]})
+                file_data = file_resp.json()
+                if file_data.get("ok"):
+                    file_path = file_data["result"].get("file_path", "")
+                    photo_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+
+        return {
+            "channel": channel,
+            "title": chat.get("title", ""),
+            "username": chat.get("username", ""),
+            "description": chat.get("description", ""),
+            "member_count": member_count,
+            "type": chat.get("type", ""),
+            "photo": chat.get("photo"),
+            "photo_url": photo_url,
+            "invite_link": chat.get("invite_link", f"https://t.me/{chat.get('username', '')}"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting channel stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.get("/admin/channel-stats-history")
+async def get_channel_stats_history(hours: int = 168):
+    """
+    История подписчиков Telegram-канала.
+    hours: 24, 72, 168 (неделя), 720 (месяц), 0 = всё.
+    """
+    try:
+        if hours <= 0:
+            cutoff = datetime(2020, 1, 1)
+        else:
+            cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        cursor = db.channel_stats_history.find(
+            {"timestamp": {"$gte": cutoff}},
+            {"_id": 0, "timestamp": 1, "member_count": 1}
+        ).sort("timestamp", 1)
+
+        points = await cursor.to_list(length=None)
+
+        # Агрегируем: для больших периодов прореживаем точки
+        if len(points) > 300:
+            step = max(1, len(points) // 200)
+            points = [points[i] for i in range(0, len(points), step)]
+            if points[-1] != (await cursor.to_list(length=1)):
+                pass  # ensure last point
+
+        for p in points:
+            p["timestamp"] = p["timestamp"].isoformat()
+
+        # Дельта: разница между первым и последним значением
+        delta = 0
+        if len(points) >= 2:
+            delta = points[-1]["member_count"] - points[0]["member_count"]
+
+        return {
+            "period_hours": hours,
+            "total_points": len(points),
+            "delta": delta,
+            "history": points,
+        }
+    except Exception as e:
+        logger.error(f"Error getting channel stats history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+# ============ Server Load Statistics ============
+
+@api_router.get("/admin/server-stats")
+async def get_server_stats():
+    """
+    Статистика нагрузки на сервер: CPU, RAM, Disk, uptime, MongoDB, процессы.
+    """
+    try:
+        import time
+
+        # CPU
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        cpu_count = psutil.cpu_count()
+        cpu_count_logical = psutil.cpu_count(logical=True)
+        cpu_freq = psutil.cpu_freq()
+        
+        # Per-core CPU
+        cpu_per_core = psutil.cpu_percent(interval=0, percpu=True)
+
+        # RAM
+        mem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+
+        # Disk
+        disk = psutil.disk_usage('/')
+        try:
+            disk_io = psutil.disk_io_counters()
+            disk_io_data = {
+                "read_bytes": disk_io.read_bytes,
+                "write_bytes": disk_io.write_bytes,
+                "read_count": disk_io.read_count,
+                "write_count": disk_io.write_count,
+            } if disk_io else None
+        except Exception:
+            disk_io_data = None
+
+        # Network
+        try:
+            net_io = psutil.net_io_counters()
+            network = {
+                "bytes_sent": net_io.bytes_sent,
+                "bytes_recv": net_io.bytes_recv,
+                "packets_sent": net_io.packets_sent,
+                "packets_recv": net_io.packets_recv,
+            }
+        except Exception:
+            network = None
+
+        # Uptime
+        boot_time = psutil.boot_time()
+        uptime_seconds = int(time.time() - boot_time)
+        uptime_days = uptime_seconds // 86400
+        uptime_hours = (uptime_seconds % 86400) // 3600
+        uptime_minutes = (uptime_seconds % 3600) // 60
+
+        # Current process (FastAPI)
+        proc = psutil.Process()
+        proc_mem = proc.memory_info()
+        proc_create_time = datetime.fromtimestamp(proc.create_time())
+
+        # MongoDB stats
+        mongo_stats = {}
+        try:
+            db_stats = await db.command("dbStats")
+            server_status = await db.command("serverStatus")
+            mongo_stats = {
+                "db_name": db_stats.get("db", ""),
+                "collections": db_stats.get("collections", 0),
+                "objects": db_stats.get("objects", 0),
+                "data_size_mb": round(db_stats.get("dataSize", 0) / (1024 * 1024), 2),
+                "storage_size_mb": round(db_stats.get("storageSize", 0) / (1024 * 1024), 2),
+                "indexes": db_stats.get("indexes", 0),
+                "index_size_mb": round(db_stats.get("indexSize", 0) / (1024 * 1024), 2),
+                "connections_current": server_status.get("connections", {}).get("current", 0),
+                "connections_available": server_status.get("connections", {}).get("available", 0),
+                "uptime_seconds": server_status.get("uptime", 0),
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get MongoDB stats: {e}")
+            mongo_stats = {"error": str(e)}
+
+        # Top processes by CPU
+        top_processes = []
+        try:
+            for p in sorted(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']),
+                            key=lambda x: x.info.get('cpu_percent', 0) or 0, reverse=True)[:8]:
+                top_processes.append({
+                    "pid": p.info['pid'],
+                    "name": p.info['name'],
+                    "cpu_percent": round(p.info.get('cpu_percent', 0) or 0, 1),
+                    "memory_percent": round(p.info.get('memory_percent', 0) or 0, 1),
+                })
+        except Exception:
+            pass
+
+        # Load average
+        try:
+            load_avg = os.getloadavg()
+            load_average = {
+                "1min": round(load_avg[0], 2),
+                "5min": round(load_avg[1], 2),
+                "15min": round(load_avg[2], 2),
+            }
+        except Exception:
+            load_average = None
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "system": {
+                "platform": platform.system(),
+                "platform_release": platform.release(),
+                "architecture": platform.machine(),
+                "hostname": platform.node(),
+                "python_version": platform.python_version(),
+            },
+            "cpu": {
+                "percent": cpu_percent,
+                "count_physical": cpu_count,
+                "count_logical": cpu_count_logical,
+                "frequency_mhz": round(cpu_freq.current, 0) if cpu_freq else None,
+                "per_core": cpu_per_core,
+                "load_average": load_average,
+            },
+            "memory": {
+                "total_gb": round(mem.total / (1024**3), 2),
+                "used_gb": round(mem.used / (1024**3), 2),
+                "available_gb": round(mem.available / (1024**3), 2),
+                "percent": mem.percent,
+                "swap_total_gb": round(swap.total / (1024**3), 2),
+                "swap_used_gb": round(swap.used / (1024**3), 2),
+                "swap_percent": swap.percent,
+            },
+            "disk": {
+                "total_gb": round(disk.total / (1024**3), 2),
+                "used_gb": round(disk.used / (1024**3), 2),
+                "free_gb": round(disk.free / (1024**3), 2),
+                "percent": round(disk.used / disk.total * 100, 1),
+                "io": disk_io_data,
+            },
+            "network": network,
+            "uptime": {
+                "seconds": uptime_seconds,
+                "days": uptime_days,
+                "hours": uptime_hours,
+                "minutes": uptime_minutes,
+                "boot_time": datetime.fromtimestamp(boot_time).isoformat(),
+            },
+            "process": {
+                "pid": proc.pid,
+                "memory_rss_mb": round(proc_mem.rss / (1024**2), 2),
+                "memory_vms_mb": round(proc_mem.vms / (1024**2), 2),
+                "cpu_percent": proc.cpu_percent(),
+                "threads": proc.num_threads(),
+                "started_at": proc_create_time.isoformat(),
+            },
+            "mongodb": mongo_stats,
+            "top_processes": top_processes,
+        }
+    except Exception as e:
+        logger.error(f"Error getting server stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Background task: сбор метрик сервера каждые 60 секунд ---
+
+async def collect_server_metrics_loop():
+    """Фоновая задача для периодического сбора метрик сервера + онлайн-статистики в MongoDB.
+    Данные хранятся НАВСЕГДА (без очистки)."""
+    await asyncio.sleep(5)  # ждём старт приложения
+    logger.info("📊 Server metrics collector started (interval: 60s, хранение: бессрочное)")
+    
+    while True:
+        try:
+            cpu_percent = psutil.cpu_percent(interval=1)
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            try:
+                net_io = psutil.net_io_counters()
+                net_bytes_sent = net_io.bytes_sent
+                net_bytes_recv = net_io.bytes_recv
+            except Exception:
+                net_bytes_sent = 0
+                net_bytes_recv = 0
+
+            try:
+                load_avg = os.getloadavg()
+                load_1 = round(load_avg[0], 2)
+                load_5 = round(load_avg[1], 2)
+                load_15 = round(load_avg[2], 2)
+            except Exception:
+                load_1 = load_5 = load_15 = 0
+
+            proc = psutil.Process()
+            proc_mem = proc.memory_info()
+
+            metric = {
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.utcnow(),
+                "cpu_percent": round(cpu_percent, 1),
+                "ram_percent": round(mem.percent, 1),
+                "ram_used_gb": round(mem.used / (1024**3), 2),
+                "ram_total_gb": round(mem.total / (1024**3), 2),
+                "disk_percent": round(disk.used / disk.total * 100, 1),
+                "disk_used_gb": round(disk.used / (1024**3), 2),
+                "net_bytes_sent": net_bytes_sent,
+                "net_bytes_recv": net_bytes_recv,
+                "load_1": load_1,
+                "load_5": load_5,
+                "load_15": load_15,
+                "process_rss_mb": round(proc_mem.rss / (1024**2), 2),
+                "process_threads": proc.num_threads(),
+            }
+
+            await db.server_metrics_history.insert_one(metric)
+
+            # --- Сохраняем онлайн-статистику ---
+            try:
+                now_utc = datetime.utcnow()
+                threshold_5m = now_utc - timedelta(minutes=5)
+                threshold_1h = now_utc - timedelta(hours=1)
+                threshold_24h = now_utc - timedelta(hours=24)
+
+                online_now = await db.user_settings.count_documents({"last_activity": {"$gte": threshold_5m}})
+                online_1h = await db.user_settings.count_documents({"last_activity": {"$gte": threshold_1h}})
+                online_24h = await db.user_settings.count_documents({"last_activity": {"$gte": threshold_24h}})
+
+                # Web vs Telegram
+                active_web = await db.web_sessions.count_documents({
+                    "status": "linked",
+                    "last_active": {"$gte": threshold_5m}
+                })
+
+                online_point = {
+                    "id": str(uuid.uuid4()),
+                    "timestamp": now_utc,
+                    "online_now": online_now,
+                    "online_1h": online_1h,
+                    "online_24h": online_24h,
+                    "web_online": active_web,
+                    "telegram_online": max(0, online_now - active_web),
+                }
+                await db.online_stats_history.insert_one(online_point)
+            except Exception as oe:
+                logger.warning(f"⚠️ Error collecting online stats: {oe}")
+
+            # --- Сохраняем статистику Telegram-канала ---
+            try:
+                from config import get_telegram_bot_token
+                token = get_telegram_bot_token()
+                if token:
+                    async with httpx.AsyncClient(timeout=10) as hc:
+                        count_resp = await hc.get(
+                            f"https://api.telegram.org/bot{token}/getChatMemberCount",
+                            params={"chat_id": "@rudngo"}
+                        )
+                        count_data = count_resp.json()
+                        if count_data.get("ok"):
+                            channel_point = {
+                                "id": str(uuid.uuid4()),
+                                "timestamp": datetime.utcnow(),
+                                "channel": "@rudngo",
+                                "member_count": count_data["result"],
+                            }
+                            await db.channel_stats_history.insert_one(channel_point)
+            except Exception as ce:
+                logger.warning(f"⚠️ Error collecting channel stats: {ce}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Error collecting server metrics: {e}")
+        
+        await asyncio.sleep(60)
+
+
+@api_router.get("/admin/server-stats-history")
+async def get_server_stats_history(hours: int = 24):
+    """
+    История нагрузки сервера за указанный период.
+    Возвращает метрики + пиковые значения.
+    
+    Query params:
+    - hours: период в часах (1, 6, 24, 72, 168, 720, 0=всё). По умолчанию 24.
+    """
+    try:
+        if hours <= 0:
+            cutoff = datetime(2020, 1, 1)  # всё время
+        else:
+            cutoff = datetime.utcnow() - timedelta(hours=hours)
+        
+        cursor = db.server_metrics_history.find(
+            {"timestamp": {"$gte": cutoff}},
+            {"_id": 0}
+        ).sort("timestamp", 1)
+        
+        all_metrics = await cursor.to_list(length=None)
+        
+        if not all_metrics:
+            return {
+                "period_hours": hours,
+                "total_points": 0,
+                "metrics": [],
+                "peaks": None,
+                "averages": None,
+            }
+        
+        # Агрегируем данные для больших периодов (чтобы не отдавать тысячи точек)
+        if hours <= 1:
+            interval_minutes = 1
+        elif hours <= 6:
+            interval_minutes = 5
+        elif hours <= 24:
+            interval_minutes = 15
+        elif hours <= 168:
+            interval_minutes = 30
+        elif hours <= 720:
+            interval_minutes = 60
+        else:
+            interval_minutes = 180  # 3 часа для всего времени
+        
+        # Группируем по интервалам
+        aggregated = []
+        bucket_start = None
+        bucket_items = []
+        
+        for m in all_metrics:
+            ts = m["timestamp"]
+            bucket_key = ts.replace(
+                minute=(ts.minute // interval_minutes) * interval_minutes,
+                second=0, microsecond=0
+            )
+            
+            if bucket_start is None or bucket_key != bucket_start:
+                if bucket_items:
+                    aggregated.append(_aggregate_bucket(bucket_items, bucket_start))
+                bucket_start = bucket_key
+                bucket_items = [m]
+            else:
+                bucket_items.append(m)
+        
+        if bucket_items:
+            aggregated.append(_aggregate_bucket(bucket_items, bucket_start))
+        
+        # Пиковые нагрузки
+        peaks = {
+            "cpu": {"value": 0, "timestamp": None},
+            "ram": {"value": 0, "timestamp": None},
+            "disk": {"value": 0, "timestamp": None},
+            "load": {"value": 0, "timestamp": None},
+        }
+        
+        for m in all_metrics:
+            if m.get("cpu_percent", 0) > peaks["cpu"]["value"]:
+                peaks["cpu"]["value"] = m["cpu_percent"]
+                peaks["cpu"]["timestamp"] = m["timestamp"].isoformat()
+            if m.get("ram_percent", 0) > peaks["ram"]["value"]:
+                peaks["ram"]["value"] = m["ram_percent"]
+                peaks["ram"]["timestamp"] = m["timestamp"].isoformat()
+            if m.get("disk_percent", 0) > peaks["disk"]["value"]:
+                peaks["disk"]["value"] = m["disk_percent"]
+                peaks["disk"]["timestamp"] = m["timestamp"].isoformat()
+            load_val = m.get("load_1", 0)
+            if load_val > peaks["load"]["value"]:
+                peaks["load"]["value"] = load_val
+                peaks["load"]["timestamp"] = m["timestamp"].isoformat()
+        
+        # Средние значения
+        n = len(all_metrics)
+        averages = {
+            "cpu": round(sum(m.get("cpu_percent", 0) for m in all_metrics) / n, 1),
+            "ram": round(sum(m.get("ram_percent", 0) for m in all_metrics) / n, 1),
+            "disk": round(sum(m.get("disk_percent", 0) for m in all_metrics) / n, 1),
+        }
+        
+        return {
+            "period_hours": hours,
+            "total_points": len(aggregated),
+            "interval_minutes": interval_minutes,
+            "metrics": aggregated,
+            "peaks": peaks,
+            "averages": averages,
+        }
+    except Exception as e:
+        logger.error(f"Error getting server stats history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _aggregate_bucket(items, bucket_time):
+    """Агрегирует массив метрик в одну точку (среднее)"""
+    n = len(items)
+    return {
+        "timestamp": bucket_time.isoformat(),
+        "cpu_percent": round(sum(m.get("cpu_percent", 0) for m in items) / n, 1),
+        "ram_percent": round(sum(m.get("ram_percent", 0) for m in items) / n, 1),
+        "ram_used_gb": round(sum(m.get("ram_used_gb", 0) for m in items) / n, 2),
+        "disk_percent": round(sum(m.get("disk_percent", 0) for m in items) / n, 1),
+        "net_bytes_sent": max(m.get("net_bytes_sent", 0) for m in items),
+        "net_bytes_recv": max(m.get("net_bytes_recv", 0) for m in items),
+        "load_1": round(sum(m.get("load_1", 0) for m in items) / n, 2),
+        "load_5": round(sum(m.get("load_5", 0) for m in items) / n, 2),
+        "process_rss_mb": round(sum(m.get("process_rss_mb", 0) for m in items) / n, 2),
+    }
+
+
+# ============ Online Statistics History API ============
+
+@api_router.get("/admin/online-stats-history")
+async def get_online_stats_history(hours: int = 24):
+    """
+    История онлайн-пользователей за указанный период.
+    Данные хранятся БЕССРОЧНО.
+    
+    Query params:
+    - hours: период (1, 6, 24, 72, 168, 720, 0=всё). По умолчанию 24.
+    """
+    try:
+        if hours <= 0:
+            cutoff = datetime(2020, 1, 1)
+        else:
+            cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        cursor = db.online_stats_history.find(
+            {"timestamp": {"$gte": cutoff}},
+            {"_id": 0}
+        ).sort("timestamp", 1)
+
+        all_points = await cursor.to_list(length=None)
+
+        if not all_points:
+            return {
+                "period_hours": hours,
+                "total_points": 0,
+                "metrics": [],
+                "peaks": None,
+            }
+
+        # Агрегируем для больших периодов
+        if hours <= 1:
+            interval_minutes = 1
+        elif hours <= 6:
+            interval_minutes = 5
+        elif hours <= 24:
+            interval_minutes = 10
+        elif hours <= 168:
+            interval_minutes = 30
+        elif hours <= 720:
+            interval_minutes = 60
+        else:
+            interval_minutes = 180
+
+        aggregated = []
+        bucket_start = None
+        bucket_items = []
+
+        for m in all_points:
+            ts = m["timestamp"]
+            bucket_key = ts.replace(
+                minute=(ts.minute // interval_minutes) * interval_minutes,
+                second=0, microsecond=0
+            )
+            if bucket_start is None or bucket_key != bucket_start:
+                if bucket_items:
+                    aggregated.append(_aggregate_online_bucket(bucket_items, bucket_start))
+                bucket_start = bucket_key
+                bucket_items = [m]
+            else:
+                bucket_items.append(m)
+
+        if bucket_items:
+            aggregated.append(_aggregate_online_bucket(bucket_items, bucket_start))
+
+        # Пиковые значения
+        peak_online = max(all_points, key=lambda x: x.get("online_now", 0))
+
+        return {
+            "period_hours": hours,
+            "total_points": len(aggregated),
+            "interval_minutes": interval_minutes,
+            "metrics": aggregated,
+            "peaks": {
+                "online_now": {
+                    "value": peak_online.get("online_now", 0),
+                    "timestamp": peak_online["timestamp"].isoformat(),
+                },
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting online stats history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _aggregate_online_bucket(items, bucket_time):
+    """Агрегирует онлайн-метрики в одну точку (среднее / максимум)"""
+    n = len(items)
+    return {
+        "timestamp": bucket_time.isoformat(),
+        "online_now": round(sum(m.get("online_now", 0) for m in items) / n, 1),
+        "online_1h": round(sum(m.get("online_1h", 0) for m in items) / n, 1),
+        "online_24h": round(sum(m.get("online_24h", 0) for m in items) / n, 1),
+        "web_online": round(sum(m.get("web_online", 0) for m in items) / n, 1),
+        "telegram_online": round(sum(m.get("telegram_online", 0) for m in items) / n, 1),
+        "peak_online": max(m.get("online_now", 0) for m in items),
+    }
+
+
+# ============ API для ЛК РУДН (lk.rudn.ru) ============
+
+@api_router.post("/lk/connect", response_model=LKConnectionResponse)
+async def connect_lk(data: LKCredentialsRequest):
+    """
+    Подключение личного кабинета РУДН к аккаунту пользователя
+    
+    - Авторизуется через OAuth RUDN ID
+    - Парсит персональные данные из профиля
+    - Сохраняет зашифрованный пароль в БД для последующей синхронизации
+    """
+    logger.info(f"LK connect request for telegram_id={data.telegram_id}")
+    
+    parser = RUDNLKParser()
+    
+    try:
+        async with parser:
+            # Проверяем авторизацию
+            success = await parser.login(data.email, data.password)
+            
+            if not success:
+                logger.warning(f"LK login failed for {data.email}")
+                raise HTTPException(
+                    status_code=401, 
+                    detail="Неверный логин или пароль ЛК РУДН"
+                )
+            
+            # Получаем персональные данные
+            personal_data = await parser.get_personal_data()
+            
+            # Шифруем пароль для хранения
+            encrypted_password = parser.encrypt_password(data.password)
+            
+            # Сохраняем в БД
+            await db.user_settings.update_one(
+                {"telegram_id": data.telegram_id},
+                {
+                    "$set": {
+                        "lk_email": data.email,
+                        "lk_password_encrypted": encrypted_password,
+                        "lk_connected": True,
+                        "lk_last_sync": datetime.utcnow().isoformat(),
+                        "lk_personal_data": personal_data
+                    }
+                },
+                upsert=True
+            )
+            
+            logger.info(f"LK connected successfully for telegram_id={data.telegram_id}")
+            
+            return LKConnectionResponse(
+                success=True,
+                message="ЛК РУДН успешно подключен",
+                personal_data=LKPersonalData(**personal_data) if personal_data else None
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LK connect error: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка подключения ЛК: {str(e)}")
+
+
+@api_router.get("/lk/data/{telegram_id}", response_model=LKDataResponse)
+async def get_lk_data(telegram_id: int, refresh: bool = False):
+    """
+    Получение данных из ЛК РУДН
+    
+    - refresh=False: возвращает кэшированные данные из БД
+    - refresh=True: заново авторизуется и парсит актуальные данные
+    """
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    
+    if not user or not user.get("lk_connected"):
+        return LKDataResponse(
+            personal_data=None,
+            last_sync=None,
+            cached=False,
+            lk_connected=False
+        )
+    
+    if not refresh and user.get("lk_personal_data"):
+        return LKDataResponse(
+            personal_data=LKPersonalData(**user["lk_personal_data"]),
+            last_sync=user.get("lk_last_sync"),
+            cached=True,
+            lk_connected=True
+        )
+    
+    # Обновляем данные с сайта
+    parser = RUDNLKParser()
+    
+    try:
+        async with parser:
+            password = parser.decrypt_password(user["lk_password_encrypted"])
+            success = await parser.login(user["lk_email"], password)
+            
+            if not success:
+                # Пароль изменился или сессия истекла
+                await db.user_settings.update_one(
+                    {"telegram_id": telegram_id},
+                    {"$set": {"lk_connected": False}}
+                )
+                raise HTTPException(
+                    status_code=401, 
+                    detail="Сессия ЛК истекла. Переподключите аккаунт."
+                )
+            
+            personal_data = await parser.get_personal_data()
+            
+            # Обновляем кэш
+            now = datetime.utcnow().isoformat()
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {
+                    "$set": {
+                        "lk_last_sync": now,
+                        "lk_personal_data": personal_data
+                    }
+                }
+            )
+            
+            return LKDataResponse(
+                personal_data=LKPersonalData(**personal_data) if personal_data else None,
+                last_sync=now,
+                cached=False,
+                lk_connected=True
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LK refresh error: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка обновления данных ЛК: {str(e)}")
+
+
+@api_router.get("/lk/status/{telegram_id}", response_model=LKStatusResponse)
+async def get_lk_status(telegram_id: int):
+    """
+    Проверка статуса подключения ЛК РУДН
+    """
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    
+    if not user:
+        return LKStatusResponse(lk_connected=False)
+    
+    return LKStatusResponse(
+        lk_connected=user.get("lk_connected", False),
+        lk_email=user.get("lk_email"),
+        lk_last_sync=user.get("lk_last_sync")
+    )
+
+
+@api_router.delete("/lk/disconnect/{telegram_id}")
+async def disconnect_lk(telegram_id: int):
+    """
+    Отключение ЛК РУДН от аккаунта
+    
+    Удаляет сохранённые учётные данные и персональные данные
+    """
+    result = await db.user_settings.update_one(
+        {"telegram_id": telegram_id},
+        {
+            "$unset": {
+                "lk_email": "",
+                "lk_password_encrypted": "",
+                "lk_personal_data": ""
+            },
+            "$set": {
+                "lk_connected": False
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    logger.info(f"LK disconnected for telegram_id={telegram_id}")
+    
+    return {"success": True, "message": "ЛК РУДН отключен"}
+
+
+# ============ Экспорт/Импорт базы данных ============
+
+@api_router.get("/export/database")
+async def export_database():
+    """
+    Экспорт всей базы данных в JSON формате
+    Возвращает все коллекции с данными
+    """
+    try:
+        logger.info("Starting database export...")
+        
+        # Список коллекций для экспорта
+        collections_to_export = [
+            "user_settings",
+            "user_stats",
+            "user_achievements",
+            "tasks",
+            "rooms",
+            "room_participants",
+            "group_tasks"
+        ]
+        
+        export_data = {
+            "export_date": datetime.utcnow().isoformat(),
+            "database": "rudn_schedule",
+            "collections": {}
+        }
+        
+        # Экспортируем каждую коллекцию
+        for collection_name in collections_to_export:
+            try:
+                collection = db[collection_name]
+                documents = await collection.find().to_list(length=None)
+                
+                # Конвертируем ObjectId и datetime в строки
+                for doc in documents:
+                    if '_id' in doc:
+                        doc['_id'] = str(doc['_id'])
+                    for key, value in doc.items():
+                        if isinstance(value, datetime):
+                            doc[key] = value.isoformat()
+                
+                export_data["collections"][collection_name] = {
+                    "count": len(documents),
+                    "data": documents
+                }
+                
+                logger.info(f"Exported {len(documents)} documents from {collection_name}")
+            
+            except Exception as e:
+                logger.error(f"Error exporting collection {collection_name}: {e}")
+                export_data["collections"][collection_name] = {
+                    "count": 0,
+                    "data": [],
+                    "error": str(e)
+                }
+        
+        # Добавляем статистику
+        total_documents = sum(
+            col_data["count"] 
+            for col_data in export_data["collections"].values()
+        )
+        export_data["total_documents"] = total_documents
+        export_data["total_collections"] = len(collections_to_export)
+        
+        logger.info(f"Database export completed: {total_documents} documents from {len(collections_to_export)} collections")
+        
+        return JSONResponse(content=export_data)
+    
+    except Exception as e:
+        logger.error(f"Error during database export: {e}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+@api_router.get("/export/collection/{collection_name}")
+async def export_collection(collection_name: str):
+    """
+    Экспорт отдельной коллекции в JSON формате
+    """
+    try:
+        allowed_collections = [
+            "user_settings", "user_stats", "user_achievements",
+            "tasks", "rooms", "room_participants", "group_tasks"
+        ]
+        
+        if collection_name not in allowed_collections:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Collection not allowed. Allowed: {', '.join(allowed_collections)}"
+            )
+        
+        collection = db[collection_name]
+        documents = await collection.find().to_list(length=None)
+        
+        # Конвертируем ObjectId и datetime в строки
+        for doc in documents:
+            if '_id' in doc:
+                doc['_id'] = str(doc['_id'])
+            for key, value in doc.items():
+                if isinstance(value, datetime):
+                    doc[key] = value.isoformat()
+        
+        export_data = {
+            "collection": collection_name,
+            "export_date": datetime.utcnow().isoformat(),
+            "count": len(documents),
+            "data": documents
+        }
+        
+        logger.info(f"Exported {len(documents)} documents from {collection_name}")
+        
+        return JSONResponse(content=export_data)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting collection {collection_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/backup/stats")
+async def backup_stats():
+    """
+    Получить статистику базы данных для бэкапа
+    """
+    try:
+        collections = [
+            "user_settings", "user_stats", "user_achievements",
+            "tasks", "rooms", "room_participants", "group_tasks"
+        ]
+        
+        stats = {
+            "database": "rudn_schedule",
+            "timestamp": datetime.utcnow().isoformat(),
+            "collections": {}
+        }
+        
+        total_size = 0
+        total_documents = 0
+        
+        for collection_name in collections:
+            collection = db[collection_name]
+            count = await collection.count_documents({})
+            
+            stats["collections"][collection_name] = {
+                "documents": count
+            }
+            
+            total_documents += count
+        
+        stats["total_collections"] = len(collections)
+        stats["total_documents"] = total_documents
+        
+        return stats
+    
+    except Exception as e:
+        logger.error(f"Error getting backup stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ API для журнала посещений (Attendance Journal) ============
+
+@api_router.post("/journals", response_model=JournalResponse)
+async def create_journal(data: JournalCreate):
+    """Создать новый журнал посещений"""
+    try:
+        journal = AttendanceJournal(
+            name=data.name,
+            group_name=data.group_name,
+            description=data.description,
+            owner_id=data.telegram_id,
+            color=data.color
+        )
+        
+        journal_dict = journal.model_dump()
+        await db.attendance_journals.insert_one(journal_dict)
+        
+        logger.info(f"Journal created: {journal.journal_id} by user {data.telegram_id}")
+        
+        return JournalResponse(
+            **journal_dict,
+            total_students=0,
+            linked_students=0,
+            total_sessions=0,
+            is_owner=True
+        )
+    except Exception as e:
+        logger.error(f"Error creating journal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{telegram_id}", response_model=List[JournalResponse])
+async def get_user_journals(telegram_id: int):
+    """Получить все журналы пользователя (как владелец и как участник)"""
+    try:
+        journals = []
+        
+        # Журналы, где пользователь владелец
+        owned_journals = await db.attendance_journals.find(
+            {"owner_id": telegram_id}
+        ).to_list(100)
+        
+        for j in owned_journals:
+            total_students = await db.journal_students.count_documents({"journal_id": j["journal_id"]})
+            linked_students = await db.journal_students.count_documents({"journal_id": j["journal_id"], "is_linked": True})
+            total_sessions = await db.journal_sessions.count_documents({"journal_id": j["journal_id"]})
+            
+            journals.append(JournalResponse(
+                journal_id=j["journal_id"],
+                name=j["name"],
+                group_name=j["group_name"],
+                description=j.get("description"),
+                owner_id=j["owner_id"],
+                color=j.get("color", "purple"),
+                invite_token=j["invite_token"],
+                settings=JournalSettings(**j.get("settings", {})),
+                created_at=j["created_at"],
+                updated_at=j["updated_at"],
+                total_students=total_students,
+                linked_students=linked_students,
+                total_sessions=total_sessions,
+                is_owner=True
+            ))
+        
+        # Журналы, где пользователь участник (привязан к студенту)
+        linked_students = await db.journal_students.find(
+            {"telegram_id": telegram_id, "is_linked": True}
+        ).to_list(100)
+        
+        for ls in linked_students:
+            journal = await db.attendance_journals.find_one({"journal_id": ls["journal_id"]})
+            if journal and journal["owner_id"] != telegram_id:
+                total_students = await db.journal_students.count_documents({"journal_id": journal["journal_id"]})
+                linked_count = await db.journal_students.count_documents({"journal_id": journal["journal_id"], "is_linked": True})
+                total_sessions = await db.journal_sessions.count_documents({"journal_id": journal["journal_id"]})
+                
+                # Рассчитать личную посещаемость
+                my_attendance = await calculate_student_attendance(ls["id"], journal["journal_id"])
+                
+                journals.append(JournalResponse(
+                    journal_id=journal["journal_id"],
+                    name=journal["name"],
+                    group_name=journal["group_name"],
+                    description=journal.get("description"),
+                    owner_id=journal["owner_id"],
+                    color=journal.get("color", "purple"),
+                    invite_token=journal["invite_token"],
+                    settings=JournalSettings(**journal.get("settings", {})),
+                    created_at=journal["created_at"],
+                    updated_at=journal["updated_at"],
+                    total_students=total_students,
+                    linked_students=linked_count,
+                    total_sessions=total_sessions,
+                    is_owner=False,
+                    my_attendance_percent=my_attendance
+                ))
+        
+        # Также добавить журналы где пользователь в pending (ожидает привязки)
+        pending = await db.journal_pending_members.find(
+            {"telegram_id": telegram_id, "is_linked": False}
+        ).to_list(100)
+        
+        for p in pending:
+            journal = await db.attendance_journals.find_one({"journal_id": p["journal_id"]})
+            if journal and journal["owner_id"] != telegram_id:
+                # Проверить что журнал не уже добавлен
+                if not any(jj.journal_id == journal["journal_id"] for jj in journals):
+                    total_students = await db.journal_students.count_documents({"journal_id": journal["journal_id"]})
+                    linked_count = await db.journal_students.count_documents({"journal_id": journal["journal_id"], "is_linked": True})
+                    total_sessions = await db.journal_sessions.count_documents({"journal_id": journal["journal_id"]})
+                    
+                    journals.append(JournalResponse(
+                        journal_id=journal["journal_id"],
+                        name=journal["name"],
+                        group_name=journal["group_name"],
+                        description=journal.get("description"),
+                        owner_id=journal["owner_id"],
+                        color=journal.get("color", "purple"),
+                        invite_token=journal["invite_token"],
+                        settings=JournalSettings(**journal.get("settings", {})),
+                        created_at=journal["created_at"],
+                        updated_at=journal["updated_at"],
+                        total_students=total_students,
+                        linked_students=linked_count,
+                        total_sessions=total_sessions,
+                        is_owner=False,
+                        my_attendance_percent=None  # Ещё не привязан
+                    ))
+        
+        return journals
+    except Exception as e:
+        logger.error(f"Error getting user journals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def calculate_student_attendance(student_id: str, journal_id: str) -> Optional[float]:
+    """Рассчитать процент посещаемости студента"""
+    try:
+        total_sessions = await db.journal_sessions.count_documents({"journal_id": journal_id})
+        if total_sessions == 0:
+            return None
+        
+        # Проверяем, был ли студент отмечен хотя бы раз
+        total_records = await db.attendance_records.count_documents({
+            "student_id": student_id,
+            "journal_id": journal_id
+        })
+        
+        # Если студент ни разу не был отмечен - не показываем процент
+        if total_records == 0:
+            return None
+        
+        present_count = await db.attendance_records.count_documents({
+            "student_id": student_id,
+            "journal_id": journal_id,
+            "status": {"$in": ["present", "late"]}
+        })
+        
+        return round((present_count / total_sessions) * 100, 1)
+    except:
+        return None
+
+
+@api_router.get("/journals/detail/{journal_id}")
+async def get_journal_detail(journal_id: str, telegram_id: int = 0):
+    """Получить детальную информацию о журнале"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        total_students = await db.journal_students.count_documents({"journal_id": journal_id})
+        linked_students = await db.journal_students.count_documents({"journal_id": journal_id, "is_linked": True})
+        total_sessions = await db.journal_sessions.count_documents({"journal_id": journal_id})
+        
+        is_owner = journal["owner_id"] == telegram_id
+        stats_viewers = journal.get("stats_viewers", [])
+        can_view_stats = is_owner or telegram_id in stats_viewers
+        my_attendance = None
+        is_linked = False
+        
+        if not is_owner and telegram_id > 0:
+            student = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": telegram_id,
+                "is_linked": True
+            })
+            if student:
+                is_linked = True
+                my_attendance = await calculate_student_attendance(student["id"], journal_id)
+        
+        return JournalResponse(
+            journal_id=journal["journal_id"],
+            name=journal["name"],
+            group_name=journal["group_name"],
+            description=journal.get("description"),
+            owner_id=journal["owner_id"],
+            color=journal.get("color", "purple"),
+            invite_token=journal["invite_token"],
+            settings=JournalSettings(**journal.get("settings", {})),
+            stats_viewers=stats_viewers,
+            created_at=journal["created_at"],
+            updated_at=journal["updated_at"],
+            total_students=total_students,
+            linked_students=linked_students,
+            total_sessions=total_sessions,
+            is_owner=is_owner,
+            can_view_stats=can_view_stats,
+            is_linked=is_linked,
+            my_attendance_percent=my_attendance
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting journal detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/journals/{journal_id}")
+async def update_journal(journal_id: str, data: dict = Body(...)):
+    """Обновить журнал"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        update_data = {"updated_at": datetime.utcnow()}
+        if "name" in data:
+            update_data["name"] = data["name"]
+        if "group_name" in data:
+            update_data["group_name"] = data["group_name"]
+        if "description" in data:
+            update_data["description"] = data["description"]
+        if "color" in data:
+            update_data["color"] = data["color"]
+        if "settings" in data:
+            update_data["settings"] = data["settings"]
+        if "stats_viewers" in data:
+            # stats_viewers - список telegram_id пользователей с правом видеть статистику
+            update_data["stats_viewers"] = data["stats_viewers"]
+        
+        await db.attendance_journals.update_one(
+            {"journal_id": journal_id},
+            {"$set": update_data}
+        )
+        
+        return {"status": "success", "journal_id": journal_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating journal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/journals/{journal_id}")
+async def delete_journal(journal_id: str, telegram_id: int):
+    """Удалить журнал (только владелец)"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        if journal["owner_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Only owner can delete journal")
+        
+        # Удалить все связанные данные
+        await db.attendance_journals.delete_one({"journal_id": journal_id})
+        await db.journal_students.delete_many({"journal_id": journal_id})
+        await db.journal_sessions.delete_many({"journal_id": journal_id})
+        await db.attendance_records.delete_many({"journal_id": journal_id})
+        await db.journal_pending_members.delete_many({"journal_id": journal_id})
+        
+        logger.info(f"Journal deleted: {journal_id}")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting journal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/leave")
+async def leave_journal(journal_id: str, telegram_id: int):
+    """Выйти из журнала (для студентов, не владельцев)"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Владелец не может выйти из своего журнала
+        if journal["owner_id"] == telegram_id:
+            raise HTTPException(status_code=403, detail="Owner cannot leave their journal. Delete it instead.")
+        
+        # Найти студента, привязанного к этому telegram_id
+        student = await db.journal_students.find_one({
+            "journal_id": journal_id,
+            "telegram_id": telegram_id
+        })
+        
+        if student:
+            # Отвязать студента (но не удалять запись - только сбросить привязку)
+            await db.journal_students.update_one(
+                {"id": student["id"]},
+                {"$set": {"telegram_id": None, "is_linked": False, "username": None, "first_name": None}}
+            )
+        
+        # Удалить из ожидающих привязки
+        await db.journal_pending_members.delete_many({
+            "journal_id": journal_id,
+            "telegram_id": telegram_id
+        })
+        
+        # Удалить из stats_viewers если был там
+        if telegram_id in journal.get("stats_viewers", []):
+            new_viewers = [v for v in journal.get("stats_viewers", []) if v != telegram_id]
+            await db.attendance_journals.update_one(
+                {"journal_id": journal_id},
+                {"$set": {"stats_viewers": new_viewers}}
+            )
+        
+        logger.info(f"User {telegram_id} left journal: {journal_id}")
+        return {"status": "success", "message": "Successfully left the journal"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error leaving journal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/invite-link", response_model=JournalInviteLinkResponse)
+async def generate_journal_invite_link(journal_id: str):
+    """Сгенерировать пригласительную ссылку"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получаем имя бота из конфига (зависит от ENV)
+        # Username бота определяется динамически через getMe
+        bot_username = get_telegram_bot_username()
+        # Старый формат через /start
+        invite_link = f"https://t.me/{bot_username}?start=journal_{journal['invite_token']}"
+        # Новый формат через Web App
+        invite_link_webapp = f"https://t.me/{bot_username}/app?startapp=journal_{journal['invite_token']}"
+        
+        return JournalInviteLinkResponse(
+            invite_link=invite_link,
+            invite_link_webapp=invite_link_webapp,
+            invite_token=journal["invite_token"],
+            journal_id=journal_id,
+            bot_username=bot_username
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating invite link: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/join/{invite_token}")
+async def join_journal(invite_token: str, data: JournalJoinRequest):
+    """Присоединиться к журналу по приглашению"""
+    try:
+        journal = await db.attendance_journals.find_one({"invite_token": invite_token})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Invalid invite link")
+        
+        is_new_member = True
+        
+        # Проверить, не владелец ли это
+        if journal["owner_id"] == data.telegram_id:
+            is_new_member = False
+            # Логируем событие даже для владельца (переход по собственной ссылке)
+            referral_event = ReferralEvent(
+                event_type="journal_join",
+                telegram_id=data.telegram_id,
+                referrer_id=data.referrer_id,
+                target_id=journal["journal_id"],
+                target_name=journal.get("name", ""),
+                invite_token=invite_token,
+                is_new_member=False
+            )
+            await db.referral_events.insert_one(referral_event.model_dump())
+            return {"status": "success", "message": "You are the owner", "journal_id": journal["journal_id"]}
+        
+        # Проверить, не привязан ли уже
+        existing_link = await db.journal_students.find_one({
+            "journal_id": journal["journal_id"],
+            "telegram_id": data.telegram_id,
+            "is_linked": True
+        })
+        if existing_link:
+            is_new_member = False
+            # Логируем событие даже для уже привязанного пользователя
+            referral_event = ReferralEvent(
+                event_type="journal_join",
+                telegram_id=data.telegram_id,
+                referrer_id=data.referrer_id,
+                target_id=journal["journal_id"],
+                target_name=journal.get("name", ""),
+                invite_token=invite_token,
+                is_new_member=False
+            )
+            await db.referral_events.insert_one(referral_event.model_dump())
+            return {"status": "success", "message": "Already linked", "journal_id": journal["journal_id"]}
+        
+        # Проверить, не в pending ли уже
+        existing_pending = await db.journal_pending_members.find_one({
+            "journal_id": journal["journal_id"],
+            "telegram_id": data.telegram_id
+        })
+        if existing_pending:
+            is_new_member = False
+            # Логируем событие даже для уже ожидающего пользователя
+            referral_event = ReferralEvent(
+                event_type="journal_join",
+                telegram_id=data.telegram_id,
+                referrer_id=data.referrer_id,
+                target_id=journal["journal_id"],
+                target_name=journal.get("name", ""),
+                invite_token=invite_token,
+                is_new_member=False
+            )
+            await db.referral_events.insert_one(referral_event.model_dump())
+            return {"status": "success", "message": "Waiting for linking", "journal_id": journal["journal_id"]}
+        
+        # Добавить в pending
+        pending = JournalPendingMember(
+            journal_id=journal["journal_id"],
+            telegram_id=data.telegram_id,
+            username=data.username,
+            first_name=data.first_name
+        )
+        await db.journal_pending_members.insert_one(pending.model_dump())
+        
+        # Логируем реферальное событие (новый участник)
+        referral_event = ReferralEvent(
+            event_type="journal_join",
+            telegram_id=data.telegram_id,
+            referrer_id=data.referrer_id,
+            target_id=journal["journal_id"],
+            target_name=journal.get("name", ""),
+            invite_token=invite_token,
+            is_new_member=True
+        )
+        await db.referral_events.insert_one(referral_event.model_dump())
+        logger.info(f"Referral event logged: journal_join, user={data.telegram_id}, referrer={data.referrer_id}, journal={journal['journal_id']}")
+        
+        logger.info(f"User {data.telegram_id} joined journal {journal['journal_id']} (pending)")
+        return {"status": "success", "message": "Joined, waiting for linking", "journal_id": journal["journal_id"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error joining journal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/join-student/{invite_code}")
+async def join_journal_by_student_link(invite_code: str, data: JoinStudentRequest):
+    """Присоединиться к журналу по персональной ссылке студента"""
+    try:
+        # Найти студента по invite_code
+        student = await db.journal_students.find_one({"invite_code": invite_code})
+        if not student:
+            raise HTTPException(status_code=404, detail="Invalid student invite link")
+        
+        journal_id = student["journal_id"]
+        
+        # Найти журнал
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Владелец (староста) тоже может привязать себя к студенту
+        # Это нужно для случаев когда староста также является студентом группы
+        is_owner = journal["owner_id"] == data.telegram_id
+        
+        # Проверить, не привязан ли уже этот студент к другому Telegram
+        if student.get("is_linked") and student.get("telegram_id") != data.telegram_id:
+            return {
+                "status": "occupied",
+                "message": f"Место для «{student['full_name']}» уже занято другим пользователем",
+                "journal_id": journal_id,
+                "student_name": student["full_name"]
+            }
+        
+        # Проверить, не привязан ли уже этот пользователь к другому студенту в этом журнале
+        existing_link = await db.journal_students.find_one({
+            "journal_id": journal_id,
+            "telegram_id": data.telegram_id,
+            "is_linked": True
+        })
+        if existing_link and existing_link["id"] != student["id"]:
+            return {
+                "status": "already_linked",
+                "message": f"Вы уже привязаны как «{existing_link['full_name']}» в этом журнале",
+                "journal_id": journal_id,
+                "student_name": existing_link["full_name"]
+            }
+        
+        # Если уже привязан к этому же студенту
+        if student.get("is_linked") and student.get("telegram_id") == data.telegram_id:
+            return {
+                "status": "success",
+                "message": f"Вы уже привязаны как «{student['full_name']}»",
+                "journal_id": journal_id,
+                "student_name": student["full_name"]
+            }
+        
+        # Привязать пользователя к студенту
+        from datetime import datetime
+        await db.journal_students.update_one(
+            {"id": student["id"]},
+            {"$set": {
+                "telegram_id": data.telegram_id,
+                "username": data.username,
+                "first_name": data.first_name,
+                "is_linked": True,
+                "linked_at": datetime.utcnow()
+            }}
+        )
+        
+        # Удалить из pending если был там
+        await db.journal_pending_members.delete_many({
+            "journal_id": journal_id,
+            "telegram_id": data.telegram_id
+        })
+        
+        logger.info(f"✅ User {data.telegram_id} linked to student '{student['full_name']}' in journal {journal_id}")
+        return {
+            "status": "success",
+            "message": f"Вы успешно привязаны как «{student['full_name']}»",
+            "journal_id": journal_id,
+            "student_name": student["full_name"],
+            "journal_name": journal.get("name", "Журнал")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error joining journal by student link: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/process-webapp-invite")
+async def process_journal_webapp_invite(data: ProcessJournalInviteRequest):
+    """
+    Обработать приглашение в журнал через Web App.
+    Вызывается при открытии приложения по ссылке:
+    - t.me/bot/app?startapp=journal_{invite_token}
+    - t.me/bot/app?startapp=jstudent_{invite_code}
+    """
+    try:
+        logger.info(f"📚 Обработка приглашения в журнал через Web App: type={data.invite_type}, code={data.invite_code}")
+        
+        if data.invite_type == "journal":
+            # Обработка общего приглашения в журнал
+            journal = await db.attendance_journals.find_one({"invite_token": data.invite_code})
+            if not journal:
+                return {
+                    "success": False,
+                    "status": "not_found",
+                    "message": "Журнал не найден или ссылка недействительна"
+                }
+            
+            journal_id = journal["journal_id"]
+            journal_name = journal.get("name", "Журнал")
+            
+            # Проверить, не владелец ли это
+            if journal["owner_id"] == data.telegram_id:
+                return {
+                    "success": True,
+                    "status": "owner",
+                    "message": f"Вы являетесь старостой журнала «{journal_name}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name
+                }
+            
+            # Проверить, не привязан ли уже
+            existing_link = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id,
+                "is_linked": True
+            })
+            if existing_link:
+                return {
+                    "success": True,
+                    "status": "already_linked",
+                    "message": f"Вы уже в журнале «{journal_name}» как «{existing_link['full_name']}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": existing_link['full_name']
+                }
+            
+            # Проверить, не подана ли уже заявка
+            existing_application = await db.journal_applications.find_one({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id,
+                "status": "pending"
+            })
+            if existing_application:
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "message": f"Ваша заявка на вступление в журнал «{journal_name}» ожидает рассмотрения старостой",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name
+                }
+            
+            # Создаём заявку на вступление
+            application = JournalJoinApplication(
+                journal_id=journal_id,
+                telegram_id=data.telegram_id,
+                username=data.username,
+                first_name=data.first_name,
+                last_name=data.last_name
+            )
+            await db.journal_applications.insert_one(application.model_dump())
+            
+            # Отправляем уведомление старосте
+            owner_id = journal["owner_id"]
+            applicant_name = data.first_name or data.username or f"User {data.telegram_id}"
+            if data.last_name:
+                applicant_name = f"{data.first_name} {data.last_name}"
+            
+            await create_notification(
+                telegram_id=owner_id,
+                notification_type=NotificationType.JOURNAL_INVITE,
+                category=NotificationCategory.JOURNAL,
+                priority=NotificationPriority.HIGH,
+                title="Новая заявка в журнал!",
+                message=f'<tg-emoji emoji-id="5258241049318418940">👤</tg-emoji> {applicant_name} хочет присоединиться к журналу «{journal_name}»',
+                emoji='<tg-emoji emoji-id="5454157610318063266">📋</tg-emoji>',
+                data={
+                    "application_id": application.id,
+                    "journal_id": journal_id,
+                    "applicant_telegram_id": data.telegram_id,
+                    "applicant_name": applicant_name,
+                    "applicant_username": data.username
+                },
+                actions=[
+                    {"id": "view_application", "label": "Просмотреть", "type": "primary"}
+                ]
+            )
+            
+            logger.info(f"📝 User {data.telegram_id} applied to journal '{journal_name}'")
+            return {
+                "success": True,
+                "status": "application_sent",
+                "message": f"Заявка на вступление в журнал «{journal_name}» отправлена! Ожидайте подтверждения от старосты.",
+                "journal_id": journal_id,
+                "journal_name": journal_name
+            }
+        
+        elif data.invite_type == "jstudent":
+            # Обработка персональной ссылки студента
+            student = await db.journal_students.find_one({"invite_code": data.invite_code})
+            if not student:
+                return {
+                    "success": False,
+                    "status": "not_found",
+                    "message": "Персональная ссылка недействительна"
+                }
+            
+            journal_id = student["journal_id"]
+            journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+            if not journal:
+                return {
+                    "success": False,
+                    "status": "not_found",
+                    "message": "Журнал не найден"
+                }
+            
+            journal_name = journal.get("name", "Журнал")
+            student_name = student["full_name"]
+            
+            # Владелец (староста) тоже может привязать себя к студенту
+            # Это нужно для случаев когда староста также является студентом группы
+            is_owner = journal["owner_id"] == data.telegram_id
+            
+            # Проверить, не занято ли место
+            if student.get("is_linked") and student.get("telegram_id") != data.telegram_id:
+                return {
+                    "success": False,
+                    "status": "occupied",
+                    "message": f"Место «{student_name}» уже занято другим пользователем",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": student_name
+                }
+            
+            # Проверить, не привязан ли пользователь к другому студенту
+            existing_link = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id,
+                "is_linked": True
+            })
+            if existing_link and existing_link["id"] != student["id"]:
+                return {
+                    "success": False,
+                    "status": "already_linked_other",
+                    "message": f"Вы уже привязаны как «{existing_link['full_name']}» в этом журнале",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": existing_link["full_name"]
+                }
+            
+            # Если уже привязан к этому студенту
+            if student.get("is_linked") and student.get("telegram_id") == data.telegram_id:
+                return {
+                    "success": True,
+                    "status": "already_linked",
+                    "message": f"Вы уже привязаны как «{student_name}»",
+                    "journal_id": journal_id,
+                    "journal_name": journal_name,
+                    "student_name": student_name
+                }
+            
+            # Привязать пользователя к студенту
+            await db.journal_students.update_one(
+                {"id": student["id"]},
+                {"$set": {
+                    "telegram_id": data.telegram_id,
+                    "username": data.username,
+                    "first_name": data.first_name,
+                    "is_linked": True,
+                    "linked_at": datetime.utcnow()
+                }}
+            )
+            
+            # Удалить из pending если был там
+            await db.journal_pending_members.delete_many({
+                "journal_id": journal_id,
+                "telegram_id": data.telegram_id
+            })
+            
+            logger.info(f"✅ User {data.telegram_id} linked to student '{student_name}' in journal '{journal_name}' via Web App")
+            return {
+                "success": True,
+                "status": "linked",
+                "message": f"Вы успешно привязаны как «{student_name}» в журнале «{journal_name}»!",
+                "journal_id": journal_id,
+                "journal_name": journal_name,
+                "student_name": student_name
+            }
+        
+        else:
+            return {
+                "success": False,
+                "status": "invalid_type",
+                "message": "Неизвестный тип приглашения"
+            }
+    
+    except Exception as e:
+        logger.error(f"❌ Error processing journal webapp invite: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== Студенты в журнале =====
+
+@api_router.post("/journals/{journal_id}/students", response_model=JournalStudentResponse)
+async def add_student(journal_id: str, data: JournalStudentCreate):
+    """Добавить студента в журнал"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получить максимальный order
+        max_order_student = await db.journal_students.find_one(
+            {"journal_id": journal_id},
+            sort=[("order", -1)]
+        )
+        next_order = (max_order_student["order"] + 1) if max_order_student else 0
+        
+        student = JournalStudent(
+            journal_id=journal_id,
+            full_name=data.full_name,
+            order=next_order
+        )
+        await db.journal_students.insert_one(student.model_dump())
+        
+        # Генерируем ссылки для студента
+        # Получаем имя бота из конфига (зависит от ENV)
+        bot_username = get_telegram_bot_username()
+        invite_link = f"https://t.me/{bot_username}?start=jstudent_{student.invite_code}"
+        invite_link_webapp = f"https://t.me/{bot_username}/app?startapp=jstudent_{student.invite_code}"
+        
+        return JournalStudentResponse(
+            id=student.id,
+            journal_id=student.journal_id,
+            full_name=student.full_name,
+            telegram_id=None,
+            username=None,
+            first_name=None,
+            is_linked=False,
+            linked_at=None,
+            order=student.order,
+            invite_code=student.invite_code,
+            invite_link=invite_link,
+            invite_link_webapp=invite_link_webapp
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/students/bulk")
+async def add_students_bulk(journal_id: str, data: JournalStudentBulkCreate):
+    """Массовое добавление студентов"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получить максимальный order
+        max_order_student = await db.journal_students.find_one(
+            {"journal_id": journal_id},
+            sort=[("order", -1)]
+        )
+        next_order = (max_order_student["order"] + 1) if max_order_student else 0
+        
+        added = []
+        for i, name in enumerate(data.names):
+            name = name.strip()
+            if not name:
+                continue
+            
+            student = JournalStudent(
+                journal_id=journal_id,
+                full_name=name,
+                order=next_order + i
+            )
+            await db.journal_students.insert_one(student.model_dump())
+            added.append(student.full_name)
+        
+        return {"status": "success", "added_count": len(added), "names": added}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding students bulk: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/students/from-friends")
+async def add_students_from_friends(journal_id: str, data: JournalStudentsFromFriendsCreate):
+    """Добавить друзей как студентов журнала с автоматической привязкой"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получить максимальный order
+        max_order_student = await db.journal_students.find_one(
+            {"journal_id": journal_id},
+            sort=[("order", -1)]
+        )
+        next_order = (max_order_student["order"] + 1) if max_order_student else 0
+        
+        added = []
+        skipped = []
+        
+        for i, friend in enumerate(data.friends):
+            # Проверяем, не добавлен ли уже этот telegram_id
+            existing = await db.journal_students.find_one({
+                "journal_id": journal_id,
+                "telegram_id": friend.telegram_id
+            })
+            
+            if existing:
+                skipped.append(friend.full_name)
+                continue
+            
+            # Создаем студента с автоматической привязкой
+            student = JournalStudent(
+                journal_id=journal_id,
+                full_name=friend.full_name,
+                telegram_id=friend.telegram_id,
+                username=friend.username,
+                first_name=friend.first_name,
+                is_linked=True,
+                linked_at=datetime.utcnow(),
+                order=next_order + i
+            )
+            await db.journal_students.insert_one(student.model_dump())
+            added.append({
+                "full_name": friend.full_name,
+                "telegram_id": friend.telegram_id
+            })
+            
+            # Удаляем из pending если был
+            await db.journal_pending_members.delete_many({
+                "journal_id": journal_id,
+                "telegram_id": friend.telegram_id
+            })
+        
+        return {
+            "status": "success", 
+            "added_count": len(added), 
+            "skipped_count": len(skipped),
+            "added": added,
+            "skipped": skipped
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding students from friends: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== Заявки на вступление в журнал =====
+
+@api_router.get("/journals/{journal_id}/applications")
+async def get_journal_applications(journal_id: str, telegram_id: int):
+    """Получить список заявок на вступление в журнал (только для владельца)"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Проверяем что это владелец
+        if journal["owner_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Только староста может просматривать заявки")
+        
+        applications = await db.journal_applications.find({
+            "journal_id": journal_id,
+            "status": "pending"
+        }).sort("created_at", -1).to_list(100)
+        
+        result = []
+        for app in applications:
+            result.append({
+                "id": app["id"],
+                "telegram_id": app["telegram_id"],
+                "username": app.get("username"),
+                "first_name": app.get("first_name"),
+                "last_name": app.get("last_name"),
+                "full_name": f"{app.get('first_name', '')} {app.get('last_name', '')}".strip() or app.get("username") or f"User {app['telegram_id']}",
+                "telegram_link": f"tg://user?id={app['telegram_id']}",
+                "created_at": app["created_at"].isoformat() if app.get("created_at") else None,
+                "status": app["status"]
+            })
+        
+        return {
+            "applications": result,
+            "total": len(result)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting journal applications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/applications/{application_id}/process")
+async def process_journal_application(application_id: str, data: ProcessJournalApplicationRequest):
+    """Обработать заявку на вступление в журнал"""
+    try:
+        # Находим заявку
+        application = await db.journal_applications.find_one({"id": application_id})
+        if not application:
+            raise HTTPException(status_code=404, detail="Заявка не найдена")
+        
+        if application["status"] != "pending":
+            raise HTTPException(status_code=400, detail="Заявка уже обработана")
+        
+        journal_id = application["journal_id"]
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Журнал не найден")
+        
+        # Проверяем что это владелец
+        if journal["owner_id"] != data.owner_telegram_id:
+            raise HTTPException(status_code=403, detail="Только староста может обрабатывать заявки")
+        
+        applicant_telegram_id = application["telegram_id"]
+        applicant_name = f"{application.get('first_name', '')} {application.get('last_name', '')}".strip()
+        if not applicant_name:
+            applicant_name = application.get("username") or f"User {applicant_telegram_id}"
+        
+        if data.action == "approve":
+            if not data.student_id:
+                raise HTTPException(status_code=400, detail="Не выбран студент для привязки")
+            
+            # Проверяем что студент существует и не привязан
+            student = await db.journal_students.find_one({
+                "id": data.student_id,
+                "journal_id": journal_id
+            })
+            if not student:
+                raise HTTPException(status_code=404, detail="Студент не найден")
+            
+            if student.get("is_linked") and student.get("telegram_id") != applicant_telegram_id:
+                raise HTTPException(status_code=400, detail="Этот студент уже привязан к другому пользователю")
+            
+            # Привязываем студента
+            await db.journal_students.update_one(
+                {"id": data.student_id},
+                {
+                    "$set": {
+                        "telegram_id": applicant_telegram_id,
+                        "is_linked": True,
+                        "linked_at": datetime.utcnow(),
+                        "username": application.get("username"),
+                        "first_name": application.get("first_name")
+                    }
+                }
+            )
+            
+            # Обновляем статус заявки
+            await db.journal_applications.update_one(
+                {"id": application_id},
+                {
+                    "$set": {
+                        "status": "approved",
+                        "processed_at": datetime.utcnow(),
+                        "linked_student_id": data.student_id
+                    }
+                }
+            )
+            
+            # Уведомляем заявителя
+            await create_notification(
+                telegram_id=applicant_telegram_id,
+                notification_type=NotificationType.JOURNAL_ATTENDANCE,
+                category=NotificationCategory.JOURNAL,
+                priority=NotificationPriority.HIGH,
+                title="Заявка одобрена!",
+                message=f"Вы добавлены в журнал «{journal.get('name', 'Журнал')}» как «{student['full_name']}»",
+                emoji="",
+                data={
+                    "journal_id": journal_id,
+                    "student_id": data.student_id,
+                    "student_name": student['full_name']
+                }
+            )
+            
+            logger.info(f"✅ Application {application_id} approved: user {applicant_telegram_id} linked to student '{student['full_name']}'")
+            
+            return {
+                "status": "success",
+                "message": f"Заявка одобрена. {applicant_name} привязан к «{student['full_name']}»",
+                "student_name": student['full_name']
+            }
+        
+        elif data.action == "reject":
+            # Отклоняем заявку
+            await db.journal_applications.update_one(
+                {"id": application_id},
+                {
+                    "$set": {
+                        "status": "rejected",
+                        "processed_at": datetime.utcnow()
+                    }
+                }
+            )
+            
+            # Уведомляем заявителя
+            await create_notification(
+                telegram_id=applicant_telegram_id,
+                notification_type=NotificationType.JOURNAL_ATTENDANCE,
+                category=NotificationCategory.JOURNAL,
+                priority=NotificationPriority.NORMAL,
+                title="Заявка отклонена",
+                message=f"Ваша заявка на вступление в журнал «{journal.get('name', 'Журнал')}» была отклонена",
+                emoji="",
+                data={"journal_id": journal_id}
+            )
+            
+            logger.info(f"❌ Application {application_id} rejected for user {applicant_telegram_id}")
+            
+            return {
+                "status": "success",
+                "message": "Заявка отклонена"
+            }
+        
+        else:
+            raise HTTPException(status_code=400, detail="Неверное действие. Используйте 'approve' или 'reject'")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing journal application: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/students", response_model=List[JournalStudentResponse])
+async def get_journal_students(journal_id: str):
+    """Получить список студентов журнала"""
+    try:
+        students = await db.journal_students.find(
+            {"journal_id": journal_id}
+        ).sort("order", 1).to_list(200)
+        
+        total_sessions = await db.journal_sessions.count_documents({"journal_id": journal_id})
+        
+        result = []
+        # Получаем имя бота из конфига (зависит от ENV)
+        bot_username = get_telegram_bot_username()
+        for s in students:
+            # Рассчитать статистику посещаемости
+            present_count = await db.attendance_records.count_documents({
+                "student_id": s["id"], "status": "present"
+            })
+            absent_count = await db.attendance_records.count_documents({
+                "student_id": s["id"], "status": "absent"
+            })
+            excused_count = await db.attendance_records.count_documents({
+                "student_id": s["id"], "status": "excused"
+            })
+            late_count = await db.attendance_records.count_documents({
+                "student_id": s["id"], "status": "late"
+            })
+            
+            # Рассчитать статистику оценок
+            grades_pipeline = [
+                {"$match": {"student_id": s["id"], "grade": {"$ne": None}}},
+                {"$group": {
+                    "_id": None,
+                    "count": {"$sum": 1},
+                    "sum": {"$sum": "$grade"},
+                    "grade_5": {"$sum": {"$cond": [{"$eq": ["$grade", 5]}, 1, 0]}},
+                    "grade_4": {"$sum": {"$cond": [{"$eq": ["$grade", 4]}, 1, 0]}},
+                    "grade_3": {"$sum": {"$cond": [{"$eq": ["$grade", 3]}, 1, 0]}},
+                    "grade_2": {"$sum": {"$cond": [{"$eq": ["$grade", 2]}, 1, 0]}},
+                    "grade_1": {"$sum": {"$cond": [{"$eq": ["$grade", 1]}, 1, 0]}}
+                }}
+            ]
+            grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+            
+            average_grade = None
+            grades_count = 0
+            grade_5_count = grade_4_count = grade_3_count = grade_2_count = grade_1_count = 0
+            
+            if grades_result:
+                g = grades_result[0]
+                grades_count = g["count"]
+                if grades_count > 0:
+                    average_grade = round(g["sum"] / grades_count, 2)
+                grade_5_count = g["grade_5"]
+                grade_4_count = g["grade_4"]
+                grade_3_count = g["grade_3"]
+                grade_2_count = g["grade_2"]
+                grade_1_count = g["grade_1"]
+            
+            attendance_percent = None
+            # Общее количество записей для этого студента (был ли он вообще отмечен)
+            total_records = present_count + absent_count + excused_count + late_count
+            
+            # Показываем процент только если есть занятия И студент был отмечен хотя бы раз
+            if total_sessions > 0 and total_records > 0:
+                attended = present_count + late_count
+                attendance_percent = round((attended / total_sessions) * 100, 1)
+            
+            # Генерируем invite_code если его нет (для старых студентов)
+            invite_code = s.get("invite_code")
+            if not invite_code:
+                invite_code = str(uuid.uuid4())[:8]
+                await db.journal_students.update_one(
+                    {"id": s["id"]},
+                    {"$set": {"invite_code": invite_code}}
+                )
+            
+            # Генерируем ссылки
+            invite_link = f"https://t.me/{bot_username}?start=jstudent_{invite_code}"
+            invite_link_webapp = f"https://t.me/{bot_username}/app?startapp=jstudent_{invite_code}"
+            
+            result.append(JournalStudentResponse(
+                id=s["id"],
+                journal_id=s["journal_id"],
+                full_name=s["full_name"],
+                telegram_id=s.get("telegram_id"),
+                username=s.get("username"),
+                first_name=s.get("first_name"),
+                is_linked=s.get("is_linked", False),
+                linked_at=s.get("linked_at"),
+                order=s.get("order", 0),
+                invite_code=invite_code,
+                invite_link=invite_link,
+                invite_link_webapp=invite_link_webapp,
+                attendance_percent=attendance_percent,
+                present_count=present_count,
+                absent_count=absent_count,
+                excused_count=excused_count,
+                late_count=late_count,
+                total_sessions=total_sessions,
+                average_grade=average_grade,
+                grades_count=grades_count,
+                grade_5_count=grade_5_count,
+                grade_4_count=grade_4_count,
+                grade_3_count=grade_3_count,
+                grade_2_count=grade_2_count,
+                grade_1_count=grade_1_count
+            ))
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error getting students: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/journals/{journal_id}/students/{student_id}")
+async def update_student(journal_id: str, student_id: str, data: dict = Body(...)):
+    """Обновить студента"""
+    try:
+        student = await db.journal_students.find_one({"id": student_id, "journal_id": journal_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        update_data = {}
+        if "full_name" in data:
+            update_data["full_name"] = data["full_name"]
+        if "order" in data:
+            update_data["order"] = data["order"]
+        
+        if update_data:
+            await db.journal_students.update_one(
+                {"id": student_id},
+                {"$set": update_data}
+            )
+        
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/journals/{journal_id}/students/{student_id}")
+async def delete_student(journal_id: str, student_id: str):
+    """Удалить студента из журнала"""
+    try:
+        result = await db.journal_students.delete_one({"id": student_id, "journal_id": journal_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Удалить записи посещаемости
+        await db.attendance_records.delete_many({"student_id": student_id})
+        
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/students/{student_id}/link")
+async def link_student(journal_id: str, student_id: str, data: JournalStudentLink):
+    """Привязать Telegram пользователя к ФИО в журнале"""
+    try:
+        student = await db.journal_students.find_one({"id": student_id, "journal_id": journal_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Обновить студента
+        await db.journal_students.update_one(
+            {"id": student_id},
+            {"$set": {
+                "telegram_id": data.telegram_id,
+                "username": data.username,
+                "first_name": data.first_name,
+                "is_linked": True,
+                "linked_at": datetime.utcnow()
+            }}
+        )
+        
+        # Обновить pending member если есть
+        await db.journal_pending_members.update_one(
+            {"journal_id": journal_id, "telegram_id": data.telegram_id},
+            {"$set": {"is_linked": True}}
+        )
+        
+        logger.info(f"Student {student_id} linked to telegram {data.telegram_id}")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error linking student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/students/{student_id}/unlink")
+async def unlink_student(journal_id: str, student_id: str):
+    """Отвязать Telegram пользователя от ФИО в журнале"""
+    try:
+        student = await db.journal_students.find_one({"id": student_id, "journal_id": journal_id})
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        if not student.get("is_linked"):
+            return {"status": "success", "message": "Student is not linked"}
+        
+        # Сохраняем telegram_id до отвязки
+        old_telegram_id = student.get("telegram_id")
+        
+        # Отвязать студента
+        await db.journal_students.update_one(
+            {"id": student_id},
+            {"$set": {
+                "telegram_id": None,
+                "username": None,
+                "first_name": None,
+                "is_linked": False,
+                "linked_at": None
+            }}
+        )
+        
+        # Удалить из pending members если там был
+        if old_telegram_id:
+            await db.journal_pending_members.delete_many({
+                "journal_id": journal_id,
+                "telegram_id": old_telegram_id
+            })
+        
+        logger.info(f"Student {student_id} unlinked from telegram")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unlinking student: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/pending-members")
+async def get_pending_members(journal_id: str):
+    """Получить список ожидающих привязки участников"""
+    try:
+        pending = await db.journal_pending_members.find(
+            {"journal_id": journal_id, "is_linked": False}
+        ).to_list(100)
+        
+        return [
+            {
+                "id": p["id"],
+                "telegram_id": p["telegram_id"],
+                "username": p.get("username"),
+                "first_name": p.get("first_name"),
+                "joined_at": p["joined_at"]
+            }
+            for p in pending
+        ]
+    except Exception as e:
+        logger.error(f"Error getting pending members: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== Предметы (Subjects) =====
+
+@api_router.post("/journals/{journal_id}/subjects")
+async def create_subject(journal_id: str, data: JournalSubjectCreate):
+    """Создать предмет в журнале"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получаем максимальный order для нового предмета
+        max_order = await db.journal_subjects.find_one(
+            {"journal_id": journal_id},
+            sort=[("order", -1)]
+        )
+        new_order = (max_order["order"] + 1) if max_order else 0
+        
+        subject = JournalSubject(
+            journal_id=journal_id,
+            name=data.name,
+            description=data.description,
+            color=data.color,
+            order=new_order,
+            created_by=data.telegram_id
+        )
+        await db.journal_subjects.insert_one(subject.model_dump())
+        
+        logger.info(f"Subject created: {subject.subject_id} in journal {journal_id}")
+        
+        return {
+            "subject_id": subject.subject_id,
+            "journal_id": subject.journal_id,
+            "name": subject.name,
+            "description": subject.description,
+            "color": subject.color,
+            "order": subject.order,
+            "created_at": subject.created_at.isoformat(),
+            "sessions_count": 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating subject: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/subjects")
+async def get_journal_subjects(journal_id: str):
+    """Получить список предметов журнала"""
+    try:
+        subjects = await db.journal_subjects.find(
+            {"journal_id": journal_id}
+        ).sort("order", 1).to_list(100)
+        
+        result = []
+        for s in subjects:
+            # Считаем количество занятий для предмета
+            sessions_count = await db.journal_sessions.count_documents({
+                "subject_id": s["subject_id"]
+            })
+            
+            result.append({
+                "subject_id": s["subject_id"],
+                "journal_id": s["journal_id"],
+                "name": s["name"],
+                "description": s.get("description"),
+                "color": s.get("color", "blue"),
+                "order": s.get("order", 0),
+                "created_at": s["created_at"].isoformat() if isinstance(s["created_at"], datetime) else s["created_at"],
+                "sessions_count": sessions_count
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error getting subjects: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/subjects/{subject_id}")
+async def get_subject_detail(subject_id: str):
+    """Получить детали предмета с занятиями"""
+    try:
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        # Получаем занятия предмета (сортировка: по дате занятия desc, затем по дате создания desc)
+        sessions = await db.journal_sessions.find(
+            {"subject_id": subject_id}
+        ).sort([("date", -1), ("created_at", -1)]).to_list(200)
+        
+        total_students = await db.journal_students.count_documents({
+            "journal_id": subject["journal_id"]
+        })
+        
+        sessions_list = []
+        for s in sessions:
+            attendance_filled = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": {"$ne": "unmarked"}
+            })
+            present_count = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": {"$in": ["present", "late"]}
+            })
+            
+            sessions_list.append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "description": s.get("description"),
+                "type": s.get("type", "lecture"),
+                "created_at": s["created_at"].isoformat() if isinstance(s["created_at"], datetime) else s["created_at"],
+                "attendance_filled": attendance_filled,
+                "total_students": total_students,
+                "present_count": present_count
+            })
+        
+        return {
+            "subject_id": subject["subject_id"],
+            "journal_id": subject["journal_id"],
+            "name": subject["name"],
+            "description": subject.get("description"),
+            "color": subject.get("color", "blue"),
+            "created_at": subject["created_at"].isoformat() if isinstance(subject["created_at"], datetime) else subject["created_at"],
+            "sessions": sessions_list,
+            "total_students": total_students
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting subject detail: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/journals/subjects/{subject_id}")
+async def update_subject(subject_id: str, data: dict = Body(...)):
+    """Обновить предмет"""
+    try:
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        update_data = {}
+        if "name" in data:
+            update_data["name"] = data["name"]
+        if "description" in data:
+            update_data["description"] = data["description"]
+        if "color" in data:
+            update_data["color"] = data["color"]
+        
+        if update_data:
+            await db.journal_subjects.update_one(
+                {"subject_id": subject_id},
+                {"$set": update_data}
+            )
+        
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating subject: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/subjects/{subject_id}/attendance-stats")
+async def get_subject_attendance_stats(subject_id: str, telegram_id: int = 0):
+    """Получить детальную статистику посещаемости по предмету со списком студентов"""
+    try:
+        # Получаем предмет
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        journal_id = subject["journal_id"]
+        
+        # Получаем журнал для проверки доступа
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Получаем все занятия этого предмета
+        sessions = await db.journal_sessions.find(
+            {"subject_id": subject_id}
+        ).sort("date", -1).to_list(1000)
+        
+        # Получаем всех студентов журнала
+        students = await db.journal_students.find(
+            {"journal_id": journal_id}
+        ).to_list(1000)
+        
+        # Получаем все записи посещаемости для занятий этого предмета
+        session_ids = [s["session_id"] for s in sessions]
+        attendance_records = await db.attendance_records.find(
+            {"session_id": {"$in": session_ids}}
+        ).to_list(10000)
+        
+        # Создаём маппинг записей: {session_id: {student_id: record}}
+        records_map = {}
+        for record in attendance_records:
+            session_id = record["session_id"]
+            student_id = record["student_id"]
+            if session_id not in records_map:
+                records_map[session_id] = {}
+            records_map[session_id][student_id] = record
+        
+        total_students = len(students)
+        total_sessions = len(sessions)
+        
+        # Статистика по студентам
+        students_stats = []
+        total_present = 0
+        total_absent = 0
+        total_late = 0
+        total_excused = 0
+        
+        for student in students:
+            student_id = student["id"]
+            present = 0
+            absent = 0
+            late = 0
+            excused = 0
+            
+            for session in sessions:
+                session_id = session["session_id"]
+                record = records_map.get(session_id, {}).get(student_id)
+                if record:
+                    status = record.get("status", "absent")
+                    if status == "present":
+                        present += 1
+                    elif status == "absent":
+                        absent += 1
+                    elif status == "late":
+                        late += 1
+                        present += 1  # late считается как присутствие
+                    elif status == "excused":
+                        excused += 1
+            
+            # Считаем процент (присутствие = present + late)
+            marked_sessions = present + absent + excused
+            attendance_percent = 0.0
+            if marked_sessions > 0:
+                # present уже включает late
+                attendance_percent = round((present / marked_sessions) * 100, 1)
+            
+            students_stats.append({
+                "student_id": student_id,
+                "full_name": student.get("full_name", ""),
+                "is_linked": bool(student.get("linked_telegram_id")),
+                "telegram_id": student.get("linked_telegram_id"),
+                "present_count": present,
+                "absent_count": absent,
+                "late_count": late,
+                "excused_count": excused,
+                "total_sessions": total_sessions,
+                "attendance_percent": attendance_percent
+            })
+            
+            total_present += present
+            total_absent += absent
+            total_late += late
+            total_excused += excused
+        
+        # Сортируем по посещаемости (от худшей к лучшей для выявления проблемных студентов)
+        students_stats.sort(key=lambda x: (-x["attendance_percent"], x["full_name"]))
+        
+        # Статистика по занятиям
+        sessions_stats = []
+        for session in sessions:
+            session_id = session["session_id"]
+            session_records = records_map.get(session_id, {})
+            
+            s_present = 0
+            s_absent = 0
+            s_late = 0
+            s_excused = 0
+            
+            for student_id, record in session_records.items():
+                status = record.get("status", "absent")
+                if status == "present":
+                    s_present += 1
+                elif status == "absent":
+                    s_absent += 1
+                elif status == "late":
+                    s_late += 1
+                    s_present += 1
+                elif status == "excused":
+                    s_excused += 1
+            
+            marked = s_present + s_absent + s_excused
+            s_percent = round((s_present / marked * 100), 1) if marked > 0 else 0.0
+            
+            sessions_stats.append({
+                "session_id": session_id,
+                "date": session["date"],
+                "title": session.get("title", ""),
+                "type": session.get("type", "lecture"),
+                "present_count": s_present,
+                "absent_count": s_absent,
+                "late_count": s_late,
+                "excused_count": s_excused,
+                "total_students": total_students,
+                "attendance_percent": s_percent
+            })
+        
+        # Общий процент посещаемости
+        total_marked = total_present + total_absent + total_excused
+        overall_percent = round((total_present / total_marked * 100), 1) if total_marked > 0 else 0.0
+        
+        return {
+            "subject_id": subject_id,
+            "subject_name": subject.get("name", ""),
+            "subject_color": subject.get("color", "blue"),
+            "description": subject.get("description"),
+            "journal_id": journal_id,
+            "total_sessions": total_sessions,
+            "total_students": total_students,
+            "overall_attendance_percent": overall_percent,
+            "present_count": total_present,
+            "absent_count": total_absent,
+            "late_count": total_late,
+            "excused_count": total_excused,
+            "students_stats": students_stats,
+            "sessions_stats": sessions_stats
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting subject attendance stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/journals/subjects/{subject_id}")
+async def delete_subject(subject_id: str):
+    """Удалить предмет и все его занятия"""
+    try:
+        subject = await db.journal_subjects.find_one({"subject_id": subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        # Получаем все session_id для удаления записей посещаемости
+        sessions = await db.journal_sessions.find(
+            {"subject_id": subject_id}
+        ).to_list(1000)
+        session_ids = [s["session_id"] for s in sessions]
+        
+        # Удаляем записи посещаемости
+        if session_ids:
+            await db.attendance_records.delete_many({"session_id": {"$in": session_ids}})
+        
+        # Удаляем занятия
+        await db.journal_sessions.delete_many({"subject_id": subject_id})
+        
+        # Удаляем предмет
+        await db.journal_subjects.delete_one({"subject_id": subject_id})
+        
+        logger.info(f"Subject deleted: {subject_id}")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting subject: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== Занятия =====
+
+@api_router.post("/journals/{journal_id}/sessions", response_model=JournalSessionResponse)
+async def create_session(journal_id: str, data: JournalSessionCreate):
+    """Создать занятие"""
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Проверяем существование предмета
+        subject = await db.journal_subjects.find_one({"subject_id": data.subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        session = JournalSession(
+            journal_id=journal_id,
+            subject_id=data.subject_id,
+            date=data.date,
+            title=data.title,
+            description=data.description,
+            type=data.type,
+            created_by=data.telegram_id
+        )
+        await db.journal_sessions.insert_one(session.model_dump())
+        
+        total_students = await db.journal_students.count_documents({"journal_id": journal_id})
+        
+        return JournalSessionResponse(
+            session_id=session.session_id,
+            journal_id=session.journal_id,
+            date=session.date,
+            title=session.title,
+            description=session.description,
+            type=session.type,
+            created_at=session.created_at,
+            created_by=session.created_by,
+            attendance_filled=0,
+            total_students=total_students
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/sessions", response_model=List[JournalSessionResponse])
+async def get_journal_sessions(journal_id: str):
+    """Получить список занятий журнала"""
+    try:
+        sessions = await db.journal_sessions.find(
+            {"journal_id": journal_id}
+        ).sort([("date", -1), ("created_at", -1)]).to_list(200)
+        
+        total_students = await db.journal_students.count_documents({"journal_id": journal_id})
+        
+        result = []
+        for s in sessions:
+            attendance_filled = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": {"$ne": "unmarked"}
+            })
+            present_count = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": {"$in": ["present", "late"]}
+            })
+            absent_count = await db.attendance_records.count_documents({
+                "session_id": s["session_id"],
+                "status": "absent"
+            })
+            
+            # Статистика оценок за сессию
+            grades_pipeline = [
+                {"$match": {"session_id": s["session_id"], "grade": {"$ne": None}}},
+                {"$group": {
+                    "_id": None,
+                    "count": {"$sum": 1},
+                    "sum": {"$sum": "$grade"}
+                }}
+            ]
+            grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+            
+            grades_count = 0
+            average_grade = None
+            if grades_result:
+                g = grades_result[0]
+                grades_count = g["count"]
+                if grades_count > 0:
+                    average_grade = round(g["sum"] / grades_count, 2)
+            
+            result.append(JournalSessionResponse(
+                session_id=s["session_id"],
+                journal_id=s["journal_id"],
+                date=s["date"],
+                title=s["title"],
+                description=s.get("description"),
+                type=s.get("type", "lecture"),
+                created_at=s["created_at"],
+                created_by=s["created_by"],
+                attendance_filled=attendance_filled,
+                total_students=total_students,
+                present_count=present_count,
+                absent_count=absent_count,
+                grades_count=grades_count,
+                average_grade=average_grade
+            ))
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error getting sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/journals/sessions/{session_id}")
+async def update_session(session_id: str, data: dict = Body(...)):
+    """Обновить занятие"""
+    try:
+        session = await db.journal_sessions.find_one({"session_id": session_id})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        update_data = {}
+        if "date" in data:
+            update_data["date"] = data["date"]
+        if "title" in data:
+            update_data["title"] = data["title"]
+        if "description" in data:
+            update_data["description"] = data["description"]
+        if "type" in data:
+            update_data["type"] = data["type"]
+        
+        if update_data:
+            await db.journal_sessions.update_one(
+                {"session_id": session_id},
+                {"$set": update_data}
+            )
+        
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/journals/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Удалить занятие"""
+    try:
+        result = await db.journal_sessions.delete_one({"session_id": session_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Удалить записи посещаемости для этого занятия
+        await db.attendance_records.delete_many({"session_id": session_id})
+        
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/journals/{journal_id}/sessions/from-schedule")
+async def create_sessions_from_schedule(journal_id: str, data: CreateSessionsFromScheduleRequest):
+    """
+    Создать занятия из расписания (массовое создание).
+    Принимает список занятий из расписания и создаёт соответствующие сессии.
+    """
+    try:
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # Проверяем существование предмета
+        subject = await db.journal_subjects.find_one({"subject_id": data.subject_id})
+        if not subject:
+            raise HTTPException(status_code=404, detail="Subject not found")
+        
+        total_students = await db.journal_students.count_documents({"journal_id": journal_id})
+        
+        # Маппинг типов занятий из расписания в типы сессий
+        lesson_type_map = {
+            "лекция": "lecture",
+            "лек": "lecture",
+            "лекции": "lecture",
+            "семинар": "seminar",
+            "сем": "seminar",
+            "практика": "seminar",
+            "практ": "seminar",
+            "практическое": "seminar",
+            "лабораторная": "lab",
+            "лаб": "lab",
+            "лабораторная работа": "lab",
+            "экзамен": "exam",
+            "зачёт": "exam",
+            "зачет": "exam",
+            "консультация": "lecture",
+            "конс": "lecture",
+        }
+        
+        created_sessions = []
+        skipped_count = 0
+        
+        for schedule_item in data.sessions:
+            # Проверяем, не существует ли уже такое занятие
+            existing = await db.journal_sessions.find_one({
+                "journal_id": journal_id,
+                "subject_id": data.subject_id,
+                "date": schedule_item.date,
+                "title": {"$regex": f"^{schedule_item.time}", "$options": "i"}
+            })
+            
+            if existing:
+                skipped_count += 1
+                continue
+            
+            # Определяем тип занятия
+            lesson_type_lower = schedule_item.lesson_type.lower().strip()
+            session_type = "lecture"  # по умолчанию
+            for key, value in lesson_type_map.items():
+                if key in lesson_type_lower:
+                    session_type = value
+                    break
+            
+            # Формируем название и описание
+            title = f"{schedule_item.time} — {schedule_item.lesson_type}"
+            
+            description_parts = []
+            if schedule_item.teacher:
+                description_parts.append(f"Преподаватель: {schedule_item.teacher}")
+            if schedule_item.auditory:
+                description_parts.append(f"Аудитория: {schedule_item.auditory}")
+            description = "; ".join(description_parts) if description_parts else None
+            
+            # Создаём сессию
+            session = JournalSession(
+                journal_id=journal_id,
+                subject_id=data.subject_id,
+                date=schedule_item.date,
+                title=title,
+                description=description,
+                type=session_type,
+                created_by=data.telegram_id
+            )
+            
+            await db.journal_sessions.insert_one(session.model_dump())
+            
+            created_sessions.append(JournalSessionResponse(
+                session_id=session.session_id,
+                journal_id=session.journal_id,
+                date=session.date,
+                title=session.title,
+                description=session.description,
+                type=session.type,
+                created_at=session.created_at,
+                created_by=session.created_by,
+                attendance_filled=0,
+                total_students=total_students
+            ))
+        
+        logger.info(f"Created {len(created_sessions)} sessions from schedule for journal {journal_id}, skipped {skipped_count}")
+        
+        return {
+            "status": "success",
+            "created_count": len(created_sessions),
+            "skipped_count": skipped_count,
+            "sessions": created_sessions
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating sessions from schedule: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== Посещаемость =====
+
+@api_router.post("/journals/sessions/{session_id}/attendance")
+async def mark_attendance(session_id: str, data: AttendanceBulkCreate):
+    """Массовая отметка посещаемости"""
+    try:
+        session = await db.journal_sessions.find_one({"session_id": session_id})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        journal_id = session["journal_id"]
+        
+        for record in data.records:
+            # Проверить существующую запись
+            existing = await db.attendance_records.find_one({
+                "session_id": session_id,
+                "student_id": record.student_id
+            })
+            
+            if existing:
+                # Обновить
+                await db.attendance_records.update_one(
+                    {"id": existing["id"]},
+                    {"$set": {
+                        "status": record.status,
+                        "grade": record.grade,
+                        "reason": record.reason,
+                        "note": record.note,
+                        "marked_by": data.telegram_id,
+                        "marked_at": datetime.utcnow()
+                    }}
+                )
+            else:
+                # Создать новую запись
+                new_record = AttendanceRecord(
+                    journal_id=journal_id,
+                    session_id=session_id,
+                    student_id=record.student_id,
+                    status=record.status,
+                    grade=record.grade,
+                    reason=record.reason,
+                    note=record.note,
+                    marked_by=data.telegram_id
+                )
+                await db.attendance_records.insert_one(new_record.model_dump())
+        
+        return {"status": "success", "marked_count": len(data.records)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking attendance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/sessions/{session_id}/attendance")
+async def get_session_attendance(session_id: str):
+    """Получить посещаемость на занятии"""
+    try:
+        session = await db.journal_sessions.find_one({"session_id": session_id})
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Получить всех студентов журнала
+        students = await db.journal_students.find(
+            {"journal_id": session["journal_id"]}
+        ).sort("order", 1).to_list(200)
+        
+        # Получить записи посещаемости
+        records = await db.attendance_records.find(
+            {"session_id": session_id}
+        ).to_list(200)
+        
+        records_map = {r["student_id"]: r for r in records}
+        
+        result = []
+        for s in students:
+            record = records_map.get(s["id"])
+            result.append({
+                "student_id": s["id"],
+                "full_name": s["full_name"],
+                "is_linked": s.get("is_linked", False),
+                "status": record["status"] if record else "unmarked",
+                "grade": record.get("grade") if record else None,
+                "reason": record.get("reason") if record else None,
+                "note": record.get("note") if record else None,
+                "marked_at": record.get("marked_at") if record else None
+            })
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting attendance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/my-attendance/{telegram_id}")
+async def get_my_attendance(journal_id: str, telegram_id: int):
+    """Получить мою посещаемость с разбивкой по предметам"""
+    try:
+        # Найти студента
+        student = await db.journal_students.find_one({
+            "journal_id": journal_id,
+            "telegram_id": telegram_id,
+            "is_linked": True
+        })
+        
+        if not student:
+            raise HTTPException(status_code=404, detail="Not linked to any student")
+        
+        # Получить все предметы журнала
+        subjects = await db.journal_subjects.find(
+            {"journal_id": journal_id}
+        ).to_list(100)
+        subjects_map = {s["subject_id"]: s for s in subjects}
+        
+        # Получить все занятия
+        sessions = await db.journal_sessions.find(
+            {"journal_id": journal_id}
+        ).sort("date", -1).to_list(500)
+        
+        # Получить записи посещаемости
+        records = await db.attendance_records.find(
+            {"student_id": student["id"]}
+        ).to_list(500)
+        
+        records_map = {r["session_id"]: r for r in records}
+        
+        # Общая статистика
+        present_count = sum(1 for r in records if r["status"] in ["present", "late"])
+        absent_count = sum(1 for r in records if r["status"] == "absent")
+        excused_count = sum(1 for r in records if r["status"] == "excused")
+        late_count = sum(1 for r in records if r["status"] == "late")
+        total_sessions = len(sessions)
+        
+        # Показываем процент только если студент был отмечен хотя бы раз
+        attendance_percent = None
+        total_records = len(records)
+        if total_sessions > 0 and total_records > 0:
+            attendance_percent = round((present_count / total_sessions) * 100, 1)
+        
+        # Расчет стрика (серии посещений)
+        current_streak = 0
+        best_streak = 0
+        temp_streak = 0
+        is_current_streak_active = True
+        
+        # Проходим по занятиям от новых к старым
+        for s in sessions:
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            
+            # Пропускаем неотмеченные занятия (например, будущие)
+            if status == "unmarked":
+                continue
+                
+            if status in ["present", "late"]:
+                # Посещение (или опоздание)
+                if is_current_streak_active:
+                    current_streak += 1
+                
+                temp_streak += 1
+                if temp_streak > best_streak:
+                    best_streak = temp_streak
+            else:
+                # Пропуск (absent или excused)
+                # Уважительная причина тоже прерывает стрик посещений "подряд"
+                is_current_streak_active = False
+                temp_streak = 0
+                
+        # Статистика по предметам
+        subjects_stats = {}
+        for s in sessions:
+            subject_id = s.get("subject_id")
+            if subject_id not in subjects_stats:
+                subject = subjects_map.get(subject_id, {})
+                subjects_stats[subject_id] = {
+                    "subject_id": subject_id,
+                    "subject_name": subject.get("name", "Без предмета"),
+                    "subject_color": subject.get("color", "blue"),
+                    "total_sessions": 0,
+                    "present_count": 0,
+                    "absent_count": 0,
+                    "late_count": 0,
+                    "excused_count": 0,
+                    "attendance_percent": 0,
+                    "sessions": [],
+                    # Оценки по предмету
+                    "grades": [],
+                    "average_grade": None,
+                    "grades_count": 0
+                }
+            
+            subjects_stats[subject_id]["total_sessions"] += 1
+            
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            grade = record.get("grade") if record else None
+            
+            if status in ["present", "late"]:
+                subjects_stats[subject_id]["present_count"] += 1
+            if status == "absent":
+                subjects_stats[subject_id]["absent_count"] += 1
+            if status == "late":
+                subjects_stats[subject_id]["late_count"] += 1
+            if status == "excused":
+                subjects_stats[subject_id]["excused_count"] += 1
+            
+            # Добавляем оценку если есть
+            if grade is not None:
+                subjects_stats[subject_id]["grades"].append({
+                    "grade": grade,
+                    "date": s["date"],
+                    "session_title": s["title"],
+                    "session_type": s.get("type", "lecture")
+                })
+            
+            subjects_stats[subject_id]["sessions"].append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "status": status,
+                "grade": grade
+            })
+        
+        # Вычисляем процент и среднюю оценку по каждому предмету
+        subjects_list = []
+        for subject_id, subj_stats in subjects_stats.items():
+            if subj_stats["total_sessions"] > 0:
+                subj_stats["attendance_percent"] = round(
+                    (subj_stats["present_count"] / subj_stats["total_sessions"]) * 100, 1
+                )
+            
+            # Средняя оценка по предмету
+            if subj_stats["grades"]:
+                subj_stats["grades_count"] = len(subj_stats["grades"])
+                total_grade = sum(g["grade"] for g in subj_stats["grades"])
+                subj_stats["average_grade"] = round(total_grade / subj_stats["grades_count"], 2)
+            
+            subjects_list.append(subj_stats)
+        
+        # Сортируем предметы по имени
+        subjects_list.sort(key=lambda x: x["subject_name"])
+        
+        # Статистика по оценкам
+        grades_pipeline = [
+            {"$match": {"student_id": student["id"], "grade": {"$ne": None}}},
+            {"$group": {
+                "_id": None,
+                "count": {"$sum": 1},
+                "sum": {"$sum": "$grade"},
+                "grade_5": {"$sum": {"$cond": [{"$eq": ["$grade", 5]}, 1, 0]}},
+                "grade_4": {"$sum": {"$cond": [{"$eq": ["$grade", 4]}, 1, 0]}},
+                "grade_3": {"$sum": {"$cond": [{"$eq": ["$grade", 3]}, 1, 0]}},
+                "grade_2": {"$sum": {"$cond": [{"$eq": ["$grade", 2]}, 1, 0]}},
+                "grade_1": {"$sum": {"$cond": [{"$eq": ["$grade", 1]}, 1, 0]}}
+            }}
+        ]
+        grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+        
+        average_grade = None
+        grades_count = 0
+        grade_5_count = grade_4_count = grade_3_count = grade_2_count = grade_1_count = 0
+        
+        if grades_result:
+            g = grades_result[0]
+            grades_count = g["count"]
+            if grades_count > 0:
+                average_grade = round(g["sum"] / grades_count, 2)
+            grade_5_count = g["grade_5"]
+            grade_4_count = g["grade_4"]
+            grade_3_count = g["grade_3"]
+            grade_2_count = g["grade_2"]
+            grade_1_count = g["grade_1"]
+        
+        # Формируем общие записи (для совместимости)
+        attendance_records = []
+        for s in sessions:
+            record = records_map.get(s["session_id"])
+            subject = subjects_map.get(s.get("subject_id"), {})
+            attendance_records.append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "subject_id": s.get("subject_id"),
+                "subject_name": subject.get("name", ""),
+                "status": record["status"] if record else "unmarked",
+                "reason": record.get("reason") if record else None,
+                "note": record.get("note") if record else None
+            })
+        
+        return {
+            "student_id": student["id"],
+            "full_name": student["full_name"],
+            "attendance_percent": attendance_percent,
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "excused_count": excused_count,
+            "late_count": late_count,
+            "total_sessions": total_sessions,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
+            "subjects_stats": subjects_list,  # Статистика по предметам
+            "records": attendance_records,
+            # Статистика по оценкам
+            "average_grade": average_grade,
+            "grades_count": grades_count,
+            "grade_5_count": grade_5_count,
+            "grade_4_count": grade_4_count,
+            "grade_3_count": grade_3_count,
+            "grade_2_count": grade_2_count,
+            "grade_1_count": grade_1_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting my attendance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/student-stats/{student_id}")
+async def get_student_stats_by_id(journal_id: str, student_id: str, telegram_id: int = 0):
+    """Получить статистику студента по student_id (для владельца журнала)"""
+    try:
+        # Проверяем права доступа
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        is_owner = journal["owner_id"] == telegram_id
+        stats_viewers = journal.get("stats_viewers", [])
+        can_view = is_owner or telegram_id in stats_viewers
+        
+        if not can_view:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Найти студента
+        student = await db.journal_students.find_one({
+            "journal_id": journal_id,
+            "id": student_id
+        })
+        
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Получить все предметы журнала
+        subjects = await db.journal_subjects.find(
+            {"journal_id": journal_id}
+        ).to_list(100)
+        subjects_map = {s["subject_id"]: s for s in subjects}
+        
+        # Получить все занятия
+        sessions = await db.journal_sessions.find(
+            {"journal_id": journal_id}
+        ).sort("date", -1).to_list(500)
+        
+        # Получить записи посещаемости
+        records = await db.attendance_records.find(
+            {"student_id": student_id}
+        ).to_list(500)
+        
+        records_map = {r["session_id"]: r for r in records}
+        
+        # Общая статистика
+        present_count = sum(1 for r in records if r["status"] in ["present", "late"])
+        absent_count = sum(1 for r in records if r["status"] == "absent")
+        excused_count = sum(1 for r in records if r["status"] == "excused")
+        late_count = sum(1 for r in records if r["status"] == "late")
+        total_sessions = len(sessions)
+        
+        attendance_percent = round((present_count / total_sessions) * 100, 1) if total_sessions > 0 else 0
+        
+        # Стрики
+        current_streak = 0
+        best_streak = 0
+        temp_streak = 0
+        
+        sorted_sessions = sorted(sessions, key=lambda x: x["date"])
+        for s in sorted_sessions:
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            
+            # Пропускаем неотмеченные занятия (будущие)
+            if status == "unmarked":
+                continue
+            
+            if status in ["present", "late"]:
+                temp_streak += 1
+                if temp_streak > best_streak:
+                    best_streak = temp_streak
+            else:
+                temp_streak = 0
+        
+        # Подсчёт текущего стрика с конца (пропуская unmarked)
+        for s in reversed(sorted_sessions):
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            
+            # Пропускаем неотмеченные занятия (будущие)
+            if status == "unmarked":
+                continue
+            
+            if status in ["present", "late"]:
+                current_streak += 1
+            else:
+                break
+        
+        # Статистика по предметам с оценками
+        subjects_stats = {}
+        for s in sessions:
+            subject_id = s.get("subject_id")
+            if subject_id not in subjects_stats:
+                subject = subjects_map.get(subject_id, {})
+                subjects_stats[subject_id] = {
+                    "subject_id": subject_id,
+                    "subject_name": subject.get("name", "Без предмета"),
+                    "subject_color": subject.get("color", "blue"),
+                    "total_sessions": 0,
+                    "present_count": 0,
+                    "absent_count": 0,
+                    "late_count": 0,
+                    "excused_count": 0,
+                    "attendance_percent": 0,
+                    "sessions": [],
+                    "grades": [],
+                    "average_grade": None,
+                    "grades_count": 0
+                }
+            
+            subjects_stats[subject_id]["total_sessions"] += 1
+            
+            record = records_map.get(s["session_id"])
+            status = record["status"] if record else "unmarked"
+            grade = record.get("grade") if record else None
+            
+            if status in ["present", "late"]:
+                subjects_stats[subject_id]["present_count"] += 1
+            if status == "absent":
+                subjects_stats[subject_id]["absent_count"] += 1
+            if status == "late":
+                subjects_stats[subject_id]["late_count"] += 1
+            if status == "excused":
+                subjects_stats[subject_id]["excused_count"] += 1
+            
+            if grade is not None:
+                subjects_stats[subject_id]["grades"].append({
+                    "grade": grade,
+                    "date": s["date"],
+                    "session_title": s["title"],
+                    "session_type": s.get("type", "lecture")
+                })
+            
+            subjects_stats[subject_id]["sessions"].append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "status": status,
+                "grade": grade
+            })
+        
+        # Вычисляем процент и среднюю оценку по каждому предмету
+        subjects_list = []
+        for subject_id, subj_stats in subjects_stats.items():
+            if subj_stats["total_sessions"] > 0:
+                subj_stats["attendance_percent"] = round(
+                    (subj_stats["present_count"] / subj_stats["total_sessions"]) * 100, 1
+                )
+            
+            if subj_stats["grades"]:
+                subj_stats["grades_count"] = len(subj_stats["grades"])
+                total_grade = sum(g["grade"] for g in subj_stats["grades"])
+                subj_stats["average_grade"] = round(total_grade / subj_stats["grades_count"], 2)
+            
+            subjects_list.append(subj_stats)
+        
+        subjects_list.sort(key=lambda x: x["subject_name"])
+        
+        # Статистика по оценкам
+        grades_pipeline = [
+            {"$match": {"student_id": student_id, "grade": {"$ne": None}}},
+            {"$group": {
+                "_id": None,
+                "count": {"$sum": 1},
+                "sum": {"$sum": "$grade"},
+                "grade_5": {"$sum": {"$cond": [{"$eq": ["$grade", 5]}, 1, 0]}},
+                "grade_4": {"$sum": {"$cond": [{"$eq": ["$grade", 4]}, 1, 0]}},
+                "grade_3": {"$sum": {"$cond": [{"$eq": ["$grade", 3]}, 1, 0]}},
+                "grade_2": {"$sum": {"$cond": [{"$eq": ["$grade", 2]}, 1, 0]}},
+                "grade_1": {"$sum": {"$cond": [{"$eq": ["$grade", 1]}, 1, 0]}}
+            }}
+        ]
+        grades_result = await db.attendance_records.aggregate(grades_pipeline).to_list(1)
+        
+        average_grade = None
+        grades_count = 0
+        grade_5_count = grade_4_count = grade_3_count = grade_2_count = grade_1_count = 0
+        
+        if grades_result:
+            g = grades_result[0]
+            grades_count = g["count"]
+            if grades_count > 0:
+                average_grade = round(g["sum"] / grades_count, 2)
+            grade_5_count = g["grade_5"]
+            grade_4_count = g["grade_4"]
+            grade_3_count = g["grade_3"]
+            grade_2_count = g["grade_2"]
+            grade_1_count = g["grade_1"]
+        
+        # Формируем общие записи
+        attendance_records = []
+        for s in sessions[:50]:
+            record = records_map.get(s["session_id"])
+            attendance_records.append({
+                "session_id": s["session_id"],
+                "date": s["date"],
+                "subject_name": subjects_map.get(s.get("subject_id"), {}).get("name", "Без предмета"),
+                "title": s["title"],
+                "type": s.get("type", "lecture"),
+                "status": record["status"] if record else "unmarked",
+                "grade": record.get("grade") if record else None
+            })
+        
+        return {
+            "student_id": student["id"],
+            "full_name": student["full_name"],
+            "telegram_id": student.get("telegram_id"),
+            "is_linked": student.get("is_linked", False),
+            "attendance_percent": attendance_percent,
+            "present_count": present_count,
+            "absent_count": absent_count,
+            "excused_count": excused_count,
+            "late_count": late_count,
+            "total_sessions": total_sessions,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
+            "subjects_stats": subjects_list,
+            "records": attendance_records,
+            "average_grade": average_grade,
+            "grades_count": grades_count,
+            "grade_5_count": grade_5_count,
+            "grade_4_count": grade_4_count,
+            "grade_3_count": grade_3_count,
+            "grade_2_count": grade_2_count,
+            "grade_1_count": grade_1_count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting student stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/journals/{journal_id}/stats", response_model=JournalStatsResponse)
+async def get_journal_stats(journal_id: str, telegram_id: int = 0):
+    """
+    Получить статистику журнала
+    ОПТИМИЗИРОВАНО: Uses Aggregation Pipeline + Smart Logic
+    ДОСТУП: Только owner или пользователи из stats_viewers
+    """
+    try:
+        # 1. Проверяем существование журнала
+        journal = await db.attendance_journals.find_one({"journal_id": journal_id})
+        if not journal:
+            raise HTTPException(status_code=404, detail="Journal not found")
+        
+        # 2. Проверяем права доступа к статистике
+        is_owner = journal["owner_id"] == telegram_id
+        stats_viewers = journal.get("stats_viewers", [])
+        can_view_stats = is_owner or telegram_id in stats_viewers
+        
+        if not can_view_stats:
+            raise HTTPException(status_code=403, detail="Access denied. Only owner or authorized users can view stats.")
+        
+        # 3. Получаем всех студентов и занятия одним запросом (без лимитов для точности)
+        students = await db.journal_students.find(
+            {"journal_id": journal_id}
+        ).sort("order", 1).to_list(None)
+        
+        sessions = await db.journal_sessions.find(
+            {"journal_id": journal_id}
+        ).sort("date", -1).to_list(None)
+        
+        total_students = len(students)
+        linked_students = sum(1 for s in students if s.get("is_linked", False))
+        total_sessions = len(sessions)
+        
+        # 4. АГРЕГАЦИЯ: Получаем все отметки одним запросом
+        pipeline = [
+            {"$match": {"journal_id": journal_id}},
+            {"$group": {
+                "_id": "$student_id",
+                "present": {"$sum": {"$cond": [{"$in": ["$status", ["present"]]}, 1, 0]}},
+                "late": {"$sum": {"$cond": [{"$eq": ["$status", "late"]}, 1, 0]}},
+                "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}},
+                "excused": {"$sum": {"$cond": [{"$eq": ["$status", "excused"]}, 1, 0]}},
+                # Считаем общее количество отметок (чтобы знать, кого отмечали)
+                "total_marked": {"$sum": 1},
+                # Собираем ID посещенных занятий для корректного расчета статистики новичков
+                "attended_sessions": {"$addToSet": "$session_id"}
+            }}
+        ]
+        
+        att_data = await db.attendance_records.aggregate(pipeline).to_list(None)
+        # Превращаем в словарь для быстрого доступа: {student_id: {stats}}
+        att_map = {item["_id"]: item for item in att_data}
+        
+        # 5. Расчет статистики по каждому студенту (Python-side logic)
+        students_stats = []
+        
+        # Переменные для общей статистики
+        global_numerator = 0
+        global_denominator = 0
+        
+        for s in students:
+            s_id = s["id"]
+            stats = att_map.get(s_id, {"present": 0, "late": 0, "absent": 0, "excused": 0, "total_marked": 0})
+            
+            present = stats["present"]
+            late = stats["late"]
+            absent = stats["absent"]
+            excused = stats["excused"]
+            total_marked = stats.get("total_marked", 0)
+            
+            # --- ЛОГИКА "НОВИЧКА" (New Student Logic) ---
+            # Студент отвечает за занятия, которые произошли после его добавления
+            # ИЛИ за те занятия, где он был отмечен (даже если это было "в прошлом")
+            student_created_at = s.get("created_at")
+            attended_sessions = set(stats.get("attended_sessions", []))
+            
+            valid_sessions_count = 0
+            
+            if not student_created_at:
+                # Если даты нет (старые данные), считаем все
+                valid_sessions_count = total_sessions
+            else:
+                s_created_date_str = student_created_at.strftime("%Y-%m-%d")
+                
+                for sess in sessions:
+                    # Учитываем занятие, если оно было после создания студента
+                    # ИЛИ если студент был отмечен на этом занятии (даже если оно было раньше)
+                    is_after_creation = sess["date"] >= s_created_date_str
+                    is_marked = sess["session_id"] in attended_sessions
+                    
+                    if is_after_creation or is_marked:
+                        valid_sessions_count += 1
+            
+            # --- ЛОГИКА "УВАЖИТЕЛЬНОЙ ПРИЧИНЫ" (Excused Logic) ---
+            # Эффективное количество занятий для знаменателя
+            # Если студент был excused, это занятие вычитается из "общего числа требований"
+            effective_sessions = valid_sessions_count - excused
+            
+            # Защита от отрицательных чисел (если вдруг excused больше чем valid - редкий кейс рассинхрона)
+            if effective_sessions < 0:
+                effective_sessions = 0
+                
+            # Числитель: Присутствовал + Опоздал
+            numerator = present + late
+            
+            # Процент - показываем только если студент был отмечен хотя бы раз
+            att_percent = None
+            if effective_sessions > 0 and total_marked > 0:
+                att_percent = round((numerator / effective_sessions) * 100, 1)
+                
+                # Добавляем в общую копилку (только если есть занятия И студент отмечен)
+                global_numerator += numerator
+                global_denominator += effective_sessions
+            
+            # IMPLICIT ABSENT FIX:
+            # Чтобы в UI (present / present+absent) совпадало с процентом,
+            # считаем "неотмеченные" (unmarked) как прогулы для отображения
+            # absent_count = (Total Valid - Excused) - (Present + Late)
+            # Но только если студент был отмечен
+            implicit_absent = 0
+            if total_marked > 0:
+                implicit_absent = effective_sessions - (present + late)
+                # Если вдруг отрицательное (из-за рассинхрона дат), ставим 0
+                if implicit_absent < 0:
+                    implicit_absent = 0
+            
+            students_stats.append(JournalStudentResponse(
+                id=s["id"],
+                journal_id=s["journal_id"],
+                full_name=s["full_name"],
+                telegram_id=s.get("telegram_id"),
+                username=s.get("username"),
+                first_name=s.get("first_name"),
+                is_linked=s.get("is_linked", False),
+                linked_at=s.get("linked_at"),
+                order=s.get("order", 0),
+                attendance_percent=att_percent,
+                present_count=present + late, 
+                absent_count=implicit_absent, # UPDATED: Includes explicit absent + unmarked
+                excused_count=excused,
+                late_count=late,
+                total_sessions=valid_sessions_count 
+            ))
+            
+        # 5. Общий процент по журналу
+        overall_percent = 0
+        if global_denominator > 0:
+            overall_percent = round((global_numerator / global_denominator) * 100, 1)
+        
+        # 6. Статистика по занятиям (Sessions Stats)
+        # Здесь тоже нужна агрегация, но для занятий их обычно меньше, и старый цикл был "OK", 
+        # но лучше оптимизировать.
+        
+        # Агрегация по занятиям
+        session_pipeline = [
+            {"$match": {"journal_id": journal_id}},
+            {"$group": {
+                "_id": "$session_id",
+                "filled_count": {"$sum": 1},
+                "present": {"$sum": {"$cond": [{"$in": ["$status", ["present", "late"]]}, 1, 0]}},
+                "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}},
+                # "late" уже включен в present выше, но если нужно отдельно:
+                "late_only": {"$sum": {"$cond": [{"$eq": ["$status", "late"]}, 1, 0]}}
+            }}
+        ]
+        sess_data = await db.attendance_records.aggregate(session_pipeline).to_list(None)
+        sess_map = {item["_id"]: item for item in sess_data}
+        
+        sessions_stats = []
+        for sess in sessions:
+            s_stats = sess_map.get(sess["session_id"], {"filled_count": 0, "present": 0, "absent": 0})
+            
+            sessions_stats.append(JournalSessionResponse(
+                session_id=sess["session_id"],
+                journal_id=sess["journal_id"],
+                date=sess["date"],
+                title=sess["title"],
+                description=sess.get("description"),
+                type=sess.get("type", "lecture"),
+                created_at=sess["created_at"],
+                created_by=sess["created_by"],
+                attendance_filled=s_stats["filled_count"],
+                total_students=total_students,
+                present_count=s_stats["present"],
+                absent_count=s_stats["absent"]
+            ))
+        
+        # 7. Статистика по предметам (Subjects Stats) - НОВАЯ СЕКЦИЯ
+        # Получаем все предметы журнала
+        subjects = await db.journal_subjects.find({"journal_id": journal_id}).to_list(None)
+        subjects_map = {s["subject_id"]: s for s in subjects}
+        
+        # Создаем маппинг session_id -> subject_id
+        session_to_subject = {sess["session_id"]: sess.get("subject_id") for sess in sessions}
+        
+        # Агрегируем посещаемость по предметам
+        subjects_stats_dict = {}
+        for subject in subjects:
+            subject_id = subject["subject_id"]
+            subjects_stats_dict[subject_id] = {
+                "subject_id": subject_id,
+                "subject_name": subject.get("name", "Без названия"),
+                "subject_color": subject.get("color", "blue"),
+                "total_sessions": 0,
+                "total_records": 0,
+                "present_count": 0,
+                "absent_count": 0,
+                "late_count": 0,
+                "excused_count": 0,
+                "attendance_percent": 0.0
+            }
+        
+        # Считаем занятия по каждому предмету
+        for sess in sessions:
+            subject_id = sess.get("subject_id")
+            if subject_id and subject_id in subjects_stats_dict:
+                subjects_stats_dict[subject_id]["total_sessions"] += 1
+                # Добавляем статистику из отмеченных посещений
+                s_stats = sess_map.get(sess["session_id"], {"present": 0, "absent": 0, "late_only": 0, "filled_count": 0})
+                subjects_stats_dict[subject_id]["present_count"] += s_stats.get("present", 0)
+                subjects_stats_dict[subject_id]["absent_count"] += s_stats.get("absent", 0)
+                subjects_stats_dict[subject_id]["late_count"] += s_stats.get("late_only", 0)
+                subjects_stats_dict[subject_id]["total_records"] += s_stats.get("filled_count", 0)
+        
+        # Вычисляем проценты посещаемости по каждому предмету
+        subjects_stats_list = []
+        for subject_id, s_data in subjects_stats_dict.items():
+            total_possible = s_data["total_sessions"] * total_students
+            if total_possible > 0 and s_data["total_records"] > 0:
+                # present_count уже включает late (present + late)
+                s_data["attendance_percent"] = round(
+                    (s_data["present_count"] / s_data["total_records"]) * 100, 1
+                )
+            subjects_stats_list.append(SubjectStatsResponse(**s_data))
+        
+        # Сортируем по имени предмета
+        subjects_stats_list.sort(key=lambda x: x.subject_name)
+        
+        return JournalStatsResponse(
+            journal_id=journal_id,
+            total_students=total_students,
+            linked_students=linked_students,
+            total_sessions=total_sessions,
+            overall_attendance_percent=overall_percent,
+            students_stats=students_stats,
+            sessions_stats=sessions_stats,
+            subjects_stats=subjects_stats_list
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting journal stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ MUSIC API ENDPOINTS ============
+
+from music_service import music_service
+from cover_service import init_cover_service, get_cover_service
+
+@api_router.get("/music/search")
+async def music_search(q: str, count: int = 20):
+    """
+    Асинхронный поиск музыки по запросу с обложками из Deezer.
+    Возвращает треки с метаданными. Прямая ссылка может быть пустой -
+    используйте /api/music/stream/{track_id} для получения URL при воспроизведении.
+    """
+    try:
+        tracks = await music_service.search(q, count)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        return {"tracks": tracks, "count": len(tracks)}
+    except Exception as e:
+        logger.error(f"Music search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/stream/{track_id}")
+async def music_stream(track_id: str):
+    """
+    Получение прямой ссылки на трек для воспроизведения.
+    Вызывается frontend'ом при нажатии play.
+    Возвращает JSON с url или редирект на прямую ссылку.
+    """
+    try:
+        url = await music_service.get_track_url(track_id)
+        
+        if not url:
+            raise HTTPException(
+                status_code=404, 
+                detail="Трек недоступен или заблокирован правообладателем"
+            )
+        
+        # Возвращаем JSON с URL (frontend сам установит src)
+        return {"url": url, "track_id": track_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music stream error for {track_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/redirect/{track_id}")
+async def music_redirect(track_id: str):
+    """
+    Альтернативный endpoint - редирект на прямую ссылку.
+    Полезен для <audio src="/api/music/redirect/...">
+    """
+    try:
+        url = await music_service.get_track_url(track_id)
+        
+        if not url:
+            raise HTTPException(
+                status_code=404, 
+                detail="Трек недоступен"
+            )
+        
+        return RedirectResponse(url=url)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music redirect error for {track_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/my")
+async def music_my_audio(count: int = 50, offset: int = 0):
+    """Мои аудиозаписи VK с обложками из Deezer"""
+    try:
+        tracks = await music_service.get_my_audio(count, offset)
+        current_count = len(tracks)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        # FIX: Убираем двойной VK API запрос для has_more.
+        # Вместо этого: если получили полный набор — скорее всего есть ещё
+        has_more = current_count >= count
+        
+        return {"tracks": tracks, "count": current_count, "offset": offset, "has_more": has_more}
+    except Exception as e:
+        logger.error(f"Music my audio error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/popular")
+async def music_popular(count: int = 30, offset: int = 0):
+    """Популярные треки с пагинацией и обложками из Deezer"""
+    try:
+        tracks = await music_service.get_popular(count, offset)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        # has_more = true если получили полный набор треков
+        has_more = len(tracks) == count
+        return {"tracks": tracks, "count": len(tracks), "has_more": has_more, "offset": offset}
+    except Exception as e:
+        logger.error(f"Music popular error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/playlists")
+async def music_playlists():
+    """Плейлисты пользователя VK (DEPRECATED - используйте /music/playlists-vk/{telegram_id})"""
+    try:
+        playlists = await music_service.get_playlists()
+        return {"playlists": playlists}
+    except Exception as e:
+        logger.error(f"Music playlists error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/playlists-vk/{telegram_id}")
+async def music_playlists_vk(telegram_id: int):
+    """
+    Получение плейлистов пользователя с использованием его персонального токена VK.
+    """
+    try:
+        # Получаем токен пользователя
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            raise HTTPException(
+                status_code=401, 
+                detail="VK аккаунт не подключен. Авторизуйтесь в разделе Музыка."
+            )
+        
+        token = token_doc.get("vk_token")
+        vk_user_id = token_doc.get("vk_user_id")
+        user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
+        
+        # Запрос плейлистов к VK API (async)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.vk.com/method/audio.getPlaylists",
+                params={
+                    "access_token": token,
+                    "owner_id": vk_user_id,
+                    "count": 50,
+                    "v": "5.131"
+                },
+                headers={"User-Agent": user_agent},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                data = await response.json()
+        
+        if "error" in data:
+            error = data["error"]
+            error_code = error.get("error_code", 0)
+            
+            # Токен истёк
+            if error_code in [5, 27]:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Токен истёк. Требуется повторная авторизация."
+                )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error.get("error_msg", "VK API Error")
+            )
+        
+        items = data.get("response", {}).get("items", [])
+        
+        # Форматируем плейлисты
+        playlists = []
+        for item in items:
+            # Получаем обложку плейлиста
+            cover_url = None
+            thumbs = item.get("thumbs", [])
+            if thumbs and len(thumbs) > 0:
+                cover_url = thumbs[0].get("photo_600") or thumbs[0].get("photo_300")
+            if not cover_url:
+                photo = item.get("photo", {})
+                if photo:
+                    cover_url = photo.get("photo_600") or photo.get("photo_300")
+            
+            playlists.append({
+                "id": item.get("id", 0),
+                "owner_id": item.get("owner_id", vk_user_id),
+                "title": item.get("title", "Без названия"),
+                "count": item.get("count", 0),
+                "cover": cover_url,
+                "access_key": item.get("access_key", "")
+            })
+        
+        logger.info(f"VK playlists for telegram_id={telegram_id}: found {len(playlists)} playlists")
+        
+        return {"playlists": playlists}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music playlists VK error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/playlist/{owner_id}/{playlist_id}")
+async def music_playlist_tracks(owner_id: int, playlist_id: int, access_key: str = "", count: int = 100):
+    """Треки конкретного плейлиста с обложками из Deezer (DEPRECATED - используйте /music/playlist-vk/{telegram_id}/{owner_id}/{playlist_id})"""
+    try:
+        tracks = await music_service.get_playlist_tracks(owner_id, playlist_id, access_key, count)
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        return {"tracks": tracks, "count": len(tracks)}
+    except Exception as e:
+        logger.error(f"Music playlist tracks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/playlist-vk/{telegram_id}/{owner_id}/{playlist_id}")
+async def music_playlist_tracks_vk(telegram_id: int, owner_id: int, playlist_id: int, access_key: str = "", count: int = 100):
+    """
+    Получение треков плейлиста с использованием персонального токена VK.
+    """
+    try:
+        # Получаем токен пользователя
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            raise HTTPException(
+                status_code=401, 
+                detail="VK аккаунт не подключен. Авторизуйтесь в разделе Музыка."
+            )
+        
+        token = token_doc.get("vk_token")
+        user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
+        
+        # Запрос треков плейлиста к VK API (async)
+        params = {
+            "access_token": token,
+            "owner_id": owner_id,
+            "playlist_id": playlist_id,
+            "count": min(count, 100),
+            "v": "5.131"
+        }
+        if access_key:
+            params["access_key"] = access_key
+            
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.vk.com/method/audio.get",
+                params=params,
+                headers={"User-Agent": user_agent},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                data = await response.json()
+        
+        if "error" in data:
+            error = data["error"]
+            error_code = error.get("error_code", 0)
+            
+            if error_code in [5, 27]:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Токен истёк. Требуется повторная авторизация."
+                )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error.get("error_msg", "VK API Error")
+            )
+        
+        items = data.get("response", {}).get("items", [])
+        
+        # Форматируем треки
+        tracks = []
+        for item in items:
+            cover_url = None
+            album = item.get("album", {})
+            if album:
+                thumb = album.get("thumb", {})
+                if thumb:
+                    cover_url = thumb.get("photo_600") or thumb.get("photo_300")
+            
+            track_id = f"{item['owner_id']}_{item['id']}"
+            direct_url = item.get("url", "")
+            is_blocked = not direct_url or "audio_api_unavailable" in direct_url
+            
+            tracks.append({
+                "id": track_id,
+                "owner_id": item["owner_id"],
+                "song_id": item["id"],
+                "artist": item.get("artist", "Unknown"),
+                "title": item.get("title", "Unknown"),
+                "duration": item.get("duration", 0),
+                "cover": cover_url,
+                "stream_url": f"/api/music/stream/{track_id}",
+                "is_blocked": is_blocked
+            })
+        
+        # Обогащаем треки обложками из Deezer API
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        logger.info(f"VK playlist tracks for telegram_id={telegram_id}: found {len(tracks)} tracks")
+        
+        return {"tracks": tracks, "count": len(tracks)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Music playlist tracks VK error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/music/artist/{artist_name:path}")
+async def music_artist_tracks(artist_name: str, count: int = 50):
+    """Получить треки артиста по имени с обложками из Deezer"""
+    try:
+        result = await music_service.get_artist_tracks(artist_name, count)
+        
+        # Обогащаем треки обложками из Deezer API
+        if result.get('tracks'):
+            result['tracks'] = await music_service.enrich_tracks_with_covers(result['tracks'])
+        
+        return result
+    except Exception as e:
+        logger.error(f"Music artist tracks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Избранные треки (хранятся в MongoDB)
+@api_router.get("/music/favorites/{telegram_id}")
+async def get_music_favorites(telegram_id: int):
+    """Получить избранные треки пользователя"""
+    try:
+        favorites = await db.music_favorites.find(
+            {"telegram_id": telegram_id}
+        ).sort("added_at", -1).to_list(500)
+        
+        # Убираем _id из ответа
+        for f in favorites:
+            f.pop("_id", None)
+        
+        return {"tracks": favorites, "count": len(favorites)}
+    except Exception as e:
+        logger.error(f"Get music favorites error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/music/favorites/{telegram_id}")
+async def add_music_favorite(telegram_id: int, track: dict):
+    """Добавить трек в избранное"""
+    try:
+        # Проверяем, не добавлен ли уже
+        existing = await db.music_favorites.find_one({
+            "telegram_id": telegram_id,
+            "id": track.get("id")
+        })
+        
+        if existing:
+            return {"success": False, "message": "Track already in favorites"}
+        
+        # FIX: Копируем dict чтобы не мутировать оригинал и не пробрасывать _id
+        favorite_doc = {**track}
+        favorite_doc["telegram_id"] = telegram_id
+        favorite_doc["added_at"] = datetime.utcnow()
+        
+        await db.music_favorites.insert_one(favorite_doc)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Add music favorite error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/music/favorites/{telegram_id}/{track_id}")
+async def remove_music_favorite(telegram_id: int, track_id: str):
+    """Удалить трек из избранного"""
+    try:
+        result = await db.music_favorites.delete_one({
+            "telegram_id": telegram_id,
+            "id": track_id
+        })
+        return {"success": result.deleted_count > 0}
+    except Exception as e:
+        logger.error(f"Remove music favorite error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ MUSIC HISTORY & SIMILAR ============
+
+@api_router.post("/music/history/{telegram_id}")
+async def add_to_history(telegram_id: int, track: dict):
+    """Добавить трек в историю прослушивания"""
+    try:
+        history_doc = {**track}
+        history_doc["telegram_id"] = telegram_id
+        history_doc["played_at"] = datetime.utcnow()
+        # Удаляем старую запись этого трека (если есть) чтобы поднять наверх
+        await db.music_history.delete_many({
+            "telegram_id": telegram_id,
+            "id": track.get("id")
+        })
+        await db.music_history.insert_one(history_doc)
+        # Ограничиваем историю 200 записями
+        count = await db.music_history.count_documents({"telegram_id": telegram_id})
+        if count > 200:
+            oldest = await db.music_history.find(
+                {"telegram_id": telegram_id}
+            ).sort("played_at", 1).limit(count - 200).to_list(None)
+            if oldest:
+                ids = [d["_id"] for d in oldest]
+                await db.music_history.delete_many({"_id": {"$in": ids}})
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Add to history error: {e}")
+        return {"success": False}
+
+@api_router.get("/music/history/{telegram_id}")
+async def get_history(telegram_id: int, limit: int = 50):
+    """Получить историю прослушивания"""
+    try:
+        history = await db.music_history.find(
+            {"telegram_id": telegram_id},
+            {"_id": 0, "telegram_id": 0}
+        ).sort("played_at", -1).limit(limit).to_list(None)
+        return {"tracks": history, "count": len(history)}
+    except Exception as e:
+        logger.error(f"Get history error: {e}")
+        return {"tracks": [], "count": 0}
+
+@api_router.get("/music/similar/{track_id}")
+async def get_similar_tracks(track_id: str, count: int = 20):
+    """Получить похожие треки (на основе артиста текущего трека)"""
+    try:
+        # Извлекаем информацию о текущем треке из поиска
+        artist = None
+        # Ищем трек в избранном или истории
+        for coll in [db.music_favorites, db.music_history]:
+            doc = await coll.find_one({"id": track_id})
+            if doc:
+                artist = doc.get("artist")
+                break
+        
+        if not artist:
+            # Пробуем получить через VK API
+            url = await music_service.get_track_url(track_id)
+            # Используем поиск по ID для получения метаданных
+            return {"tracks": [], "count": 0, "source": "unknown_track"}
+        
+        # Ищем треки того же артиста
+        results = await music_service.search(artist, count=count)
+        # Фильтруем текущий трек
+        similar = [t for t in results if t.get("id") != track_id]
+        # Обогащаем обложками
+        similar = await music_service.enrich_tracks_with_covers(similar)
+        
+        return {"tracks": similar[:count], "count": len(similar[:count]), "source": "artist"}
+    except Exception as e:
+        logger.error(f"Get similar tracks error: {e}")
+        return {"tracks": [], "count": 0}
+
+
+# ============ VK AUTH API ============
+
+from vk_auth_service import vk_auth_service, VKAuthError
+from fastapi.responses import HTMLResponse
+from urllib.parse import urlencode, quote
+
+class VKAuthRequest(BaseModel):
+    """Запрос авторизации VK через логин/пароль (Kate Mobile)"""
+    # Авторизация через логин/пароль (основной метод)
+    login: Optional[str] = Field(None, description="Телефон, email или логин VK")
+    password: Optional[str] = Field(None, description="Пароль от аккаунта VK")
+    two_fa_code: Optional[str] = Field(None, description="Код двухфакторной аутентификации")
+    captcha_key: Optional[str] = Field(None, description="Ответ на капчу")
+    captcha_sid: Optional[str] = Field(None, description="ID капчи")
+    # Fallback - OAuth токен (если есть)
+    token_url: Optional[str] = Field(None, description="URL с токеном из redirect")
+    access_token: Optional[str] = Field(None, description="Или напрямую access_token")
+
+class VKAuthResponse(BaseModel):
+    """Ответ авторизации VK"""
+    success: bool
+    message: str
+    vk_user_id: Optional[int] = None
+    needs_2fa: bool = False
+    captcha_data: Optional[dict] = None
+    twofa_data: Optional[dict] = None  # phone_mask, validation_sid, validation_type
+
+class VKOAuthConfigResponse(BaseModel):
+    """Конфигурация OAuth для VK"""
+    auth_url: str
+    app_id: int
+    redirect_uri: str
+
+# VK OAuth Configuration - Kate Mobile (как vkserv.ru)
+# Используем Implicit Grant Flow для получения токена с доступом к аудио
+VK_OAUTH_CONFIG = {
+    "app_id": 2685278,  # Kate Mobile - даёт доступ к audio API
+    "redirect_uri": "https://api.vk.com/blank.html",  # Стандартный redirect для Implicit Grant
+    "scope": "audio,offline",  # Минимальные права: только музыка и бессрочный токен
+    "response_type": "token",  # Implicit Grant Flow - токен сразу в URL
+    "display": "page"  # Полноразмерная страница авторизации
+}
+
+# Временное хранилище state для CSRF защиты (telegram_id -> state)
+vk_oauth_states = {}
+
+@api_router.get("/music/auth/config")
+async def get_vk_oauth_config(telegram_id: int = None):
+    """
+    Получить конфигурацию OAuth для авторизации VK (Kate Mobile).
+    
+    Используем Implicit Grant Flow как на vkserv.ru:
+    - client_id=2685278 (Kate Mobile)
+    - redirect_uri=https://api.vk.com/blank.html
+    - response_type=token (токен сразу в URL)
+    
+    Flow:
+    1. Пользователь открывает auth_url
+    2. Авторизуется в VK
+    3. VK редиректит на blank.html#access_token=XXX&user_id=YYY
+    4. Пользователь копирует URL и вставляет в приложение
+    """
+    # Формируем OAuth URL (Implicit Grant - токен сразу в URL)
+    params = {
+        "client_id": VK_OAUTH_CONFIG["app_id"],
+        "redirect_uri": VK_OAUTH_CONFIG["redirect_uri"],
+        "response_type": VK_OAUTH_CONFIG["response_type"],
+        "scope": VK_OAUTH_CONFIG["scope"],
+        "display": VK_OAUTH_CONFIG["display"]
+    }
+    
+    auth_url = f"https://oauth.vk.com/authorize?{urlencode(params)}"
+    
+    return VKOAuthConfigResponse(
+        auth_url=auth_url,
+        app_id=VK_OAUTH_CONFIG["app_id"],
+        redirect_uri=VK_OAUTH_CONFIG["redirect_uri"]
+    )
+
+
+@api_router.get("/music/vk-callback")
+async def vk_oauth_callback(code: str = None, state: str = None, error: str = None, error_description: str = None):
+    """
+    Callback для VK OAuth.
+    
+    VK перенаправляет сюда после авторизации пользователя с параметром code.
+    Мы обмениваем code на access_token и сохраняем токен.
+    """
+    
+    # HTML шаблон для ответа
+    def make_html_response(success: bool, message: str, vk_user_name: str = None):
+        color = "#4CAF50" if success else "#f44336"
+        icon = "✅" if success else "❌"
+        return HTMLResponse(content=f"""
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK Авторизация - RUDN Schedule</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }}
+        .container {{
+            background: rgba(255,255,255,0.05);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }}
+        .icon {{
+            font-size: 64px;
+            margin-bottom: 20px;
+        }}
+        .title {{
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: {color};
+        }}
+        .message {{
+            font-size: 16px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }}
+        .user-name {{
+            font-size: 18px;
+            color: white;
+            margin-bottom: 24px;
+        }}
+        .hint {{
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 20px;
+        }}
+        .close-btn {{
+            background: {color};
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">{icon}</div>
+        <div class="title">{"Успешно!" if success else "Ошибка"}</div>
+        {f'<div class="user-name">{vk_user_name}</div>' if vk_user_name else ''}
+        <div class="message">{message}</div>
+        <button class="close-btn" onclick="window.close()">Закрыть</button>
+        <div class="hint">Вернитесь в приложение</div>
+    </div>
+    <script>
+        // Попробуем закрыть окно автоматически через 3 секунды
+        setTimeout(() => {{
+            try {{ window.close(); }} catch(e) {{}}
+        }}, 3000);
+    </script>
+</body>
+</html>
+        """)
+    
+    # Проверяем ошибку от VK
+    if error:
+        logger.error(f"VK OAuth error: {error} - {error_description}")
+        return make_html_response(False, f"VK вернул ошибку: {error_description or error}")
+    
+    # Проверяем наличие code
+    if not code:
+        return make_html_response(False, "Код авторизации не получен")
+    
+    # Проверяем state и извлекаем telegram_id
+    telegram_id = None
+    if state:
+        state_data = vk_oauth_states.get(state)
+        if state_data:
+            telegram_id = state_data.get("telegram_id")
+            # Удаляем использованный state
+            del vk_oauth_states[state]
+        else:
+            # Пробуем извлечь telegram_id из state напрямую
+            try:
+                telegram_id = int(state.split("_")[0])
+            except:
+                pass
+    
+    if not telegram_id:
+        return make_html_response(False, "Не удалось определить пользователя. Попробуйте авторизоваться заново.")
+    
+    try:
+        # Обмениваем code на access_token
+        token_url = "https://oauth.vk.com/access_token"
+        token_params = {
+            "client_id": VK_OAUTH_CONFIG["app_id"],
+            "client_secret": VK_OAUTH_CONFIG["client_secret"],
+            "redirect_uri": VK_OAUTH_CONFIG["redirect_uri"],
+            "code": code
+        }
+        
+        response = requests.get(token_url, params=token_params, timeout=10)
+        token_data = response.json()
+        
+        if "error" in token_data:
+            error_msg = token_data.get("error_description", token_data.get("error", "Unknown error"))
+            logger.error(f"VK token exchange error: {error_msg}")
+            return make_html_response(False, f"Ошибка получения токена: {error_msg}")
+        
+        access_token = token_data.get("access_token")
+        vk_user_id = token_data.get("user_id")
+        expires_in = token_data.get("expires_in", 0)
+        
+        if not access_token:
+            return make_html_response(False, "Токен не получен от VK")
+        
+        # Валидируем токен
+        verify_result = await vk_auth_service.verify_token(access_token)
+        
+        if not verify_result.get("valid"):
+            return make_html_response(False, f"Недействительный токен: {verify_result.get('error', 'Unknown')}")
+        
+        # Получаем user_id из токена если не было
+        if not vk_user_id:
+            vk_user_id = verify_result.get("user_id")
+        
+        # Проверяем доступ к аудио
+        audio_check = await vk_auth_service.test_audio_access(access_token)
+        audio_count = audio_check.get("audio_count", 0)
+        has_audio = audio_check.get("has_access", False)
+        
+        # Формируем имя пользователя
+        user_name = f"{verify_result.get('first_name', '')} {verify_result.get('last_name', '')}".strip()
+        
+        # Сохраняем токен в MongoDB
+        token_doc = {
+            "telegram_id": telegram_id,
+            "vk_user_id": vk_user_id,
+            "vk_token": access_token,
+            "user_agent": "VKAndroidApp/8.0-15000 (Android 10; SDK 29; arm64-v8a; ru)",
+            "audio_count": audio_count,
+            "has_audio_access": has_audio,
+            "expires_in": expires_in,
+            "auth_method": "vk_id_oauth",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        await db.user_vk_tokens.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": token_doc},
+            upsert=True
+        )
+        
+        logger.info(f"VK ID OAuth success: telegram_id={telegram_id}, vk_user_id={vk_user_id}, user={user_name}, audio_count={audio_count}")
+        
+        if has_audio:
+            return make_html_response(
+                True, 
+                f"VK аккаунт успешно подключен! У вас {audio_count} аудиозаписей.",
+                user_name
+            )
+        else:
+            return make_html_response(
+                True,
+                "Аккаунт подключен, но доступ к аудио ограничен VK. Попробуйте использовать Kate Mobile.",
+                user_name
+            )
+        
+    except Exception as e:
+        logger.error(f"VK OAuth callback error: {e}")
+        return make_html_response(False, f"Ошибка обработки: {str(e)}")
+
+def parse_vk_token_from_url(url: str) -> dict:
+    """
+    Парсит токен VK из URL после OAuth редиректа.
+    
+    URL формат: https://api.vk.com/blank.html#access_token=...&expires_in=...&user_id=...
+    """
+    import re
+    from urllib.parse import urlparse, parse_qs
+    
+    result = {
+        "access_token": None,
+        "user_id": None,
+        "expires_in": None
+    }
+    
+    # Если это полный URL
+    if url.startswith("http"):
+        parsed = urlparse(url)
+        # Токен в fragment (#)
+        fragment = parsed.fragment
+        if fragment:
+            params = parse_qs(fragment)
+            result["access_token"] = params.get("access_token", [None])[0]
+            result["user_id"] = params.get("user_id", [None])[0]
+            result["expires_in"] = params.get("expires_in", [None])[0]
+    
+    # Если это просто токен
+    elif url.startswith("vk1.") or len(url) > 50:
+        result["access_token"] = url.strip()
+    
+    # Попробуем извлечь токен из произвольной строки
+    if not result["access_token"]:
+        # Ищем access_token= в строке
+        token_match = re.search(r'access_token=([^&\s]+)', url)
+        if token_match:
+            result["access_token"] = token_match.group(1)
+        
+        # Ищем user_id
+        user_match = re.search(r'user_id=(\d+)', url)
+        if user_match:
+            result["user_id"] = user_match.group(1)
+    
+    return result
+
+@api_router.post("/music/auth/{telegram_id}", response_model=VKAuthResponse)
+async def vk_auth(telegram_id: int, request: VKAuthRequest):
+    """
+    Авторизация VK через логин/пароль (Kate Mobile) или OAuth токен.
+    
+    Основной метод - логин/пароль:
+    1. Пользователь вводит логин и пароль от VK
+    2. Сервер получает токен Kate Mobile через vkaudiotoken
+    3. Токен даёт доступ к VK Audio API
+    4. Токен сохраняется в MongoDB
+    
+    Fallback - OAuth токен (если передан):
+    1. Парсим токен из URL
+    2. Валидируем и сохраняем
+    """
+    try:
+        token = None
+        vk_user_id = None
+        user_agent = "KateMobileAndroid/93 lite-530 (Android 10; SDK 29; arm64-v8a; Xiaomi Redmi Note 8 Pro; ru)"
+        auth_method = "kate_mobile"
+        user_name = ""
+        
+        # === Метод 1: Авторизация через логин/пароль (Kate Mobile) ===
+        if request.login and request.password:
+            logger.info(f"VK Kate auth attempt for telegram_id: {telegram_id}")
+            
+            try:
+                auth_result = await vk_auth_service.authenticate(
+                    login=request.login,
+                    password=request.password,
+                    two_fa_code=request.two_fa_code,
+                    captcha_key=request.captcha_key,
+                    captcha_sid=request.captcha_sid
+                )
+                
+                token = auth_result.get("token")
+                vk_user_id = auth_result.get("user_id")
+                user_agent = auth_result.get("user_agent", user_agent)
+                
+            except VKAuthError as e:
+                logger.warning(f"VK Kate auth error: {e.error_code} - {e.message}")
+                return VKAuthResponse(
+                    success=False,
+                    message=e.message,
+                    needs_2fa=e.needs_2fa,
+                    captcha_data=e.captcha_data,
+                    twofa_data=e.twofa_data  # Передаём данные о 2FA (phone_mask и т.д.)
+                )
+        
+        # === Метод 2: OAuth токен (fallback) ===
+        elif request.token_url or request.access_token:
+            auth_method = "oauth"
+            
+            if request.token_url:
+                parsed = parse_vk_token_from_url(request.token_url)
+                token = parsed.get("access_token")
+                vk_user_id = parsed.get("user_id")
+                if vk_user_id:
+                    vk_user_id = int(vk_user_id)
+            elif request.access_token:
+                token = request.access_token.strip()
+        
+        # === Проверка токена ===
+        if not token:
+            return VKAuthResponse(
+                success=False,
+                message="Введите логин и пароль от VK для авторизации",
+                needs_2fa=False
+            )
+        
+        # Валидируем токен через VK API
+        verify_result = await vk_auth_service.verify_token(token)
+        
+        if not verify_result.get("valid"):
+            return VKAuthResponse(
+                success=False,
+                message=f"Ошибка токена: {verify_result.get('error', 'Unknown error')}",
+                needs_2fa=False
+            )
+        
+        # Получаем user_id из токена если не было
+        if not vk_user_id:
+            vk_user_id = verify_result.get("user_id")
+        
+        user_name = f"{verify_result.get('first_name', '')} {verify_result.get('last_name', '')}".strip()
+        
+        # Проверяем доступ к аудио
+        audio_check = await vk_auth_service.test_audio_access(token)
+        
+        if not audio_check.get("has_access"):
+            return VKAuthResponse(
+                success=False,
+                message="Токен получен, но нет доступа к аудио. Возможно, VK ограничил доступ. Попробуйте позже.",
+                needs_2fa=False
+            )
+        
+        # === Сохраняем токен в MongoDB ===
+        token_doc = {
+            "telegram_id": telegram_id,
+            "vk_user_id": vk_user_id,
+            "vk_token": token,
+            "user_agent": user_agent,
+            "audio_count": audio_check.get("audio_count", 0),
+            "auth_method": auth_method,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        # Upsert - обновляем если существует, создаем если нет
+        await db.user_vk_tokens.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": token_doc},
+            upsert=True
+        )
+        
+        logger.info(f"VK {auth_method} token saved for telegram_id: {telegram_id}, vk_user_id: {vk_user_id}, user: {user_name}")
+        
+        return VKAuthResponse(
+            success=True,
+            message=f"VK аккаунт подключен! Добро пожаловать, {user_name}",
+            vk_user_id=vk_user_id,
+            needs_2fa=False
+        )
+        
+    except Exception as e:
+        logger.error(f"VK auth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/auth/status/{telegram_id}")
+async def vk_auth_status(telegram_id: int):
+    """
+    Проверка статуса авторизации VK пользователя.
+    
+    Returns:
+        - is_connected: bool - подключен ли VK аккаунт
+        - vk_user_id: int - ID пользователя VK
+        - vk_user_info: dict - информация о пользователе VK
+        - token_valid: bool - валиден ли токен
+        - audio_access: bool - есть ли доступ к аудио
+    """
+    try:
+        # Ищем сохраненный токен
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            return {
+                "is_connected": False,
+                "message": "VK аккаунт не подключен"
+            }
+        
+        # Проверяем валидность токена
+        token = token_doc.get("vk_token")
+        verify_result = await vk_auth_service.verify_token(token)
+        
+        if not verify_result.get("valid"):
+            return {
+                "is_connected": True,
+                "vk_user_id": token_doc.get("vk_user_id"),
+                "token_valid": False,
+                "message": "Токен истёк, требуется повторная авторизация",
+                "error": verify_result.get("error")
+            }
+        
+        # Проверяем доступ к аудио
+        audio_check = await vk_auth_service.test_audio_access(token)
+        
+        return {
+            "is_connected": True,
+            "vk_user_id": token_doc.get("vk_user_id"),
+            "vk_user_info": {
+                "first_name": verify_result.get("first_name"),
+                "last_name": verify_result.get("last_name"),
+                "photo": verify_result.get("photo")
+            },
+            "token_valid": True,
+            "audio_access": audio_check.get("has_access", False),
+            "audio_count": audio_check.get("audio_count", 0),
+            "connected_at": token_doc.get("created_at").isoformat() if token_doc.get("created_at") else None
+        }
+        
+    except Exception as e:
+        logger.error(f"VK auth status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/music/auth/{telegram_id}")
+async def vk_auth_disconnect(telegram_id: int):
+    """
+    Отключение VK аккаунта (удаление токена).
+    """
+    try:
+        result = await db.user_vk_tokens.delete_one({"telegram_id": telegram_id})
+        
+        if result.deleted_count > 0:
+            logger.info(f"VK token deleted for telegram_id: {telegram_id}")
+            return {"success": True, "message": "VK аккаунт отключен"}
+        else:
+            return {"success": False, "message": "VK аккаунт не был подключен"}
+            
+    except Exception as e:
+        logger.error(f"VK auth disconnect error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/my-vk/{telegram_id}")
+async def get_my_vk_audio(telegram_id: int, count: int = 50, offset: int = 0):
+    """
+    Получение аудиозаписей пользователя с использованием его персонального токена.
+    
+    Использует персональный токен пользователя для доступа к его аудио.
+    """
+    try:
+        # Получаем токен пользователя
+        token_doc = await db.user_vk_tokens.find_one({"telegram_id": telegram_id})
+        
+        if not token_doc:
+            raise HTTPException(
+                status_code=401, 
+                detail="VK аккаунт не подключен. Авторизуйтесь в разделе Музыка."
+            )
+        
+        token = token_doc.get("vk_token")
+        vk_user_id = token_doc.get("vk_user_id")
+        user_agent = token_doc.get("user_agent", "KateMobileAndroid/93 lite-530")
+        
+        # Запрос к VK API (async)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.vk.com/method/audio.get",
+                params={
+                    "access_token": token,
+                    "owner_id": vk_user_id,
+                    "count": count,
+                    "offset": offset,
+                    "v": "5.131"
+                },
+                headers={"User-Agent": user_agent},
+                timeout=aiohttp.ClientTimeout(total=15)
+            ) as response:
+                data = await response.json()
+        
+        if "error" in data:
+            error = data["error"]
+            error_code = error.get("error_code", 0)
+            
+            # Токен истёк
+            if error_code in [5, 27]:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Токен истёк. Требуется повторная авторизация."
+                )
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error.get("error_msg", "VK API Error")
+            )
+        
+        items = data.get("response", {}).get("items", [])
+        total_count = data.get("response", {}).get("count", 0)
+        
+        # Форматируем треки
+        tracks = []
+        for item in items:
+            cover_url = None
+            album = item.get("album", {})
+            if album:
+                thumb = album.get("thumb", {})
+                if thumb:
+                    cover_url = thumb.get("photo_600") or thumb.get("photo_300")
+            
+            track_id = f"{item['owner_id']}_{item['id']}"
+            direct_url = item.get("url", "")
+            is_blocked = not direct_url or "audio_api_unavailable" in direct_url
+            
+            tracks.append({
+                "id": track_id,
+                "owner_id": item["owner_id"],
+                "song_id": item["id"],
+                "artist": item.get("artist", "Unknown"),
+                "title": item.get("title", "Unknown"),
+                "duration": item.get("duration", 0),
+                "url": direct_url if not is_blocked else None,
+                "cover": cover_url,
+                "stream_url": f"/api/music/stream/{track_id}",
+                "is_blocked": is_blocked
+            })
+        
+        # Обогащаем обложками
+        tracks = await music_service.enrich_tracks_with_covers(tracks)
+        
+        return {
+            "tracks": tracks,
+            "count": len(tracks),
+            "total": total_count,
+            "has_more": offset + len(tracks) < total_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get my VK audio error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ============ API для совместного прослушивания музыки (Listening Rooms) ============
+
+# Хранилище WebSocket соединений для комнат прослушивания
+listening_room_connections: Dict[str, Dict[int, WebSocket]] = {}  # room_id -> {telegram_id -> websocket}
+
+
+def calculate_actual_position(state: dict) -> float:
+    """
+    Рассчитывает актуальную позицию воспроизведения с учётом времени.
+    
+    Если музыка играет (is_playing=True), то актуальная позиция = 
+    сохранённая позиция + время прошедшее с последнего обновления.
+    
+    Returns:
+        Актуальная позиция в секундах
+    """
+    if not state:
+        return 0
+    
+    position = state.get("position", 0)
+    is_playing = state.get("is_playing", False)
+    updated_at = state.get("updated_at")
+    
+    # Если не играет или нет времени обновления - возвращаем сохранённую позицию
+    if not is_playing or not updated_at:
+        return position
+    
+    # Рассчитываем время прошедшее с последнего обновления
+    try:
+        if isinstance(updated_at, str):
+            updated_at = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+        
+        now = datetime.utcnow()
+        if updated_at.tzinfo:
+            now = datetime.utcnow().replace(tzinfo=updated_at.tzinfo)
+        
+        elapsed = (now - updated_at.replace(tzinfo=None) if updated_at.tzinfo else now - updated_at).total_seconds()
+        
+        # Ограничиваем elapsed чтобы не уходить слишком далеко (макс 30 секунд drift)
+        elapsed = max(0, min(elapsed, 30))
+        
+        actual_position = position + elapsed
+        
+        # Ограничиваем позицию длительностью трека (если известна и валидна)
+        current_track = state.get("current_track")
+        if current_track:
+            duration = current_track.get("duration")
+            # Проверяем что duration валидный (больше 0)
+            if duration and isinstance(duration, (int, float)) and duration > 0:
+                actual_position = min(actual_position, duration)
+        
+        return actual_position
+        
+    except Exception as e:
+        logger.warning(f"Error calculating actual position: {e}")
+        return position
+
+
+def get_state_with_actual_position(state: dict) -> dict:
+    """
+    Возвращает копию состояния с актуальной позицией воспроизведения.
+    """
+    if not state:
+        return {}
+    
+    result = dict(state)
+    result["position"] = calculate_actual_position(state)
+    return result
+
+@api_router.post("/music/rooms", response_model=CreateListeningRoomResponse)
+async def create_listening_room(request: CreateListeningRoomRequest):
+    """
+    Создать комнату совместного прослушивания музыки.
+    Улучшено: добавлены queue, history, initiated_by, max_participants
+    """
+    try:
+        room_id = str(uuid.uuid4())
+        invite_code = str(uuid.uuid4())[:8].upper()
+        
+        # Создаём хоста как первого участника
+        host_participant = {
+            "telegram_id": request.telegram_id,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "username": request.username,
+            "photo_url": request.photo_url,
+            "joined_at": datetime.utcnow(),
+            "can_control": True,
+            "is_online": False  # Станет True при подключении к WebSocket
+        }
+        
+        room_data = {
+            "id": room_id,
+            "invite_code": invite_code,
+            "name": request.name,
+            "host_id": request.telegram_id,
+            "control_mode": request.control_mode.value,
+            "allowed_controllers": [],
+            "participants": [host_participant],
+            "state": {
+                "is_playing": False,
+                "current_track": None,
+                "position": 0,
+                "updated_at": datetime.utcnow(),
+                "initiated_by": None,
+                "initiated_by_name": ""
+            },
+            "queue": [],  # Очередь треков
+            "history": [],  # История последних 20 треков
+            "created_at": datetime.utcnow(),
+            "is_active": True,
+            "max_participants": 50
+        }
+        
+        await db.listening_rooms.insert_one(room_data)
+        
+        bot_username = get_telegram_bot_username()
+        invite_link = f"https://t.me/{bot_username}/app?startapp=listen_{invite_code}"
+        
+        logger.info(f"🎵 Created listening room {room_id[:8]}... by user {request.telegram_id}")
+        
+        return CreateListeningRoomResponse(
+            success=True,
+            room_id=room_id,
+            invite_code=invite_code,
+            invite_link=invite_link,
+            message="Комната создана!"
+        )
+        
+    except Exception as e:
+        logger.error(f"Create listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/{room_id}", response_model=ListeningRoomResponse)
+async def get_listening_room(room_id: str, telegram_id: int):
+    """
+    Получить информацию о комнате прослушивания.
+    Улучшено: добавлен online_count, queue, history
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        is_host = room["host_id"] == telegram_id
+        
+        # Определяем, может ли пользователь управлять воспроизведением
+        can_control = False
+        if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+            can_control = True
+        elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+            can_control = is_host
+        elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+            can_control = is_host or telegram_id in room.get("allowed_controllers", [])
+        
+        # Получаем актуальный online_count из WebSocket соединений
+        online_count = len(listening_room_connections.get(room_id, {}))
+        
+        # Безопасное создание state с новыми полями
+        state_data = room.get("state", {})
+        state = ListeningRoomState(
+            is_playing=state_data.get("is_playing", False),
+            current_track=ListeningRoomTrack(**state_data["current_track"]) if state_data.get("current_track") else None,
+            position=state_data.get("position", 0),
+            updated_at=state_data.get("updated_at", datetime.utcnow()),
+            initiated_by=state_data.get("initiated_by"),
+            initiated_by_name=state_data.get("initiated_by_name", "")
+        )
+        
+        # Конвертируем в Pydantic модель
+        room_model = ListeningRoom(
+            id=room["id"],
+            invite_code=room["invite_code"],
+            name=room["name"],
+            host_id=room["host_id"],
+            control_mode=ListeningRoomControlMode(room["control_mode"]),
+            allowed_controllers=room.get("allowed_controllers", []),
+            participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
+            state=state,
+            queue=[ListeningRoomTrack(**t) for t in room.get("queue", [])],
+            history=room.get("history", [])[:20],  # Последние 20 треков
+            created_at=room["created_at"],
+            is_active=room["is_active"],
+            max_participants=room.get("max_participants", 50)
+        )
+        
+        return ListeningRoomResponse(
+            room=room_model,
+            is_host=is_host,
+            can_control=can_control,
+            online_count=online_count
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/preview/{invite_code}")
+async def preview_listening_room_by_code(invite_code: str):
+    """
+    Получить информацию о комнате по коду приглашения (без присоединения).
+    Используется для показа модального окна подтверждения при сканировании QR.
+    """
+    try:
+        room = await db.listening_rooms.find_one({
+            "invite_code": invite_code.upper(),
+            "is_active": True
+        })
+        
+        if not room:
+            return {"found": False, "message": "Комната не найдена или уже закрыта"}
+        
+        host = next((p for p in room.get("participants", []) if p["telegram_id"] == room.get("host_id")), None)
+        host_name = host.get("first_name", "Неизвестный") if host else "Неизвестный"
+        
+        online_count = len(listening_room_connections.get(room["id"], {}))
+        
+        current_track = room.get("state", {}).get("current_track")
+        track_info = None
+        if current_track:
+            track_info = {
+                "title": current_track.get("title", ""),
+                "artist": current_track.get("artist", "")
+            }
+        
+        return {
+            "found": True,
+            "room_id": room["id"],
+            "name": room.get("name", "Комната"),
+            "host_name": host_name,
+            "host_id": room.get("host_id"),
+            "participants_count": len(room.get("participants", [])),
+            "online_count": online_count,
+            "max_participants": room.get("max_participants", 50),
+            "current_track": track_info,
+            "invite_code": room["invite_code"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Preview listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/join/{invite_code}", response_model=JoinListeningRoomResponse)
+async def join_listening_room_by_code(invite_code: str, request: JoinListeningRoomRequest):
+    """
+    Присоединиться к комнате по коду приглашения.
+    Улучшено: проверка max_participants, is_online статус
+    """
+    try:
+        room = await db.listening_rooms.find_one({
+            "invite_code": invite_code.upper(),
+            "is_active": True
+        })
+        
+        if not room:
+            return JoinListeningRoomResponse(
+                success=False,
+                message="Комната не найдена или уже закрыта"
+            )
+        
+        # Проверяем лимит участников
+        max_participants = room.get("max_participants", 50)
+        if len(room["participants"]) >= max_participants:
+            return JoinListeningRoomResponse(
+                success=False,
+                message=f"Комната заполнена (макс. {max_participants} участников)"
+            )
+        
+        # Проверяем, не находится ли пользователь уже в комнате
+        existing_participant = next(
+            (p for p in room["participants"] if p["telegram_id"] == request.telegram_id),
+            None
+        )
+        
+        if existing_participant:
+            # Уже в комнате - просто возвращаем её
+            online_count = len(listening_room_connections.get(room["id"], {}))
+            state_data = room.get("state", {})
+            state = ListeningRoomState(
+                is_playing=state_data.get("is_playing", False),
+                current_track=ListeningRoomTrack(**state_data["current_track"]) if state_data.get("current_track") else None,
+                position=state_data.get("position", 0),
+                updated_at=state_data.get("updated_at", datetime.utcnow()),
+                initiated_by=state_data.get("initiated_by"),
+                initiated_by_name=state_data.get("initiated_by_name", "")
+            )
+            room_model = ListeningRoom(
+                id=room["id"],
+                invite_code=room["invite_code"],
+                name=room["name"],
+                host_id=room["host_id"],
+                control_mode=ListeningRoomControlMode(room["control_mode"]),
+                allowed_controllers=room.get("allowed_controllers", []),
+                participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
+                state=state,
+                queue=[ListeningRoomTrack(**t) for t in room.get("queue", [])],
+                history=room.get("history", [])[:20],
+                created_at=room["created_at"],
+                is_active=room["is_active"],
+                max_participants=max_participants
+            )
+            return JoinListeningRoomResponse(
+                success=True,
+                room=room_model,
+                message="Вы уже в этой комнате"
+            )
+        
+        # Определяем, может ли новый участник управлять
+        can_control = room["control_mode"] == ListeningRoomControlMode.EVERYONE.value
+        
+        # Добавляем нового участника
+        new_participant = {
+            "telegram_id": request.telegram_id,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "username": request.username,
+            "photo_url": request.photo_url,
+            "joined_at": datetime.utcnow(),
+            "can_control": can_control,
+            "is_online": False  # Станет True при подключении к WebSocket
+        }
+        
+        await db.listening_rooms.update_one(
+            {"id": room["id"]},
+            {"$push": {"participants": new_participant}}
+        )
+        
+        # Получаем обновлённую комнату
+        room = await db.listening_rooms.find_one({"id": room["id"]})
+        online_count = len(listening_room_connections.get(room["id"], {}))
+        
+        state_data = room.get("state", {})
+        state = ListeningRoomState(
+            is_playing=state_data.get("is_playing", False),
+            current_track=ListeningRoomTrack(**state_data["current_track"]) if state_data.get("current_track") else None,
+            position=state_data.get("position", 0),
+            updated_at=state_data.get("updated_at", datetime.utcnow()),
+            initiated_by=state_data.get("initiated_by"),
+            initiated_by_name=state_data.get("initiated_by_name", "")
+        )
+        
+        room_model = ListeningRoom(
+            id=room["id"],
+            invite_code=room["invite_code"],
+            name=room["name"],
+            host_id=room["host_id"],
+            control_mode=ListeningRoomControlMode(room["control_mode"]),
+            allowed_controllers=room.get("allowed_controllers", []),
+            participants=[ListeningRoomParticipant(**p) for p in room["participants"]],
+            state=state,
+            queue=[ListeningRoomTrack(**t) for t in room.get("queue", [])],
+            history=room.get("history", [])[:20],
+            created_at=room["created_at"],
+            is_active=room["is_active"],
+            max_participants=room.get("max_participants", 50)
+        )
+        
+        # Уведомляем других участников через WebSocket
+        await broadcast_to_listening_room(room["id"], {
+            "event": "user_joined",
+            "user": new_participant,
+            "participants_count": len(room["participants"]),
+            "online_count": online_count
+        }, exclude_user=request.telegram_id)
+        
+        logger.info(f"🎵 User {request.telegram_id} joined room {room['id'][:8]}...")
+        
+        return JoinListeningRoomResponse(
+            success=True,
+            room=room_model,
+            message="Вы присоединились к комнате!"
+        )
+        
+    except Exception as e:
+        logger.error(f"Join listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/{room_id}/leave")
+async def leave_listening_room(room_id: str, telegram_id: int):
+    """
+    Выйти из комнаты прослушивания.
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Если выходит хост - закрываем комнату
+        if room["host_id"] == telegram_id:
+            await db.listening_rooms.update_one(
+                {"id": room_id},
+                {"$set": {"is_active": False}}
+            )
+            
+            # Уведомляем всех участников
+            await broadcast_to_listening_room(room_id, {
+                "event": "room_closed",
+                "message": "Хост закрыл комнату"
+            })
+            
+            # Закрываем все соединения
+            if room_id in listening_room_connections:
+                for ws in listening_room_connections[room_id].values():
+                    try:
+                        await ws.close()
+                    except:
+                        pass
+                del listening_room_connections[room_id]
+            
+            logger.info(f"🎵 Room {room_id[:8]}... closed by host")
+            return {"success": True, "message": "Комната закрыта"}
+        
+        # Удаляем участника
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$pull": {"participants": {"telegram_id": telegram_id}}}
+        )
+        
+        # Удаляем WebSocket соединение
+        if room_id in listening_room_connections and telegram_id in listening_room_connections[room_id]:
+            try:
+                await listening_room_connections[room_id][telegram_id].close()
+            except:
+                pass
+            del listening_room_connections[room_id][telegram_id]
+        
+        # Уведомляем других
+        await broadcast_to_listening_room(room_id, {
+            "event": "user_left",
+            "telegram_id": telegram_id
+        })
+        
+        logger.info(f"🎵 User {telegram_id} left room {room_id[:8]}...")
+        return {"success": True, "message": "Вы вышли из комнаты"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Leave listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/music/rooms/{room_id}")
+async def delete_listening_room(room_id: str, telegram_id: int):
+    """
+    Удалить комнату (только для хоста).
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        if room["host_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Только хост может удалить комнату")
+        
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$set": {"is_active": False}}
+        )
+        
+        # Уведомляем всех и закрываем соединения
+        await broadcast_to_listening_room(room_id, {
+            "event": "room_closed",
+            "message": "Комната закрыта хостом"
+        })
+        
+        if room_id in listening_room_connections:
+            for ws in listening_room_connections[room_id].values():
+                try:
+                    await ws.close()
+                except:
+                    pass
+            del listening_room_connections[room_id]
+        
+        logger.info(f"🎵 Room {room_id[:8]}... deleted")
+        return {"success": True, "message": "Комната удалена"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete listening room error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/music/rooms/{room_id}/settings")
+async def update_listening_room_settings(
+    room_id: str, 
+    telegram_id: int,
+    request: UpdateListeningRoomSettingsRequest
+):
+    """
+    Изменить настройки комнаты (только для хоста).
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        if room["host_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Только хост может изменять настройки")
+        
+        update_data = {}
+        if request.name is not None:
+            update_data["name"] = request.name
+        if request.control_mode is not None:
+            update_data["control_mode"] = request.control_mode.value
+        if request.allowed_controllers is not None:
+            update_data["allowed_controllers"] = request.allowed_controllers
+        
+        if update_data:
+            await db.listening_rooms.update_one(
+                {"id": room_id},
+                {"$set": update_data}
+            )
+            
+            # Уведомляем участников об изменении настроек
+            await broadcast_to_listening_room(room_id, {
+                "event": "settings_changed",
+                "settings": update_data
+            })
+        
+        return {"success": True, "message": "Настройки обновлены"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update listening room settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/user/{telegram_id}")
+async def get_user_listening_rooms(telegram_id: int):
+    """
+    Получить активные комнаты пользователя.
+    """
+    try:
+        # Комнаты где пользователь является участником
+        cursor = db.listening_rooms.find({
+            "participants.telegram_id": telegram_id,
+            "is_active": True
+        })
+        
+        rooms = await cursor.to_list(length=50)
+        
+        result = []
+        for room in rooms:
+            # Получаем актуальный online_count из WebSocket соединений
+            room_online_count = len(listening_room_connections.get(room["id"], {}))
+            
+            result.append({
+                "id": room["id"],
+                "name": room["name"],
+                "invite_code": room["invite_code"],
+                "host_id": room["host_id"],
+                "is_host": room["host_id"] == telegram_id,
+                "participants_count": len(room["participants"]),
+                "online_count": room_online_count,  # Актуальное количество онлайн
+                "is_playing": room.get("state", {}).get("is_playing", False),
+                "current_track": room.get("state", {}).get("current_track"),
+                "created_at": room["created_at"]
+            })
+        
+        return {"rooms": result, "count": len(result)}
+        
+    except Exception as e:
+        logger.error(f"Get user listening rooms error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/{room_id}/state")
+async def get_listening_room_state(room_id: str):
+    """
+    Получить текущее состояние комнаты (для HTTP polling).
+    Используется как fallback когда WebSocket недоступен.
+    Возвращает актуальную позицию с учётом времени прошедшего с последнего обновления.
+    """
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        state = room.get("state", {})
+        
+        # Рассчитываем актуальную позицию
+        actual_position = calculate_actual_position(state)
+        
+        return {
+            "is_playing": state.get("is_playing", False),
+            "current_track": state.get("current_track"),
+            "position": actual_position,
+            "updated_at": state.get("updated_at").isoformat() if state.get("updated_at") else None,
+            "participants_count": len(room.get("participants", []))
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get listening room state error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/{room_id}/sync")
+async def sync_listening_room_state(
+    room_id: str, 
+    telegram_id: int = Query(...),
+    event: str = Query(...),
+    position: float = Query(0),
+    request: Request = None
+):
+    """
+    Синхронизировать состояние комнаты через HTTP (fallback для WebSocket).
+    Track передаётся в body как JSON.
+    """
+    try:
+        # Получаем track из body
+        track = None
+        if request:
+            try:
+                body = await request.json()
+                if body and isinstance(body, dict) and body.get('id'):
+                    track = body
+            except:
+                pass
+        
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем права на управление
+        can_control = False
+        if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+            can_control = True
+        elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+            can_control = room["host_id"] == telegram_id
+        elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+            can_control = room["host_id"] == telegram_id or telegram_id in room.get("allowed_controllers", [])
+        
+        if event in ["play", "pause", "seek", "track_change"] and not can_control:
+            raise HTTPException(status_code=403, detail="У вас нет прав на управление воспроизведением")
+        
+        # Обновляем состояние
+        state_update = {"state.updated_at": datetime.utcnow()}
+        
+        if event == "play":
+            state_update["state.is_playing"] = True
+            state_update["state.position"] = position
+            if track:
+                state_update["state.current_track"] = track
+        elif event == "pause":
+            state_update["state.is_playing"] = False
+            state_update["state.position"] = position
+        elif event == "seek":
+            state_update["state.position"] = position
+        elif event == "track_change":
+            if track:
+                state_update["state.current_track"] = track
+                state_update["state.position"] = 0
+                state_update["state.is_playing"] = True
+        
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$set": state_update}
+        )
+        
+        logger.info(f"🎵 Room {room_id[:8]}... sync: {event} by {telegram_id}")
+        
+        # Отправляем через WebSocket тем, кто подключен
+        await broadcast_to_listening_room(room_id, {
+            "event": event,
+            "track": track,
+            "position": position,
+            "triggered_by": telegram_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }, exclude_user=telegram_id)
+        
+        return {"success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Sync listening room state error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+def serialize_for_json(obj):
+    """
+    Рекурсивно конвертирует datetime объекты в ISO строки для JSON сериализации.
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_json(item) for item in obj]
+    return obj
+
+
+async def broadcast_to_listening_room(room_id: str, message: dict, exclude_user: int = None):
+    """
+    Отправить сообщение всем участникам комнаты через WebSocket.
+    """
+    if room_id not in listening_room_connections:
+        return
+    
+    # Сериализуем сообщение для JSON
+    serialized_message = serialize_for_json(message)
+    
+    disconnected = []
+    for user_id, ws in listening_room_connections[room_id].items():
+        if exclude_user and user_id == exclude_user:
+            continue
+        try:
+            await ws.send_json(serialized_message)
+        except:
+            disconnected.append(user_id)
+    
+    # Удаляем отключённые соединения
+    for user_id in disconnected:
+        del listening_room_connections[room_id][user_id]
+
+
+@app.websocket("/api/ws/listening-room/{room_id}/{telegram_id}")
+async def listening_room_websocket(websocket: WebSocket, room_id: str, telegram_id: int):
+    """
+    WebSocket для синхронизации воспроизведения в комнате.
+    """
+    await websocket.accept()
+    
+    # Проверяем существование комнаты
+    room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+    if not room:
+        await websocket.send_json({"event": "error", "message": "Комната не найдена"})
+        await websocket.close()
+        return
+    
+    # Проверяем, что пользователь является участником
+    is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+    if not is_participant:
+        await websocket.send_json({"event": "error", "message": "Вы не являетесь участником комнаты"})
+        await websocket.close()
+        return
+    
+    # Определяем права на управление
+    can_control = False
+    if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+        can_control = True
+    elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+        can_control = room["host_id"] == telegram_id
+    elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+        can_control = room["host_id"] == telegram_id or telegram_id in room.get("allowed_controllers", [])
+    
+    # Сохраняем соединение
+    if room_id not in listening_room_connections:
+        listening_room_connections[room_id] = {}
+    listening_room_connections[room_id][telegram_id] = websocket
+    
+    # Обновляем is_online статус в БД
+    await db.listening_rooms.update_one(
+        {"id": room_id, "participants.telegram_id": telegram_id},
+        {"$set": {"participants.$.is_online": True}}
+    )
+    
+    # Получаем актуальное количество онлайн
+    online_count = len(listening_room_connections[room_id])
+    
+    # Отправляем текущее состояние новому участнику
+    # Рассчитываем актуальную позицию с учётом времени прошедшего с последнего обновления
+    # Это важно для синхронизации - новый участник должен начать с той же позиции что и остальные
+    state_with_actual_position = get_state_with_actual_position(room.get("state", {}))
+    
+    # Сериализуем state для JSON (datetime -> ISO string)
+    await websocket.send_json({
+        "event": "connected",
+        "room_id": room_id,
+        "can_control": can_control,
+        "state": serialize_for_json(state_with_actual_position),
+        "queue": room.get("queue", []),
+        "history": serialize_for_json(room.get("history", [])[:10]),  # Последние 10 треков
+        "online_count": online_count
+    })
+    
+    # Уведомляем остальных участников о новом подключении с актуальным online_count
+    await broadcast_to_listening_room(room_id, {
+        "event": "user_connected",
+        "telegram_id": telegram_id,
+        "online_count": online_count
+    }, exclude_user=telegram_id)
+    
+    logger.info(f"🎵 WebSocket connected: user {telegram_id} to room {room_id[:8]}... (online: {online_count})")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            event = data.get("event")
+            
+            # Проверяем права на управление для событий воспроизведения
+            control_events = ["play", "pause", "seek", "track_change", "queue_add", "queue_remove", "queue_clear"]
+            if event in control_events and not can_control:
+                await websocket.send_json({
+                    "event": "error",
+                    "message": "У вас нет прав на управление воспроизведением"
+                })
+                continue
+            
+            # Получаем имя пользователя для initiated_by
+            participant = next((p for p in room["participants"] if p["telegram_id"] == telegram_id), None)
+            user_name = f"{participant.get('first_name', '')} {participant.get('last_name', '')}".strip() if participant else ""
+            
+            if event == "play":
+                # Воспроизведение
+                track_data = data.get("track")
+                position = data.get("position", 0)
+                
+                state_update = {
+                    "state.is_playing": True,
+                    "state.position": position,
+                    "state.updated_at": datetime.utcnow(),
+                    "state.initiated_by": telegram_id,
+                    "state.initiated_by_name": user_name
+                }
+                if track_data:
+                    state_update["state.current_track"] = track_data
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": state_update}
+                )
+                
+                # Отправляем всем участникам
+                await broadcast_to_listening_room(room_id, {
+                    "event": "play",
+                    "track": track_data,
+                    "position": position,
+                    "triggered_by": telegram_id,
+                    "triggered_by_name": user_name,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "pause":
+                # Пауза
+                position = data.get("position", 0)
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {
+                        "state.is_playing": False,
+                        "state.position": position,
+                        "state.updated_at": datetime.utcnow()
+                    }}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "pause",
+                    "position": position,
+                    "triggered_by": telegram_id,
+                    "triggered_by_name": user_name,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "seek":
+                # Перемотка
+                position = data.get("position", 0)
+                
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {
+                        "state.position": position,
+                        "state.updated_at": datetime.utcnow()
+                    }}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "seek",
+                    "position": position,
+                    "triggered_by": telegram_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+                
+            elif event == "track_change":
+                # Смена трека - добавляем в историю
+                track_data = data.get("track")
+                
+                # Создаём запись для истории
+                history_item = {
+                    "track": track_data,
+                    "played_by": telegram_id,
+                    "played_by_name": user_name,
+                    "played_at": datetime.utcnow()
+                }
+                
+                # Обновляем состояние и добавляем в историю (максимум 20 записей)
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {
+                        "$set": {
+                            "state.current_track": track_data,
+                            "state.position": 0,
+                            "state.is_playing": True,
+                            "state.updated_at": datetime.utcnow(),
+                            "state.initiated_by": telegram_id,
+                            "state.initiated_by_name": user_name
+                        },
+                        "$push": {
+                            "history": {
+                                "$each": [history_item],
+                                "$position": 0,
+                                "$slice": 20  # Храним только последние 20 треков
+                            }
+                        }
+                    }
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "track_change",
+                    "track": track_data,
+                    "triggered_by": telegram_id,
+                    "triggered_by_name": user_name,
+                    "timestamp": datetime.utcnow().isoformat()
+                }, exclude_user=telegram_id)
+            
+            elif event == "queue_add":
+                # Добавить трек в очередь
+                track_data = data.get("track")
+                if track_data:
+                    await db.listening_rooms.update_one(
+                        {"id": room_id},
+                        {"$push": {"queue": track_data}}
+                    )
+                    
+                    # Получаем обновлённую очередь
+                    room = await db.listening_rooms.find_one({"id": room_id})
+                    queue = room.get("queue", [])
+                    
+                    await broadcast_to_listening_room(room_id, {
+                        "event": "queue_updated",
+                        "queue": queue,
+                        "action": "add",
+                        "track": track_data,
+                        "triggered_by": telegram_id,
+                        "triggered_by_name": user_name
+                    })
+            
+            elif event == "queue_remove":
+                # Удалить трек из очереди по индексу
+                track_index = data.get("index", -1)
+                if track_index >= 0:
+                    room = await db.listening_rooms.find_one({"id": room_id})
+                    queue = room.get("queue", [])
+                    if 0 <= track_index < len(queue):
+                        removed_track = queue.pop(track_index)
+                        await db.listening_rooms.update_one(
+                            {"id": room_id},
+                            {"$set": {"queue": queue}}
+                        )
+                        
+                        await broadcast_to_listening_room(room_id, {
+                            "event": "queue_updated",
+                            "queue": queue,
+                            "action": "remove",
+                            "track": removed_track,
+                            "triggered_by": telegram_id
+                        })
+            
+            elif event == "queue_clear":
+                # Очистить очередь
+                await db.listening_rooms.update_one(
+                    {"id": room_id},
+                    {"$set": {"queue": []}}
+                )
+                
+                await broadcast_to_listening_room(room_id, {
+                    "event": "queue_updated",
+                    "queue": [],
+                    "action": "clear",
+                    "triggered_by": telegram_id
+                })
+            
+            elif event == "queue_play_next":
+                # Воспроизвести следующий трек из очереди
+                room = await db.listening_rooms.find_one({"id": room_id})
+                queue = room.get("queue", [])
+                if queue:
+                    next_track = queue.pop(0)
+                    
+                    # Добавляем в историю
+                    history_item = {
+                        "track": next_track,
+                        "played_by": telegram_id,
+                        "played_by_name": user_name,
+                        "played_at": datetime.utcnow()
+                    }
+                    
+                    await db.listening_rooms.update_one(
+                        {"id": room_id},
+                        {
+                            "$set": {
+                                "queue": queue,
+                                "state.current_track": next_track,
+                                "state.position": 0,
+                                "state.is_playing": True,
+                                "state.updated_at": datetime.utcnow(),
+                                "state.initiated_by": telegram_id,
+                                "state.initiated_by_name": user_name
+                            },
+                            "$push": {
+                                "history": {
+                                    "$each": [history_item],
+                                    "$position": 0,
+                                    "$slice": 20
+                                }
+                            }
+                        }
+                    )
+                    
+                    await broadcast_to_listening_room(room_id, {
+                        "event": "track_change",
+                        "track": next_track,
+                        "triggered_by": telegram_id,
+                        "triggered_by_name": user_name,
+                        "from_queue": True,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    
+                    await broadcast_to_listening_room(room_id, {
+                        "event": "queue_updated",
+                        "queue": queue,
+                        "action": "play_next"
+                    })
+                
+            elif event == "sync_request":
+                # Запрос синхронизации состояния - проверяем что пользователь участник
+                room = await db.listening_rooms.find_one({"id": room_id})
+                if room:
+                    is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+                    if not is_participant:
+                        await websocket.send_json({
+                            "event": "error",
+                            "message": "Вы не являетесь участником комнаты"
+                        })
+                        continue
+                    
+                    state_with_actual_position = get_state_with_actual_position(room.get("state", {}))
+                    await websocket.send_json({
+                        "event": "sync_state",
+                        "state": serialize_for_json(state_with_actual_position),
+                        "queue": room.get("queue", []),
+                        "history": serialize_for_json(room.get("history", [])[:10])  # Последние 10
+                    })
+                    
+            elif event == "ping":
+                await websocket.send_json({"event": "pong"})
+                
+    except WebSocketDisconnect:
+        logger.info(f"🎵 WebSocket disconnected: user {telegram_id} from room {room_id[:8]}...")
+    except Exception as e:
+        logger.error(f"Listening room WebSocket error: {e}")
+    finally:
+        # Удаляем соединение и обновляем статус участника
+        if room_id in listening_room_connections and telegram_id in listening_room_connections[room_id]:
+            del listening_room_connections[room_id][telegram_id]
+            
+            # Обновляем is_online статус в БД
+            try:
+                await db.listening_rooms.update_one(
+                    {"id": room_id, "participants.telegram_id": telegram_id},
+                    {"$set": {"participants.$.is_online": False}}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update participant online status: {e}")
+            
+            # Получаем актуальное количество онлайн
+            online_count = len(listening_room_connections.get(room_id, {}))
+            
+            # Уведомляем остальных об отключении и актуальном online_count
+            try:
+                await broadcast_to_listening_room(room_id, {
+                    "event": "user_disconnected",
+                    "telegram_id": telegram_id,
+                    "online_count": online_count
+                })
+            except Exception as e:
+                logger.warning(f"Failed to broadcast disconnect: {e}")
+
+
+# ============ API для очереди и истории Listening Room ============
+
+@api_router.get("/music/rooms/{room_id}/queue")
+async def get_listening_room_queue(room_id: str, telegram_id: int):
+    """Получить очередь треков комнаты"""
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем что пользователь участник
+        is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        return {
+            "queue": room.get("queue", []),
+            "count": len(room.get("queue", []))
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get queue error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/music/rooms/{room_id}/history")
+async def get_listening_room_history(room_id: str, telegram_id: int, limit: int = 20):
+    """Получить историю прослушивания комнаты"""
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем что пользователь участник
+        is_participant = any(p["telegram_id"] == telegram_id for p in room["participants"])
+        if not is_participant:
+            raise HTTPException(status_code=403, detail="Вы не являетесь участником комнаты")
+        
+        history = room.get("history", [])[:limit]
+        
+        return {
+            "history": serialize_for_json(history),
+            "count": len(history)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/music/rooms/{room_id}/queue/add")
+async def add_to_listening_room_queue(room_id: str, telegram_id: int, track: dict):
+    """Добавить трек в очередь комнаты (HTTP fallback)"""
+    try:
+        room = await db.listening_rooms.find_one({"id": room_id, "is_active": True})
+        if not room:
+            raise HTTPException(status_code=404, detail="Комната не найдена")
+        
+        # Проверяем права
+        can_control = False
+        if room["control_mode"] == ListeningRoomControlMode.EVERYONE.value:
+            can_control = True
+        elif room["control_mode"] == ListeningRoomControlMode.HOST_ONLY.value:
+            can_control = room["host_id"] == telegram_id
+        elif room["control_mode"] == ListeningRoomControlMode.SELECTED.value:
+            can_control = room["host_id"] == telegram_id or telegram_id in room.get("allowed_controllers", [])
+        
+        if not can_control:
+            raise HTTPException(status_code=403, detail="У вас нет прав на управление")
+        
+        await db.listening_rooms.update_one(
+            {"id": room_id},
+            {"$push": {"queue": track}}
+        )
+        
+        # Уведомляем участников
+        participant = next((p for p in room["participants"] if p["telegram_id"] == telegram_id), None)
+        user_name = f"{participant.get('first_name', '')} {participant.get('last_name', '')}".strip() if participant else ""
+        
+        room = await db.listening_rooms.find_one({"id": room_id})
+        await broadcast_to_listening_room(room_id, {
+            "event": "queue_updated",
+            "queue": room.get("queue", []),
+            "action": "add",
+            "track": track,
+            "triggered_by": telegram_id,
+            "triggered_by_name": user_name
+        })
+        
+        return {"success": True, "queue_length": len(room.get("queue", []))}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Add to queue error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ SSE система реального времени для друзей ============
+
+import json as _json
+
+# In-memory хранилище подписчиков: { telegram_id: [asyncio.Queue, ...] }
+_friend_event_subscribers: dict[int, list[asyncio.Queue]] = {}
+
+def _subscribe_friend_events(telegram_id: int) -> asyncio.Queue:
+    """Подписаться на события друзей для пользователя"""
+    q = asyncio.Queue(maxsize=50)
+    if telegram_id not in _friend_event_subscribers:
+        _friend_event_subscribers[telegram_id] = []
+    _friend_event_subscribers[telegram_id].append(q)
+    return q
+
+def _unsubscribe_friend_events(telegram_id: int, q: asyncio.Queue):
+    """Отписаться от событий"""
+    if telegram_id in _friend_event_subscribers:
+        try:
+            _friend_event_subscribers[telegram_id].remove(q)
+        except ValueError:
+            pass
+        if not _friend_event_subscribers[telegram_id]:
+            del _friend_event_subscribers[telegram_id]
+
+async def _emit_friend_event(telegram_id: int, event_type: str, data: dict = None):
+    """Отправить событие пользователю"""
+    if telegram_id not in _friend_event_subscribers:
+        return
+    payload = _json.dumps({"type": event_type, "data": data or {}}, ensure_ascii=False, default=str)
+    dead_queues = []
+    for q in _friend_event_subscribers[telegram_id]:
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead_queues.append(q)
+    for dq in dead_queues:
+        _unsubscribe_friend_events(telegram_id, dq)
+
+
+@api_router.get("/friends/events/{telegram_id}")
+async def friend_events_sse(telegram_id: int, request: Request):
+    """SSE endpoint для real-time обновлений друзей"""
+    q = _subscribe_friend_events(telegram_id)
+
+    async def event_generator():
+        try:
+            # Отправляем начальный ping
+            yield f"data: {_json.dumps({'type': 'connected'})}\n\n"
+            while True:
+                # Проверяем отключение клиента
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"data: {payload}\n\n"
+                except asyncio.TimeoutError:
+                    # Heartbeat каждые 25 сек чтобы соединение не закрылось
+                    yield f"data: {_json.dumps({'type': 'ping'})}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _unsubscribe_friend_events(telegram_id, q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
+# ============ API для системы друзей (Friends) ============
+
+# Вспомогательные функции для друзей
+
+async def get_user_friends_count(telegram_id: int) -> int:
+    """Получить количество друзей пользователя"""
+    return await db.friends.count_documents({"user_telegram_id": telegram_id})
+
+
+async def get_mutual_friends_count(user1_id: int, user2_id: int) -> int:
+    """Получить количество общих друзей двух пользователей (оптимизировано через aggregation)"""
+    try:
+        pipeline = [
+            {"$match": {"user_telegram_id": user1_id}},
+            {"$lookup": {
+                "from": "friends",
+                "let": {"friend_id": "$friend_telegram_id"},
+                "pipeline": [
+                    {"$match": {
+                        "$expr": {
+                            "$and": [
+                                {"$eq": ["$user_telegram_id", user2_id]},
+                                {"$eq": ["$friend_telegram_id", "$$friend_id"]}
+                            ]
+                        }
+                    }}
+                ],
+                "as": "mutual"
+            }},
+            {"$match": {"mutual": {"$ne": []}}},
+            {"$count": "total"}
+        ]
+        result = await db.friends.aggregate(pipeline).to_list(1)
+        return result[0]["total"] if result else 0
+    except Exception:
+        # Fallback к простому методу
+        friends1 = await db.friends.find({"user_telegram_id": user1_id}).to_list(1000)
+        friends1_ids = set(f["friend_telegram_id"] for f in friends1)
+        friends2 = await db.friends.find({"user_telegram_id": user2_id}).to_list(1000)
+        friends2_ids = set(f["friend_telegram_id"] for f in friends2)
+        return len(friends1_ids & friends2_ids)
+
+
+async def get_mutual_friends_count_batch(user_id: int, target_ids: list) -> dict:
+    """Batch-подсчёт общих друзей для списка пользователей"""
+    if not target_ids:
+        return {}
+    
+    my_friends = await db.friends.find({"user_telegram_id": user_id}).to_list(1000)
+    my_friend_ids = set(f["friend_telegram_id"] for f in my_friends)
+    
+    result = {}
+    for tid in target_ids:
+        their_friends = await db.friends.find({"user_telegram_id": tid}).to_list(1000)
+        their_ids = set(f["friend_telegram_id"] for f in their_friends)
+        result[tid] = len(my_friend_ids & their_ids)
+    return result
+
+
+async def is_blocked(blocker_id: int, blocked_id: int) -> bool:
+    """Проверить, заблокирован ли пользователь"""
+    block = await db.user_blocks.find_one({
+        "blocker_telegram_id": blocker_id,
+        "blocked_telegram_id": blocked_id
+    })
+    return block is not None
+
+
+async def are_friends(user1_id: int, user2_id: int) -> bool:
+    """Проверить, являются ли пользователи друзьями"""
+    friend = await db.friends.find_one({
+        "user_telegram_id": user1_id,
+        "friend_telegram_id": user2_id
+    })
+    return friend is not None
+
+
+async def get_friendship_status(
+    user_id: int,
+    target_id: int,
+    *,
+    precomputed_blocked_user_target: Optional[bool] = None,
+    precomputed_blocked_target_user: Optional[bool] = None,
+) -> Optional[str]:
+    """Получить статус дружбы между пользователями.
+
+    Оптимизация: если `is_blocked` уже был вычислен вызывающей стороной —
+    передаём через precomputed_* и избегаем повторных запросов к БД.
+    """
+    # Собираем задачи, опуская уже вычисленные is_blocked
+    block_user_target_task: Any
+    block_target_user_task: Any
+    if precomputed_blocked_user_target is None:
+        block_user_target_task = is_blocked(user_id, target_id)
+    else:
+        async def _already_ut():
+            return precomputed_blocked_user_target
+        block_user_target_task = _already_ut()
+
+    if precomputed_blocked_target_user is None:
+        block_target_user_task = is_blocked(target_id, user_id)
+    else:
+        async def _already_tu():
+            return precomputed_blocked_target_user
+        block_target_user_task = _already_tu()
+
+    block_user_target, block_target_user, friendship, incoming_req, outgoing_req = await asyncio.gather(
+        block_user_target_task,
+        block_target_user_task,
+        are_friends(user_id, target_id),
+        db.friend_requests.find_one({
+            "from_telegram_id": target_id,
+            "to_telegram_id": user_id,
+            "status": "pending"
+        }),
+        db.friend_requests.find_one({
+            "from_telegram_id": user_id,
+            "to_telegram_id": target_id,
+            "status": "pending"
+        }),
+    )
+
+    # Проверяем результаты в порядке приоритета
+    if block_user_target:
+        return "blocked"
+    if block_target_user:
+        return "blocked_by"
+    if friendship:
+        return "friend"
+    if incoming_req:
+        return "pending_incoming"
+    if outgoing_req:
+        return "pending_outgoing"
+
+    return None
+
+
+def _coerce_bool(value: Any) -> Optional[bool]:
+    """Мягкое приведение к bool для обратной совместимости со старыми записями в БД.
+    Поддерживает: bool, int (0/1), str ('true'/'false'/'yes'/'no'/'1'/'0' — case-insensitive).
+    Возвращает None если приведение невозможно (чтобы вызывающий мог применить дефолт).
+
+    🐛 BUG-P11 FIX: ранее ``isinstance(v, bool)`` молча терял настройки, сохранённые
+    в legacy-формате (например, из Mongo Compass или миграций), и возвращал дефолты —
+    пользователь терял свои настройки приватности без уведомления.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "1", "yes", "y", "on"):
+            return True
+        if normalized in ("false", "0", "no", "n", "off", ""):
+            return False
+    return None
+
+
+async def get_user_privacy_settings(telegram_id: int, user_doc: dict = None) -> PrivacySettings:
+    """Получить настройки приватности пользователя.
+    Если user_doc передан — используем его (экономим запрос в БД).
+    Отказоустойчивость: при ошибке парсинга возвращаем дефолтные настройки.
+    """
+    if user_doc is None:
+        user_doc = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if user_doc and user_doc.get("privacy_settings"):
+        try:
+            raw = user_doc["privacy_settings"]
+            allowed = {
+                "show_online_status",
+                "show_in_search",
+                "show_friends_list",
+                "show_achievements",
+                "show_schedule",
+            }
+            # 🐛 BUG-P11 FIX: мягкое приведение значений (bool/int/str) — защита от legacy-данных
+            cleaned: Dict[str, bool] = {}
+            for key in allowed:
+                if key in raw:
+                    coerced = _coerce_bool(raw[key])
+                    if coerced is not None:
+                        cleaned[key] = coerced
+            return PrivacySettings(**cleaned)
+        except Exception as e:
+            logger.warning(f"Privacy parse error for {telegram_id}: {e}, fallback to defaults")
+            return PrivacySettings()
+    return PrivacySettings()  # Возвращаем настройки по умолчанию
+
+
+# ============================================================================
+# 🔐 АВТОРИЗАЦИОННЫЕ ХЕЛПЕРЫ ДЛЯ ПРОФИЛЯ (Stage 8 — P0 Security Hardening)
+# ============================================================================
+# Ранее legacy-эндпоинты `/profile/{telegram_id}/*` полагались только на
+# query/body параметр `requester_telegram_id`, что позволяло атакующему просто
+# передать `requester_telegram_id == telegram_id` и получить/изменить приватные
+# данные ЛЮБОГО пользователя (BUG-P1..P9). Теперь — строгая JWT-проверка.
+
+
+def _authorize_profile_owner(
+    telegram_id: int,
+    current_user: Optional[Dict[str, Any]],
+    body_requester_id: Any = None,
+) -> int:
+    """Строгая проверка что запрос на мутацию профиля исходит от его владельца.
+
+    Приоритет авторизации:
+      1) JWT (`current_user.tid`) — обязателен для всех мутаций профиля.
+      2) `body_requester_id` (legacy-параметр) — если передан, ДОЛЖЕН совпадать
+         с `tid` из токена (иначе 403).
+
+    Возвращает подтверждённый `telegram_id` владельца (равный `telegram_id` из пути).
+
+    Raises:
+      401 — нет JWT;
+      403 — токен валидный, но принадлежит другому пользователю;
+      400 — body_requester_id некорректен (не число).
+    """
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Требуется авторизация (Bearer token)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token_tid_raw = current_user.get("tid")
+    if token_tid_raw is None:
+        raise HTTPException(
+            status_code=403,
+            detail="В токене отсутствует telegram_id. Завершите привязку Telegram-аккаунта.",
+        )
+    try:
+        token_tid = int(token_tid_raw)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="Некорректный telegram_id в токене")
+
+    if token_tid != int(telegram_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён: это не ваш профиль",
+        )
+
+    # Защита от старых клиентов, которые передают requester_telegram_id в body:
+    # принимаем только если совпадает с JWT (не даём вводить в заблуждение аудит-логи).
+    if body_requester_id is not None:
+        try:
+            if int(body_requester_id) != token_tid:
+                raise HTTPException(
+                    status_code=403,
+                    detail="requester_telegram_id не совпадает с токеном авторизации",
+                )
+        except HTTPException:
+            raise
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail="requester_telegram_id должен быть числом",
+            )
+    return token_tid
+
+
+def _resolve_viewer_from_auth(
+    current_user: Optional[Dict[str, Any]],
+    query_viewer: Optional[int] = None,
+) -> Optional[int]:
+    """Получить `viewer_telegram_id` из JWT (источник истины).
+
+    Правила:
+      — JWT есть → возвращаем `tid` из токена. Если в query передан
+        `viewer_telegram_id`, он ДОЛЖЕН совпадать (иначе 403, т.к. это попытка
+        подмены личности).
+      — JWT нет → возвращаем `None` (анонимный просмотр). Legacy-параметр
+        `viewer_telegram_id` из query в таком случае ИГНОРИРУЕТСЯ — доверять ему
+        нельзя (BUG-P1/P2).
+
+    Это обеспечивает, что privacy-фильтры нельзя обойти через подмену query-параметра.
+    """
+    token_tid: Optional[int] = None
+    if current_user is not None:
+        raw = current_user.get("tid")
+        if raw is not None:
+            try:
+                token_tid = int(raw)
+            except (ValueError, TypeError):
+                token_tid = None
+
+    if token_tid is not None:
+        if query_viewer is not None:
+            try:
+                if int(query_viewer) != token_tid:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="viewer_telegram_id не совпадает с токеном авторизации",
+                    )
+            except HTTPException:
+                raise
+            except (ValueError, TypeError):
+                # Некорректный query — просто игнорируем, используем JWT
+                pass
+        return token_tid
+
+    # Нет JWT — анонимный просмотр. Query-параметр игнорируем (не доверяем).
+    return None
+
+
+async def build_friend_card(user_data: dict, current_user_id: int, friendship_date: datetime = None, is_favorite: bool = False) -> FriendCard:
+    """Построить карточку друга"""
+    friend_id = user_data.get("telegram_id")
+    privacy = await get_user_privacy_settings(friend_id)
+    
+    # Проверяем онлайн-статус (активность за последние 5 минут)
+    is_online = False
+    last_activity = user_data.get("last_activity")
+    if last_activity and privacy.show_online_status:
+        if isinstance(last_activity, str):
+            last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+        # Fix: используем timezone-aware сравнение
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=timezone.utc)
+        is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
+    
+    return FriendCard(
+        telegram_id=friend_id,
+        username=user_data.get("username"),
+        first_name=user_data.get("first_name"),
+        last_name=user_data.get("last_name"),
+        group_name=user_data.get("group_name"),
+        facultet_name=user_data.get("facultet_name"),
+        is_online=is_online if privacy.show_online_status else False,
+        last_activity=last_activity if privacy.show_online_status else None,
+        is_favorite=is_favorite,
+        mutual_friends_count=await get_mutual_friends_count(current_user_id, friend_id),
+        friendship_date=friendship_date
+    )
+
+
+async def update_friends_stats(telegram_id: int):
+    """Обновить статистику друзей пользователя"""
+    # Подсчитываем друзей
+    friends_count = await get_user_friends_count(telegram_id)
+    
+    # Подсчитываем уникальные факультеты друзей
+    friends = await db.friends.find({"user_telegram_id": telegram_id}).to_list(1000)
+    friend_ids = [f["friend_telegram_id"] for f in friends]
+    
+    faculties = set()
+    if friend_ids:
+        friend_users = await db.user_settings.find({"telegram_id": {"$in": friend_ids}}).to_list(1000)
+        for u in friend_users:
+            if u.get("facultet_id"):
+                faculties.add(u["facultet_id"])
+    
+    # Обновляем статистику
+    await db.user_stats.update_one(
+        {"telegram_id": telegram_id},
+        {
+            "$set": {
+                "friends_count": friends_count,
+                "friends_faculties_count": len(faculties),
+                "updated_at": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+    
+    # БАГ-ФИХ: проверяем и выдаём достижения за друзей сразу после обновления статистики
+    try:
+        updated_stats = await get_or_create_user_stats(db, telegram_id)
+        await check_and_award_achievements(db, telegram_id, updated_stats)
+    except Exception as e:
+        logger.warning(f"Failed to check achievements after friends stats update: {e}")
+
+
+# API Endpoints для друзей
+
+@api_router.post("/friends/request/{target_telegram_id}", response_model=FriendActionResponse)
+async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Отправить запрос на дружбу"""
+    try:
+        # Проверяем, что не отправляем запрос самому себе
+        if telegram_id == target_telegram_id:
+            raise HTTPException(status_code=400, detail="Нельзя добавить себя в друзья")
+        
+        # Проверяем существование целевого пользователя
+        target_user = await db.user_settings.find_one({"telegram_id": target_telegram_id})
+        if not target_user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Проверяем блокировку
+        if await is_blocked(target_telegram_id, telegram_id):
+            raise HTTPException(status_code=403, detail="Вы заблокированы этим пользователем")
+        if await is_blocked(telegram_id, target_telegram_id):
+            raise HTTPException(status_code=403, detail="Вы заблокировали этого пользователя")
+        
+        # Проверяем, не друзья ли уже
+        if await are_friends(telegram_id, target_telegram_id):
+            raise HTTPException(status_code=400, detail="Вы уже друзья")
+        
+        # Проверяем существующий запрос от нас
+        existing_outgoing = await db.friend_requests.find_one({
+            "from_telegram_id": telegram_id,
+            "to_telegram_id": target_telegram_id,
+            "status": "pending"
+        })
+        if existing_outgoing:
+            raise HTTPException(status_code=400, detail="Запрос уже отправлен")
+        
+        # Проверяем входящий запрос от этого пользователя
+        existing_incoming = await db.friend_requests.find_one({
+            "from_telegram_id": target_telegram_id,
+            "to_telegram_id": telegram_id,
+            "status": "pending"
+        })
+        
+        if existing_incoming:
+            # Автоматически принимаем - взаимный запрос
+            await db.friend_requests.update_one(
+                {"id": existing_incoming["id"]},
+                {"$set": {"status": "accepted", "updated_at": datetime.utcnow()}}
+            )
+            
+            # Создаем связи дружбы
+            friend1 = Friend(
+                user_telegram_id=telegram_id,
+                friend_telegram_id=target_telegram_id
+            )
+            friend2 = Friend(
+                user_telegram_id=target_telegram_id,
+                friend_telegram_id=telegram_id
+            )
+            await db.friends.insert_many([friend1.dict(), friend2.dict()])
+            
+            # Обновляем статистику
+            await update_friends_stats(telegram_id)
+            await update_friends_stats(target_telegram_id)
+            
+            # Проверяем достижения
+            from achievements import check_and_award_achievements, get_or_create_user_stats
+            stats = await get_or_create_user_stats(db, telegram_id)
+            await check_and_award_achievements(db, telegram_id, stats)
+            
+            friend_card = await build_friend_card(target_user, telegram_id, datetime.utcnow())
+            
+            # SSE: уведомляем обе стороны о взаимной дружбе
+            await _emit_friend_event(telegram_id, "friend_request_mutual_accepted", {
+                "friend_telegram_id": target_telegram_id
+            })
+            await _emit_friend_event(target_telegram_id, "friend_request_mutual_accepted", {
+                "friend_telegram_id": telegram_id
+            })
+            
+            return FriendActionResponse(
+                success=True,
+                message="Запрос принят, вы теперь друзья!",
+                friend=friend_card
+            )
+        
+        # Создаем новый запрос
+        request = FriendRequest(
+            from_telegram_id=telegram_id,
+            to_telegram_id=target_telegram_id
+        )
+        await db.friend_requests.insert_one(request.dict())
+        
+        # Отправляем уведомление получателю
+        sender_user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if sender_user:
+            await notify_friend_request(target_telegram_id, sender_user, request.id)
+        
+        logger.info(f"👥 Friend request sent: {telegram_id} -> {target_telegram_id}")
+        
+        # SSE: уведомляем получателя о новой заявке
+        await _emit_friend_event(target_telegram_id, "friend_request_received", {
+            "from_telegram_id": telegram_id,
+            "request_id": request.id
+        })
+        
+        return FriendActionResponse(
+            success=True,
+            message="Запрос на дружбу отправлен"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/accept/{request_id}", response_model=FriendActionResponse)
+async def accept_friend_request(request_id: str, telegram_id: int = Body(..., embed=True)):
+    """Принять запрос на дружбу"""
+    try:
+        # Находим запрос
+        request = await db.friend_requests.find_one({"id": request_id, "status": "pending"})
+        if not request:
+            raise HTTPException(status_code=404, detail="Запрос не найден")
+        
+        # Проверяем, что запрос адресован нам
+        if request["to_telegram_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Это не ваш запрос")
+        
+        # Обновляем статус запроса
+        await db.friend_requests.update_one(
+            {"id": request_id},
+            {"$set": {"status": "accepted", "updated_at": datetime.utcnow()}}
+        )
+        
+        from_id = request["from_telegram_id"]
+        
+        # Создаем связи дружбы (двусторонние)
+        friend1 = Friend(
+            user_telegram_id=telegram_id,
+            friend_telegram_id=from_id
+        )
+        friend2 = Friend(
+            user_telegram_id=from_id,
+            friend_telegram_id=telegram_id
+        )
+        await db.friends.insert_many([friend1.dict(), friend2.dict()])
+        
+        # Обновляем статистику обоих
+        await update_friends_stats(telegram_id)
+        await update_friends_stats(from_id)
+        
+        # Проверяем достижения для обоих
+        from achievements import check_and_award_achievements, get_or_create_user_stats
+        for user_id in [telegram_id, from_id]:
+            stats = await get_or_create_user_stats(db, user_id)
+            await check_and_award_achievements(db, user_id, stats)
+        
+        # Получаем данные нового друга
+        friend_user = await db.user_settings.find_one({"telegram_id": from_id})
+        friend_card = await build_friend_card(friend_user, telegram_id, datetime.utcnow()) if friend_user else None
+        
+        # Отправляем уведомление отправителю заявки
+        accepter_user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if accepter_user:
+            await notify_friend_accepted(from_id, accepter_user)
+        
+        logger.info(f"👥 Friend request accepted: {from_id} <-> {telegram_id}")
+        
+        # SSE: уведомляем отправителя заявки что она принята
+        await _emit_friend_event(from_id, "friend_request_accepted", {
+            "by_telegram_id": telegram_id,
+            "request_id": request_id
+        })
+        # SSE: уведомляем принимающего (себя) для обновления UI
+        await _emit_friend_event(telegram_id, "friend_request_accepted_self", {
+            "friend_telegram_id": from_id,
+            "request_id": request_id
+        })
+        
+        return FriendActionResponse(
+            success=True,
+            message="Запрос принят, вы теперь друзья!",
+            friend=friend_card
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Accept friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/reject/{request_id}", response_model=FriendActionResponse)
+async def reject_friend_request(request_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отклонить запрос на дружбу"""
+    try:
+        # Находим запрос
+        request = await db.friend_requests.find_one({"id": request_id, "status": "pending"})
+        if not request:
+            raise HTTPException(status_code=404, detail="Запрос не найден")
+        
+        # Проверяем, что запрос адресован нам
+        if request["to_telegram_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Это не ваш запрос")
+        
+        # Обновляем статус запроса
+        await db.friend_requests.update_one(
+            {"id": request_id},
+            {"$set": {"status": "rejected", "updated_at": datetime.utcnow()}}
+        )
+        
+        logger.info(f"👥 Friend request rejected: {request['from_telegram_id']} -> {telegram_id}")
+        
+        # SSE: уведомляем отправителя что заявка отклонена
+        await _emit_friend_event(request["from_telegram_id"], "friend_request_rejected", {
+            "by_telegram_id": telegram_id,
+            "request_id": request_id
+        })
+        
+        return FriendActionResponse(
+            success=True,
+            message="Запрос отклонен"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Reject friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/cancel/{request_id}", response_model=FriendActionResponse)
+async def cancel_friend_request(request_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отменить отправленный запрос на дружбу"""
+    try:
+        # Находим запрос
+        request = await db.friend_requests.find_one({"id": request_id, "status": "pending"})
+        if not request:
+            raise HTTPException(status_code=404, detail="Запрос не найден")
+        
+        # Проверяем, что запрос от нас
+        if request["from_telegram_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Это не ваш запрос")
+        
+        # Удаляем запрос
+        await db.friend_requests.delete_one({"id": request_id})
+        
+        logger.info(f"👥 Friend request cancelled: {telegram_id} -> {request['to_telegram_id']}")
+        
+        # SSE: уведомляем получателя что заявка отменена
+        await _emit_friend_event(request["to_telegram_id"], "friend_request_cancelled", {
+            "by_telegram_id": telegram_id,
+            "request_id": request_id
+        })
+        
+        return FriendActionResponse(
+            success=True,
+            message="Запрос отменен"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Cancel friend request error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/friends/{friend_telegram_id}", response_model=FriendActionResponse)
+async def remove_friend(friend_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Удалить из друзей"""
+    try:
+        # Проверяем, что действительно друзья
+        if not await are_friends(telegram_id, friend_telegram_id):
+            raise HTTPException(status_code=400, detail="Вы не друзья")
+        
+        # Удаляем связи дружбы (обе стороны)
+        await db.friends.delete_many({
+            "$or": [
+                {"user_telegram_id": telegram_id, "friend_telegram_id": friend_telegram_id},
+                {"user_telegram_id": friend_telegram_id, "friend_telegram_id": telegram_id}
+            ]
+        })
+        
+        # Обновляем статистику
+        await update_friends_stats(telegram_id)
+        await update_friends_stats(friend_telegram_id)
+        
+        logger.info(f"👥 Friend removed: {telegram_id} X {friend_telegram_id}")
+        
+        # SSE: уведомляем обе стороны об удалении
+        await _emit_friend_event(friend_telegram_id, "friend_removed", {
+            "by_telegram_id": telegram_id
+        })
+        await _emit_friend_event(telegram_id, "friend_removed_self", {
+            "friend_telegram_id": friend_telegram_id
+        })
+        
+        return FriendActionResponse(
+            success=True,
+            message="Удален из друзей"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Remove friend error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/block/{target_telegram_id}", response_model=FriendActionResponse)
+async def block_user(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Заблокировать пользователя"""
+    try:
+        if telegram_id == target_telegram_id:
+            raise HTTPException(status_code=400, detail="Нельзя заблокировать себя")
+        
+        # Проверяем, не заблокирован ли уже
+        if await is_blocked(telegram_id, target_telegram_id):
+            raise HTTPException(status_code=400, detail="Пользователь уже заблокирован")
+        
+        # Удаляем из друзей, если были друзьями
+        await db.friends.delete_many({
+            "$or": [
+                {"user_telegram_id": telegram_id, "friend_telegram_id": target_telegram_id},
+                {"user_telegram_id": target_telegram_id, "friend_telegram_id": telegram_id}
+            ]
+        })
+        
+        # Удаляем все запросы между пользователями
+        await db.friend_requests.delete_many({
+            "$or": [
+                {"from_telegram_id": telegram_id, "to_telegram_id": target_telegram_id},
+                {"from_telegram_id": target_telegram_id, "to_telegram_id": telegram_id}
+            ]
+        })
+        
+        # Создаем блокировку
+        block = UserBlock(
+            blocker_telegram_id=telegram_id,
+            blocked_telegram_id=target_telegram_id
+        )
+        await db.user_blocks.insert_one(block.dict())
+        
+        # Обновляем статистику
+        await update_friends_stats(telegram_id)
+        await update_friends_stats(target_telegram_id)
+        
+        logger.info(f"🚫 User blocked: {telegram_id} blocked {target_telegram_id}")
+        
+        # SSE: уведомляем заблокированного пользователя
+        await _emit_friend_event(target_telegram_id, "user_blocked", {
+            "by_telegram_id": telegram_id
+        })
+        
+        return FriendActionResponse(
+            success=True,
+            message="Пользователь заблокирован"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Block user error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/friends/block/{target_telegram_id}", response_model=FriendActionResponse)
+async def unblock_user(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
+    """Разблокировать пользователя"""
+    try:
+        result = await db.user_blocks.delete_one({
+            "blocker_telegram_id": telegram_id,
+            "blocked_telegram_id": target_telegram_id
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не был заблокирован")
+        
+        logger.info(f"✅ User unblocked: {telegram_id} unblocked {target_telegram_id}")
+        return FriendActionResponse(
+            success=True,
+            message="Пользователь разблокирован"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unblock user error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/friends/{friend_telegram_id}/favorite", response_model=FriendActionResponse)
+async def toggle_favorite_friend(friend_telegram_id: int, telegram_id: int = Body(..., embed=True), is_favorite: bool = Body(...)):
+    """Добавить/убрать из избранных друзей"""
+    try:
+        result = await db.friends.update_one(
+            {"user_telegram_id": telegram_id, "friend_telegram_id": friend_telegram_id},
+            {"$set": {"is_favorite": is_favorite}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Друг не найден")
+        
+        message = "Добавлен в избранное" if is_favorite else "Убран из избранного"
+        return FriendActionResponse(success=True, message=message)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle favorite friend error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/search", response_model=FriendSearchResponse)
+async def search_users(
+    telegram_id: int,
+    query: str = None,
+    group_id: str = None,
+    facultet_id: str = None,
+    limit: int = 50
+):
+    """Поиск пользователей для добавления в друзья (оптимизировано)"""
+    try:
+        # Получаем заблокированных пользователей
+        blocked_by_me = await db.user_blocks.find({"blocker_telegram_id": telegram_id}).to_list(100)
+        blocked_me = await db.user_blocks.find({"blocked_telegram_id": telegram_id}).to_list(100)
+        blocked_ids = [b["blocked_telegram_id"] for b in blocked_by_me] + [b["blocker_telegram_id"] for b in blocked_me]
+        
+        # Исключаем себя и заблокированных
+        exclude_ids = [telegram_id] + blocked_ids
+        
+        # Базовый фильтр
+        filter_query = {"telegram_id": {"$nin": exclude_ids}}
+        
+        # Поиск по группе
+        if group_id:
+            filter_query["group_id"] = group_id
+        
+        # Поиск по факультету
+        if facultet_id:
+            filter_query["facultet_id"] = facultet_id
+        
+        # Текстовый поиск
+        if query:
+            filter_query["$or"] = [
+                {"username": {"$regex": query, "$options": "i"}},
+                {"first_name": {"$regex": query, "$options": "i"}},
+                {"last_name": {"$regex": query, "$options": "i"}}
+            ]
+        
+        users = await db.user_settings.find(filter_query).limit(limit).to_list(limit)
+        
+        if not users:
+            return FriendSearchResponse(results=[], total=0, query=query)
+        
+        # Batch-загрузка privacy settings (проверяем поле в уже загруженных user_settings)
+        # Batch-подсчёт статусов дружбы
+        user_ids = [u["telegram_id"] for u in users]
+        
+        # Получаем все дружбы текущего пользователя
+        my_friends = await db.friends.find({"user_telegram_id": telegram_id}).to_list(1000)
+        my_friend_ids = set(f["friend_telegram_id"] for f in my_friends)
+        
+        # Получаем все pending запросы текущего пользователя
+        my_outgoing = await db.friend_requests.find({
+            "from_telegram_id": telegram_id,
+            "to_telegram_id": {"$in": user_ids},
+            "status": "pending"
+        }).to_list(100)
+        outgoing_map = {r["to_telegram_id"] for r in my_outgoing}
+        
+        my_incoming = await db.friend_requests.find({
+            "to_telegram_id": telegram_id,
+            "from_telegram_id": {"$in": user_ids},
+            "status": "pending"
+        }).to_list(100)
+        incoming_map = {r["from_telegram_id"] for r in my_incoming}
+        
+        # Batch mutual friends
+        mutual_counts = await get_mutual_friends_count_batch(telegram_id, user_ids)
+        
+        results = []
+        for user in users:
+            uid = user["telegram_id"]
+            
+            # Проверяем privacy
+            privacy_data = user.get("privacy_settings", {})
+            show_in_search = privacy_data.get("show_in_search", True) if privacy_data else True
+            if not show_in_search:
+                continue
+            
+            # Определяем статус дружбы
+            if uid in my_friend_ids:
+                friendship_status = "friend"
+            elif uid in incoming_map:
+                friendship_status = "pending_incoming"
+            elif uid in outgoing_map:
+                friendship_status = "pending_outgoing"
+            else:
+                friendship_status = None
+            
+            results.append(FriendSearchResult(
+                telegram_id=uid,
+                username=user.get("username"),
+                first_name=user.get("first_name"),
+                last_name=user.get("last_name"),
+                group_name=user.get("group_name"),
+                facultet_name=user.get("facultet_name"),
+                kurs=user.get("kurs"),
+                mutual_friends_count=mutual_counts.get(uid, 0),
+                friendship_status=friendship_status
+            ))
+        
+        return FriendSearchResponse(
+            results=results,
+            total=len(results),
+            query=query
+        )
+        
+    except Exception as e:
+        logger.error(f"Search users error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}", response_model=FriendsListResponse)
+async def get_friends_list(telegram_id: int, favorites_only: bool = False, search: str = None):
+    """Получить список друзей (оптимизировано: batch-запросы)"""
+    try:
+        query = {"user_telegram_id": telegram_id}
+        if favorites_only:
+            query["is_favorite"] = True
+        
+        friends_data = await db.friends.find(query).to_list(1000)
+        if not friends_data:
+            return FriendsListResponse(friends=[], total=0)
+        
+        # Batch-загрузка всех user_settings за один запрос
+        friend_ids = [f["friend_telegram_id"] for f in friends_data]
+        friend_users_list = await db.user_settings.find({"telegram_id": {"$in": friend_ids}}).to_list(1000)
+        friend_users_map = {u["telegram_id"]: u for u in friend_users_list}
+        
+        # Batch-подсчёт общих друзей
+        mutual_counts = await get_mutual_friends_count_batch(telegram_id, friend_ids)
+        
+        # Маппинг is_favorite и created_at
+        friend_meta = {f["friend_telegram_id"]: f for f in friends_data}
+        
+        friends = []
+        for fid in friend_ids:
+            user_data = friend_users_map.get(fid)
+            if not user_data:
+                continue
+            
+            # Фильтрация по поиску
+            if search:
+                search_lower = search.lower()
+                name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".lower()
+                username = (user_data.get("username") or "").lower()
+                if search_lower not in name and search_lower not in username:
+                    continue
+            
+            meta = friend_meta.get(fid, {})
+            privacy = await get_user_privacy_settings(fid)
+            
+            # Проверяем онлайн-статус
+            is_online = False
+            last_activity = user_data.get("last_activity")
+            if last_activity and privacy.show_online_status:
+                if isinstance(last_activity, str):
+                    last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                is_online = (datetime.utcnow() - last_activity).total_seconds() < 300
+            
+            friend_card = FriendCard(
+                telegram_id=fid,
+                username=user_data.get("username"),
+                first_name=user_data.get("first_name"),
+                last_name=user_data.get("last_name"),
+                group_name=user_data.get("group_name"),
+                facultet_name=user_data.get("facultet_name"),
+                is_online=is_online if privacy.show_online_status else False,
+                last_activity=last_activity if privacy.show_online_status else None,
+                is_favorite=meta.get("is_favorite", False),
+                mutual_friends_count=mutual_counts.get(fid, 0),
+                friendship_date=meta.get("created_at")
+            )
+            friends.append(friend_card)
+        
+        # Сортируем: избранные первые, потом по алфавиту
+        friends.sort(key=lambda x: (not x.is_favorite, x.first_name or "", x.last_name or ""))
+        
+        return FriendsListResponse(friends=friends, total=len(friends))
+        
+    except Exception as e:
+        logger.error(f"Get friends list error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}/requests", response_model=FriendRequestsResponse)
+async def get_friend_requests(telegram_id: int):
+    """Получить входящие и исходящие запросы на дружбу (оптимизировано)"""
+    try:
+        # Загружаем все запросы одним батчем
+        all_requests = await db.friend_requests.find({
+            "$or": [
+                {"to_telegram_id": telegram_id, "status": "pending"},
+                {"from_telegram_id": telegram_id, "status": "pending"}
+            ]
+        }).to_list(200)
+        
+        incoming_data = [r for r in all_requests if r["to_telegram_id"] == telegram_id]
+        outgoing_data = [r for r in all_requests if r["from_telegram_id"] == telegram_id]
+        
+        # Собираем все нужные user IDs
+        user_ids = set()
+        for req in incoming_data:
+            user_ids.add(req["from_telegram_id"])
+        for req in outgoing_data:
+            user_ids.add(req["to_telegram_id"])
+        
+        # Batch-загрузка пользователей
+        users_list = await db.user_settings.find({"telegram_id": {"$in": list(user_ids)}}).to_list(200)
+        users_map = {u["telegram_id"]: u for u in users_list}
+        
+        # Batch-подсчёт общих друзей
+        mutual_counts = await get_mutual_friends_count_batch(telegram_id, list(user_ids))
+        
+        incoming = []
+        for req in incoming_data:
+            user = users_map.get(req["from_telegram_id"])
+            if user:
+                incoming.append(FriendRequestCard(
+                    request_id=req["id"],
+                    telegram_id=req["from_telegram_id"],
+                    username=user.get("username"),
+                    first_name=user.get("first_name"),
+                    last_name=user.get("last_name"),
+                    group_name=user.get("group_name"),
+                    facultet_name=user.get("facultet_name"),
+                    message=req.get("message"),
+                    mutual_friends_count=mutual_counts.get(req["from_telegram_id"], 0),
+                    created_at=req.get("created_at", datetime.utcnow())
+                ))
+        
+        outgoing = []
+        for req in outgoing_data:
+            user = users_map.get(req["to_telegram_id"])
+            if user:
+                outgoing.append(FriendRequestCard(
+                    request_id=req["id"],
+                    telegram_id=req["to_telegram_id"],
+                    username=user.get("username"),
+                    first_name=user.get("first_name"),
+                    last_name=user.get("last_name"),
+                    group_name=user.get("group_name"),
+                    facultet_name=user.get("facultet_name"),
+                    message=req.get("message"),
+                    mutual_friends_count=mutual_counts.get(req["to_telegram_id"], 0),
+                    created_at=req.get("created_at", datetime.utcnow())
+                ))
+        
+        return FriendRequestsResponse(
+            incoming=incoming,
+            outgoing=outgoing,
+            incoming_count=len(incoming),
+            outgoing_count=len(outgoing)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get friend requests error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/mutual/{telegram_id}/{other_telegram_id}", response_model=MutualFriendsResponse)
+async def get_mutual_friends(telegram_id: int, other_telegram_id: int):
+    """Получить список общих друзей"""
+    try:
+        # Получаем друзей первого пользователя
+        friends1 = await db.friends.find({"user_telegram_id": telegram_id}).to_list(1000)
+        friends1_ids = set(f["friend_telegram_id"] for f in friends1)
+        
+        # Получаем друзей второго пользователя
+        friends2 = await db.friends.find({"user_telegram_id": other_telegram_id}).to_list(1000)
+        friends2_ids = set(f["friend_telegram_id"] for f in friends2)
+        
+        # Находим пересечение
+        mutual_ids = friends1_ids & friends2_ids
+        
+        mutual_friends = []
+        for friend_id in mutual_ids:
+            user = await db.user_settings.find_one({"telegram_id": friend_id})
+            if user:
+                friend_card = await build_friend_card(user, telegram_id)
+                mutual_friends.append(friend_card)
+        
+        return MutualFriendsResponse(
+            mutual_friends=mutual_friends,
+            count=len(mutual_friends)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get mutual friends error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API для профиля
+
+# Moved general profile endpoint after specific ones to fix routing
+
+
+@api_router.get("/profile/{telegram_id}/schedule", response_model=FriendScheduleResponse)
+async def get_friend_schedule(
+    telegram_id: int,
+    viewer_telegram_id: int,
+    date: str = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить расписание друга или своё собственное.
+
+    Особенности:
+    - Владелец (viewer == owner) всегда может смотреть свой schedule.
+    - Для чужого: обязательна дружба и privacy.show_schedule=True.
+    - Дата по умолчанию — сегодня в Московском часовом поясе.
+    - common_classes вычисляются через перекрытие по времени (не только same-group).
+    - common_breaks — окна между парами, где оба одновременно свободны.
+
+    🔐 BUG-P2 FIX (Stage 8): `viewer_telegram_id` проверяется через JWT.
+    Если токен передан — query ДОЛЖЕН совпадать с `tid` токена. Без токена —
+    чужое расписание недоступно (требуется авторизация для friendship-check).
+    """
+    # 🔐 JWT-проверка viewer'а (защита от spoofing'а)
+    token_viewer = _resolve_viewer_from_auth(current_user, viewer_telegram_id)
+    if token_viewer is not None:
+        effective_viewer = token_viewer
+    else:
+        # Анонимный запрос: чужое расписание недоступно, своё — требует JWT.
+        # Legacy: оставляем возможность запроса со своим же id БЕЗ JWT только для
+        # is_own_schedule (это не приватные данные чужих людей).
+        if viewer_telegram_id != telegram_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Требуется авторизация для просмотра чужого расписания",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        effective_viewer = viewer_telegram_id
+
+    return await _get_friend_schedule_impl(telegram_id, effective_viewer, date)
+
+
+async def _get_friend_schedule_impl(
+    telegram_id: int,
+    viewer_telegram_id: int,
+    date: str = None,
+) -> "FriendScheduleResponse":
+    """Внутренняя реализация (без JWT-проверки — viewer уже доверенный)."""
+    try:
+        # Валидация
+        if telegram_id <= 0 or viewer_telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        is_own_schedule = viewer_telegram_id == telegram_id
+
+        # Для чужого расписания — проверяем блокировку и дружбу
+        if not is_own_schedule:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, viewer_telegram_id),
+                is_blocked(viewer_telegram_id, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                raise HTTPException(status_code=403, detail="Профиль недоступен")
+
+            if not await are_friends(viewer_telegram_id, telegram_id):
+                raise HTTPException(status_code=403, detail="Вы не друзья с этим пользователем")
+
+            # Проверяем настройки приватности (только для чужого просмотра)
+            privacy = await get_user_privacy_settings(telegram_id)
+            if not privacy.show_schedule:
+                raise HTTPException(status_code=403, detail="Пользователь скрыл своё расписание")
+
+        # Получаем данные пользователя
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user or not user.get("group_id"):
+            raise HTTPException(status_code=404, detail="У пользователя не настроена группа")
+
+        # Определяем дату по Московскому часовому поясу (UTC+3)
+        try:
+            import pytz
+            moscow_tz = pytz.timezone("Europe/Moscow")
+            now_moscow = datetime.now(moscow_tz)
+        except Exception:
+            # Фолбэк: UTC+3 вручную
+            now_moscow = datetime.now(timezone.utc) + timedelta(hours=3)
+
+        if not date:
+            date = now_moscow.strftime("%Y-%m-%d")
+
+        # Валидация формата даты
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат даты. Ожидается YYYY-MM-DD")
+
+        # День недели на русском
+        days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+        days_en = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        day_name_ru = days_ru[date_obj.weekday()]
+        day_name_en = days_en[date_obj.weekday()]
+
+        # Получаем расписание владельца
+        from rudn_parser import get_schedule
+
+        owner_all_events = await get_schedule(
+            user.get("facultet_id", ""),
+            user.get("level_id", ""),
+            user.get("kurs", ""),
+            user.get("form_code", ""),
+            user["group_id"],
+        )
+        if not isinstance(owner_all_events, list):
+            owner_all_events = []
+
+        def _match_day(event: dict) -> bool:
+            """Сопоставить событие с нужным днём недели.
+            Поддерживаем: русское имя, английское имя, дату в формате YYYY-MM-DD.
+            Если в событии нет ни одного из этих полей — считаем событие актуальным на каждый день
+            (может быть regular schedule без дней — просто отфильтруется дальше)."""
+            d = event.get("day")
+            if d:
+                d_lower = str(d).lower().strip()
+                if d_lower == day_name_ru.lower() or d_lower == day_name_en:
+                    return True
+                # если в поле лежит полная дата — сверяем
+                if d_lower == date:
+                    return True
+                # иначе НЕ совпадает
+                return False
+            # поле "date" напрямую
+            if event.get("date") == date:
+                return True
+            # если ни day, ни date нет — всё равно показываем (общий шаблон)
+            return True
+
+        schedule_events = [e for e in owner_all_events if _match_day(e)]
+
+        # Получаем viewer для вычисления overlap
+        common_classes: list = []
+        common_breaks: list = []
+        same_group = False
+        viewer_group_name = None
+
+        if not is_own_schedule:
+            viewer = await db.user_settings.find_one({"telegram_id": viewer_telegram_id})
+            if viewer:
+                viewer_group_name = viewer.get("group_name")
+                same_group = bool(viewer.get("group_id")) and viewer.get("group_id") == user.get("group_id")
+
+                if same_group:
+                    # Одна группа → всё общее
+                    common_classes = schedule_events.copy()
+                elif viewer.get("group_id"):
+                    # Разные группы — ищем перекрытия по времени
+                    viewer_events_all = await get_schedule(
+                        viewer.get("facultet_id", ""),
+                        viewer.get("level_id", ""),
+                        viewer.get("kurs", ""),
+                        viewer.get("form_code", ""),
+                        viewer["group_id"],
+                    )
+                    if not isinstance(viewer_events_all, list):
+                        viewer_events_all = []
+                    viewer_events = [e for e in viewer_events_all if _match_day(e)]
+
+                    common_classes, common_breaks = _compute_schedule_overlap(
+                        schedule_events, viewer_events
+                    )
+
+        friend_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Друг"
+
+        return FriendScheduleResponse(
+            friend_telegram_id=telegram_id,
+            friend_name=friend_name,
+            group_name=user.get("group_name"),
+            schedule=schedule_events,
+            common_classes=common_classes,
+            common_breaks=common_breaks,
+            same_group=same_group,
+            viewer_group_name=viewer_group_name,
+            date=date,
+            day_name=day_name_ru,
+            is_own_schedule=is_own_schedule,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get friend schedule error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при загрузке расписания")
+
+
+def _parse_hhmm(s: str) -> Optional[int]:
+    """'HH:MM' → минуты от полуночи. None при ошибке."""
+    if not s or not isinstance(s, str):
+        return None
+    try:
+        parts = s.strip().split(":")
+        if len(parts) != 2:
+            return None
+        h, m = int(parts[0]), int(parts[1])
+        if 0 <= h < 24 and 0 <= m < 60:
+            return h * 60 + m
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _parse_event_time(event: dict) -> Optional[tuple]:
+    """Извлечь (start_min, end_min) из события. Поддерживает разные форматы.
+    Возвращает None если не удалось.
+    """
+    time_str = event.get("time") or event.get("time_range")
+    if time_str and isinstance(time_str, str) and " - " in time_str:
+        parts = time_str.split(" - ")
+        start = _parse_hhmm(parts[0])
+        end = _parse_hhmm(parts[1])
+        if start is not None and end is not None and end > start:
+            return (start, end)
+    # Альтернатива: поля start/end
+    start = _parse_hhmm(event.get("start"))
+    end = _parse_hhmm(event.get("end"))
+    if start is not None and end is not None and end > start:
+        return (start, end)
+    return None
+
+
+def _compute_schedule_overlap(owner_events: list, viewer_events: list) -> tuple:
+    """Вычислить перекрытие расписаний двух пользователей.
+
+    Returns:
+        (common_classes, common_breaks)
+        - common_classes: список событий-пар владельца, которые перекрываются по времени
+          с хотя бы одной парой viewer-а (возможность «увидеться в одной аудитории или корпусе»
+          не учитываем — только совпадение по времени как «оба заняты одновременно»).
+        - common_breaks: периоды когда ОБА свободны (между парами). Список словарей:
+          {start: "HH:MM", end: "HH:MM", duration_min: int}
+    """
+    def parsed(events):
+        out = []
+        for e in events:
+            t = _parse_event_time(e)
+            if t:
+                out.append((t[0], t[1], e))
+        # сортируем по времени
+        out.sort(key=lambda x: x[0])
+        return out
+
+    owner_parsed = parsed(owner_events)
+    viewer_parsed = parsed(viewer_events)
+
+    # --- Общие пары: те, которые по времени пересекаются у обоих (оба заняты одновременно) ---
+    common_classes = []
+    for o_start, o_end, o_event in owner_parsed:
+        for v_start, v_end, _ in viewer_parsed:
+            # Два интервала пересекаются если start1 < end2 AND start2 < end1
+            if o_start < v_end and v_start < o_end:
+                common_classes.append(o_event)
+                break
+
+    # --- Общие окна: периоды когда ОБА свободны ---
+    # Занятость = union интервалов обоих
+    busy = []
+    for s, e, _ in owner_parsed:
+        busy.append((s, e))
+    for s, e, _ in viewer_parsed:
+        busy.append((s, e))
+    if not busy:
+        return common_classes, []
+
+    busy.sort(key=lambda x: x[0])
+    # Слияние пересекающихся интервалов
+    merged = [busy[0]]
+    for s, e in busy[1:]:
+        last_s, last_e = merged[-1]
+        if s <= last_e:
+            merged[-1] = (last_s, max(last_e, e))
+        else:
+            merged.append((s, e))
+
+    # Окна между занятыми интервалами
+    common_breaks = []
+    for i in range(len(merged) - 1):
+        gap_start = merged[i][1]
+        gap_end = merged[i + 1][0]
+        if gap_end > gap_start:
+            duration = gap_end - gap_start
+            # Окна меньше 10 минут пропускаем (не информативно)
+            if duration >= 10:
+                common_breaks.append({
+                    "start": f"{gap_start // 60:02d}:{gap_start % 60:02d}",
+                    "end": f"{gap_end // 60:02d}:{gap_end % 60:02d}",
+                    "duration_min": duration,
+                })
+
+    return common_classes, common_breaks
+
+
+@api_router.put("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
+async def update_privacy_settings(
+    telegram_id: int,
+    settings: PrivacySettingsUpdate,
+    requester_telegram_id: int = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Обновить настройки приватности (partial update).
+
+    🔐 BUG-P3 FIX (Stage 8): требуется JWT, и `tid` в токене ДОЛЖЕН совпадать с
+    `telegram_id` в пути. `requester_telegram_id` оставлен для обратной совместимости,
+    но если передан — должен совпадать с JWT (иначе 403). Ранее атакующий мог
+    передать `requester_telegram_id == telegram_id` и переписать ЛЮБЫЕ privacy-настройки.
+
+    🐛 BUG-P12 FIX: атомарное обновление через dot-notation ($set: privacy_settings.field)
+    вместо read-modify-write всего вложенного документа — устраняет race condition
+    при параллельных запросах.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        # 🔐 JWT-авторизация
+        _authorize_profile_owner(telegram_id, current_user, requester_telegram_id)
+
+        # Проверяем существование пользователя
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"privacy_settings": 1, "_id": 0},
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # Собираем partial-update
+        try:
+            update_data = settings.model_dump(exclude_unset=True)
+        except AttributeError:
+            update_data = settings.dict(exclude_unset=True)
+
+        if not update_data:
+            # Ничего не передано — возвращаем текущие настройки
+            return await get_user_privacy_settings(telegram_id, user_doc=user)
+
+        # 🐛 BUG-P12 FIX: атомарный $set через dot-notation — каждая настройка
+        # обновляется независимо, не затирая остальные поля.
+        ALLOWED_FIELDS = {
+            "show_online_status",
+            "show_in_search",
+            "show_friends_list",
+            "show_achievements",
+            "show_schedule",
+        }
+        set_operations: Dict[str, Any] = {}
+        for key, value in update_data.items():
+            if key in ALLOWED_FIELDS and value is not None:
+                set_operations[f"privacy_settings.{key}"] = bool(value)
+
+        if not set_operations:
+            return await get_user_privacy_settings(telegram_id, user_doc=user)
+
+        set_operations["privacy_updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": set_operations},
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        logger.info(f"🔒 Privacy settings updated for {telegram_id}: {list(update_data.keys())}")
+        # Возвращаем актуальные настройки (re-read для честности ответа)
+        fresh = await db.user_settings.find_one(
+            {"telegram_id": telegram_id}, {"privacy_settings": 1, "_id": 0}
+        )
+        return await get_user_privacy_settings(telegram_id, user_doc=fresh)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update privacy settings error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при обновлении настроек приватности")
+
+
+@api_router.get("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
+async def get_privacy_settings(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Получить настройки приватности (только владелец).
+
+    🔐 BUG-P3 FIX: JWT обязателен. Query `requester_telegram_id` принимается
+    только если совпадает с токеном (для обратной совместимости с фронтом).
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        _authorize_profile_owner(telegram_id, current_user, requester_telegram_id)
+
+        return await get_user_privacy_settings(telegram_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get privacy settings error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@api_router.get("/profile/{telegram_id}/qr")
+async def get_profile_qr_data(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить данные для QR-кода профиля.
+
+    - Владельцу (viewer == telegram_id) — всегда доступно.
+    - Чужому — проверяем блокировку и privacy.show_in_search.
+
+    🔐 BUG-P17 FIX (Stage 8): viewer определяется из JWT. Query-параметр
+    `requester_telegram_id` — только для legacy-совместимости (должен совпадать
+    с JWT). Без токена — отказ, чтобы не дать злоумышленнику обойти privacy
+    подменой `requester_telegram_id == telegram_id`.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        # 🔐 viewer из JWT (строго); query игнорируется без токена
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        is_owner = effective_viewer is not None and effective_viewer == telegram_id
+
+        # Для чужого (или анонимного) — проверяем блокировку и privacy
+        if not is_owner and effective_viewer is not None:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                raise HTTPException(status_code=403, detail="Профиль недоступен")
+
+        if not is_owner:
+            privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
+            if not privacy.show_in_search:
+                raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль из поиска")
+
+        # Генерируем ссылку для добавления в друзья (открывает Web App напрямую)
+        bot_username = get_telegram_bot_username()
+        friend_link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
+
+        display_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or user.get("username") or "Пользователь"
+        return {
+            "qr_data": friend_link,
+            "telegram_id": telegram_id,
+            "display_name": display_name,
+            "avatar_mode": user.get("avatar_mode", "telegram"),
+            "has_custom_avatar": bool(user.get("custom_avatar")),
+            "group_name": user.get("group_name"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get profile QR data error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+# ========== GRAFFITI (HEADER + WALL) ==========
+
+# --- Вспомогательные функции ---
+
+def _parse_graffiti_requester(body: dict, telegram_id: int, action: str = "изменять") -> int:
+    """Безопасная валидация requester_telegram_id для граффити endpoints.
+    Возвращает parsed requester_id или бросает HTTPException.
+
+    ⚠️ Stage 8: этот helper ОСТАВЛЕН только для валидации формата body.requester_telegram_id.
+    Реальная авторизация теперь выполняется через JWT (`_authorize_profile_owner`).
+    """
+    requester_id = body.get("requester_telegram_id")
+    if requester_id is None:
+        raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+    try:
+        requester_int = int(requester_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="requester_telegram_id должен быть числом")
+    if requester_int != telegram_id:
+        raise HTTPException(status_code=403, detail=f"Можно {action} только своё граффити")
+    return requester_int
+
+
+def _parse_requester_id(body: dict) -> int:
+    """Извлечь и валидировать requester_telegram_id из body (без проверки владельца)."""
+    requester_id = body.get("requester_telegram_id")
+    if requester_id is None:
+        raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
+    try:
+        return int(requester_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="requester_telegram_id должен быть числом")
+
+
+async def _parse_json_body(request: Request) -> dict:
+    """Безопасный парсинг JSON body — возвращает 400 вместо 500 при невалидном JSON."""
+    try:
+        return await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалидное тело запроса. Ожидается JSON.")
+
+
+def _validate_graffiti_data(graffiti_data: str, max_size: int = 3 * 1024 * 1024) -> None:
+    """Строгая валидация данных граффити.
+    - Whitelist форматов: png, jpeg, webp (SVG исключён ради безопасности).
+    - Проверка base64-структуры data URL.
+    - Лимит размера.
+    """
+    if not isinstance(graffiti_data, str):
+        raise HTTPException(status_code=400, detail="Граффити должно быть строкой data URL")
+
+    # Строгий whitelist: png / jpeg / jpg / webp
+    allowed_prefixes = (
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,",
+        "data:image/jpg;base64,",
+        "data:image/webp;base64,",
+    )
+    if not graffiti_data.startswith(allowed_prefixes):
+        raise HTTPException(
+            status_code=400,
+            detail="Неверный формат граффити. Разрешено: PNG, JPEG, WEBP (base64 data URL)",
+        )
+
+    if len(graffiti_data) > max_size:
+        mb = max_size // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"Граффити слишком большое. Максимум: {mb}MB",
+        )
+
+
+async def _check_total_media_quota(
+    telegram_id: int,
+    *,
+    new_header: Optional[str] = None,
+    new_wall: Optional[str] = None,
+    new_avatar: Optional[str] = None,
+    max_total_bytes: int = 10 * 1024 * 1024,  # 10MB общий лимит (MongoDB doc limit = 16MB)
+) -> None:
+    """Проверить суммарный размер медиа в документе (header + wall + avatar).
+    Защищает от превышения лимита BSON-документа MongoDB (16MB).
+    """
+    user = await db.user_settings.find_one(
+        {"telegram_id": telegram_id},
+        {
+            "header_graffiti_data": 1,
+            "graffiti_data": 1,
+            "wall_graffiti_data": 1,
+            "custom_avatar": 1,
+            "_id": 0,
+        },
+    )
+    current_header = new_header if new_header is not None else (
+        (user or {}).get("header_graffiti_data") or (user or {}).get("graffiti_data") or ""
+    )
+    current_wall = new_wall if new_wall is not None else (user or {}).get("wall_graffiti_data", "")
+    current_avatar = new_avatar if new_avatar is not None else (user or {}).get("custom_avatar", "")
+
+    total = len(current_header or "") + len(current_wall or "") + len(current_avatar or "")
+    if total > max_total_bytes:
+        mb = max_total_bytes // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Суммарный размер медиа профиля превышен (макс. {mb}MB). "
+                f"Удалите или уменьшите граффити/аватар."
+            ),
+        )
+
+
+def _get_header_graffiti(user: dict) -> str:
+    """Извлечь header graffiti с обратной совместимостью (header_graffiti_data → graffiti_data fallback)."""
+    return user.get("header_graffiti_data") or user.get("graffiti_data", "")
+
+
+# --- HEADER GRAFFITI (шапка профиля — только владелец) ---
+
+@api_router.put("/profile/{telegram_id}/graffiti")
+async def save_header_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Сохранить header-граффити пользователя (base64 data URL). Только владелец.
+
+    🔐 BUG-P5 FIX (Stage 8): JWT обязателен.
+    🐛 BUG-P10 FIX: убран `upsert=True` (пользователь должен существовать).
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        body = await _parse_json_body(request)
+        graffiti_data = body.get("graffiti_data", "")
+
+        # 🔐 Строгая JWT-авторизация
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
+
+        # 🐛 BUG-P10: пользователь должен существовать
+        existing = await db.user_settings.find_one({"telegram_id": telegram_id}, {"_id": 1})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
+
+        # Пустая строка = очистка
+        if not graffiti_data or graffiti_data.strip() == "":
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {
+                    "$unset": {"header_graffiti_data": "", "header_graffiti_updated_at": "", "graffiti_data": "", "graffiti_updated_at": ""},
+                },
+            )
+            return {"success": True, "cleared": True, "graffiti_updated_at": None}
+
+        _validate_graffiti_data(graffiti_data)
+        # Проверка общей квоты медиа (header + wall + avatar ≤ 10MB)
+        await _check_total_media_quota(telegram_id, new_header=graffiti_data)
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {
+                "$set": {
+                    "header_graffiti_data": graffiti_data,
+                    "header_graffiti_updated_at": now_iso,
+                },
+                # Удаляем старое имя поля для чистоты
+                "$unset": {"graffiti_data": "", "graffiti_updated_at": ""},
+            },
+        )
+
+        return {"success": True, "graffiti_updated_at": now_iso}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save header graffiti error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при сохранении граффити")
+
+
+@api_router.get("/profile/{telegram_id}/graffiti")
+async def get_header_graffiti(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить header-граффити пользователя.
+
+    Блокированным пользователям возвращается пустой ответ (не раскрываем данные).
+    🔐 viewer определяется из JWT, query `requester_telegram_id` — legacy compat.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
+        # Блокированные юзеры не видят граффити
+        if effective_viewer is not None and effective_viewer != telegram_id:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                return {"graffiti_data": "", "graffiti_updated_at": None}
+
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"header_graffiti_data": 1, "header_graffiti_updated_at": 1, "graffiti_data": 1, "graffiti_updated_at": 1, "_id": 0},
+        )
+        if not user:
+            return {"graffiti_data": "", "graffiti_updated_at": None}
+
+        data = _get_header_graffiti(user)
+        updated_at = user.get("header_graffiti_updated_at") or user.get("graffiti_updated_at")
+
+        return {"graffiti_data": data, "graffiti_updated_at": updated_at}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get header graffiti error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при загрузке граффити")
+
+
+@api_router.post("/profile/{telegram_id}/graffiti/clear")
+async def clear_header_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Удалить header-граффити пользователя (полная очистка). Только владелец.
+
+    🔐 BUG-P5 FIX: JWT обязателен.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        body = await _parse_json_body(request)
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
+
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$unset": {"header_graffiti_data": "", "header_graffiti_updated_at": "", "graffiti_data": "", "graffiti_updated_at": ""}},
+        )
+
+        return {"success": True, "had_graffiti": result.modified_count > 0}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Clear header graffiti error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при удалении граффити")
+
+
+# --- WALL GRAFFITI (стена граффити — владелец + гости с разрешением) ---
+
+@api_router.get("/profile/{telegram_id}/wall-graffiti")
+async def get_wall_graffiti(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить стену граффити пользователя + флаг доступа для гостей.
+
+    Блокированным пользователям возвращается пустой ответ.
+    Дополнительно возвращаем информацию о последнем художнике.
+
+    🔐 viewer определяется из JWT, query `requester_telegram_id` — legacy compat.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
+        # Блокированные юзеры не видят граффити
+        if effective_viewer is not None and effective_viewer != telegram_id:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                return {
+                    "wall_graffiti_data": "",
+                    "wall_graffiti_updated_at": None,
+                    "wall_graffiti_access": False,
+                    "wall_graffiti_last_drawn_by": None,
+                    "wall_graffiti_last_drawn_name": None,
+                }
+
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {
+                "wall_graffiti_data": 1,
+                "wall_graffiti_updated_at": 1,
+                "wall_graffiti_access": 1,
+                "wall_graffiti_last_drawn_by": 1,
+                "_id": 0,
+            },
+        )
+        if not user:
+            return {
+                "wall_graffiti_data": "",
+                "wall_graffiti_updated_at": None,
+                "wall_graffiti_access": False,
+                "wall_graffiti_last_drawn_by": None,
+                "wall_graffiti_last_drawn_name": None,
+            }
+
+        # Добираем имя художника если есть
+        last_drawn_by = user.get("wall_graffiti_last_drawn_by")
+        last_drawn_name = None
+        if last_drawn_by:
+            drawer = await db.user_settings.find_one(
+                {"telegram_id": last_drawn_by},
+                {"first_name": 1, "last_name": 1, "username": 1, "_id": 0},
+            )
+            if drawer:
+                last_drawn_name = (
+                    f"{drawer.get('first_name', '')} {drawer.get('last_name', '')}".strip()
+                    or drawer.get("username")
+                    or "Неизвестный"
+                )
+
+        return {
+            "wall_graffiti_data": user.get("wall_graffiti_data", ""),
+            "wall_graffiti_updated_at": user.get("wall_graffiti_updated_at"),
+            "wall_graffiti_access": user.get("wall_graffiti_access", False),
+            "wall_graffiti_last_drawn_by": last_drawn_by,
+            "wall_graffiti_last_drawn_name": last_drawn_name,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get wall graffiti error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при загрузке стены граффити")
+
+
+@api_router.put("/profile/{telegram_id}/wall-graffiti")
+async def save_wall_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Сохранить стену граффити.
+    - Владелец: всегда может рисовать.
+    - Гость: может рисовать только если wall_graffiti_access=true И не заблокирован.
+
+    🔐 BUG-P5/P6 FIX (Stage 8): `requester_id` берётся ИЗ JWT (tid), не из body.
+    Это предотвращает подмену личности "последнего художника" через body spoofing.
+    🐛 BUG-P10 FIX: убран `upsert=True`.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        body = await _parse_json_body(request)
+        graffiti_data = body.get("wall_graffiti_data", "")
+
+        # 🔐 JWT — единственный источник requester_id (защита от spoofing)
+        token_tid = current_user.get("tid")
+        if token_tid is None:
+            raise HTTPException(
+                status_code=403,
+                detail="В токене отсутствует telegram_id. Завершите привязку Telegram-аккаунта.",
+            )
+        try:
+            requester_id = int(token_tid)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=401, detail="Некорректный telegram_id в токене")
+
+        if requester_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный requester_telegram_id")
+
+        # Если body.requester_telegram_id передан — должен совпадать с токеном
+        body_req = body.get("requester_telegram_id")
+        if body_req is not None:
+            try:
+                if int(body_req) != requester_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="requester_telegram_id не совпадает с токеном авторизации",
+                    )
+            except HTTPException:
+                raise
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="requester_telegram_id должен быть числом")
+
+        is_owner = requester_id == telegram_id
+
+        # Проверка прав для гостей
+        if not is_owner:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, requester_id),
+                is_blocked(requester_id, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                raise HTTPException(status_code=403, detail="Нет доступа к этому профилю")
+
+            owner = await db.user_settings.find_one(
+                {"telegram_id": telegram_id},
+                {"wall_graffiti_access": 1, "_id": 0},
+            )
+            if not owner:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+            if not owner.get("wall_graffiti_access", False):
+                raise HTTPException(status_code=403, detail="Владелец профиля не разрешил рисовать на стене граффити")
+        else:
+            # 🐛 BUG-P10: владелец тоже должен существовать
+            existing = await db.user_settings.find_one({"telegram_id": telegram_id}, {"_id": 1})
+            if not existing:
+                raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
+
+        # Пустая строка = очистка (только владелец)
+        if not graffiti_data or graffiti_data.strip() == "":
+            if not is_owner:
+                raise HTTPException(status_code=403, detail="Только владелец может очищать стену граффити")
+            await db.user_settings.update_one(
+                {"telegram_id": telegram_id},
+                {"$unset": {
+                    "wall_graffiti_data": "",
+                    "wall_graffiti_updated_at": "",
+                    "wall_graffiti_last_drawn_by": "",
+                }},
+            )
+            return {"success": True, "cleared": True, "wall_graffiti_updated_at": None}
+
+        _validate_graffiti_data(graffiti_data)
+        # Проверка общей квоты медиа
+        await _check_total_media_quota(telegram_id, new_wall=graffiti_data)
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {
+                "wall_graffiti_data": graffiti_data,
+                "wall_graffiti_updated_at": now_iso,
+                "wall_graffiti_last_drawn_by": requester_id,
+            }},
+        )
+
+        return {
+            "success": True,
+            "wall_graffiti_updated_at": now_iso,
+            "drawn_by": requester_id,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save wall graffiti error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при сохранении стены граффити")
+
+
+@api_router.post("/profile/{telegram_id}/wall-graffiti/clear")
+async def clear_wall_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Очистить стену граффити. Только владелец.
+
+    🔐 BUG-P5 FIX: JWT обязателен.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        body = await _parse_json_body(request)
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
+
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$unset": {
+                "wall_graffiti_data": "",
+                "wall_graffiti_updated_at": "",
+                "wall_graffiti_last_drawn_by": "",
+            }},
+        )
+
+        return {"success": True, "had_graffiti": result.modified_count > 0}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Clear wall graffiti error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при очистке стены граффити")
+
+
+@api_router.put("/profile/{telegram_id}/wall-graffiti/access")
+async def toggle_wall_graffiti_access(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Переключить доступ гостей к стене граффити. Только владелец.
+
+    🔐 BUG-P5 FIX: JWT обязателен.
+    🐛 BUG-P10 FIX: убран `upsert=True` (создание записи для несуществующего user).
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        body = await _parse_json_body(request)
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
+
+        # Получить текущее значение
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"wall_graffiti_access": 1, "_id": 0},
+        )
+        if user is None:
+            raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
+
+        current_access = user.get("wall_graffiti_access", False)
+        new_access = not current_access
+
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"wall_graffiti_access": new_access}},
+        )
+
+        return {"success": True, "wall_graffiti_access": new_access}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle wall graffiti access error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при изменении доступа к стене граффити")
+
+# ========== END GRAFFITI ==========
+
+
+# ========== CUSTOM AVATAR ==========
+
+@api_router.put("/profile/{telegram_id}/avatar")
+async def save_custom_avatar(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Save custom avatar for user (base64 data URL). Только владелец.
+
+    🔐 BUG-P4 FIX (Stage 8): требуется JWT. Ранее `requester_telegram_id` из body
+    не верифицировался → атакующий мог подменить аватар любого пользователя.
+    🐛 BUG-P10 FIX: убран `upsert`-эффект (пользователь должен существовать).
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        body = await request.json()
+        avatar_data = body.get("avatar_data", "")
+        # 🔐 Строгая JWT-авторизация (body.requester_telegram_id — только для legacy compat)
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
+
+        # 🐛 BUG-P10 FIX: пользователь должен существовать (никаких скрытых upsert'ов)
+        existing = await db.user_settings.find_one({"telegram_id": telegram_id}, {"_id": 1})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
+
+        # Валидация avatar_data (если не пустой)
+        if avatar_data:
+            _validate_graffiti_data(avatar_data, max_size=3 * 1024 * 1024)
+            # Проверка общей квоты
+            await _check_total_media_quota(telegram_id, new_avatar=avatar_data)
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {
+                "custom_avatar": avatar_data,
+                "avatar_mode": "custom" if avatar_data else "telegram",
+                "custom_avatar_updated_at": now_iso,
+            }},
+        )
+
+        return {"success": True, "avatar_mode": "custom" if avatar_data else "telegram", "updated_at": now_iso}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save custom avatar error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@api_router.get("/profile/{telegram_id}/avatar")
+async def get_custom_avatar(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Get custom avatar for user.
+
+    Для несуществующего пользователя или заблокированных — возвращается пустой ответ
+    (не 404, чтобы фронтенд мог гладко использовать fallback).
+
+    🔐 BUG-P4 FIX: viewer определяется из JWT (приоритет). Query-параметр
+    `requester_telegram_id` принимается только для обратной совместимости — если
+    не совпадает с JWT, возвращаем 403.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
+        # Блокированные юзеры — пустой ответ
+        if effective_viewer is not None and effective_viewer != telegram_id:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                return {"avatar_data": "", "avatar_mode": "telegram", "updated_at": None}
+
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"custom_avatar": 1, "avatar_mode": 1, "custom_avatar_updated_at": 1, "_id": 0}
+        )
+        if not user:
+            # Консистентность: пустой ответ вместо 404
+            return {"avatar_data": "", "avatar_mode": "telegram", "updated_at": None}
+
+        return {
+            "avatar_data": user.get("custom_avatar", ""),
+            "avatar_mode": user.get("avatar_mode", "telegram"),
+            "updated_at": user.get("custom_avatar_updated_at"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get custom avatar error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@api_router.delete("/profile/{telegram_id}/avatar")
+async def delete_custom_avatar(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Delete custom avatar (return to Telegram avatar).
+
+    🔐 BUG-P4 FIX: JWT обязателен.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        _authorize_profile_owner(telegram_id, current_user, requester_telegram_id)
+
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {
+                "$unset": {"custom_avatar": "", "custom_avatar_updated_at": ""},
+                "$set": {"avatar_mode": "telegram"}
+            }
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete custom avatar error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+# ========== END CUSTOM AVATAR ==========
+
+
+# ========== GENERAL PROFILE ENDPOINT (moved after specific ones) ==========
+
+@api_router.get("/profile/{telegram_id}", response_model=UserProfilePublic)
+async def get_user_profile(
+    telegram_id: int,
+    viewer_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить публичный профиль пользователя.
+
+    Особенности:
+    - Владелец всегда видит полную картину (включая приватные настройки).
+    - Чужой просмотр фильтруется согласно privacy настройкам владельца.
+    - Анонимный запрос (без viewer_telegram_id) заблокирован если владелец скрыт из поиска.
+    - БЕЗ side-effect на last_activity — для обновления используйте /profile/activity-ping.
+
+    🔐 BUG-P1 FIX (Stage 8): `viewer_telegram_id` из query используется ТОЛЬКО если
+    совпадает с `tid` из JWT. Ранее атакующий мог передать `viewer_telegram_id ==
+    telegram_id` и получить профиль в обход всех privacy-фильтров (is_own_profile=True).
+    Теперь источник истины — только JWT; query сохранён для обратной совместимости.
+    """
+    # 🔐 Определяем viewer из JWT (приоритет) — query игнорируется без токена
+    effective_viewer = _resolve_viewer_from_auth(current_user, viewer_telegram_id)
+    return await _get_user_profile_impl(telegram_id, effective_viewer)
+
+
+async def _get_user_profile_impl(
+    telegram_id: int,
+    viewer_telegram_id: Optional[int],
+) -> "UserProfilePublic":
+    """Внутренняя реализация построения публичного профиля.
+    Отделена от endpoint-а для переиспользования из `/u/{uid}` без JWT-обхода.
+    `viewer_telegram_id` здесь уже считается ДОВЕРЕННЫМ (пришёл из JWT или None для анонима).
+    """
+    try:
+        # Валидация telegram_id
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+        if viewer_telegram_id is not None and viewer_telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный viewer_telegram_id")
+
+        is_own_profile = viewer_telegram_id is not None and viewer_telegram_id == telegram_id
+        is_anonymous = viewer_telegram_id is None
+
+        # Проверяем блокировку — в обе стороны параллельно (оптимизировано)
+        blocked_by_owner = False
+        blocked_by_viewer = False
+        if viewer_telegram_id and not is_own_profile:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(telegram_id, viewer_telegram_id),
+                is_blocked(viewer_telegram_id, telegram_id),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                raise HTTPException(status_code=403, detail="Профиль недоступен")
+
+        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
+        privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
+
+        # Анонимный запрос к скрытому из поиска профилю — запрет
+        if is_anonymous and not privacy.show_in_search:
+            raise HTTPException(status_code=403, detail="Профиль скрыт владельцем из поиска")
+
+        # Оптимизация: параллельные запросы к БД
+        tasks = [
+            db.user_stats.find_one({"telegram_id": telegram_id}),
+            db.user_achievements.count_documents({"telegram_id": telegram_id}),
+            get_user_friends_count(telegram_id),
+        ]
+        # Общие друзья и статус дружбы — только если смотрит другой пользователь
+        if viewer_telegram_id and not is_own_profile:
+            tasks.append(get_mutual_friends_count(viewer_telegram_id, telegram_id))
+            # Переиспользуем уже вычисленные is_blocked — экономим 2 запроса
+            tasks.append(get_friendship_status(
+                viewer_telegram_id, telegram_id,
+                precomputed_blocked_user_target=blocked_by_viewer,
+                precomputed_blocked_target_user=blocked_by_owner,
+            ))
+
+        results = await asyncio.gather(*tasks)
+
+        stats = results[0]
+        achievements_count = results[1]
+        friends_count = results[2]
+        mutual_count = results[3] if len(results) > 3 else 0
+        friendship_status = results[4] if len(results) > 4 else None
+
+        # Проверяем онлайн-статус (timezone-aware) — чистая функция без побочных эффектов
+        is_online = False
+        last_activity = user.get("last_activity")
+        if last_activity:
+            if isinstance(last_activity, str):
+                try:
+                    last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                except Exception:
+                    last_activity = None
+            if last_activity is not None:
+                if last_activity.tzinfo is None:
+                    last_activity = last_activity.replace(tzinfo=timezone.utc)
+                is_online = (datetime.now(timezone.utc) - last_activity).total_seconds() < 300
+
+        # Владелец профиля — всегда онлайн (раз открыл профиль — значит в приложении).
+        # NB: last_activity обновляется отдельным endpoint /profile/activity-ping — это GET,
+        # он НЕ должен иметь side-effect.
+        if is_own_profile:
+            is_online = True
+
+        # Streak данные
+        streak_current = stats.get("visit_streak_current", 0) if stats else 0
+        streak_max = stats.get("visit_streak_max", 0) if stats else 0
+
+        # Система уровней
+        user_xp = stats.get("xp", 0) if stats else 0
+        level_info = calculate_level_info(user_xp)
+
+        # Avatar info
+        avatar_mode = user.get("avatar_mode", "telegram")
+        has_custom_avatar = bool(user.get("custom_avatar"))
+
+        # Счётчик просмотров профиля (видит только владелец)
+        profile_views = user.get("profile_views_count", 0) if is_own_profile else None
+
+        # 🐛 BUG-7: UID из user_settings (миграция уже проставила), fallback — поиск в users
+        user_uid = user.get("uid")
+        if not user_uid:
+            user_doc = await db.users.find_one({"telegram_id": telegram_id}, {"uid": 1})
+            if user_doc:
+                user_uid = user_doc.get("uid")
+
+        # Применяем privacy-фильтры ТОЛЬКО для чужих профилей (владелец видит всё)
+        if is_own_profile:
+            return UserProfilePublic(
+                telegram_id=telegram_id,
+                uid=user_uid,
+                username=user.get("username"),
+                first_name=user.get("first_name"),
+                last_name=user.get("last_name"),
+                group_id=user.get("group_id"),
+                group_name=user.get("group_name"),
+                facultet_id=user.get("facultet_id"),
+                facultet_name=user.get("facultet_name"),
+                kurs=user.get("kurs"),
+                friends_count=friends_count,
+                mutual_friends_count=0,
+                achievements_count=achievements_count,
+                total_points=stats.get("total_points", 0) if stats else 0,
+                xp=user_xp,
+                level=level_info["level"],
+                tier=level_info["tier"],
+                xp_current_level=level_info["xp_current_level"],
+                xp_next_level=level_info["xp_next_level"],
+                xp_progress=level_info["progress"],
+                stars=level_info.get("stars", 1),
+                level_title=level_info.get("title", ""),
+                visit_streak_current=streak_current,
+                visit_streak_max=streak_max,
+                avatar_mode=avatar_mode,
+                has_custom_avatar=has_custom_avatar,
+                is_online=is_online,
+                last_activity=last_activity,
+                privacy=privacy,
+                created_at=user.get("created_at"),
+                friendship_status=None,
+                profile_views_count=profile_views,
+                friends_list_hidden=False,
+                achievements_hidden=False,
+                online_status_hidden=False,
+                schedule_hidden=False,
+                is_hidden_from_search=not privacy.show_in_search,
+            )
+
+        # --- Чужой просмотр: применяем privacy-фильтры ---
+        # Принцип:
+        # - show_friends_list=False → скрываем friends_count и mutual_friends_count
+        # - show_achievements=False → скрываем ЧИСЛОВЫЕ метрики (XP, points, achievements count, streak)
+        #   НО показываем level/tier/stars/title (это не «достижения» — это общий статус уровня)
+        # - show_online_status=False → скрываем is_online и last_activity
+        # - is_anonymous → скрываем чувствительную инфу (группа/факультет/курс)
+        # - is_hidden_from_search → для не-друзей скрываем чувствительные поля
+        # 🐛 BUG-5: created_at (Member since) показываем ВСЕГДА — это социальная метаданная
+
+        # Учитываем статус друзей: друзья видят больше даже при show_in_search=false
+        is_friend = friendship_status == "friend"
+        # Если профиль скрыт из поиска И смотрящий не друг — урезаем поля ещё сильнее
+        hide_as_stranger = (not privacy.show_in_search) and (not is_friend)
+
+        show_profile_info = (not is_anonymous) and (not hide_as_stranger)
+
+        return UserProfilePublic(
+            telegram_id=telegram_id,
+            uid=user_uid,
+            username=user.get("username"),
+            first_name=user.get("first_name"),
+            last_name=user.get("last_name"),
+            group_id=user.get("group_id") if show_profile_info else None,
+            group_name=user.get("group_name") if show_profile_info else None,
+            facultet_id=user.get("facultet_id") if show_profile_info else None,
+            facultet_name=user.get("facultet_name") if show_profile_info else None,
+            kurs=user.get("kurs") if show_profile_info else None,
+            friends_count=friends_count if (privacy.show_friends_list and show_profile_info) else 0,
+            mutual_friends_count=mutual_count if privacy.show_friends_list else 0,
+            achievements_count=achievements_count if (privacy.show_achievements and show_profile_info) else 0,
+            total_points=(stats.get("total_points", 0) if stats else 0) if (privacy.show_achievements and show_profile_info) else 0,
+            xp=user_xp if (privacy.show_achievements and show_profile_info) else 0,
+            # Level/tier/stars/title — это не "достижения", это публичный статус уровня
+            level=level_info["level"] if show_profile_info else 1,
+            tier=level_info["tier"] if show_profile_info else "base",
+            xp_current_level=level_info["xp_current_level"] if (privacy.show_achievements and show_profile_info) else 0,
+            xp_next_level=level_info["xp_next_level"] if (privacy.show_achievements and show_profile_info) else 100,
+            xp_progress=level_info["progress"] if (privacy.show_achievements and show_profile_info) else 0.0,
+            stars=level_info.get("stars", 1) if show_profile_info else 1,
+            level_title=level_info.get("title", "") if show_profile_info else "",
+            visit_streak_current=streak_current if (privacy.show_achievements and show_profile_info) else 0,
+            visit_streak_max=streak_max if (privacy.show_achievements and show_profile_info) else 0,
+            avatar_mode=avatar_mode,
+            has_custom_avatar=has_custom_avatar,
+            is_online=is_online if privacy.show_online_status else False,
+            last_activity=last_activity if privacy.show_online_status else None,
+            privacy=None,  # Чужим не отдаём privacy настройки
+            # 🐛 BUG-5: created_at показываем ВСЕМ (Member since)
+            created_at=user.get("created_at"),
+            friendship_status=friendship_status,
+            profile_views_count=None,  # Только владелец видит
+            friends_list_hidden=(not privacy.show_friends_list),
+            achievements_hidden=(not privacy.show_achievements),
+            online_status_hidden=(not privacy.show_online_status),
+            schedule_hidden=(not privacy.show_schedule),
+            is_hidden_from_search=(not privacy.show_in_search),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get user profile error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера при загрузке профиля")
+
+# ========== END GENERAL PROFILE ENDPOINT ==========
+
+
+# ========== PROFILE AUXILIARY ENDPOINTS ==========
+
+class ActivityPingRequest(BaseModel):
+    telegram_id: int
+
+
+@api_router.post("/profile/activity-ping")
+async def profile_activity_ping(
+    request: ActivityPingRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Обновить last_activity пользователя (замена side-effect в GET /profile).
+
+    🔐 BUG-P9 FIX (Stage 8): JWT теперь ОБЯЗАТЕЛЕН. Ранее без токена атакующий
+    мог пинговать `last_activity` для ЛЮБОГО telegram_id, фальсифицируя "online"-статус
+    жертвы. Теперь `telegram_id` в теле ДОЛЖЕН совпадать с `tid` из токена.
+    """
+    try:
+        telegram_id = request.telegram_id
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        # 🔐 Строгая авторизация: пингуем только свой профиль
+        _authorize_profile_owner(telegram_id, current_user)
+
+        now = datetime.now(timezone.utc)
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"last_activity": now}},
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        return {"success": True, "last_activity": now.isoformat()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Activity ping error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+class ProfileViewRequest(BaseModel):
+    """DEPRECATED: перенесено в models.py. Оставлено для обратной совместимости импортов."""
+    viewer_telegram_id: int
+
+
+@api_router.post("/profile/{telegram_id}/view")
+async def register_profile_view(
+    telegram_id: int,
+    request: ProfileViewRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Зарегистрировать просмотр профиля (для счётчика у владельца).
+
+    - Самопросмотр не считается.
+    - Блокированные не могут счётчик накручивать.
+    - 🐛 BUG-3 FIX: Скрытый из поиска (show_in_search=false) — не считаем просмотры от не-друзей.
+    - Rate-limit: один пользователь может добавить счётчик не чаще раза в час (дедупликация).
+
+    🔐 BUG-P8 FIX (Stage 8): JWT обязателен. viewer_id берётся ИЗ ТОКЕНА (tid),
+    а не из body — это предотвращает инфляцию счётчика через ротацию `viewer_telegram_id`.
+    Поле `request.viewer_telegram_id` (если передано) должно совпадать с токеном.
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        # 🔐 viewer_id — строго из JWT, не из body
+        token_tid = current_user.get("tid")
+        if token_tid is None:
+            raise HTTPException(
+                status_code=403,
+                detail="В токене отсутствует telegram_id. Завершите привязку Telegram-аккаунта.",
+            )
+        try:
+            viewer_id = int(token_tid)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=401, detail="Некорректный telegram_id в токене")
+
+        # Если в body есть viewer_telegram_id — он должен совпадать с токеном
+        if request.viewer_telegram_id and request.viewer_telegram_id != viewer_id:
+            raise HTTPException(
+                status_code=403,
+                detail="viewer_telegram_id не совпадает с токеном авторизации",
+            )
+
+        if viewer_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный viewer_telegram_id")
+
+        # Свой просмотр не считаем
+        if viewer_id == telegram_id:
+            return {"success": True, "counted": False, "reason": "self-view"}
+
+        # Блокировка — не считаем
+        blocked_by_owner = await is_blocked(telegram_id, viewer_id)
+        blocked_by_viewer = await is_blocked(viewer_id, telegram_id)
+        if blocked_by_owner or blocked_by_viewer:
+            return {"success": True, "counted": False, "reason": "blocked"}
+
+        # 🐛 BUG-3: Если профиль скрыт из поиска И viewer не друг — не засчитываем
+        privacy = await get_user_privacy_settings(telegram_id)
+        if not privacy.show_in_search:
+            is_friend = await check_friendship(telegram_id, viewer_id)
+            if not is_friend:
+                return {"success": True, "counted": False, "reason": "hidden-from-search"}
+
+        # Rate-limit через коллекцию profile_views (дедупликация за последний час)
+        now = datetime.now(timezone.utc)
+        one_hour_ago = now - timedelta(hours=1)
+
+        recent = await db.profile_views.find_one({
+            "viewed_telegram_id": telegram_id,
+            "viewer_telegram_id": viewer_id,
+            "viewed_at": {"$gte": one_hour_ago},
+        })
+        if recent:
+            return {"success": True, "counted": False, "reason": "rate-limited"}
+
+        # Записываем просмотр
+        await db.profile_views.insert_one({
+            "id": str(uuid.uuid4()),
+            "viewed_telegram_id": telegram_id,
+            "viewer_telegram_id": viewer_id,
+            "viewed_at": now,
+        })
+
+        # Инкрементируем счётчик у владельца
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$inc": {"profile_views_count": 1}},
+        )
+        return {"success": True, "counted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Register profile view error: {e}")
+        # Не поломаем UX, возвращаем не-критическую ошибку
+        return {"success": False, "counted": False, "error": "internal"}
+
+
+@api_router.get("/profile/{telegram_id}/share-link")
+async def get_profile_share_link(
+    telegram_id: int,
+    request: Request,
+    viewer_telegram_id: Optional[int] = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Получить ссылку для шаринга профиля.
+
+    🐛 BUG-1 FIX: владелец может получить свою ссылку даже со `show_in_search=false`.
+    Определяем владельца по:
+      1) JWT токену (приоритет) — current_user.tid / current_user.sub
+      2) query-параметру `viewer_telegram_id` (для обратной совместимости)
+    """
+    try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
+
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"first_name": 1, "last_name": 1, "username": 1, "group_name": 1, "uid": 1, "_id": 0},
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # 🔐 Stage 8: viewer определяется строго из JWT (query только для совпадения)
+        effective_viewer = _resolve_viewer_from_auth(current_user, viewer_telegram_id)
+        is_owner = effective_viewer is not None and effective_viewer == telegram_id
+
+        # Приватность (только если не владелец)
+        if not is_owner:
+            privacy = await get_user_privacy_settings(telegram_id)
+            if not privacy.show_in_search:
+                raise HTTPException(status_code=403, detail="Профиль скрыт из поиска — ссылка недоступна")
+
+        bot_username = get_telegram_bot_username()
+        telegram_link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
+
+        # Новая публичная ссылка (через UID) — если у пользователя есть UID
+        uid = user.get("uid")
+        public_link = None
+        if uid:
+            # Stage 7: B-20 — если PUBLIC_BASE_URL пуст, используем хост
+            # из текущего request.url (защита от относительных ссылок в share-popup).
+            from config import PUBLIC_BASE_URL
+            base = (PUBLIC_BASE_URL or "").rstrip("/")
+            if not base and request is not None:
+                try:
+                    base = f"{request.url.scheme}://{request.url.netloc}"
+                except Exception:
+                    base = ""
+            public_link = f"{base}/u/{uid}" if base else f"/u/{uid}"
+
+        display_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or user.get("username") or "Пользователь"
+
+        share_text = f"{display_name}"
+        if user.get("group_name"):
+            share_text += f" · {user.get('group_name')}"
+
+        return {
+            "link": telegram_link,  # legacy поле — Telegram-ссылка
+            "telegram_link": telegram_link,
+            "public_link": public_link,  # новая публичная ссылка по UID
+            "uid": uid,
+            "share_text": share_text,
+            "display_name": display_name,
+            "group_name": user.get("group_name"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get profile share link error: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+# ========== END PROFILE AUXILIARY ENDPOINTS ==========
+
+
+# ========== STAGE 2: PUBLIC PROFILE BY UID (/api/u/{uid}/*) ==========
+# Новый публичный API, работает по 9-digit numeric UID.
+# Использует JWT (опционально) для определения viewer'а; резолвит uid → telegram_id.
+
+
+async def _resolve_user_by_uid(uid: str) -> Optional[dict]:
+    """Найти пользователя по UID (9-digit numeric).
+
+    Возвращает dict `{telegram_id, uid, ...}` или None.
+    """
+    if not uid or not uid.isdigit() or len(uid) != 9:
+        return None
+
+    # Приоритет: коллекция users
+    user_doc = await db.users.find_one(
+        {"uid": uid},
+        {
+            "uid": 1, "telegram_id": 1, "username": 1,
+            "first_name": 1, "last_name": 1, "created_at": 1,
+            "email": 1, "vk_id": 1, "auth_providers": 1, "registration_step": 1,
+            "_id": 0,
+        },
+    )
+    if user_doc:
+        return user_doc
+
+    # Fallback: user_settings (если миграция не прошла)
+    settings_doc = await db.user_settings.find_one(
+        {"uid": uid},
+        {"uid": 1, "telegram_id": 1, "username": 1, "first_name": 1, "last_name": 1, "created_at": 1, "_id": 0},
+    )
+    return settings_doc
+
+
+async def _resolve_uid_or_404(uid: str) -> dict:
+    user = await _resolve_user_by_uid(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь с таким UID не найден")
+    return user
+
+
+@api_router.get("/u/{uid}/resolve")
+async def resolve_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Быстрый резолв UID → telegram_id + базовая инфа для отображения превью.
+
+    Stage 7: B-06 — респектуем privacy:
+      - Если у пользователя show_in_search=False и viewer НЕ сам пользователь
+        и НЕ друг — возвращаем 404 (как будто пользователь не существует).
+      - Если viewer заблокирован пользователем — тоже 404.
+    """
+    user = await _resolve_user_by_uid(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    target_tid = user.get("telegram_id")
+    viewer_tid = current_user.get("tid") if current_user else None
+    viewer_uid = current_user.get("sub") if current_user else None
+
+    # Privacy-проверка: self — всегда OK, остальные — проверяем show_in_search + блок
+    is_self = (viewer_uid == uid) or (viewer_tid and target_tid and viewer_tid == target_tid)
+    if not is_self and target_tid:
+        try:
+            # Настройки приватности
+            settings_doc = await db.user_settings.find_one({"telegram_id": target_tid})
+            privacy = await get_user_privacy_settings(target_tid, user_doc=settings_doc)
+
+            is_friend = False
+            if viewer_tid:
+                # 🐛 BUG-P7 FIX: ранее использовались несуществующие коллекции
+                # `db.friendships` и `db.blocked_users` с неправильными полями —
+                # теперь используем проверенные helper'ы `are_friends()` и `is_blocked()`,
+                # которые работают с реальными коллекциями `db.friends` / `db.user_blocks`.
+                try:
+                    blocked_by_owner, is_friend = await asyncio.gather(
+                        is_blocked(target_tid, viewer_tid),
+                        are_friends(viewer_tid, target_tid),
+                    )
+                    # Блокировка: если target заблокировал viewer → 404 (пользователь "не существует")
+                    if blocked_by_owner:
+                        raise HTTPException(status_code=404, detail="Пользователь не найден")
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.warning(f"resolve_uid friendship check failed for uid={uid}: {e}")
+
+            if not privacy.show_in_search and not is_friend:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"resolve_uid privacy check error for uid={uid}: {e}")
+
+    display_name = (
+        f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
+        or user.get("username")
+        or f"User {uid}"
+    )
+    return {
+        "uid": uid,
+        "telegram_id": target_tid,
+        "display_name": display_name,
+        "username": user.get("username"),
+        "has_telegram": bool(target_tid),
+        "auth_providers": user.get("auth_providers", []),
+    }
+
+
+@api_router.get("/u/{uid}", response_model=UserProfilePublic)
+async def get_public_profile_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Публичный профиль по UID. Работает БЕЗ auth (респектует privacy).
+
+    Если JWT передан — определяет viewer как его `tid` для персонализации
+    (вычисление mutual friends, дружбы, блокировки).
+    """
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+
+    if not target_tid:
+        raise HTTPException(
+            status_code=422,
+            detail="Профиль пользователя не настроен (не связан с telegram-аккаунтом)",
+        )
+
+    viewer_tid = None
+    if current_user:
+        viewer_tid = current_user.get("tid")
+
+    # Stage 8: используем внутреннюю реализацию — viewer_tid уже доверенный (из JWT),
+    # не нужно проходить через query-validation в endpoint-обёртке.
+    return await _get_user_profile_impl(int(target_tid), int(viewer_tid) if viewer_tid else None)
+
+
+@api_router.get("/u/{uid}/schedule", response_model=FriendScheduleResponse)
+async def get_public_schedule_by_uid(
+    uid: str,
+    date: str = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Расписание по UID (только для друзей или владельца)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    viewer_tid = current_user.get("tid")
+    if viewer_tid is None:
+        raise HTTPException(status_code=401, detail="Требуется авторизация с telegram_id")
+
+    # Stage 8: используем внутреннюю реализацию — viewer_tid уже доверенный (из JWT)
+    return await _get_friend_schedule_impl(
+        telegram_id=int(target_tid),
+        viewer_telegram_id=int(viewer_tid),
+        date=date,
+    )
+
+
+@api_router.get("/u/{uid}/qr")
+async def get_public_qr_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """QR-код профиля по UID."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    requester_tid = None
+    if current_user:
+        requester_tid = current_user.get("tid")
+
+    # Stage 8: передаём current_user явно (direct Python call, Depends не инжектится)
+    return await get_profile_qr_data(
+        telegram_id=int(target_tid),
+        requester_telegram_id=requester_tid,
+        current_user=current_user,
+    )
+
+
+@api_router.get("/u/{uid}/share-link")
+async def get_public_share_link_by_uid(
+    uid: str,
+    request: Request,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Ссылки для шаринга профиля по UID."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        # Для пользователей без telegram — всё равно отдаём public_link
+        display_name = (
+            f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
+            or user.get("username")
+            or f"User {uid}"
+        )
+        # Stage 7: B-20 — fallback из request.url если PUBLIC_BASE_URL пуст
+        from config import PUBLIC_BASE_URL
+        base = (PUBLIC_BASE_URL or "").rstrip("/")
+        if not base:
+            try:
+                base = f"{request.url.scheme}://{request.url.netloc}"
+            except Exception:
+                base = ""
+        public_link = f"{base}/u/{uid}" if base else f"/u/{uid}"
+        return {
+            "link": None,
+            "telegram_link": None,
+            "public_link": public_link,
+            "uid": uid,
+            "share_text": display_name,
+            "display_name": display_name,
+            "group_name": None,
+        }
+
+    return await get_profile_share_link(
+        telegram_id=int(target_tid),
+        request=request,
+        viewer_telegram_id=None,
+        current_user=current_user,
+    )
+
+
+@api_router.get("/u/{uid}/privacy", response_model=PrivacySettings)
+async def get_public_privacy_by_uid(
+    uid: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Получить privacy настройки (только владелец)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+
+    # Проверка владельца: по sub (uid) или по tid
+    is_owner = (
+        current_user.get("sub") == uid
+        or (target_tid and int(current_user.get("tid") or 0) == int(target_tid))
+    )
+    if not is_owner:
+        raise HTTPException(status_code=403, detail="Доступ запрещён — только владелец")
+
+    if not target_tid:
+        # Возвращаем дефолтные настройки
+        return PrivacySettings()
+
+    # Stage 8: используем helper напрямую (авторизация уже проверена выше)
+    return await get_user_privacy_settings(int(target_tid))
+
+
+@api_router.put("/u/{uid}/privacy", response_model=PrivacySettings)
+async def update_public_privacy_by_uid(
+    uid: str,
+    settings: PrivacySettingsUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Обновить privacy настройки (только владелец)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+
+    is_owner = (
+        current_user.get("sub") == uid
+        or (target_tid and int(current_user.get("tid") or 0) == int(target_tid))
+    )
+    if not is_owner:
+        raise HTTPException(status_code=403, detail="Доступ запрещён — только владелец")
+
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    # Stage 8: собираем $set с dot-notation (идентично update_privacy_settings)
+    try:
+        update_data = settings.model_dump(exclude_unset=True)
+    except AttributeError:
+        update_data = settings.dict(exclude_unset=True)
+
+    if not update_data:
+        return await get_user_privacy_settings(int(target_tid))
+
+    ALLOWED_FIELDS = {
+        "show_online_status",
+        "show_in_search",
+        "show_friends_list",
+        "show_achievements",
+        "show_schedule",
+    }
+    set_operations: Dict[str, Any] = {}
+    for key, value in update_data.items():
+        if key in ALLOWED_FIELDS and value is not None:
+            set_operations[f"privacy_settings.{key}"] = bool(value)
+
+    if not set_operations:
+        return await get_user_privacy_settings(int(target_tid))
+
+    set_operations["privacy_updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    result = await db.user_settings.update_one(
+        {"telegram_id": int(target_tid)},
+        {"$set": set_operations},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    logger.info(f"🔒 Privacy settings updated via /u/{uid}: {list(update_data.keys())}")
+    fresh = await db.user_settings.find_one(
+        {"telegram_id": int(target_tid)}, {"privacy_settings": 1, "_id": 0}
+    )
+    return await get_user_privacy_settings(int(target_tid), user_doc=fresh)
+
+
+@api_router.post("/u/{uid}/view")
+async def register_view_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Зарегистрировать просмотр профиля (viewer берётся из JWT)."""
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        return {"success": True, "counted": False, "reason": "profile-not-setup"}
+
+    viewer_tid = None
+    if current_user:
+        viewer_tid = current_user.get("tid")
+    if viewer_tid is None:
+        return {"success": True, "counted": False, "reason": "anonymous"}
+
+    # Stage 8: передаём current_user явно (direct Python call, Depends не инжектится)
+    return await register_profile_view(
+        telegram_id=int(target_tid),
+        request=ProfileViewRequest(viewer_telegram_id=int(viewer_tid)),
+        current_user=current_user,
+    )
+
+
+# ========== END PUBLIC PROFILE BY UID ==========
+
+
+
+
+# Обработка приглашения от друга (онбординг)
+
+@api_router.post("/friends/process-invite", response_model=ProcessFriendInviteResponse)
+async def process_friend_invite(request: ProcessFriendInviteRequest):
+    """Обработать приглашение от друга при онбординге"""
+    try:
+        inviter = await db.user_settings.find_one({"telegram_id": request.inviter_telegram_id})
+        if not inviter:
+            return ProcessFriendInviteResponse(
+                success=False,
+                friend_added=False,
+                group_set=False,
+                message="Пригласивший пользователь не найден"
+            )
+        
+        # Проверяем, новый ли это пользователь
+        existing_user = await db.user_settings.find_one({"telegram_id": request.telegram_id})
+        is_new_user = existing_user is None
+        
+        # Автоматически добавляем в друзья
+        if not await are_friends(request.telegram_id, request.inviter_telegram_id):
+            friend1 = Friend(
+                user_telegram_id=request.telegram_id,
+                friend_telegram_id=request.inviter_telegram_id
+            )
+            friend2 = Friend(
+                user_telegram_id=request.inviter_telegram_id,
+                friend_telegram_id=request.telegram_id
+            )
+            await db.friends.insert_many([friend1.dict(), friend2.dict()])
+            
+            # Обновляем статистику
+            await update_friends_stats(request.telegram_id)
+            await update_friends_stats(request.inviter_telegram_id)
+            
+            # Если новый пользователь - увеличиваем счетчик приглашений
+            if is_new_user:
+                await db.user_stats.update_one(
+                    {"telegram_id": request.inviter_telegram_id},
+                    {"$inc": {"users_invited": 1}},
+                    upsert=True
+                )
+        
+        # Устанавливаем группу пригласившего если запрошено
+        group_set = False
+        if request.use_inviter_group and inviter.get("group_id"):
+            await db.user_settings.update_one(
+                {"telegram_id": request.telegram_id},
+                {
+                    "$set": {
+                        "group_id": inviter["group_id"],
+                        "group_name": inviter.get("group_name"),
+                        "facultet_id": inviter.get("facultet_id"),
+                        "facultet_name": inviter.get("facultet_name"),
+                        "level_id": inviter.get("level_id"),
+                        "kurs": inviter.get("kurs"),
+                        "form_code": inviter.get("form_code")
+                    }
+                },
+                upsert=True
+            )
+            group_set = True
+        
+        # Проверяем достижения
+        from achievements import check_and_award_achievements, get_or_create_user_stats
+        for user_id in [request.telegram_id, request.inviter_telegram_id]:
+            stats = await get_or_create_user_stats(db, user_id)
+            await check_and_award_achievements(db, user_id, stats)
+        
+        inviter_card = await build_friend_card(inviter, request.telegram_id, datetime.utcnow())
+        
+        logger.info(f"👥 Friend invite processed: {request.inviter_telegram_id} -> {request.telegram_id}")
+        return ProcessFriendInviteResponse(
+            success=True,
+            friend_added=True,
+            group_set=group_set,
+            inviter_info=inviter_card,
+            message="Вы добавлены в друзья!"
+        )
+        
+    except Exception as e:
+        logger.error(f"Process friend invite error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}/blocked")
+async def get_blocked_users(telegram_id: int):
+    """Получить список заблокированных пользователей"""
+    try:
+        blocks = await db.user_blocks.find({"blocker_telegram_id": telegram_id}).to_list(100)
+        
+        blocked_users = []
+        for block in blocks:
+            user = await db.user_settings.find_one({"telegram_id": block["blocked_telegram_id"]})
+            if user:
+                blocked_users.append({
+                    "telegram_id": block["blocked_telegram_id"],
+                    "username": user.get("username"),
+                    "first_name": user.get("first_name"),
+                    "last_name": user.get("last_name"),
+                    "blocked_at": block.get("created_at")
+                })
+        
+        return {"blocked_users": blocked_users, "count": len(blocked_users)}
+        
+    except Exception as e:
+        logger.error(f"Get blocked users error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ API для системы уведомлений (In-App Notifications) ============
+
+def get_time_ago(dt: datetime) -> str:
+    """Получить относительное время (5м, 2ч, вчера)"""
+    now = datetime.utcnow()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    minutes = seconds / 60
+    hours = minutes / 60
+    days = hours / 24
+    
+    if seconds < 60:
+        return "сейчас"
+    elif minutes < 60:
+        return f"{int(minutes)}м"
+    elif hours < 24:
+        return f"{int(hours)}ч"
+    elif days < 2:
+        return "вчера"
+    elif days < 7:
+        return f"{int(days)}д"
+    else:
+        return dt.strftime("%d.%m")
+
+
+async def get_notification_settings(telegram_id: int) -> ExtendedNotificationSettings:
+    """Получить расширенные настройки уведомлений"""
+    user = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if user and "extended_notification_settings" in user:
+        return ExtendedNotificationSettings(**user["extended_notification_settings"])
+    return ExtendedNotificationSettings()
+
+
+async def should_send_notification(telegram_id: int, category: NotificationCategory, notification_type: NotificationType) -> tuple[bool, bool]:
+    """Проверить, нужно ли отправлять уведомление. Возвращает (in_app, push)"""
+    settings = await get_notification_settings(telegram_id)
+    
+    if not settings.notifications_enabled:
+        return False, False
+    
+    in_app = True
+    push = False
+    
+    if category == NotificationCategory.STUDY:
+        in_app = settings.study_enabled
+        push = settings.study_push
+    elif category == NotificationCategory.SOCIAL:
+        in_app = settings.social_enabled
+        push = settings.social_push
+        if notification_type == NotificationType.FRIEND_REQUEST:
+            in_app = in_app and settings.social_friend_requests
+        elif notification_type == NotificationType.FRIEND_ACCEPTED:
+            in_app = in_app and settings.social_friend_accepted
+        elif notification_type == NotificationType.NEW_MESSAGE:
+            in_app = in_app and settings.social_messages
+            push = push and settings.social_messages
+    elif category == NotificationCategory.ROOMS:
+        in_app = settings.rooms_enabled
+        push = settings.rooms_push
+        if notification_type == NotificationType.ROOM_TASK_NEW:
+            in_app = in_app and settings.rooms_new_tasks
+        elif notification_type == NotificationType.ROOM_TASK_ASSIGNED:
+            in_app = in_app and settings.rooms_assignments
+        elif notification_type == NotificationType.ROOM_TASK_COMPLETED:
+            in_app = in_app and settings.rooms_completions
+    elif category == NotificationCategory.JOURNAL:
+        in_app = settings.journal_enabled
+        push = settings.journal_push
+    elif category == NotificationCategory.ACHIEVEMENTS:
+        in_app = settings.achievements_enabled
+        push = settings.achievements_push
+    elif category == NotificationCategory.SYSTEM:
+        in_app = settings.system_enabled
+        push = settings.system_push
+    
+    return in_app, push
+
+
+async def create_notification(
+    telegram_id: int,
+    notification_type: NotificationType,
+    category: NotificationCategory,
+    title: str,
+    message: str,
+    emoji: str = "🔔",
+    priority: NotificationPriority = NotificationPriority.NORMAL,
+    data: dict = None,
+    actions: list = None,
+    send_push: bool = None
+) -> Optional[str]:
+    """Создать уведомление"""
+    try:
+        # Проверяем настройки
+        should_in_app, should_push = await should_send_notification(telegram_id, category, notification_type)
+        
+        if not should_in_app:
+            return None
+        
+        notification = InAppNotification(
+            telegram_id=telegram_id,
+            type=notification_type,
+            category=category,
+            priority=priority,
+            title=title,
+            message=message,
+            emoji=emoji,
+            data=data or {},
+            actions=actions or []
+        )
+        
+        await db.in_app_notifications.insert_one(notification.dict())
+        
+        # Отправляем push если нужно
+        if (send_push is True) or (send_push is None and should_push):
+            try:
+                from notifications import get_notification_service
+                notification_service = get_notification_service()
+                
+                # Красиво форматируем push-сообщение
+                push_text = f"{emoji}  <b>{title}</b>\n{message}"
+                
+                await notification_service.send_message(
+                    telegram_id,
+                    push_text
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send push notification: {e}")
+        
+        logger.info(f"📬 Notification created: {notification_type} for {telegram_id}")
+        return notification.id
+        
+    except Exception as e:
+        logger.error(f"Create notification error: {e}")
+        return None
+
+
+# Хелперы для создания уведомлений разных типов
+
+async def notify_friend_request(to_telegram_id: int, from_user: dict, request_id: str):
+    """Уведомление о новой заявке в друзья"""
+    from_name = f"{from_user.get('first_name', '')} {from_user.get('last_name', '')}".strip() or from_user.get('username', 'Пользователь')
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.FRIEND_REQUEST,
+        category=NotificationCategory.SOCIAL,
+        priority=NotificationPriority.HIGH,
+        title="Заявка в друзья",
+        message=f'<tg-emoji emoji-id="5341588772347732638">👤</tg-emoji> {from_name} хочет добавить вас в друзья',
+        emoji='<tg-emoji emoji-id="5238039443008408242">💌</tg-emoji>',
+        data={
+            "request_id": request_id,
+            "from_telegram_id": from_user.get("telegram_id"),
+            "from_name": from_name
+        },
+        actions=[
+            {"id": "accept", "label": "✅ Принять", "type": "primary"},
+            {"id": "reject", "label": "Отклонить", "type": "secondary"}
+        ]
+    )
+
+
+async def notify_friend_accepted(to_telegram_id: int, friend_user: dict):
+    """Уведомление о принятии заявки"""
+    friend_name = f"{friend_user.get('first_name', '')} {friend_user.get('last_name', '')}".strip() or friend_user.get('username', 'Пользователь')
+    
+    await create_notification(
+        telegram_id=to_telegram_id,
+        notification_type=NotificationType.FRIEND_ACCEPTED,
+        category=NotificationCategory.SOCIAL,
+        priority=NotificationPriority.NORMAL,
+        title="Вы теперь друзья!",
+        message=f'<tg-emoji emoji-id="5267062246424473960">🤝</tg-emoji><tg-emoji emoji-id="5264739223168117981">🤝</tg-emoji> {friend_name} принял вашу заявку',
+        emoji='<tg-emoji emoji-id="5317026657540780588">🎉</tg-emoji>',
+        data={
+            "friend_telegram_id": friend_user.get("telegram_id"),
+            "friend_name": friend_name
+        }
+    )
+
+
+# API Endpoints для уведомлений
+
+@api_router.get("/notifications/{telegram_id}", response_model=NotificationsListResponse)
+async def get_notifications(telegram_id: int, limit: int = 50, offset: int = 0, unread_only: bool = False):
+    """Получить список уведомлений"""
+    try:
+        query = {"telegram_id": telegram_id, "dismissed": False}
+        if unread_only:
+            query["read"] = False
+        
+        total = await db.in_app_notifications.count_documents(query)
+        unread_count = await db.in_app_notifications.count_documents({
+            "telegram_id": telegram_id, 
+            "read": False,
+            "dismissed": False
+        })
+        
+        notifications_cursor = db.in_app_notifications.find(query) \
+            .sort("created_at", -1) \
+            .skip(offset) \
+            .limit(limit)
+        
+        notifications = []
+        async for notif in notifications_cursor:
+            created_at = notif.get("created_at")
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            
+            notifications.append(NotificationCard(
+                id=notif["id"],
+                type=notif["type"],
+                category=notif["category"],
+                priority=notif.get("priority", "normal"),
+                title=notif["title"],
+                message=notif["message"],
+                emoji=notif.get("emoji", "🔔"),
+                data=notif.get("data", {}),
+                actions=notif.get("actions", []),
+                action_taken=notif.get("action_taken"),
+                read=notif.get("read", False),
+                created_at=created_at,
+                time_ago=get_time_ago(created_at) if created_at else ""
+            ))
+        
+        return NotificationsListResponse(
+            notifications=notifications,
+            total=total,
+            unread_count=unread_count,
+            has_more=offset + limit < total
+        )
+        
+    except Exception as e:
+        logger.error(f"Get notifications error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/notifications/{telegram_id}/unread-count", response_model=UnreadCountResponse)
+async def get_unread_count(telegram_id: int):
+    """Получить количество непрочитанных уведомлений"""
+    try:
+        total = await db.in_app_notifications.count_documents({
+            "telegram_id": telegram_id,
+            "read": False,
+            "dismissed": False
+        })
+        
+        # Считаем по категориям
+        pipeline = [
+            {"$match": {"telegram_id": telegram_id, "read": False, "dismissed": False}},
+            {"$group": {"_id": "$category", "count": {"$sum": 1}}}
+        ]
+        
+        by_category = {}
+        async for doc in db.in_app_notifications.aggregate(pipeline):
+            by_category[doc["_id"]] = doc["count"]
+        
+        return UnreadCountResponse(unread_count=total, by_category=by_category)
+        
+    except Exception as e:
+        logger.error(f"Get unread count error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, telegram_id: int = Body(..., embed=True)):
+    """Отметить уведомление как прочитанное"""
+    try:
+        result = await db.in_app_notifications.update_one(
+            {"id": notification_id, "telegram_id": telegram_id},
+            {"$set": {"read": True, "read_at": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        
+        return {"success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark notification read error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{telegram_id}/read-all")
+async def mark_all_notifications_read(telegram_id: int):
+    """Отметить все уведомления как прочитанные"""
+    try:
+        result = await db.in_app_notifications.update_many(
+            {"telegram_id": telegram_id, "read": False},
+            {"$set": {"read": True, "read_at": datetime.utcnow()}}
+        )
+        
+        return {"success": True, "updated": result.modified_count}
+        
+    except Exception as e:
+        logger.error(f"Mark all notifications read error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/notifications/{notification_id}")
+async def dismiss_notification(notification_id: str, telegram_id: int = Body(..., embed=True)):
+    """Скрыть уведомление"""
+    try:
+        result = await db.in_app_notifications.update_one(
+            {"id": notification_id, "telegram_id": telegram_id},
+            {"$set": {"dismissed": True}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        
+        return {"success": True}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dismiss notification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{notification_id}/action")
+async def notification_action(notification_id: str, telegram_id: int = Body(...), action_id: str = Body(...)):
+    """Выполнить действие уведомления"""
+    try:
+        result = await db.in_app_notifications.update_one(
+            {"id": notification_id, "telegram_id": telegram_id},
+            {"$set": {"action_taken": action_id, "read": True, "read_at": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        
+        return {"success": True, "action_id": action_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Notification action error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/notifications/{telegram_id}/settings", response_model=ExtendedNotificationSettings)
+async def get_extended_notification_settings(telegram_id: int):
+    """Получить расширенные настройки уведомлений"""
+    try:
+        return await get_notification_settings(telegram_id)
+    except Exception as e:
+        logger.error(f"Get extended notification settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/notifications/{telegram_id}/settings", response_model=ExtendedNotificationSettings)
+async def update_extended_notification_settings(telegram_id: int, settings: ExtendedNotificationSettingsUpdate):
+    """Обновить расширенные настройки уведомлений"""
+    try:
+        current = await get_notification_settings(telegram_id)
+        
+        # Обновляем только переданные поля
+        update_data = settings.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(current, key, value)
+        
+        await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$set": {"extended_notification_settings": current.dict()}},
+            upsert=True
+        )
+        
+        logger.info(f"📬 Extended notification settings updated for {telegram_id}")
+        return current
+        
+    except Exception as e:
+        logger.error(f"Update extended notification settings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ API для системы сообщений между друзьями (Messages / Dialogs) ============
+
+# In-memory typing indicators {conversation_id: {telegram_id: timestamp}}
+typing_indicators_store: dict = {}
+# Счётчик вызовов для периодической очистки
+_typing_cleanup_counter = 0
+
+async def get_or_create_conversation(user1_id: int, user2_id: int) -> dict:
+    """Получить или создать диалог между двумя пользователями (атомарная операция)"""
+    participant_ids = sorted([user1_id, user2_id])
+    now = datetime.utcnow()
+    # Используем find_one_and_update с upsert для атомарности (без race condition)
+    conversation = await db.conversations.find_one_and_update(
+        {"participant_ids": participant_ids},
+        {"$setOnInsert": {
+            "id": str(uuid.uuid4()),
+            "participant_ids": participant_ids,
+            "created_at": now,
+            "updated_at": now,
+        }},
+        upsert=True,
+        return_document=True
+    )
+    return conversation
+
+
+def build_message_response(msg: dict) -> MessageResponse:
+    """Сформировать ответ сообщения из документа MongoDB"""
+    reply_to = None
+    if msg.get("reply_to"):
+        rt = msg["reply_to"]
+        reply_to = ReplyInfo(
+            message_id=rt.get("message_id", ""),
+            sender_id=rt.get("sender_id", 0),
+            sender_name=rt.get("sender_name", ""),
+            text=rt.get("text", ""),
+        )
+    reactions = []
+    for r in msg.get("reactions", []):
+        reactions.append(ReactionInfo(emoji=r["emoji"], users=r.get("users", [])))
+    return MessageResponse(
+        id=msg["id"],
+        conversation_id=msg["conversation_id"],
+        sender_id=msg["sender_id"],
+        text=msg["text"],
+        message_type=msg.get("message_type", "text"),
+        created_at=msg["created_at"],
+        read_at=msg.get("read_at"),
+        is_deleted=msg.get("is_deleted", False),
+        edited_at=msg.get("edited_at"),
+        is_pinned=msg.get("is_pinned", False),
+        reply_to=reply_to,
+        reactions=reactions,
+        metadata=msg.get("metadata"),
+        forwarded_from=msg.get("forwarded_from"),
+    )
+
+
+async def build_conversation_response(conversation: dict, current_user_id: int) -> ConversationResponse:
+    """Сформировать полный ответ о диалоге"""
+    participants = []
+    for pid in conversation["participant_ids"]:
+        user_data = await db.user_settings.find_one({"telegram_id": pid})
+        if user_data:
+            participants.append(ConversationParticipant(
+                telegram_id=pid,
+                first_name=user_data.get("first_name", ""),
+                last_name=user_data.get("last_name", ""),
+                username=user_data.get("username", ""),
+                is_online=user_data.get("is_online", False),
+                last_activity=user_data.get("last_activity"),
+            ))
+        else:
+            participants.append(ConversationParticipant(telegram_id=pid))
+    last_msg_doc = await db.messages.find_one(
+        {"conversation_id": conversation["id"], "is_deleted": {"$ne": True}},
+        sort=[("created_at", -1)]
+    )
+    last_message = build_message_response(last_msg_doc) if last_msg_doc else None
+    pinned_doc = await db.messages.find_one(
+        {"conversation_id": conversation["id"], "is_pinned": True, "is_deleted": {"$ne": True}},
+        sort=[("created_at", -1)]
+    )
+    pinned_message = build_message_response(pinned_doc) if pinned_doc else None
+    unread_count = await db.messages.count_documents({
+        "conversation_id": conversation["id"],
+        "sender_id": {"$ne": current_user_id},
+        "read_at": None,
+        "is_deleted": {"$ne": True},
+    })
+    return ConversationResponse(
+        id=conversation["id"],
+        participants=participants,
+        last_message=last_message,
+        unread_count=unread_count,
+        pinned_message=pinned_message,
+        created_at=conversation["created_at"],
+        updated_at=conversation["updated_at"],
+    )
+
+
+async def get_user_name(telegram_id: int) -> str:
+    """Получить имя пользователя"""
+    u = await db.user_settings.find_one({"telegram_id": telegram_id})
+    if u:
+        return f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or u.get('username', 'Пользователь')
+    return 'Пользователь'
+
+
+async def check_friendship(user1: int, user2: int) -> bool:
+    """Проверить дружбу"""
+    return bool(await db.friends.find_one({
+        "$or": [
+            {"user_telegram_id": user1, "friend_telegram_id": user2},
+            {"user_telegram_id": user2, "friend_telegram_id": user1},
+            {"user1_id": user1, "user2_id": user2},
+            {"user1_id": user2, "user2_id": user1},
+        ]
+    }))
+
+
+@api_router.post("/messages/conversations", response_model=ConversationResponse)
+async def create_or_get_conversation(data: ConversationCreate):
+    """Создать или получить существующий диалог"""
+    try:
+        if data.user1_id == data.user2_id:
+            raise HTTPException(status_code=400, detail="Нельзя создать диалог с самим собой")
+        if not await check_friendship(data.user1_id, data.user2_id):
+            raise HTTPException(status_code=403, detail="Отправлять сообщения можно только друзьям")
+        conversation = await get_or_create_conversation(data.user1_id, data.user2_id)
+        return await build_conversation_response(conversation, data.user1_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create conversation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/conversations/{telegram_id}", response_model=ConversationsListResponse)
+async def get_user_conversations(telegram_id: int):
+    """Получить все диалоги пользователя"""
+    try:
+        conversations = await db.conversations.find(
+            {"participant_ids": telegram_id}
+        ).sort("updated_at", -1).to_list(100)
+        result = []
+        for conv in conversations:
+            result.append(await build_conversation_response(conv, telegram_id))
+        return ConversationsListResponse(conversations=result, total=len(result))
+    except Exception as e:
+        logger.error(f"Get conversations error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/{conversation_id}/messages", response_model=MessagesListResponse)
+async def get_conversation_messages(conversation_id: str, limit: int = 50, offset: int = 0, telegram_id: int = 0, before: str = ""):
+    """Получить сообщения в диалоге с пагинацией (cursor-based через before)"""
+    try:
+        conversation = await db.conversations.find_one({"id": conversation_id})
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Диалог не найден")
+        if telegram_id and telegram_id not in conversation.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
+        
+        base_filter = {"conversation_id": conversation_id, "is_deleted": {"$ne": True}}
+        total = await db.messages.count_documents(base_filter)
+        
+        # Cursor-based пагинация: загружать сообщения ДО определённого ID
+        if before:
+            anchor_msg = await db.messages.find_one({"id": before})
+            if anchor_msg:
+                base_filter["created_at"] = {"$lt": anchor_msg["created_at"]}
+        
+        messages_docs = await db.messages.find(base_filter).sort("created_at", -1).limit(limit).to_list(limit)
+        messages = [build_message_response(msg) for msg in messages_docs]
+        
+        # has_more: проверяем есть ли ещё более старые сообщения
+        has_more = False
+        if messages_docs:
+            oldest_in_batch = messages_docs[-1]["created_at"]
+            older_count = await db.messages.count_documents({
+                "conversation_id": conversation_id,
+                "is_deleted": {"$ne": True},
+                "created_at": {"$lt": oldest_in_batch}
+            })
+            has_more = older_count > 0
+        
+        return MessagesListResponse(messages=messages, total=total, has_more=has_more)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get messages error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/send", response_model=MessageResponse)
+async def send_message(data: MessageCreate):
+    """Отправить сообщение другу"""
+    try:
+        if data.sender_id == data.receiver_id:
+            raise HTTPException(status_code=400, detail="Нельзя отправить сообщение самому себе")
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Отправлять сообщения можно только друзьям")
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        # Обработка reply
+        reply_to_data = None
+        if data.reply_to_id:
+            original = await db.messages.find_one({"id": data.reply_to_id})
+            if original:
+                reply_to_data = {
+                    "message_id": original["id"],
+                    "sender_id": original["sender_id"],
+                    "sender_name": await get_user_name(original["sender_id"]),
+                    "text": original["text"][:150],
+                }
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": data.text.strip(),
+            "message_type": data.message_type or "text",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": reply_to_data,
+            "reactions": [],
+            "metadata": data.metadata,
+            "forwarded_from": None,
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        # In-app + Telegram push notification
+        try:
+            sender_name = await get_user_name(data.sender_id)
+            text_preview = data.text.strip()[:100] + ("..." if len(data.text.strip()) > 100 else "")
+            await create_notification(
+                telegram_id=data.receiver_id,
+                notification_type=NotificationType.NEW_MESSAGE,
+                category=NotificationCategory.SOCIAL,
+                title=f"Сообщение от {sender_name}",
+                message=text_preview,
+                emoji="💬",
+                data={"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+            )
+        except Exception as ne:
+            logger.warning(f"Notification error: {ne}")
+        # Начисляем XP за отправку сообщения (лимит 5/день)
+        asyncio.create_task(safe_award_xp(db, data.sender_id, XP_REWARDS["message_sent"], reason="message_sent"))
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/messages/{message_id}/edit", response_model=MessageResponse)
+async def edit_message(message_id: str, data: MessageEdit):
+    """Редактировать сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        if message["sender_id"] != data.telegram_id:
+            raise HTTPException(status_code=403, detail="Можно редактировать только свои сообщения")
+        if message.get("is_deleted"):
+            raise HTTPException(status_code=400, detail="Нельзя редактировать удалённое сообщение")
+        now = datetime.utcnow()
+        await db.messages.update_one(
+            {"id": message_id},
+            {"$set": {"text": data.text.strip(), "edited_at": now}}
+        )
+        updated = await db.messages.find_one({"id": message_id})
+        return build_message_response(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Edit message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/{message_id}/reactions", response_model=MessageResponse)
+async def toggle_reaction(message_id: str, data: MessageReaction):
+    """Добавить или убрать реакцию на сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        reactions = message.get("reactions", [])
+        found = False
+        for r in reactions:
+            if r["emoji"] == data.emoji:
+                if data.telegram_id in r["users"]:
+                    r["users"].remove(data.telegram_id)
+                    if not r["users"]:
+                        reactions.remove(r)
+                else:
+                    r["users"].append(data.telegram_id)
+                found = True
+                break
+        if not found:
+            reactions.append({"emoji": data.emoji, "users": [data.telegram_id]})
+        await db.messages.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
+        updated = await db.messages.find_one({"id": message_id})
+        return build_message_response(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle reaction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/messages/{message_id}/pin")
+async def pin_message(message_id: str, data: MessagePin):
+    """Закрепить/открепить сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        if message.get("is_deleted"):
+            raise HTTPException(status_code=400, detail="Нельзя закрепить удалённое сообщение")
+        conv = await db.conversations.find_one({"id": message["conversation_id"]})
+        if not conv or data.telegram_id not in conv.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа")
+        if data.is_pinned:
+            await db.messages.update_many(
+                {"conversation_id": message["conversation_id"], "is_pinned": True},
+                {"$set": {"is_pinned": False}}
+            )
+        await db.messages.update_one({"id": message_id}, {"$set": {"is_pinned": data.is_pinned}})
+        return {"success": True, "message": "Сообщение закреплено" if data.is_pinned else "Сообщение откреплено"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Pin message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/{conversation_id}/pinned")
+async def get_pinned_message(conversation_id: str):
+    """Получить закреплённое сообщение"""
+    try:
+        pinned = await db.messages.find_one(
+            {"conversation_id": conversation_id, "is_pinned": True, "is_deleted": {"$ne": True}}
+        )
+        if not pinned:
+            return {"pinned_message": None}
+        return {"pinned_message": build_message_response(pinned).dict()}
+    except Exception as e:
+        logger.error(f"Get pinned error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/forward", response_model=MessageResponse)
+async def forward_message(data: MessageForward):
+    """Переслать сообщение другому другу"""
+    try:
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Можно пересылать только друзьям")
+        original = await db.messages.find_one({"id": data.original_message_id})
+        if not original:
+            raise HTTPException(status_code=404, detail="Оригинальное сообщение не найдено")
+        original_sender_name = await get_user_name(original["sender_id"])
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": original["text"],
+            "message_type": "forward",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": None,
+            "reactions": [],
+            "metadata": original.get("metadata"),
+            "forwarded_from": {
+                "sender_id": original["sender_id"],
+                "sender_name": original_sender_name,
+                "original_type": original.get("message_type", "text"),
+            },
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        # In-app + Telegram push notification for forwarded message
+        try:
+            sender_name = await get_user_name(data.sender_id)
+            await create_notification(
+                telegram_id=data.receiver_id,
+                notification_type=NotificationType.NEW_MESSAGE,
+                category=NotificationCategory.SOCIAL,
+                title=f"Пересланное от {sender_name}",
+                message=original["text"][:100],
+                emoji="↗️",
+                data={"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+            )
+        except Exception as ne:
+            logger.warning(f"Forward notification error: {ne}")
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Forward message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/send-schedule", response_model=MessageResponse)
+async def send_schedule_message(data: ScheduleShareMessage):
+    """Отправить расписание как сообщение"""
+    try:
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Можно отправлять только друзьям")
+        sender_settings = await db.user_settings.find_one({"telegram_id": data.sender_id})
+        if not sender_settings or not sender_settings.get("group_id"):
+            raise HTTPException(status_code=400, detail="Группа не указана в настройках")
+        target_date = data.date or datetime.utcnow().strftime("%Y-%m-%d")
+        
+        # Определяем номер недели (1=текущая, 2=следующая) для RUDN парсера
+        # RUDN показывает текущую неделю (tab 1) и следующую (tab 2)
+        try:
+            dt = datetime.strptime(target_date, "%Y-%m-%d")
+            today = datetime.utcnow()
+            # Начало текущей недели (понедельник)
+            today_week_start = today - timedelta(days=today.weekday())
+            today_week_start = today_week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            # Начало целевой недели
+            target_week_start = dt - timedelta(days=dt.weekday())
+            target_week_start = target_week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            diff_days = (target_week_start - today_week_start).days
+            if diff_days < 7:
+                week_number = 1  # Текущая неделя
+            else:
+                week_number = 2  # Следующая неделя
+        except Exception:
+            week_number = 1
+        
+        # Определяем день недели для фильтрации
+        day_names_ru = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+        try:
+            dt = datetime.strptime(target_date, "%Y-%m-%d")
+            target_day_name = day_names_ru[dt.weekday()]
+        except Exception:
+            target_day_name = None
+        
+        # Получаем расписание через реальный API (get_schedule)
+        schedule_items = []
+        try:
+            events = await get_schedule(
+                facultet_id=sender_settings.get("facultet_id", ""),
+                level_id=sender_settings.get("level_id", ""),
+                kurs=sender_settings.get("kurs", ""),
+                form_code=sender_settings.get("form_code", ""),
+                group_id=sender_settings["group_id"],
+                week_number=week_number
+            )
+            if events:
+                # Фильтруем по нужному дню
+                if target_day_name:
+                    day_events = [e for e in events if e.get("day") == target_day_name]
+                    schedule_items = day_events if day_events else events[:8]
+                else:
+                    schedule_items = events[:8]
+                logger.info(f"Schedule API: получено {len(schedule_items)} пар для {target_date}")
+        except Exception as parse_err:
+            logger.warning(f"Schedule API error: {parse_err}")
+        
+        # Fallback: кэш из MongoDB
+        if not schedule_items:
+            try:
+                cached = await db.schedule_cache.find_one({
+                    "group_id": sender_settings["group_id"],
+                    "week_number": week_number
+                })
+                if cached and cached.get("events"):
+                    all_cached = cached["events"]
+                    if target_day_name:
+                        day_events = [e for e in all_cached if e.get("day") == target_day_name]
+                        schedule_items = day_events if day_events else all_cached[:8]
+                    else:
+                        schedule_items = all_cached[:8]
+                    logger.info(f"Schedule cache: получено {len(schedule_items)} пар для {target_date}")
+            except Exception as cache_err:
+                logger.warning(f"Schedule cache error: {cache_err}")
+        
+        sender_name = await get_user_name(data.sender_id)
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": f"📅 Расписание на {target_date}",
+            "message_type": "schedule",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": None,
+            "reactions": [],
+            "metadata": {
+                "date": target_date,
+                "group_name": sender_settings.get("group_name", ""),
+                "sender_name": sender_name,
+                "items": schedule_items[:8],
+                "week_number": week_number,
+                "day_name": target_day_name or "",
+            },
+            "forwarded_from": None,
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        # In-app + Telegram push notification for schedule message
+        try:
+            await create_notification(
+                telegram_id=data.receiver_id,
+                notification_type=NotificationType.NEW_MESSAGE,
+                category=NotificationCategory.SOCIAL,
+                title=f"Расписание от {sender_name}",
+                message=f"📅 Расписание на {target_date}",
+                emoji="📅",
+                data={"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+            )
+        except Exception as ne:
+            logger.warning(f"Schedule notification error: {ne}")
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send schedule error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/send-music", response_model=MessageResponse)
+async def send_music_message(data: MusicShareMessage):
+    """Отправить музыку как сообщение"""
+    try:
+        if not await check_friendship(data.sender_id, data.receiver_id):
+            raise HTTPException(status_code=403, detail="Можно отправлять только друзьям")
+        conversation = await get_or_create_conversation(data.sender_id, data.receiver_id)
+        now = datetime.utcnow()
+        message_doc = {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation["id"],
+            "sender_id": data.sender_id,
+            "text": f"🎵 {data.track_artist} — {data.track_title}",
+            "message_type": "music",
+            "created_at": now,
+            "read_at": None,
+            "is_deleted": False,
+            "edited_at": None,
+            "is_pinned": False,
+            "reply_to": None,
+            "reactions": [],
+            "metadata": {
+                "track_title": data.track_title,
+                "track_artist": data.track_artist,
+                "track_id": data.track_id,
+                "track_duration": data.track_duration,
+                "cover_url": data.cover_url,
+            },
+            "forwarded_from": None,
+        }
+        await db.messages.insert_one(message_doc)
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": {"updated_at": now}})
+        # In-app + Telegram push notification for music message
+        try:
+            sender_name = await get_user_name(data.sender_id)
+            await create_notification(
+                telegram_id=data.receiver_id,
+                notification_type=NotificationType.NEW_MESSAGE,
+                category=NotificationCategory.SOCIAL,
+                title=f"Музыка от {sender_name}",
+                message=f"🎵 {data.track_artist} — {data.track_title}",
+                emoji="🎵",
+                data={"conversation_id": conversation["id"], "sender_id": data.sender_id, "sender_name": sender_name, "message_id": message_doc["id"]},
+            )
+        except Exception as ne:
+            logger.warning(f"Music notification error: {ne}")
+        return build_message_response(message_doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send music error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/create-task")
+async def create_task_from_message(data: TaskFromMessage):
+    """Создать задачу из сообщения"""
+    try:
+        message = await db.messages.find_one({"id": data.message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        # Проверяем что пользователь является участником диалога
+        conv = await db.conversations.find_one({"id": message["conversation_id"]})
+        if not conv or data.telegram_id not in conv.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа к этому сообщению")
+        task_text = data.title or message["text"][:200]
+        notes = message["text"] if len(message["text"]) > 200 else ""
+        # Используем модель TaskCreate для правильного создания задачи
+        max_order_task = await db.tasks.find_one(
+            {"telegram_id": data.telegram_id},
+            sort=[("order", -1)]
+        )
+        next_order = (max_order_task.get("order", -1) + 1) if max_order_task else 0
+        now = datetime.utcnow()
+        task_dict = {
+            "id": str(uuid.uuid4()),
+            "telegram_id": data.telegram_id,
+            "text": task_text,
+            "completed": False,
+            "completed_at": None,
+            "skipped": False,
+            "category": None,
+            "priority": "medium",
+            "deadline": None,
+            "target_date": None,
+            "subject": None,
+            "discipline_id": None,
+            "notes": notes,
+            "subtasks": [],
+            "time_start": None,
+            "time_end": None,
+            "is_fixed": False,
+            "origin": "message",
+            "source_task_id": None,
+            "order": next_order,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.tasks.insert_one(task_dict)
+        return {"success": True, "message": "Задача создана", "task_id": task_dict["id"], "text": task_text}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create task from message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/messages/{conversation_id}/typing")
+async def set_typing(conversation_id: str, data: TypingIndicator):
+    """Установить индикатор набора"""
+    try:
+        if conversation_id not in typing_indicators_store:
+            typing_indicators_store[conversation_id] = {}
+        typing_indicators_store[conversation_id][data.telegram_id] = datetime.utcnow()
+        return {"success": True}
+    except Exception:
+        return {"success": False}
+
+
+@api_router.get("/messages/{conversation_id}/typing")
+async def get_typing(conversation_id: str, telegram_id: int = 0):
+    """Получить список печатающих"""
+    global _typing_cleanup_counter
+    try:
+        now = datetime.utcnow()
+        typing_users = []
+        conv_typing = typing_indicators_store.get(conversation_id, {})
+        expired = []
+        for uid, ts in conv_typing.items():
+            if (now - ts).total_seconds() < 4 and uid != telegram_id:
+                name = await get_user_name(uid)
+                typing_users.append({"telegram_id": uid, "name": name})
+            elif (now - ts).total_seconds() >= 4:
+                expired.append(uid)
+        for uid in expired:
+            conv_typing.pop(uid, None)
+        # Периодическая глобальная очистка (каждые 100 вызовов)
+        _typing_cleanup_counter += 1
+        if _typing_cleanup_counter >= 100:
+            _typing_cleanup_counter = 0
+            stale_convs = []
+            for cid, users in typing_indicators_store.items():
+                if not users or all((now - ts).total_seconds() >= 30 for ts in users.values()):
+                    stale_convs.append(cid)
+            for cid in stale_convs:
+                typing_indicators_store.pop(cid, None)
+        return {"typing_users": typing_users}
+    except Exception:
+        return {"typing_users": []}
+
+
+@api_router.get("/messages/{conversation_id}/search")
+async def search_messages(conversation_id: str, q: str = "", telegram_id: int = 0, limit: int = 30):
+    """Поиск по сообщениям в диалоге"""
+    try:
+        if not q.strip():
+            return {"results": [], "total": 0}
+        conv = await db.conversations.find_one({"id": conversation_id})
+        if not conv:
+            raise HTTPException(status_code=404, detail="Диалог не найден")
+        if telegram_id and telegram_id not in conv.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа")
+        # Экранируем спецсимволы regex для безопасного поиска
+        escaped_query = re.escape(q.strip())
+        query_filter = {
+            "conversation_id": conversation_id,
+            "is_deleted": {"$ne": True},
+            "text": {"$regex": escaped_query, "$options": "i"},
+        }
+        total = await db.messages.count_documents(query_filter)
+        docs = await db.messages.find(query_filter).sort("created_at", -1).limit(limit).to_list(limit)
+        results = [build_message_response(d) for d in docs]
+        return {"results": [r.dict() for r in results], "total": total}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Search messages error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/messages/{conversation_id}/read")
+async def mark_messages_read(conversation_id: str, telegram_id: int = Body(..., embed=True)):
+    """Пометить все сообщения в диалоге как прочитанные"""
+    try:
+        conversation = await db.conversations.find_one({"id": conversation_id})
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Диалог не найден")
+        if telegram_id not in conversation.get("participant_ids", []):
+            raise HTTPException(status_code=403, detail="Нет доступа к этому диалогу")
+        now = datetime.utcnow()
+        result = await db.messages.update_many(
+            {"conversation_id": conversation_id, "sender_id": {"$ne": telegram_id}, "read_at": None, "is_deleted": {"$ne": True}},
+            {"$set": {"read_at": now}}
+        )
+        return {"success": True, "marked_count": result.modified_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mark read error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/messages/{message_id}")
+async def delete_message(message_id: str, telegram_id: int = Body(..., embed=True)):
+    """Удалить сообщение"""
+    try:
+        message = await db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail="Сообщение не найдено")
+        if message["sender_id"] != telegram_id:
+            raise HTTPException(status_code=403, detail="Можно удалять только свои сообщения")
+        await db.messages.update_one({"id": message_id}, {"$set": {"is_deleted": True, "text": ""}})
+        return {"success": True, "message": "Сообщение удалено"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/messages/unread/{telegram_id}", response_model=MessagesUnreadCountResponse)
+async def get_unread_messages_count(telegram_id: int):
+    """Получить количество непрочитанных (оптимизировано через aggregation)"""
+    try:
+        # Используем агрегацию для подсчёта за один запрос вместо N+1
+        pipeline = [
+            {"$match": {
+                "sender_id": {"$ne": telegram_id},
+                "read_at": None,
+                "is_deleted": {"$ne": True},
+            }},
+            {"$lookup": {
+                "from": "conversations",
+                "localField": "conversation_id",
+                "foreignField": "id",
+                "as": "conv"
+            }},
+            {"$unwind": "$conv"},
+            {"$match": {"conv.participant_ids": telegram_id}},
+            {"$group": {
+                "_id": "$conversation_id",
+                "count": {"$sum": 1}
+            }}
+        ]
+        results = await db.messages.aggregate(pipeline).to_list(200)
+        total_unread = 0
+        per_conversation = {}
+        for r in results:
+            per_conversation[r["_id"]] = r["count"]
+            total_unread += r["count"]
+        return MessagesUnreadCountResponse(total_unread=total_unread, per_conversation=per_conversation)
+    except Exception as e:
+        logger.error(f"Get unread count error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Web Sessions (связка Telegram профиля через QR) ============
+
+# Словарь для хранения активных WebSocket соединений по session_token
+web_session_connections: dict = {}
+
+
+@api_router.post("/web-sessions", response_model=WebSessionResponse)
+async def create_web_session(
+    request: Request,
+    device_info: WebSessionCreateRequest = None
+):
+    """
+    Создать новую веб-сессию для связки с Telegram профилем.
+    Возвращает session_token и QR URL для сканирования.
+    """
+    try:
+        # Генерируем уникальный токен сессии
+        session_token = str(uuid.uuid4())
+        
+        # Получаем username бота для формирования ссылки
+        bot_username = get_telegram_bot_username()
+        
+        # Формируем URL для QR-кода (открывает Telegram Web App с параметром)
+        qr_url = f"https://t.me/{bot_username}/app?startapp=link_{session_token}"
+        
+        # Время истечения сессии (10 минут)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        
+        # Получаем информацию об устройстве из заголовков или тела запроса
+        user_agent = request.headers.get("User-Agent", "")
+        ip_address = request.client.host if request.client else None
+        
+        # Парсим User-Agent для определения браузера и ОС
+        browser_name = None
+        os_name = None
+        device_name = None
+        
+        if device_info:
+            browser_name = device_info.browser
+            os_name = device_info.os
+            device_name = device_info.device_name
+            if device_info.user_agent:
+                user_agent = device_info.user_agent
+        
+        # Автоматический парсинг User-Agent если не переданы данные
+        if not browser_name or not os_name:
+            ua_lower = user_agent.lower()
+            
+            # Определяем браузер
+            if "chrome" in ua_lower and "edg" not in ua_lower:
+                browser_name = browser_name or "Chrome"
+            elif "firefox" in ua_lower:
+                browser_name = browser_name or "Firefox"
+            elif "safari" in ua_lower and "chrome" not in ua_lower:
+                browser_name = browser_name or "Safari"
+            elif "edg" in ua_lower:
+                browser_name = browser_name or "Edge"
+            elif "opera" in ua_lower or "opr" in ua_lower:
+                browser_name = browser_name or "Opera"
+            else:
+                browser_name = browser_name or "Browser"
+            
+            # Определяем ОС
+            if "windows" in ua_lower:
+                os_name = os_name or "Windows"
+            elif "mac os" in ua_lower or "macos" in ua_lower:
+                os_name = os_name or "macOS"
+            elif "linux" in ua_lower:
+                os_name = os_name or "Linux"
+            elif "android" in ua_lower:
+                os_name = os_name or "Android"
+            elif "iphone" in ua_lower or "ipad" in ua_lower:
+                os_name = os_name or "iOS"
+            else:
+                os_name = os_name or "Unknown"
+        
+        # Формируем название устройства
+        if not device_name:
+            device_name = f"{browser_name} на {os_name}"
+        
+        # Создаем сессию в БД
+        session_data = {
+            "id": str(uuid.uuid4()),
+            "session_token": session_token,
+            "status": WebSessionStatus.PENDING.value,
+            "telegram_id": None,
+            "first_name": None,
+            "last_name": None,
+            "username": None,
+            "photo_url": None,
+            "device_name": device_name,
+            "browser": browser_name,
+            "os": os_name,
+            "user_agent": user_agent,
+            "ip_address": ip_address,
+            "user_settings": None,
+            "created_at": datetime.utcnow(),
+            "expires_at": expires_at,
+            "linked_at": None,
+            "last_active": datetime.utcnow()
+        }
+        
+        await db.web_sessions.insert_one(session_data)
+        
+        logger.info(f"🔗 Created web session: {session_token[:8]}... ({device_name})")
+        
+        return WebSessionResponse(
+            session_token=session_token,
+            status=WebSessionStatus.PENDING,
+            qr_url=qr_url,
+            expires_at=expires_at
+        )
+        
+    except Exception as e:
+        logger.error(f"Create web session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/web-sessions/{session_token}/status", response_model=WebSessionResponse)
+async def get_web_session_status(session_token: str):
+    """
+    Получить статус веб-сессии.
+    Используется для polling или проверки после WebSocket disconnect.
+    Обновляет last_active для связанных сессий.
+    Возвращает данные сканирования если QR-код был отсканирован.
+    """
+    try:
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        # Проверяем истечение срока
+        if session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+            if session["status"] == WebSessionStatus.PENDING.value:
+                await db.web_sessions.update_one(
+                    {"session_token": session_token},
+                    {"$set": {"status": WebSessionStatus.EXPIRED.value}}
+                )
+                session["status"] = WebSessionStatus.EXPIRED.value
+        
+        # Обновляем last_active для связанных сессий при каждом запросе статуса
+        if session["status"] == WebSessionStatus.LINKED.value:
+            await db.web_sessions.update_one(
+                {"session_token": session_token},
+                {"$set": {"last_active": datetime.utcnow()}}
+            )
+        
+        bot_username = get_telegram_bot_username()
+        qr_url = f"https://t.me/{bot_username}/app?startapp=link_{session_token}"
+        
+        # Для PENDING сессий с данными сканирования — передаём scanned_by
+        # (polling-клиенты узнают что QR отсканирован)
+        response_data = {
+            "session_token": session_token,
+            "status": WebSessionStatus(session["status"]),
+            "qr_url": qr_url,
+            "expires_at": session.get("expires_at"),
+            "telegram_id": session.get("telegram_id"),
+            "first_name": session.get("first_name"),
+            "last_name": session.get("last_name"),
+            "username": session.get("username"),
+            "photo_url": session.get("photo_url"),
+            "user_settings": session.get("user_settings")
+        }
+        
+        # Если сессия PENDING но уже отсканирована — передаём данные в first_name/photo_url/telegram_id
+        # чтобы polling-клиент мог показать "waiting" состояние
+        if session["status"] == WebSessionStatus.PENDING.value and session.get("scanned_by"):
+            response_data["telegram_id"] = session.get("scanned_by")
+            response_data["first_name"] = session.get("scanned_first_name")
+            response_data["photo_url"] = session.get("scanned_photo_url")
+        
+        return WebSessionResponse(**response_data)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get web session status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/link", response_model=WebSessionLinkResponse)
+async def link_web_session(session_token: str, request: WebSessionLinkRequest):
+    """
+    Связать веб-сессию с Telegram профилем.
+    Вызывается из Telegram Web App после подтверждения пользователем.
+    Использует атомарную операцию find_one_and_update для предотвращения race condition.
+    """
+    try:
+        # Проверяем срок действия (предварительная проверка)
+        session_check = await db.web_sessions.find_one({"session_token": session_token})
+        
+        if not session_check:
+            return WebSessionLinkResponse(
+                success=False,
+                message="Сессия не найдена"
+            )
+        
+        if session_check.get("expires_at") and datetime.utcnow() > session_check["expires_at"]:
+            await db.web_sessions.update_one(
+                {"session_token": session_token},
+                {"$set": {"status": WebSessionStatus.EXPIRED.value}}
+            )
+            return WebSessionLinkResponse(
+                success=False,
+                message="Срок действия сессии истёк"
+            )
+        
+        # Получаем настройки пользователя из БД
+        user_settings = await db.user_settings.find_one({"telegram_id": request.telegram_id})
+        user_settings_dict = None
+        if user_settings:
+            # Убираем _id для сериализации
+            user_settings_dict = {k: v for k, v in user_settings.items() if k != "_id"}
+            # Конвертируем datetime в string для JSON
+            for key, value in user_settings_dict.items():
+                if isinstance(value, datetime):
+                    user_settings_dict[key] = value.isoformat()
+        
+        # АТОМАРНАЯ ОПЕРАЦИЯ: find_one_and_update с условием status=PENDING
+        # Предотвращает race condition - только один запрос сможет связать сессию
+        update_data = {
+            "status": WebSessionStatus.LINKED.value,
+            "telegram_id": request.telegram_id,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "username": request.username,
+            "photo_url": request.photo_url,
+            "user_settings": user_settings_dict,
+            "linked_at": datetime.utcnow(),
+            "last_active": datetime.utcnow()
+        }
+        
+        result = await db.web_sessions.find_one_and_update(
+            {
+                "session_token": session_token,
+                "status": WebSessionStatus.PENDING.value
+            },
+            {"$set": update_data},
+            return_document=True  # pymongo.ReturnDocument.AFTER
+        )
+        
+        if not result:
+            return WebSessionLinkResponse(
+                success=False,
+                message="Сессия уже использована или истекла"
+            )
+        
+        logger.info(f"✅ Web session linked: {session_token[:8]}... -> {request.telegram_id}")
+        
+        # Отправляем уведомление в Telegram о новом устройстве (fire-and-forget)
+        async def _send_telegram_notification():
+            try:
+                from telegram_bot import send_device_linked_notification
+                device_name = result.get("device_name", "Неизвестное устройство")
+                await send_device_linked_notification(
+                    telegram_id=request.telegram_id,
+                    device_name=device_name,
+                    session_token=session_token,
+                    photo_url=request.photo_url,
+                    first_name=request.first_name
+                )
+            except Exception as notify_err:
+                logger.warning(f"⚠️ Не удалось отправить Telegram уведомление: {notify_err}")
+        
+        asyncio.create_task(_send_telegram_notification())
+        
+        # Отправляем уведомление через WebSocket если есть активное соединение
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "linked",
+                    "data": {
+                        "telegram_id": request.telegram_id,
+                        "first_name": request.first_name,
+                        "last_name": request.last_name,
+                        "username": request.username,
+                        "photo_url": request.photo_url,
+                        "user_settings": user_settings_dict
+                    }
+                })
+                logger.info(f"📤 WebSocket notification sent for session {session_token[:8]}...")
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+        
+        return WebSessionLinkResponse(
+            success=True,
+            message="Профиль успешно подключен!",
+            session_token=session_token
+        )
+        
+    except Exception as e:
+        logger.error(f"Link web session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/scanned")
+async def notify_session_scanned(session_token: str, telegram_id: int = Body(...), first_name: str = Body(None), photo_url: str = Body(None)):
+    """
+    Уведомить веб-клиент о том, что QR-код отсканирован и ожидается подтверждение.
+    Вызывается мобильным клиентом при показе модального окна подтверждения.
+    Сохраняет данные сканирования в БД для polling-клиентов.
+    """
+    try:
+        # Проверяем существование сессии
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        if not session:
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        # Проверяем что сессия ещё pending (не linked/expired)
+        if session.get("status") != WebSessionStatus.PENDING.value:
+            raise HTTPException(status_code=400, detail="Сессия уже не ожидает связки")
+        
+        # Сохраняем данные сканирования в БД — для polling-клиентов
+        await db.web_sessions.update_one(
+            {"session_token": session_token},
+            {"$set": {
+                "scanned_by": telegram_id,
+                "scanned_first_name": first_name,
+                "scanned_photo_url": photo_url,
+                "scanned_at": datetime.utcnow()
+            }}
+        )
+        
+        # Отправляем через WebSocket
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "scanned",
+                    "data": {
+                        "telegram_id": telegram_id,
+                        "first_name": first_name,
+                        "photo_url": photo_url
+                    }
+                })
+                logger.info(f"📱 Session scanned notification sent: {session_token[:8]}...")
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+        
+        return {"success": True, "message": "Уведомление отправлено"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Scanned notification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/rejected")
+async def notify_session_rejected(session_token: str):
+    """
+    Уведомить веб-клиент о том, что пользователь отклонил подключение.
+    Вызывается мобильным клиентом при нажатии "Отмена".
+    """
+    try:
+        # Обновляем статус в БД на EXPIRED, чтобы polling-клиенты тоже узнали
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        if session and session.get("status") == WebSessionStatus.PENDING.value:
+            await db.web_sessions.update_one(
+                {"session_token": session_token},
+                {"$set": {"status": WebSessionStatus.EXPIRED.value}}
+            )
+        
+        # Отправляем через WebSocket
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "rejected"
+                })
+                logger.info(f"❌ Session rejected notification sent: {session_token[:8]}...")
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+        
+        return {"success": True, "message": "Уведомление отправлено"}
+        
+    except Exception as e:
+        logger.error(f"Rejected notification error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/web-sessions/user/{telegram_id}/devices", response_model=DevicesListResponse)
+async def get_user_devices(telegram_id: int, current_token: str = None):
+    """
+    Получить список активных устройств пользователя.
+    current_token - токен текущей сессии для маркировки.
+    """
+    try:
+        # Получаем все активные (linked) сессии пользователя
+        cursor = db.web_sessions.find({
+            "telegram_id": telegram_id,
+            "status": WebSessionStatus.LINKED.value
+        }).sort("linked_at", -1)
+        
+        sessions = await cursor.to_list(length=100)
+        
+        devices = []
+        for session in sessions:
+            device = DeviceInfo(
+                session_token=session.get("session_token", ""),
+                device_name=session.get("device_name", "Неизвестное устройство"),
+                browser=session.get("browser"),
+                os=session.get("os"),
+                linked_at=session.get("linked_at"),
+                last_active=session.get("last_active"),
+                is_current=(current_token == session.get("session_token")) if current_token else False
+            )
+            devices.append(device)
+        
+        logger.info(f"📱 Found {len(devices)} devices for user {telegram_id}")
+        
+        return DevicesListResponse(
+            devices=devices,
+            total=len(devices)
+        )
+        
+    except Exception as e:
+        logger.error(f"Get user devices error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/notify-revoked")
+async def notify_session_revoked(session_token: str):
+    """
+    Уведомить веб-клиент о том, что сессия была отозвана.
+    Вызывается из telegram_bot при удалении через inline-кнопку.
+    """
+    try:
+        # Отправляем через WebSocket
+        if session_token in web_session_connections:
+            try:
+                ws = web_session_connections[session_token]
+                await ws.send_json({
+                    "event": "revoked",
+                    "message": "Сессия отключена"
+                })
+                logger.info(f"🔌 Revoked notification sent for session {session_token[:8]}...")
+                # Закрываем соединение
+                await ws.close()
+            except Exception as ws_error:
+                logger.warning(f"WebSocket send error: {ws_error}")
+            finally:
+                if session_token in web_session_connections:
+                    del web_session_connections[session_token]
+        
+        return {"success": True, "message": "Уведомление отправлено"}
+        
+    except Exception as e:
+        logger.error(f"Notify revoked error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/web-sessions/{session_token}/heartbeat")
+async def session_heartbeat(session_token: str):
+    """
+    Обновить last_active для сессии (heartbeat/ping).
+    Вызывается периодически из frontend для отслеживания активности.
+    Возвращает 404 если сессия удалена или не активна.
+    """
+    try:
+        # Сначала проверяем существует ли сессия вообще
+        session = await db.web_sessions.find_one({"session_token": session_token})
+        
+        if not session:
+            # Сессия удалена (revoked)
+            raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+        if session.get("status") != WebSessionStatus.LINKED.value:
+            # Сессия существует, но не активна (expired или pending)
+            raise HTTPException(status_code=404, detail="Сессия не активна")
+        
+        # Обновляем last_active
+        await db.web_sessions.update_one(
+            {"session_token": session_token},
+            {"$set": {"last_active": datetime.utcnow()}}
+        )
+        
+        return {"success": True, "updated_at": datetime.utcnow().isoformat()}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Session heartbeat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@api_router.delete("/web-sessions/{session_token}")
+async def revoke_device_session(session_token: str, telegram_id: int):
+    """
+    Отключить устройство (отозвать сессию).
+    telegram_id используется для проверки владельца.
+    """
+    try:
+        # Проверяем, что сессия принадлежит пользователю
+        session = await db.web_sessions.find_one({
+            "session_token": session_token,
+            "telegram_id": telegram_id
+        })
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Сессия не найдена или не принадлежит вам")
+        
+        # Удаляем сессию
+        result = await db.web_sessions.delete_one({"session_token": session_token})
+        
+        if result.deleted_count > 0:
+            logger.info(f"🗑️ Revoked session {session_token[:8]}... for user {telegram_id}")
+            
+            # Если есть активное WebSocket соединение - закрываем его
+            if session_token in web_session_connections:
+                try:
+                    ws = web_session_connections[session_token]
+                    await ws.send_json({"event": "revoked", "message": "Сессия отключена"})
+                    await ws.close()
+                except:
+                    pass
+                finally:
+                    del web_session_connections[session_token]
+            
+            return {"success": True, "message": "Устройство отключено"}
+        else:
+            raise HTTPException(status_code=500, detail="Не удалось удалить сессию")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Revoke device session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/web-sessions/user/{telegram_id}/all")
+async def revoke_all_devices(telegram_id: int):
+    """
+    Отключить все устройства пользователя (удалить все сессии).
+    """
+    try:
+        # Получаем все сессии пользователя для закрытия WebSocket соединений
+        sessions = await db.web_sessions.find({
+            "telegram_id": telegram_id,
+            "status": WebSessionStatus.LINKED.value
+        }).to_list(length=100)
+        
+        # Закрываем WebSocket соединения
+        for session in sessions:
+            session_token = session.get("session_token")
+            if session_token and session_token in web_session_connections:
+                try:
+                    ws = web_session_connections[session_token]
+                    await ws.send_json({"event": "revoked", "message": "Все сессии отключены"})
+                    await ws.close()
+                except:
+                    pass
+                finally:
+                    if session_token in web_session_connections:
+                        del web_session_connections[session_token]
+        
+        # Удаляем все сессии пользователя
+        result = await db.web_sessions.delete_many({
+            "telegram_id": telegram_id
+        })
+        
+        logger.info(f"🗑️ Revoked all {result.deleted_count} sessions for user {telegram_id}")
+        
+        return {
+            "success": True, 
+            "message": f"Отключено устройств: {result.deleted_count}",
+            "deleted_count": result.deleted_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Revoke all devices error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Очистка устаревших сессий ============
+
+async def cleanup_expired_sessions():
+    """Удаляет expired и старые pending сессии (старше 30 минут) из БД"""
+    try:
+        cutoff_time = datetime.utcnow() - timedelta(minutes=30)
+        
+        # Удаляем expired сессии
+        result_expired = await db.web_sessions.delete_many({
+            "status": WebSessionStatus.EXPIRED.value
+        })
+        
+        # Удаляем зависшие pending сессии (старше 30 минут)
+        result_pending = await db.web_sessions.delete_many({
+            "status": WebSessionStatus.PENDING.value,
+            "created_at": {"$lt": cutoff_time}
+        })
+        
+        total = result_expired.deleted_count + result_pending.deleted_count
+        if total > 0:
+            logger.info(f"🧹 Cleaned up {total} stale sessions (expired: {result_expired.deleted_count}, old pending: {result_pending.deleted_count})")
+        
+        # Очищаем stale WebSocket connections
+        stale_tokens = []
+        for token, ws in web_session_connections.items():
+            try:
+                # Проверяем существует ли сессия в БД
+                session = await db.web_sessions.find_one({"session_token": token})
+                if not session:
+                    stale_tokens.append(token)
+            except Exception:
+                stale_tokens.append(token)
+        
+        for token in stale_tokens:
+            try:
+                ws = web_session_connections.pop(token, None)
+                if ws:
+                    await ws.close()
+            except Exception:
+                pass
+        
+        if stale_tokens:
+            logger.info(f"🧹 Cleaned up {len(stale_tokens)} stale WebSocket connections")
+            
+    except Exception as e:
+        logger.warning(f"Session cleanup error: {e}")
+
+
+# =============================================
+# MODAL IMAGES & REFERRAL MODAL CONFIG
+# =============================================
+import os
+import shutil
+
+MODAL_IMAGES_DIR = os.path.join(os.path.dirname(__file__), "static", "modal_images")
+os.makedirs(MODAL_IMAGES_DIR, exist_ok=True)
+
+@api_router.post("/admin/modal-images")
+async def upload_modal_image(file: UploadFile = File(...)):
+    """Загрузить изображение для модальных окон"""
+    try:
+        allowed = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in allowed:
+            raise HTTPException(status_code=400, detail=f"Формат {ext} не поддерживается. Допустимые: {', '.join(allowed)}")
+        
+        import uuid as _uuid
+        image_id = str(_uuid.uuid4())[:8]
+        filename = f"{image_id}{ext}"
+        filepath = os.path.join(MODAL_IMAGES_DIR, filename)
+        
+        with open(filepath, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        
+        # Сохраняем метаданные в БД
+        meta = {
+            "id": image_id,
+            "filename": filename,
+            "original_name": file.filename,
+            "content_type": file.content_type,
+            "uploaded_at": datetime.utcnow(),
+        }
+        await db.modal_images.insert_one(meta)
+        
+        logger.info(f"✅ Загружено изображение для модалок: {filename}")
+        return {"id": image_id, "filename": filename, "url": f"/api/static/modal_images/{filename}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка загрузки изображения: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/modal-images")
+async def list_modal_images():
+    """Список всех загруженных изображений для модалок"""
+    try:
+        images = await db.modal_images.find().sort("uploaded_at", -1).to_list(length=100)
+        result = []
+        for img in images:
+            result.append({
+                "id": img["id"],
+                "filename": img["filename"],
+                "original_name": img.get("original_name", ""),
+                "url": f"/api/static/modal_images/{img['filename']}",
+                "uploaded_at": img.get("uploaded_at", ""),
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка получения списка изображений: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/admin/modal-images/{image_id}")
+async def delete_modal_image(image_id: str):
+    """Удалить изображение модалки"""
+    try:
+        img = await db.modal_images.find_one({"id": image_id})
+        if not img:
+            raise HTTPException(status_code=404, detail="Изображение не найдено")
+        
+        filepath = os.path.join(MODAL_IMAGES_DIR, img["filename"])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        await db.modal_images.delete_one({"id": image_id})
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/referral-modal/{code}")
+async def get_referral_modal_config(code: str):
+    """Получить конфигурацию модалки по коду реферальной ссылки (публичный endpoint)"""
+    try:
+        link = await db.admin_referral_links.find_one({"code": code.upper(), "is_active": True})
+        if not link:
+            return {"has_modal": False}
+        
+        modal_config = link.get("modal_config")
+        if not modal_config or not modal_config.get("enabled"):
+            return {"has_modal": False}
+        
+        # Подставляем полный URL изображения
+        image_id = modal_config.get("image_id", "")
+        image_url = ""
+        if image_id:
+            img = await db.modal_images.find_one({"id": image_id})
+            if img:
+                image_url = f"/api/static/modal_images/{img['filename']}"
+        
+        return {
+            "has_modal": True,
+            "title": modal_config.get("title", ""),
+            "description": modal_config.get("description", ""),
+            "image_url": image_url,
+            "button_text": modal_config.get("button_text", "OK"),
+            "button_action": modal_config.get("button_action", "close"),
+            "button_url": modal_config.get("button_url", ""),
+            "button_navigate_to": modal_config.get("button_navigate_to", ""),
+            "reward_points": modal_config.get("reward_points", 0),
+            "always_show": modal_config.get("always_show", False),
+        }
+    except Exception as e:
+        logger.error(f"Ошибка получения modal config: {e}")
+        return {"has_modal": False}
+
+
+@api_router.post("/referral-reward")
+async def claim_referral_reward(data: dict = Body(...)):
+    """Начислить баллы пользователю за реферальную ссылку"""
+    try:
+        telegram_id = data.get("telegram_id")
+        points = data.get("points", 0)
+        code = data.get("code", "")
+        
+        if not telegram_id or points <= 0:
+            raise HTTPException(status_code=400, detail="telegram_id и points обязательны")
+        
+        # Проверяем что награда ещё не была получена
+        existing = await db.referral_rewards.find_one({
+            "telegram_id": telegram_id,
+            "code": code
+        })
+        if existing:
+            return {"success": False, "message": "Награда уже получена", "points": 0}
+        
+        # Начисляем баллы
+        result = await db.user_settings.update_one(
+            {"telegram_id": telegram_id},
+            {"$inc": {"referral_points_earned": points}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+        # Записываем факт получения награды
+        await db.referral_rewards.insert_one({
+            "telegram_id": telegram_id,
+            "code": code,
+            "points": points,
+            "claimed_at": datetime.utcnow()
+        })
+        
+        logger.info(f"🎁 Начислено {points} баллов пользователю {telegram_id} за ссылку {code}")
+        return {"success": True, "points": points, "message": f"Начислено {points} баллов"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка начисления награды: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# Include the router in the main app
+
+# ============ Эндпоинты для совместного расписания ============
+
+PARTICIPANT_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+MAX_PARTICIPANTS = 8  # максимум 8 участников (включая владельца)
+
+
+# ─── Создать/обновить личное совместное расписание ───────────────────────────
+@api_router.post("/shared-schedule", response_model=SharedScheduleResponse)
+async def create_shared_schedule(data: SharedScheduleCreate):
+    """
+    Создать или обновить ЛИЧНОЕ совместное расписание пользователя.
+    Если расписание уже есть — добавляет новых участников, не заменяет существующих.
+    Каждый пользователь имеет своё собственное расписание — никакого «владельца».
+    """
+    try:
+        existing = await db.shared_schedules.find_one({"owner_id": data.owner_id})
+
+        if existing:
+            # Расписание уже есть — добавляем только новых участников
+            existing_ids = {p["telegram_id"] for p in existing.get("participants", [])}
+            new_additions = []
+            for pid in data.participant_ids:
+                if pid == data.owner_id:
+                    continue  # себя не добавляем дважды
+                if pid not in existing_ids and len(existing.get("participants", [])) + len(new_additions) < MAX_PARTICIPANTS:
+                    p_settings = await db.user_settings.find_one({"telegram_id": pid})
+                    p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
+                    p_group = p_settings.get("group_name", "") if p_settings else ""
+                    color_idx = (len(existing["participants"]) + len(new_additions)) % len(PARTICIPANT_COLORS)
+                    new_additions.append({
+                        "telegram_id": pid,
+                        "first_name": p_name,
+                        "group_name": p_group,
+                        "color": PARTICIPANT_COLORS[color_idx],
+                    })
+            if new_additions:
+                await db.shared_schedules.update_one(
+                    {"owner_id": data.owner_id},
+                    {"$push": {"participants": {"$each": new_additions}},
+                     "$set": {"updated_at": datetime.utcnow()}}
+                )
+            updated = await db.shared_schedules.find_one({"owner_id": data.owner_id})
+            return SharedScheduleResponse(
+                id=updated["id"], owner_id=updated["owner_id"],
+                participants=updated.get("participants", []),
+                schedules={}, free_windows=[], created_at=updated.get("created_at")
+            )
+
+        # Создаём новое личное расписание
+        schedule_id = str(uuid.uuid4())
+        owner_settings = await db.user_settings.find_one({"telegram_id": data.owner_id})
+        owner_name = owner_settings.get("first_name", "Я") if owner_settings else "Я"
+        owner_group = owner_settings.get("group_name", "") if owner_settings else ""
+
+        participants = [{"telegram_id": data.owner_id, "first_name": owner_name, "group_name": owner_group, "color": PARTICIPANT_COLORS[0]}]
+        color_counter = 1  # БАГ-ФИХ: отдельный счётчик цветов, не зависит от enumerate idx
+        for pid in data.participant_ids[:(MAX_PARTICIPANTS - 1)]:
+            if pid == data.owner_id:
+                continue  # пропускаем себя — уже добавлены как owner
+            p_settings = await db.user_settings.find_one({"telegram_id": pid})
+            p_name = p_settings.get("first_name", str(pid)) if p_settings else str(pid)
+            p_group = p_settings.get("group_name", "") if p_settings else ""
+            participants.append({
+                "telegram_id": pid, "first_name": p_name, "group_name": p_group,
+                "color": PARTICIPANT_COLORS[color_counter % len(PARTICIPANT_COLORS)]
+            })
+            color_counter += 1
+
+        doc = {"id": schedule_id, "owner_id": data.owner_id, "participants": participants,
+               "created_at": datetime.utcnow(), "updated_at": datetime.utcnow()}
+        await db.shared_schedules.insert_one(doc)
+
+        return SharedScheduleResponse(
+            id=schedule_id, owner_id=data.owner_id, participants=participants,
+            schedules={}, free_windows=[], created_at=doc["created_at"]
+        )
+    except Exception as e:
+        logger.error(f"Ошибка создания совместного расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Получить личное совместное расписание ───────────────────────────────────
+@api_router.get("/shared-schedule/{telegram_id}")
+async def get_shared_schedule(telegram_id: int, week: int = 1):
+    """Получить личное совместное расписание с расписаниями всех участников."""
+    try:
+        doc = await db.shared_schedules.find_one({"owner_id": telegram_id})
+        if not doc:
+            return {"exists": False, "id": None, "participants": [], "schedules": {}, "free_windows": []}
+
+        participants = doc.get("participants", [])
+        schedules = {}
+        week_num = max(1, min(2, week))
+
+        for p in participants:
+            p_id = p["telegram_id"]
+            if p.get("schedule_hidden", False):
+                continue
+            p_settings = await db.user_settings.find_one({"telegram_id": p_id})
+            if p_settings and p_settings.get("group_id"):
+                group_id = p_settings["group_id"]
+                cached = await db.schedule_cache.find_one({"group_id": group_id, "week_number": week_num})
+                cache_valid = (cached and cached.get("events") and cached.get("expires_at")
+                               and cached["expires_at"] > datetime.utcnow())
+                if cache_valid:
+                    schedules[str(p_id)] = cached["events"]
+                else:
+                    try:
+                        from rudn_parser import get_schedule
+                        events = await get_schedule(
+                            p_settings.get("facultet_id", ""), p_settings.get("level_id", ""),
+                            p_settings.get("kurs", ""), p_settings.get("form_code", ""),
+                            group_id, week_num
+                        )
+                        loaded = [e if isinstance(e, dict) else (e.dict() if hasattr(e, 'dict') else {}) for e in events] if events else []
+                        schedules[str(p_id)] = loaded
+                        if loaded:
+                            await db.schedule_cache.update_one(
+                                {"group_id": group_id, "week_number": week_num},
+                                {"$set": {"group_id": group_id, "week_number": week_num, "events": loaded,
+                                          "cached_at": datetime.utcnow(),
+                                          "expires_at": datetime.utcnow() + timedelta(hours=6)}},
+                                upsert=True
+                            )
+                    except Exception as sched_err:
+                        logger.warning(f"Cannot load schedule for {p_id}: {sched_err}")
+                        schedules[str(p_id)] = cached["events"] if (cached and cached.get("events")) else []
+            else:
+                schedules[str(p_id)] = []
+
+        free_windows = _compute_free_windows(schedules, participants)
+        return {
+            "exists": True, "id": doc.get("id"), "owner_id": doc.get("owner_id"),
+            "participants": participants, "schedules": schedules,
+            "free_windows": free_windows,
+            "created_at": doc.get("created_at"), "updated_at": doc.get("updated_at"),
+            "week": week_num
+        }
+    except Exception as e:
+        logger.error(f"Ошибка получения совместного расписания: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Добавить участника в личное расписание ──────────────────────────────────
+@api_router.post("/shared-schedule/{schedule_id}/add-participant")
+async def add_shared_schedule_participant(schedule_id: str, data: SharedScheduleAddParticipant):
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        participants = doc.get("participants", [])
+        if len(participants) >= MAX_PARTICIPANTS:
+            raise HTTPException(status_code=400, detail=f"Максимум {MAX_PARTICIPANTS} участников")
+        if any(p["telegram_id"] == data.participant_id for p in participants):
+            return SuccessResponse(success=True, message="Участник уже добавлен")
+        if data.participant_id == doc.get("owner_id"):
+            return SuccessResponse(success=True, message="Это вы — уже в расписании")
+        # БАГ-ФИХ: проверяем, что добавляемый пользователь — друг владельца
+        owner_id = doc.get("owner_id")
+        is_friend = await are_friends(owner_id, data.participant_id)
+        if not is_friend:
+            raise HTTPException(status_code=403, detail="Можно добавить только друзей")
+        p_settings = await db.user_settings.find_one({"telegram_id": data.participant_id})
+        p_name = p_settings.get("first_name", str(data.participant_id)) if p_settings else str(data.participant_id)
+        p_group = p_settings.get("group_name", "") if p_settings else ""
+        new_p = {"telegram_id": data.participant_id, "first_name": p_name, "group_name": p_group,
+                 "color": PARTICIPANT_COLORS[len(participants) % len(PARTICIPANT_COLORS)]}
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {"$push": {"participants": new_p}, "$set": {"updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message=f"Участник {p_name} добавлен")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Удалить участника из личного расписания ─────────────────────────────────
+@api_router.delete("/shared-schedule/{schedule_id}/remove-participant/{participant_id}")
+async def remove_shared_schedule_participant(schedule_id: str, participant_id: int):
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        # Нельзя удалить себя (владельца документа) — можно только удалить весь документ
+        if doc.get("owner_id") == participant_id:
+            raise HTTPException(status_code=400, detail="Нельзя удалить себя. Удалите расписание целиком.")
+        await db.shared_schedules.update_one(
+            {"id": schedule_id},
+            {"$pull": {"participants": {"telegram_id": participant_id}},
+             "$set": {"updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message="Участник удалён")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Удалить личное расписание ───────────────────────────────────────────────
+@api_router.delete("/shared-schedule/{schedule_id}")
+async def delete_shared_schedule(schedule_id: str, owner_id: Optional[int] = None):
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        # БАГ-ФИХ: owner_id обязателен для проверки прав; без него — 403
+        if owner_id is None:
+            raise HTTPException(status_code=403, detail="Необходимо указать owner_id")
+        if doc.get("owner_id") != owner_id:
+            raise HTTPException(status_code=403, detail="Нет прав")
+        await db.shared_schedules.delete_one({"id": schedule_id})
+        return SuccessResponse(success=True, message="Расписание удалено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Создать share-токен (ссылка «открыть с участниками») ────────────────────
+@api_router.post("/shared-schedule/{schedule_id}/share-token")
+async def create_share_token(schedule_id: str):
+    """
+    Создаёт одноразовый токен, кодирующий список участников.
+    Ссылка открывает у получателя ЕГО СОБСТВЕННОЕ расписание с теми же участниками.
+    Никакого «подключения» — только передача параметров.
+    """
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+
+        # Список участников для передачи получателю:
+        # Включаем ВСЕХ из расписания владельца (включая его самого).
+        # Получатель создаст СВОЁ расписание с этими людьми — его там не будет,
+        # он будет добавлен автоматически как owner своей копии.
+        all_participant_ids = [p["telegram_id"] for p in doc.get("participants", [])]
+        # Если вдруг owner не в списке — добавляем
+        if doc["owner_id"] not in all_participant_ids:
+            all_participant_ids = [doc["owner_id"]] + all_participant_ids
+
+        token = str(uuid.uuid4()).replace("-", "")[:16]
+        await db.schedule_share_tokens.insert_one({
+            "token": token,
+            "participant_ids": all_participant_ids,
+            "source_owner_id": doc["owner_id"],
+            "created_at": datetime.utcnow(),
+            "expires_at": datetime.utcnow() + timedelta(days=30),
+        })
+
+        bot_username = get_telegram_bot_username()
+        invite_link = f"https://t.me/{bot_username}/app?startapp=sschedule_{token}"
+        return {"token": token, "invite_link": invite_link, "participant_ids": all_participant_ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка создания share-токена: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Получить данные share-токена ────────────────────────────────────────────
+@api_router.get("/shared-schedule/token/{token}")
+async def get_share_token(token: str):
+    """Вернуть список participant_ids из токена (без join-логики)."""
+    try:
+        doc = await db.schedule_share_tokens.find_one({"token": token})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Ссылка не найдена или устарела")
+        if doc.get("expires_at") and doc["expires_at"] < datetime.utcnow():
+            raise HTTPException(status_code=410, detail="Ссылка истекла")
+        return {
+            "token": token,
+            "participant_ids": doc.get("participant_ids", []),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Добавить своё расписание (снять schedule_hidden) ────────────────────────
+@api_router.post("/shared-schedule/{schedule_id}/add-my-schedule")
+async def add_my_schedule(schedule_id: str, data: dict):
+    try:
+        telegram_id = int(data.get("telegram_id", 0))
+        if not telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_id обязателен")
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        if not any(p["telegram_id"] == telegram_id for p in doc.get("participants", [])):
+            raise HTTPException(status_code=404, detail="Вы не участник этого расписания")
+        await db.shared_schedules.update_one(
+            {"id": schedule_id, "participants.telegram_id": telegram_id},
+            {"$set": {"participants.$.schedule_hidden": False, "updated_at": datetime.utcnow()}}
+        )
+        return SuccessResponse(success=True, message="Ваше расписание добавлено")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Получить invite-link (старый метод, оставляем для совместимости) ─────────
+@api_router.get("/shared-schedule/{schedule_id}/invite-link")
+async def get_shared_schedule_invite_link(schedule_id: str):
+    """Переадресует на share-token endpoint."""
+    try:
+        doc = await db.shared_schedules.find_one({"id": schedule_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Расписание не найдено")
+        result = await create_share_token(schedule_id)
+        return {"invite_link": result["invite_link"], "schedule_id": schedule_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _compute_free_windows(schedules: dict, participants: list) -> list:
+    """Вычислить общие свободные окна для всех участников.
+    
+    Логика: находим временные слоты, когда НИ У ОДНОГО участника нет пар.
+    Диапазон — полные сутки (0:00–24:00).
+    Минимальная длительность свободного окна — 30 минут.
+    Гранулярность — 15 минут (точнее учитывает нестандартное время начала пар).
+    """
+    if not schedules:
+        return []
+    
+    SLOT_STEP = 15  # гранулярность 15 минут вместо 30
+
+    days_ru = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+    free_windows = []
+    
+    def normalize_day(day_str: str) -> str:
+        return day_str.strip().lower() if day_str else ""
+
+    # Слоты на весь день: 0:00 – 23:45 (96 слотов по 15 мин)
+    time_slots = []
+    for total_min in range(0, 24 * 60, SLOT_STEP):
+        time_slots.append(total_min)
+
+    for day in days_ru:
+        day_norm = normalize_day(day)
+        all_busy = set()
+        has_any_events_today = False
+        
+        for p_id, events in schedules.items():
+            for event in events:
+                event_day = normalize_day(event.get("day", ""))
+                if event_day != day_norm:
+                    continue
+                
+                has_any_events_today = True
+                time_str = event.get("time", "")
+                if " - " in time_str:
+                    start_time, end_time = time_str.split(" - ", 1)
+                    try:
+                        sh, sm = map(int, start_time.strip().split(":"))
+                        eh, em = map(int, end_time.strip().split(":"))
+                        
+                        current = sh * 60 + sm
+                        end_min = eh * 60 + em
+                        # Округляем начало вниз до ближайшего слота, конец вверх
+                        slot_start = (current // SLOT_STEP) * SLOT_STEP
+                        while slot_start < end_min:
+                            all_busy.add(slot_start)
+                            slot_start += SLOT_STEP
+                    except (ValueError, AttributeError):
+                        pass
+        
+        if not has_any_events_today:
+            continue
+        
+        free_start = None
+        for slot_min in time_slots:
+            if slot_min not in all_busy:
+                if free_start is None:
+                    free_start = slot_min
+            else:
+                if free_start is not None:
+                    duration = slot_min - free_start
+                    if duration >= 30:
+                        free_windows.append({
+                            "day": day,
+                            "start": f"{free_start // 60:02d}:{free_start % 60:02d}",
+                            "end": f"{slot_min // 60:02d}:{slot_min % 60:02d}",
+                            "duration_minutes": duration
+                        })
+                    free_start = None
+        
+        # Последнее окно до конца суток
+        if free_start is not None:
+            duration = 24 * 60 - free_start
+            if duration >= 30:
+                free_windows.append({
+                    "day": day,
+                    "start": f"{free_start // 60:02d}:{free_start % 60:02d}",
+                    "end": "24:00",
+                    "duration_minutes": duration
+                })
+    
+    return free_windows
+
+
+# ============ Эндпоинты для Admin: уведомления из Telegram постов ============
+
+@api_router.post("/admin/notifications/parse-telegram")
+async def parse_telegram_post(data: dict):
+    """Парсить публичный Telegram пост для извлечения контента"""
+    try:
+        telegram_url = data.get("telegram_url", "")
+        if not telegram_url:
+            raise HTTPException(status_code=400, detail="URL не указан")
+        
+        # Извлекаем channel и post_id из URL
+        # Форматы: https://t.me/channel/123, https://t.me/s/channel/123
+        import re
+        match = re.search(r't\.me/(?:s/)?([^/]+)/(\d+)', telegram_url)
+        if not match:
+            raise HTTPException(status_code=400, detail="Неверный формат ссылки на Telegram пост")
+        
+        channel = match.group(1)
+        post_id = match.group(2)
+        
+        # Загружаем публичный превью поста
+        preview_url = f"https://t.me/{channel}/{post_id}?embed=1&mode=tme"
+        
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(preview_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    raise HTTPException(status_code=400, detail="Не удалось загрузить пост")
+                html = await resp.text()
+        
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Извлекаем данные
+        title = ""
+        description = ""
+        image_url = ""
+        
+        # OG метатеги
+        og_title = soup.find('meta', property='og:title')
+        og_desc = soup.find('meta', property='og:description')
+        og_image = soup.find('meta', property='og:image')
+        
+        if og_title:
+            title = og_title.get('content', '')
+        if og_desc:
+            description = og_desc.get('content', '')
+        if og_image:
+            image_url = og_image.get('content', '')
+        
+        # Fallback: ищем в контенте поста
+        if not description:
+            msg_text = soup.find('div', class_='tgme_widget_message_text')
+            if msg_text:
+                description = msg_text.get_text(separator='\n').strip()
+        
+        if not title and description:
+            # Берем первую строку как заголовок
+            lines = description.split('\n')
+            title = lines[0][:100] if lines else ""
+        
+        if not image_url:
+            # Ищем изображение в посте
+            img_wrap = soup.find('a', class_='tgme_widget_message_photo_wrap')
+            if img_wrap:
+                style = img_wrap.get('style', '')
+                url_match = re.search(r"url\('([^']+)'\)", style)
+                if url_match:
+                    image_url = url_match.group(1)
+        
+        return {
+            "success": True,
+            "title": title,
+            "description": description,
+            "image_url": image_url,
+            "channel": channel,
+            "post_id": post_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка парсинга Telegram поста: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/notifications/send-from-post")
+async def send_notification_from_post(data: dict):
+    """Отправить уведомление всем пользователям на основе Telegram поста"""
+    try:
+        title = data.get("title", "")
+        description = data.get("description", "")
+        image_url = data.get("image_url", "")
+        recipients = data.get("recipients", "all")
+        
+        if not title and not description:
+            raise HTTPException(status_code=400, detail="Заголовок или описание обязательны")
+        
+        # Получаем список получателей
+        if recipients == "all":
+            users = await db.user_settings.find({}, {"telegram_id": 1}).to_list(None)
+            recipient_ids = [u["telegram_id"] for u in users]
+        else:
+            recipient_ids = data.get("recipient_ids", [])
+        
+        if not recipient_ids:
+            return {"success": False, "message": "Нет получателей", "sent": 0, "failed": 0}
+        
+        # Формируем текст сообщения
+        message_text = ""
+        if title:
+            message_text += f"<b>{title}</b>\n\n"
+        if description:
+            message_text += description
+        
+        notification_svc = get_notification_service()
+        sent = 0
+        failed = 0
+        
+        for uid in recipient_ids:
+            try:
+                if image_url:
+                    # Отправляем фото с подписью
+                    await notification_svc.bot.send_photo(
+                        chat_id=uid,
+                        photo=image_url,
+                        caption=message_text[:1024],
+                        parse_mode='HTML'
+                    )
+                else:
+                    await notification_svc.send_message(uid, message_text)
+                sent += 1
+            except Exception as e:
+                logger.warning(f"Не удалось отправить уведомление {uid}: {e}")
+                failed += 1
+            
+            # Задержка для избежания rate-limit
+            await asyncio.sleep(0.05)
+        
+        # Сохраняем в историю
+        await db.notification_history.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "admin_post",
+            "title": title,
+            "description": description[:500],
+            "image_url": image_url,
+            "recipients_count": len(recipient_ids),
+            "sent": sent,
+            "failed": failed,
+            "created_at": datetime.utcnow()
+        })
+        
+        return {
+            "success": True,
+            "message": f"Отправлено {sent} из {len(recipient_ids)}",
+            "sent": sent,
+            "failed": failed
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления из поста: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Отправка изображения расписания в ЛС бота ============
+
+@api_router.post("/send-schedule-image")
+async def send_schedule_image(
+    telegram_id: int = Body(...),
+    image_base64: str = Body(...),
+    caption: str = Body("📅 Совместное расписание"),
+    short_caption: str = Body(None),
+    share_text: str = Body(None)
+):
+    """Отправить сгенерированное изображение расписания в ЛС бота"""
+    try:
+        import base64
+        import io
+        from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+        import urllib.parse
+
+        bot_token = get_telegram_bot_token()
+        if not bot_token:
+            raise HTTPException(status_code=500, detail="Bot token not configured")
+
+        # Декодируем base64 изображение
+        if "," in image_base64:
+            image_base64 = image_base64.split(",", 1)[1]
+
+        image_bytes = base64.b64decode(image_base64)
+        image_io = io.BytesIO(image_bytes)
+        image_io.name = "schedule.png"
+
+        bot = Bot(token=bot_token)
+        bot_info = await bot.get_me()
+        bot_username = bot_info.username or "bot"
+
+        # Inline-кнопка «Поделиться»
+        share_content = share_text or caption
+        bot_url = urllib.parse.quote(f"https://t.me/{bot_username}")
+        share_encoded = urllib.parse.quote(share_content)
+        share_url = f"https://t.me/share/url?url={bot_url}&text={share_encoded}"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 Поделиться", url=share_url)]
+        ])
+
+        # Если caption помещается в лимит (1024) — отправляем всё в описании фото
+        if len(caption) <= 1024:
+            await bot.send_photo(
+                chat_id=telegram_id,
+                photo=image_io,
+                caption=caption,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+        else:
+            # Caption слишком длинный — фото с коротким заголовком,
+            # полное расписание отдельным сообщением с inline-кнопкой
+            photo_caption = short_caption or ""
+            await bot.send_photo(
+                chat_id=telegram_id,
+                photo=image_io,
+                caption=photo_caption if photo_caption else None,
+                parse_mode="HTML" if photo_caption else None
+            )
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=caption,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+
+        logger.info(f"✅ Schedule image sent to user {telegram_id}")
+        return {"success": True, "message": "Image sent to bot DM"}
+
+    except Exception as e:
+        logger.error(f"❌ Error sending schedule image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+app.include_router(api_router)
+
+# Mount static files for modal images
+app.mount("/api/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+
+
+
+# ============ WebSocket для Web Sessions (связка Telegram профиля) ============
+
+@app.websocket("/api/ws/session/{session_token}")
+async def websocket_session(websocket: WebSocket, session_token: str):
+    """
+    WebSocket для real-time уведомления о связке/мониторинге сессии.
+    - Для PENDING сессий: ждёт событие 'linked'/'scanned'/'rejected'
+    - Для LINKED сессий: мониторит событие 'revoked' (вместо закрытия)
+    """
+    await websocket.accept()
+    
+    # Проверяем существование сессии
+    session = await db.web_sessions.find_one({"session_token": session_token})
+    if not session:
+        await websocket.send_json({"event": "error", "message": "Сессия не найдена"})
+        await websocket.close()
+        return
+    
+    # Для LINKED сессий — режим мониторинга (ждём revoked)
+    # НЕ закрываем сразу, а держим соединение для получения revoked событий
+    is_monitor_mode = session["status"] == WebSessionStatus.LINKED.value
+    
+    # Сохраняем соединение
+    web_session_connections[session_token] = websocket
+    logger.info(f"🔌 WebSocket connected for session {session_token[:8]}... (monitor={is_monitor_mode})")
+    
+    try:
+        # Отправляем подтверждение подключения с текущим статусом
+        if is_monitor_mode:
+            await websocket.send_json({
+                "event": "connected",
+                "session_token": session_token,
+                "mode": "monitor",
+                "status": "linked"
+            })
+        else:
+            await websocket.send_json({"event": "connected", "session_token": session_token})
+        
+        # Ждём сообщений или отключения
+        while True:
+            try:
+                # Ждём ping/pong для поддержания соединения
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                
+                if data == "ping":
+                    await websocket.send_text("pong")
+                elif data == "check":
+                    # Проверяем статус сессии
+                    session = await db.web_sessions.find_one({"session_token": session_token})
+                    if not session:
+                        # Сессия удалена (revoked)
+                        await websocket.send_json({"event": "revoked", "message": "Сессия удалена"})
+                        break
+                    
+                    if session["status"] == WebSessionStatus.LINKED.value and not is_monitor_mode:
+                        # Сессия связана — отправляем данные
+                        await websocket.send_json({
+                            "event": "linked",
+                            "data": {
+                                "telegram_id": session.get("telegram_id"),
+                                "first_name": session.get("first_name"),
+                                "last_name": session.get("last_name"),
+                                "username": session.get("username"),
+                                "photo_url": session.get("photo_url"),
+                                "user_settings": session.get("user_settings")
+                            }
+                        })
+                        break
+                    elif session["status"] == WebSessionStatus.EXPIRED.value:
+                        await websocket.send_json({"event": "expired"})
+                        break
+                        
+            except asyncio.TimeoutError:
+                # Проверяем статус сессии при timeout
+                session = await db.web_sessions.find_one({"session_token": session_token})
+                if not session:
+                    # Сессия удалена (revoked)
+                    await websocket.send_json({"event": "revoked", "message": "Сессия удалена"})
+                    break
+                
+                if session["status"] == WebSessionStatus.LINKED.value and not is_monitor_mode:
+                    await websocket.send_json({
+                        "event": "linked",
+                        "data": {
+                            "telegram_id": session.get("telegram_id"),
+                            "first_name": session.get("first_name"),
+                            "last_name": session.get("last_name"),
+                            "username": session.get("username"),
+                            "photo_url": session.get("photo_url"),
+                            "user_settings": session.get("user_settings")
+                        }
+                    })
+                    break
+                elif session.get("expires_at") and datetime.utcnow() > session["expires_at"]:
+                    if not is_monitor_mode:
+                        await websocket.send_json({"event": "expired"})
+                        break
+                
+                # Отправляем ping для поддержания соединения
+                try:
+                    await websocket.send_text("ping")
+                except Exception:
+                    break
+                
+    except WebSocketDisconnect:
+        logger.info(f"🔌 WebSocket disconnected for session {session_token[:8]}...")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+    finally:
+        # Удаляем соединение из словаря
+        if session_token in web_session_connections:
+            del web_session_connections[session_token]
+
+
+# ============ Shutdown lifecycle ============
+
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    """Очистка ресурсов при остановке"""
+    logger.info("Shutting down RUDN Schedule API...")
+    
+    # Останавливаем Telegram бота
+    global bot_application
+    if bot_application:
+        try:
+            logger.info("Stopping Telegram bot...")
+            await bot_application.updater.stop()
+            await bot_application.stop()
+            await bot_application.shutdown()
+            logger.info("Telegram bot stopped")
+        except Exception as e:
+            logger.error(f"Error stopping Telegram bot: {e}")
+    
+    # Останавливаем планировщик V2
+    try:
+        scheduler_v2 = get_scheduler_v2(db)
+        scheduler_v2.stop()
+        logger.info("✅ Notification Scheduler V2 stopped")
+    except Exception as e:
+        logger.error(f"Error stopping scheduler V2: {e}")
+        # Пытаемся остановить старый планировщик на всякий случай
+        try:
+            scheduler = get_scheduler(db)
+            scheduler.stop()
+        except:
+            pass
+    
+    # Закрываем подключение к БД
+    client.close()
+    logger.info("Database connection closed")
