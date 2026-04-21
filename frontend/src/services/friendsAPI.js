@@ -6,13 +6,18 @@
  * глобального axios, поэтому Authorization header ранее НЕ добавлялся к запросам.
  * Теперь установлены собственные request/response интерсепторы, чтобы все legacy
  * endpoints (`/profile/*`, `/friends/*`) корректно передавали JWT.
+ *
+ * 🔐 BUG-FIX (2026-04): раньше использовался хардкодный ключ `auth_token`, но
+ * реальный JWT хранится под `rudn_auth_token` (см. `utils/authStorage.js`).
+ * Из-за этого токен всегда был `null` → 401 на всех /profile/* и /friends/*
+ * (граффити, activity-ping и т.п.). Теперь читаем через общий хелпер `getToken()`.
  */
 
 import axios from 'axios';
 import { getBackendURL } from '../utils/config';
+import { getToken } from '../utils/authStorage';
 
 const API_BASE = `${getBackendURL()}/api`;
-const AUTH_TOKEN_KEY = 'auth_token';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -26,7 +31,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     try {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      const token = getToken();
       if (token && !config.headers?.Authorization) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
