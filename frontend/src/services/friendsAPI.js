@@ -1,12 +1,18 @@
 /**
  * API Service для работы с системой друзей
  * Использует REACT_APP_BACKEND_URL из .env
+ *
+ * 🔐 BUG-P13 FIX (Stage 8): custom axios instance не наследует интерсепторы
+ * глобального axios, поэтому Authorization header ранее НЕ добавлялся к запросам.
+ * Теперь установлены собственные request/response интерсепторы, чтобы все legacy
+ * endpoints (`/profile/*`, `/friends/*`) корректно передавали JWT.
  */
 
 import axios from 'axios';
 import { getBackendURL } from '../utils/config';
 
 const API_BASE = `${getBackendURL()}/api`;
+const AUTH_TOKEN_KEY = 'auth_token';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -15,6 +21,32 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// 🔐 Stage 8: Request interceptor — автоматически добавляет Bearer-токен
+api.interceptors.request.use(
+  (config) => {
+    try {
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (token && !config.headers?.Authorization) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (_) {
+      // localStorage недоступен (SSR/приватный режим) — просто пропускаем
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+// 🔐 Stage 8: Response interceptor — 401 не выкидываем жёстко (пусть бизнес-логика решает)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Не форсим редирект здесь — глобальный interceptor AuthContext'а обработает
+    return Promise.reject(error);
+  },
+);
 
 // Обработка ошибок
 const handleError = (error) => {

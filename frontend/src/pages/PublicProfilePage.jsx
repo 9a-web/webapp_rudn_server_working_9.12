@@ -22,7 +22,7 @@ import axios from 'axios';
 import {
   ArrowLeft, Copy, Share2, Users, Trophy, Eye, EyeOff, Wifi,
   Loader2, AlertTriangle, Lock, CalendarDays, GraduationCap,
-  CheckCircle2, Home, LogIn, UserPlus, ExternalLink,
+  CheckCircle2, Home, LogIn, UserPlus, ExternalLink, RefreshCw,
 } from 'lucide-react';
 
 import { getBackendURL } from '../utils/config';
@@ -479,9 +479,15 @@ const PublicProfilePage = () => {
           actions={
             <button
               onClick={fetchProfile}
-              className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.15]"
+              disabled={loading}
+              aria-label="Повторить загрузку профиля"
+              className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.15] disabled:opacity-60 disabled:cursor-wait"
             >
-              <Loader2 className="h-4 w-4" /> Повторить
+              {loading
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <RefreshCw className="h-4 w-4" />
+              }
+              {loading ? 'Загрузка…' : 'Повторить'}
             </button>
           }
         />

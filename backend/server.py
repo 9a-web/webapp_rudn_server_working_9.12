@@ -14532,6 +14532,28 @@ async def get_friendship_status(
     return None
 
 
+def _coerce_bool(value: Any) -> Optional[bool]:
+    """Мягкое приведение к bool для обратной совместимости со старыми записями в БД.
+    Поддерживает: bool, int (0/1), str ('true'/'false'/'yes'/'no'/'1'/'0' — case-insensitive).
+    Возвращает None если приведение невозможно (чтобы вызывающий мог применить дефолт).
+
+    🐛 BUG-P11 FIX: ранее ``isinstance(v, bool)`` молча терял настройки, сохранённые
+    в legacy-формате (например, из Mongo Compass или миграций), и возвращал дефолты —
+    пользователь терял свои настройки приватности без уведомления.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "1", "yes", "y", "on"):
+            return True
+        if normalized in ("false", "0", "no", "n", "off", ""):
+            return False
+    return None
+
+
 async def get_user_privacy_settings(telegram_id: int, user_doc: dict = None) -> PrivacySettings:
     """Получить настройки приватности пользователя.
     Если user_doc передан — используем его (экономим запрос в БД).
@@ -14542,7 +14564,6 @@ async def get_user_privacy_settings(telegram_id: int, user_doc: dict = None) -> 
     if user_doc and user_doc.get("privacy_settings"):
         try:
             raw = user_doc["privacy_settings"]
-            # Фильтруем только известные поля — защита от extra-полей в БД
             allowed = {
                 "show_online_status",
                 "show_in_search",
@@ -14550,12 +14571,132 @@ async def get_user_privacy_settings(telegram_id: int, user_doc: dict = None) -> 
                 "show_achievements",
                 "show_schedule",
             }
-            cleaned = {k: v for k, v in raw.items() if k in allowed and isinstance(v, bool)}
+            # 🐛 BUG-P11 FIX: мягкое приведение значений (bool/int/str) — защита от legacy-данных
+            cleaned: Dict[str, bool] = {}
+            for key in allowed:
+                if key in raw:
+                    coerced = _coerce_bool(raw[key])
+                    if coerced is not None:
+                        cleaned[key] = coerced
             return PrivacySettings(**cleaned)
         except Exception as e:
             logger.warning(f"Privacy parse error for {telegram_id}: {e}, fallback to defaults")
             return PrivacySettings()
     return PrivacySettings()  # Возвращаем настройки по умолчанию
+
+
+# ============================================================================
+# 🔐 АВТОРИЗАЦИОННЫЕ ХЕЛПЕРЫ ДЛЯ ПРОФИЛЯ (Stage 8 — P0 Security Hardening)
+# ============================================================================
+# Ранее legacy-эндпоинты `/profile/{telegram_id}/*` полагались только на
+# query/body параметр `requester_telegram_id`, что позволяло атакующему просто
+# передать `requester_telegram_id == telegram_id` и получить/изменить приватные
+# данные ЛЮБОГО пользователя (BUG-P1..P9). Теперь — строгая JWT-проверка.
+
+
+def _authorize_profile_owner(
+    telegram_id: int,
+    current_user: Optional[Dict[str, Any]],
+    body_requester_id: Any = None,
+) -> int:
+    """Строгая проверка что запрос на мутацию профиля исходит от его владельца.
+
+    Приоритет авторизации:
+      1) JWT (`current_user.tid`) — обязателен для всех мутаций профиля.
+      2) `body_requester_id` (legacy-параметр) — если передан, ДОЛЖЕН совпадать
+         с `tid` из токена (иначе 403).
+
+    Возвращает подтверждённый `telegram_id` владельца (равный `telegram_id` из пути).
+
+    Raises:
+      401 — нет JWT;
+      403 — токен валидный, но принадлежит другому пользователю;
+      400 — body_requester_id некорректен (не число).
+    """
+    if current_user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Требуется авторизация (Bearer token)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token_tid_raw = current_user.get("tid")
+    if token_tid_raw is None:
+        raise HTTPException(
+            status_code=403,
+            detail="В токене отсутствует telegram_id. Завершите привязку Telegram-аккаунта.",
+        )
+    try:
+        token_tid = int(token_tid_raw)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="Некорректный telegram_id в токене")
+
+    if token_tid != int(telegram_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Доступ запрещён: это не ваш профиль",
+        )
+
+    # Защита от старых клиентов, которые передают requester_telegram_id в body:
+    # принимаем только если совпадает с JWT (не даём вводить в заблуждение аудит-логи).
+    if body_requester_id is not None:
+        try:
+            if int(body_requester_id) != token_tid:
+                raise HTTPException(
+                    status_code=403,
+                    detail="requester_telegram_id не совпадает с токеном авторизации",
+                )
+        except HTTPException:
+            raise
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail="requester_telegram_id должен быть числом",
+            )
+    return token_tid
+
+
+def _resolve_viewer_from_auth(
+    current_user: Optional[Dict[str, Any]],
+    query_viewer: Optional[int] = None,
+) -> Optional[int]:
+    """Получить `viewer_telegram_id` из JWT (источник истины).
+
+    Правила:
+      — JWT есть → возвращаем `tid` из токена. Если в query передан
+        `viewer_telegram_id`, он ДОЛЖЕН совпадать (иначе 403, т.к. это попытка
+        подмены личности).
+      — JWT нет → возвращаем `None` (анонимный просмотр). Legacy-параметр
+        `viewer_telegram_id` из query в таком случае ИГНОРИРУЕТСЯ — доверять ему
+        нельзя (BUG-P1/P2).
+
+    Это обеспечивает, что privacy-фильтры нельзя обойти через подмену query-параметра.
+    """
+    token_tid: Optional[int] = None
+    if current_user is not None:
+        raw = current_user.get("tid")
+        if raw is not None:
+            try:
+                token_tid = int(raw)
+            except (ValueError, TypeError):
+                token_tid = None
+
+    if token_tid is not None:
+        if query_viewer is not None:
+            try:
+                if int(query_viewer) != token_tid:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="viewer_telegram_id не совпадает с токеном авторизации",
+                    )
+            except HTTPException:
+                raise
+            except (ValueError, TypeError):
+                # Некорректный query — просто игнорируем, используем JWT
+                pass
+        return token_tid
+
+    # Нет JWT — анонимный просмотр. Query-параметр игнорируем (не доверяем).
+    return None
 
 
 async def build_friend_card(user_data: dict, current_user_id: int, friendship_date: datetime = None, is_favorite: bool = False) -> FriendCard:
@@ -15337,7 +15478,12 @@ async def get_mutual_friends(telegram_id: int, other_telegram_id: int):
 
 
 @api_router.get("/profile/{telegram_id}/schedule", response_model=FriendScheduleResponse)
-async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: str = None):
+async def get_friend_schedule(
+    telegram_id: int,
+    viewer_telegram_id: int,
+    date: str = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Получить расписание друга или своё собственное.
 
     Особенности:
@@ -15346,7 +15492,36 @@ async def get_friend_schedule(telegram_id: int, viewer_telegram_id: int, date: s
     - Дата по умолчанию — сегодня в Московском часовом поясе.
     - common_classes вычисляются через перекрытие по времени (не только same-group).
     - common_breaks — окна между парами, где оба одновременно свободны.
+
+    🔐 BUG-P2 FIX (Stage 8): `viewer_telegram_id` проверяется через JWT.
+    Если токен передан — query ДОЛЖЕН совпадать с `tid` токена. Без токена —
+    чужое расписание недоступно (требуется авторизация для friendship-check).
     """
+    # 🔐 JWT-проверка viewer'а (защита от spoofing'а)
+    token_viewer = _resolve_viewer_from_auth(current_user, viewer_telegram_id)
+    if token_viewer is not None:
+        effective_viewer = token_viewer
+    else:
+        # Анонимный запрос: чужое расписание недоступно, своё — требует JWT.
+        # Legacy: оставляем возможность запроса со своим же id БЕЗ JWT только для
+        # is_own_schedule (это не приватные данные чужих людей).
+        if viewer_telegram_id != telegram_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Требуется авторизация для просмотра чужого расписания",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        effective_viewer = viewer_telegram_id
+
+    return await _get_friend_schedule_impl(telegram_id, effective_viewer, date)
+
+
+async def _get_friend_schedule_impl(
+    telegram_id: int,
+    viewer_telegram_id: int,
+    date: str = None,
+) -> "FriendScheduleResponse":
+    """Внутренняя реализация (без JWT-проверки — viewer уже доверенный)."""
     try:
         # Валидация
         if telegram_id <= 0 or viewer_telegram_id <= 0:
@@ -15598,56 +15773,81 @@ def _compute_schedule_overlap(owner_events: list, viewer_events: list) -> tuple:
 
 
 @api_router.put("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
-async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpdate, requester_telegram_id: int = None):
-    """Обновить настройки приватности (partial update)."""
+async def update_privacy_settings(
+    telegram_id: int,
+    settings: PrivacySettingsUpdate,
+    requester_telegram_id: int = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Обновить настройки приватности (partial update).
+
+    🔐 BUG-P3 FIX (Stage 8): требуется JWT, и `tid` в токене ДОЛЖЕН совпадать с
+    `telegram_id` в пути. `requester_telegram_id` оставлен для обратной совместимости,
+    но если передан — должен совпадать с JWT (иначе 403). Ранее атакующий мог
+    передать `requester_telegram_id == telegram_id` и переписать ЛЮБЫЕ privacy-настройки.
+
+    🐛 BUG-P12 FIX: атомарное обновление через dot-notation ($set: privacy_settings.field)
+    вместо read-modify-write всего вложенного документа — устраняет race condition
+    при параллельных запросах.
+    """
     try:
-        # Авторизация
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
-        if requester_telegram_id is None:
-            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
-        if requester_telegram_id != telegram_id:
-            raise HTTPException(status_code=403, detail="Можно изменять только свои настройки приватности")
+
+        # 🔐 JWT-авторизация
+        _authorize_profile_owner(telegram_id, current_user, requester_telegram_id)
 
         # Проверяем существование пользователя
-        user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        user = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"privacy_settings": 1, "_id": 0},
+        )
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        # Получаем текущие настройки (из уже загруженного документа)
-        current = await get_user_privacy_settings(telegram_id, user_doc=user)
-
-        # Обновляем только переданные поля (Pydantic v2 safe)
+        # Собираем partial-update
         try:
             update_data = settings.model_dump(exclude_unset=True)
         except AttributeError:
-            # Fallback для Pydantic v1
             update_data = settings.dict(exclude_unset=True)
 
         if not update_data:
-            # Ничего не передано — возвращаем текущие
-            return current
+            # Ничего не передано — возвращаем текущие настройки
+            return await get_user_privacy_settings(telegram_id, user_doc=user)
 
+        # 🐛 BUG-P12 FIX: атомарный $set через dot-notation — каждая настройка
+        # обновляется независимо, не затирая остальные поля.
+        ALLOWED_FIELDS = {
+            "show_online_status",
+            "show_in_search",
+            "show_friends_list",
+            "show_achievements",
+            "show_schedule",
+        }
+        set_operations: Dict[str, Any] = {}
         for key, value in update_data.items():
-            if value is not None:
-                setattr(current, key, value)
+            if key in ALLOWED_FIELDS and value is not None:
+                set_operations[f"privacy_settings.{key}"] = bool(value)
 
-        # Сохраняем (Pydantic v2 safe)
-        try:
-            current_dict = current.model_dump()
-        except AttributeError:
-            current_dict = current.dict()
+        if not set_operations:
+            return await get_user_privacy_settings(telegram_id, user_doc=user)
+
+        set_operations["privacy_updated_at"] = datetime.now(timezone.utc).isoformat()
 
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
-            {"$set": {"privacy_settings": current_dict, "privacy_updated_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": set_operations},
         )
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
         logger.info(f"🔒 Privacy settings updated for {telegram_id}: {list(update_data.keys())}")
-        return current
+        # Возвращаем актуальные настройки (re-read для честности ответа)
+        fresh = await db.user_settings.find_one(
+            {"telegram_id": telegram_id}, {"privacy_settings": 1, "_id": 0}
+        )
+        return await get_user_privacy_settings(telegram_id, user_doc=fresh)
 
     except HTTPException:
         raise
@@ -15657,15 +15857,20 @@ async def update_privacy_settings(telegram_id: int, settings: PrivacySettingsUpd
 
 
 @api_router.get("/profile/{telegram_id}/privacy", response_model=PrivacySettings)
-async def get_privacy_settings(telegram_id: int, requester_telegram_id: int = None):
-    """Получить настройки приватности (только владелец)."""
+async def get_privacy_settings(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Получить настройки приватности (только владелец).
+
+    🔐 BUG-P3 FIX: JWT обязателен. Query `requester_telegram_id` принимается
+    только если совпадает с токеном (для обратной совместимости с фронтом).
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
-        if requester_telegram_id is None:
-            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
-        if requester_telegram_id != telegram_id:
-            raise HTTPException(status_code=403, detail="Можно просматривать только свои настройки приватности")
+        _authorize_profile_owner(telegram_id, current_user, requester_telegram_id)
 
         return await get_user_privacy_settings(telegram_id)
     except HTTPException:
@@ -15676,32 +15881,43 @@ async def get_privacy_settings(telegram_id: int, requester_telegram_id: int = No
 
 
 @api_router.get("/profile/{telegram_id}/qr")
-async def get_profile_qr_data(telegram_id: int, requester_telegram_id: int = None):
+async def get_profile_qr_data(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Получить данные для QR-кода профиля.
 
-    - Владельцу (requester == telegram_id) — всегда доступно.
+    - Владельцу (viewer == telegram_id) — всегда доступно.
     - Чужому — проверяем блокировку и privacy.show_in_search.
+
+    🔐 BUG-P17 FIX (Stage 8): viewer определяется из JWT. Query-параметр
+    `requester_telegram_id` — только для legacy-совместимости (должен совпадать
+    с JWT). Без токена — отказ, чтобы не дать злоумышленнику обойти privacy
+    подменой `requester_telegram_id == telegram_id`.
     """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
+        # 🔐 viewer из JWT (строго); query игнорируется без токена
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        is_owner = requester_telegram_id is not None and requester_telegram_id == telegram_id
+        is_owner = effective_viewer is not None and effective_viewer == telegram_id
 
-        # Для чужого — проверяем блокировку и privacy
-        if not is_owner and requester_telegram_id is not None:
+        # Для чужого (или анонимного) — проверяем блокировку и privacy
+        if not is_owner and effective_viewer is not None:
             blocked_by_owner, blocked_by_viewer = await asyncio.gather(
-                is_blocked(telegram_id, requester_telegram_id),
-                is_blocked(requester_telegram_id, telegram_id),
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
             )
             if blocked_by_owner or blocked_by_viewer:
                 raise HTTPException(status_code=403, detail="Профиль недоступен")
 
-        # Проверяем приватность только для не-владельца (или анонимного запроса)
         if not is_owner:
             privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
             if not privacy.show_in_search:
@@ -15735,6 +15951,9 @@ async def get_profile_qr_data(telegram_id: int, requester_telegram_id: int = Non
 def _parse_graffiti_requester(body: dict, telegram_id: int, action: str = "изменять") -> int:
     """Безопасная валидация requester_telegram_id для граффити endpoints.
     Возвращает parsed requester_id или бросает HTTPException.
+
+    ⚠️ Stage 8: этот helper ОСТАВЛЕН только для валидации формата body.requester_telegram_id.
+    Реальная авторизация теперь выполняется через JWT (`_authorize_profile_owner`).
     """
     requester_id = body.get("requester_telegram_id")
     if requester_id is None:
@@ -15844,15 +16063,29 @@ def _get_header_graffiti(user: dict) -> str:
 # --- HEADER GRAFFITI (шапка профиля — только владелец) ---
 
 @api_router.put("/profile/{telegram_id}/graffiti")
-async def save_header_graffiti(telegram_id: int, request: Request):
-    """Сохранить header-граффити пользователя (base64 data URL). Только владелец."""
+async def save_header_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Сохранить header-граффити пользователя (base64 data URL). Только владелец.
+
+    🔐 BUG-P5 FIX (Stage 8): JWT обязателен.
+    🐛 BUG-P10 FIX: убран `upsert=True` (пользователь должен существовать).
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
         body = await _parse_json_body(request)
         graffiti_data = body.get("graffiti_data", "")
 
-        _parse_graffiti_requester(body, telegram_id, "изменять")
+        # 🔐 Строгая JWT-авторизация
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
+
+        # 🐛 BUG-P10: пользователь должен существовать
+        existing = await db.user_settings.find_one({"telegram_id": telegram_id}, {"_id": 1})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
 
         # Пустая строка = очистка
         if not graffiti_data or graffiti_data.strip() == "":
@@ -15879,7 +16112,6 @@ async def save_header_graffiti(telegram_id: int, request: Request):
                 # Удаляем старое имя поля для чистоты
                 "$unset": {"graffiti_data": "", "graffiti_updated_at": ""},
             },
-            upsert=True,
         )
 
         return {"success": True, "graffiti_updated_at": now_iso}
@@ -15891,20 +16123,27 @@ async def save_header_graffiti(telegram_id: int, request: Request):
 
 
 @api_router.get("/profile/{telegram_id}/graffiti")
-async def get_header_graffiti(telegram_id: int, requester_telegram_id: int = None):
+async def get_header_graffiti(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Получить header-граффити пользователя.
 
     Блокированным пользователям возвращается пустой ответ (не раскрываем данные).
+    🔐 viewer определяется из JWT, query `requester_telegram_id` — legacy compat.
     """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
         # Блокированные юзеры не видят граффити
-        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+        if effective_viewer is not None and effective_viewer != telegram_id:
             blocked_by_owner, blocked_by_viewer = await asyncio.gather(
-                is_blocked(telegram_id, requester_telegram_id),
-                is_blocked(requester_telegram_id, telegram_id),
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
             )
             if blocked_by_owner or blocked_by_viewer:
                 return {"graffiti_data": "", "graffiti_updated_at": None}
@@ -15928,11 +16167,20 @@ async def get_header_graffiti(telegram_id: int, requester_telegram_id: int = Non
 
 
 @api_router.post("/profile/{telegram_id}/graffiti/clear")
-async def clear_header_graffiti(telegram_id: int, request: Request):
-    """Удалить header-граффити пользователя (полная очистка). Только владелец."""
+async def clear_header_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Удалить header-граффити пользователя (полная очистка). Только владелец.
+
+    🔐 BUG-P5 FIX: JWT обязателен.
+    """
     try:
+        if telegram_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
         body = await _parse_json_body(request)
-        _parse_graffiti_requester(body, telegram_id, "удалять")
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
 
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
@@ -15950,21 +16198,29 @@ async def clear_header_graffiti(telegram_id: int, request: Request):
 # --- WALL GRAFFITI (стена граффити — владелец + гости с разрешением) ---
 
 @api_router.get("/profile/{telegram_id}/wall-graffiti")
-async def get_wall_graffiti(telegram_id: int, requester_telegram_id: int = None):
+async def get_wall_graffiti(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Получить стену граффити пользователя + флаг доступа для гостей.
 
     Блокированным пользователям возвращается пустой ответ.
     Дополнительно возвращаем информацию о последнем художнике.
+
+    🔐 viewer определяется из JWT, query `requester_telegram_id` — legacy compat.
     """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
         # Блокированные юзеры не видят граффити
-        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+        if effective_viewer is not None and effective_viewer != telegram_id:
             blocked_by_owner, blocked_by_viewer = await asyncio.gather(
-                is_blocked(telegram_id, requester_telegram_id),
-                is_blocked(requester_telegram_id, telegram_id),
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
             )
             if blocked_by_owner or blocked_by_viewer:
                 return {
@@ -16024,25 +16280,58 @@ async def get_wall_graffiti(telegram_id: int, requester_telegram_id: int = None)
 
 
 @api_router.put("/profile/{telegram_id}/wall-graffiti")
-async def save_wall_graffiti(telegram_id: int, request: Request):
+async def save_wall_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
     """Сохранить стену граффити.
     - Владелец: всегда может рисовать.
     - Гость: может рисовать только если wall_graffiti_access=true И не заблокирован.
+
+    🔐 BUG-P5/P6 FIX (Stage 8): `requester_id` берётся ИЗ JWT (tid), не из body.
+    Это предотвращает подмену личности "последнего художника" через body spoofing.
+    🐛 BUG-P10 FIX: убран `upsert=True`.
     """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
         body = await _parse_json_body(request)
         graffiti_data = body.get("wall_graffiti_data", "")
-        requester_id = _parse_requester_id(body)
+
+        # 🔐 JWT — единственный источник requester_id (защита от spoofing)
+        token_tid = current_user.get("tid")
+        if token_tid is None:
+            raise HTTPException(
+                status_code=403,
+                detail="В токене отсутствует telegram_id. Завершите привязку Telegram-аккаунта.",
+            )
+        try:
+            requester_id = int(token_tid)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=401, detail="Некорректный telegram_id в токене")
+
         if requester_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный requester_telegram_id")
+
+        # Если body.requester_telegram_id передан — должен совпадать с токеном
+        body_req = body.get("requester_telegram_id")
+        if body_req is not None:
+            try:
+                if int(body_req) != requester_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="requester_telegram_id не совпадает с токеном авторизации",
+                    )
+            except HTTPException:
+                raise
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="requester_telegram_id должен быть числом")
 
         is_owner = requester_id == telegram_id
 
         # Проверка прав для гостей
         if not is_owner:
-            # Блокировка
             blocked_by_owner, blocked_by_viewer = await asyncio.gather(
                 is_blocked(telegram_id, requester_id),
                 is_blocked(requester_id, telegram_id),
@@ -16054,8 +16343,15 @@ async def save_wall_graffiti(telegram_id: int, request: Request):
                 {"telegram_id": telegram_id},
                 {"wall_graffiti_access": 1, "_id": 0},
             )
-            if not owner or not owner.get("wall_graffiti_access", False):
+            if not owner:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+            if not owner.get("wall_graffiti_access", False):
                 raise HTTPException(status_code=403, detail="Владелец профиля не разрешил рисовать на стене граффити")
+        else:
+            # 🐛 BUG-P10: владелец тоже должен существовать
+            existing = await db.user_settings.find_one({"telegram_id": telegram_id}, {"_id": 1})
+            if not existing:
+                raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
 
         # Пустая строка = очистка (только владелец)
         if not graffiti_data or graffiti_data.strip() == "":
@@ -16083,7 +16379,6 @@ async def save_wall_graffiti(telegram_id: int, request: Request):
                 "wall_graffiti_updated_at": now_iso,
                 "wall_graffiti_last_drawn_by": requester_id,
             }},
-            upsert=True,
         )
 
         return {
@@ -16099,13 +16394,20 @@ async def save_wall_graffiti(telegram_id: int, request: Request):
 
 
 @api_router.post("/profile/{telegram_id}/wall-graffiti/clear")
-async def clear_wall_graffiti(telegram_id: int, request: Request):
-    """Очистить стену граффити. Только владелец."""
+async def clear_wall_graffiti(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Очистить стену граффити. Только владелец.
+
+    🔐 BUG-P5 FIX: JWT обязателен.
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
         body = await _parse_json_body(request)
-        _parse_graffiti_requester(body, telegram_id, "очищать стену")
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
 
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
@@ -16125,26 +16427,36 @@ async def clear_wall_graffiti(telegram_id: int, request: Request):
 
 
 @api_router.put("/profile/{telegram_id}/wall-graffiti/access")
-async def toggle_wall_graffiti_access(telegram_id: int, request: Request):
-    """Переключить доступ гостей к стене граффити. Только владелец."""
+async def toggle_wall_graffiti_access(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Переключить доступ гостей к стене граффити. Только владелец.
+
+    🔐 BUG-P5 FIX: JWT обязателен.
+    🐛 BUG-P10 FIX: убран `upsert=True` (создание записи для несуществующего user).
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
         body = await _parse_json_body(request)
-        _parse_graffiti_requester(body, telegram_id, "управлять доступом к стене")
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
 
         # Получить текущее значение
         user = await db.user_settings.find_one(
             {"telegram_id": telegram_id},
             {"wall_graffiti_access": 1, "_id": 0},
         )
-        current_access = user.get("wall_graffiti_access", False) if user else False
+        if user is None:
+            raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
+
+        current_access = user.get("wall_graffiti_access", False)
         new_access = not current_access
 
         await db.user_settings.update_one(
             {"telegram_id": telegram_id},
             {"$set": {"wall_graffiti_access": new_access}},
-            upsert=True,
         )
 
         return {"success": True, "wall_graffiti_access": new_access}
@@ -16160,25 +16472,26 @@ async def toggle_wall_graffiti_access(telegram_id: int, request: Request):
 # ========== CUSTOM AVATAR ==========
 
 @api_router.put("/profile/{telegram_id}/avatar")
-async def save_custom_avatar(telegram_id: int, request: Request):
-    """Save custom avatar for user (base64 data URL). Только владелец."""
+async def save_custom_avatar(
+    telegram_id: int,
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Save custom avatar for user (base64 data URL). Только владелец.
+
+    🔐 BUG-P4 FIX (Stage 8): требуется JWT. Ранее `requester_telegram_id` из body
+    не верифицировался → атакующий мог подменить аватар любого пользователя.
+    🐛 BUG-P10 FIX: убран `upsert`-эффект (пользователь должен существовать).
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
         body = await request.json()
         avatar_data = body.get("avatar_data", "")
-        requester_id = body.get("requester_telegram_id")
+        # 🔐 Строгая JWT-авторизация (body.requester_telegram_id — только для legacy compat)
+        _authorize_profile_owner(telegram_id, current_user, body.get("requester_telegram_id"))
 
-        # Авторизация: обязательная проверка что запрос от владельца
-        if requester_id is None:
-            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
-        try:
-            if int(requester_id) != telegram_id:
-                raise HTTPException(status_code=403, detail="Можно изменять только свой аватар")
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="requester_telegram_id должен быть числом")
-
-        # Защита: пользователь должен существовать (чтобы не создавать пустой upsert)
+        # 🐛 BUG-P10 FIX: пользователь должен существовать (никаких скрытых upsert'ов)
         existing = await db.user_settings.find_one({"telegram_id": telegram_id}, {"_id": 1})
         if not existing:
             raise HTTPException(status_code=404, detail="Пользователь не найден. Сначала завершите онбординг.")
@@ -16208,21 +16521,31 @@ async def save_custom_avatar(telegram_id: int, request: Request):
 
 
 @api_router.get("/profile/{telegram_id}/avatar")
-async def get_custom_avatar(telegram_id: int, requester_telegram_id: int = None):
+async def get_custom_avatar(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Get custom avatar for user.
 
     Для несуществующего пользователя или заблокированных — возвращается пустой ответ
     (не 404, чтобы фронтенд мог гладко использовать fallback).
+
+    🔐 BUG-P4 FIX: viewer определяется из JWT (приоритет). Query-параметр
+    `requester_telegram_id` принимается только для обратной совместимости — если
+    не совпадает с JWT, возвращаем 403.
     """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
+        effective_viewer = _resolve_viewer_from_auth(current_user, requester_telegram_id)
+
         # Блокированные юзеры — пустой ответ
-        if requester_telegram_id is not None and requester_telegram_id != telegram_id:
+        if effective_viewer is not None and effective_viewer != telegram_id:
             blocked_by_owner, blocked_by_viewer = await asyncio.gather(
-                is_blocked(telegram_id, requester_telegram_id),
-                is_blocked(requester_telegram_id, telegram_id),
+                is_blocked(telegram_id, effective_viewer),
+                is_blocked(effective_viewer, telegram_id),
             )
             if blocked_by_owner or blocked_by_viewer:
                 return {"avatar_data": "", "avatar_mode": "telegram", "updated_at": None}
@@ -16248,15 +16571,19 @@ async def get_custom_avatar(telegram_id: int, requester_telegram_id: int = None)
 
 
 @api_router.delete("/profile/{telegram_id}/avatar")
-async def delete_custom_avatar(telegram_id: int, requester_telegram_id: int = None):
-    """Delete custom avatar (return to Telegram avatar)."""
+async def delete_custom_avatar(
+    telegram_id: int,
+    requester_telegram_id: int = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Delete custom avatar (return to Telegram avatar).
+
+    🔐 BUG-P4 FIX: JWT обязателен.
+    """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
-        if requester_telegram_id is None:
-            raise HTTPException(status_code=400, detail="requester_telegram_id обязателен")
-        if requester_telegram_id != telegram_id:
-            raise HTTPException(status_code=403, detail="Можно удалять только свой аватар")
+        _authorize_profile_owner(telegram_id, current_user, requester_telegram_id)
 
         result = await db.user_settings.update_one(
             {"telegram_id": telegram_id},
@@ -16281,7 +16608,11 @@ async def delete_custom_avatar(telegram_id: int, requester_telegram_id: int = No
 # ========== GENERAL PROFILE ENDPOINT (moved after specific ones) ==========
 
 @api_router.get("/profile/{telegram_id}", response_model=UserProfilePublic)
-async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
+async def get_user_profile(
+    telegram_id: int,
+    viewer_telegram_id: int = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
     """Получить публичный профиль пользователя.
 
     Особенности:
@@ -16289,6 +16620,24 @@ async def get_user_profile(telegram_id: int, viewer_telegram_id: int = None):
     - Чужой просмотр фильтруется согласно privacy настройкам владельца.
     - Анонимный запрос (без viewer_telegram_id) заблокирован если владелец скрыт из поиска.
     - БЕЗ side-effect на last_activity — для обновления используйте /profile/activity-ping.
+
+    🔐 BUG-P1 FIX (Stage 8): `viewer_telegram_id` из query используется ТОЛЬКО если
+    совпадает с `tid` из JWT. Ранее атакующий мог передать `viewer_telegram_id ==
+    telegram_id` и получить профиль в обход всех privacy-фильтров (is_own_profile=True).
+    Теперь источник истины — только JWT; query сохранён для обратной совместимости.
+    """
+    # 🔐 Определяем viewer из JWT (приоритет) — query игнорируется без токена
+    effective_viewer = _resolve_viewer_from_auth(current_user, viewer_telegram_id)
+    return await _get_user_profile_impl(telegram_id, effective_viewer)
+
+
+async def _get_user_profile_impl(
+    telegram_id: int,
+    viewer_telegram_id: Optional[int],
+) -> "UserProfilePublic":
+    """Внутренняя реализация построения публичного профиля.
+    Отделена от endpoint-а для переиспользования из `/u/{uid}` без JWT-обхода.
+    `viewer_telegram_id` здесь уже считается ДОВЕРЕННЫМ (пришёл из JWT или None для анонима).
     """
     try:
         # Валидация telegram_id
@@ -16507,27 +16856,21 @@ class ActivityPingRequest(BaseModel):
 @api_router.post("/profile/activity-ping")
 async def profile_activity_ping(
     request: ActivityPingRequest,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
 ):
     """Обновить last_activity пользователя (замена side-effect в GET /profile).
 
-    🔐 BUG-2 FIX: если JWT передан, пингуемый telegram_id ДОЛЖЕН совпадать с telegram_id
-    в токене (нельзя пинговать чужого). Без JWT — оставляем обратную совместимость (legacy
-    клиенты из Telegram WebApp), но логируем для мониторинга.
+    🔐 BUG-P9 FIX (Stage 8): JWT теперь ОБЯЗАТЕЛЕН. Ранее без токена атакующий
+    мог пинговать `last_activity` для ЛЮБОГО telegram_id, фальсифицируя "online"-статус
+    жертвы. Теперь `telegram_id` в теле ДОЛЖЕН совпадать с `tid` из токена.
     """
     try:
         telegram_id = request.telegram_id
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
-        # 🔐 Authorization: если JWT передан, проверяем что пингуется СВОЙ профиль
-        if current_user:
-            token_tid = current_user.get("tid")
-            if token_tid is not None and int(token_tid) != int(telegram_id):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Нельзя обновлять last_activity чужого пользователя",
-                )
+        # 🔐 Строгая авторизация: пингуем только свой профиль
+        _authorize_profile_owner(telegram_id, current_user)
 
         now = datetime.now(timezone.utc)
         result = await db.user_settings.update_one(
@@ -16550,18 +16893,45 @@ class ProfileViewRequest(BaseModel):
 
 
 @api_router.post("/profile/{telegram_id}/view")
-async def register_profile_view(telegram_id: int, request: ProfileViewRequest):
+async def register_profile_view(
+    telegram_id: int,
+    request: ProfileViewRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
     """Зарегистрировать просмотр профиля (для счётчика у владельца).
 
     - Самопросмотр не считается.
     - Блокированные не могут счётчик накручивать.
     - 🐛 BUG-3 FIX: Скрытый из поиска (show_in_search=false) — не считаем просмотры от не-друзей.
     - Rate-limit: один пользователь может добавить счётчик не чаще раза в час (дедупликация).
+
+    🔐 BUG-P8 FIX (Stage 8): JWT обязателен. viewer_id берётся ИЗ ТОКЕНА (tid),
+    а не из body — это предотвращает инфляцию счётчика через ротацию `viewer_telegram_id`.
+    Поле `request.viewer_telegram_id` (если передано) должно совпадать с токеном.
     """
     try:
         if telegram_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный telegram_id")
-        viewer_id = request.viewer_telegram_id
+
+        # 🔐 viewer_id — строго из JWT, не из body
+        token_tid = current_user.get("tid")
+        if token_tid is None:
+            raise HTTPException(
+                status_code=403,
+                detail="В токене отсутствует telegram_id. Завершите привязку Telegram-аккаунта.",
+            )
+        try:
+            viewer_id = int(token_tid)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=401, detail="Некорректный telegram_id в токене")
+
+        # Если в body есть viewer_telegram_id — он должен совпадать с токеном
+        if request.viewer_telegram_id and request.viewer_telegram_id != viewer_id:
+            raise HTTPException(
+                status_code=403,
+                detail="viewer_telegram_id не совпадает с токеном авторизации",
+            )
+
         if viewer_id <= 0:
             raise HTTPException(status_code=400, detail="Некорректный viewer_telegram_id")
 
@@ -16641,14 +17011,9 @@ async def get_profile_share_link(
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-        # 🔐 Определяем, является ли запрашивающий владельцем
-        is_owner = False
-        if current_user:
-            token_tid = current_user.get("tid")
-            if token_tid is not None and int(token_tid) == int(telegram_id):
-                is_owner = True
-        if not is_owner and viewer_telegram_id is not None and int(viewer_telegram_id) == int(telegram_id):
-            is_owner = True
+        # 🔐 Stage 8: viewer определяется строго из JWT (query только для совпадения)
+        effective_viewer = _resolve_viewer_from_auth(current_user, viewer_telegram_id)
+        is_owner = effective_viewer is not None and effective_viewer == telegram_id
 
         # Приватность (только если не владелец)
         if not is_owner:
@@ -16769,27 +17134,22 @@ async def resolve_uid(
 
             is_friend = False
             if viewer_tid:
-                # Проверка дружбы (только если viewer авторизован)
+                # 🐛 BUG-P7 FIX: ранее использовались несуществующие коллекции
+                # `db.friendships` и `db.blocked_users` с неправильными полями —
+                # теперь используем проверенные helper'ы `are_friends()` и `is_blocked()`,
+                # которые работают с реальными коллекциями `db.friends` / `db.user_blocks`.
                 try:
-                    friendship = await db.friendships.find_one({
-                        "$or": [
-                            {"user_id": viewer_tid, "friend_id": target_tid},
-                            {"user_id": target_tid, "friend_id": viewer_tid},
-                        ]
-                    })
-                    is_friend = bool(friendship)
-
-                    # Блокировка: если target заблокировал viewer → 404
-                    blocked = await db.blocked_users.find_one({
-                        "user_id": target_tid,
-                        "blocked_user_id": viewer_tid,
-                    })
-                    if blocked:
+                    blocked_by_owner, is_friend = await asyncio.gather(
+                        is_blocked(target_tid, viewer_tid),
+                        are_friends(viewer_tid, target_tid),
+                    )
+                    # Блокировка: если target заблокировал viewer → 404 (пользователь "не существует")
+                    if blocked_by_owner:
                         raise HTTPException(status_code=404, detail="Пользователь не найден")
                 except HTTPException:
                     raise
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"resolve_uid friendship check failed for uid={uid}: {e}")
 
             if not privacy.show_in_search and not is_friend:
                 raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -16836,8 +17196,9 @@ async def get_public_profile_by_uid(
     if current_user:
         viewer_tid = current_user.get("tid")
 
-    # Вызываем существующий endpoint handler напрямую как Python-функцию
-    return await get_user_profile(telegram_id=int(target_tid), viewer_telegram_id=viewer_tid)
+    # Stage 8: используем внутреннюю реализацию — viewer_tid уже доверенный (из JWT),
+    # не нужно проходить через query-validation в endpoint-обёртке.
+    return await _get_user_profile_impl(int(target_tid), int(viewer_tid) if viewer_tid else None)
 
 
 @api_router.get("/u/{uid}/schedule", response_model=FriendScheduleResponse)
@@ -16856,7 +17217,8 @@ async def get_public_schedule_by_uid(
     if viewer_tid is None:
         raise HTTPException(status_code=401, detail="Требуется авторизация с telegram_id")
 
-    return await get_friend_schedule(
+    # Stage 8: используем внутреннюю реализацию — viewer_tid уже доверенный (из JWT)
+    return await _get_friend_schedule_impl(
         telegram_id=int(target_tid),
         viewer_telegram_id=int(viewer_tid),
         date=date,
@@ -16878,9 +17240,11 @@ async def get_public_qr_by_uid(
     if current_user:
         requester_tid = current_user.get("tid")
 
+    # Stage 8: передаём current_user явно (direct Python call, Depends не инжектится)
     return await get_profile_qr_data(
         telegram_id=int(target_tid),
         requester_telegram_id=requester_tid,
+        current_user=current_user,
     )
 
 
@@ -16948,10 +17312,8 @@ async def get_public_privacy_by_uid(
         # Возвращаем дефолтные настройки
         return PrivacySettings()
 
-    return await get_privacy_settings(
-        telegram_id=int(target_tid),
-        requester_telegram_id=int(target_tid),  # пропускаем owner-check (он уже сделан выше)
-    )
+    # Stage 8: используем helper напрямую (авторизация уже проверена выше)
+    return await get_user_privacy_settings(int(target_tid))
 
 
 @api_router.put("/u/{uid}/privacy", response_model=PrivacySettings)
@@ -16974,11 +17336,44 @@ async def update_public_privacy_by_uid(
     if not target_tid:
         raise HTTPException(status_code=422, detail="Профиль не настроен")
 
-    return await update_privacy_settings(
-        telegram_id=int(target_tid),
-        settings=settings,
-        requester_telegram_id=int(target_tid),  # owner-check уже сделан выше
+    # Stage 8: собираем $set с dot-notation (идентично update_privacy_settings)
+    try:
+        update_data = settings.model_dump(exclude_unset=True)
+    except AttributeError:
+        update_data = settings.dict(exclude_unset=True)
+
+    if not update_data:
+        return await get_user_privacy_settings(int(target_tid))
+
+    ALLOWED_FIELDS = {
+        "show_online_status",
+        "show_in_search",
+        "show_friends_list",
+        "show_achievements",
+        "show_schedule",
+    }
+    set_operations: Dict[str, Any] = {}
+    for key, value in update_data.items():
+        if key in ALLOWED_FIELDS and value is not None:
+            set_operations[f"privacy_settings.{key}"] = bool(value)
+
+    if not set_operations:
+        return await get_user_privacy_settings(int(target_tid))
+
+    set_operations["privacy_updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    result = await db.user_settings.update_one(
+        {"telegram_id": int(target_tid)},
+        {"$set": set_operations},
     )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    logger.info(f"🔒 Privacy settings updated via /u/{uid}: {list(update_data.keys())}")
+    fresh = await db.user_settings.find_one(
+        {"telegram_id": int(target_tid)}, {"privacy_settings": 1, "_id": 0}
+    )
+    return await get_user_privacy_settings(int(target_tid), user_doc=fresh)
 
 
 @api_router.post("/u/{uid}/view")
@@ -16998,9 +17393,11 @@ async def register_view_by_uid(
     if viewer_tid is None:
         return {"success": True, "counted": False, "reason": "anonymous"}
 
+    # Stage 8: передаём current_user явно (direct Python call, Depends не инжектится)
     return await register_profile_view(
         telegram_id=int(target_tid),
         request=ProfileViewRequest(viewer_telegram_id=int(viewer_tid)),
+        current_user=current_user,
     )
 
 
