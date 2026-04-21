@@ -518,6 +518,7 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
                   alt="Profile"
                   className="absolute inset-0 w-full h-full object-cover"
                   style={{ opacity: imgLoaded ? 1 : 0 }}
+                  referrerPolicy="no-referrer"
                   onLoad={() => setImgLoaded(true)}
                   onError={() => {}}
                 />

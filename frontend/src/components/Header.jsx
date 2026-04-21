@@ -22,29 +22,49 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
   const photoLoadedRef = useRef(false);
 
   // Загрузка фото профиля пользователя
+  // Приоритет:
+  //   1. user.photo_url — если уже есть в auth-профиле (VK / Email / Telegram Login Widget)
+  //   2. Telegram Bot API proxy — fallback только для Telegram-пользователей
+  //      (pseudo_tid от VK/Email в боте не существует → прокси всегда вернёт 404)
   useEffect(() => {
     const loadProfilePhoto = async () => {
-      if (user?.id && !photoLoadedRef.current) {
-        setPhotoLoading(true);
+      if (!user?.id || photoLoadedRef.current) return;
+
+      // 1. Фото уже пришло из auth-контекста (VK / Email / TG Login Widget)
+      if (user.photo_url) {
+        setProfilePhoto(user.photo_url);
         setPhotoError(false);
-        try {
-          const photoUrl = await botAPI.getUserProfilePhoto(user.id);
-          if (photoUrl) {
-            setProfilePhoto(photoUrl);
-            photoLoadedRef.current = true;
-          } else {
-            setPhotoError(true);
-          }
-        } catch (error) {
+        photoLoadedRef.current = true;
+        return;
+      }
+
+      // 2. Fallback: тянем через прокси Telegram-бота.
+      //    Для VK/Email pseudo_tid (>= 10^10) пропускаем — бот не знает такого юзера.
+      const PSEUDO_TID_OFFSET = 10_000_000_000;
+      if (Number(user.id) >= PSEUDO_TID_OFFSET) {
+        setPhotoError(true);
+        return;
+      }
+
+      setPhotoLoading(true);
+      setPhotoError(false);
+      try {
+        const photoUrl = await botAPI.getUserProfilePhoto(user.id);
+        if (photoUrl) {
+          setProfilePhoto(photoUrl);
+          photoLoadedRef.current = true;
+        } else {
           setPhotoError(true);
-        } finally {
-          setPhotoLoading(false);
         }
+      } catch (error) {
+        setPhotoError(true);
+      } finally {
+        setPhotoLoading(false);
       }
     };
 
     loadProfilePhoto();
-  }, [user?.id]);
+  }, [user?.id, user?.photo_url]);
 
   // Уведомляем родительский компонент о состоянии MenuModal
   useEffect(() => {
@@ -77,19 +97,30 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
   const handleProfileClick = () => {
     if (hapticFeedback) hapticFeedback('impact', 'medium');
     setIsProfileOpen(!isProfileOpen);
-    
+
     // Если фото не загрузилось, пробуем загрузить снова
     if (photoError && user?.id) {
       photoLoadedRef.current = false;
       setPhotoError(false);
       setProfilePhoto(null);
-      // Загрузка произойдёт автоматически через useEffect
-      botAPI.getUserProfilePhoto(user.id).then(url => {
-        if (url) {
-          setProfilePhoto(url);
-          photoLoadedRef.current = true;
-        }
-      });
+
+      // Если у юзера есть photo_url от VK/Email/TG — берём сразу
+      if (user.photo_url) {
+        setProfilePhoto(user.photo_url);
+        photoLoadedRef.current = true;
+        return;
+      }
+
+      // Иначе fallback на Telegram Bot API (только для реальных TG ID)
+      const PSEUDO_TID_OFFSET = 10_000_000_000;
+      if (Number(user.id) < PSEUDO_TID_OFFSET) {
+        botAPI.getUserProfilePhoto(user.id).then(url => {
+          if (url) {
+            setProfilePhoto(url);
+            photoLoadedRef.current = true;
+          }
+        });
+      }
     }
   };
 
@@ -458,6 +489,7 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
                   alt="" 
                   className="absolute inset-0 w-full h-full object-cover rounded-full z-20"
                   style={{ objectPosition: 'center' }}
+                  referrerPolicy="no-referrer"
                   onLoad={(e) => { e.target.style.opacity = '1'; }}
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
