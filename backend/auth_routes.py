@@ -426,10 +426,19 @@ async def _issue_token(
     suggested_username_taken: Optional[str] = None,
     request: Optional[Request] = None,
 ) -> AuthTokenResponse:
-    """Генерирует JWT для пользователя и возвращает AuthTokenResponse."""
+    """Генерирует JWT для пользователя и возвращает AuthTokenResponse.
+
+    🐛 BUG-FIX (2026-04): раньше в JWT писался только реальный `telegram_id`,
+    поэтому для VK/Email-юзеров (у которых telegram_id=None) поле `tid`
+    отсутствовало вовсе. Это ломало все legacy `/profile/*` endpoints
+    (аватар, граффити, activity-ping и т.п.), потому что они проверяют
+    `current_user.tid` против pseudo_tid из URL. Теперь в JWT всегда кладём
+    `effective_tid` — реальный TG-ID если привязан, иначе pseudo_tid (10^10+uid),
+    что совпадает с тем, как фронтенд формирует `user.id` в App.jsx.
+    """
     token = create_jwt(
         uid=user_doc["uid"],
-        telegram_id=user_doc.get("telegram_id"),
+        telegram_id=effective_tid_for_user(user_doc),
         providers=user_doc.get("auth_providers", []),
     )
     if not is_new:
@@ -1174,7 +1183,7 @@ def create_auth_router(db) -> APIRouter:
             if user_doc:
                 token = create_jwt(
                     uid=user_doc["uid"],
-                    telegram_id=user_doc.get("telegram_id"),
+                    telegram_id=effective_tid_for_user(user_doc),
                     providers=user_doc.get("auth_providers", []),
                 )
                 await db.auth_qr_sessions.update_one(
