@@ -1,0 +1,56 @@
+{
+  "summary": "Stage 9 backend tests for Password Management, Email Verification, Sessions, Referral and P1 fixes. 11/15 tests pass. Two CRITICAL/HIGH bugs found: (1) Session revocation has NO effect on JWT validation — logout/logout-all/DELETE /auth/sessions/{jti} all succeed and mark DB rows revoked=true but subsequent requests with the same JWT still return 200 on /auth/me; (2) UserPublic (response of /auth/me) does NOT expose email_verified and has no access to referral/user_settings fields — user-facing spec requires email_verified visible there.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/auth/me (and ALL protected endpoints)",
+        "issue": "Session revocation is not enforced. auth_utils.get_current_user_required only calls decode_jwt() and never checks is_session_active(jti). As a result: POST /auth/logout, POST /auth/logout-all (keep_current=false), and DELETE /auth/sessions/{jti} all return 200 and flip auth_sessions.revoked=true in MongoDB, but the JWT keeps authenticating on /auth/me and every other route. make_session_dependency() exists in auth_utils.py (line 735) but is not used anywhere. Fix: either (a) add 'jti revoked' check inside get_current_user_required, or (b) replace Depends(get_current_user_required) with Depends(make_session_dependency(db)) on all protected routers. Confirmed via 4 failing tests and direct DB inspection (13 sessions with revoked=true already, yet their JWTs still work).",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "GET /api/auth/me (UserPublic response model)",
+        "issue": "models.UserPublic (models.py:2796) has no `email_verified` field, so /auth/me never surfaces it even after /auth/email/verify correctly sets users.email_verified=true in DB. Review request explicitly requires this to be visible on /me. Also missing: referral_code, invited_count, referred_by (or a nested user_settings block).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/auth/register/email",
+        "issue": "Rate limit is 5/hour/IP — strict but expected. Behaviour honours X-Forwarded-For correctly (get_client_ip). Not a bug, but easy to hit during local test runs; tests now randomise XFF to work around it."
+      },
+      {
+        "endpoint": "POST /api/auth/register/email (referral)",
+        "issue": "A newly-registered user has NO referral_code in user_settings. The code is only generated lazily on GET /api/referral/get-code. Review spec phrases it as 'user A registers → receives referral_code' which implies it should be generated at registration (or at least exposed via /me). Current behaviour forces a second round-trip. Referral processing itself (_process_referral_for_new_user) works correctly once A.user_settings.referral_code exists — verified in test."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/stage9_backend_test.py",
+    "/app/test_reports/pytest/stage9_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Wire session revocation into JWT validation. Either (a) inline is_session_active(db, jti) check inside get_current_user_required (auth_utils.py:426), or (b) replace Depends(get_current_user_required) with Depends(make_session_dependency(db)) for all auth-protected routes.",
+    "HIGH: Add `email_verified: bool = False` (and ideally referral_code/invited_count/referred_by) to models.UserPublic so GET /auth/me exposes them. Update /auth/me handler (auth_routes.py:1525) to populate these from users doc and/or user_settings.",
+    "MEDIUM: Auto-generate user_settings.referral_code during registration (register_email / register_telegram / register_vk) instead of only on /api/referral/get-code — matches spec wording and avoids extra round-trip for frontend.",
+    "Public preview URL https://rudn-server-3.preview.emergentagent.com/api/* returns HTTP 404 (Cloudflare/ingress not routing /api). Verify ingress config — tests had to use localhost:8001 directly."
+  ],
+  "critical_code_review_comments": [
+    "auth_utils.py:735 — make_session_dependency is defined but NEVER imported/used. Dead code hiding the only place where session revocation would be enforced.",
+    "auth_routes.py uses Depends(get_current_user_required) on 16+ routes including /auth/me, /auth/logout, /password/change, /sessions, etc. None of them check session.revoked.",
+    "models.UserPublic exposes email but not email_verified — inconsistent (frontend cannot render 'verified' badge without calling a second endpoint).",
+    "Referral code generation is split across server.py (generate_referral_code) and /referral/get-code handler; not invoked from auth_routes.register_* paths — guaranteed to miss brand-new users until they open the referrals screen."
+  ],
+  "updated_files": [
+    "/app/backend/tests/stage9_backend_test.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "73% (11/15)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Tests register on-the-fly: stage9_<hex>@test.com / Test1234. X-Forwarded-For randomised per request to bypass 5/hr/IP cap. SMTP_HOST='' → email bodies land in /app/logs/emails.log; reset/verify tokens extracted by regex from that file.",
+  "seed_data_creation": "~20 stage9_* users created during the run; referral test injected referral_code=T<HEX> directly into user_settings via mongosh to simulate 'A already has a code'.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "After main agent fixes (1) session-revocation enforcement and (2) UserPublic fields, re-run `pytest /app/backend/tests/stage9_backend_test.py -v` — the 4 session tests and the verification /me check should all turn green without changes. The Email SMTP DEV mode writes to /app/logs/emails.log; tokens are extracted via regex on `[?&]token=...`. Public ingress does not route /api/* (HTTP 404 from cloudflare) — use http://localhost:8001 for backend tests.",
+  "rca of the issue": "CRITICAL SESSION BUG — RCA: get_current_user_required (auth_utils.py:426-449) only runs decode_jwt(token); it never consults auth_sessions collection for jti-revocation. A companion helper make_session_dependency (auth_utils.py:735-776) was written with the correct check but is not imported or used anywhere in auth_routes.py (grep -n 'make_session_dependency' /app/backend/*.py returns only the definition). Reproduction: (a) register via /auth/register/email, (b) POST /auth/logout with the bearer token → 200, db.auth_sessions finds that jti with revoked=true, (c) GET /auth/me with the SAME bearer token → still 200. Same reproduction path for DELETE /auth/sessions/{jti} and /auth/logout-all. Mitigation: in auth_utils.get_current_user_required, after validating payload, add `if payload.get('jti') and not await is_session_active(request.app.state.db, payload['jti']): raise HTTPException(401, 'Сессия отозвана')`. Alternatively, switch each protected Depends to make_session_dependency(db)."
+}
