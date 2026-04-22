@@ -1,5 +1,15 @@
 # Test credentials
 
+## Stage 9 testing (2026-04-22)
+
+Test users created on-the-fly by testing agent:
+- Pattern: `stage9_*@test.com` / `Test1234`
+- Pattern: `stage9_retest_*@test.com` / `Test1234`
+
+SMTP DEV-mode: emails land in `/app/logs/emails.log`. Reset/verification tokens extracted by regex `[?&]token=...`.
+
+Rate-limit: register email is 5/hr/IP — use `X-Forwarded-For` header with randomized IPs during tests to bypass.
+
 ## Stage 7 testing (2026-04-20)
 
 Test users created by testing agent during Stage 7 verification:
