@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from telegram import Bot
 from telegram.error import TelegramError
 from config import get_telegram_bot_token, is_test_environment
+from auth_utils import is_real_telegram_user, is_pseudo_tid
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,14 @@ class TelegramNotificationService:
             True если уведомление отправлено успешно
         """
         try:
+            # 🛡 P0-guard: не шлём в pseudo_tid (VK/Email юзеры без real TG)
+            if not is_real_telegram_user(telegram_id):
+                logger.info(
+                    f"🟡 Skip class notification: tid={telegram_id} "
+                    f"reason={'pseudo_tid' if is_pseudo_tid(telegram_id) else 'no_tid'}"
+                )
+                return False
+
             # Формируем текст сообщения (уже содержит tg-emoji теги)
             message = self._format_class_notification(class_info, minutes_before)
             
@@ -108,6 +117,14 @@ class TelegramNotificationService:
         Отправить тестовое уведомление
         """
         try:
+            # 🛡 P0-guard
+            if not is_real_telegram_user(telegram_id):
+                logger.info(
+                    f"🟡 Skip test notification: tid={telegram_id} "
+                    f"reason={'pseudo_tid' if is_pseudo_tid(telegram_id) else 'no_tid'}"
+                )
+                return False
+
             message = (
                 '<tg-emoji emoji-id="5458603043203327669">🔔</tg-emoji>  <b>Уведомления подключены!</b>\n'
                 '<tg-emoji emoji-id="5206607081334906820">✨</tg-emoji> Отлично — теперь вы не пропустите ни одной пары.\n'
@@ -140,6 +157,14 @@ class TelegramNotificationService:
             True если сообщение отправлено успешно
         """
         try:
+            # 🛡 P0-guard
+            if not is_real_telegram_user(telegram_id):
+                logger.info(
+                    f"🟡 Skip arbitrary push: tid={telegram_id} "
+                    f"reason={'pseudo_tid' if is_pseudo_tid(telegram_id) else 'no_tid'}"
+                )
+                return False
+
             await self.bot.send_message(
                 chat_id=telegram_id,
                 text=text,

@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Импорт конфигурации с выбором токена по ENV
 from config import get_telegram_bot_token, ENV, is_test_environment
+from auth_utils import is_real_telegram_user, is_pseudo_tid
 
 # Получение переменных окружения
 TELEGRAM_BOT_TOKEN = get_telegram_bot_token()
@@ -41,7 +42,7 @@ WEB_APP_URL = "https://rudn-schedule.ru"
 logger.info(f"🚀 Telegram Bot запущен в режиме: {'TEST' if is_test_environment() else 'PRODUCTION'}")
 
 # ID администраторов (могут использовать команду /users и /clear_db)
-ADMIN_IDS = [765963392, 1311283832]
+from config import ADMIN_TELEGRAM_IDS as ADMIN_IDS  # единый источник правды
 
 # Пароль для очистки базы данных (храним в переменной окружения или здесь)
 DB_CLEAR_PASSWORD = os.getenv("DB_CLEAR_PASSWORD", "RUDN_CLEAR_2025")
@@ -159,6 +160,14 @@ async def send_device_linked_notification(
     с inline-кнопкой для удаления сеанса
     """
     try:
+        # 🛡 P0-guard: не шлём в pseudo_tid (VK/Email/QR юзеры)
+        if not is_real_telegram_user(telegram_id):
+            logger.info(
+                f"🟡 Skip device-linked TG push: tid={telegram_id} "
+                f"reason={'pseudo_tid' if is_pseudo_tid(telegram_id) else 'no_tid'}"
+            )
+            return False
+
         bot = Bot(token=TELEGRAM_BOT_TOKEN)
         
         # Формируем время в МСК
@@ -392,23 +401,30 @@ async def send_room_join_notifications(bot, room_data: dict, new_user_name: str,
     
     # Отправляем уведомление новому участнику
     try:
-        new_member_message = (
-            f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
-            f'\n'
-            f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
-            f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
-            f'\n'
-            f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
-            f'\n'
-            f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
-        )
-        
-        await bot.send_message(
-            chat_id=new_user_id,
-            text=new_member_message,
-            parse_mode='HTML'
-        )
-        logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
+        # 🛡 P0-guard: только для real TG юзеров (у pseudo_tid нет чата)
+        if not is_real_telegram_user(new_user_id):
+            logger.info(
+                f"🟡 Skip room-welcome TG push: tid={new_user_id} "
+                f"reason={'pseudo_tid' if is_pseudo_tid(new_user_id) else 'no_tid'}"
+            )
+        else:
+            new_member_message = (
+                f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
+                f'\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
+                f'\n'
+                f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
+                f'\n'
+                f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
+            )
+
+            await bot.send_message(
+                chat_id=new_user_id,
+                text=new_member_message,
+                parse_mode='HTML'
+            )
+            logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
     except Exception as e:
         logger.warning(f"⚠️ Не удалось отправить уведомление новому участнику {new_user_id}: {e}")
     
@@ -419,7 +435,15 @@ async def send_room_join_notifications(bot, room_data: dict, new_user_name: str,
         # Пропускаем нового участника
         if participant_id == new_user_id:
             continue
-        
+
+        # 🛡 P0-guard: пропускаем pseudo_tid (VK/Email юзеры — им только in-app)
+        if not is_real_telegram_user(participant_id):
+            logger.info(
+                f"🟡 Skip room-newmember TG push to participant: tid={participant_id} "
+                f"reason={'pseudo_tid' if is_pseudo_tid(participant_id) else 'no_tid'}"
+            )
+            continue
+
         try:
             existing_member_message = (
                 f'<tg-emoji emoji-id="5170203290721321766">👋</tg-emoji> <b>Новый участник в комнате!</b>\n'
@@ -741,19 +765,26 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                     
                     # Уведомляем пригласившего (опционально)
                     try:
-                        from telegram import Bot
-                        bot = Bot(token=TELEGRAM_BOT_TOKEN)
-                        referrer_name = f"{first_name} {last_name}".strip()
-                        await bot.send_message(
-                            chat_id=referrer_id,
-                            text=(
-                                f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji>  <b>Новый реферал!</b>\n'
-                                f'{referrer_name} присоединился по вашей пригласительной ссылке.\n'
-                                f'<tg-emoji emoji-id="5325521342643064145">💰</tg-emoji> Начислено: <b>+{bonus_points} баллов</b>\n'
-                                f'Приглашайте друзей — получайте бонусы!'
-                            ),
-                            parse_mode='HTML'
-                        )
+                        # 🛡 P0-guard: реферер может быть pseudo_tid (VK/Email)
+                        if not is_real_telegram_user(referrer_id):
+                            logger.info(
+                                f"🟡 Skip referrer bonus TG push: tid={referrer_id} "
+                                f"reason={'pseudo_tid' if is_pseudo_tid(referrer_id) else 'no_tid'}"
+                            )
+                        else:
+                            from telegram import Bot
+                            bot = Bot(token=TELEGRAM_BOT_TOKEN)
+                            referrer_name = f"{first_name} {last_name}".strip()
+                            await bot.send_message(
+                                chat_id=referrer_id,
+                                text=(
+                                    f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji>  <b>Новый реферал!</b>\n'
+                                    f'{referrer_name} присоединился по вашей пригласительной ссылке.\n'
+                                    f'<tg-emoji emoji-id="5325521342643064145">💰</tg-emoji> Начислено: <b>+{bonus_points} баллов</b>\n'
+                                    f'Приглашайте друзей — получайте бонусы!'
+                                ),
+                                parse_mode='HTML'
+                            )
                     except Exception as e:
                         logger.warning(f"Не удалось отправить уведомление пригласившему: {e}")
                 else:

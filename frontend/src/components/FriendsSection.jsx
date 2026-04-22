@@ -21,9 +21,7 @@ import FriendProfileModal from './FriendProfileModal';
 import FriendSearchModal from './FriendSearchModal';
 import ChatModal from './ChatModal';
 import { getBackendURL } from '../utils/config';
-
-// Админ IDs
-const ADMIN_UIDS = ['765963392', '1311283832'];
+import { useIsAdmin } from '../hooks/useIsAdmin';
 
 // Все доступные dev-команды с описаниями
 const DEV_COMMANDS = [
@@ -186,20 +184,23 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
   const [devCommandLoading, setDevCommandLoading] = useState(false);
   const [devCommandHistory, setDevCommandHistory] = useState([]);
   
-  // Проверка на админа — ТОЛЬКО в Telegram WebApp
-  // В веб-версии (браузер) dev-команды доступны без проверки
+  // Проверка на админа — через backend (/api/auth/me/is_admin).
+  // Единый источник правды: для VK/Email/QR юзеров со связанным admin-TG
+  // возвращает true; для Telegram — сверяется с config.ADMIN_TELEGRAM_IDS.
+  // В веб-версии (не в Telegram WebApp) dev-команды также доступны (legacy).
+  const { isAdmin: isBackendAdmin } = useIsAdmin();
   const isDevAdmin = useMemo(() => {
     const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
     const isTelegramWebApp = !!tgUser;
-    
+
     if (isTelegramWebApp) {
-      // В Telegram WebApp — проверяем admin ID
-      return ADMIN_UIDS.includes(String(tgUser.id));
+      // В Telegram WebApp — бэкенд-проверка (устойчиво к pseudo_tid при линковке)
+      return isBackendAdmin;
     }
-    
-    // В веб-версии (не Telegram) — доступно всем
+
+    // В веб-версии (не Telegram) — доступно всем (как раньше)
     return true;
-  }, [user?.id]);
+  }, [isBackendAdmin]);
   
   // Определяем, является ли текущий ввод dev-командой
   const isDevCommand = useMemo(() => {

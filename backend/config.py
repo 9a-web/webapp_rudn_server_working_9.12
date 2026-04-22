@@ -21,6 +21,53 @@ ENV = os.getenv("ENV", "test").lower()
 PRODUCTION_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TEST_BOT_TOKEN = os.getenv("TEST_TELEGRAM_BOT_TOKEN")
 
+# ──────────────────────────────────────────────────────────────────────────
+# Администраторы
+# ──────────────────────────────────────────────────────────────────────────
+# Перечень Telegram ID пользователей с правами администратора.
+# Источник истины: ENV var `ADMIN_TELEGRAM_IDS` (csv: "765963392,1311283832").
+# Если ENV не задана — используются hard-coded значения (для безопасного
+# дефолта на staging / локалке).
+_ADMIN_IDS_DEFAULT = [765963392, 1311283832]
+
+def _parse_admin_ids() -> list[int]:
+    raw = os.getenv("ADMIN_TELEGRAM_IDS", "").strip()
+    if not raw:
+        return list(_ADMIN_IDS_DEFAULT)
+    out: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            logger.warning(f"ADMIN_TELEGRAM_IDS: пропущен некорректный id={part!r}")
+    return out or list(_ADMIN_IDS_DEFAULT)
+
+ADMIN_TELEGRAM_IDS: list[int] = _parse_admin_ids()
+
+
+def is_admin_telegram_id(telegram_id) -> bool:
+    """True если данный telegram_id имеет права администратора.
+    Принимает int / str / None.
+    """
+    if telegram_id is None:
+        return False
+    try:
+        return int(telegram_id) in ADMIN_TELEGRAM_IDS
+    except (TypeError, ValueError):
+        return False
+
+
+def is_admin_user(user_doc: dict | None) -> bool:
+    """True если пользователь — админ (по его telegram_id в users)."""
+    if not user_doc:
+        return False
+    tid = user_doc.get("telegram_id")
+    return is_admin_telegram_id(tid)
+
+
 
 def get_telegram_bot_token() -> str:
     """

@@ -278,6 +278,8 @@ from auth_routes import create_auth_router, migrate_user_settings_to_users, migr
 from auth_utils import (
     get_current_user_required,
     get_current_user_optional,
+    is_real_telegram_user,
+    is_pseudo_tid,
 )
 from achievements import (
     get_all_achievements,
@@ -1775,7 +1777,7 @@ async def get_user_daily_xp(telegram_id: int):
 
 # ============ Dev-команды (админ-панель в поиске) ============
 
-ADMIN_IDS = [765963392, 1311283832]
+from config import ADMIN_TELEGRAM_IDS as ADMIN_IDS  # единый источник правды
 
 def _check_admin(telegram_id: int):
     """Проверка на админа"""
@@ -4739,23 +4741,30 @@ async def send_room_join_notifications_api(room_doc: dict, new_user_name: str, n
         
         # Отправляем уведомление новому участнику
         try:
-            new_member_message = (
-                f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
-                f'\n'
-                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
-                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
-                f'\n'
-                f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
-                f'\n'
-                f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
-            )
-            
-            await bot.send_message(
-                chat_id=new_user_id,
-                text=new_member_message,
-                parse_mode='HTML'
-            )
-            logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
+            # 🛡 P0-guard: не шлём в pseudo_tid (VK/Email юзеры)
+            if not is_real_telegram_user(new_user_id):
+                logger.info(
+                    f"🟡 Skip room-welcome TG push: tid={new_user_id} "
+                    f"reason={'pseudo_tid' if is_pseudo_tid(new_user_id) else 'no_tid'}"
+                )
+            else:
+                new_member_message = (
+                    f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
+                    f'\n'
+                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
+                    f'\n'
+                    f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
+                    f'\n'
+                    f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
+                )
+
+                await bot.send_message(
+                    chat_id=new_user_id,
+                    text=new_member_message,
+                    parse_mode='HTML'
+                )
+                logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отправить уведомление новому участнику {new_user_id}: {e}")
         
@@ -4766,7 +4775,15 @@ async def send_room_join_notifications_api(room_doc: dict, new_user_name: str, n
             # Пропускаем нового участника
             if participant_id == new_user_id:
                 continue
-            
+
+            # 🛡 P0-guard: пропускаем pseudo_tid участников
+            if not is_real_telegram_user(participant_id):
+                logger.info(
+                    f"🟡 Skip room-newmember TG push to participant: tid={participant_id} "
+                    f"reason={'pseudo_tid' if is_pseudo_tid(participant_id) else 'no_tid'}"
+                )
+                continue
+
             try:
                 existing_member_message = (
                     f'<tg-emoji emoji-id="5170203290721321766">👋</tg-emoji> <b>Новый участник в комнате!</b>\n'
@@ -20061,6 +20078,15 @@ async def send_notification_from_post(data: dict):
         
         for uid in recipient_ids:
             try:
+                # 🛡 P0-guard: пропускаем pseudo_tid
+                if not is_real_telegram_user(uid):
+                    logger.info(
+                        f"🟡 Skip admin broadcast to tid={uid} "
+                        f"reason={'pseudo_tid' if is_pseudo_tid(uid) else 'no_tid'}"
+                    )
+                    failed += 1
+                    continue
+
                 if image_url:
                     # Отправляем фото с подписью
                     await notification_svc.bot.send_photo(
@@ -20117,6 +20143,20 @@ async def send_schedule_image(
 ):
     """Отправить сгенерированное изображение расписания в ЛС бота"""
     try:
+        # 🛡 P0-guard: фича «поделиться в личку бота» работает только для
+        # пользователей с настоящим Telegram-аккаунтом. VK/Email-юзерам
+        # возвращаем 409, фронт корректно обработает и предложит другой способ.
+        if not is_real_telegram_user(telegram_id):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "telegram_required",
+                    "reason": "pseudo_tid" if is_pseudo_tid(telegram_id) else "no_tid",
+                    "message": "Эта функция доступна только при входе через Telegram. "
+                               "Зайдите в мини-приложение через бота, чтобы получить картинку в ЛС.",
+                },
+            )
+
         import base64
         import io
         from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup

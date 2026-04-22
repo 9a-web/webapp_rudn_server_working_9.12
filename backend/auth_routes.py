@@ -1574,6 +1574,28 @@ def create_auth_router(db) -> APIRouter:
         settings = await _load_user_settings(user_doc["uid"], user_doc)
         return _user_to_public(user_doc, include_email=True, settings_doc=settings)
 
+    @router.get("/me/is_admin")
+    async def me_is_admin(
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Проверка админских прав текущего юзера.
+
+        Возвращает `{"is_admin": bool, "uid": "...", "telegram_id": int|null}`.
+        Источник истины — backend (`config.is_admin_user`), чтобы VK/Email/QR
+        юзеры со связанным админским Telegram получали `True` без знания
+        списка ADMIN_TELEGRAM_IDS на фронте.
+        """
+        from config import is_admin_user as _is_admin_user  # локальный импорт для цикла
+
+        user_doc = await db.users.find_one({"uid": current_user["sub"]})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        return {
+            "is_admin": bool(_is_admin_user(user_doc)),
+            "uid": user_doc.get("uid"),
+            "telegram_id": user_doc.get("telegram_id"),
+        }
+
     # ============= /logout =============
 
     @router.post("/logout")

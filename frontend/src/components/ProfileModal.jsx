@@ -12,9 +12,7 @@ import { createWebSession, createSessionWebSocket } from '../services/webSession
 import { getBackendURL } from '../services/api';
 import { clearAllLocalAuthData } from '../utils/authStorage';
 import { fetchBotInfo } from '../utils/botInfo';
-
-// Admin UIDs для доступа к специальным функциям
-const ADMIN_UIDS = ['765963392', '1311283832'];
+import { useIsAdmin } from '../hooks/useIsAdmin';
 
 // Функция для получения корректного ФИО
 // Если full_name содержит "Персональные данные" (ошибка парсинга), 
@@ -71,11 +69,8 @@ export const ProfileModal = ({
     fetchBotInfo().then(info => setBotUsername(info.username));
   }, []);
 
-  // Проверка на админа
-  const isAdmin = useMemo(() => {
-    if (!user?.id) return false;
-    return ADMIN_UIDS.includes(String(user.id));
-  }, [user?.id]);
+  // Проверка на админа — единый backend-источник правды
+  const { isAdmin } = useIsAdmin();
 
   // Состояния для связки Telegram профиля
   const [showTelegramLink, setShowTelegramLink] = useState(false);
@@ -687,8 +682,8 @@ export const ProfileModal = ({
               </motion.div>
             )}
 
-            {/* Подключение ЛК РУДН - только для главного админа */}
-            {isTelegramUser && String(user?.id) === '765963392' && (
+            {/* Подключение ЛК РУДН - только для главных админов (isAdmin + TG-юзер) */}
+            {isTelegramUser && isAdmin && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

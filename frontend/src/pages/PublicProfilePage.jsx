@@ -29,6 +29,7 @@ import { getBackendURL } from '../utils/config';
 import { buildProfileUrl } from '../constants/publicBase';
 import { getTierConfig } from '../constants/levelConstants';
 import { useAuth } from '../contexts/AuthContext';
+import { getAvatarSeed, hashSeed, isSameUser } from '../utils/userIdentity';
 
 // ============ Helpers ============
 
@@ -44,8 +45,10 @@ const AVATAR_GRADIENTS = [
 ];
 
 const pickGradient = (seed) => {
-  const n = Math.abs(Number(seed) || 0);
-  return AVATAR_GRADIENTS[n % AVATAR_GRADIENTS.length];
+  // Используем стабильный hash от строкового seed (uid или др.) —
+  // аватар один и тот же для юзера, вошедшего через VK (pseudo_tid)
+  // и через TG (real_tid) после линковки, потому что uid не меняется.
+  return AVATAR_GRADIENTS[hashSeed(seed) % AVATAR_GRADIENTS.length];
 };
 
 const getInitials = (firstName, lastName, username) => {
@@ -304,16 +307,14 @@ const PublicProfilePage = () => {
     [profile],
   );
 
-  const avatarSeed = profile?.telegram_id || profile?.uid || uid;
+  const avatarSeed = getAvatarSeed(profile) || uid;
   const gradient = pickGradient(avatarSeed);
   const tierCfg = profile?.level ? getTierConfig(profile.tier || 'base') : null;
 
-  const isOwner = useMemo(() => {
-    if (!isAuthenticated || !currentUser || !profile) return false;
-    if (currentUser.uid && profile.uid && String(currentUser.uid) === String(profile.uid)) return true;
-    if (currentUser.telegram_id && profile.telegram_id && Number(currentUser.telegram_id) === Number(profile.telegram_id)) return true;
-    return false;
-  }, [isAuthenticated, currentUser, profile]);
+  const isOwner = useMemo(
+    () => (isAuthenticated && currentUser && profile ? isSameUser(currentUser, profile) : false),
+    [isAuthenticated, currentUser, profile],
+  );
 
   // ---- Actions ----
   const handleBack = () => {

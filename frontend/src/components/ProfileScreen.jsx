@@ -18,8 +18,7 @@ import GraffitiEditor from './GraffitiEditor';
 import WallGraffiti from './WallGraffiti';
 import { getTierColor, getTierName, getTierConfig, renderStars } from '../constants/levelConstants';
 import { buildProfileUrl } from '../constants/publicBase';
-
-const ADMIN_UIDS = ['765963392', '1311283832'];
+import { useIsAdmin } from '../hooks/useIsAdmin';
 
 const TABS = [
   { id: 'general', label: 'Общее' },
@@ -102,10 +101,9 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   }, [isOpen, initialTab]);
 
 
-  const isAdmin = useMemo(() => {
-    if (!user?.id) return false;
-    return ADMIN_UIDS.includes(String(user.id));
-  }, [user?.id]);
+  // Админский флаг — через backend (/api/auth/me/is_admin).
+  // Устойчиво к pseudo_tid для VK/Email/QR юзеров со связанным admin-TG.
+  const { isAdmin } = useIsAdmin();
 
   // Bug 9: Загрузка актуальных данных профиля с сервера
   // FIX: Убрана зависимость от showLevelUp — предотвращает рекурсию и дубли

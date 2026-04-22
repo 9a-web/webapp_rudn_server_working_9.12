@@ -15,6 +15,7 @@ from apscheduler.triggers.date import DateTrigger
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo.errors import DuplicateKeyError
 from notifications import get_notification_service
+from auth_utils import PSEUDO_TID_OFFSET, is_real_telegram_user, is_pseudo_tid
 
 logger = logging.getLogger(__name__)
 
@@ -166,9 +167,14 @@ class NotificationSchedulerV2:
             week_number = self._get_week_number(now)
             
             # Используем курсор вместо загрузки всех пользователей сразу
+            # 🛡 P0-фильтр: исключаем pseudo_tid юзеров (VK/Email/QR) — для них нет
+            # реального TG-чата, поэтому scheduled notifications бессмысленны
+            # и гарантированно упадут с `chat not found` при отправке.
+            # Real TG ids находятся в диапазоне (0, PSEUDO_TID_OFFSET).
             cursor = self.db.user_settings.find({
                 "notifications_enabled": True,
-                "group_id": {"$exists": True, "$ne": None}
+                "group_id": {"$exists": True, "$ne": None},
+                "telegram_id": {"$gt": 0, "$lt": PSEUDO_TID_OFFSET},
             })
             
             total_notifications_created = 0

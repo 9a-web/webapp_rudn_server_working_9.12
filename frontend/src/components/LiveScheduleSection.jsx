@@ -9,6 +9,7 @@ import { translateDiscipline, translateLessonType } from '../i18n/subjects';
 import { ShareScheduleModal } from './ShareScheduleModal';
 import { SharedScheduleView } from './SharedScheduleView';
 import { achievementsAPI } from '../services/api';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 
 export const LiveScheduleSection = ({ 
   selectedDate, 
@@ -67,18 +68,10 @@ export const LiveScheduleSection = ({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [sharedShareTrigger, setSharedShareTrigger] = useState(0);
   const { t, i18n } = useTranslation();
-  
-  // Debug: логируем user.id для проверки доступа к админ панели
-  useEffect(() => {
-    if (user) {
-      const isAdmin = String(user.id) === '765963392' || String(user.id) === '1311283832';
-      console.log('👤 Admin Panel Check:', { 
-        userId: user.id, 
-        userIdType: typeof user.id,
-        isAdmin 
-      });
-    }
-  }, [user]);
+
+  // Админские права — через backend, устойчиво к pseudo_tid для VK/Email юзеров
+  // со связанным admin-TG. Источник правды: ADMIN_TELEGRAM_IDS в backend/config.py.
+  const { isAdmin, loading: isAdminLoading } = useIsAdmin();
   
   // Motion values для swipe индикатора
   const x = useMotionValue(0);
@@ -680,10 +673,11 @@ export const LiveScheduleSection = ({
         )}
         {/* end of scheduleMode === 'personal' */}
         
-        {/* Admin Panel Link - показывается только для admin IDs: 765963392, 1311283832 */}
-        {user && (String(user.id) === '765963392' || String(user.id) === '1311283832') && (
+        {/* Admin Panel Link — показывается только админам (см. backend/config.py ADMIN_TELEGRAM_IDS).
+            Скрываем во время загрузки, чтобы не мерцало при первом рендере. */}
+        {!isAdminLoading && isAdmin && (
           <div className="mt-8 mb-6 text-center">
-            <p 
+            <p
               onClick={() => {
                 hapticFeedback?.('medium');
                 onAdminPanelOpen?.();
