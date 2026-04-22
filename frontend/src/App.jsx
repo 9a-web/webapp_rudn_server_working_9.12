@@ -63,6 +63,10 @@ const VKCallbackPage = lazy(() => import('./pages/VKCallbackPage'));
 const QRConfirmPage = lazy(() => import('./pages/QRConfirmPage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 const Test3DLogoPage = lazy(() => import('./pages/Test3DLogoPage'));
+// P2/P3: Password management & Email verification
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 
 const AuthLoadingFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-[#0E0E10] text-white/60 text-sm">
@@ -2661,6 +2665,9 @@ function App() {
                     <Routes>
                       <Route path="/login" element={<LoginPage />} />
                       <Route path="/register" element={<RegisterWizard />} />
+                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      <Route path="/verify-email" element={<VerifyEmailPage />} />
                       <Route path="/auth/vk/callback" element={<VKCallbackPage />} />
                       <Route path="/auth/qr/confirm" element={<QRConfirmPage />} />
                       {/* Публичный профиль по UID — БЕЗ AuthGate (Stage 4) */}

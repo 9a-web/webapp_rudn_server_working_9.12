@@ -274,7 +274,7 @@ from notifications import get_notification_service
 from scheduler import get_scheduler  # Старая система (резерв)
 from scheduler_v2 import get_scheduler_v2  # Новая улучшенная система
 from cache import cache
-from auth_routes import create_auth_router, migrate_user_settings_to_users
+from auth_routes import create_auth_router, migrate_user_settings_to_users, migrate_usernames_to_lowercase
 from auth_utils import (
     get_current_user_required,
     get_current_user_optional,
@@ -667,6 +667,18 @@ async def create_indexes():
         await safe_create_index(db.auth_events, [("uid", 1), ("ts", -1)])
         await safe_create_index(db.auth_events, [("event", 1), ("ts", -1)])
         await safe_create_index(db.auth_events, "ts", expireAfterSeconds=30 * 24 * 3600)
+
+        # P2/P3: Auth tokens (password reset, email verify) - TTL по expires_at
+        await safe_create_index(db.auth_tokens, "token_hash", unique=True)
+        await safe_create_index(db.auth_tokens, [("uid", 1), ("purpose", 1), ("used_at", 1)])
+        # TTL: удаляем записи через 48h после expires_at (запас для аудита)
+        await safe_create_index(db.auth_tokens, "expires_at", expireAfterSeconds=48 * 3600)
+
+        # P4: Sessions (devices / JWT tracking)
+        await safe_create_index(db.auth_sessions, "jti", unique=True)
+        await safe_create_index(db.auth_sessions, [("uid", 1), ("revoked", 1), ("last_active_at", -1)])
+        # TTL: auth_sessions удаляются через 30 дней после истечения
+        await safe_create_index(db.auth_sessions, "expires_at", expireAfterSeconds=30 * 24 * 3600)
         
         logger.info("✅ Database indexes created successfully")
     except Exception as e:
@@ -729,6 +741,14 @@ async def startup_event():
                 logger.info(f"✅ Auth migration completed: {migration_result}")
         except Exception as e:
             logger.error(f"❌ Auth migration failed: {e}", exc_info=True)
+
+        # 6.6. 🔐 Миграция: username → lowercase (P1-FIX, идемпотентно)
+        try:
+            uname_mig = await migrate_usernames_to_lowercase(db)
+            if uname_mig.get("changed") or uname_mig.get("nulled"):
+                logger.info(f"✅ Username lowercase migration: {uname_mig}")
+        except Exception as e:
+            logger.error(f"❌ Username lowercase migration failed: {e}", exc_info=True)
     
     # 7. Запускаем планировщик уведомлений V2
     try:
@@ -16512,6 +16532,21 @@ async def save_custom_avatar(
             }},
         )
 
+        # 🐛 P1-FIX: ставим флаг `photo_url_custom` в users, чтобы Telegram/VK
+        # логины не перетирали пользовательское фото. Флаг синхронизирован с
+        # avatar_mode в user_settings.
+        try:
+            user_doc = await db.users.find_one({"telegram_id": telegram_id}, {"uid": 1})
+            if user_doc:
+                await db.users.update_one(
+                    {"uid": user_doc["uid"]},
+                    {"$set": {"photo_url_custom": bool(avatar_data),
+                              "updated_at": datetime.now(timezone.utc)}},
+                )
+        except Exception as _e:
+            # Не блокируем ответ на ошибке обновления users (это легаси-синхронизация)
+            logger.warning(f"photo_url_custom sync failed for tid={telegram_id}: {_e}")
+
         return {"success": True, "avatar_mode": "custom" if avatar_data else "telegram", "updated_at": now_iso}
     except HTTPException:
         raise
@@ -16594,6 +16629,18 @@ async def delete_custom_avatar(
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # 🐛 P1-FIX: снимаем флаг — разрешаем Telegram/VK перетирать photo_url.
+        try:
+            user_doc = await db.users.find_one({"telegram_id": telegram_id}, {"uid": 1})
+            if user_doc:
+                await db.users.update_one(
+                    {"uid": user_doc["uid"]},
+                    {"$set": {"photo_url_custom": False,
+                              "updated_at": datetime.now(timezone.utc)}},
+                )
+        except Exception as _e:
+            logger.warning(f"photo_url_custom unset failed for tid={telegram_id}: {_e}")
 
         return {"success": True}
     except HTTPException:

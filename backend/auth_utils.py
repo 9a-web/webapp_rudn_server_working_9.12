@@ -203,12 +203,41 @@ def choose_primary_auth(active_providers: Iterable[str], fallback: str = "email"
     """Возвращает наиболее приоритетный провайдер из списка `active_providers`.
 
     Используется при unlink, чтобы детерминированно установить новый primary_auth.
+
+    🐛 P1-FIX: если `fallback` не входит в active_providers — возвращаем первый
+    элемент active_providers (в порядке приоритета из `PROVIDERS`) вместо
+    несуществующего fallback. Это гарантирует, что primary_auth всегда
+    указывает на РЕАЛЬНО активный провайдер.
     """
     active_set = set(active_providers or [])
     for p in PROVIDERS:
         if p in active_set:
             return p
+    # Безопасный fallback: возвращаем ТОЛЬКО если он активен
+    if fallback in active_set:
+        return fallback
+    # Последний рубеж — первый из активных (если вдруг PROVIDERS устарел).
+    # Если active_set пуст → возвращаем fallback как было (граничный случай).
+    if active_set:
+        return sorted(active_set)[0]
     return fallback
+
+
+def is_real_telegram_user(tid: Optional[int]) -> bool:
+    """🐛 P1: True если tid — настоящий Telegram ID (можно писать в бот).
+
+    Используется как guard перед `bot.send_message(chat_id=tid)`, чтобы
+    не слать в pseudo_tid (10^10+uid) для email/VK-юзеров — это приводит
+    к "chat not found" в логах.
+    """
+    if tid is None:
+        return False
+    try:
+        tid_int = int(tid)
+    except (TypeError, ValueError):
+        return False
+    # Реальный Telegram ID: 1..10^10-1. Pseudo: 10^10 + uid.
+    return 0 < tid_int < PSEUDO_TID_OFFSET
 
 
 # ----- Rate Limiter (in-memory, общий) -----
@@ -534,3 +563,227 @@ def verify_telegram_webapp_init_data(init_data: str, bot_token: Optional[str] = 
     except Exception as e:
         logger.warning(f"verify_telegram_webapp_init_data error: {e}")
         return None
+
+
+
+# ==================== SESSIONS / DEVICES (P4) ====================
+
+_UA_BROWSER_RE = re.compile(
+    r"(Edg|OPR|Opera|Chrome|Safari|Firefox|YaBrowser|SamsungBrowser)/[\d\.]+",
+    re.IGNORECASE,
+)
+_UA_OS_PATTERNS = [
+    ("Windows", re.compile(r"Windows NT", re.IGNORECASE)),
+    ("macOS", re.compile(r"Mac OS X|Macintosh", re.IGNORECASE)),
+    ("iOS", re.compile(r"iPhone|iPad|iPod", re.IGNORECASE)),
+    ("Android", re.compile(r"Android", re.IGNORECASE)),
+    ("Linux", re.compile(r"Linux", re.IGNORECASE)),
+]
+
+
+def parse_device_label(user_agent: Optional[str]) -> str:
+    """Человекочитаемая метка устройства вида "iOS · Safari" / "Windows · Chrome".
+
+    Возвращает "Неизвестное устройство" если UA пуст или не распознан.
+    """
+    if not user_agent:
+        return "Неизвестное устройство"
+    os_name = None
+    for name, pat in _UA_OS_PATTERNS:
+        if pat.search(user_agent):
+            os_name = name
+            break
+    m = _UA_BROWSER_RE.search(user_agent)
+    # Edg → Edge, OPR → Opera
+    browser_map = {"edg": "Edge", "opr": "Opera"}
+    browser = None
+    if m:
+        raw = m.group(1).lower()
+        browser = browser_map.get(raw, m.group(1))
+    if os_name and browser:
+        return f"{os_name} · {browser}"
+    if os_name:
+        return os_name
+    if browser:
+        return browser
+    # Fallback: первые 40 символов UA
+    return user_agent[:40]
+
+
+async def register_session(
+    db,
+    *,
+    uid: str,
+    jti: str,
+    expires_at: datetime,
+    request: Optional[Request] = None,
+    provider: Optional[str] = None,
+) -> None:
+    """Создаёт запись в `auth_sessions` для выпущенного токена.
+
+    Идемпотентно по `jti` (через upsert). Никогда не бросает исключений —
+    auth-flow не должен падать при проблемах с сессиями (fail-open).
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        ip = get_client_ip(request) if request else "unknown"
+        ua = (request.headers.get("User-Agent", "") if request else "") or ""
+        device_label = parse_device_label(ua)
+        doc = {
+            "uid": str(uid),
+            "jti": jti,
+            "created_at": now,
+            "last_active_at": now,
+            "expires_at": expires_at,
+            "ip": ip[:64],
+            "user_agent": ua[:512],
+            "device_label": device_label,
+            "provider": provider,
+            "revoked": False,
+        }
+        await db.auth_sessions.update_one(
+            {"jti": jti},
+            {"$set": doc},
+            upsert=True,
+        )
+    except Exception as e:
+        logger.warning(f"register_session failed (uid={uid}, jti={jti}): {e}")
+
+
+async def is_session_active(db, jti: Optional[str]) -> bool:
+    """True если сессия существует и не помечена revoked.
+
+    Быстрая проверка (может быть закеширована позже). Не ходит в БД если jti пуст.
+    """
+    if not jti:
+        return True  # старые токены без jti: считаем активными (backward compat)
+    try:
+        doc = await db.auth_sessions.find_one(
+            {"jti": jti, "revoked": {"$ne": True}},
+            {"_id": 1},
+        )
+        return doc is not None
+    except Exception as e:
+        logger.warning(f"is_session_active check failed for jti={jti}: {e}")
+        return True  # fail-open (не ломаем auth)
+
+
+async def touch_session(db, jti: Optional[str]) -> None:
+    """Обновляет last_active_at. Вызывается best-effort."""
+    if not jti:
+        return
+    try:
+        await db.auth_sessions.update_one(
+            {"jti": jti},
+            {"$set": {"last_active_at": datetime.now(timezone.utc)}},
+        )
+    except Exception:
+        pass
+
+
+async def revoke_session(db, *, uid: str, jti: str) -> bool:
+    """Помечает сессию revoked. Возвращает True если была активная сессия."""
+    try:
+        res = await db.auth_sessions.update_one(
+            {"uid": str(uid), "jti": jti, "revoked": {"$ne": True}},
+            {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc)}},
+        )
+        return res.modified_count > 0
+    except Exception as e:
+        logger.warning(f"revoke_session failed: {e}")
+        return False
+
+
+async def revoke_all_sessions(db, *, uid: str, except_jti: Optional[str] = None) -> int:
+    """Отзывает все сессии пользователя (кроме except_jti). Возвращает кол-во отозванных."""
+    try:
+        query: Dict[str, Any] = {"uid": str(uid), "revoked": {"$ne": True}}
+        if except_jti:
+            query["jti"] = {"$ne": except_jti}
+        res = await db.auth_sessions.update_many(
+            query,
+            {"$set": {"revoked": True, "revoked_at": datetime.now(timezone.utc)}},
+        )
+        return res.modified_count
+    except Exception as e:
+        logger.warning(f"revoke_all_sessions failed: {e}")
+        return 0
+
+
+async def list_user_sessions(db, *, uid: str, current_jti: Optional[str] = None) -> list:
+    """Возвращает список активных сессий пользователя (revoked=False, не истёкших)."""
+    try:
+        now = datetime.now(timezone.utc)
+        cursor = db.auth_sessions.find(
+            {
+                "uid": str(uid),
+                "revoked": {"$ne": True},
+                "expires_at": {"$gt": now},
+            },
+            {"_id": 0, "uid": 0},
+        ).sort("last_active_at", -1)
+        sessions = []
+        async for s in cursor:
+            s["is_current"] = bool(current_jti and s.get("jti") == current_jti)
+            sessions.append(s)
+        return sessions
+    except Exception as e:
+        logger.warning(f"list_user_sessions failed: {e}")
+        return []
+
+
+def make_session_dependency(db):
+    """Фабрика: возвращает FastAPI dependency, которая проверяет JWT + активность сессии.
+
+    Использовать ТОЛЬКО для критичных endpoint'ов (password change, profile delete,
+    session mgmt). Для hot-path продолжайте использовать `get_current_user_required`.
+    """
+    async def _dep(
+        request: Request,
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    ) -> Dict[str, Any]:
+        token = _extract_token(request, credentials)
+        if not token:
+            raise HTTPException(
+                status_code=401,
+                detail="Требуется авторизация (токен отсутствует)",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        try:
+            payload = decode_jwt(token)
+            if not payload.get("sub"):
+                raise HTTPException(status_code=401, detail="Невалидный токен (нет subject)")
+        except JWTError as e:
+            logger.debug(f"Invalid JWT (session dep): {e}")
+            raise HTTPException(
+                status_code=401,
+                detail="Невалидный или истёкший токен",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        # Проверка активности сессии
+        jti = payload.get("jti")
+        if jti and not await is_session_active(db, jti):
+            raise HTTPException(
+                status_code=401,
+                detail="Сессия отозвана. Войдите заново.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        # touch (best-effort)
+        if jti:
+            await touch_session(db, jti)
+        return payload
+
+    return _dep
+
+
+# ==================== AUTH TOKENS (password reset / email verification) ====================
+
+def new_secure_token(nbytes: int = 32) -> str:
+    """Криптостойкий URL-safe токен (для password reset / email verify)."""
+    return secrets.token_urlsafe(nbytes)
+
+
+def hash_token(token: str) -> str:
+    """SHA-256 хэш токена — храним в БД только хэши, чтобы compromise БД
+    не позволял использовать токены напрямую."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

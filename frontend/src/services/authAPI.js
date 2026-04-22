@@ -30,8 +30,12 @@ const unwrap = (fn) => async (...args) => {
 
 export const authAPI = {
   // Registration
-  registerEmail: unwrap((email, password, first_name, last_name) =>
-    axios.post(`${BASE}/register/email`, { email, password, first_name, last_name })),
+  // P4: теперь принимает referral_code как 5й аргумент
+  registerEmail: unwrap((email, password, first_name, last_name, referral_code) =>
+    axios.post(`${BASE}/register/email`, {
+      email, password, first_name, last_name,
+      referral_code: referral_code || undefined,
+    })),
 
   // Email login
   loginEmail: unwrap((email, password) =>
@@ -57,6 +61,8 @@ export const authAPI = {
   // Session
   me: unwrap(() => axios.get(`${BASE}/me`, withAuth())),
   logout: unwrap(() => axios.post(`${BASE}/logout`, {}, withAuth())),
+  logoutAll: unwrap((keep_current = true) =>
+    axios.post(`${BASE}/logout-all?keep_current=${keep_current ? 'true' : 'false'}`, {}, withAuth())),
 
   // Linking & profile
   linkEmail: unwrap((email, password) =>
@@ -84,6 +90,30 @@ export const authAPI = {
   updateProfileStep: unwrap((payload) =>
     axios.patch(`${BASE}/profile-step`, payload, withAuth())),
 
-  // Public config (bot username, VK app id)
+  // ========== P2: Password management ==========
+  changePassword: unwrap((old_password, new_password) =>
+    axios.post(`${BASE}/password/change`, { old_password, new_password }, withAuth())),
+
+  forgotPassword: unwrap((email) =>
+    axios.post(`${BASE}/password/forgot`, { email })),
+
+  resetPassword: unwrap((token, new_password) =>
+    axios.post(`${BASE}/password/reset`, { token, new_password })),
+
+  // ========== P3: Email verification ==========
+  sendVerification: unwrap(() =>
+    axios.post(`${BASE}/email/send-verification`, {}, withAuth())),
+
+  verifyEmail: unwrap((token) =>
+    axios.post(`${BASE}/email/verify`, { token }, withAuth())),
+
+  // ========== P4: Sessions / Devices ==========
+  getSessions: unwrap(() =>
+    axios.get(`${BASE}/sessions`, withAuth())),
+
+  revokeSession: unwrap((jti) =>
+    axios.delete(`${BASE}/sessions/${encodeURIComponent(jti)}`, withAuth())),
+
+  // Public config (bot username, VK app id, features flags)
   config: unwrap(() => axios.get(`${BASE}/config`)),
 };

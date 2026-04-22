@@ -41,9 +41,19 @@ from auth_utils import (
     get_current_user_optional,
     get_current_user_required,
     hash_password,
+    hash_token,
+    is_real_telegram_user,
+    is_session_active,
+    list_user_sessions,
+    new_secure_token,
     normalize_username,
+    parse_device_label,
     pseudo_tid_from_uid,
+    register_session,
     resolve_safe_username,
+    revoke_all_sessions,
+    revoke_session,
+    touch_session,
     verify_password,
     verify_telegram_login_widget_hash,
     verify_telegram_webapp_init_data,
@@ -55,9 +65,21 @@ from config import (
     VK_CLIENT_SECRET,
     VK_REDIRECT_URI,
     ENV,
+    JWT_EXPIRE_DAYS,
+)
+from email_service import (
+    send_email,
+    template_password_reset,
+    template_email_verification,
+    template_password_changed,
+    is_email_configured,
+    PUBLIC_BASE_URL as EMAIL_PUBLIC_BASE_URL,
 )
 from models import (
     AuthTokenResponse,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    GenericSuccessResponse,
     LinkTelegramRequest,
     LinkTelegramWebAppRequest,
     LinkVKRequest,
@@ -66,8 +88,12 @@ from models import (
     QRInitResponse,
     QRStatusResponse,
     RegisterEmailRequest,
+    ResetPasswordRequest,
+    SessionInfo,
+    SessionsListResponse,
     TelegramLoginRequest,
     TelegramWebAppLoginRequest,
+    VerifyEmailRequest,
     UpdateProfileStepRequest,
     User,  # noqa: F401  (документация модели)
     UserPublic,
@@ -104,7 +130,20 @@ _RATE_LIMITS = {
     "profile_step_uid":  (60, 600),      # 60 patch / uid / 10 мин
     "check_username_ip": (120, 60),      # 2 запроса/сек/IP
     "check_username_uid": (60, 60),      # для авторизованных
+
+    # P2: password management
+    "forgot_password_ip":    (5, 3600),   # 5 запросов/час с IP
+    "forgot_password_email": (3, 3600),   # 3 запроса/час на email (анти-abuse)
+    "reset_password_ip":     (10, 3600),  # 10 попыток reset/час с IP
+    "change_password_uid":   (10, 3600),
+    # P3: email verification
+    "send_verify_uid":       (5, 3600),
+    "verify_email_ip":       (20, 600),
 }
+
+# P2/P3: TTL токенов (минуты)
+_PASSWORD_RESET_TTL_MIN = 30
+_EMAIL_VERIFY_TTL_MIN = 24 * 60  # 24 часа
 
 
 # ========== Helpers ==========
@@ -418,6 +457,94 @@ async def _update_last_login(
     await db.users.update_one({"uid": uid}, {"$set": update})
 
 
+# ==================== P4: REFERRAL INTEGRATION ====================
+
+async def _process_referral_for_new_user(
+    db,
+    *,
+    referral_code: Optional[str],
+    user_doc: dict,
+    request: Optional[Request] = None,
+) -> None:
+    """🔗 P4: Обрабатывает `referral_code` при создании нового пользователя.
+
+    Связывает нового юзера с рефером, создаёт `referral_events` и начисляет
+    бонусы (до 3 уровней в цепочке). Идемпотентна, fail-soft — не падает на
+    ошибках, только логирует (чтобы не ломать регистрацию).
+    """
+    if not referral_code:
+        return
+    code = str(referral_code).strip().upper()
+    if len(code) < 4:
+        return
+    try:
+        # Ищем реферера по коду в user_settings (legacy, но единственный источник).
+        referrer = await db.user_settings.find_one(
+            {"referral_code": code},
+            {"telegram_id": 1, "first_name": 1, "username": 1, "uid": 1, "_id": 0},
+        )
+        if not referrer:
+            logger.info(f"🔗 Referral code not found: {code}")
+            return
+
+        referrer_tid = referrer.get("telegram_id")
+        new_tid = user_doc.get("telegram_id") or pseudo_tid_from_uid(user_doc["uid"])
+        if referrer_tid == new_tid:
+            logger.info(f"🔗 Self-referral ignored: {code}")
+            return
+
+        # Не позволяем перепривязать если у юзера уже есть referred_by
+        existing_us = await db.user_settings.find_one(
+            {"telegram_id": new_tid},
+            {"referred_by": 1, "referral_code": 1, "_id": 0},
+        )
+        if existing_us and existing_us.get("referred_by"):
+            logger.info(f"🔗 User already has referrer: uid={user_doc['uid']}")
+            return
+
+        # Проставляем referred_by + генерим собственный referral_code (если нет)
+        from server import generate_referral_code, create_referral_connections, award_referral_bonus
+        new_referral_code = (existing_us or {}).get("referral_code") or generate_referral_code(new_tid)
+        await db.user_settings.update_one(
+            {"telegram_id": new_tid},
+            {
+                "$set": {
+                    "referred_by": referrer_tid,
+                    "referral_code": new_referral_code,
+                    "referral_processed_at": datetime.now(timezone.utc),
+                },
+                "$setOnInsert": {"invited_count": 0, "referral_points_earned": 0},
+            },
+            upsert=True,
+        )
+        # Создаём цепочку связей (до 3 уровней) и начисляем бонусы
+        try:
+            await create_referral_connections(new_tid, referrer_tid, db)
+        except Exception as e:
+            logger.warning(f"create_referral_connections failed: {e}")
+        try:
+            await award_referral_bonus(referrer_tid, new_tid, 50, 1, db)
+        except Exception as e:
+            logger.warning(f"award_referral_bonus failed: {e}")
+
+        # Инкременты счётчиков
+        await db.user_settings.update_one(
+            {"telegram_id": referrer_tid},
+            {"$inc": {"invited_count": 1}},
+        )
+        await _log_auth_event(
+            db, event_type="referral_processed", uid=user_doc["uid"],
+            request=request, success=True,
+            extra={"referral_code": code, "referrer_tid": referrer_tid},
+        )
+        logger.info(
+            f"🔗 Referral linked: new uid={user_doc['uid']} (tid={new_tid}) ← "
+            f"referrer tid={referrer_tid} via code={code}"
+        )
+    except Exception as e:
+        logger.warning(f"_process_referral_for_new_user failed: {e}", exc_info=True)
+
+
 async def _issue_token(
     db,
     user_doc: dict,
@@ -425,6 +552,7 @@ async def _issue_token(
     is_new: bool = False,
     suggested_username_taken: Optional[str] = None,
     request: Optional[Request] = None,
+    provider: Optional[str] = None,
 ) -> AuthTokenResponse:
     """Генерирует JWT для пользователя и возвращает AuthTokenResponse.
 
@@ -435,11 +563,26 @@ async def _issue_token(
     `current_user.tid` против pseudo_tid из URL. Теперь в JWT всегда кладём
     `effective_tid` — реальный TG-ID если привязан, иначе pseudo_tid (10^10+uid),
     что совпадает с тем, как фронтенд формирует `user.id` в App.jsx.
+
+    🔐 P4 (sessions): регистрируем сессию в `auth_sessions` для
+    управления устройствами (GET/DELETE /auth/sessions).
     """
+    import secrets as _secrets
+    jti = _secrets.token_urlsafe(12)
+    now = datetime.now(timezone.utc)
+    from config import JWT_EXPIRE_DAYS as _EXP_DAYS
+    expires_at = now + timedelta(days=_EXP_DAYS)
+
     token = create_jwt(
         uid=user_doc["uid"],
         telegram_id=effective_tid_for_user(user_doc),
         providers=user_doc.get("auth_providers", []),
+        jti=jti,
+    )
+    # Регистрируем сессию (best-effort, не блокирует выдачу токена)
+    await register_session(
+        db, uid=user_doc["uid"], jti=jti, expires_at=expires_at,
+        request=request, provider=provider or user_doc.get("primary_auth"),
     )
     if not is_new:
         await _update_last_login(db, user_doc["uid"], request=request)
@@ -578,10 +721,19 @@ async def migrate_user_settings_to_users(db) -> Dict[str, int]:
 
             uid = await generate_uid(db)
             now = datetime.now(timezone.utc)
+            # 🐛 P1-FIX: нормализуем username при миграции, чтобы избежать
+            # регистрозависимых дубликатов и гарантировать работу unique index.
+            raw_username = settings_doc.get("username")
+            normalized_username = None
+            if raw_username:
+                try:
+                    normalized_username = normalize_username(raw_username)
+                except ValueError:
+                    normalized_username = None  # некорректный — оставляем пустым
             new_doc = {
                 "id": str(uuid.uuid4()),
                 "uid": uid,
-                "username": settings_doc.get("username"),
+                "username": normalized_username,
                 "first_name": settings_doc.get("first_name"),
                 "last_name": settings_doc.get("last_name"),
                 "email": None,
@@ -657,6 +809,64 @@ async def migrate_user_settings_to_users(db) -> Dict[str, int]:
     return result
 
 
+async def migrate_usernames_to_lowercase(db) -> Dict[str, int]:
+    """🐛 P1: Приводит все username к lowercase (идемпотентно).
+
+    Цель — убрать регистрозависимые дубликаты, чтобы unique-индекс
+    `users.username` гарантированно работал, а `check_username` не
+    зависел от регистра.
+
+    Корректно обрабатывает коллизии (если `Alice` и `alice` обе существуют —
+    оставляем lowercase-версию, конфликтующую обнуляем в None, чтобы
+    пользователь выбрал новый при следующем входе).
+    """
+    changed = 0
+    nulled = 0
+    errors = 0
+
+    # Найти все users с username в верхнем регистре (отличающимся от .lower())
+    # Используем aggregation-проекцию на клиенте, т.к. Mongo нет easy lowercase filter
+    cursor = db.users.find(
+        {"username": {"$exists": True, "$ne": None, "$type": "string"}},
+        {"uid": 1, "username": 1},
+    )
+
+    async for doc in cursor:
+        uid = doc.get("uid")
+        u = doc.get("username")
+        if not isinstance(u, str) or not u:
+            continue
+        low = u.lower().strip()
+        if low == u:
+            continue  # уже lowercase
+        try:
+            await db.users.update_one({"uid": uid}, {"$set": {"username": low}})
+            changed += 1
+        except DuplicateKeyError:
+            # Коллизия с другим lowercase username — обнуляем, заставим выбрать новый
+            try:
+                await db.users.update_one(
+                    {"uid": uid},
+                    {"$set": {"username": None, "registration_step": 2,
+                              "updated_at": datetime.now(timezone.utc)}},
+                )
+                nulled += 1
+                logger.warning(
+                    f"⚠️ Username lowercase collision — cleared for uid={uid} (was '{u}')"
+                )
+            except Exception as e2:
+                errors += 1
+                logger.error(f"Failed to clear conflicting username uid={uid}: {e2}")
+        except Exception as e:
+            errors += 1
+            logger.error(f"Failed to lowercase username uid={uid}: {e}")
+
+    res = {"changed": changed, "nulled": nulled, "errors": errors}
+    if changed or nulled:
+        logger.info(f"✅ username lowercase migration: {res}")
+    return res
+
+
 # ========== Router factory ==========
 
 
@@ -702,11 +912,16 @@ def create_auth_router(db) -> APIRouter:
             registration_step=2,
         )
 
+        # 🔗 P4: Обработка referral_code (если передан)
+        await _process_referral_for_new_user(
+            db, referral_code=req.referral_code, user_doc=user_doc, request=request,
+        )
+
         await _log_auth_event(
             db, event_type="register_email", uid=user_doc["uid"],
             provider="email", success=True, request=request,
         )
-        return await _issue_token(db, user_doc, is_new=True, request=request)
+        return await _issue_token(db, user_doc, is_new=True, request=request, provider="email")
 
     # ============= LOGIN (email) =============
 
@@ -860,13 +1075,18 @@ def create_auth_router(db) -> APIRouter:
             registration_step=2,
         )
 
+        # 🔗 P4: Обработка referral_code
+        await _process_referral_for_new_user(
+            db, referral_code=req.referral_code, user_doc=user_doc, request=request,
+        )
+
         await _log_auth_event(
             db, event_type="register_telegram", uid=user_doc["uid"],
             provider="telegram", success=True, request=request,
         )
         return await _issue_token(
             db, user_doc, is_new=True,
-            suggested_username_taken=conflict, request=request,
+            suggested_username_taken=conflict, request=request, provider="telegram",
         )
 
     # ============= LOGIN (Telegram WebApp initData) =============
@@ -967,13 +1187,18 @@ def create_auth_router(db) -> APIRouter:
             registration_step=2,
         )
 
+        # 🔗 P4: Обработка referral_code
+        await _process_referral_for_new_user(
+            db, referral_code=req.referral_code, user_doc=user_doc, request=request,
+        )
+
         await _log_auth_event(
             db, event_type="register_telegram_webapp", uid=user_doc["uid"],
             provider="telegram", success=True, request=request,
         )
         return await _issue_token(
             db, user_doc, is_new=True,
-            suggested_username_taken=conflict, request=request,
+            suggested_username_taken=conflict, request=request, provider="telegram",
         )
 
     # ============= LOGIN (VK ID OAuth) =============
@@ -1071,6 +1296,10 @@ def create_auth_router(db) -> APIRouter:
                 registration_step=2,
             )
             is_new = True
+            # 🔗 P4: Обработка referral_code для нового VK-пользователя
+            await _process_referral_for_new_user(
+                db, referral_code=req.referral_code, user_doc=user_doc, request=request,
+            )
 
         await _log_auth_event(
             db, event_type=("register_vk" if is_new else "login_vk"),
@@ -1078,7 +1307,7 @@ def create_auth_router(db) -> APIRouter:
         )
         return await _issue_token(
             db, user_doc, is_new=is_new,
-            suggested_username_taken=conflict_username, request=request,
+            suggested_username_taken=conflict_username, request=request, provider="vk",
         )
 
     # ============= QR LOGIN =============
@@ -1375,11 +1604,23 @@ def create_auth_router(db) -> APIRouter:
         source: str,  # "widget" или "webapp"
     ) -> dict:
         """Обновляет users + переносит user_settings(pseudo_tid → real_tid)."""
-        # Идемпотентность
-        if user_doc.get("telegram_id") == tg_id:
-            return {"success": True, "message": "Telegram уже привязан", "telegram_id": tg_id}
+        # 🐛 P1-FIX: приведение типов, т.к. Mongo может хранить int64/str.
+        try:
+            tg_id_int = int(tg_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Некорректный telegram_id")
 
-        if user_doc.get("telegram_id") and user_doc["telegram_id"] != tg_id:
+        current_tid_raw = user_doc.get("telegram_id")
+        try:
+            current_tid_int = int(current_tid_raw) if current_tid_raw is not None else None
+        except (TypeError, ValueError):
+            current_tid_int = None
+
+        # Идемпотентность (с нормализацией типов)
+        if current_tid_int is not None and current_tid_int == tg_id_int:
+            return {"success": True, "message": "Telegram уже привязан", "telegram_id": tg_id_int}
+
+        if current_tid_int is not None and current_tid_int != tg_id_int:
             raise HTTPException(
                 status_code=409,
                 detail="К вашему аккаунту уже привязан другой Telegram. Сначала отвяжите текущий.",
@@ -1387,7 +1628,7 @@ def create_auth_router(db) -> APIRouter:
 
         # Не занят ли tg_id другим аккаунтом
         other = await db.users.find_one(
-            {"telegram_id": tg_id, "uid": {"$ne": user_doc["uid"]}},
+            {"telegram_id": tg_id_int, "uid": {"$ne": user_doc["uid"]}},
             {"uid": 1},
         )
         if other:
@@ -1400,20 +1641,20 @@ def create_auth_router(db) -> APIRouter:
         await db.users.update_one(
             {"uid": user_doc["uid"]},
             {
-                "$set": {"telegram_id": tg_id, "updated_at": now},
+                "$set": {"telegram_id": tg_id_int, "updated_at": now},
                 "$addToSet": {"auth_providers": "telegram"},
             },
         )
 
         # 🔥 КРИТИЧЕСКИ ВАЖНО: переносим user_settings с pseudo_tid на real_tid.
         old_tid = pseudo_tid_from_uid(user_doc["uid"])  # текущий ключ user_settings
-        await _remap_user_settings_tid(db, user_doc["uid"], old_tid, tg_id)
+        await _remap_user_settings_tid(db, user_doc["uid"], old_tid, tg_id_int)
 
         await _log_auth_event(
             db, event_type=f"link_telegram_{source}", uid=user_doc["uid"],
             provider="telegram", success=True, request=request,
         )
-        logger.info(f"🔗 Manual link ({source}): uid={user_doc['uid']} ← telegram_id={tg_id}")
+        logger.info(f"🔗 Manual link ({source}): uid={user_doc['uid']} ← telegram_id={tg_id_int}")
 
         updated = await db.users.find_one({"uid": user_doc["uid"]})
         return {
@@ -1570,11 +1811,12 @@ def create_auth_router(db) -> APIRouter:
             active.add("vk")
 
         if provider not in active:
-            return {
-                "success": True,
-                "message": f"{provider} не был привязан",
-                "auth_providers": list(current_providers),
-            }
+            # 🐛 P1-FIX: возвращаем 404 вместо тихого 200, чтобы клиент знал
+            # что провайдер не был привязан (корректное поведение REST).
+            raise HTTPException(
+                status_code=404,
+                detail=f"Провайдер {provider} не был привязан к вашему аккаунту",
+            )
 
         remaining = active - {provider}
         if not remaining:
@@ -1802,11 +2044,421 @@ def create_auth_router(db) -> APIRouter:
             "env": ENV,
             "qr_login_ttl_minutes": QR_SESSION_TTL_MINUTES,
             "features": {
-                "email_verification": False,
+                "email_verification": True,
+                "password_reset": True,
+                "sessions_management": True,
                 "qr_login": True,
                 "vk_login": bool(VK_APP_ID and VK_CLIENT_SECRET),
                 "telegram_login": True,
+                "email_smtp_configured": is_email_configured(),
             },
         }
+
+    # ============= 🔐 PASSWORD MANAGEMENT (P2) =============
+
+    @router.post("/password/change", response_model=GenericSuccessResponse)
+    async def change_password(
+        req: ChangePasswordRequest,
+        request: Request,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Сменить пароль (требует старый пароль). Отзывает все остальные сессии."""
+        uid = current_user["sub"]
+        rl_max, rl_win = _RATE_LIMITS["change_password_uid"]
+        if not check_rate_limit(uid, "change_password_uid", rl_max, rl_win):
+            raise HTTPException(status_code=429, detail="Слишком много попыток. Попробуйте позже.")
+
+        user_doc = await db.users.find_one({"uid": uid})
+        if not user_doc or not user_doc.get("is_active", True):
+            raise HTTPException(status_code=404, detail="Аккаунт не найден")
+        if not user_doc.get("password_hash"):
+            # У пользователя ещё нет пароля (зашёл через Telegram/VK). Пусть
+            # использует "Забыли пароль?" — это добавит пароль и привяжет email.
+            raise HTTPException(
+                status_code=400,
+                detail="У вас ещё нет пароля. Установите его через «Забыли пароль?» с привязанным email.",
+            )
+        if not verify_password(req.old_password, user_doc["password_hash"]):
+            await _log_auth_event(
+                db, event_type="change_password", uid=uid, success=False,
+                request=request, extra={"reason": "wrong_old_password"},
+            )
+            raise HTTPException(status_code=401, detail="Текущий пароль неверен")
+
+        try:
+            new_hash = hash_password(req.new_password)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Отклоняем если новый совпадает со старым
+        if verify_password(req.new_password, user_doc["password_hash"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Новый пароль не должен совпадать с текущим",
+            )
+
+        await db.users.update_one(
+            {"uid": uid},
+            {"$set": {
+                "password_hash": new_hash,
+                "password_changed_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }},
+        )
+        # Отозвать все ДРУГИЕ сессии (текущая остаётся)
+        current_jti = current_user.get("jti")
+        revoked_count = await revoke_all_sessions(db, uid=uid, except_jti=current_jti)
+
+        await _log_auth_event(
+            db, event_type="change_password", uid=uid, success=True,
+            request=request, extra={"revoked_sessions": revoked_count},
+        )
+        # Уведомление по email (если привязан)
+        if user_doc.get("email"):
+            try:
+                name = user_doc.get("first_name") or ""
+                subj, html, text = template_password_changed(
+                    user_name=name, ip=get_client_ip(request),
+                )
+                await send_email(user_doc["email"], subj, html, text)
+            except Exception as e:
+                logger.warning(f"password_changed email failed: {e}")
+        return GenericSuccessResponse(
+            success=True,
+            message=f"Пароль изменён. Отозвано других сессий: {revoked_count}",
+        )
+
+    @router.post("/password/forgot", response_model=GenericSuccessResponse)
+    async def forgot_password(req: ForgotPasswordRequest, request: Request):
+        """Отправляет ссылку для сброса пароля.
+
+        🔐 Privacy: всегда возвращаем success (даже если email не зарегистрирован),
+        чтобы не давать enumeration-атакам понять, какие email есть в системе.
+        """
+        client_ip = get_client_ip(request)
+        email_norm = req.email.strip().lower()
+
+        # Двойной rate-limit: per-IP + per-email (анти-спам на чужой email)
+        ip_max, ip_win = _RATE_LIMITS["forgot_password_ip"]
+        em_max, em_win = _RATE_LIMITS["forgot_password_email"]
+        if not check_rate_limit(client_ip, "forgot_password_ip", ip_max, ip_win):
+            raise HTTPException(status_code=429, detail="Слишком много запросов с этого IP.")
+        if not check_rate_limit(email_norm, "forgot_password_email", em_max, em_win):
+            # Молча возвращаем success (privacy) — atak видит 200 даже при лимите
+            logger.warning(f"forgot_password: per-email rate limit hit for {email_norm}")
+            return GenericSuccessResponse(
+                success=True,
+                message="Если email зарегистрирован — мы отправили инструкцию.",
+            )
+
+        user_doc = await db.users.find_one({"email": email_norm, "is_active": True})
+        if user_doc:
+            # Генерируем токен, храним ХЭШ, ссылку шлём по email с plain-токеном
+            raw = new_secure_token(32)
+            token_hash = hash_token(raw)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=_PASSWORD_RESET_TTL_MIN)
+            # Делаем ранее выпущенные reset-токены неактивными
+            await db.auth_tokens.update_many(
+                {"uid": user_doc["uid"], "purpose": "password_reset", "used_at": None},
+                {"$set": {"used_at": datetime.now(timezone.utc), "invalidated": True}},
+            )
+            await db.auth_tokens.insert_one({
+                "id": str(uuid.uuid4()),
+                "uid": user_doc["uid"],
+                "purpose": "password_reset",
+                "token_hash": token_hash,
+                "created_at": datetime.now(timezone.utc),
+                "expires_at": expires_at,
+                "used_at": None,
+                "ip": client_ip,
+                "ua": (request.headers.get("User-Agent", "") or "")[:300],
+            })
+
+            base = (EMAIL_PUBLIC_BASE_URL or "").rstrip("/")
+            reset_url = f"{base}/reset-password?token={raw}"
+            subj, html, text = template_password_reset(
+                reset_url=reset_url,
+                user_name=user_doc.get("first_name") or "",
+            )
+            await send_email(user_doc["email"], subj, html, text)
+            await _log_auth_event(
+                db, event_type="forgot_password", uid=user_doc["uid"],
+                success=True, request=request,
+            )
+        else:
+            # Не существует — всё равно "success", но логируем для аудита
+            await _log_auth_event(
+                db, event_type="forgot_password", success=False,
+                request=request, extra={"reason": "unknown_email", "email": email_norm[:50]},
+            )
+
+        return GenericSuccessResponse(
+            success=True,
+            message="Если email зарегистрирован — мы отправили инструкцию.",
+        )
+
+    @router.post("/password/reset", response_model=AuthTokenResponse)
+    async def reset_password(req: ResetPasswordRequest, request: Request):
+        """Сбросить пароль по токену из email. Возвращает access_token (авто-логин)."""
+        client_ip = get_client_ip(request)
+        rl_max, rl_win = _RATE_LIMITS["reset_password_ip"]
+        if not check_rate_limit(client_ip, "reset_password_ip", rl_max, rl_win):
+            raise HTTPException(status_code=429, detail="Слишком много попыток.")
+
+        token_hash = hash_token(req.token)
+        now = datetime.now(timezone.utc)
+        token_doc = await db.auth_tokens.find_one({
+            "purpose": "password_reset",
+            "token_hash": token_hash,
+            "used_at": None,
+            "expires_at": {"$gt": now},
+        })
+        if not token_doc:
+            await _log_auth_event(
+                db, event_type="reset_password", success=False,
+                request=request, extra={"reason": "invalid_or_expired"},
+            )
+            raise HTTPException(status_code=400, detail="Ссылка недействительна или истекла.")
+
+        user_doc = await db.users.find_one({"uid": token_doc["uid"], "is_active": True})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Аккаунт не найден")
+
+        try:
+            new_hash = hash_password(req.new_password)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Транзакция: пометить токен использованным + обновить пароль + revoke all sessions
+        await db.auth_tokens.update_one(
+            {"_id": token_doc["_id"]},
+            {"$set": {"used_at": now, "used_ip": client_ip}},
+        )
+        await db.users.update_one(
+            {"uid": user_doc["uid"]},
+            {"$set": {
+                "password_hash": new_hash,
+                "password_changed_at": now,
+                "updated_at": now,
+                # Email считаем подтверждённым (владелец получил ссылку по email)
+                "email_verified": True,
+                # Убеждаемся что email есть в auth_providers
+            }, "$addToSet": {"auth_providers": "email"}},
+        )
+        # Отзываем ВСЕ прежние сессии (безопасность)
+        revoked_count = await revoke_all_sessions(db, uid=user_doc["uid"])
+
+        user_doc = await db.users.find_one({"uid": user_doc["uid"]})
+        await _log_auth_event(
+            db, event_type="reset_password", uid=user_doc["uid"],
+            success=True, request=request, extra={"revoked_sessions": revoked_count},
+        )
+        # Email-нотификация о смене
+        try:
+            subj, html, text = template_password_changed(
+                user_name=user_doc.get("first_name") or "",
+                ip=client_ip,
+            )
+            await send_email(user_doc["email"], subj, html, text)
+        except Exception as e:
+            logger.warning(f"reset notification email failed: {e}")
+
+        return await _issue_token(
+            db, user_doc, is_new=False, request=request, provider="email",
+        )
+
+    # ============= ✉️ EMAIL VERIFICATION (P3) =============
+
+    @router.post("/email/send-verification", response_model=GenericSuccessResponse)
+    async def send_verification(
+        request: Request,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Отправить письмо подтверждения email на текущий адрес."""
+        uid = current_user["sub"]
+        rl_max, rl_win = _RATE_LIMITS["send_verify_uid"]
+        if not check_rate_limit(uid, "send_verify_uid", rl_max, rl_win):
+            raise HTTPException(status_code=429, detail="Слишком часто. Попробуйте позже.")
+
+        user_doc = await db.users.find_one({"uid": uid})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Аккаунт не найден")
+        if not user_doc.get("email"):
+            raise HTTPException(status_code=400, detail="Email не привязан к аккаунту")
+        if user_doc.get("email_verified"):
+            return GenericSuccessResponse(success=True, message="Email уже подтверждён")
+
+        raw = new_secure_token(32)
+        token_hash = hash_token(raw)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=_EMAIL_VERIFY_TTL_MIN)
+
+        # Инвалидируем предыдущие verify-токены
+        await db.auth_tokens.update_many(
+            {"uid": uid, "purpose": "email_verify", "used_at": None},
+            {"$set": {"used_at": datetime.now(timezone.utc), "invalidated": True}},
+        )
+        await db.auth_tokens.insert_one({
+            "id": str(uuid.uuid4()),
+            "uid": uid,
+            "purpose": "email_verify",
+            "token_hash": token_hash,
+            "email": user_doc["email"],  # фиксируем email на момент выдачи
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": expires_at,
+            "used_at": None,
+        })
+        base = (EMAIL_PUBLIC_BASE_URL or "").rstrip("/")
+        verify_url = f"{base}/verify-email?token={raw}"
+        subj, html, text = template_email_verification(
+            verify_url=verify_url,
+            user_name=user_doc.get("first_name") or "",
+        )
+        await send_email(user_doc["email"], subj, html, text)
+        await _log_auth_event(
+            db, event_type="send_verification", uid=uid, success=True, request=request,
+        )
+        return GenericSuccessResponse(
+            success=True,
+            message=f"Письмо отправлено на {user_doc['email']}. Проверьте почту.",
+        )
+
+    @router.post("/email/verify", response_model=GenericSuccessResponse)
+    async def verify_email(
+        req: VerifyEmailRequest,
+        request: Request,
+        current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+    ):
+        """Подтвердить email по токену (работает и для неавторизованного клиента)."""
+        client_ip = get_client_ip(request)
+        rl_max, rl_win = _RATE_LIMITS["verify_email_ip"]
+        if not check_rate_limit(client_ip, "verify_email_ip", rl_max, rl_win):
+            raise HTTPException(status_code=429, detail="Слишком много попыток.")
+
+        token_hash = hash_token(req.token)
+        now = datetime.now(timezone.utc)
+        token_doc = await db.auth_tokens.find_one({
+            "purpose": "email_verify",
+            "token_hash": token_hash,
+            "used_at": None,
+            "expires_at": {"$gt": now},
+        })
+        if not token_doc:
+            raise HTTPException(status_code=400, detail="Ссылка недействительна или истекла.")
+
+        user_doc = await db.users.find_one({"uid": token_doc["uid"]})
+        if not user_doc or not user_doc.get("is_active", True):
+            raise HTTPException(status_code=404, detail="Аккаунт не найден")
+
+        # Если email изменился после выдачи токена — инвалидируем
+        if token_doc.get("email") and token_doc["email"] != user_doc.get("email"):
+            await db.auth_tokens.update_one(
+                {"_id": token_doc["_id"]},
+                {"$set": {"used_at": now, "invalidated": True}},
+            )
+            raise HTTPException(status_code=400, detail="Email был изменён. Запросите новое письмо.")
+
+        await db.auth_tokens.update_one(
+            {"_id": token_doc["_id"]},
+            {"$set": {"used_at": now, "used_ip": client_ip}},
+        )
+        await db.users.update_one(
+            {"uid": user_doc["uid"]},
+            {"$set": {"email_verified": True, "updated_at": now}},
+        )
+        await _log_auth_event(
+            db, event_type="verify_email", uid=user_doc["uid"],
+            success=True, request=request,
+        )
+        return GenericSuccessResponse(success=True, message="Email успешно подтверждён ✓")
+
+    # ============= 🖥️ SESSIONS / DEVICES (P4) =============
+
+    @router.get("/sessions", response_model=SessionsListResponse)
+    async def get_sessions(
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Список активных сессий текущего пользователя."""
+        uid = current_user["sub"]
+        current_jti = current_user.get("jti")
+        raw_sessions = await list_user_sessions(db, uid=uid, current_jti=current_jti)
+        sessions: List[SessionInfo] = []
+        for s in raw_sessions:
+            try:
+                sessions.append(SessionInfo(
+                    jti=s.get("jti", ""),
+                    created_at=s.get("created_at"),
+                    last_active_at=s.get("last_active_at"),
+                    expires_at=s.get("expires_at"),
+                    ip=s.get("ip"),
+                    user_agent=s.get("user_agent"),
+                    device_label=s.get("device_label"),
+                    provider=s.get("provider"),
+                    is_current=s.get("is_current", False),
+                ))
+            except Exception as e:
+                logger.warning(f"session parse failed: {e}")
+        return SessionsListResponse(sessions=sessions, total=len(sessions))
+
+    @router.delete("/sessions/{jti}", response_model=GenericSuccessResponse)
+    async def revoke_session_endpoint(
+        jti: str,
+        request: Request,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Отозвать конкретную сессию (logout с конкретного устройства)."""
+        uid = current_user["sub"]
+        if not jti or len(jti) > 64:
+            raise HTTPException(status_code=400, detail="Некорректный jti")
+        ok = await revoke_session(db, uid=uid, jti=jti)
+        if not ok:
+            # Не нашли активную сессию с таким jti
+            raise HTTPException(status_code=404, detail="Сессия не найдена или уже отозвана")
+        await _log_auth_event(
+            db, event_type="revoke_session", uid=uid, success=True,
+            request=request, extra={"revoked_jti": jti[:24]},
+        )
+        is_current = current_user.get("jti") == jti
+        return GenericSuccessResponse(
+            success=True,
+            message="Сессия завершена" + (" (текущая — требуется повторный вход)" if is_current else ""),
+        )
+
+    @router.post("/logout", response_model=GenericSuccessResponse)
+    async def logout(
+        request: Request,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Logout — отзывает ТЕКУЩУЮ сессию."""
+        uid = current_user["sub"]
+        jti = current_user.get("jti")
+        if jti:
+            await revoke_session(db, uid=uid, jti=jti)
+            await _log_auth_event(
+                db, event_type="logout", uid=uid, success=True,
+                request=request, extra={"jti": jti[:24]},
+            )
+        return GenericSuccessResponse(success=True, message="Вы вышли из системы")
+
+    @router.post("/logout-all", response_model=GenericSuccessResponse)
+    async def logout_all(
+        request: Request,
+        keep_current: bool = True,
+        current_user: Dict[str, Any] = Depends(get_current_user_required),
+    ):
+        """Logout со всех устройств. По умолчанию сохраняет текущую сессию."""
+        uid = current_user["sub"]
+        except_jti = current_user.get("jti") if keep_current else None
+        count = await revoke_all_sessions(db, uid=uid, except_jti=except_jti)
+        await _log_auth_event(
+            db, event_type="logout_all", uid=uid, success=True,
+            request=request, extra={"revoked": count, "keep_current": keep_current},
+        )
+        return GenericSuccessResponse(
+            success=True,
+            message=(
+                f"Отозвано сессий: {count}."
+                + ("" if keep_current else " Ваша текущая сессия тоже отозвана — войдите заново.")
+            ),
+        )
 
     return router

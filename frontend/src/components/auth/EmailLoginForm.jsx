@@ -2,6 +2,7 @@
  * Email Login Form.
  */
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Mail, Lock } from 'lucide-react';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
@@ -24,7 +25,15 @@ const EmailLoginForm = ({ onSuccess, onSwitchRegister }) => {
       const resp = await loginEmail(email.trim(), password);
       onSuccess?.(resp);
     } catch (e) {
-      setError(e.message);
+      // Улучшенные сообщения для конкретных ошибок
+      const msg = e?.message || 'Не удалось войти';
+      if (msg.includes('429') || msg.toLowerCase().includes('слишком')) {
+        setError('Слишком много попыток входа. Попробуйте через несколько минут.');
+      } else if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('неверн')) {
+        setError('Неверный email или пароль');
+      } else {
+        setError(msg);
+      }
     }
   };
 
@@ -50,6 +59,15 @@ const EmailLoginForm = ({ onSuccess, onSwitchRegister }) => {
         onChange={(e) => setPassword(e.target.value)}
         required
       />
+
+      <div className="flex items-center justify-end -mt-2">
+        <Link
+          to="/forgot-password"
+          className="text-xs text-indigo-300 hover:text-indigo-200 transition-colors"
+        >
+          Забыли пароль?
+        </Link>
+      </div>
 
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">

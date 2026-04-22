@@ -52,3 +52,4 @@ greenlet
 vkaudiotoken
 yt-dlp
 psutil
+aiosmtplib>=3.0.0

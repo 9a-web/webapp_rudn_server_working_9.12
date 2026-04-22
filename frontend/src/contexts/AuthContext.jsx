@@ -203,10 +203,10 @@ export const AuthProvider = ({ children }) => {
     finally { setLoading(false); }
   };
 
-  const registerEmail = async (email, password, first_name, last_name) => {
+  const registerEmail = async (email, password, first_name, last_name, referral_code) => {
     setLoading(true); setError(null);
     try {
-      const resp = await authAPI.registerEmail(email, password, first_name, last_name);
+      const resp = await authAPI.registerEmail(email, password, first_name, last_name, referral_code);
       applyAuth(resp.access_token, resp.user);
       _stashUsernameConflict(resp);
       return resp;
@@ -259,6 +259,56 @@ export const AuthProvider = ({ children }) => {
     return updated;
   };
 
+  // ========== P2/P3: Password & Email verification ==========
+
+  /** Сменить пароль. После успеха текущая сессия сохраняется, остальные отозваны. */
+  const changePassword = async (old_password, new_password) => {
+    setError(null);
+    const r = await authAPI.changePassword(old_password, new_password);
+    return r;
+  };
+
+  /** Отправить ссылку для сброса пароля. Публично, без авторизации. */
+  const forgotPassword = async (email) => {
+    setError(null);
+    return authAPI.forgotPassword(email);
+  };
+
+  /** Сброс пароля по токену — авто-логинит после успеха. */
+  const resetPassword = async (token, new_password) => {
+    setLoading(true); setError(null);
+    try {
+      const resp = await authAPI.resetPassword(token, new_password);
+      applyAuth(resp.access_token, resp.user);
+      return resp;
+    } catch (e) { setError(e.message); throw e; }
+    finally { setLoading(false); }
+  };
+
+  const sendVerification = async () => {
+    setError(null);
+    return authAPI.sendVerification();
+  };
+
+  /** Подтвердить email. Обновляет текущего user в state. */
+  const verifyEmail = async (token) => {
+    setError(null);
+    const r = await authAPI.verifyEmail(token);
+    // Рефрешим /me чтобы получить email_verified=true
+    try { await refreshMe(); } catch { /* noop */ }
+    return r;
+  };
+
+  // ========== P4: Sessions / Devices ==========
+
+  const getSessions = async () => authAPI.getSessions();
+  const revokeSession = async (jti) => authAPI.revokeSession(jti);
+  const logoutAll = async (keepCurrent = true) => {
+    const r = await authAPI.logoutAll(keepCurrent);
+    if (!keepCurrent) clearLocalAuth();
+    return r;
+  };
+
   const value = useMemo(() => ({
     token, user, loading, initializing, error, meError,
     isAuthenticated: !!token && !!user,
@@ -272,6 +322,16 @@ export const AuthProvider = ({ children }) => {
     logout,
     refreshMe,
     updateProfile,
+    // P2/P3: Password & email verification
+    changePassword,
+    forgotPassword,
+    resetPassword,
+    sendVerification,
+    verifyEmail,
+    // P4: Sessions
+    getSessions,
+    revokeSession,
+    logoutAll,
     clearError: () => setError(null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [token, user, loading, initializing, error, meError]);

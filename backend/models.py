@@ -2835,7 +2835,9 @@ class RegisterEmailRequest(BaseModel):
 
 class LoginEmailRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., max_length=128)  # Stage 7: B-12
+    # P1: password всегда непустой (min_length=1 защищает от пустых строк
+    # и экономит bcrypt CPU на заведомо невалидных попытках).
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class TelegramLoginRequest(BaseModel):
@@ -2969,6 +2971,55 @@ class UsernameCheckResponse(BaseModel):
     username: str
     available: bool
     reason: Optional[str] = None
+
+
+# ==================== PASSWORD MANAGEMENT (P2) ====================
+
+class ChangePasswordRequest(BaseModel):
+    """Смена пароля авторизованным пользователем."""
+    old_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Запрос ссылки для сброса пароля."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Выполнение сброса пароля по токену из email."""
+    token: str = Field(..., min_length=16, max_length=128)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    """Подтверждение email по токену."""
+    token: str = Field(..., min_length=16, max_length=128)
+
+
+# ==================== SESSIONS / DEVICES (P4) ====================
+
+class SessionInfo(BaseModel):
+    """Информация об активной сессии (токене)."""
+    jti: str
+    created_at: datetime
+    last_active_at: Optional[datetime] = None
+    expires_at: datetime
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    device_label: Optional[str] = None  # "iPhone · Safari" / "Windows · Chrome"
+    provider: Optional[str] = None      # email / telegram / vk / qr
+    is_current: bool = False
+
+
+class SessionsListResponse(BaseModel):
+    sessions: List[SessionInfo]
+    total: int
+
+
+class GenericSuccessResponse(BaseModel):
+    success: bool = True
+    message: Optional[str] = None
 
 
 class ProfileViewRequest(BaseModel):
