@@ -149,8 +149,15 @@ _EMAIL_VERIFY_TTL_MIN = 24 * 60  # 24 часа
 # ========== Helpers ==========
 
 
-def _user_to_public(user_doc: dict, include_email: bool = False) -> UserPublic:
-    """Конвертирует Mongo-doc `users` → UserPublic."""
+def _user_to_public(user_doc: dict, include_email: bool = False, settings_doc: Optional[dict] = None) -> UserPublic:
+    """Конвертирует Mongo-doc `users` → UserPublic.
+
+    Опционально обогащается данными `user_settings` (referral_code, invited_count,
+    referred_by). Вызывающий код может передать уже загруженный settings_doc,
+    либо оставить None — тогда реферальные поля будут пустыми (их можно получить
+    через /api/referral/get-code).
+    """
+    s = settings_doc or {}
     return UserPublic(
         uid=user_doc.get("uid"),
         username=user_doc.get("username"),
@@ -172,6 +179,10 @@ def _user_to_public(user_doc: dict, include_email: bool = False) -> UserPublic:
         registration_step=user_doc.get("registration_step", 0),
         created_at=user_doc.get("created_at"),
         last_login_at=user_doc.get("last_login_at"),
+        email_verified=bool(user_doc.get("email_verified", False)),
+        referral_code=s.get("referral_code"),
+        invited_count=int(s.get("invited_count") or 0),
+        referred_by=s.get("referred_by"),
     )
 
 
@@ -412,6 +423,12 @@ async def _create_new_user(
 
     # Зеркало в user_settings — реальный tid если есть, иначе pseudo-tid.
     effective_tid = int(telegram_id) if telegram_id else pseudo_tid_from_uid(uid)
+    # 🔗 P4: Авто-генерация referral_code при создании юзера
+    try:
+        from server import generate_referral_code as _gen_ref_code  # локальный импорт чтобы избежать циклов
+        _referral_code = _gen_ref_code(effective_tid)
+    except Exception:
+        _referral_code = None
     try:
         await db.user_settings.update_one(
             {"telegram_id": effective_tid},
@@ -419,6 +436,9 @@ async def _create_new_user(
                 "$setOnInsert": {
                     "telegram_id": effective_tid,
                     "created_at": now,
+                    "invited_count": 0,
+                    "referral_points_earned": 0,
+                    **({"referral_code": _referral_code} if _referral_code else {}),
                 },
                 "$set": {
                     "uid": uid,
@@ -587,10 +607,22 @@ async def _issue_token(
     if not is_new:
         await _update_last_login(db, user_doc["uid"], request=request)
 
+    # P4: подгружаем user_settings для referral_code/invited_count/referred_by
+    settings_doc: Optional[dict] = None
+    try:
+        eff_tid = user_doc.get("telegram_id")
+        eff_tid = int(eff_tid) if eff_tid else pseudo_tid_from_uid(user_doc["uid"])
+        settings_doc = await db.user_settings.find_one(
+            {"telegram_id": eff_tid},
+            {"_id": 0, "referral_code": 1, "invited_count": 1, "referred_by": 1},
+        )
+    except Exception:
+        pass
+
     return AuthTokenResponse(
         access_token=token,
         token_type="bearer",
-        user=_user_to_public(user_doc, include_email=True),
+        user=_user_to_public(user_doc, include_email=True, settings_doc=settings_doc),
         is_new_user=is_new,
         suggested_username_taken=suggested_username_taken,
     )
@@ -1522,12 +1554,25 @@ def create_auth_router(db) -> APIRouter:
 
     # ============= /me =============
 
+    async def _load_user_settings(uid: str, user_doc: dict) -> Optional[dict]:
+        """Подгружает user_settings-документ (для referral_code/invited_count/referred_by)."""
+        try:
+            tid = user_doc.get("telegram_id")
+            eff_tid = int(tid) if tid else pseudo_tid_from_uid(uid)
+            return await db.user_settings.find_one(
+                {"telegram_id": eff_tid},
+                {"_id": 0, "referral_code": 1, "invited_count": 1, "referred_by": 1},
+            )
+        except Exception:
+            return None
+
     @router.get("/me", response_model=UserPublic)
     async def me(current_user: Dict[str, Any] = Depends(get_current_user_required)):
         user_doc = await db.users.find_one({"uid": current_user["sub"]})
         if not user_doc:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
-        return _user_to_public(user_doc, include_email=True)
+        settings = await _load_user_settings(user_doc["uid"], user_doc)
+        return _user_to_public(user_doc, include_email=True, settings_doc=settings)
 
     # ============= /logout =============
 
@@ -1536,7 +1581,13 @@ def create_auth_router(db) -> APIRouter:
         request: Request,
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
-        """Logout — клиент удаляет JWT. Логируем для audit."""
+        """Logout — отзывает ТЕКУЩУЮ сессию (jti) + логирует event."""
+        jti = current_user.get("jti")
+        if jti:
+            try:
+                await revoke_session(db, uid=current_user["sub"], jti=jti)
+            except Exception as e:
+                logger.warning(f"logout revoke_session failed: {e}")
         await _log_auth_event(
             db, event_type="logout", uid=current_user["sub"],
             success=True, request=request,

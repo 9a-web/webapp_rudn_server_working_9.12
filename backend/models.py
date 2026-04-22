@@ -2820,6 +2820,14 @@ class UserPublic(BaseModel):
     created_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
 
+    # P3: email verification — фронт использует для показа баннера
+    email_verified: bool = False
+
+    # P4: referral — автогенерация при регистрации
+    referral_code: Optional[str] = None
+    invited_count: int = 0
+    referred_by: Optional[int] = None
+
 
 # --- Auth requests ---
 

@@ -427,7 +427,13 @@ async def get_current_user_required(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> Dict[str, Any]:
-    """Обязательная аутентификация — бросает 401 при отсутствии/невалидности токена."""
+    """Обязательная аутентификация — бросает 401 при отсутствии/невалидности токена.
+
+    🔐 P4 (sessions): также отклоняет JWT с revoked jti. `db` берётся из
+    `request.app.state.db` (устанавливается в server.py при старте). Если
+    `state.db` не задан — проверка сессии пропускается (graceful fallback,
+    чтобы не ломать unit-тесты без app context).
+    """
     token = _extract_token(request, credentials)
     if not token:
         raise HTTPException(
@@ -439,7 +445,6 @@ async def get_current_user_required(
         payload = decode_jwt(token)
         if not payload.get("sub"):
             raise HTTPException(status_code=401, detail="Невалидный токен (нет subject)")
-        return payload
     except JWTError as e:
         logger.debug(f"Invalid JWT (required): {e}")
         raise HTTPException(
@@ -447,6 +452,29 @@ async def get_current_user_required(
             detail="Невалидный или истёкший токен",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # 🔐 Session revocation check (best-effort, no-op если state.db отсутствует)
+    jti = payload.get("jti")
+    if jti:
+        db = getattr(getattr(request.app, "state", None), "db", None)
+        if db is not None:
+            try:
+                if not await is_session_active(db, jti):
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Сессия отозвана. Войдите заново.",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+                # touch best-effort (не блокируем на ошибках)
+                try:
+                    await touch_session(db, jti)
+                except Exception:
+                    pass
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.warning(f"session check failed (allowing through): {e}")
+    return payload
 
 
 # ----- Telegram Login Widget validation -----

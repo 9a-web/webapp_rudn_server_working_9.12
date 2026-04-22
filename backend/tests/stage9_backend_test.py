@@ -174,6 +174,11 @@ class TestPasswordChange:
                       headers=h)
         assert r3.status_code == 200, r3.text
 
+        # After password change, the original JWT must become invalid (all sessions revoked)
+        r_me_after = api.get(f"{BASE_URL}/api/auth/me", headers=h)
+        assert r_me_after.status_code == 401, \
+            f"JWT should be revoked after password change, got {r_me_after.status_code}"
+
         time.sleep(0.4)
         log = _read_log_tail()
         assert email in log, "change-notification email should be logged for user"
@@ -205,19 +210,12 @@ class TestEmailVerification:
                       json={"token": verify_token})
         assert r2.status_code == 200, r2.text
 
-        # Check DB directly (UserPublic/me doesn't expose email_verified)
-        import subprocess
-        out = subprocess.run(
-            ["mongosh", "test_database", "--quiet", "--eval",
-             f'const u=db.users.findOne({{email:"{email}"}}); print(u && u.email_verified);'],
-            capture_output=True, text=True,
-        )
-        assert "true" in out.stdout.lower(), f"email_verified not true in DB: {out.stdout}"
-
-        # Soft check: /auth/me — known to NOT expose email_verified (bug, see report)
+        # /auth/me MUST now expose email_verified=true (HIGH fix)
         r3 = api.get(f"{BASE_URL}/api/auth/me", headers=h)
         assert r3.status_code == 200
-        # (intentionally not asserting me.email_verified — reported as bug)
+        me = r3.json()
+        assert "email_verified" in me, f"UserPublic missing email_verified field: {me}"
+        assert me["email_verified"] is True, f"email_verified should be True after /verify, got {me.get('email_verified')}"
 
         # reuse token -> 400
         r4 = api.post(f"{BASE_URL}/api/auth/email/verify",
@@ -322,69 +320,96 @@ class TestSessions:
         assert r2.status_code == 200
 
 
+# ============== UserPublic fields (HIGH fix) ==============
+class TestUserPublicFields:
+    def test_me_exposes_new_fields(self, api):
+        email, pwd, token, user = _register(api)
+        # response.user must already include fields
+        assert "email_verified" in user, f"register.user missing email_verified: {user}"
+        assert user["email_verified"] is False
+        assert "referral_code" in user, f"register.user missing referral_code: {user}"
+        assert user["referral_code"], f"referral_code must be auto-generated, got {user.get('referral_code')!r}"
+        assert "invited_count" in user, f"register.user missing invited_count: {user}"
+        assert user["invited_count"] == 0
+        assert "referred_by" in user, f"register.user missing referred_by key: {user}"
+        assert user["referred_by"] is None
+
+        # /auth/me returns the same values
+        h = {"Authorization": f"Bearer {token}"}
+        r = api.get(f"{BASE_URL}/api/auth/me", headers=h)
+        assert r.status_code == 200
+        me = r.json()
+        assert me["email_verified"] is False
+        assert me["referral_code"] == user["referral_code"], \
+            f"/me.referral_code {me.get('referral_code')} != register.referral_code {user.get('referral_code')}"
+        assert me["invited_count"] == 0
+        assert me["referred_by"] is None
+
+
 # ============== Referral ==============
 class TestReferral:
     def test_referral_flow(self, api):
-        # Register user A
+        # Register user A — referral_code is auto-generated now (MEDIUM fix)
         email_a, pwd_a, token_a, user_a = _register(api)
         h_a = {"Authorization": f"Bearer {token_a}"}
         r = api.get(f"{BASE_URL}/api/auth/me", headers=h_a)
         assert r.status_code == 200
-        uid_a = r.json()["uid"]
+        me_a = r.json()
+        uid_a = me_a["uid"]
+        a_code = me_a.get("referral_code")
+        assert a_code, f"A.referral_code must be auto-generated, got {a_code!r}"
 
-        # A's referral_code is NOT auto-generated at registration; inject one via DB
-        # (mirrors what /api/referral/get-code would do lazily)
-        import subprocess
-        test_code = f"T{uuid.uuid4().hex[:6].upper()}"
-        # read effective_tid = pseudo_tid_from_uid(uid_a) via a small helper endpoint.
-        # Simpler: locate user_settings doc by uid.
+        # Register user B with A's referral_code
+        email_b, pwd_b, token_b, user_b = _register(api, referral_code=a_code)
+        h_b = {"Authorization": f"Bearer {token_b}"}
+        r = api.get(f"{BASE_URL}/api/auth/me", headers=h_b)
+        me_b = r.json()
+        uid_b = me_b["uid"]
+
+        time.sleep(0.6)  # let referral processing complete
+
+        # B.referred_by must be set to A's effective_tid; check via /me
+        assert me_b.get("referred_by") is not None or True  # /me may have stale snapshot; re-fetch
+        r_b2 = api.get(f"{BASE_URL}/api/auth/me", headers=h_b)
+        me_b2 = r_b2.json()
+        b_referred_by = me_b2.get("referred_by")
+        assert b_referred_by is not None, f"B.referred_by should be set, got {b_referred_by!r} (me={me_b2})"
+
+        # A.invited_count must be incremented
+        r_a2 = api.get(f"{BASE_URL}/api/auth/me", headers=h_a)
+        me_a2 = r_a2.json()
+        assert me_a2.get("invited_count", 0) >= 1, \
+            f"A.invited_count should be >=1 after B signs up with A.code, got {me_a2.get('invited_count')}"
+
+        # And B.referred_by should match A's effective_tid (uid for email users)
+        # Verify consistency via DB
+        import subprocess, json as _json, re as _re
         js = f"""
-        db.user_settings.updateOne({{uid: "{uid_a}"}},
-            {{$set: {{referral_code: "{test_code}", invited_count: 0}}}});
-        const us = db.user_settings.findOne({{uid: "{uid_a}"}});
-        print(JSON.stringify({{tid: us.telegram_id, code: us.referral_code, invited_count: us.invited_count}}));
+        const a = db.user_settings.findOne({{uid: "{uid_a}"}});
+        const b = db.user_settings.findOne({{uid: "{uid_b}"}});
+        print(JSON.stringify({{
+            a_tid: a && a.telegram_id,
+            a_code: a && a.referral_code,
+            a_invited: a && a.invited_count,
+            b_ref_by: b && b.referred_by
+        }}));
         """
         out = subprocess.run(
             ["mongosh", "test_database", "--quiet", "--eval", js],
             capture_output=True, text=True,
         )
-        assert "referral_code" in out.stdout or test_code in out.stdout, out.stdout + out.stderr
-        # parse A's telegram_id
-        import json as _json, re as _re
         m = _re.search(r'\{.*\}', out.stdout)
         assert m, out.stdout
-        a_tid = _json.loads(m.group(0)).get("tid")
-        # mongosh may render Long as {"$numberLong":"..."} — unwrap
-        if isinstance(a_tid, dict):
-            a_tid = int(a_tid.get("$numberLong") or a_tid.get("low"))
-
-        # Register user B with A's referral_code
-        email_b, pwd_b, token_b, user_b = _register(api, referral_code=test_code)
-        h_b = {"Authorization": f"Bearer {token_b}"}
-        r = api.get(f"{BASE_URL}/api/auth/me", headers=h_b)
-        uid_b = r.json()["uid"]
-
-        time.sleep(0.5)  # let referral processing complete
-
-        # Verify in DB: B.referred_by == A.tid, A.invited_count == 1
-        js2 = f"""
-        const b = db.user_settings.findOne({{uid: "{uid_b}"}});
-        const a = db.user_settings.findOne({{uid: "{uid_a}"}});
-        print(JSON.stringify({{b_referred_by: b && b.referred_by, a_invited: a && a.invited_count}}));
-        """
-        out2 = subprocess.run(
-            ["mongosh", "test_database", "--quiet", "--eval", js2],
-            capture_output=True, text=True,
-        )
-        m2 = _re.search(r'\{.*\}', out2.stdout)
-        assert m2, out2.stdout
-        result = _json.loads(m2.group(0))
-        referred_by = result.get("b_referred_by")
-        if isinstance(referred_by, dict):
-            referred_by = int(referred_by.get("$numberLong") or referred_by.get("low"))
-        invited = result.get("a_invited") or 0
-        assert referred_by == a_tid, f"B.referred_by={referred_by} != A.tid={a_tid} (result={result})"
-        assert invited >= 1, f"A.invited_count should be >=1, got {invited}"
+        result = _json.loads(m.group(0))
+        def _unwrap(v):
+            if isinstance(v, dict):
+                return int(v.get("$numberLong") or v.get("low") or 0)
+            return v
+        a_tid = _unwrap(result.get("a_tid"))
+        b_ref_by = _unwrap(result.get("b_ref_by"))
+        assert result.get("a_code") == a_code, f"DB.a_code {result.get('a_code')} != /me code {a_code}"
+        assert b_ref_by == a_tid, f"B.referred_by={b_ref_by} != A.tid={a_tid}"
+        assert _unwrap(result.get("a_invited")) >= 1
 
 
 # ============== P1 fixes ==============
@@ -428,9 +453,6 @@ class TestRegressionFlow:
         r = api.post(f"{BASE_URL}/api/auth/logout", headers=h)
         assert r.status_code == 200
 
-        # NOTE: due to current bug (get_current_user_required doesn't check session
-        # revocation), the JWT still works after logout. Log this as a finding instead
-        # of failing the regression.
+        # After logout the SAME JWT MUST now be invalid (CRITICAL fix)
         r = api.get(f"{BASE_URL}/api/auth/me", headers=h)
-        # soft-check: ideally 401, currently 200 (bug)
-        assert r.status_code in (200, 401)
+        assert r.status_code == 401, f"JWT should be invalid after logout, got {r.status_code}"

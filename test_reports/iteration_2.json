@@ -1,0 +1,37 @@
+{
+  "summary": "Stage 9 retest after CRITICAL/HIGH/MEDIUM fixes. 15/16 tests pass (94%). All 3 targeted fixes verified working: (1) Session revocation now enforced — logout, logout-all (keep_current=true/false), DELETE /sessions/{jti} all correctly invalidate the JWT; (2) UserPublic now exposes email_verified, referral_code, invited_count, referred_by on both register response and /auth/me; (3) referral_code is auto-generated at registration and referral flow (A→B) wires referred_by + invited_count correctly. Only remaining deviation: POST /auth/password/change does NOT revoke the CURRENT JWT — by design (code uses revoke_all_sessions with except_jti=current_jti and docstring says 'Отзывает все остальные сессии'), which contradicts the retest requirement that /auth/me with SAME JWT must return 401 after password change.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/auth/password/change",
+        "issue": "Does not revoke the CURRENT session's JWT. auth_routes.py:2161 calls `revoke_all_sessions(db, uid=uid, except_jti=current_jti)` — only OTHER sessions are killed; the docstring explicitly says 'Отзывает все остальные сессии'. The retest spec requires the current JWT to also return 401 on subsequent /auth/me. Two valid remediations: (a) drop `except_jti` so all sessions (including current) are revoked — matches spec, forces frontend to re-login; or (b) keep current behaviour but update the spec. Only 1/16 tests affected."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/stage9_backend_test.py",
+    "/app/test_reports/pytest/stage9_retest_results.xml"
+  ],
+  "action_items": [
+    "Decide policy for POST /auth/password/change: if spec is authoritative, change `revoke_all_sessions(db, uid=uid, except_jti=current_jti)` to `revoke_all_sessions(db, uid=uid)` in auth_routes.py:2161 and update docstring; else, update the retest spec. All other fixes verified PASS."
+  ],
+  "critical_code_review_comments": [
+    "Session revocation fix via request.app.state.db + is_session_active inside get_current_user_required works correctly across logout, logout-all (both keep_current variants), and DELETE /sessions/{jti} — verified by 4 tests that used to fail.",
+    "UserPublic now includes email_verified/referral_code/invited_count/referred_by — register response AND /auth/me both consistent.",
+    "Auto-generated referral_code at registration eliminates the previous lazy-generation round-trip; referral A→B flow works end-to-end without DB injection.",
+    "auth_routes.py:2116 docstring and implementation for /password/change disagree with the retest spec — semantic mismatch, not a code bug per se."
+  ],
+  "updated_files": [
+    "/app/backend/tests/stage9_backend_test.py"
+  ],
+  "success_rate": {"backend": "94% (15/16)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "stage9_<hex>@test.com / Test1234 (on-the-fly); X-Forwarded-For randomised to bypass 5/hr/IP. SMTP DEV → /app/logs/emails.log; tokens extracted via regex.",
+  "seed_data_creation": "~25 stage9_* users created across the run. All isolated; no prod data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "If main agent decides to also revoke the current session on /password/change, re-run `pytest /app/backend/tests/stage9_backend_test.py::TestPasswordChange -v` — the test_change_full_flow test expects 401 on /me after change. Otherwise, flip that one assertion back to a soft check. Public ingress still not routing /api/* — tests use http://localhost:8001 directly.",
+  "rca of the issue": "Password change keeps-current-session behaviour: intentional — auth_routes.py:2159-2161 passes except_jti=current_jti to revoke_all_sessions so the user who just changed their password isn't instantly kicked out. The retest request phrasing ('after these operations subsequent /auth/me with the SAME JWT MUST return 401') conflicts with this UX. To align with spec: drop except_jti (or require client to re-login). No code-level bug; just a policy disagreement."
+}

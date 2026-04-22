@@ -436,6 +436,9 @@ bot_application = None
 # Create the main app without a prefix
 app = FastAPI(title="RUDN Schedule API", version="1.0.0")
 
+# 🔐 P4: expose db on app.state so auth deps can do session-revocation checks
+app.state.db = db
+
 # Configure CORS middleware BEFORE adding routes
 cors_origins_str = os.environ.get('CORS_ORIGINS', '*')
 cors_origins_list = [origin.strip() for origin in cors_origins_str.split(',')]
