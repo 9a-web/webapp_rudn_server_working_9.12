@@ -13,7 +13,7 @@ ENV-переменные (все опциональные — fallback к LOG_ON
 - SMTP_USER        (логин для auth, обычно email)
 - SMTP_PASSWORD    (пароль приложения)
 - SMTP_FROM        (email отправителя, по умолчанию SMTP_USER)
-- SMTP_FROM_NAME   (человекочитаемое имя, по умолчанию "RUDN Schedule")
+- SMTP_FROM_NAME   (человекочитаемое имя, по умолчанию "RUDN Go")
 - SMTP_USE_TLS     ("true" = STARTTLS, "false" = SSL on 465)
 - SMTP_TIMEOUT     (секунды, default 15)
 """
@@ -45,7 +45,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or "587")
 SMTP_USER = os.getenv("SMTP_USER", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "").strip() or SMTP_USER
-SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "RUDN Schedule").strip()
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "RUDN Go").strip()
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes", "on")
 SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "15") or "15")
 
@@ -176,21 +176,21 @@ def _base_template(body_html: str, preheader: str = "") -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RUDN Schedule</title>
+  <title>RUDN Go</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f4f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;">
   <span style="display:none!important;visibility:hidden;opacity:0;height:0;width:0;overflow:hidden;">{preheader}</span>
   <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
     <div style="background:#fff;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;">
       <div style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);padding:24px 32px;color:#fff;">
-        <h1 style="margin:0;font-size:20px;font-weight:700;">🎓 RUDN Schedule</h1>
+        <h1 style="margin:0;font-size:20px;font-weight:700;">🎓 RUDN Go</h1>
       </div>
       <div style="padding:32px;line-height:1.6;font-size:15px;color:#1a1a1a;">
         {body_html}
       </div>
       <div style="padding:16px 32px;background:#f9fafb;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb;">
         Это автоматическое письмо. Если вы не запрашивали его — просто проигнорируйте.<br>
-        © RUDN Schedule, {datetime.now().year}
+        © RUDN Go, {datetime.now().year}
       </div>
     </div>
   </div>
@@ -200,11 +200,11 @@ def _base_template(body_html: str, preheader: str = "") -> str:
 
 def template_password_reset(reset_url: str, user_name: str = "") -> tuple[str, str, str]:
     """Возвращает (subject, html, text)."""
-    subject = "🔐 Сброс пароля — RUDN Schedule"
+    subject = "🔐 Сброс пароля — RUDN Go"
     greeting = f"Здравствуйте, {user_name}!" if user_name else "Здравствуйте!"
     body = f"""
         <p>{greeting}</p>
-        <p>Вы запросили сброс пароля для аккаунта RUDN Schedule.</p>
+        <p>Вы запросили сброс пароля для аккаунта RUDN Go.</p>
         <p>Нажмите на кнопку ниже, чтобы задать новый пароль:</p>
         <p style="text-align:center;margin:28px 0;">
           <a href="{reset_url}" style="display:inline-block;padding:14px 32px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">
@@ -228,7 +228,7 @@ def template_password_reset(reset_url: str, user_name: str = "") -> tuple[str, s
 
 
 def template_email_verification(verify_url: str, user_name: str = "") -> tuple[str, str, str]:
-    subject = "✉️ Подтвердите email — RUDN Schedule"
+    subject = "✉️ Подтвердите email — RUDN Go"
     greeting = f"Здравствуйте, {user_name}!" if user_name else "Здравствуйте!"
     body = f"""
         <p>{greeting}</p>
@@ -251,7 +251,7 @@ def template_email_verification(verify_url: str, user_name: str = "") -> tuple[s
 
 
 def template_password_changed(user_name: str = "", ip: str = "") -> tuple[str, str, str]:
-    subject = "🔐 Пароль изменён — RUDN Schedule"
+    subject = "🔐 Пароль изменён — RUDN Go"
     greeting = f"Здравствуйте, {user_name}!" if user_name else "Здравствуйте!"
     ip_line = f"<p style='font-size:13px;color:#6b7280;'>IP-адрес: <code>{ip}</code></p>" if ip else ""
     body = f"""
