@@ -1024,7 +1024,7 @@ const TasksTab = ({
                     </div>
 
                     {/* Actions */}
-                    {(isOwner || task.owner_id === userSettings?.telegram_id) && (
+                    {(isOwner || isSameUser({ telegram_id: task.owner_id }, userSettings)) && (
                       <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.stopPropagation(); handlePinTask(task); }}

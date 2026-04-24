@@ -22,6 +22,7 @@ import FriendSearchModal from './FriendSearchModal';
 import ChatModal from './ChatModal';
 import { getBackendURL } from '../utils/config';
 import { useIsAdmin } from '../hooks/useIsAdmin';
+import { isSameUser } from '../utils/userIdentity';
 
 // Все доступные dev-команды с описаниями
 const DEV_COMMANDS = [
@@ -659,7 +660,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
       showToast(result?.message || 'Запрос отправлен!');
       // Оптимистично обновляем статус в результатах поиска
       setSearchResults(prev => prev.map(r =>
-        r.telegram_id === targetId ? { ...r, friendship_status: 'pending_outgoing' } : r
+        // P2 (instrUIDprofile.md): безопасное сравнение — поддержка pseudo_tid
+        isSameUser(r, { telegram_id: targetId }) ? { ...r, friendship_status: 'pending_outgoing' } : r
       ));
       // Перезагружаем запросы
       loadRequests();
@@ -1156,7 +1158,8 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
                 </div>
               ) : conversations.length > 0 ? (
                 conversations.map((conv, idx) => {
-                  const other = conv.participants?.find(p => p.telegram_id !== user?.id);
+                  // P2 (instrUIDprofile.md): isSameUser — поддержка pseudo_tid
+                  const other = conv.participants?.find(p => !isSameUser(p, user));
                   if (!other) return null;
                   const displayName = [other.first_name, other.last_name].filter(Boolean).join(' ') || other.username || 'Пользователь';
                   const lastMsg = conv.last_message;

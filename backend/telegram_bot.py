@@ -226,32 +226,41 @@ async def send_device_linked_notification(
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Пытаемся получить фото профиля пользователя и отправить с ним
+        # P1: через safe_send_telegram — guard + единый error-handling
         try:
             photos = await bot.get_user_profile_photos(telegram_id, limit=1)
 
             if photos.total_count > 0:
                 photo = photos.photos[0][0]
-                await bot.send_photo(
-                    chat_id=telegram_id,
+                ok = await safe_send_telegram(
+                    bot,
+                    telegram_id,
                     photo=photo.file_id,
                     caption=message_text,
                     parse_mode='HTML',
-                    reply_markup=reply_markup
+                    reply_markup=reply_markup,
+                    method="photo",
+                    log_ctx="device_linked_photo",
                 )
-                logger.info(f"📱 Уведомление об устройстве с фото отправлено: {telegram_id}")
-                return True
+                if ok:
+                    logger.info(f"📱 Уведомление об устройстве с фото отправлено: {telegram_id}")
+                    return True
         except Exception as photo_err:
             logger.warning(f"⚠️ Не удалось получить фото профиля: {photo_err}")
 
         # Fallback: просто текст
-        await bot.send_message(
-            chat_id=telegram_id,
+        ok = await safe_send_telegram(
+            bot,
+            telegram_id,
             text=message_text,
             parse_mode='HTML',
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            method="message",
+            log_ctx="device_linked_text",
         )
-        logger.info(f"📱 Уведомление об устройстве отправлено: {telegram_id}")
-        return True
+        if ok:
+            logger.info(f"📱 Уведомление об устройстве отправлено: {telegram_id}")
+        return ok
 
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке уведомления об устройстве: {e}", exc_info=True)

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { messagesAPI } from '../services/messagesAPI';
 import { getBackendURL } from '../utils/config';
+import { isSameUser } from '../utils/userIdentity';
 
 const getAvatarGradient = (id) => {
   const gradients = [
@@ -125,7 +126,8 @@ const ConversationsListModal = ({ isOpen, onClose, currentUserId, onOpenChat }) 
     if (!searchQuery.trim()) return conversations;
     const q = searchQuery.toLowerCase();
     return conversations.filter(conv => {
-      const other = conv.participants?.find(p => p.telegram_id !== currentUserId);
+      // P2 (instrUIDprofile.md): isSameUser — поддержка pseudo_tid/uid
+      const other = conv.participants?.find(p => !isSameUser(p, { telegram_id: currentUserId }));
       if (!other) return false;
       const name = `${other.first_name} ${other.last_name} ${other.username}`.toLowerCase();
       return name.includes(q);
@@ -133,7 +135,7 @@ const ConversationsListModal = ({ isOpen, onClose, currentUserId, onOpenChat }) 
   }, [conversations, searchQuery, currentUserId]);
 
   const handleOpenChat = (conv) => {
-    const other = conv.participants?.find(p => p.telegram_id !== currentUserId);
+    const other = conv.participants?.find(p => !isSameUser(p, { telegram_id: currentUserId }));
     if (other) {
       onOpenChat?.({
         telegram_id: other.telegram_id,
@@ -220,7 +222,8 @@ const ConversationsListModal = ({ isOpen, onClose, currentUserId, onOpenChat }) 
                 </div>
               ) : filteredConversations.length > 0 ? (
                 filteredConversations.map((conv, idx) => {
-                  const other = conv.participants?.find(p => p.telegram_id !== currentUserId);
+                  // P2 (instrUIDprofile.md): isSameUser — поддержка pseudo_tid/uid
+                  const other = conv.participants?.find(p => !isSameUser(p, { telegram_id: currentUserId }));
                   if (!other) return null;
 
                   const displayName = [other.first_name, other.last_name].filter(Boolean).join(' ') || other.username || 'Пользователь';

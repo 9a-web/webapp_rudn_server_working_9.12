@@ -771,7 +771,33 @@ async def startup_event():
             logger.info("⚠️ Fallback: Old notification scheduler started")
         except Exception as fallback_error:
             logger.error(f"❌ Fallback also failed: {fallback_error}")
-    
+
+    # 7.5. 📬 Инициализация delivery-сервиса (P1-Extension): индексы + retry worker
+    if mongo_ok:
+        try:
+            from services.delivery import ensure_delivery_attempts_indexes
+            asyncio.create_task(ensure_delivery_attempts_indexes(db))
+            logger.info("✅ delivery_attempts indexes scheduled")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to schedule delivery indexes: {e}")
+
+        # Retry worker: каждые 60 сек обрабатывает pending_retry
+        async def _delivery_retry_loop():
+            from services.delivery import process_pending_retries
+            # Ждём готовности бота
+            await asyncio.sleep(30)
+            while True:
+                try:
+                    bot_ref = bot_application.bot if 'bot_application' in globals() and bot_application else None
+                    if bot_ref is not None:
+                        await process_pending_retries(db, bot_ref, limit=50, log_ctx="retry_worker")
+                except Exception as retry_e:  # noqa: BLE001
+                    logger.error(f"[delivery.retry_loop] {retry_e}", exc_info=False)
+                await asyncio.sleep(60)
+
+        asyncio.create_task(_delivery_retry_loop())
+        logger.info("✅ Delivery retry worker scheduled (interval=60s)")
+
     # 8. Запускаем Telegram бота как background task
     try:
         global bot_application
@@ -1876,7 +1902,6 @@ async def dev_reset_streak(data: DevResetStreakRequest):
 async def dev_execute_command(data: DevCommandRequest):
     """Универсальный endpoint для dev-команд"""
     _check_admin(data.telegram_id)
-    
     command = data.command.lower().strip()
     args = data.args or []
     tid = data.telegram_id
@@ -7379,6 +7404,137 @@ async def get_admin_stats(days: Optional[int] = None):
         web_unique_users=web_unique_users,
         web_users_today=web_users_today
     )
+
+
+# ============================================================================
+# 📬 DELIVERY STATS — мониторинг системы доставки уведомлений (P1-Extension)
+# ============================================================================
+
+@api_router.get("/admin/delivery/stats")
+async def get_admin_delivery_stats(telegram_id: int, hours: int = 24):
+    """📊 Статистика системы доставки уведомлений.
+
+    Возвращает метрики:
+      - attempts / sent / pending_retry / dlq
+      - разбивку по категориям (schedule, admin_broadcast, friend_request, ...)
+      - последние DLQ-записи (для ручного разбора)
+
+    Args:
+        telegram_id: ID админа (для _check_admin)
+        hours: окно статистики (по умолчанию 24 часа)
+    """
+    _check_admin(telegram_id)
+
+    try:
+        from services.delivery import DELIVERY_ATTEMPTS_COLL
+        cutoff = datetime.utcnow() - timedelta(hours=max(1, min(hours, 720)))  # cap 30 дней
+
+        coll = db[DELIVERY_ATTEMPTS_COLL]
+
+        # Общая агрегация по статусам
+        pipeline_status = [
+            {"$match": {"created_at": {"$gte": cutoff}}},
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+        ]
+        status_counts = {d["_id"]: d["count"] async for d in coll.aggregate(pipeline_status)}
+
+        # По категориям (для понимания где чаще всего падает)
+        pipeline_cat = [
+            {"$match": {"created_at": {"$gte": cutoff}}},
+            {"$group": {
+                "_id": {"category": "$category", "status": "$status"},
+                "count": {"$sum": 1},
+            }},
+        ]
+        by_category: dict[str, dict[str, int]] = {}
+        async for d in coll.aggregate(pipeline_cat):
+            cat = d["_id"].get("category") or "unknown"
+            st = d["_id"].get("status") or "unknown"
+            by_category.setdefault(cat, {})[st] = d["count"]
+
+        # По приоритетам
+        pipeline_prio = [
+            {"$match": {"created_at": {"$gte": cutoff}}},
+            {"$group": {"_id": "$priority", "count": {"$sum": 1}}},
+        ]
+        by_priority = {d["_id"]: d["count"] async for d in coll.aggregate(pipeline_prio)}
+
+        # Последние 10 DLQ-записей (для ручного разбора)
+        dlq_cursor = coll.find({"status": "dlq"}).sort("failed_at", -1).limit(10)
+        dlq_docs = []
+        async for d in dlq_cursor:
+            dlq_docs.append({
+                "id": d.get("id"),
+                "uid": d.get("uid"),
+                "telegram_id": d.get("telegram_id"),
+                "kind": d.get("kind"),
+                "category": d.get("category"),
+                "priority": d.get("priority"),
+                "error": d.get("error"),
+                "attempts": d.get("attempt"),
+                "max_attempts": d.get("max_attempts"),
+                "failed_at": d.get("failed_at").isoformat() if d.get("failed_at") else None,
+                "created_at": d.get("created_at").isoformat() if d.get("created_at") else None,
+            })
+
+        # Health-score: чем меньше DLQ/retry от общего, тем лучше
+        total = sum(status_counts.values()) or 1
+        sent = status_counts.get("sent", 0)
+        dlq = status_counts.get("dlq", 0)
+        pending = status_counts.get("pending_retry", 0)
+        health_score = round((sent / total) * 100, 2)
+
+        return {
+            "status": "ok",
+            "window_hours": hours,
+            "total_attempts": total,
+            "counts": status_counts,
+            "by_category": by_category,
+            "by_priority": by_priority,
+            "health_score_percent": health_score,
+            "dlq_recent": dlq_docs,
+            "summary": {
+                "sent": sent,
+                "dlq": dlq,
+                "pending_retry": pending,
+            },
+        }
+    except Exception as e:
+        logger.error(f"[admin/delivery/stats] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/admin/delivery/retry-dlq")
+async def admin_retry_dlq(telegram_id: int, attempt_ids: Optional[List[str]] = None):
+    """🔁 Ручной retry DLQ-записей (админская операция).
+
+    Если `attempt_ids` не задан — retry всех DLQ записей (осторожно!).
+    Если задан — retry только указанных.
+
+    Помечает записи как `pending_retry` с `next_retry_at = now` и сбрасывает attempt.
+    """
+    _check_admin(telegram_id)
+
+    try:
+        from services.delivery import DELIVERY_ATTEMPTS_COLL
+        filter_q = {"status": "dlq"}
+        if attempt_ids:
+            filter_q["id"] = {"$in": attempt_ids}
+
+        now = datetime.now(timezone.utc)
+        res = await db[DELIVERY_ATTEMPTS_COLL].update_many(
+            filter_q,
+            {"$set": {
+                "status": "pending_retry",
+                "attempt": 0,  # сброс
+                "next_retry_at": now,
+                "error": "manual_retry",
+            }},
+        )
+        return {"status": "ok", "revived": res.modified_count}
+    except Exception as e:
+        logger.error(f"[admin/delivery/retry-dlq] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.get("/admin/referral-stats", response_model=ReferralStatsDetailResponse)
@@ -20075,61 +20231,93 @@ async def send_notification_from_post(data: dict):
             message_text += description
         
         notification_svc = get_notification_service()
+        bot_ref = notification_svc.bot if notification_svc else None
         sent = 0
         failed = 0
         in_app_created = 0
 
-        for uid in recipient_ids:
-            try:
-                # P1: доставка через delivery.notify_user — in-app всем, TG только real
-                result = await _notify_user(
-                    db,
-                    notification_svc.bot if notification_svc else None,
-                    telegram_id=uid,
-                    title=title or "📢 Объявление",
-                    message=description or title or "",
-                    emoji="📢",
-                    type="admin_message",
-                    category="system",
-                    priority="high",
-                    data={"image_url": image_url, "source": "admin_broadcast"},
-                    # Для TG отправляем оригинальный HTML-блок
-                    telegram_text=message_text,
-                    # Отключаем встроенную TG-отправку — ниже сделаем фото-вариант
-                    send_telegram=False,
-                    log_ctx="admin_broadcast",
-                )
-                if result.get("in_app_id"):
-                    in_app_created += 1
+        # ═══════════════════════════════════════════════════════════════════
+        # P1-Extension: batch-отправка с семафором
+        # Вместо последовательного loop со sleep(0.05) используем
+        # asyncio.gather с Semaphore(20) — быстрее в 10-20 раз для больших
+        # списков. Для фото (image_url) шлём через notify_user_with_photo,
+        # для текста — через send_batch (наиболее эффективный путь).
+        # ═══════════════════════════════════════════════════════════════════
 
-                # TG-push — только real TG (поддержка image_url)
-                if is_real_telegram_user(uid):
+        # ── Вариант 1: без фото — используем send_batch (наиболее эффективно) ──
+        if not image_url:
+            from services.delivery import (
+                BatchRecipient, MessagePriority, send_batch as _send_batch,
+            )
+            batch_recipients = [BatchRecipient(telegram_id=int(uid)) for uid in recipient_ids]
+            batch_res = await _send_batch(
+                db,
+                bot_ref,
+                batch_recipients,
+                title=title or "📢 Объявление",
+                message=description or title or "",
+                emoji="📢",
+                type="admin_message",
+                category="system",
+                priority=MessagePriority.HIGH,
+                data={"source": "admin_broadcast"},
+                telegram_text=message_text,
+                telegram_parse_mode="HTML",
+                send_in_app=True,
+                enable_retry=True,  # при fail → DLQ retry-worker
+                concurrency=20,
+                inter_batch_delay_ms=50,  # 50ms между слотами — суммарно не бьёт rate-limit
+                log_ctx="admin_broadcast",
+            )
+            sent = batch_res.delivered_telegram
+            failed = batch_res.total - sent
+            in_app_created = batch_res.delivered_in_app
+        else:
+            # ── Вариант 2: с фото — параллельный обход через notify_user_with_photo ──
+            from services.delivery import notify_user_with_photo, MessagePriority
+
+            semaphore_ = asyncio.Semaphore(20)
+
+            async def _send_photo_one(uid_):
+                async with semaphore_:
                     try:
-                        if image_url:
-                            await notification_svc.bot.send_photo(
-                                chat_id=uid,
-                                photo=image_url,
-                                caption=message_text[:1024],
-                                parse_mode='HTML'
-                            )
-                        else:
-                            await notification_svc.send_message(uid, message_text)
-                        sent += 1
-                    except Exception as tg_e:
-                        logger.warning(f"Admin broadcast TG send failed tid={uid}: {tg_e}")
-                        failed += 1
-                else:
-                    # Для VK/Email — только in-app (который уже создан выше)
-                    logger.debug(
-                        f"🟡 admin broadcast: in-app only for tid={uid} "
-                        f"(reason={'pseudo_tid' if is_pseudo_tid(uid) else 'no_tid'})"
-                    )
-            except Exception as e:
-                logger.warning(f"Не удалось отправить уведомление {uid}: {e}")
-                failed += 1
+                        res = await notify_user_with_photo(
+                            db,
+                            bot_ref,
+                            telegram_id=int(uid_),
+                            title=title or "📢 Объявление",
+                            message=description or title or "",
+                            photo=image_url,
+                            emoji="📢",
+                            type="admin_message",
+                            category="system",
+                            priority=MessagePriority.HIGH,
+                            data={"image_url": image_url, "source": "admin_broadcast"},
+                            telegram_text=message_text,
+                            telegram_parse_mode="HTML",
+                            log_ctx="admin_broadcast_photo",
+                        )
+                        await asyncio.sleep(0.05)
+                        return res
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"admin_broadcast photo: {e}")
+                        return None
 
-            # Задержка для избежания rate-limit
-            await asyncio.sleep(0.05)
+            tasks = [_send_photo_one(uid) for uid in recipient_ids]
+            results_ = await asyncio.gather(*tasks)
+            for r in results_:
+                if r is None:
+                    failed += 1
+                    continue
+                if r.telegram_sent:
+                    sent += 1
+                elif r.get("telegram_skipped_reason") in ("pseudo_tid", "no_tid"):
+                    # VK/Email — in-app достаточно, не считаем как failed
+                    pass
+                else:
+                    failed += 1
+                if r.get("in_app_id"):
+                    in_app_created += 1
 
         logger.info(
             f"📨 Admin broadcast done: tg_sent={sent} tg_failed={failed} "
@@ -20219,6 +20407,10 @@ async def send_schedule_image(
         ])
 
         # Если caption помещается в лимит (1024) — отправляем всё в описании фото
+        # P1: guard `is_real_telegram_user` уже проверен выше (409 для VK/Email),
+        # поэтому используем raw bot.send_* — файловый поток BytesIO + особая
+        # комбинация photo+отдельное длинное сообщение с reply_markup только
+        # на текстовом fallback'е.
         if len(caption) <= 1024:
             await bot.send_photo(
                 chat_id=telegram_id,

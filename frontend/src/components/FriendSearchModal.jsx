@@ -8,6 +8,7 @@ import { X, Search, Users, Building2, UserPlus, Check, Clock, Loader2, Sparkles 
 import { friendsAPI } from '../services/friendsAPI';
 import { scheduleAPI } from '../services/api';
 import { getBackendURL } from '../utils/config';
+import { isSameUser } from '../utils/userIdentity';
 
 const getAvatarGradient = (id) => {
   const gradients = [
@@ -113,7 +114,8 @@ const FriendSearchModal = ({ isOpen, onClose, userSettings, currentUserId, onSen
     try {
       await onSendRequest(targetId);
       setResults(prev => prev.map(r =>
-        r.telegram_id === targetId ? { ...r, friendship_status: 'pending_outgoing' } : r
+        // P2 (instrUIDprofile.md): безопасное сравнение — поддержка pseudo_tid
+        isSameUser(r, { telegram_id: targetId }) ? { ...r, friendship_status: 'pending_outgoing' } : r
       ));
     } catch (error) {
       console.error('Error sending request:', error);

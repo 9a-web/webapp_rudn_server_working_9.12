@@ -886,6 +886,12 @@ class NotificationSchedulerV2:
                     if not last_visit or not telegram_id:
                         continue
                     
+                    # 🛡 P0-guard (instrUIDprofile.md): inactivity-reminders уходят
+                    # ТОЛЬКО в Telegram (через бот). У pseudo_tid-юзеров (VK/Email)
+                    # нет TG-чата, поэтому ретраим бессмысленно — пропускаем сразу.
+                    if not is_real_telegram_user(telegram_id):
+                        continue
+                    
                     from datetime import date as date_type
                     last_date = date_type.fromisoformat(last_visit)
                     today_date = date_type.fromisoformat(today_str)
