@@ -10,6 +10,7 @@ from telegram import Bot
 from telegram.error import TelegramError
 from config import get_telegram_bot_token, is_test_environment
 from auth_utils import is_real_telegram_user, is_pseudo_tid
+from services.delivery import notify_user as _notify_user
 
 logger = logging.getLogger(__name__)
 
@@ -34,44 +35,86 @@ class TelegramNotificationService:
         minutes_before: int
     ) -> bool:
         """
-        Отправить уведомление о начале пары
-        
+        Отправить уведомление о начале пары.
+
+        P1 (instrUIDprofile.md): вместо простого skip для pseudo_tid (VK/Email)
+        идёт через MessageDeliveryService — in-app создаётся для всех, TG-push
+        только для real telegram_id.
+
         Args:
-            telegram_id: ID пользователя в Telegram
+            telegram_id: ID пользователя (real TG или pseudo_tid)
             class_info: Информация о паре (discipline, time, teacher, auditory)
             minutes_before: За сколько минут до начала отправлено уведомление
-            
+
         Returns:
-            True если уведомление отправлено успешно
+            True если было доставлено хоть по одному каналу (in-app или TG).
         """
         try:
-            # 🛡 P0-guard: не шлём в pseudo_tid (VK/Email юзеры без real TG)
-            if not is_real_telegram_user(telegram_id):
-                logger.info(
-                    f"🟡 Skip class notification: tid={telegram_id} "
-                    f"reason={'pseudo_tid' if is_pseudo_tid(telegram_id) else 'no_tid'}"
-                )
-                return False
+            # Импорт db здесь — избегаем циклов (notifications.py грузится рано)
+            from server import db
 
-            # Формируем текст сообщения (уже содержит tg-emoji теги)
             message = self._format_class_notification(class_info, minutes_before)
-            
-            # Отправляем сообщение
-            await self.bot.send_message(
-                chat_id=telegram_id,
-                text=message,
-                parse_mode='HTML'
+
+            discipline = class_info.get("discipline", "Пара")
+            title = f"⏰ Через {minutes_before} мин: {discipline}" if minutes_before > 0 else f"🔴 Пара началась: {discipline}"
+
+            result = await _notify_user(
+                db,
+                self.bot,
+                telegram_id=telegram_id,
+                title=title,
+                message=self._format_class_notification_inapp(class_info, minutes_before),
+                emoji="⏰",
+                type="class_starting",
+                category="study",
+                priority="high",
+                data={
+                    "discipline": class_info.get("discipline"),
+                    "auditory": class_info.get("auditory"),
+                    "teacher": class_info.get("teacher"),
+                    "lesson_type": class_info.get("lessonType"),
+                    "minutes_before": minutes_before,
+                },
+                # Для Telegram используем форматированный HTML из существующего шаблона
+                telegram_text=message,
+                telegram_parse_mode="HTML",
+                log_ctx="class_reminder",
             )
-            
-            logger.info(f"Notification sent to {telegram_id} for class: {class_info.get('discipline')}")
-            return True
-            
+
+            delivered = result["telegram_sent"] or (result["in_app_id"] is not None)
+            if result["telegram_sent"]:
+                logger.info(
+                    f"📨 Class reminder delivered TG+in-app tid={telegram_id} "
+                    f"({class_info.get('discipline')})"
+                )
+            elif result["in_app_id"]:
+                logger.info(
+                    f"📬 Class reminder delivered in-app only tid={telegram_id} "
+                    f"(reason={result['telegram_skipped_reason']})"
+                )
+            return delivered
+
         except TelegramError as e:
-            logger.error(f"Failed to send notification to {telegram_id}: {e}")
+            logger.error(f"Failed to send class notification to {telegram_id}: {e}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error sending notification: {e}")
+            logger.error(f"Unexpected error sending class notification: {e}", exc_info=True)
             return False
+
+    def _format_class_notification_inapp(self, class_info: dict, minutes_before: int) -> str:
+        """Короткая (plain-text) версия сообщения о паре — для in-app карточки."""
+        parts = []
+        if minutes_before <= 5:
+            parts.append(f"🔴 Бегом! Пара через {minutes_before} мин")
+        elif minutes_before <= 15:
+            parts.append(f"🟡 Скоро начало — через {minutes_before} мин")
+        else:
+            parts.append(f"🟢 Через {minutes_before} мин")
+        if class_info.get("auditory"):
+            parts.append(f"📍 {class_info['auditory']}")
+        if class_info.get("teacher"):
+            parts.append(f"👨‍🏫 {class_info['teacher']}")
+        return " • ".join(parts)
     
     def _format_class_notification(self, class_info: dict, minutes_before: int) -> str:
         """
@@ -114,34 +157,42 @@ class TelegramNotificationService:
     
     async def send_test_notification(self, telegram_id: int) -> bool:
         """
-        Отправить тестовое уведомление
+        Отправить тестовое уведомление (P1: через delivery).
         """
         try:
-            # 🛡 P0-guard
-            if not is_real_telegram_user(telegram_id):
-                logger.info(
-                    f"🟡 Skip test notification: tid={telegram_id} "
-                    f"reason={'pseudo_tid' if is_pseudo_tid(telegram_id) else 'no_tid'}"
-                )
-                return False
+            from server import db
 
-            message = (
+            tg_text = (
                 '<tg-emoji emoji-id="5458603043203327669">🔔</tg-emoji>  <b>Уведомления подключены!</b>\n'
                 '<tg-emoji emoji-id="5206607081334906820">✨</tg-emoji> Отлично — теперь вы не пропустите ни одной пары.\n'
                 '<tg-emoji emoji-id="5422439311196834318">💡</tg-emoji> <i>Время уведомлений можно изменить в настройках приложения.</i>'
             )
-            
-            await self.bot.send_message(
-                chat_id=telegram_id,
-                text=message,
-                parse_mode='HTML'
+
+            result = await _notify_user(
+                db,
+                self.bot,
+                telegram_id=telegram_id,
+                title="Уведомления подключены!",
+                message="Отлично — теперь вы не пропустите ни одной пары. Время уведомлений можно изменить в настройках.",
+                emoji="🔔",
+                type="announcement",
+                category="system",
+                priority="normal",
+                telegram_text=tg_text,
+                log_ctx="test_notification",
             )
-            
-            logger.info(f"Test notification sent to {telegram_id}")
-            return True
-            
+            delivered = result["telegram_sent"] or (result["in_app_id"] is not None)
+            logger.info(
+                f"🧪 Test notification delivered tid={telegram_id} "
+                f"tg={result['telegram_sent']} in_app={bool(result['in_app_id'])}"
+            )
+            return delivered
+
         except TelegramError as e:
             logger.error(f"Failed to send test notification to {telegram_id}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error sending test notification: {e}", exc_info=True)
             return False
 
     async def send_message(self, telegram_id: int, text: str, parse_mode: str = 'HTML') -> bool:

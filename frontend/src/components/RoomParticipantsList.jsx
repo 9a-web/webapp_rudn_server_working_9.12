@@ -8,6 +8,7 @@ import { Users, Crown, Shield, Eye, User, ChevronDown, Check, UserPlus, Link2, C
 import { updateParticipantRole, addFriendsToRoom, generateInviteLink, kickParticipant, transferOwnership } from '../services/roomsAPI';
 import { useTelegram } from '../contexts/TelegramContext';
 import SelectFriendsModal from './SelectFriendsModal';
+import { isSameUser } from '../utils/userIdentity';
 
 const ROLES = [
   { id: 'owner', name: 'Владелец', icon: Crown, color: 'text-yellow-400', bgColor: 'bg-yellow-500/10' },
@@ -33,7 +34,7 @@ const RoomParticipantsList = ({
   const [linkCopied, setLinkCopied] = useState(false);
   const { webApp } = useTelegram();
 
-  const currentUser = participants.find(p => p.telegram_id === currentUserId);
+  const currentUser = participants.find(p => isSameUser(p, { telegram_id: currentUserId }));
   const canChangeRoles = currentUser && (currentUser.role === 'owner' || currentUser.role === 'admin');
   const canAddMembers = currentUser && (currentUser.role === 'owner' || currentUser.role === 'admin' || currentUser.role === 'moderator');
 
@@ -324,7 +325,7 @@ const RoomParticipantsList = ({
                       <span className="text-sm font-medium text-white truncate">
                         {participant.first_name}
                       </span>
-                      {participant.telegram_id === currentUserId && (
+                      {isSameUser(participant, { telegram_id: currentUserId }) && (
                         <span className="text-xs text-blue-400">(вы)</span>
                       )}
                     </div>

@@ -31,6 +31,7 @@ import RoomParticipantsList from './RoomParticipantsList';
 import RoomActivityFeed from './RoomActivityFeed';
 import RoomStatsPanel from './RoomStatsPanel';
 import AddRoomTaskModal from './AddRoomTaskModal';
+import { isSameUser } from '../utils/userIdentity';
 
 const TABS = [
   { id: 'tasks', name: 'Задачи', icon: CheckCircle },
@@ -57,7 +58,12 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
 
-  const isOwner = room && userSettings && room.owner_id === userSettings.telegram_id;
+  // owner_id в БД хранится как effective_tid владельца, userSettings.telegram_id — тот же ключ.
+  // isSameUser учитывает uid при его появлении, что делает проверку forward-compatible.
+  const isOwner = room && userSettings && isSameUser(
+    { telegram_id: room.owner_id, uid: room.owner_uid },
+    userSettings
+  );
   const colorScheme = room ? getRoomColor(room.color || 'blue') : getRoomColor('blue');
 
   useEffect(() => {
@@ -252,7 +258,7 @@ const RoomDetailModal = ({ isOpen, onClose, room, userSettings, onRoomDeleted, o
     if (!userSettings) return;
 
     const currentParticipant = task.participants.find(
-      p => p.telegram_id === userSettings.telegram_id
+      p => isSameUser(p, userSettings)
     );
 
     try {
@@ -900,7 +906,7 @@ const TasksTab = ({
           <Reorder.Group axis="y" values={tasks} onReorder={handleReorderTasks} className="space-y-2.5">
           {tasks.map((task) => {
             const currentUserParticipant = task.participants.find(
-              p => p.telegram_id === userSettings?.telegram_id
+              p => isSameUser(p, userSettings)
             );
             const progress = getTaskProgress(task);
             const deadlineInfo = getDeadlineInfo(task.deadline);

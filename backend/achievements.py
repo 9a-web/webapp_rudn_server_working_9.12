@@ -2,11 +2,14 @@
 Система достижений для приложения расписания РУДН
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 from models import Achievement, UserAchievement, UserStats, NewAchievementsResponse
 import uuid
 import pytz
+
+logger = logging.getLogger(__name__)
 
 # Московское время для единообразия со streak-механикой
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
@@ -764,29 +767,81 @@ async def award_referral_points(db, telegram_id: int, points_earned: int):
 
 async def create_achievement_notification(db, telegram_id: int, achievement: dict):
     """
-    Создать in-app уведомление о получении достижения
-    
-    Args:
-        db: Соединение с базой данных
-        telegram_id: ID пользователя
-        achievement: Данные достижения
+    Создать уведомление о получении достижения.
+
+    P1 (instrUIDprofile.md): идёт через MessageDeliveryService —
+    in-app создаётся всегда, TG-push шлётся для real TG юзеров (VK/Email
+    увидят достижение только в SPA, что соответствует их точке входа).
     """
-    from models import InAppNotification, NotificationType, NotificationCategory, NotificationPriority
-    
-    notification = InAppNotification(
-        telegram_id=telegram_id,
-        type=NotificationType.ACHIEVEMENT_EARNED,
-        category=NotificationCategory.ACHIEVEMENTS,
-        priority=NotificationPriority.NORMAL,
-        title="Новое достижение!",
-        message=f"Получено достижение «{achievement.get('name', '')}» +{achievement.get('points', 0)} очков",
-        emoji=achievement.get('emoji', '🏆'),
-        data={
-            "achievement_id": achievement.get("id"),
-            "achievement_name": achievement.get("name"),
-            "points": achievement.get("points")
-        }
-    )
-    
-    await db.in_app_notifications.insert_one(notification.dict())
-    logger.info(f"🏆 Создано уведомление о достижении '{achievement.get('name')}' для {telegram_id}")
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        from services.delivery import notify_user as _notify_user
+        from telegram import Bot
+        from config import get_telegram_bot_token
+
+        ach_name = achievement.get('name', '')
+        ach_points = achievement.get('points', 0)
+        ach_emoji = achievement.get('emoji', '🏆')
+        ach_desc = achievement.get('description', '')
+
+        # Лениво создаём bot (pull-режим — не запускаем polling)
+        bot = None
+        try:
+            token = get_telegram_bot_token()
+            if token:
+                bot = Bot(token=token)
+        except Exception:
+            pass
+
+        tg_text = (
+            f'{ach_emoji} <b>Новое достижение!</b>\n'
+            f'«{ach_name}»\n'
+            f'<i>{ach_desc}</i>\n'
+            f'💎 +{ach_points} очков'
+        )
+
+        await _notify_user(
+            db,
+            bot,
+            telegram_id=telegram_id,
+            title="Новое достижение!",
+            message=f"Получено достижение «{ach_name}» +{ach_points} очков",
+            emoji=ach_emoji,
+            type="achievement_earned",
+            category="achievements",
+            priority="normal",
+            data={
+                "achievement_id": achievement.get("id"),
+                "achievement_name": ach_name,
+                "points": ach_points,
+                "description": ach_desc,
+            },
+            telegram_text=tg_text,
+            log_ctx="achievement_unlocked",
+        )
+        logger.info(f"🏆 Achievement notification delivered: '{ach_name}' → tid={telegram_id}")
+    except Exception as e:
+        logger.error(f"❌ create_achievement_notification failed tid={telegram_id}: {e}", exc_info=True)
+        # Fallback: оригинальный способ — прямая запись в in_app_notifications
+        try:
+            from models import InAppNotification, NotificationType, NotificationCategory, NotificationPriority
+            notification = InAppNotification(
+                telegram_id=telegram_id,
+                type=NotificationType.ACHIEVEMENT_EARNED,
+                category=NotificationCategory.ACHIEVEMENTS,
+                priority=NotificationPriority.NORMAL,
+                title="Новое достижение!",
+                message=f"Получено достижение «{achievement.get('name', '')}» +{achievement.get('points', 0)} очков",
+                emoji=achievement.get('emoji', '🏆'),
+                data={
+                    "achievement_id": achievement.get("id"),
+                    "achievement_name": achievement.get("name"),
+                    "points": achievement.get("points")
+                }
+            )
+            await db.in_app_notifications.insert_one(notification.dict())
+            logger.info(f"🏆 Achievement fallback in-app saved: '{achievement.get('name')}' → {telegram_id}")
+        except Exception as e2:
+            logger.error(f"❌ Fallback achievement in-app insert also failed: {e2}", exc_info=True)

@@ -25,6 +25,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useTelegram } from '../../contexts/TelegramContext';
 import { usePlayer } from './PlayerContext';
+import { isSameUser } from '../../utils/userIdentity';
 import {
   createListeningRoom,
   joinListeningRoom,
@@ -1613,7 +1614,7 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
                                 {participant.first_name?.[0] || '?'}
                               </div>
-                              {participant.telegram_id === telegramId && isConnected && (
+                              {isSameUser(participant, { telegram_id: telegramId }) && isConnected && (
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-[#1C1C1E]" />
                               )}
                             </div>
@@ -1622,10 +1623,10 @@ const ListeningRoomModal = ({ isOpen, onClose, telegramId, onActiveRoomChange, p
                                 {participant.first_name} {participant.last_name}
                               </p>
                             </div>
-                            {participant.telegram_id === currentRoom.host_id && (
+                            {isSameUser(participant, { telegram_id: currentRoom.host_id, uid: currentRoom.host_uid }) && (
                               <Crown className="w-4 h-4 text-yellow-400" />
                             )}
-                            {participant.telegram_id === telegramId && (
+                            {isSameUser(participant, { telegram_id: telegramId }) && (
                               <span className="text-xs text-gray-400">Вы</span>
                             )}
                           </div>

@@ -33,6 +33,7 @@ import { AddStudentsModal } from './AddStudentsModal';
 import { CreateSessionModal } from './CreateSessionModal';
 import { CreateSubjectModal } from './CreateSubjectModal';
 import { SubjectDetailModal } from './SubjectDetailModal';
+import { isSameUser } from '../../utils/userIdentity';
 import { AttendanceModal } from './AttendanceModal';
 import { LinkStudentModal } from './LinkStudentModal';
 import JournalApplicationsModal from './JournalApplicationsModal';
@@ -464,7 +465,7 @@ export const JournalDetailModal = ({
               </button>
               <div className="flex gap-2">
                 {/* Кнопка выхода для студентов (не владельцев) */}
-                {!isOwner && (isLinked || pendingMembers.some(m => m.telegram_id === telegramId)) && (
+                {!isOwner && (isLinked || pendingMembers.some(m => isSameUser(m, { telegram_id: telegramId }))) && (
                   <button
                     onClick={() => setShowLeaveConfirm(true)}
                     className="p-2 rounded-full bg-black/20 backdrop-blur-sm hover:bg-red-500/30 transition-colors"

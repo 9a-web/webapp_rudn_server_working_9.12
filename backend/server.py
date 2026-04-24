@@ -281,6 +281,7 @@ from auth_utils import (
     is_real_telegram_user,
     is_pseudo_tid,
 )
+from services.delivery import notify_user as _notify_user, safe_send_telegram
 from achievements import (
     get_all_achievements,
     get_user_achievements,
@@ -4738,69 +4739,70 @@ async def send_room_join_notifications_api(room_doc: dict, new_user_name: str, n
         bot = Bot(token=bot_token)
         room_name = room_doc.get("name", "комнату")
         participants = room_doc.get("participants", [])
-        
-        # Отправляем уведомление новому участнику
-        try:
-            # 🛡 P0-guard: не шлём в pseudo_tid (VK/Email юзеры)
-            if not is_real_telegram_user(new_user_id):
-                logger.info(
-                    f"🟡 Skip room-welcome TG push: tid={new_user_id} "
-                    f"reason={'pseudo_tid' if is_pseudo_tid(new_user_id) else 'no_tid'}"
-                )
-            else:
-                new_member_message = (
-                    f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
-                    f'\n'
-                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
-                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
-                    f'\n'
-                    f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
-                    f'\n'
-                    f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
-                )
+        room_id = room_doc.get("id") or room_doc.get("_id")
 
-                await bot.send_message(
-                    chat_id=new_user_id,
-                    text=new_member_message,
-                    parse_mode='HTML'
-                )
-                logger.info(f"✅ Отправлено уведомление новому участнику {new_user_id}")
+        # 1. Приветствие новому участнику (in-app всегда + TG если real)
+        new_member_tg = (
+            f'<tg-emoji emoji-id="5264943697971132520">🎉</tg-emoji> <b>Добро пожаловать в комнату!</b>\n'
+            f'\n'
+            f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+            f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Участников: {len(participants)}\n'
+            f'\n'
+            f'<tg-emoji emoji-id="5213466161286517919">✅</tg-emoji> Вы успешно присоединились!\n'
+            f'\n'
+            f'<i>Откройте приложение, чтобы увидеть задачи комнаты</i>'
+        )
+        try:
+            await _notify_user(
+                db,
+                bot,
+                telegram_id=new_user_id,
+                title=f"🎉 Добро пожаловать в «{room_name}»",
+                message=f"Вы успешно присоединились к комнате. Участников: {len(participants)}.",
+                emoji="🎉",
+                type="room_invite",
+                category="rooms",
+                priority="normal",
+                data={"room_id": room_id, "room_name": room_name, "kind": "welcome"},
+                telegram_text=new_member_tg,
+                log_ctx="room_welcome_server",
+            )
+            logger.info(f"✅ Room-welcome delivered → uid/tid={new_user_id} (room={room_name})")
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось отправить уведомление новому участнику {new_user_id}: {e}")
-        
-        # Отправляем уведомления всем существующим участникам (кроме нового)
+            logger.warning(f"⚠️ room-welcome delivery failed tid={new_user_id}: {e}")
+
+        # 2. Уведомления существующим участникам (in-app всем + TG-push real)
         for participant in participants:
             participant_id = participant.get("telegram_id")
-            
+
             # Пропускаем нового участника
             if participant_id == new_user_id:
                 continue
 
-            # 🛡 P0-guard: пропускаем pseudo_tid участников
-            if not is_real_telegram_user(participant_id):
-                logger.info(
-                    f"🟡 Skip room-newmember TG push to participant: tid={participant_id} "
-                    f"reason={'pseudo_tid' if is_pseudo_tid(participant_id) else 'no_tid'}"
-                )
-                continue
-
+            existing_member_tg = (
+                f'<tg-emoji emoji-id="5170203290721321766">👋</tg-emoji> <b>Новый участник в комнате!</b>\n'
+                f'\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
+                f'<tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> К команде присоединился: <b>{new_user_name}</b>\n'
+                f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Всего участников: {len(participants)}'
+            )
             try:
-                existing_member_message = (
-                    f'<tg-emoji emoji-id="5170203290721321766">👋</tg-emoji> <b>Новый участник в комнате!</b>\n'
-                    f'\n'
-                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Комната: <b>{room_name}</b>\n'
-                    f'<tg-emoji emoji-id="5472164874886846699">✨</tg-emoji> К команде присоединился: <b>{new_user_name}</b>\n'
-                    f'<tg-emoji emoji-id="5372926953978341366">👥</tg-emoji> Всего участников: {len(participants)}'
+                await _notify_user(
+                    db,
+                    bot,
+                    telegram_id=participant_id,
+                    title=f"👋 Новый участник в «{room_name}»",
+                    message=f"К команде присоединился {new_user_name}. Всего участников: {len(participants)}.",
+                    emoji="👥",
+                    type="room_member_joined",
+                    category="rooms",
+                    priority="normal",
+                    data={"room_id": room_id, "room_name": room_name, "new_user_id": new_user_id, "new_user_name": new_user_name},
+                    telegram_text=existing_member_tg,
+                    log_ctx="room_new_member_server",
                 )
-                
-                await bot.send_message(
-                    chat_id=participant_id,
-                    text=existing_member_message,
-                    parse_mode='HTML'
-                )
-                logger.info(f"✅ Отправлено уведомление участнику {participant_id}")
             except Exception as e:
-                logger.warning(f"⚠️ Не удалось отправить уведомление участнику {participant_id}: {e}")
+                logger.warning(f"⚠️ room-new-member delivery failed tid={participant_id}: {e}")
     
     except Exception as e:
         logger.error(f"❌ Ошибка при отправке уведомлений о присоединении к комнате: {e}")
@@ -20075,35 +20077,64 @@ async def send_notification_from_post(data: dict):
         notification_svc = get_notification_service()
         sent = 0
         failed = 0
-        
+        in_app_created = 0
+
         for uid in recipient_ids:
             try:
-                # 🛡 P0-guard: пропускаем pseudo_tid
-                if not is_real_telegram_user(uid):
-                    logger.info(
-                        f"🟡 Skip admin broadcast to tid={uid} "
-                        f"reason={'pseudo_tid' if is_pseudo_tid(uid) else 'no_tid'}"
-                    )
-                    failed += 1
-                    continue
+                # P1: доставка через delivery.notify_user — in-app всем, TG только real
+                result = await _notify_user(
+                    db,
+                    notification_svc.bot if notification_svc else None,
+                    telegram_id=uid,
+                    title=title or "📢 Объявление",
+                    message=description or title or "",
+                    emoji="📢",
+                    type="admin_message",
+                    category="system",
+                    priority="high",
+                    data={"image_url": image_url, "source": "admin_broadcast"},
+                    # Для TG отправляем оригинальный HTML-блок
+                    telegram_text=message_text,
+                    # Отключаем встроенную TG-отправку — ниже сделаем фото-вариант
+                    send_telegram=False,
+                    log_ctx="admin_broadcast",
+                )
+                if result.get("in_app_id"):
+                    in_app_created += 1
 
-                if image_url:
-                    # Отправляем фото с подписью
-                    await notification_svc.bot.send_photo(
-                        chat_id=uid,
-                        photo=image_url,
-                        caption=message_text[:1024],
-                        parse_mode='HTML'
-                    )
+                # TG-push — только real TG (поддержка image_url)
+                if is_real_telegram_user(uid):
+                    try:
+                        if image_url:
+                            await notification_svc.bot.send_photo(
+                                chat_id=uid,
+                                photo=image_url,
+                                caption=message_text[:1024],
+                                parse_mode='HTML'
+                            )
+                        else:
+                            await notification_svc.send_message(uid, message_text)
+                        sent += 1
+                    except Exception as tg_e:
+                        logger.warning(f"Admin broadcast TG send failed tid={uid}: {tg_e}")
+                        failed += 1
                 else:
-                    await notification_svc.send_message(uid, message_text)
-                sent += 1
+                    # Для VK/Email — только in-app (который уже создан выше)
+                    logger.debug(
+                        f"🟡 admin broadcast: in-app only for tid={uid} "
+                        f"(reason={'pseudo_tid' if is_pseudo_tid(uid) else 'no_tid'})"
+                    )
             except Exception as e:
                 logger.warning(f"Не удалось отправить уведомление {uid}: {e}")
                 failed += 1
-            
+
             # Задержка для избежания rate-limit
             await asyncio.sleep(0.05)
+
+        logger.info(
+            f"📨 Admin broadcast done: tg_sent={sent} tg_failed={failed} "
+            f"in_app_created={in_app_created}/{len(recipient_ids)}"
+        )
         
         # Сохраняем в историю
         await db.notification_history.insert_one({

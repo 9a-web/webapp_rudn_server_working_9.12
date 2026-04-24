@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Users, Calendar, Tag, Flag, MessageCircle, Send, CheckCircle, LogOut, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { modalVariants, backdropVariants } from '../utils/animations';
+import { isSameUser } from '../utils/userIdentity';
 
 /**
  * Детальный экран групповой задачи
@@ -100,7 +101,7 @@ export const GroupTaskDetailModal = ({
 
   if (!isOpen || !task) return null;
 
-  const currentParticipant = task.participants.find(p => p.telegram_id === telegramId);
+  const currentParticipant = task.participants.find(p => isSameUser(p, { telegram_id: telegramId }));
   const isOwner = task.owner_id === telegramId;
   const isCompleted = currentParticipant?.completed || false;
 

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getJournalStats, getStudentStats } from '../../services/journalAPI';
 import { SubjectAttendanceModal } from './SubjectAttendanceModal';
+import { isSameUser } from '../../utils/userIdentity';
 
 // Цветовая палитра для графиков
 const COLORS = {
@@ -848,7 +849,7 @@ export const JournalStatsTab = ({
           ) : (
             <div className="space-y-2">
               {statsViewers.map((viewerId) => {
-                const student = students.find(s => s.telegram_id === viewerId);
+                const student = students.find(s => isSameUser(s, { telegram_id: viewerId }));
                 return (
                   <div
                     key={viewerId}

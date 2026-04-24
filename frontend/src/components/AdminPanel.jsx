@@ -16,6 +16,7 @@ import {
   RadialBarChart, RadialBar
 } from 'recharts';
 import { getBackendURL } from '../utils/config';
+import { isSameUser } from '../utils/userIdentity';
 
 const BACKEND_URL = getBackendURL();
 
@@ -2021,7 +2022,7 @@ const NotificationsTab = () => {
           <div className="max-h-[400px] overflow-y-auto space-y-1.5 pr-1">
             {loading ? <GlassLoader /> : filteredUsers.length > 0 ? (
               filteredUsers.map((user) => {
-                const isSelected = selectedUser?.telegram_id === user.telegram_id;
+                const isSelected = isSameUser(selectedUser, user);
                 return (
                   <motion.button
                     key={user.telegram_id}

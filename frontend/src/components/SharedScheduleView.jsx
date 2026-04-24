@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sharedScheduleAPI, botAPI } from '../services/api';
 import { friendsAPI } from '../services/friendsAPI';
 import { useTranslation } from 'react-i18next';
+import { isSameUser } from '../utils/userIdentity';
 
 const DAYS_ORDER = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
@@ -1659,7 +1660,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                       style={{ backgroundColor: participant.color }}
                     />
                     <span className="text-[10px] font-semibold" style={{ color: participant.color }}>
-                      {participant.telegram_id === telegramId ? 'Вы' : participant.first_name}
+                      {isSameUser(participant, { telegram_id: telegramId }) ? 'Вы' : participant.first_name}
                     </span>
                   </div>
                 );
@@ -1787,7 +1788,7 @@ export const SharedScheduleView = ({ telegramId, selectedDate, weekNumber = 1, o
                   participantName={participant.first_name}
                   columnIndex={colIdx}
                   totalColumns={totalColumns}
-                  isOwner={participant.telegram_id === telegramId}
+                  isOwner={isSameUser(participant, { telegram_id: telegramId })}
                   subCol={item.subCol}
                   subColTotal={item.subColTotal}
                   pxPerMin={pxPerMin}

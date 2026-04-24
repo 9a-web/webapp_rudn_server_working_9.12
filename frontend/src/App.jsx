@@ -1687,7 +1687,9 @@ const Home = () => {
       
       // Сохраняем в localStorage для восстановления после перезагрузки
       localStorage.setItem('synced_user', JSON.stringify(syncedUserData));
-      localStorage.setItem('linked_telegram_id', userData.telegram_id?.toString());
+      // 📌 P2.7 (instrUIDprofile.md): `linked_telegram_id` больше не сохраняется.
+      // Источник истины — `authUser.telegram_id` из JWT (`auth.user.telegram_id`).
+      // Старое legacy-значение чистится через authStorage:LEGACY_LOCAL_KEYS при logout.
       
       // ВАЖНО: Сохраняем telegram_user для TelegramContext
       // Это нужно чтобы при перезагрузке страницы пользователь не был гостем
