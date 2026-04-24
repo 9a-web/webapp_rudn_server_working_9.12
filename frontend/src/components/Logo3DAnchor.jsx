@@ -16,6 +16,11 @@
 import React, { useEffect, useId, useMemo, useRef } from 'react';
 import { useLogo3DContext } from '../contexts/Logo3DContext';
 
+// Дефолты вынесены наружу — иначе каждый рендер создавал бы новый массив,
+// что инвалидировало бы useMemo(propsObject) и приводило к бесконечному
+// циклу updateAnchorProps → setAnchors → re-render → новый default → ...
+const DEFAULT_LIGHT_POSITION = [-0.5, 2, 4];
+
 export default function Logo3DAnchor({
   size = 200,
   material = 'metal',
@@ -25,7 +30,7 @@ export default function Logo3DAnchor({
   metalness = 0.9,
   roughness = 0.25,
   color,
-  lightPosition = [-0.5, 2, 4],
+  lightPosition = DEFAULT_LIGHT_POSITION,
   priority = 0,
   className,
   style,
@@ -33,6 +38,12 @@ export default function Logo3DAnchor({
   const ref = useRef(null);
   const id = useId();
   const ctx = useLogo3DContext();
+
+  // Стабильные методы из контекста (через ref, чтобы effect deps были стабильны).
+  // Сам объект ctx пересоздаётся при каждом изменении anchors → нельзя ставить
+  // его в deps, иначе зацикливание.
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
 
   // Стабильные props объект — для диффа
   const propsObject = useMemo(
@@ -52,17 +63,23 @@ export default function Logo3DAnchor({
 
   // Регистрация / снятие регистрации
   useEffect(() => {
-    if (!ctx) return undefined;
-    ctx.registerAnchor(id, ref, propsObject, priority);
-    return () => ctx.unregisterAnchor(id);
+    const c = ctxRef.current;
+    if (!c) return undefined;
+    c.registerAnchor(id, ref, propsObject, priority);
+    return () => {
+      const c2 = ctxRef.current;
+      if (c2) c2.unregisterAnchor(id);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, priority]);
 
-  // Обновление props — separate effect, чтобы не дёргать register/unregister
+  // Обновление props — separate effect, чтобы не дёргать register/unregister.
+  // Не зависим от ctx (он пересоздаётся), берём через ref.
   useEffect(() => {
-    if (!ctx) return;
-    ctx.updateAnchorProps(id, propsObject);
-  }, [ctx, id, propsObject]);
+    const c = ctxRef.current;
+    if (!c) return;
+    c.updateAnchorProps(id, propsObject);
+  }, [id, propsObject]);
 
   return (
     <div

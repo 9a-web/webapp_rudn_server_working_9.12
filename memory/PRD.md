@@ -41,6 +41,18 @@ Russian UI + code comments + Pydantic messages.
 
 ## What's been implemented
 
+### Stage 10 — UID migration + Singleton 3D Logo (2026-04-24)
+- [x] **P0 backend:** Все raw `bot.send_*` мигрированы на `safe_send_telegram` в `server.py` и `telegram_bot.py`. Добавлен `pseudo_tid` guard в `check_inactive_users`.
+- [x] **P1 backend extension:** Рефакторинг `services/delivery.py` с `MessagePriority`, `send_batch` через семафор, retry/DLQ через `delivery_attempts`. Добавлен `/api/admin/delivery/stats`.
+- [x] **P2 frontend:** Замена `=== telegram_id` на `isSameUser()` для поддержки `uid` во фронтенд-компонентах.
+- [x] **3D Logo singleton (Frontend):** `Logo3DProvider` + `Logo3DHost` (один Canvas в Portal на body) + `Logo3DAnchor` placeholders. Логотип НЕ перемонтируется при переходах — плавно перелетает через CSS-transition позиции/размера. Экономит ~500-3000 ms на каждом переходе между LoadingScreen/Auth-страницами.
+- [x] **Bug fix (2026-04-24):** Исправлен критический регресс `Maximum update depth exceeded` после внедрения singleton-логотипа. Корневые причины:
+  - Дефолтный `lightPosition = [-0.5, 2, 4]` создавал новый массив на каждом рендере → `propsObject` useMemo инвалидировался → бесконечный `updateAnchorProps` цикл. Вынесен в константу.
+  - `useEffect` в `Logo3DAnchor` зависел от целого `ctx`-объекта (пересоздаётся при каждом setAnchors). Заменено на `ctxRef`.
+  - `setRect` в RAF-цикле создавал новый объект каждый кадр без сравнения значений. Добавлено epsilon-сравнение (0.5px), функциональный setState возвращает prev.
+  - useEffect Logo3DHost зависел от `activeAnchor` целиком — теперь от `anchorId`+`anchorRef`.
+  - **Файлы:** `Logo3DAnchor.jsx`, `Logo3DHost.jsx`. Проверено скриншот-тестом: `/login` → `/register` → `/forgot-password` работают, 0 ошибок в консоли.
+
 ### Stage 9 — Full hardening (2026-04-22)
 - [x] **Package 1 (P0 critical):** lowercase username migration; unique indexes on `username`/`email`; rate-limit hardening (12 buckets); `photo_url_custom` sync; `LoginEmailRequest.password min_length=1`; `DELETE /link/email` returns 404 if email absent; `choose_primary_auth` safe fallback; `is_real_telegram_user` guard.
 - [x] **Package 2 — Password Management:**
@@ -69,12 +81,14 @@ Russian UI + code comments + Pydantic messages.
 
 ## Pending items
 
-### P0 (needs user input)
-- **SMTP credentials** — currently DEV-mode (emails → /app/logs/emails.log). User intends to configure real SMTP (Yandex/Gmail/Mail.ru) — instructions provided.
-
 ### P1 (next up)
-- RegisterWizard UX polish — better per-step validation and feedback (agent noted weak validation on steps 2/3, empty first_name accepted).
-- Frontend E2E testing via testing agent (requires user approval, currently skipped per user request).
+- **UID Phase P3:** универсальный `resolve_user(db, identifier)` helper, 11 новых `/api/u/{uid}/*` эндпоинтов (settings, tasks, notifications), JWT с `uid`+`tid`.
+- **UID Phase P4:** миграционный скрипт `backfill_uid_to_collections.py` для 38 коллекций, добавить `uid` в 93 Pydantic-модели, индексы по `uid`.
+- RegisterWizard UX polish — better per-step validation and feedback.
+- Frontend E2E testing via testing agent.
+
+### P0 (needs user input)
+- **SMTP credentials** — currently DEV-mode (emails → /app/logs/emails.log).
 
 ### P2 (backlog)
 - Split `auth_routes.py` (~2500 lines) into `routes/email_auth.py`, `routes/oauth.py`, `routes/sessions.py`, `routes/password.py`.

@@ -65,24 +65,42 @@ export default function Logo3DHost() {
     };
   }, [svgString]);
 
-  // Отслеживание rect активного anchor'а
+  // Отслеживание rect активного anchor'а.
+  // Зависим от anchor.id (а не от объекта целиком), чтобы props-обновления
+  // активного якоря не перезапускали rafLoop.
+  const anchorId = activeAnchor?.id;
+  const anchorRef = activeAnchor?.ref;
   useEffect(() => {
-    const el = activeAnchor?.ref?.current;
+    const el = anchorRef?.current;
     if (!el) {
       setRect(null);
       return undefined;
     }
 
-    // Инициализация — сразу установим позицию без transition
+    // Инициализация — сразу установим позицию без transition.
+    // Используем functional setState с epsilon-сравнением, чтобы при равных
+    // значениях не создавать новый объект (иначе RAF 60fps × 700ms превращался
+    // бы в 42 ререндера + бесконечный цикл при каскаде).
     const update = () => {
       const r = el.getBoundingClientRect();
       // getBoundingClientRect может вернуть 0×0, если элемент display:none
       if (r.width === 0 && r.height === 0) return;
-      setRect({
-        top: r.top,
-        left: r.left,
-        width: r.width,
-        height: r.height,
+      setRect((prev) => {
+        if (
+          prev &&
+          Math.abs(prev.top - r.top) < 0.5 &&
+          Math.abs(prev.left - r.left) < 0.5 &&
+          Math.abs(prev.width - r.width) < 0.5 &&
+          Math.abs(prev.height - r.height) < 0.5
+        ) {
+          return prev; // нет изменений — НЕ инициируем ре-рендер
+        }
+        return {
+          top: r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height,
+        };
       });
     };
     update();
@@ -119,7 +137,7 @@ export default function Logo3DHost() {
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(rafHandle);
     };
-  }, [activeAnchor]);
+  }, [anchorId, anchorRef]);
 
   // Отмечаем первое реальное позиционирование
   useEffect(() => {
