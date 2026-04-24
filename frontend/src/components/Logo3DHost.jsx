@@ -3,31 +3,31 @@
  *
  * Рендерится ОДИН раз при маунте Logo3DProvider и НЕ размонтируется до
  * перезагрузки страницы. Позиционируется абсолютно (`position: fixed`) над
- * активным Logo3DAnchor'ом (через getBoundingClientRect + ResizeObserver).
+ * активным Logo3DAnchor'ом.
  *
  * ## Что это решает:
  *
  * Пакет `3dsvg` (обёртка над three.js) при каждом маунте компонента:
  *  1. Делает `fetch(svgUrl)` — сетевой запрос (~50-200ms)
  *  2. Парсит SVG → THREE.ShapePath[]
- *  3. Строит `new THREE.ExtrudeGeometry()` для каждого shape (1448 сегментов × N shapes) — это САМЫЙ дорогой шаг (~300-800ms на мобильных)
+ *  3. Строит `new THREE.ExtrudeGeometry()` (1448 сегментов) — ~300-800ms
  *  4. Создаёт WebGL Canvas + shaders
  *  5. Воспроизводит intro-анимацию "zoom" (2.5 секунды)
  *
- * Итого 500-3000ms "чёрного экрана" при каждом монтировании. При переходах
- * LoadingScreen → AuthLayout → AuthLayout это раздражает.
+ * Итого 500-3000ms "чёрного экрана" при каждом монтировании.
  *
- * Решение: Logo3DHost оставляет Canvas ВСЕГДА смонтированным и только плавно
- * перемещает его по экрану.
+ * ## Как работает позиционирование (без задержек):
  *
- * ## Цепочка оптимизаций:
- *
- * 1. SVG preload (utils/logoPreload) — убирает fetch #1 при повторах
- * 2. Singleton Canvas (этот файл) — убирает пункты 3–5 при переходах
- * 3. `transition: top/left/width/height` — плавная анимация перелёта (400ms)
+ *  - Continuous requestAnimationFrame loop, пока anchor смонтирован.
+ *  - Позиция применяется через `transform: translate3d(...)` напрямую к DOM,
+ *    БЕЗ React state и БЕЗ CSS transition. Это даёт 60fps без re-render и
+ *    идеальное «приклеивание» к anchor'у при скролле/анимациях.
+ *  - Когда anchor исчезает (страница меняется) — Canvas мгновенно прячется
+ *    через `display: none`. Когда новый anchor появляется — Canvas мгновенно
+ *    появляется на новом месте. Никаких «перелётов».
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLogo3DContext } from '../contexts/Logo3DContext';
 import Logo3D from './Logo3D';
@@ -37,21 +37,15 @@ import {
   preloadLogoSvg,
 } from '../utils/logoPreload';
 
-/**
- * Стили transition перелёта при смене anchor'а.
- * Отключаются при ПЕРВОМ размещении (чтобы логотип не "прилетал" из угла).
- */
-const FLY_TRANSITION =
-  'top 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), ' +
-  'left 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), ' +
-  'width 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), ' +
-  'height 0.45s cubic-bezier(0.25, 0.1, 0.25, 1)';
+const DEFAULT_LIGHT_POSITION = [-0.5, 2, 4];
 
 export default function Logo3DHost() {
   const { activeAnchor } = useLogo3DContext();
-  const [rect, setRect] = useState(null);
   const [svgString, setSvgString] = useState(() => getCachedLogoSvg());
-  const [hasEverBeenPositioned, setHasEverBeenPositioned] = useState(false);
+
+  // Ref на host-div: позиционируем напрямую через style, без React state.
+  // Это убирает 60 ре-рендеров/сек на скролле и зависание Canvas.
+  const hostRef = useRef(null);
 
   // Preload SVG если ещё не в кэше
   useEffect(() => {
@@ -65,129 +59,86 @@ export default function Logo3DHost() {
     };
   }, [svgString]);
 
-  // Отслеживание rect активного anchor'а.
-  // Зависим от anchor.id (а не от объекта целиком), чтобы props-обновления
-  // активного якоря не перезапускали rafLoop.
+  // Continuous RAF loop: следим за позицией anchor'а и применяем transform
+  // напрямую к DOM. Никаких React-перерендеров.
   const anchorId = activeAnchor?.id;
   const anchorRef = activeAnchor?.ref;
   useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+
     const el = anchorRef?.current;
     if (!el) {
-      setRect(null);
+      // Якорь отсутствует — мгновенно прячем Canvas (без transition).
+      host.style.display = 'none';
       return undefined;
     }
 
-    // Инициализация — сразу установим позицию без transition.
-    // Используем functional setState с epsilon-сравнением, чтобы при равных
-    // значениях не создавать новый объект (иначе RAF 60fps × 700ms превращался
-    // бы в 42 ререндера + бесконечный цикл при каскаде).
-    const update = () => {
-      const r = el.getBoundingClientRect();
-      // getBoundingClientRect может вернуть 0×0, если элемент display:none
-      if (r.width === 0 && r.height === 0) return;
-      setRect((prev) => {
-        if (
-          prev &&
-          Math.abs(prev.top - r.top) < 0.5 &&
-          Math.abs(prev.left - r.left) < 0.5 &&
-          Math.abs(prev.width - r.width) < 0.5 &&
-          Math.abs(prev.height - r.height) < 0.5
-        ) {
-          return prev; // нет изменений — НЕ инициируем ре-рендер
-        }
-        return {
-          top: r.top,
-          left: r.left,
-          width: r.width,
-          height: r.height,
-        };
-      });
-    };
-    update();
-
-    let ro = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(update);
-      ro.observe(el);
-    }
-
-    // При scroll / resize / animation frame — обновляем
-    // true в scroll = listen capture phase, чтобы ловить scroll любых
-    // внутренних элементов (например motion.div animate scale).
-    const onScroll = () => update();
-    const onResize = () => update();
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onResize);
-
-    // Для framer-motion animate / CSS transitions anchor'а — RAF-цикл
-    // в течение 600ms (охватывает типичные entrance-анимации 300-500ms)
     let rafHandle = 0;
-    const startedAt = performance.now();
-    const rafLoop = () => {
-      update();
-      if (performance.now() - startedAt < 700) {
-        rafHandle = requestAnimationFrame(rafLoop);
+    let prevLeft = NaN;
+    let prevTop = NaN;
+    let prevWidth = NaN;
+    let prevHeight = NaN;
+
+    const tick = () => {
+      const r = el.getBoundingClientRect();
+      // Если anchor скрыт (display:none) — getBoundingClientRect вернёт 0×0.
+      if (r.width === 0 && r.height === 0) {
+        host.style.display = 'none';
+      } else {
+        // Применяем стили только если изменились (минимизируем layout/paint).
+        if (host.style.display !== 'block') host.style.display = 'block';
+        if (r.left !== prevLeft || r.top !== prevTop) {
+          host.style.transform = `translate3d(${r.left}px, ${r.top}px, 0)`;
+          prevLeft = r.left;
+          prevTop = r.top;
+        }
+        if (r.width !== prevWidth) {
+          host.style.width = `${r.width}px`;
+          prevWidth = r.width;
+        }
+        if (r.height !== prevHeight) {
+          host.style.height = `${r.height}px`;
+          prevHeight = r.height;
+        }
       }
+      rafHandle = requestAnimationFrame(tick);
     };
-    rafHandle = requestAnimationFrame(rafLoop);
+
+    rafHandle = requestAnimationFrame(tick);
 
     return () => {
-      if (ro) ro.disconnect();
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onResize);
       cancelAnimationFrame(rafHandle);
+      // На время "перехода" между anchor'ами (старый размонтировался,
+      // новый ещё не появился) — прячем Canvas, чтобы он не "висел" на
+      // месте старого. Если новый anchor появится — следующий useEffect
+      // run его подхватит.
+      if (host) host.style.display = 'none';
     };
   }, [anchorId, anchorRef]);
 
-  // Отмечаем первое реальное позиционирование
-  useEffect(() => {
-    if (rect && !hasEverBeenPositioned) {
-      // Small delay, чтобы первый paint прошёл без transition
-      const h = requestAnimationFrame(() => setHasEverBeenPositioned(true));
-      return () => cancelAnimationFrame(h);
-    }
-    return undefined;
-  }, [rect, hasEverBeenPositioned]);
-
-  const isVisible = !!(activeAnchor && rect);
   const props = activeAnchor?.props ?? {};
   const size = props.size ?? 200;
-
-  // Fixed-позиционирование. Когда нет anchor'а — прячем за экран, чтобы Canvas
-  // оставался в DOM (не размонтировать!), но не занимал место и не ловил клики.
-  const style = useMemo(() => {
-    if (!isVisible) {
-      return {
-        position: 'fixed',
-        top: -10000,
-        left: -10000,
-        width: size,
-        height: size,
-        pointerEvents: 'none',
-        visibility: 'hidden',
-        zIndex: 100,
-      };
-    }
-    return {
-      position: 'fixed',
-      top: rect.top,
-      left: rect.left,
-      width: rect.width,
-      height: rect.height,
-      pointerEvents: 'none',
-      zIndex: 100,
-      // При первом позиционировании — без transition, чтобы логотип появился на
-      // месте. При последующих — плавно перелетает.
-      transition: hasEverBeenPositioned ? FLY_TRANSITION : 'none',
-      willChange: 'top, left, width, height',
-    };
-  }, [isVisible, rect, size, hasEverBeenPositioned]);
 
   // SSR guard
   if (typeof document === 'undefined') return null;
 
+  // Базовый стиль host-div'а. Позиция/размер применяются императивно через
+  // hostRef (см. useEffect выше) — это даёт 60fps без React-ре-рендеров.
+  const baseStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: size,
+    height: size,
+    pointerEvents: 'none',
+    zIndex: 100,
+    display: 'none', // изначально скрыт — RAF включит когда anchor появится
+    willChange: 'transform',
+  };
+
   return createPortal(
-    <div style={style} aria-hidden={!isVisible} data-testid="logo3d-host">
+    <div ref={hostRef} style={baseStyle} aria-hidden="true" data-testid="logo3d-host">
       <Logo3D
         size={size}
         material={props.material ?? 'metal'}
@@ -197,7 +148,7 @@ export default function Logo3DHost() {
         metalness={props.metalness ?? 0.9}
         roughness={props.roughness ?? 0.25}
         color={props.color}
-        lightPosition={props.lightPosition ?? [-0.5, 2, 4]}
+        lightPosition={props.lightPosition ?? DEFAULT_LIGHT_POSITION}
         svgString={svgString || undefined}
         svg={svgString ? undefined : DEFAULT_LOGO_SVG_URL}
         fallbackSrc={DEFAULT_LOGO_SVG_URL}
