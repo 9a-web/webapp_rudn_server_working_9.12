@@ -174,6 +174,7 @@ const Logo3D = ({
   color,
   lightPosition = [-0.5, 2, 4],
   svg = DEFAULT_SVG_URL,
+  svgString,                 // 🆕 P: inline SVG string — обходит useFetchSvg в 3dsvg
   fallbackSrc = DEFAULT_SVG_URL,
   onReady,
   onError,
@@ -234,7 +235,10 @@ const Logo3D = ({
         {/* Пока lazy-загружается сам пакет 3dsvg — показываем спиннер (НЕ 2D) */}
         <Suspense fallback={<Logo3DLoader size={size} />}>
           <SVG3DLazy
-            svg={svg}
+            // Если есть svgString (preloaded) — передаём его напрямую,
+            // тогда 3dsvg НЕ делает fetch и геометрия строится мгновенно.
+            // Иначе fallback на URL (поведение как раньше).
+            {...(svgString ? { svgString } : { svg })}
             smoothness={smoothness}
             material={material}
             metalness={metalness}

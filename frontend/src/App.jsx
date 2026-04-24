@@ -21,6 +21,9 @@ import StatusTester from './StatusTester';
 import StreakRewardModal, { StreakRewardPreview } from './components/StreakRewardModal';
 import { TelegramProvider, useTelegram } from './contexts/TelegramContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Import ThemeProvider
+import { Logo3DProvider } from './contexts/Logo3DContext';
+import Logo3DHost from './components/Logo3DHost';
+import { preloadLogoSvg } from './utils/logoPreload';
 import { scheduleAPI, userAPI, achievementsAPI, tasksAPI, activityAPI, streakAPI, sharedScheduleAPI, getBackendURL } from './services/api';
 import { processReferralWebApp, trackAdminReferralEvent } from './services/referralAPI';
 import { processJournalWebAppInvite } from './services/journalAPI';
@@ -2655,6 +2658,12 @@ const Home = () => {
 };
 
 function App() {
+  // 🚀 Preload SVG-логотипа сразу при инициализации App (до маунта Logo3D).
+  // Это убирает первый fetch при старте — Logo3D получит svgString из кэша.
+  React.useEffect(() => {
+    preloadLogoSvg();
+  }, []);
+
   return (
     <ErrorBoundary>
       <div className="App">
@@ -2662,32 +2671,38 @@ function App() {
           <TelegramProvider>
             <AuthProvider>
               <PlayerProvider>
-                <BrowserRouter>
-                  <Suspense fallback={<AuthLoadingFallback />}>
-                    <Routes>
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route path="/register" element={<RegisterWizard />} />
-                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                      <Route path="/reset-password" element={<ResetPasswordPage />} />
-                      <Route path="/verify-email" element={<VerifyEmailPage />} />
-                      <Route path="/auth/vk/callback" element={<VKCallbackPage />} />
-                      <Route path="/auth/qr/confirm" element={<QRConfirmPage />} />
-                      {/* Публичный профиль по UID — БЕЗ AuthGate (Stage 4) */}
-                      <Route path="/u/:uid" element={<PublicProfilePage />} />
-                      <Route
-                        path="/"
-                        element={
-                          <AuthGate>
-                            <Home />
-                          </AuthGate>
-                        }
-                      />
-                      <Route path="/status-tester" element={<StatusTester />} />
-                      <Route path="/streak-demo" element={<StreakRewardPreview />} />
-                      <Route path="/test-3d-logo" element={<Test3DLogoPage />} />
-                    </Routes>
-                  </Suspense>
-                </BrowserRouter>
+                <Logo3DProvider>
+                  {/* 🎯 Logo3DHost — ОДИН инстанс 3D-логотипа в body (Portal).
+                      Не размонтируется при переходах между экранами.
+                      Logo3DAnchor в дочерних компонентах задаёт его позицию. */}
+                  <Logo3DHost />
+                  <BrowserRouter>
+                    <Suspense fallback={<AuthLoadingFallback />}>
+                      <Routes>
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/register" element={<RegisterWizard />} />
+                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        <Route path="/verify-email" element={<VerifyEmailPage />} />
+                        <Route path="/auth/vk/callback" element={<VKCallbackPage />} />
+                        <Route path="/auth/qr/confirm" element={<QRConfirmPage />} />
+                        {/* Публичный профиль по UID — БЕЗ AuthGate (Stage 4) */}
+                        <Route path="/u/:uid" element={<PublicProfilePage />} />
+                        <Route
+                          path="/"
+                          element={
+                            <AuthGate>
+                              <Home />
+                            </AuthGate>
+                          }
+                        />
+                        <Route path="/status-tester" element={<StatusTester />} />
+                        <Route path="/streak-demo" element={<StreakRewardPreview />} />
+                        <Route path="/test-3d-logo" element={<Test3DLogoPage />} />
+                      </Routes>
+                    </Suspense>
+                  </BrowserRouter>
+                </Logo3DProvider>
               </PlayerProvider>
             </AuthProvider>
           </TelegramProvider>

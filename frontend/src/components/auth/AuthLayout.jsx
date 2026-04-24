@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { motion } from 'framer-motion';
-import Logo3D from '../Logo3D';
+import Logo3DAnchor from '../Logo3DAnchor';
 
 const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
   return (
@@ -40,8 +40,9 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
         >
           {showLogo && (
             <div className="mb-8 flex flex-col items-center text-center">
-              {/* 3D-логотип РУДН (упрощённый SVG → мгновенный рендер).
-                  Fallback на 2D <img> если WebGL недоступен или 3D упал. */}
+              {/* 3D-логотип РУДН — рендерится через глобальный Logo3DHost.
+                  При переходе LoadingScreen → AuthLayout (или между auth-страницами)
+                  логотип НЕ перезагружается, а плавно перелетает на новое место. */}
               <div
                 className="relative mb-4"
                 style={{
@@ -60,7 +61,7 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
                     filter: 'blur(24px)',
                   }}
                 />
-                <Logo3D
+                <Logo3DAnchor
                   size={112}
                   material="metal"
                   animate="spin"
@@ -69,6 +70,7 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
                   metalness={0.85}
                   roughness={0.25}
                   lightPosition={[-0.5, 2, 4]}
+                  priority={5}
                 />
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-white">{title || 'РУДН Расписание'}</h1>

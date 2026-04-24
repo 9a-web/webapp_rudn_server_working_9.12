@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import Logo3D from './Logo3D';
+import Logo3DAnchor from './Logo3DAnchor';
 
 /**
  * LoadingScreen — анимированный экран загрузки с 3D-логотипом РУДН.
  *
- * Использует компонент Logo3D (обёртка над `3dsvg` → SVG3D), который:
- *  • Ленится (three.js грузится только когда компонент на экране)
- *  • Автоматически падает в 2D <img> если WebGL недоступен или 3D ломается
- *  • Использует УПРОЩЁННЫЙ SVG (1448 сегментов вместо 13316) для быстрого рендера
+ * Использует Logo3DAnchor (placeholder), а сам 3D-логотип рендерится
+ * глобально через Logo3DHost (один раз на всё приложение). Это позволяет:
+ *  • Не пересобирать ExtrudeGeometry при каждом маунте LoadingScreen
+ *  • Плавно "перелетать" логотипу при переходе LoadingScreen → AuthLayout
+ *  • Один SVG-fetch на сессию (preloadLogoSvg в App.jsx)
  */
 export const LoadingScreen = ({ message = 'Загрузка...' }) => {
   return (
@@ -43,8 +44,8 @@ export const LoadingScreen = ({ message = 'Загрузка...' }) => {
             transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
           />
 
-          {/* Сам 3D-логотип */}
-          <Logo3D
+          {/* 3D-логотип через глобальный Logo3DHost (placeholder anchor) */}
+          <Logo3DAnchor
             size={200}
             material="metal"
             animate="spin"
@@ -53,6 +54,7 @@ export const LoadingScreen = ({ message = 'Загрузка...' }) => {
             metalness={0.9}
             roughness={0.25}
             lightPosition={[-0.5, 2, 4]}
+            priority={10}
           />
         </motion.div>
 
