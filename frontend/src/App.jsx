@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import { Header } from './components/Header';
 import { LiveScheduleCard } from './components/LiveScheduleCard';
@@ -334,6 +334,25 @@ const Home = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [openProfileTab, setOpenProfileTab] = useState(null);
+
+  // 🪄 Owner-redirect from /u/{ownUid}: detect ?openProfile=1 query param and
+  // auto-open ProfileScreen, then strip the param from URL (replaceState).
+  const _location = useLocation();
+  const _navigate = useNavigate();
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(_location.search);
+    if (sp.get('openProfile') === '1') {
+      setOpenProfileTab('general');
+      // Strip the param without leaving an extra history entry
+      sp.delete('openProfile');
+      const cleanSearch = sp.toString();
+      _navigate(
+        { pathname: _location.pathname, search: cleanSearch ? `?${cleanSearch}` : '' },
+        { replace: true },
+      );
+    }
+  }, [_location.search, _location.pathname, _navigate]);
   // Состояние для модального окна ShareScheduleModal
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   // Состояние для модального окна добавления друга в совместное расписание

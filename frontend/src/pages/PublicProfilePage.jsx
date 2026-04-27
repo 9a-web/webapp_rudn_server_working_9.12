@@ -1,756 +1,2014 @@
 /**
- * PublicProfilePage — публичная страница профиля по UID.
+ * 🌐 PublicProfilePage — публичная страница профиля по UID (`/u/{uid}`).
  *
- * Маршрут: /u/:uid
- * Доступность: БЕЗ авторизации (респектирует privacy настройки владельца).
- * Эндпоинты backend:
- *   GET  /api/u/{uid}          → UserProfilePublic
- *   GET  /api/u/{uid}/share-link
- *   POST /api/u/{uid}/view     (JWT optional; считается только для авторизованных)
+ * Дизайн:
+ *   1-в-1 повторяет owner-дизайн ProfileScreen (граффити-шапка, аватар 140×140,
+ *   level/online pill, 3 колонки Друзей/Тир/$RDN, табы Общее/Друзья/Достижения/Материалы,
+ *   bottom amber-glow), но адаптирован под просмотр другим пользователем.
  *
- * UX-принципы:
- *  - Лёгкая загрузка (skeleton), мягкий fade-in
- *  - Чёткие пустые состояния: 404 / 422 / hidden / private
- *  - Dark theme с градиентным glow, аватар-градиент, уровень/tier
- *  - CTA: Копировать ссылку, Открыть в приложении, Войти
- *  - Responsive (mobile-first + desktop)
+ * Поведение:
+ *   * Если viewer == owner → авто-редирект на `/?openProfile=1` с заменой URL —
+ *     владелец редактирует свой профиль через Header → ProfileScreen.
+ *   * Не-владелец авторизованный → доступны действия дружбы (добавить/отозвать/
+ *     принять/отклонить/удалить/блокировка) + Share + Open in app.
+ *   * Аноним → Share + Login.
+ *
+ * Privacy:
+ *   * Все поля (online, friends, achievements) учитывают privacy-флаги из API.
+ *   * Backend дополнительно фильтрует /u/{uid}/friends и /u/{uid}/achievements
+ *     на серверной стороне для не-друзей.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
 import {
-  ArrowLeft, Copy, Share2, Users, Trophy, Eye, EyeOff, Wifi,
-  Loader2, AlertTriangle, Lock, CalendarDays, GraduationCap,
-  CheckCircle2, Home, LogIn, UserPlus, ExternalLink, RefreshCw,
+  ChevronLeft, Trophy, QrCode, Share2, UserPlus, UserCheck, Clock,
+  Loader2, Lock, Star, Sliders, Users, MessageCircle, LogIn, Copy, Check, X,
+  ExternalLink, MoreVertical, ShieldX, UserX, EyeOff,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import axios from 'axios';
 
-import { getBackendURL } from '../utils/config';
-import { buildProfileUrl } from '../constants/publicBase';
-import { getTierConfig } from '../constants/levelConstants';
+import { friendsAPI } from '../services/friendsAPI';
 import { useAuth } from '../contexts/AuthContext';
-import { getAvatarSeed, hashSeed, isSameUser } from '../utils/userIdentity';
+import { getTierConfig } from '../constants/levelConstants';
+import { buildProfileUrl } from '../constants/publicBase';
+import { isSameUser } from '../utils/userIdentity';
+import WallGraffiti from '../components/WallGraffiti';
+import LevelDetailModal from '../components/LevelDetailModal';
+import { getBackendURL } from '../services/api';
 
-// ============ Helpers ============
+// =============================================================================
+// Константы
+// =============================================================================
 
-const API_BASE = `${getBackendURL()}/api`;
-
-const AVATAR_GRADIENTS = [
-  'from-violet-500 to-purple-600',
-  'from-blue-500 to-cyan-500',
-  'from-emerald-500 to-teal-500',
-  'from-rose-500 to-pink-500',
-  'from-amber-500 to-orange-500',
-  'from-indigo-500 to-blue-600',
+const TABS = [
+  { id: 'general', label: 'Общее' },
+  { id: 'friends', label: 'Друзья' },
+  { id: 'achievements', label: 'Достижения' },
+  { id: 'materials', label: 'Материалы' },
 ];
 
-const pickGradient = (seed) => {
-  // Используем стабильный hash от строкового seed (uid или др.) —
-  // аватар один и тот же для юзера, вошедшего через VK (pseudo_tid)
-  // и через TG (real_tid) после линковки, потому что uid не меняется.
-  return AVATAR_GRADIENTS[hashSeed(seed) % AVATAR_GRADIENTS.length];
+const PSEUDO_TID_OFFSET = 10_000_000_000;
+
+// =============================================================================
+// Хелперы
+// =============================================================================
+
+const pluralizeFriends = (n) => {
+  const num = Number(n) || 0;
+  const mod10 = num % 10;
+  const mod100 = num % 100;
+  if (mod100 >= 11 && mod100 <= 19) return 'Друзей';
+  if (mod10 === 1) return 'Друг';
+  if (mod10 >= 2 && mod10 <= 4) return 'Друга';
+  return 'Друзей';
 };
 
-const getInitials = (firstName, lastName, username) => {
-  const parts = [];
-  if (firstName) parts.push(String(firstName).trim()[0]);
-  if (lastName) parts.push(String(lastName).trim()[0]);
-  if (parts.length === 0 && username) parts.push(String(username).trim()[0]);
-  return parts.join('').toUpperCase() || '?';
-};
-
-const formatRelativeTime = (iso) => {
-  if (!iso) return '';
+const formatLastSeen = (iso) => {
+  if (!iso) return null;
   try {
-    const d = typeof iso === 'string' ? new Date(iso) : iso;
-    if (isNaN(d.getTime())) return '';
-    const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
-    if (diffMin < 1) return 'только что';
-    if (diffMin < 60) return `${diffMin} мин назад`;
-    const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) return `${diffH} ч назад`;
-    const diffD = Math.floor(diffH / 24);
-    if (diffD < 7) return `${diffD} дн назад`;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60_000);
+    if (mins < 1) return 'только что';
+    if (mins < 60) return `${mins} мин назад`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} ч назад`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} дн назад`;
     return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  } catch {
-    return '';
-  }
+  } catch { return null; }
 };
 
-const formatMemberSince = (iso) => {
-  if (!iso) return '';
-  try {
-    const d = typeof iso === 'string' ? new Date(iso) : iso;
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-  } catch {
-    return '';
-  }
+const buildTelegramPhotoUrl = (telegramId) => {
+  if (!telegramId) return null;
+  const tid = Number(telegramId);
+  if (!Number.isFinite(tid) || tid <= 0 || tid >= PSEUDO_TID_OFFSET) return null;
+  const base = getBackendURL();
+  return `${base}/api/user-profile-photo-proxy/${tid}`;
 };
 
-// ============ Sub-components ============
-
-const PageFrame = ({ children }) => (
-  <div
-    className="min-h-screen w-full text-white"
-    style={{
-      background:
-        'radial-gradient(1200px 600px at 10% 0%, rgba(124,58,237,0.12) 0%, transparent 60%),' +
-        'radial-gradient(900px 500px at 100% 100%, rgba(59,130,246,0.10) 0%, transparent 60%),' +
-        '#0B0B0F',
-    }}
-  >
-    <div className="mx-auto w-full max-w-[640px] px-4 pb-12 pt-6 sm:pt-10">
-      {children}
-    </div>
-  </div>
-);
-
-const TopBar = ({ onBack, uid }) => (
-  <div className="mb-6 flex items-center justify-between">
-    <button
-      type="button"
-      onClick={onBack}
-      className="inline-flex items-center gap-2 rounded-full bg-white/[0.05] px-3 py-2 text-[13px] font-medium text-white/70 transition hover:bg-white/[0.10] hover:text-white"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Назад
-    </button>
-    <div className="flex items-center gap-2 rounded-full bg-white/[0.04] px-3 py-1.5 text-[11px] font-mono tracking-wider text-white/50 border border-white/[0.06]">
-      UID · {uid}
-    </div>
-  </div>
-);
-
-const LoadingSkeleton = () => (
-  <div className="animate-pulse">
-    <div className="flex items-start gap-4">
-      <div className="h-[88px] w-[88px] rounded-[26px] bg-white/[0.06]" />
-      <div className="flex-1 space-y-3 pt-2">
-        <div className="h-5 w-2/3 rounded-md bg-white/[0.06]" />
-        <div className="h-3 w-1/3 rounded-md bg-white/[0.05]" />
-        <div className="h-3 w-1/2 rounded-md bg-white/[0.04]" />
-      </div>
-    </div>
-    <div className="mt-6 grid grid-cols-3 gap-3">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="h-20 rounded-2xl bg-white/[0.04]" />
-      ))}
-    </div>
-    <div className="mt-4 h-16 rounded-2xl bg-white/[0.03]" />
-    <div className="mt-4 h-12 w-2/3 rounded-full bg-white/[0.04]" />
-  </div>
-);
-
-const EmptyState = ({ icon: Icon, iconColor = 'text-white/40', title, description, actions }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 8 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="mt-6 rounded-3xl border border-white/[0.06] bg-white/[0.03] p-8 text-center"
-  >
-    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06]">
-      <Icon className={`h-7 w-7 ${iconColor}`} />
-    </div>
-    <h2 className="text-[18px] font-semibold text-white">{title}</h2>
-    {description && (
-      <p className="mx-auto mt-2 max-w-[380px] text-[13px] leading-relaxed text-white/60">
-        {description}
-      </p>
-    )}
-    {actions && <div className="mt-5 flex flex-wrap items-center justify-center gap-2">{actions}</div>}
-  </motion.div>
-);
-
-const StatCard = ({ value, label, hidden, icon: Icon }) => (
-  <div className="flex flex-col items-center rounded-2xl border border-white/[0.06] bg-white/[0.04] px-3 py-3 text-center">
-    {hidden ? (
-      <>
-        <EyeOff className="mb-1 h-5 w-5 text-white/30" />
-        <span className="text-[10px] font-medium text-white/40">Скрыто</span>
-      </>
-    ) : (
-      <>
-        {Icon && <Icon className="mb-1 h-[18px] w-[18px] text-white/40" />}
-        <span className="text-[20px] font-bold text-white leading-none">{value ?? 0}</span>
-        <span className="mt-1 text-[11px] font-medium text-white/50">{label}</span>
-      </>
-    )}
-  </div>
-);
-
-const FriendshipBadge = ({ status }) => {
-  if (!status) return null;
-  const map = {
-    friend: { label: 'В друзьях', color: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-400/20' },
-    pending_incoming: { label: 'Входящий запрос', color: 'text-amber-300', bg: 'bg-amber-500/10', border: 'border-amber-400/20' },
-    pending_outgoing: { label: 'Запрос отправлен', color: 'text-sky-300', bg: 'bg-sky-500/10', border: 'border-sky-400/20' },
-    blocked: { label: 'Заблокирован', color: 'text-rose-300', bg: 'bg-rose-500/10', border: 'border-rose-400/20' },
-  };
-  const cfg = map[status];
-  if (!cfg) return null;
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${cfg.bg} ${cfg.border} ${cfg.color}`}>
-      <CheckCircle2 className="h-3 w-3" />
-      {cfg.label}
-    </span>
-  );
-};
-
-// ============ Main Component ============
+// =============================================================================
+// Компонент
+// =============================================================================
 
 const PublicProfilePage = () => {
   const { uid } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { isAuthenticated, user: currentUser, initializing: authInitializing } = useAuth();
+  const location = useLocation();
+  const { user: currentUser, isAuthenticated } = useAuth();
 
+  // === Profile data ===
   const [profile, setProfile] = useState(null);
-  const [shareInfo, setShareInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // { type: 'not_found' | 'not_configured' | 'hidden' | 'generic', message }
-  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
 
-  const publicUrl = useMemo(() => buildProfileUrl(uid), [uid]);
+  // === Avatar / Header graffiti ===
+  const [customAvatar, setCustomAvatar] = useState(null);  // base64 data URL
+  const [headerGraffitiUrl, setHeaderGraffitiUrl] = useState(null);
+  const [tgPhotoOk, setTgPhotoOk] = useState(true);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
-  // ---- Page title / meta ----
+  // === Tabs ===
+  const [activeTab, setActiveTab] = useState('general');
+  const [friendsList, setFriendsList] = useState([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendsHiddenByPrivacy, setFriendsHiddenByPrivacy] = useState(false);
+  const [allAchievements, setAllAchievements] = useState([]);
+  const [userAchievements, setUserAchievements] = useState([]);
+  const [achievementsLoading, setAchievementsLoading] = useState(false);
+  const [achievementsHiddenByPrivacy, setAchievementsHiddenByPrivacy] = useState(false);
+
+  // === Overlays ===
+  const [showQR, setShowQR] = useState(false);
+  const [qrData, setQrData] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showLevelDetail, setShowLevelDetail] = useState(false);
+  const [showFriendActions, setShowFriendActions] = useState(false);
+  const [friendActionLoading, setFriendActionLoading] = useState(false);
+  const [friendActionError, setFriendActionError] = useState(null);
+
+  // === Refs ===
+  const tabsContainerRef = useRef(null);
+  const tabRefs = useRef({});
+  const scrollContainerRef = useRef(null);
+  const viewSentRef = useRef(false);
+  const profileLoadedForUidRef = useRef(null);
+
+  // ---------------------------------------------------------------------------
+  // Owner detection (использует isSameUser, корректно работает для VK/Email pseudo_tid)
+  // ---------------------------------------------------------------------------
+  const isOwner = useMemo(() => {
+    if (!profile || !currentUser) return false;
+    return isSameUser(currentUser, { uid: profile.uid, telegram_id: profile.telegram_id });
+  }, [profile, currentUser]);
+
+  // ---------------------------------------------------------------------------
+  // OWNER REDIRECT (Choice 1.b): авто-редирект на / с авто-открытием ProfileScreen
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    const displayName = profile
-      ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() ||
-        (profile.username ? `@${profile.username}` : `User ${uid}`)
-      : `Профиль ${uid}`;
-    document.title = `${displayName} · RUDN`;
-
-    // OG-like description (meta tag)
-    const descContent = profile
-      ? `${displayName} в расписании РУДН${profile.group_name ? ` · ${profile.group_name}` : ''}`
-      : 'Публичный профиль в RUDN Schedule';
-    let meta = document.querySelector('meta[name="description"]');
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.setAttribute('name', 'description');
-      document.head.appendChild(meta);
+    if (isOwner) {
+      navigate('/?openProfile=1', { replace: true });
     }
-    meta.setAttribute('content', descContent);
-  }, [profile, uid]);
+  }, [isOwner, navigate]);
 
-  // ---- Fetch profile ----
-  const fetchProfile = useCallback(async () => {
+  // ---------------------------------------------------------------------------
+  // Загрузка основного профиля по UID
+  // ---------------------------------------------------------------------------
+  const loadProfile = useCallback(async () => {
     if (!uid) return;
     setLoading(true);
     setError(null);
     try {
-      const profileRes = await axios.get(`${API_BASE}/u/${uid}`, { validateStatus: () => true });
-
-      if (profileRes.status === 200) {
-        setProfile(profileRes.data);
-      } else if (profileRes.status === 404) {
-        setError({ type: 'not_found', message: 'Пользователь с таким UID не найден' });
-        return;
-      } else if (profileRes.status === 422) {
-        setError({ type: 'not_configured', message: 'Профиль не настроен владельцем' });
-        return;
-      } else if (profileRes.status === 401 || profileRes.status === 403) {
-        setError({ type: 'hidden', message: 'Этот профиль скрыт от публичного просмотра' });
-        return;
+      const base = getBackendURL();
+      const resp = await axios.get(`${base}/api/u/${encodeURIComponent(uid)}`);
+      setProfile(resp.data);
+      profileLoadedForUidRef.current = uid;
+    } catch (err) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      if (status === 404) {
+        setError({ kind: 'not_found', message: 'Профиль не найден' });
+      } else if (status === 422) {
+        setError({ kind: 'not_configured', message: detail || 'Профиль ещё не настроен' });
+      } else if (status === 403) {
+        setError({ kind: 'hidden', message: detail || 'Профиль скрыт владельцем' });
       } else {
-        setError({
-          type: 'generic',
-          message: profileRes.data?.detail || `Ошибка ${profileRes.status}`,
-        });
-        return;
+        setError({ kind: 'generic', message: 'Не удалось загрузить профиль' });
       }
-
-      // Fetch share info (non-blocking for rendering)
-      try {
-        const shareRes = await axios.get(`${API_BASE}/u/${uid}/share-link`, { validateStatus: () => true });
-        if (shareRes.status === 200) setShareInfo(shareRes.data);
-      } catch {
-        /* noop */
-      }
-    } catch (e) {
-      setError({
-        type: 'generic',
-        message: e?.response?.data?.detail || e?.message || 'Не удалось загрузить профиль',
-      });
     } finally {
       setLoading(false);
     }
   }, [uid]);
 
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    profileLoadedForUidRef.current = null;
+    viewSentRef.current = false;
+    setActiveTab('general');
+    setFriendsList([]);
+    setUserAchievements([]);
+    setAllAchievements([]);
+    setHeaderGraffitiUrl(null);
+    setCustomAvatar(null);
+    setImgLoaded(false);
+    setTgPhotoOk(true);
+    setFriendsHiddenByPrivacy(false);
+    setAchievementsHiddenByPrivacy(false);
+    loadProfile();
+  }, [uid, loadProfile]);
 
-  // ---- Register view (once, best-effort) ----
+  // ---------------------------------------------------------------------------
+  // Регистрация просмотра (1 раз на UID, debounced)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!uid || !profile) return;
-    // Только для авторизованных — иначе backend вернёт counted=false
-    if (!isAuthenticated) return;
-    const timer = setTimeout(() => {
-      axios.post(`${API_BASE}/u/${uid}/view`).catch(() => {});
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [uid, profile, isAuthenticated]);
+    if (!profile || !currentUser?.id || isOwner || viewSentRef.current) return;
+    viewSentRef.current = true;
+    const base = getBackendURL();
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      axios.post(
+        `${base}/api/u/${encodeURIComponent(uid)}/view`,
+        { viewer_telegram_id: currentUser.id },
+        { signal: ctrl.signal },
+      ).catch(() => {});
+    }, 800);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [profile, currentUser?.id, isOwner, uid]);
 
-  // ---- Derived display values ----
-  const displayName = useMemo(() => {
-    if (!profile) return '';
-    const full = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
-    if (full) return full;
-    if (profile.username) return `@${profile.username}`;
-    if (profile.uid) return `User ${profile.uid}`;
-    return `User ${uid}`;
-  }, [profile, uid]);
+  // ---------------------------------------------------------------------------
+  // Загрузка кастомного аватара и header-граффити (по UID — privacy-safe)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!profile || isOwner) return;
+    let cancelled = false;
+    (async () => {
+      const [av, gr] = await Promise.all([
+        friendsAPI.getPublicAvatarByUid(uid),
+        friendsAPI.getPublicGraffitiByUid(uid),
+      ]);
+      if (cancelled) return;
+      if (av?.avatar_data) setCustomAvatar(av.avatar_data);
+      if (gr?.graffiti_data) setHeaderGraffitiUrl(gr.graffiti_data);
+    })();
+    return () => { cancelled = true; };
+  }, [profile, isOwner, uid]);
 
-  const initials = useMemo(
-    () => getInitials(profile?.first_name, profile?.last_name, profile?.username),
-    [profile],
-  );
-
-  const avatarSeed = getAvatarSeed(profile) || uid;
-  const gradient = pickGradient(avatarSeed);
-  const tierCfg = profile?.level ? getTierConfig(profile.tier || 'base') : null;
-
-  const isOwner = useMemo(
-    () => (isAuthenticated && currentUser && profile ? isSameUser(currentUser, profile) : false),
-    [isAuthenticated, currentUser, profile],
-  );
-
-  // ---- Actions ----
-  const handleBack = () => {
-    // Если пришли из самого приложения — вернёмся назад, иначе — на главную
-    if (window.history.length > 1 && document.referrer && document.referrer.includes(window.location.host)) {
-      navigate(-1);
-    } else {
-      navigate('/');
+  // ---------------------------------------------------------------------------
+  // Друзья (lazy при переключении на таб)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (activeTab !== 'friends' || !profile) return;
+    // Если фронт уже знает что friends_list_hidden — не дёргаем сеть
+    if (profile.friends_list_hidden && !isOwner) {
+      setFriendsHiddenByPrivacy(true);
+      setFriendsList([]);
+      return;
     }
+    setFriendsLoading(true);
+    friendsAPI.getPublicFriendsByUid(uid)
+      .then(data => {
+        const list = Array.isArray(data?.friends) ? data.friends : [];
+        setFriendsList(list);
+        // Если backend вернул пустой список но privacy_hidden — показываем плашку
+        setFriendsHiddenByPrivacy(
+          list.length === 0 && profile.friends_list_hidden && !isOwner,
+        );
+      })
+      .catch(() => setFriendsList([]))
+      .finally(() => setFriendsLoading(false));
+  }, [activeTab, profile, uid, isOwner]);
+
+  // ---------------------------------------------------------------------------
+  // Достижения (lazy при переключении на таб)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (activeTab !== 'achievements' || !profile) return;
+    setAchievementsLoading(true);
+    friendsAPI.getPublicAchievementsByUid(uid)
+      .then(data => {
+        setAllAchievements(Array.isArray(data?.all) ? data.all : []);
+        setUserAchievements(Array.isArray(data?.earned) ? data.earned : []);
+        setAchievementsHiddenByPrivacy(!!data?.hidden && !isOwner);
+      })
+      .catch(() => {})
+      .finally(() => setAchievementsLoading(false));
+  }, [activeTab, profile, uid, isOwner]);
+
+  // ---------------------------------------------------------------------------
+  // QR
+  // ---------------------------------------------------------------------------
+  const loadQR = useCallback(async () => {
+    if (!uid) return;
+    setQrLoading(true);
+    try {
+      const base = getBackendURL();
+      const resp = await axios.get(`${base}/api/u/${encodeURIComponent(uid)}/qr`);
+      setQrData(resp.data);
+    } catch {
+      setQrData(null);
+    } finally {
+      setQrLoading(false);
+    }
+  }, [uid]);
+
+  const handleQRClick = () => {
+    if (!qrData) loadQR();
+    setShowQR(true);
   };
 
-  const handleCopy = async () => {
+  // ---------------------------------------------------------------------------
+  // Share
+  // ---------------------------------------------------------------------------
+  const profileUrl = useMemo(() => buildProfileUrl(uid), [uid]);
+
+  const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(profileUrl);
     } catch {
-      // Fallback
-      const el = document.createElement('textarea');
-      el.value = publicUrl;
-      el.setAttribute('readonly', '');
-      el.style.position = 'absolute';
-      el.style.left = '-9999px';
-      document.body.appendChild(el);
-      el.select();
-      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-      catch { /* noop */ }
-      document.body.removeChild(el);
+      const ta = document.createElement('textarea');
+      ta.value = profileUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
     }
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 1800);
   };
 
   const handleShare = async () => {
-    const text = displayName ? `Профиль ${displayName} в RUDN Schedule` : 'Профиль в RUDN Schedule';
+    const title = profile
+      ? `${[profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.username || 'Профиль'} в RUDN App`
+      : 'Профиль RUDN App';
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url: profileUrl });
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
+      }
+    }
+    setShowShareSheet(true);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Действия дружбы (Choice 2.a — полная функциональность на публичной странице)
+  // ---------------------------------------------------------------------------
+  const refreshAfterFriendAction = useCallback(async () => {
+    await loadProfile();
+  }, [loadProfile]);
+
+  const handleSendFriendRequest = async () => {
+    if (!currentUser?.id || !profile?.telegram_id) return;
+    setFriendActionLoading(true); setFriendActionError(null);
     try {
-      if (window.Telegram?.WebApp?.openTelegramLink) {
-        window.Telegram.WebApp.openTelegramLink(
-          `https://t.me/share/url?url=${encodeURIComponent(publicUrl)}&text=${encodeURIComponent(text)}`,
-        );
-        return;
-      }
-      if (navigator.share) {
-        await navigator.share({ title: 'Профиль', text, url: publicUrl });
-        return;
-      }
-    } catch {
-      /* user cancelled or unsupported — fallback to copy */
+      await friendsAPI.sendFriendRequest(currentUser.id, profile.telegram_id);
+      await refreshAfterFriendAction();
+    } catch (e) {
+      setFriendActionError(e?.message || 'Не удалось отправить заявку');
+    } finally {
+      setFriendActionLoading(false);
     }
-    handleCopy();
   };
 
-  const handleOpenInApp = () => {
-    // Если profile связан с telegram — можно открыть Telegram-бота с deep-link
-    const tgLink = shareInfo?.telegram_link;
-    if (tgLink) {
-      if (window.Telegram?.WebApp?.openTelegramLink) {
-        window.Telegram.WebApp.openTelegramLink(tgLink);
-      } else {
-        window.open(tgLink, '_blank', 'noopener,noreferrer');
-      }
+  const handleRemoveFriend = async () => {
+    if (!currentUser?.id || !profile?.telegram_id) return;
+    if (!window.confirm('Удалить из друзей?')) return;
+    setFriendActionLoading(true); setFriendActionError(null);
+    try {
+      await friendsAPI.removeFriend(currentUser.id, profile.telegram_id);
+      await refreshAfterFriendAction();
+      setShowFriendActions(false);
+    } catch (e) {
+      setFriendActionError(e?.message || 'Не удалось удалить из друзей');
+    } finally {
+      setFriendActionLoading(false);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!currentUser?.id || !profile?.telegram_id) return;
+    if (!window.confirm('Заблокировать пользователя? Вы больше не будете видеть друг друга.')) return;
+    setFriendActionLoading(true); setFriendActionError(null);
+    try {
+      await friendsAPI.blockUser(currentUser.id, profile.telegram_id);
+      // После блока — назад
+      navigate(-1);
+    } catch (e) {
+      setFriendActionError(e?.message || 'Не удалось заблокировать');
+    } finally {
+      setFriendActionLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Back navigation (надёжный, работает в iframe TG WebApp)
+  // ---------------------------------------------------------------------------
+  const handleBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1);
     } else {
-      // fallback — открыть веб-приложение (главную)
-      navigate('/');
+      navigate('/', { replace: true });
     }
+  }, [navigate]);
+
+  // ---------------------------------------------------------------------------
+  // Login redirect (с возвратом на текущий профиль)
+  // ---------------------------------------------------------------------------
+  const handleLogin = () => {
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    navigate(`/login?returnTo=${returnTo}`);
   };
 
-  const goToLogin = () => {
-    const cont = encodeURIComponent(`/u/${uid}`);
-    navigate(`/login?continue=${cont}`);
-  };
+  // ===========================================================================
+  // Производные значения для рендера
+  // ===========================================================================
+  const displayName = profile
+    ? (profile.username || profile.first_name || `User ${profile.uid}`).toUpperCase()
+    : '';
+  const fullName = profile
+    ? [profile.first_name, profile.last_name].filter(Boolean).join(' ')
+    : '';
+  const initial = (
+    profile?.first_name?.[0]
+    || profile?.username?.[0]
+    || (profile?.uid ? String(profile.uid)[0] : '?')
+  ).toUpperCase();
 
-  // ============ Render states ============
+  const showOnline = profile && !profile.online_status_hidden;
+  const isOnline = !!profile?.is_online;
+  const lastSeenLabel = !isOnline ? formatLastSeen(profile?.last_activity) : null;
 
-  if (loading || authInitializing) {
-    return (
-      <PageFrame>
-        <TopBar onBack={handleBack} uid={uid} />
-        <LoadingSkeleton />
-      </PageFrame>
-    );
+  const tier = profile?.tier || 'base';
+  const tc = getTierConfig(tier);
+  const isHighTier = tier === 'legend' || tier === 'premium';
+  const starCount = Math.min(profile?.stars || 0, 4);
+  const xpProg = profile?.xp_progress ?? 0;
+
+  const tgPhotoUrl = useMemo(
+    () => (profile?.telegram_id ? buildTelegramPhotoUrl(profile.telegram_id) : null),
+    [profile?.telegram_id],
+  );
+  const avatarSrc = customAvatar || (tgPhotoOk ? tgPhotoUrl : null);
+
+  const friendsCount = profile?.friends_count ?? 0;
+  const totalPoints = profile?.total_points ?? 0;
+  const showAchievementsStat = !profile?.achievements_hidden;
+
+  const friendshipStatus = profile?.friendship_status; // 'friend' | 'pending_outgoing' | 'pending_incoming' | null
+
+  // ===========================================================================
+  // RENDER: Loading / Error / Page
+  // ===========================================================================
+
+  if (loading) {
+    return <PublicProfileSkeleton onBack={handleBack} />;
   }
 
   if (error) {
-    const { type, message } = error;
-    if (type === 'not_found') {
-      return (
-        <PageFrame>
-          <TopBar onBack={handleBack} uid={uid} />
-          <EmptyState
-            icon={AlertTriangle}
-            iconColor="text-amber-300"
-            title="Профиль не найден"
-            description={`UID «${uid}» не существует или был удалён.`}
-            actions={
-              <button
-                onClick={() => navigate('/')}
-                className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.15]"
-              >
-                <Home className="h-4 w-4" /> На главную
-              </button>
-            }
-          />
-        </PageFrame>
-      );
-    }
-    if (type === 'not_configured') {
-      return (
-        <PageFrame>
-          <TopBar onBack={handleBack} uid={uid} />
-          <EmptyState
-            icon={AlertTriangle}
-            iconColor="text-amber-300"
-            title="Профиль ещё не настроен"
-            description="Владелец UID пока не связал аккаунт с Telegram или не завершил регистрацию."
-            actions={
-              <button
-                onClick={() => navigate('/')}
-                className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.15]"
-              >
-                <Home className="h-4 w-4" /> На главную
-              </button>
-            }
-          />
-        </PageFrame>
-      );
-    }
-    if (type === 'hidden') {
-      return (
-        <PageFrame>
-          <TopBar onBack={handleBack} uid={uid} />
-          <EmptyState
-            icon={Lock}
-            iconColor="text-indigo-300"
-            title="Этот профиль скрыт"
-            description="Владелец настроил приватность: профиль недоступен для анонимного просмотра. Войдите, чтобы увидеть подробности (если у вас есть доступ)."
-            actions={
-              <>
-                <button
-                  onClick={goToLogin}
-                  className="inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-indigo-400"
-                >
-                  <LogIn className="h-4 w-4" /> Войти
-                </button>
-                <button
-                  onClick={() => navigate('/')}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.15]"
-                >
-                  <Home className="h-4 w-4" /> На главную
-                </button>
-              </>
-            }
-          />
-        </PageFrame>
-      );
-    }
-    return (
-      <PageFrame>
-        <TopBar onBack={handleBack} uid={uid} />
-        <EmptyState
-          icon={AlertTriangle}
-          iconColor="text-rose-300"
-          title="Не удалось загрузить профиль"
-          description={message}
-          actions={
-            <button
-              onClick={fetchProfile}
-              disabled={loading}
-              aria-label="Повторить загрузку профиля"
-              className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.15] disabled:opacity-60 disabled:cursor-wait"
-            >
-              {loading
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <RefreshCw className="h-4 w-4" />
-              }
-              {loading ? 'Загрузка…' : 'Повторить'}
-            </button>
-          }
-        />
-      </PageFrame>
-    );
+    return <PublicProfileError error={error} onBack={handleBack} onLogin={!isAuthenticated ? handleLogin : null} />;
   }
 
-  // ============ Profile loaded ============
+  if (!profile) return null;
 
   return (
-    <PageFrame>
-      <TopBar onBack={handleBack} uid={uid} />
-
+    <div
+      className="fixed inset-0 z-[200] flex flex-col"
+      style={{ backgroundColor: '#000000', overscrollBehavior: 'contain' }}
+    >
+      {/* ============== Верхняя панель ============== */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
+        transition={{ delay: 0.05, duration: 0.25 }}
+        className="flex items-center justify-between px-4"
+        style={{
+          paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
+          paddingBottom: '8px',
+          position: 'relative',
+          zIndex: 10,
+          flexShrink: 0,
+        }}
       >
-        {/* ===== Hero ===== */}
-        <div className="relative overflow-hidden rounded-3xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6">
-          {/* Ambient gradient glow */}
-          <div
-            className={`pointer-events-none absolute -top-24 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-gradient-to-br ${gradient} opacity-[0.12] blur-3xl`}
-          />
+        <button onClick={handleBack} aria-label="Назад">
+          <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
+        </button>
 
-          <div className="relative flex items-start gap-4">
-            {/* Avatar */}
-            <div className="relative flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <button onClick={handleQRClick} aria-label="QR-код">
+            <QrCode style={{ width: '24px', height: '24px', color: 'rgba(255,255,255,0.7)' }} />
+          </button>
+          <button onClick={handleShare} aria-label="Поделиться">
+            <Share2 style={{ width: '22px', height: '22px', color: 'rgba(255,255,255,0.7)' }} />
+          </button>
+          {/* Действия зависят от статуса дружбы */}
+          {isAuthenticated ? (
+            <FriendshipButton
+              status={friendshipStatus}
+              loading={friendActionLoading}
+              onSendRequest={handleSendFriendRequest}
+              onMore={() => setShowFriendActions(true)}
+            />
+          ) : (
+            <button
+              onClick={handleLogin}
+              className="flex items-center gap-1.5 px-3"
+              style={{
+                height: '32px',
+                borderRadius: '16px',
+                background: 'rgba(248,185,76,0.12)',
+                border: '1px solid rgba(248,185,76,0.25)',
+                color: '#F8B94C',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                fontFamily: "'Poppins', sans-serif",
+              }}
+              aria-label="Войти"
+            >
+              <LogIn style={{ width: '14px', height: '14px' }} />
+              Войти
+            </button>
+          )}
+        </div>
+      </motion.div>
+
+      {friendActionError && (
+        <div style={{
+          margin: '0 16px 8px', padding: '8px 12px', borderRadius: '10px',
+          background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+          color: '#FCA5A5', fontSize: '12px', fontFamily: "'Poppins', sans-serif",
+        }}>
+          {friendActionError}
+        </div>
+      )}
+
+      {/* ============== Скроллируемый контейнер ============== */}
+      <div
+        ref={scrollContainerRef}
+        style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
+      >
+        {/* ===== ШАПКА с граффити-фоном ===== */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          overflow: 'hidden',
+          paddingBottom: '18px',
+        }}>
+          {headerGraffitiUrl && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 0,
+              opacity: 0.55,
+              pointerEvents: 'none',
+            }}>
+              <img
+                src={headerGraffitiUrl}
+                alt=""
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                }}
+              />
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '60px',
+                background: 'linear-gradient(to top, #000000, transparent)',
+              }} />
+            </div>
+          )}
+
+          {/* Аватар */}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 260, delay: 0.08 }}
+            style={{ marginTop: '12px', position: 'relative', zIndex: 1 }}
+          >
+            <div
+              className="overflow-hidden relative"
+              style={{
+                width: '140px',
+                height: '140px',
+                borderRadius: '44px',
+                border: '3px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 0 60px rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              {/* Fallback initials gradient */}
               <div
-                className={`flex h-[88px] w-[88px] items-center justify-center overflow-hidden rounded-[26px] bg-gradient-to-br ${gradient} text-white text-[30px] font-bold shadow-[0_8px_30px_rgba(0,0,0,0.4)]`}
+                className="absolute inset-0 flex items-center justify-center text-4xl font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#FFFFFF',
+                }}
               >
-                {initials}
+                {initial}
               </div>
-              {profile.is_online && (
-                <div className="absolute -bottom-1 -right-1">
-                  <div
-                    className="relative h-5 w-5 rounded-full border-[3px] bg-emerald-500"
-                    style={{ borderColor: '#0B0B0F' }}
-                  >
-                    <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-30" />
-                  </div>
-                </div>
+
+              {avatarSrc && (
+                <img
+                  src={avatarSrc}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+                  referrerPolicy="no-referrer"
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => {
+                    if (avatarSrc === tgPhotoUrl) setTgPhotoOk(false);
+                  }}
+                />
               )}
             </div>
+          </motion.div>
 
-            {/* Name & meta */}
-            <div className="min-w-0 flex-1 pt-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-[22px] font-bold leading-tight text-white sm:text-[24px]">
-                  {displayName}
-                </h1>
-                {isOwner && (
-                  <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300 border border-indigo-400/20">
-                    Это вы
+          {/* Online + Level pills */}
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.25 }}
+            className="flex items-center"
+            style={{ marginTop: '12px', gap: '16px', position: 'relative', zIndex: 1 }}
+          >
+            {showOnline ? (
+              <div
+                className="flex items-center gap-2"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                }}
+                title={lastSeenLabel ? `Был(а) ${lastSeenLabel}` : undefined}
+              >
+                <div
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: isOnline ? '#4ADE80' : '#EF4444',
+                    boxShadow: isOnline ? '0 0 6px rgba(74, 222, 128, 0.5)' : '0 0 6px rgba(239, 68, 68, 0.5)',
+                  }}
+                />
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '12px',
+                  color: '#FFFFFF',
+                }}>
+                  {isOnline ? 'Online' : (lastSeenLabel || 'Offline')}
+                </span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-1.5"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <EyeOff style={{ width: '12px', height: '12px', color: 'rgba(255,255,255,0.4)' }} />
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 500,
+                  fontSize: '12px',
+                  color: 'rgba(255,255,255,0.4)',
+                }}>
+                  Скрыто
+                </span>
+              </div>
+            )}
+
+            {/* Level pill — кликабельный для всех (детали уровня публичны) */}
+            <div
+              onClick={() => setShowLevelDetail(true)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease',
+              }}
+            >
+              <div style={{
+                position: 'relative',
+                overflow: 'hidden',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                background: isHighTier ? tc.gradient : tc.color,
+                animation: isHighTier ? 'levelPulse 2s ease-in-out infinite' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: 0, left: 0, width: '100%', height: '100%',
+                  pointerEvents: 'none', overflow: 'hidden', borderRadius: '20px',
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '-20%', left: '-50%',
+                    width: '45%', height: '140%',
+                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)',
+                    animation: 'badgeShimmer 2.8s ease-in-out infinite',
+                    animationDelay: '0.5s',
+                  }} />
+                </div>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  color: '#1c1c1c',
+                  position: 'relative',
+                  zIndex: 1,
+                }}>
+                  LV. {profile.level ?? 1}
+                </span>
+                {starCount > 0 && (
+                  <span style={{ display: 'inline-flex', gap: '1px', position: 'relative', zIndex: 1 }}>
+                    {Array.from({ length: starCount }).map((_, i) => (
+                      <motion.span
+                        key={i}
+                        initial={{ opacity: 0, scale: 0.3 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.3 + i * 0.12, type: 'spring', stiffness: 400, damping: 12 }}
+                        style={{
+                          fontFamily: "'Poppins', sans-serif",
+                          fontSize: '10px',
+                          color: '#1c1c1c',
+                          display: 'inline-block',
+                          animation: `starTwinkle ${1.8 + i * 0.2}s ease-in-out infinite`,
+                          animationDelay: `${1 + i * 0.3}s`,
+                        }}
+                      >★</motion.span>
+                    ))}
                   </span>
                 )}
               </div>
-              {profile.username && (
-                <p className="mt-1 text-[13px] text-white/50">@{profile.username}</p>
-              )}
-              {profile.group_name && (
-                <p className="mt-1.5 flex items-center gap-1.5 text-[13px] font-medium text-purple-300">
-                  <GraduationCap className="h-3.5 w-3.5" />
-                  {profile.group_name}
-                </p>
-              )}
-              {profile.facultet_name && (
-                <p className="mt-0.5 truncate text-[11px] text-white/40">{profile.facultet_name}</p>
-              )}
-
-              {/* Tier / Level */}
-              {tierCfg && profile.level > 0 && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className="rounded-lg border px-2 py-0.5 text-[11px] font-bold"
-                    style={{
-                      background: tierCfg.bgTint,
-                      color: tierCfg.color,
-                      borderColor: tierCfg.borderTint,
-                    }}
-                  >
-                    LV. {profile.level}
-                  </span>
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ color: tierCfg.color }}
-                  >
-                    {tierCfg.nameRu}
-                  </span>
-                  {profile.stars > 0 && (
-                    <span
-                      style={{ color: tierCfg.color, letterSpacing: '1px', fontSize: 10 }}
-                    >
-                      {'★'.repeat(Math.min(profile.stars || 1, 4))}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Online / last seen */}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {profile.is_online ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-300">
-                    <Wifi className="h-3 w-3" /> в сети
-                  </span>
-                ) : profile.online_status_hidden ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/40">
-                    <EyeOff className="h-3 w-3" /> статус скрыт
-                  </span>
-                ) : profile.last_activity ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/40">
-                    был(а) {formatRelativeTime(profile.last_activity)}
-                  </span>
-                ) : null}
-                <FriendshipBadge status={profile.friendship_status} />
-              </div>
-            </div>
-          </div>
-
-          {/* Stats grid */}
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <StatCard
-              icon={Users}
-              value={profile.friends_count}
-              label="Друзей"
-              hidden={profile.friends_list_hidden}
-            />
-            <StatCard
-              icon={Users}
-              value={profile.mutual_friends_count}
-              label="Общих"
-              hidden={!isAuthenticated}
-            />
-            <StatCard
-              icon={Trophy}
-              value={profile.achievements_count}
-              label="Достижений"
-              hidden={profile.achievements_hidden}
-            />
-          </div>
-
-          {/* XP progress */}
-          {tierCfg && profile.xp > 0 && profile.xp_progress > 0 && (
-            <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-3">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium text-white/40">
-                <span>{profile.xp || 0} XP</span>
-                <span>LV. {profile.level} → {profile.level + 1}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                <div
-                  className="h-full rounded-full transition-[width] duration-700 ease-out"
+              <div style={{
+                width: '80%',
+                height: '3px',
+                borderRadius: '2px',
+                backgroundColor: 'rgba(255, 255, 255, 0.10)',
+                marginTop: '4px',
+                overflow: 'hidden',
+                position: 'relative',
+              }}>
+                <motion.div
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${Math.max(xpProg * 100, 2)}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
                   style={{
-                    width: `${Math.max((profile.xp_progress || 0) * 100, 2)}%`,
-                    background: tierCfg.gradient,
+                    height: '100%',
+                    borderRadius: '2px',
+                    background: tc.gradient,
+                    boxShadow: `0 0 6px ${tc.color}55`,
+                    animation: 'xpBarGlow 2s ease-in-out infinite',
                   }}
                 />
               </div>
             </div>
-          )}
+          </motion.div>
 
-          {/* Meta info */}
-          {(profile.created_at || isOwner) && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-white/40">
-              {profile.created_at && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.03] px-2.5 py-1 border border-white/[0.05]">
-                  <CalendarDays className="h-3 w-3" />
-                  Участник с {formatMemberSince(profile.created_at)}
-                </span>
-              )}
-              {isOwner && typeof profile.profile_views_count === 'number' && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.03] px-2.5 py-1 border border-white/[0.05]">
-                  <Eye className="h-3 w-3" />
-                  {profile.profile_views_count} просмотров
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ===== Actions ===== */}
-        <div className="mt-5 space-y-2.5">
-          {/* Primary: open in app */}
-          <button
-            onClick={handleOpenInApp}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3.5 text-[14px] font-semibold text-white shadow-[0_10px_30px_rgba(124,58,237,0.35)] transition hover:from-indigo-400 hover:to-purple-400 active:scale-[0.98]"
+          {/* Большое имя */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            style={{
+              marginTop: '8px',
+              fontFamily: "'Proxima Nova ExCn', sans-serif",
+              fontWeight: 800,
+              fontSize: '47px',
+              color: '#FFFFFF',
+              textAlign: 'center',
+              lineHeight: 1.1,
+              position: 'relative',
+              zIndex: 1,
+              padding: '0 16px',
+              wordBreak: 'break-word',
+            }}
           >
-            <ExternalLink className="h-4 w-4" />
-            {shareInfo?.telegram_link ? 'Открыть в Telegram' : 'Открыть в приложении'}
-          </button>
+            {displayName}
+          </motion.div>
 
-          {/* Secondary: share + copy */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              onClick={handleShare}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-[13px] font-semibold text-white transition hover:bg-white/[0.08] active:scale-[0.98]"
+          {fullName && fullName !== displayName && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              transition={{ delay: 0.22, duration: 0.3 }}
+              style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                fontSize: '14px',
+                color: 'rgba(255,255,255,0.55)',
+                textAlign: 'center',
+                marginTop: '2px',
+                position: 'relative',
+                zIndex: 1,
+                padding: '0 16px',
+              }}
             >
-              <Share2 className="h-4 w-4" />
-              Поделиться
-            </button>
-            <button
-              onClick={handleCopy}
-              className="relative flex items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-[13px] font-semibold text-white transition hover:bg-white/[0.08] active:scale-[0.98]"
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {copied ? (
-                  <motion.span
-                    key="copied"
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    className="inline-flex items-center gap-2 text-emerald-300"
-                  >
-                    <CheckCircle2 className="h-4 w-4" /> Скопировано
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="copy"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    className="inline-flex items-center gap-2"
-                  >
-                    <Copy className="h-4 w-4" /> Копировать
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
-          </div>
-
-          {/* URL preview */}
-          <div className="flex items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
-            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-              URL
-            </span>
-            <span className="truncate font-mono text-[12px] text-white/70">{publicUrl}</span>
-          </div>
-
-          {/* Auth CTA */}
-          {!isAuthenticated && (
-            <button
-              onClick={goToLogin}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.12] bg-transparent px-4 py-3 text-[13px] font-medium text-white/70 transition hover:border-white/[0.25] hover:text-white"
-            >
-              <UserPlus className="h-4 w-4" />
-              Войти, чтобы добавить в друзья
-            </button>
+              {fullName}
+            </motion.div>
           )}
+
+          {/* Группа + streak */}
+          {profile.group_name && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25, duration: 0.3 }}
+              style={{
+                marginTop: '6px',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '16px',
+                color: '#FF4E9D',
+                textAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                zIndex: 1,
+              }}
+            >
+              {profile.group_name}
+              {(profile.visit_streak_current ?? 0) > 0 && (
+                <>
+                  <Trophy style={{ width: '14.5px', height: '14.5px', color: '#FFB54E', marginLeft: '8px', flexShrink: 0 }} />
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '14.5px',
+                    color: '#FFB54E',
+                    marginLeft: '3px',
+                  }}>
+                    🔥{profile.visit_streak_current}
+                  </span>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {/* 3-колонка: Друзья / Тир / $RDN */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+            className="flex items-start justify-center"
+            style={{ marginTop: '10px', gap: '40px', position: 'relative', zIndex: 1 }}
+          >
+            {/* Друзей */}
+            <div className="flex flex-col items-center">
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '21px',
+                color: profile.friends_list_hidden ? 'rgba(255,255,255,0.4)' : '#FFBE4E',
+                lineHeight: 1.2,
+              }}>
+                {profile.friends_list_hidden ? '—' : friendsCount}
+              </span>
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                fontSize: '14px',
+                color: '#FFFFFF',
+                marginTop: '2px',
+              }}>
+                {pluralizeFriends(friendsCount)}
+              </span>
+            </div>
+
+            {/* Уровень/Тир */}
+            <div
+              className="flex flex-col items-center"
+              onClick={() => setShowLevelDetail(true)}
+              style={{ cursor: 'pointer' }}
+            >
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '24px',
+                lineHeight: 1.2,
+                ...(isHighTier ? {
+                  background: tc.gradient,
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                } : { color: tc.color }),
+              }}>
+                {tc.nameRu}
+              </span>
+              {starCount > 0 && (
+                <div style={{ display: 'flex', gap: '2px', marginTop: '1px' }}>
+                  {Array.from({ length: starCount }).map((_, i) => (
+                    <motion.span
+                      key={i}
+                      initial={{ opacity: 0, scale: 0, y: 4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: 0.5 + i * 0.15, type: 'spring', stiffness: 350, damping: 14 }}
+                      style={{
+                        fontSize: '12px',
+                        color: tc.color,
+                        display: 'inline-block',
+                        animation: `starTwinkle ${2 + i * 0.25}s ease-in-out infinite`,
+                        animationDelay: `${1.5 + i * 0.4}s`,
+                        filter: `drop-shadow(0 0 2px ${tc.color}66)`,
+                      }}
+                    >★</motion.span>
+                  ))}
+                </div>
+              )}
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                fontSize: '14px',
+                color: '#FFFFFF',
+                marginTop: '2px',
+              }}>
+                Уровень
+              </span>
+              <div style={{
+                width: '52px',
+                height: '3px',
+                borderRadius: '2px',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                marginTop: '4px',
+                overflow: 'hidden',
+              }}>
+                <motion.div
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${Math.max(xpProg * 100, 2)}%` }}
+                  transition={{ duration: 1, ease: 'easeOut', delay: 0.6 }}
+                  style={{
+                    height: '100%',
+                    borderRadius: '2px',
+                    background: tc.gradient,
+                    boxShadow: `0 0 4px ${tc.color}44`,
+                    animation: 'xpBarGlow 2s ease-in-out infinite',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* $RDN */}
+            <div className="flex flex-col items-center">
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '21px',
+                color: showAchievementsStat ? '#FFBE4E' : 'rgba(255,255,255,0.4)',
+                lineHeight: 1.2,
+              }}>
+                {showAchievementsStat ? totalPoints : '—'}
+              </span>
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 500,
+                fontSize: '14px',
+                color: '#FFFFFF',
+                marginTop: '2px',
+              }}>
+                $RDN
+              </span>
+            </div>
+          </motion.div>
+        </div>
+        {/* ===== КОНЕЦ ШАПКИ ===== */}
+
+        {/* Табы */}
+        <div
+          ref={tabsContainerRef}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch',
+            padding: '15px 20px',
+            backgroundColor: '#000000',
+            width: '100%',
+            flexShrink: 0,
+            minHeight: '56px',
+            scrollBehavior: 'smooth',
+          }}
+          className="scrollbar-hide"
+        >
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              ref={(el) => { tabRefs.current[tab.id] = el; }}
+              onClick={() => {
+                if (scrollContainerRef.current) {
+                  scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+                }
+                setActiveTab(tab.id);
+                const btn = tabRefs.current[tab.id];
+                const container = tabsContainerRef.current;
+                if (btn && container) {
+                  const btnRect = btn.getBoundingClientRect();
+                  const containerRect = container.getBoundingClientRect();
+                  const target = container.scrollLeft + (btnRect.left - containerRect.left) - (containerRect.width / 2) + (btnRect.width / 2);
+                  container.scrollTo({ left: target, behavior: 'smooth' });
+                }
+              }}
+              style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '15px',
+                color: activeTab === tab.id ? '#F8B94C' : '#88888B',
+                background: activeTab === tab.id ? 'rgba(248, 185, 76, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: activeTab === tab.id ? '1px solid rgba(248, 185, 76, 0.25)' : '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '16px',
+                padding: '10px 22px',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 0.25s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                lineHeight: 1.2,
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Privacy note */}
-        {(profile.schedule_hidden || profile.friends_list_hidden || profile.achievements_hidden) && (
-          <p className="mt-5 rounded-2xl border border-white/[0.05] bg-white/[0.02] px-3.5 py-2.5 text-[11px] leading-relaxed text-white/40">
-            <Lock className="mr-1.5 -mt-0.5 inline h-3 w-3" />
-            Некоторые разделы скрыты владельцем в настройках приватности.
-          </p>
+        {/* Контент табов */}
+        <div style={{ width: '100%', padding: '16px 20px 100px' }}>
+          <AnimatePresence mode="wait">
+            {activeTab === 'general' && (
+              <motion.div
+                key="general"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}
+              >
+                {/* Bio */}
+                {profile.bio && (
+                  <div style={{
+                    padding: '14px 16px',
+                    borderRadius: '16px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <div style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 500,
+                      fontSize: '11px',
+                      color: 'rgba(255,255,255,0.4)',
+                      marginBottom: '4px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                    }}>
+                      О себе
+                    </div>
+                    <div style={{
+                      fontFamily: "'Poppins', sans-serif",
+                      fontWeight: 400,
+                      fontSize: '14px',
+                      color: '#F4F3FC',
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre-wrap',
+                    }}>
+                      {profile.bio}
+                    </div>
+                  </div>
+                )}
+
+                {/* Faculty */}
+                {profile.facultet_name && (
+                  <div style={{
+                    padding: '12px 16px',
+                    borderRadius: '14px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}>
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '10px',
+                      background: 'rgba(248,185,76,0.15)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <Trophy style={{ width: '16px', height: '16px', color: '#F8B94C' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 400,
+                        fontSize: '11px',
+                        color: 'rgba(255,255,255,0.4)',
+                      }}>
+                        Факультет{profile.kurs ? ` · ${profile.kurs} курс` : ''}
+                      </div>
+                      <div style={{
+                        fontFamily: "'Poppins', sans-serif",
+                        fontWeight: 500,
+                        fontSize: '13px',
+                        color: '#F4F3FC',
+                        lineHeight: 1.3,
+                        marginTop: '2px',
+                      }}>
+                        {profile.facultet_name}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Стена граффити (read-only для не-владельца, write-mode только если access enabled) */}
+                <WallGraffiti
+                  user={currentUser}
+                  profileOwnerId={profile.telegram_id}
+                  hapticFeedback={null}
+                />
+              </motion.div>
+            )}
+
+            {activeTab === 'friends' && (
+              <motion.div
+                key="friends"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+              >
+                {friendsLoading ? (
+                  <SpinnerInline />
+                ) : friendsHiddenByPrivacy ? (
+                  <PrivacyHiddenBlock
+                    icon={<Users style={{ width: '32px', height: '32px', color: 'rgba(255,255,255,0.2)' }} />}
+                    title="Список друзей скрыт"
+                    subtitle="Владелец профиля скрыл свой список друзей"
+                  />
+                ) : friendsList.length > 0 ? (
+                  friendsList.map((friend) => (
+                    <FriendRow
+                      key={friend.telegram_id}
+                      friend={friend}
+                      onClick={() => {
+                        // Перейти на страницу профиля друга
+                        const targetUid = String(friend.uid || friend.telegram_id);
+                        navigate(`/u/${targetUid}`);
+                      }}
+                    />
+                  ))
+                ) : (
+                  <PrivacyHiddenBlock
+                    icon={<Users style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.15)' }} />}
+                    title="Пока нет друзей"
+                  />
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'achievements' && (
+              <motion.div
+                key="achievements"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+              >
+                {achievementsLoading ? (
+                  <SpinnerInline />
+                ) : achievementsHiddenByPrivacy ? (
+                  <PrivacyHiddenBlock
+                    icon={<Trophy style={{ width: '32px', height: '32px', color: 'rgba(255,255,255,0.2)' }} />}
+                    title="Достижения скрыты"
+                    subtitle="Владелец профиля скрыл свои достижения"
+                  />
+                ) : (
+                  <AchievementsBlock
+                    allAchievements={allAchievements}
+                    userAchievements={userAchievements}
+                    totalPoints={totalPoints}
+                  />
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'materials' && (
+              <motion.div
+                key="materials"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <PrivacyHiddenBlock
+                  icon={<Sliders style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.15)' }} />}
+                  title="Скоро появится"
+                  subtitle="Учебные материалы, заметки и файлы"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Свечение внизу */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '300px',
+        background: 'linear-gradient(180deg, rgba(248, 185, 76, 0) 0%, rgba(248, 185, 76, 0.30) 100%)',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }} />
+
+      {/* ============== Overlays ============== */}
+      <AnimatePresence>
+        {showQR && (
+          <QROverlay
+            qrData={qrData}
+            qrLoading={qrLoading}
+            profileUrl={profileUrl}
+            displayName={displayName}
+            initial={initial}
+            avatarSrc={avatarSrc}
+            onClose={() => setShowQR(false)}
+            onCopy={copyLink}
+            copied={copiedLink}
+          />
         )}
 
-        <div className="mt-8 text-center text-[10px] font-medium uppercase tracking-[0.15em] text-white/25">
-          RUDN · Schedule
+        {showShareSheet && (
+          <ShareSheet
+            url={profileUrl}
+            onClose={() => setShowShareSheet(false)}
+            onCopy={copyLink}
+            copied={copiedLink}
+          />
+        )}
+
+        {showLevelDetail && (
+          <LevelDetailModal
+            isOpen={showLevelDetail}
+            onClose={() => setShowLevelDetail(false)}
+            levelData={{
+              level: profile.level || 1,
+              tier: profile.tier || 'base',
+              xp: profile.xp || 0,
+              xp_progress: profile.xp_progress || 0,
+              xp_current_level: profile.xp_current_level || 0,
+              xp_next_level: profile.xp_next_level || 100,
+              stars: profile.stars || 0,
+              level_title: profile.level_title || '',
+              total_points: profile.total_points || 0,
+            }}
+            telegramId={isOwner ? profile.telegram_id : null}
+          />
+        )}
+
+        {showFriendActions && (
+          <FriendActionsSheet
+            friendshipStatus={friendshipStatus}
+            displayName={displayName}
+            loading={friendActionLoading}
+            onClose={() => setShowFriendActions(false)}
+            onRemoveFriend={handleRemoveFriend}
+            onBlock={handleBlock}
+            onOpenChat={() => {
+              // TODO: open chat — пока редирект на главную, чат поднимется через FriendProfileModal
+              setShowFriendActions(false);
+              navigate('/');
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// =============================================================================
+// SUB-COMPONENTS
+// =============================================================================
+
+const FriendshipButton = ({ status, loading, onSendRequest, onMore }) => {
+  if (loading) {
+    return (
+      <button disabled aria-label="Загрузка" style={iconBtnStyle()}>
+        <Loader2 style={{ width: '20px', height: '20px', color: 'rgba(255,255,255,0.5)', animation: 'spin 0.8s linear infinite' }} />
+      </button>
+    );
+  }
+  if (status === 'friend') {
+    return (
+      <button onClick={onMore} aria-label="Действия" style={iconBtnStyle('rgba(74,222,128,0.18)', 'rgba(74,222,128,0.35)')}>
+        <UserCheck style={{ width: '18px', height: '18px', color: '#4ADE80' }} />
+      </button>
+    );
+  }
+  if (status === 'pending_outgoing') {
+    return (
+      <button onClick={onMore} aria-label="Заявка отправлена" style={iconBtnStyle('rgba(168,85,247,0.18)', 'rgba(168,85,247,0.35)')}>
+        <Clock style={{ width: '18px', height: '18px', color: '#C084FC' }} />
+      </button>
+    );
+  }
+  if (status === 'pending_incoming') {
+    return (
+      <button onClick={onMore} aria-label="Входящая заявка" style={iconBtnStyle('rgba(248,185,76,0.18)', 'rgba(248,185,76,0.35)')}>
+        <UserPlus style={{ width: '18px', height: '18px', color: '#F8B94C' }} />
+      </button>
+    );
+  }
+  return (
+    <button onClick={onSendRequest} aria-label="Добавить в друзья" style={iconBtnStyle('rgba(248,185,76,0.18)', 'rgba(248,185,76,0.35)')}>
+      <UserPlus style={{ width: '18px', height: '18px', color: '#F8B94C' }} />
+    </button>
+  );
+};
+
+const iconBtnStyle = (bg = 'rgba(255,255,255,0.06)', border = 'rgba(255,255,255,0.1)') => ({
+  width: '34px',
+  height: '34px',
+  borderRadius: '12px',
+  background: bg,
+  border: `1px solid ${border}`,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+});
+
+const SpinnerInline = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+    <div style={{
+      width: '32px',
+      height: '32px',
+      border: '2px solid rgba(248,185,76,0.3)',
+      borderTopColor: '#F8B94C',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite',
+    }} />
+  </div>
+);
+
+const PrivacyHiddenBlock = ({ icon, title, subtitle }) => (
+  <div style={{ padding: '40px 16px', textAlign: 'center' }}>
+    <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>{icon}</div>
+    <div style={{
+      fontFamily: "'Poppins', sans-serif",
+      fontWeight: 600,
+      fontSize: '15px',
+      color: 'rgba(255,255,255,0.5)',
+    }}>
+      {title}
+    </div>
+    {subtitle && (
+      <div style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontWeight: 400,
+        fontSize: '12px',
+        color: 'rgba(255,255,255,0.3)',
+        marginTop: '4px',
+        maxWidth: '280px',
+        margin: '4px auto 0',
+      }}>
+        {subtitle}
+      </div>
+    )}
+  </div>
+);
+
+const FriendRow = ({ friend, onClick }) => (
+  <div
+    onClick={onClick}
+    style={{
+      padding: '12px 16px',
+      borderRadius: '16px',
+      background: 'rgba(255,255,255,0.04)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      cursor: 'pointer',
+      transition: 'background 0.15s ease',
+    }}
+    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+  >
+    <div style={{
+      width: '40px',
+      height: '40px',
+      borderRadius: '14px',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      overflow: 'hidden',
+    }}>
+      {friend.photo_url ? (
+        <img src={friend.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: '16px' }}>
+          {(friend.first_name?.[0] || friend.username?.[0] || '?').toUpperCase()}
+        </span>
+      )}
+    </div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <span style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontWeight: 600,
+        fontSize: '14px',
+        color: '#F4F3FC',
+        display: 'block',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      }}>
+        {[friend.first_name, friend.last_name].filter(Boolean).join(' ') || friend.username || 'Пользователь'}
+      </span>
+      {friend.group_name && (
+        <span style={{
+          fontFamily: "'Poppins', sans-serif",
+          fontWeight: 400,
+          fontSize: '12px',
+          color: 'rgba(255,255,255,0.35)',
+        }}>
+          {friend.group_name}
+        </span>
+      )}
+    </div>
+    {friend.is_online && (
+      <div style={{
+        width: '8px',
+        height: '8px',
+        borderRadius: '50%',
+        backgroundColor: '#4ADE80',
+        boxShadow: '0 0 6px rgba(74,222,128,0.5)',
+        flexShrink: 0,
+      }} />
+    )}
+  </div>
+);
+
+const AchievementsBlock = ({ allAchievements, userAchievements, totalPoints }) => {
+  const earnedIds = new Set(userAchievements.map(ua => ua.achievement?.id));
+  const sorted = [...allAchievements].sort((a, b) => {
+    const ae = earnedIds.has(a.id) ? 1 : 0;
+    const be = earnedIds.has(b.id) ? 1 : 0;
+    if (ae !== be) return be - ae;
+    return a.points - b.points;
+  });
+
+  return (
+    <>
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '4px' }}>
+        <div style={{
+          flex: 1,
+          background: 'linear-gradient(135deg, rgba(248,185,76,0.1) 0%, rgba(248,185,76,0.04) 100%)',
+          borderRadius: '16px',
+          padding: '14px',
+          border: '1px solid rgba(248,185,76,0.15)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <Star style={{ width: '14px', height: '14px', color: '#F8B94C' }} />
+            <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Очки</span>
+          </div>
+          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#F4F3FC' }}>
+            {totalPoints || 0}
+          </span>
         </div>
-      </motion.div>
-    </PageFrame>
+        <div style={{
+          flex: 1,
+          background: 'linear-gradient(135deg, rgba(163,247,191,0.1) 0%, rgba(163,247,191,0.04) 100%)',
+          borderRadius: '16px',
+          padding: '14px',
+          border: '1px solid rgba(163,247,191,0.15)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <Trophy style={{ width: '14px', height: '14px', color: '#A3F7BF' }} />
+            <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 400, fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>Получено</span>
+          </div>
+          <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: '22px', color: '#F4F3FC' }}>
+            {userAchievements.length}/{allAchievements.length}
+          </span>
+        </div>
+      </div>
+
+      {sorted.map((ach) => {
+        const earned = userAchievements.find(ua => ua.achievement?.id === ach.id);
+        const isEarned = !!earned;
+        return (
+          <div
+            key={ach.id}
+            style={{
+              padding: '14px 16px',
+              borderRadius: '16px',
+              background: isEarned
+                ? 'linear-gradient(135deg, rgba(163,247,191,0.08) 0%, rgba(248,185,76,0.06) 100%)'
+                : 'rgba(255,255,255,0.03)',
+              border: isEarned
+                ? '1px solid rgba(163,247,191,0.2)'
+                : '1px solid rgba(255,255,255,0.06)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+            }}
+          >
+            <div style={{
+              fontSize: '32px',
+              lineHeight: 1,
+              flexShrink: 0,
+              opacity: isEarned ? 1 : 0.3,
+              filter: isEarned ? 'none' : 'grayscale(1)',
+            }}>
+              {ach.emoji}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+                <span style={{
+                  fontFamily: "'Poppins', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  color: isEarned ? '#F4F3FC' : 'rgba(255,255,255,0.35)',
+                }}>
+                  {ach.name}
+                </span>
+                {!isEarned && <Lock style={{ width: '14px', height: '14px', color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />}
+              </div>
+              <span style={{
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 400,
+                fontSize: '12px',
+                color: isEarned ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
+                display: 'block',
+                marginBottom: '6px',
+              }}>
+                {ach.description}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Star style={{ width: '13px', height: '13px', color: isEarned ? '#F8B94C' : 'rgba(255,255,255,0.2)' }} />
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    color: isEarned ? '#F8B94C' : 'rgba(255,255,255,0.2)',
+                  }}>
+                    {ach.points} $RDN
+                  </span>
+                </div>
+                {isEarned && earned.earned_at && (
+                  <span style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 400,
+                    fontSize: '11px',
+                    color: 'rgba(255,255,255,0.3)',
+                  }}>
+                    {new Date(earned.earned_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {allAchievements.length === 0 && (
+        <PrivacyHiddenBlock
+          icon={<Trophy style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.15)' }} />}
+          title="Достижения загружаются..."
+        />
+      )}
+    </>
+  );
+};
+
+const QROverlay = ({ qrData, qrLoading, profileUrl, displayName, initial, avatarSrc, onClose, onCopy, copied }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    transition={{ duration: 0.2 }}
+    className="fixed inset-0 z-[250] flex items-center justify-center"
+    style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ scale: 0.85, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.85, opacity: 0 }}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        background: '#1C1C1C',
+        borderRadius: '24px',
+        padding: '32px 28px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '14px',
+        position: 'relative',
+        minWidth: '300px',
+        maxWidth: '340px',
+      }}
+    >
+      <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <X style={{ width: '20px', height: '20px', color: '#888' }} />
+      </button>
+      <div style={{
+        background: '#fff',
+        padding: '12px',
+        borderRadius: '16px',
+        position: 'relative',
+        minWidth: '236px',
+        minHeight: '236px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        {qrLoading ? (
+          <Loader2 style={{ width: '32px', height: '32px', color: '#1C1C1C', animation: 'spin 0.8s linear infinite' }} />
+        ) : (
+          <QRCodeSVG
+            value={qrData?.share_url || profileUrl}
+            size={212}
+            level="H"
+            includeMargin={false}
+            imageSettings={avatarSrc ? {
+              src: avatarSrc,
+              height: 44,
+              width: 44,
+              excavate: true,
+            } : undefined}
+          />
+        )}
+      </div>
+      <div style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontWeight: 700,
+        fontSize: '15px',
+        color: '#F4F3FC',
+        textAlign: 'center',
+      }}>
+        {displayName}
+      </div>
+      <div style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontWeight: 400,
+        fontSize: '11px',
+        color: 'rgba(255,255,255,0.4)',
+        textAlign: 'center',
+        wordBreak: 'break-all',
+      }}>
+        {profileUrl}
+      </div>
+      <button
+        onClick={onCopy}
+        style={{
+          width: '100%',
+          padding: '12px',
+          borderRadius: '14px',
+          background: copied ? 'rgba(74,222,128,0.15)' : 'rgba(248,185,76,0.15)',
+          border: `1px solid ${copied ? 'rgba(74,222,128,0.3)' : 'rgba(248,185,76,0.3)'}`,
+          color: copied ? '#4ADE80' : '#F8B94C',
+          fontFamily: "'Poppins', sans-serif",
+          fontWeight: 600,
+          fontSize: '13px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+        }}
+      >
+        {copied ? <Check style={{ width: '16px', height: '16px' }} /> : <Copy style={{ width: '16px', height: '16px' }} />}
+        {copied ? 'Скопировано' : 'Копировать ссылку'}
+      </button>
+    </motion.div>
+  </motion.div>
+);
+
+const ShareSheet = ({ url, onClose, onCopy, copied }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 z-[260] flex items-end justify-center"
+    style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ y: '100%' }}
+      animate={{ y: 0 }}
+      exit={{ y: '100%' }}
+      transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: '100%',
+        maxWidth: '500px',
+        background: '#1C1C1C',
+        borderTopLeftRadius: '24px',
+        borderTopRightRadius: '24px',
+        padding: '20px 20px calc(env(safe-area-inset-bottom, 12px) + 16px)',
+      }}
+    >
+      <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
+      <div style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontWeight: 700,
+        fontSize: '16px',
+        color: '#F4F3FC',
+        marginBottom: '14px',
+      }}>
+        Поделиться профилем
+      </div>
+      <div style={{
+        padding: '12px 14px',
+        borderRadius: '14px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        marginBottom: '12px',
+        fontFamily: "'Poppins', sans-serif",
+        fontSize: '12px',
+        color: 'rgba(255,255,255,0.7)',
+        wordBreak: 'break-all',
+      }}>
+        {url}
+      </div>
+      <button
+        onClick={onCopy}
+        style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: '14px',
+          background: copied ? 'rgba(74,222,128,0.15)' : 'rgba(248,185,76,0.15)',
+          border: `1px solid ${copied ? 'rgba(74,222,128,0.3)' : 'rgba(248,185,76,0.3)'}`,
+          color: copied ? '#4ADE80' : '#F8B94C',
+          fontFamily: "'Poppins', sans-serif",
+          fontWeight: 600,
+          fontSize: '14px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+        }}
+      >
+        {copied ? <Check style={{ width: '16px', height: '16px' }} /> : <Copy style={{ width: '16px', height: '16px' }} />}
+        {copied ? 'Скопировано' : 'Копировать ссылку'}
+      </button>
+    </motion.div>
+  </motion.div>
+);
+
+const FriendActionsSheet = ({ friendshipStatus, displayName, loading, onClose, onRemoveFriend, onBlock, onOpenChat }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 z-[260] flex items-end justify-center"
+    style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+    onClick={onClose}
+  >
+    <motion.div
+      initial={{ y: '100%' }}
+      animate={{ y: 0 }}
+      exit={{ y: '100%' }}
+      transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: '100%',
+        maxWidth: '500px',
+        background: '#1C1C1C',
+        borderTopLeftRadius: '24px',
+        borderTopRightRadius: '24px',
+        padding: '20px 20px calc(env(safe-area-inset-bottom, 12px) + 16px)',
+      }}
+    >
+      <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
+      <div style={{
+        fontFamily: "'Poppins', sans-serif",
+        fontWeight: 700,
+        fontSize: '15px',
+        color: '#F4F3FC',
+        marginBottom: '14px',
+        textAlign: 'center',
+      }}>
+        {displayName}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {friendshipStatus === 'friend' && (
+          <ActionRow
+            icon={<MessageCircle style={{ width: '18px', height: '18px', color: '#3B82F6' }} />}
+            label="Написать"
+            onClick={onOpenChat}
+            disabled={loading}
+          />
+        )}
+
+        {friendshipStatus === 'friend' && (
+          <ActionRow
+            icon={<UserX style={{ width: '18px', height: '18px', color: '#F8B94C' }} />}
+            label="Удалить из друзей"
+            onClick={onRemoveFriend}
+            disabled={loading}
+          />
+        )}
+
+        <ActionRow
+          icon={<ShieldX style={{ width: '18px', height: '18px', color: '#EF4444' }} />}
+          label="Заблокировать"
+          onClick={onBlock}
+          disabled={loading}
+          danger
+        />
+
+        <button
+          onClick={onClose}
+          disabled={loading}
+          style={{
+            marginTop: '6px',
+            padding: '14px',
+            borderRadius: '14px',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            color: 'rgba(255,255,255,0.6)',
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer',
+          }}
+        >
+          Отмена
+        </button>
+      </div>
+    </motion.div>
+  </motion.div>
+);
+
+const ActionRow = ({ icon, label, onClick, disabled, danger }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      width: '100%',
+      padding: '14px 16px',
+      borderRadius: '14px',
+      background: danger ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${danger ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'}`,
+      color: danger ? '#FCA5A5' : '#F4F3FC',
+      fontFamily: "'Poppins', sans-serif",
+      fontWeight: 500,
+      fontSize: '14px',
+      cursor: disabled ? 'wait' : 'pointer',
+      opacity: disabled ? 0.6 : 1,
+      transition: 'background 0.15s ease',
+    }}
+  >
+    {icon}
+    {label}
+  </button>
+);
+
+// =============================================================================
+// Skeleton & Error
+// =============================================================================
+
+const PublicProfileSkeleton = ({ onBack }) => (
+  <div className="fixed inset-0 z-[200] flex flex-col" style={{ backgroundColor: '#000000' }}>
+    <div className="flex items-center justify-between px-4" style={{
+      paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
+      paddingBottom: '8px',
+    }}>
+      <button onClick={onBack}>
+        <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
+      </button>
+    </div>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 16px' }}>
+      <SkelBlock w={140} h={140} r={44} />
+      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+        <SkelBlock w={84} h={28} r={14} />
+        <SkelBlock w={84} h={28} r={14} />
+      </div>
+      <SkelBlock w={220} h={42} r={8} mt={12} />
+      <SkelBlock w={140} h={18} r={6} mt={8} />
+      <div style={{ display: 'flex', gap: 36, marginTop: 14 }}>
+        <SkelBlock w={56} h={48} r={8} />
+        <SkelBlock w={72} h={48} r={8} />
+        <SkelBlock w={56} h={48} r={8} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 24, width: '100%', maxWidth: 360, paddingLeft: 8, overflow: 'hidden' }}>
+        {[0, 1, 2, 3].map(i => <SkelBlock key={i} w={86} h={36} r={14} />)}
+      </div>
+      <div style={{ width: '100%', maxWidth: 380, marginTop: 16 }}>
+        <SkelBlock w={'100%'} h={120} r={16} />
+      </div>
+    </div>
+  </div>
+);
+
+const SkelBlock = ({ w, h, r, mt }) => (
+  <div style={{
+    width: w,
+    height: h,
+    borderRadius: r,
+    marginTop: mt || 0,
+    background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%)',
+    backgroundSize: '200% 100%',
+    animation: 'skelShimmer 1.4s ease-in-out infinite',
+  }} />
+);
+
+const PublicProfileError = ({ error, onBack, onLogin }) => {
+  const cfg = {
+    not_found: { title: 'Профиль не найден', subtitle: 'Возможно, ссылка неверна или профиль был удалён.', icon: '🔍' },
+    not_configured: { title: 'Профиль ещё не настроен', subtitle: 'Владелец ещё не завершил настройку публичной страницы.', icon: '⚙️' },
+    hidden: { title: 'Профиль скрыт', subtitle: 'Владелец сделал свой профиль приватным.', icon: '🔒' },
+    generic: { title: 'Не удалось загрузить', subtitle: 'Проверьте соединение и попробуйте снова.', icon: '⚠️' },
+  }[error.kind] || { title: 'Ошибка', subtitle: error.message, icon: '⚠️' };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex flex-col" style={{ backgroundColor: '#000000' }}>
+      <div className="flex items-center justify-between px-4" style={{
+        paddingTop: 'calc(var(--header-safe-padding, 0px) + 16px)',
+        paddingBottom: '8px',
+      }}>
+        <button onClick={onBack}>
+          <ChevronLeft style={{ width: '31px', height: '31px', color: 'rgba(255,255,255,0.7)' }} />
+        </button>
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
+        <div style={{ fontSize: '64px', marginBottom: '16px' }}>{cfg.icon}</div>
+        <h2 style={{
+          fontFamily: "'Poppins', sans-serif",
+          fontWeight: 700,
+          fontSize: '20px',
+          color: '#F4F3FC',
+          marginBottom: '8px',
+        }}>
+          {cfg.title}
+        </h2>
+        <p style={{
+          fontFamily: "'Poppins', sans-serif",
+          fontWeight: 400,
+          fontSize: '14px',
+          color: 'rgba(255,255,255,0.5)',
+          maxWidth: '320px',
+          lineHeight: 1.5,
+          marginBottom: '24px',
+        }}>
+          {cfg.subtitle}
+        </p>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={onBack}
+            style={{
+              padding: '12px 22px',
+              borderRadius: '14px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#F4F3FC',
+              fontFamily: "'Poppins', sans-serif",
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            Назад
+          </button>
+          {onLogin && (
+            <button
+              onClick={onLogin}
+              style={{
+                padding: '12px 22px',
+                borderRadius: '14px',
+                background: 'rgba(248,185,76,0.15)',
+                border: '1px solid rgba(248,185,76,0.3)',
+                color: '#F8B94C',
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <LogIn style={{ width: '14px', height: '14px' }} />
+              Войти
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

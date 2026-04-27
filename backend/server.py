@@ -15,7 +15,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import uuid
 from datetime import datetime, timedelta, timezone
 from itertools import groupby
@@ -17624,6 +17624,192 @@ async def register_view_by_uid(
         request=ProfileViewRequest(viewer_telegram_id=int(viewer_tid)),
         current_user=current_user,
     )
+
+
+# -------- НОВЫЕ публичные UID-эндпоинты для расширенного профиля (B-2026-07) --------
+# Используются страницей /u/{uid} для рендера профиля в стиле личного профиля.
+# Все эндпоинты:
+#   * Анонимный доступ разрешён (если профиль не скрыт через privacy);
+#   * Если viewer заблокирован владельцем — возвращаем безопасные пустые данные;
+#   * Privacy-настройки (show_friends_list / show_achievements / show_in_search)
+#     применяются строго к не-друзьям; владелец и друзья видят больше.
+
+async def _resolve_uid_with_privacy(
+    uid: str,
+    current_user: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], int, Optional[int], "PrivacySettings", bool, bool]:
+    """Унифицированный резолв UID + контекст viewer'а для публичных эндпоинтов.
+
+    Возвращает: (user_doc, target_tid, viewer_tid, privacy, is_owner, is_friend)
+    Бросает HTTPException(404) если UID не найден или viewer заблокирован.
+    Бросает HTTPException(422) если у профиля нет telegram_id.
+    """
+    user = await _resolve_uid_or_404(uid)
+    target_tid = user.get("telegram_id")
+    if not target_tid:
+        raise HTTPException(status_code=422, detail="Профиль не настроен")
+
+    viewer_tid: Optional[int] = None
+    viewer_uid: Optional[str] = None
+    if current_user:
+        viewer_tid = current_user.get("tid")
+        viewer_uid = current_user.get("sub")
+
+    is_owner = (
+        (viewer_uid is not None and viewer_uid == uid)
+        or (viewer_tid is not None and int(viewer_tid) == int(target_tid))
+    )
+
+    # Блокировка — даже до загрузки данных
+    if viewer_tid is not None and not is_owner:
+        blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+            is_blocked(int(target_tid), int(viewer_tid)),
+            is_blocked(int(viewer_tid), int(target_tid)),
+        )
+        if blocked_by_owner or blocked_by_viewer:
+            # 404 — единый ответ, не раскрывает причину
+            raise HTTPException(status_code=404, detail="Профиль недоступен")
+
+    privacy = await get_user_privacy_settings(int(target_tid))
+
+    is_friend = False
+    if viewer_tid is not None and not is_owner:
+        try:
+            is_friend = await are_friends(int(viewer_tid), int(target_tid))
+        except Exception:
+            is_friend = False
+
+    return user, int(target_tid), viewer_tid, privacy, is_owner, is_friend
+
+
+@api_router.get("/u/{uid}/avatar")
+async def get_public_avatar_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Кастомный аватар (base64) пользователя по UID.
+
+    Безопасно для анонимного доступа — `get_custom_avatar` уже учитывает
+    блокировки и возвращает пустой ответ для несуществующих профилей.
+    """
+    user_doc, target_tid, _, _, _, _ = await _resolve_uid_with_privacy(uid, current_user)
+    return await get_custom_avatar(
+        telegram_id=int(target_tid),
+        requester_telegram_id=None,
+        current_user=current_user,
+    )
+
+
+@api_router.get("/u/{uid}/graffiti")
+async def get_public_graffiti_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Header-граффити пользователя по UID."""
+    _, target_tid, _, _, _, _ = await _resolve_uid_with_privacy(uid, current_user)
+    return await get_header_graffiti(
+        telegram_id=int(target_tid),
+        requester_telegram_id=None,
+        current_user=current_user,
+    )
+
+
+@api_router.get("/u/{uid}/wall-graffiti")
+async def get_public_wall_graffiti_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Стена граффити пользователя по UID."""
+    _, target_tid, _, _, _, _ = await _resolve_uid_with_privacy(uid, current_user)
+    return await get_wall_graffiti(
+        telegram_id=int(target_tid),
+        requester_telegram_id=None,
+        current_user=current_user,
+    )
+
+
+@api_router.get("/u/{uid}/friends", response_model=FriendsListResponse)
+async def get_public_friends_by_uid(
+    uid: str,
+    favorites_only: bool = False,
+    search: str = None,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Список друзей пользователя по UID — с уважением privacy.
+
+    Видимость:
+      * Владелец → видит весь список;
+      * Друг → видит весь список (даже если show_friends_list=False, friends всё равно видят);
+      * Аноним / не-друг → видит, только если show_friends_list=True И show_in_search=True;
+      * Заблокированный viewer → 404 (через _resolve_uid_with_privacy).
+    """
+    user_doc, target_tid, viewer_tid, privacy, is_owner, is_friend = await _resolve_uid_with_privacy(uid, current_user)
+
+    # Privacy-проверка для не-владельцев и не-друзей
+    if not is_owner and not is_friend:
+        if not privacy.show_friends_list:
+            # Возвращаем пустой список — фронт покажет «🔒 Скрыто владельцем»
+            return FriendsListResponse(friends=[], total=0)
+        if not privacy.show_in_search:
+            # Профиль скрыт из поиска — для незнакомцев тоже скрываем друзей
+            return FriendsListResponse(friends=[], total=0)
+
+    # Делегируем к существующему хелперу
+    return await get_friends_list(
+        telegram_id=int(target_tid),
+        favorites_only=favorites_only,
+        search=search,
+    )
+
+
+@api_router.get("/u/{uid}/achievements")
+async def get_public_achievements_by_uid(
+    uid: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Достижения пользователя по UID — с уважением privacy.
+
+    Возвращает структуру:
+        {
+          "earned": [UserAchievementResponse, ...],
+          "all": [Achievement, ...],
+          "hidden": bool,            # true → скрыто владельцем, фронт покажет плашку
+          "earned_count": int,
+          "total_count": int,
+        }
+    """
+    user_doc, target_tid, viewer_tid, privacy, is_owner, is_friend = await _resolve_uid_with_privacy(uid, current_user)
+
+    all_achievements = get_all_achievements()
+    total_count = len(all_achievements)
+
+    # Privacy-проверка
+    if not is_owner and not is_friend:
+        if not privacy.show_achievements:
+            return {
+                "earned": [],
+                "all": all_achievements,
+                "hidden": True,
+                "earned_count": 0,
+                "total_count": total_count,
+            }
+        if not privacy.show_in_search:
+            return {
+                "earned": [],
+                "all": all_achievements,
+                "hidden": True,
+                "earned_count": 0,
+                "total_count": total_count,
+            }
+
+    earned = await get_user_achievements(db, int(target_tid))
+    return {
+        "earned": earned,
+        "all": all_achievements,
+        "hidden": False,
+        "earned_count": len(earned),
+        "total_count": total_count,
+    }
 
 
 # ========== END PUBLIC PROFILE BY UID ==========

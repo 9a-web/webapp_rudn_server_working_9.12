@@ -530,6 +530,57 @@ export const friendsAPI = {
       handleError(error);
     }
   },
+
+  // ========== Публичный профиль по UID (B-2026-07) ==========
+  // Используются страницей /u/{uid}. Возвращают те же данные, что и
+  // legacy /api/profile/{tid}/* эндпоинты, но с уважением privacy и блокировок,
+  // и без необходимости предварительно резолвить UID → telegram_id на фронте.
+
+  getPublicAvatarByUid: async (uid) => {
+    try {
+      const response = await api.get(`/u/${uid}/avatar`);
+      return response.data;
+    } catch (error) {
+      // Не шумим в консоли — анонимный доступ может быть запрещён privacy
+      return null;
+    }
+  },
+
+  getPublicGraffitiByUid: async (uid) => {
+    try {
+      const response = await api.get(`/u/${uid}/graffiti`);
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  getPublicWallGraffitiByUid: async (uid) => {
+    try {
+      const response = await api.get(`/u/${uid}/wall-graffiti`);
+      return response.data;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  getPublicFriendsByUid: async (uid) => {
+    try {
+      const response = await api.get(`/u/${uid}/friends`);
+      return response.data;
+    } catch (error) {
+      return { friends: [], total: 0 };
+    }
+  },
+
+  getPublicAchievementsByUid: async (uid) => {
+    try {
+      const response = await api.get(`/u/${uid}/achievements`);
+      return response.data;
+    } catch (error) {
+      return { earned: [], all: [], hidden: false, earned_count: 0, total_count: 0 };
+    }
+  },
 };
 
 export default friendsAPI;

@@ -488,3 +488,9 @@ input[type="range"]::-moz-range-thumb {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
+
+@keyframes skelShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+

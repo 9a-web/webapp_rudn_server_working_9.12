@@ -1,0 +1,131 @@
+{
+  "test_suite": "B-2026-07 Public Profile UID Endpoints (Enhanced)",
+  "timestamp": "2026-04-27T16:09:14.489343",
+  "summary": {
+    "passed": 20,
+    "failed": 0,
+    "total": 20
+  },
+  "results": [
+    {
+      "test": "Basic functionality /u/123456789/avatar",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:13.619169"
+    },
+    {
+      "test": "Basic functionality /u/123456789/graffiti",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:13.663090"
+    },
+    {
+      "test": "Basic functionality /u/123456789/wall-graffiti",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:13.707100"
+    },
+    {
+      "test": "Basic functionality /u/123456789/friends",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:13.755088"
+    },
+    {
+      "test": "Basic functionality /u/123456789/achievements",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:13.800136"
+    },
+    {
+      "test": "404 for nonexistent UID /u/000000000/avatar",
+      "passed": true,
+      "details": "Status: 404",
+      "timestamp": "2026-04-27T16:09:13.844056"
+    },
+    {
+      "test": "404 for nonexistent UID /u/000000000/graffiti",
+      "passed": true,
+      "details": "Status: 404",
+      "timestamp": "2026-04-27T16:09:13.888058"
+    },
+    {
+      "test": "404 for nonexistent UID /u/000000000/wall-graffiti",
+      "passed": true,
+      "details": "Status: 404",
+      "timestamp": "2026-04-27T16:09:13.932072"
+    },
+    {
+      "test": "404 for nonexistent UID /u/000000000/friends",
+      "passed": true,
+      "details": "Status: 404",
+      "timestamp": "2026-04-27T16:09:13.976031"
+    },
+    {
+      "test": "404 for nonexistent UID /u/000000000/achievements",
+      "passed": true,
+      "details": "Status: 404",
+      "timestamp": "2026-04-27T16:09:14.021042"
+    },
+    {
+      "test": "Privacy: friends list hidden",
+      "passed": true,
+      "details": "Empty friends list returned",
+      "timestamp": "2026-04-27T16:09:14.080041"
+    },
+    {
+      "test": "Privacy: achievements hidden",
+      "passed": true,
+      "details": "Achievements properly hidden",
+      "timestamp": "2026-04-27T16:09:14.126155"
+    },
+    {
+      "test": "Privacy: show_in_search=false hides friends",
+      "passed": true,
+      "details": "Friends hidden from strangers",
+      "timestamp": "2026-04-27T16:09:14.171080"
+    },
+    {
+      "test": "Privacy: show_in_search=false hides achievements",
+      "passed": true,
+      "details": "Achievements hidden from strangers",
+      "timestamp": "2026-04-27T16:09:14.216129"
+    },
+    {
+      "test": "Friends response structure",
+      "passed": true,
+      "details": "Has friends and total fields",
+      "timestamp": "2026-04-27T16:09:14.268069"
+    },
+    {
+      "test": "Achievements response structure",
+      "passed": true,
+      "details": "Has all required fields",
+      "timestamp": "2026-04-27T16:09:14.313075"
+    },
+    {
+      "test": "Legacy endpoint GET /u/123456789",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:14.358062"
+    },
+    {
+      "test": "Legacy endpoint GET /u/123456789/share-link",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:14.402067"
+    },
+    {
+      "test": "Legacy endpoint GET /u/123456789/qr",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:14.446016"
+    },
+    {
+      "test": "Legacy endpoint POST /u/123456789/view",
+      "passed": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-27T16:09:14.489006"
+    }
+  ]
+}
