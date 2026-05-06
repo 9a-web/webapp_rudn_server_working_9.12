@@ -1,12 +1,19 @@
 /**
- * AuthInput — поле ввода с иконкой, анимированной обводкой на focus,
- * поддержкой password-toggle и error/hint текста.
+ * AuthInput — поле ввода в стиле GLASSMORPHISM.
  *
- * 🔒 Stage 6:
- *  - Корректная композиция rightSlot + isPassword (eye-icon рядом, без наложения).
- *  - Generated id для label ↔ input связи (a11y).
- *  - aria-invalid и aria-describedby для error/hint.
- *  - role="alert" на error для screen readers.
+ * Дизайн:
+ *  - Frosted glass background с subtle border
+ *  - Animated focus ring (indigo glow + brightening)
+ *  - Иконка слева, password-toggle справа
+ *  - Smooth transitions всех состояний
+ *
+ * UX/UI:
+ *  - 48px высота (touch target)
+ *  - Generated id для label↔input связи (a11y)
+ *  - aria-invalid + aria-describedby для error/hint
+ *  - role="alert" на error (screen readers)
+ *  - Иконка eye имеет aria-pressed для toggle-state
+ *  - Error/hint с min-height чтобы layout не прыгал
  */
 import React, { forwardRef, useId, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
@@ -19,6 +26,7 @@ const AuthInput = forwardRef(function AuthInput(
   ref,
 ) {
   const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const isPassword = type === 'password';
   const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
@@ -26,61 +34,102 @@ const AuthInput = forwardRef(function AuthInput(
   const inputId = idProp || `auth-input-${reactId}`;
   const helpId = `${inputId}-help`;
 
+  const handleFocus = (e) => {
+    setIsFocused(true);
+    props.onFocus?.(e);
+  };
+  const handleBlur = (e) => {
+    setIsFocused(false);
+    props.onBlur?.(e);
+  };
+
   return (
     <div className={`w-full ${className}`}>
       {label && (
         <label
           htmlFor={inputId}
-          className="mb-1.5 block text-xs font-medium text-white/70"
+          className="mb-2 block text-[12px] font-medium text-white/80"
         >
           {label}
         </label>
       )}
-      <div
-        className={`group relative flex items-center rounded-xl border ${
-          error
-            ? 'border-red-500/70 focus-within:border-red-400'
-            : 'border-white/10 focus-within:border-indigo-400/70'
-        } bg-white/5 transition-colors focus-within:bg-white/[0.07]`}
-      >
-        {Icon && (
-          <Icon
-            className="ml-3 h-4 w-4 flex-shrink-0 text-white/50 group-focus-within:text-indigo-300"
-            aria-hidden="true"
-          />
-        )}
-        <input
-          ref={ref}
-          id={inputId}
-          type={effectiveType}
-          aria-invalid={!!error}
-          aria-describedby={(error || hint) ? helpId : undefined}
-          className="flex-1 min-w-0 bg-transparent px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
-          {...props}
+
+      <div className="relative">
+        {/* Внешний glow при фокусе */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute -inset-px rounded-2xl transition-opacity duration-300 ${
+            error ? 'opacity-100' : isFocused ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{
+            background: error
+              ? 'linear-gradient(135deg, rgba(239,68,68,0.55), rgba(239,68,68,0.25))'
+              : 'linear-gradient(135deg, rgba(129,140,248,0.55), rgba(168,85,247,0.30))',
+            filter: 'blur(8px)',
+          }}
         />
-        {/* Правая часть: иконка-глаз для password + кастомный rightSlot */}
-        <div className="mr-2 flex items-center gap-1">
-          {isPassword && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => setShowPassword((s) => !s)}
-              className="rounded-lg p-1.5 text-white/50 transition-colors hover:bg-white/10 hover:text-white/80"
-              aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-              aria-pressed={showPassword}
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
+
+        {/* Само поле */}
+        <div
+          className={`relative flex items-center rounded-2xl border bg-white/[0.06] backdrop-blur-md transition-all duration-200 ${
+            error
+              ? 'border-red-400/60'
+              : isFocused
+                ? 'border-indigo-300/50 bg-white/[0.10] ring-2 ring-indigo-400/30'
+                : 'border-white/15 hover:border-white/25 hover:bg-white/[0.08]'
+          }`}
+          style={{
+            boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.12)',
+          }}
+        >
+          {Icon && (
+            <Icon
+              className={`ml-3.5 h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200 ${
+                error
+                  ? 'text-red-300'
+                  : isFocused
+                    ? 'text-indigo-200'
+                    : 'text-white/55'
+              }`}
+              aria-hidden="true"
+            />
           )}
-          {rightSlot}
+          <input
+            ref={ref}
+            id={inputId}
+            type={effectiveType}
+            aria-invalid={!!error}
+            aria-describedby={(error || hint) ? helpId : undefined}
+            className="flex-1 min-w-0 bg-transparent px-3 py-3.5 text-[15px] text-white placeholder:text-white/35 focus:outline-none"
+            {...props}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+          />
+
+          <div className="mr-2 flex items-center gap-1">
+            {isPassword && (
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((s) => !s)}
+                className="rounded-xl p-2 text-white/55 transition-all hover:bg-white/10 hover:text-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            )}
+            {rightSlot}
+          </div>
         </div>
       </div>
+
       {(error || hint) && (
         <div
           id={helpId}
           role={error ? 'alert' : undefined}
-          className={`mt-1.5 text-xs ${
-            error ? 'text-red-400' : 'text-white/40'
+          className={`mt-1.5 min-h-[16px] text-[11.5px] leading-tight ${
+            error ? 'text-red-300' : 'text-white/45'
           }`}
         >
           {error || hint}

@@ -92,39 +92,67 @@ const LoginPage = () => {
       footer={
         <div>
           Нет аккаунта?{' '}
-          <Link to="/register" className="font-semibold text-indigo-300 hover:text-indigo-200">Создать</Link>
+          <Link
+            to="/register"
+            className="font-semibold text-indigo-200 underline-offset-4 transition-colors hover:text-white hover:underline"
+          >
+            Создать
+          </Link>
         </div>
       }
     >
       {/* Stage 7: B-14 — session expired banner */}
       {reason === 'expired' && (
-        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-          Ваша сессия истекла. Войдите снова.
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-2 rounded-2xl border border-amber-400/40 bg-amber-500/[0.12] p-3 text-xs text-amber-100 backdrop-blur-md"
+        >
+          <span className="mt-[2px] inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-300" />
+          <span>Ваша сессия истекла. Войдите снова.</span>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-5 grid grid-cols-4 gap-1 rounded-xl bg-white/5 p-1">
+      {/* ── Tabs ────────────────────────────────────────────────── */}
+      <div
+        role="tablist"
+        aria-label="Способ входа"
+        className="relative mb-6 grid grid-cols-4 gap-1 rounded-2xl border border-white/10 bg-black/25 p-1 backdrop-blur-md"
+        style={{
+          boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.08), inset 0 -1px 0 0 rgba(0,0,0,0.25)',
+        }}
+      >
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key;
           return (
             <button
               key={key}
               type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls={`tabpanel-${key}`}
+              id={`tab-${key}`}
               onClick={() => setTab(key)}
-              className={`relative flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition-colors ${
-                active ? 'text-white' : 'text-white/50 hover:text-white/80'
+              className={`relative flex h-[58px] flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50 ${
+                active ? 'text-white' : 'text-white/55 hover:text-white/85'
               }`}
             >
               {active && (
                 <motion.div
                   layoutId="tab-active"
-                  className="absolute inset-0 rounded-lg bg-gradient-to-br from-indigo-500/40 to-fuchsia-500/30 ring-1 ring-white/10"
+                  className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-400/45 via-violet-500/35 to-fuchsia-500/35 ring-1 ring-white/20"
+                  style={{
+                    boxShadow:
+                      '0 4px 18px -2px rgba(129,140,248,0.45), inset 0 1px 0 0 rgba(255,255,255,0.20)',
+                  }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
               )}
-              <Icon className="relative z-10 h-4 w-4" />
-              <span className="relative z-10">{label}</span>
+              <Icon
+                className={`relative z-10 h-[18px] w-[18px] transition-transform duration-200 ${
+                  active ? 'scale-110' : ''
+                }`}
+              />
+              <span className="relative z-10 leading-none">{label}</span>
             </button>
           );
         })}
@@ -133,21 +161,21 @@ const LoginPage = () => {
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}
-          initial={{ opacity: 0, y: 10 }}
+          id={`tabpanel-${tab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${tab}`}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
         >
           {tab === 'email' && (
-            <EmailLoginForm
-              onSuccess={handleSuccess}
-              onSwitchRegister={() => navigate('/register')}
-            />
+            <EmailLoginForm onSuccess={handleSuccess} />
           )}
 
           {tab === 'telegram' && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="text-center text-sm text-white/70">
+            <div className="flex flex-col items-center gap-4 py-1">
+              <div className="text-center text-[13px] leading-relaxed text-white/75">
                 {!tgReady
                   ? 'Проверяем окружение Telegram...'
                   : isInsideTelegram
@@ -155,7 +183,6 @@ const LoginPage = () => {
                     : 'Нажмите кнопку ниже и подтвердите вход в приложении Telegram.'}
               </div>
 
-              {/* Ждём завершения детекции чтобы не мигать между компонентами */}
               {tgReady && isInsideTelegram && (
                 <TelegramWebAppLoginButton onSubmit={handleTelegramWebApp} />
               )}
@@ -170,18 +197,24 @@ const LoginPage = () => {
                       requestAccess="write"
                     />
                   ) : (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    <div
+                      role="alert"
+                      className="rounded-2xl border border-amber-400/40 bg-amber-500/[0.12] p-3 text-xs text-amber-100 backdrop-blur-md"
+                    >
                       Telegram Login не сконфигурирован на сервере.
                     </div>
                   )}
                   {tgWidgetError && (
-                    <div className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                    <div
+                      role="alert"
+                      className="w-full rounded-2xl border border-red-400/40 bg-red-500/[0.12] px-3 py-2 text-xs text-red-200 backdrop-blur-md"
+                    >
                       {tgWidgetError}
                     </div>
                   )}
-                  <div className="text-[11px] text-white/40 text-center leading-snug">
+                  <div className="text-[11px] leading-snug text-white/45 text-center">
                     Если кнопка не появилась — домен не привязан к боту. Администратору:
-                    откройте @BotFather → <code className="rounded bg-white/10 px-1">/setdomain</code> и добавьте
+                    откройте @BotFather → <code className="rounded bg-white/10 px-1.5 py-0.5 text-white/70">/setdomain</code> и добавьте
                     текущий домен.
                   </div>
                 </div>
@@ -189,19 +222,19 @@ const LoginPage = () => {
 
               {!tgReady && (
                 <div className="flex items-center justify-center py-3">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white/80" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white/85" />
                 </div>
               )}
 
               {configError && (
-                <div className="text-xs text-red-400">{configError}</div>
+                <div role="alert" className="text-xs text-red-300">{configError}</div>
               )}
             </div>
           )}
 
           {tab === 'vk' && (
-            <div className="flex flex-col gap-4 py-2">
-              <div className="text-center text-sm text-white/70">
+            <div className="flex flex-col gap-4 py-1">
+              <div className="text-center text-[13px] leading-relaxed text-white/75">
                 Вход через VK ID. Вы будете перенаправлены на id.vk.com.
               </div>
               <VkLoginButton
@@ -209,7 +242,10 @@ const LoginPage = () => {
                 disabled={!config?.features?.vk_login}
               />
               {!config?.features?.vk_login && config && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-amber-400/40 bg-amber-500/[0.12] p-3 text-xs text-amber-100 backdrop-blur-md"
+                >
                   VK OAuth не сконфигурирован.
                 </div>
               )}
@@ -219,6 +255,14 @@ const LoginPage = () => {
           {tab === 'qr' && <QRLoginBlock onSuccess={handleQRSuccess} />}
         </motion.div>
       </AnimatePresence>
+
+      {/* ── Trust badge / Footer внутри карточки ────────────────── */}
+      <div className="mt-6 flex items-center justify-center gap-2 text-[11px] text-white/40">
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span>Защищённое соединение · JWT + bcrypt</span>
+      </div>
     </AuthLayout>
   );
 };

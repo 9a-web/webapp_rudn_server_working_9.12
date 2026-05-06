@@ -1,11 +1,15 @@
 /**
- * AuthLayout — общий контейнер для страниц /login и /register.
+ * AuthLayout — общий контейнер для auth-страниц (/login, /register, /forgot-password, ...).
  *
- * Предоставляет:
- *  - красивый фон с градиентом/блуром
- *  - декоративную glow-сетку
- *  - центрированную карточку для формы
- *  - логотип + слоган
+ * Дизайн: GLASSMORPHISM + UX/UI canon
+ *  - Фоновое фото door_rudn.png + затемнение для читаемости
+ *  - Многослойное стекло (двойной backdrop-blur, ring подсветка)
+ *  - Decorative orbs с subtle floating animation
+ *  - Inner highlight (имитация отражения света на верхнем крае стекла)
+ *  - Subtle noise texture для премиальности
+ *  - Корректный контраст (WCAG AA)
+ *  - Поддержка prefers-reduced-motion (через Framer Motion)
+ *  - Focus-friendly (ring-offset для контраста)
  */
 import React from 'react';
 import { motion } from 'framer-motion';
@@ -13,8 +17,8 @@ import Logo3DAnchor from '../Logo3DAnchor';
 
 const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#0E0E10] text-white">
-      {/* Background photo: door_rudn — облачное небо + дверь на холме */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#0a0a0d] text-white">
+      {/* ── Слой 1: Фоновое фото ───────────────────────────────────── */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -26,65 +30,97 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
         }}
       />
 
-      {/* Затемняющий градиент для читаемости формы (сверху темнее, снизу светлее) */}
+      {/* ── Слой 2: Радиальный vignette + затемняющий градиент ───── */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, rgba(14,14,16,0.55) 0%, rgba(14,14,16,0.35) 40%, rgba(14,14,16,0.65) 100%)',
+            'radial-gradient(ellipse at center, rgba(10,10,13,0.30) 0%, rgba(10,10,13,0.55) 55%, rgba(10,10,13,0.85) 100%)',
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(10,10,13,0.50) 0%, rgba(10,10,13,0.20) 35%, rgba(10,10,13,0.55) 100%)',
         }}
       />
 
-      {/* Decorative gradients (поверх фото — мягкое свечение) */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-600/20 blur-[120px]" />
-        <div className="absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full bg-fuchsia-500/15 blur-[140px]" />
-        <div className="absolute -bottom-40 left-1/4 h-96 w-96 rounded-full bg-sky-500/15 blur-[120px]" />
-      </div>
+      {/* ── Слой 3: Анимированные orbs (мягкое цветное свечение) ─── */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -top-32 -left-32 h-[420px] w-[420px] rounded-full bg-indigo-500/25 blur-[120px]"
+        animate={{ x: [0, 18, 0], y: [0, -12, 0] }}
+        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute top-1/4 -right-32 h-[520px] w-[520px] rounded-full bg-fuchsia-500/20 blur-[150px]"
+        animate={{ x: [0, -22, 0], y: [0, 14, 0] }}
+        transition={{ duration: 17, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-32 left-1/3 h-[400px] w-[400px] rounded-full bg-sky-400/20 blur-[120px]"
+        animate={{ x: [0, 16, 0], y: [0, -10, 0] }}
+        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+      />
 
-      {/* Subtle grid pattern */}
+      {/* ── Слой 4: Тонкая сетка (структура) ─────────────────────── */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.025]"
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage:
             'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
+          backgroundSize: '56px 56px',
         }}
       />
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8">
+      {/* ── Слой 5: Noise/grain (премиальность) ──────────────────── */}
+      <svg
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.06] mix-blend-overlay"
+      >
+        <filter id="auth-noise">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" />
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#auth-noise)" />
+      </svg>
+
+      {/* ── Контент ──────────────────────────────────────────────── */}
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:py-12">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: 24, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-md"
         >
           {showLogo && (
-            <div className="mb-8 flex flex-col items-center text-center">
-              {/* 3D-логотип РУДН — рендерится через глобальный Logo3DHost.
-                  При переходе LoadingScreen → AuthLayout (или между auth-страницами)
-                  логотип НЕ перезагружается, а плавно перелетает на новое место. */}
+            <div className="mb-7 flex flex-col items-center text-center">
+              {/* Logo 3D + radial glow подложка */}
               <div
-                className="relative mb-4"
+                className="relative mb-5"
                 style={{
-                  width: 112,
-                  height: 112,
-                  filter: 'drop-shadow(0 10px 30px rgba(99, 102, 241, 0.45))',
+                  width: 108,
+                  height: 108,
+                  filter: 'drop-shadow(0 14px 36px rgba(99, 102, 241, 0.55))',
                 }}
               >
-                {/* Мягкое свечение за логотипом */}
                 <div
                   aria-hidden
                   className="pointer-events-none absolute inset-0"
                   style={{
                     background:
-                      'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)',
-                    filter: 'blur(24px)',
+                      'radial-gradient(circle, rgba(139,92,246,0.40) 0%, transparent 70%)',
+                    filter: 'blur(28px)',
                   }}
                 />
                 <Logo3DAnchor
-                  size={112}
+                  size={108}
                   material="metal"
                   animate="spin"
                   animateSpeed={2}
@@ -95,19 +131,66 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
                   priority={5}
                 />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">{title || 'РУДН Расписание'}</h1>
+              <h1 className="text-[26px] font-bold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-[28px]">
+                {title || 'РУДН Расписание'}
+              </h1>
               {subtitle && (
-                <p className="mt-2 text-sm text-white/60 leading-relaxed">{subtitle}</p>
+                <p className="mt-2 text-sm leading-relaxed text-white/70 drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">
+                  {subtitle}
+                </p>
               )}
             </div>
           )}
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-8">
-            {children}
+          {/* ── ГЛАВНАЯ СТЕКЛЯННАЯ КАРТОЧКА ────────────────────── */}
+          <div className="relative">
+            {/* Внешнее свечение карточки */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -inset-px rounded-[28px] opacity-60"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(99,102,241,0.20) 35%, rgba(56,189,248,0.20) 70%, rgba(168,85,247,0.30) 100%)',
+                filter: 'blur(14px)',
+              }}
+            />
+
+            {/* Сама карточка */}
+            <div
+              className="relative overflow-hidden rounded-[26px] border border-white/15 bg-white/[0.07] p-6 shadow-[0_20px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl backdrop-saturate-150 sm:p-8"
+              style={{
+                boxShadow:
+                  '0 20px 60px -12px rgba(0,0,0,0.6), 0 4px 16px -4px rgba(0,0,0,0.4), inset 0 1px 0 0 rgba(255,255,255,0.18)',
+              }}
+            >
+              {/* Top inner highlight (отражение света сверху) */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-px"
+                style={{
+                  background:
+                    'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
+                }}
+              />
+              {/* Subtle radial highlight в верхнем-левом углу (имитация света) */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -top-1/2 -left-1/4 h-[200%] w-[150%] opacity-30"
+                style={{
+                  background:
+                    'radial-gradient(ellipse at top left, rgba(255,255,255,0.18) 0%, transparent 50%)',
+                }}
+              />
+
+              {/* Контент формы */}
+              <div className="relative z-10">{children}</div>
+            </div>
           </div>
 
           {footer && (
-            <div className="mt-6 text-center text-sm text-white/50">{footer}</div>
+            <div className="mt-6 text-center text-sm text-white/60 drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">
+              {footer}
+            </div>
           )}
         </motion.div>
       </div>
