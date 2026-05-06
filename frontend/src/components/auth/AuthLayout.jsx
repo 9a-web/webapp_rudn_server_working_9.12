@@ -18,13 +18,10 @@ import Logo3DAnchor from '../Logo3DAnchor';
 const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#0a0a0d] text-white">
-      {/* ── Слой 1: Фоновое фото ───────────────────────────────────── */}
+      {/* ── Слой 1: Фоновое фото (отдельные версии для mob/desktop) ─ */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-no-repeat bg-center bg-[length:auto_90%] sm:bg-cover"
-        style={{
-          backgroundImage: 'url(/images/door_rudn.png)',
-        }}
+        className="pointer-events-none absolute inset-0 bg-no-repeat bg-center bg-cover bg-[url('/images/door_rudn_mob.png')] sm:bg-[url('/images/door_rudn.png')]"
       />
 
       {/* ── Слой 2: Радиальный vignette + затемняющий градиент ───── */}
