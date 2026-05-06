@@ -602,7 +602,7 @@ VITE_ENV=test
 | **Stage 10** UID singleton + 3D-логотип | ✅ DONE | — |
 | **UID Phase P3** | 🟡 PARTIAL | универсальный `resolve_user(db, identifier)` helper, 11 новых `/api/u/{uid}/*` (settings, tasks, notifications), JWT с `uid`+`tid` |
 | **UID Phase P4** | ⏳ PENDING | миграционный скрипт `backfill_uid_to_collections.py` для 38 коллекций; `uid` в 93 Pydantic-модели; индексы по `uid` |
-| **SMTP credentials** | 🔴 P0 (нужен ввод от пользователя) | сейчас DEV-режим (`/app/logs/emails.log`) |
+| **SMTP credentials** | ✅ DONE | VK WorkSpace (`smtp.mail.ru:465` SSL), отправитель `noreply@rudn-schedule.ru`. Email reset/verify/notifications работают. |
 | **RegisterWizard UX polish** | ⏳ | per-step validation, лучше feedback |
 | **Frontend E2E testing** | ⏳ | через testing agent |
 | **Auth_routes split** | ⏳ P2 | `routes/email_auth.py`, `routes/oauth.py`, `routes/sessions.py`, `routes/password.py` |

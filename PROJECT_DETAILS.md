@@ -1572,6 +1572,7 @@ typer>=0.9.0, jq>=1.6.0
 
 ### 🟡 Pending
 
+- **SMTP credentials** ✅ DONE — VK WorkSpace (`smtp.mail.ru:465` SSL), отправитель `noreply@rudn-schedule.ru "РУДН Расписание"`. Письма для password-reset / email-verify / password-changed-notification отправляются успешно.
 - **UID Phase P3** — `resolve_user(db, identifier)` helper, 11 новых `/api/u/{uid}/*` (settings, tasks, notifications), JWT с `uid`+`tid`
 - **UID Phase P4** — `backfill_uid_to_collections.py` для 38 коллекций, `uid` в 93 моделях, индексы по `uid`
 - **SMTP credentials** (P0) — нужны от пользователя для production
