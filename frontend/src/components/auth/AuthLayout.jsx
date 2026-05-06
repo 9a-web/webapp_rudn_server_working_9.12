@@ -157,7 +157,7 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
 
             {/* Сама карточка */}
             <div
-              className="relative overflow-hidden rounded-[26px] border border-white/15 bg-white/[0.07] p-6 shadow-[0_20px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl backdrop-saturate-150 sm:p-8"
+              className="relative overflow-hidden rounded-[26px] border border-white/15 bg-white/[0.05] p-6 shadow-[0_20px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-md backdrop-saturate-150 sm:p-8"
               style={{
                 boxShadow:
                   '0 20px 60px -12px rgba(0,0,0,0.6), 0 4px 16px -4px rgba(0,0,0,0.4), inset 0 1px 0 0 rgba(255,255,255,0.18)',
