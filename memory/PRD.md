@@ -41,6 +41,15 @@ Russian UI + code comments + Pydantic messages.
 
 ## What's been implemented
 
+### Stage 11 — Auth UI Glassmorphism + GroupSelector design unification (2026-05-06)
+- [x] **Auth pages**: full glassmorphism redesign (`AuthLayout`, `LoginPage`, `AuthInput`, `AuthButton`).
+- [x] **Background**: desktop `door_rudn.png` / mobile `door_rudn_mob.png` via Tailwind arbitrary variants.
+- [x] **SMTP**: VK Workspace (noreply@rudn-schedule.ru) configured in `/app/backend/.env` — password reset & email verification working.
+- [x] **GroupSelector glass variant**: new `variant="glass"` prop for inline rendering inside `AuthLayout` (used by `RegisterWizard` Step 3) — frosted-glass buttons, inline progress, breadcrumb, accent-tinted hover.
+- [x] **GroupSelector default variant**: legacy fullscreen overlay (App.jsx flow + ProfileEditScreen) — кнопки списка переведены на glassmorphism (`bg-white/[0.05]` + `backdrop-blur(14px) saturate(160%)` + inset-highlight + indigo hover-shadow). Layout (fullscreen + bottom progress bar) сохранён.
+- [x] **Documentation**: `AI_CONTEXT.md`, `PROJECT_DETAILS.md`, `README.md` полностью переписаны.
+- [x] **Files touched**: `frontend/src/components/GroupSelector.jsx`, `frontend/src/components/auth/*`, `frontend/src/pages/LoginPage.jsx`, `frontend/src/pages/RegisterWizard.jsx`, `backend/.env`.
+
 ### Stage 10 — UID migration + Singleton 3D Logo (2026-04-24)
 - [x] **P0 backend:** Все raw `bot.send_*` мигрированы на `safe_send_telegram` в `server.py` и `telegram_bot.py`. Добавлен `pseudo_tid` guard в `check_inactive_users`.
 - [x] **P1 backend extension:** Рефакторинг `services/delivery.py` с `MessagePriority`, `send_batch` через семафор, retry/DLQ через `delivery_attempts`. Добавлен `/api/admin/delivery/stats`.

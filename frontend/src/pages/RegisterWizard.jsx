@@ -360,25 +360,29 @@ const Step3Academic = ({ onComplete, onSkip }) => {
   };
 
   return (
-    <div>
-      <div className="mb-3 text-center text-sm text-white/70">
+    <div className="space-y-3">
+      <div className="text-center text-xs text-white/65">
         Выберите факультет и группу, чтобы получать расписание РУДН.
       </div>
 
-      <div className="-mx-2 overflow-hidden">
-        <GroupSelector onGroupSelected={handleGroupSelected} onCancel={handleSkip} />
-      </div>
+      <GroupSelector
+        variant="glass"
+        onGroupSelected={handleGroupSelected}
+        onCancel={handleSkip}
+      />
 
       {error && (
-        <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</div>
+        <div role="alert" className="rounded-2xl border border-red-400/40 bg-red-500/[0.12] p-3 text-xs text-red-200 backdrop-blur-md">
+          {error}
+        </div>
       )}
 
-      <div className="mt-4 flex justify-center">
+      <div className="flex justify-center pt-1">
         <button
           type="button"
           onClick={handleSkip}
           disabled={saving}
-          className="text-xs text-white/50 hover:text-white/80 disabled:opacity-50"
+          className="text-[11px] text-white/50 underline-offset-4 transition-colors hover:text-white/80 hover:underline disabled:opacity-50"
         >
           Пропустить — настрою позже
         </button>
