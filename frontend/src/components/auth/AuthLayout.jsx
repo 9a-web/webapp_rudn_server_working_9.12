@@ -21,12 +21,9 @@ const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
       {/* ── Слой 1: Фоновое фото ───────────────────────────────────── */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 bg-no-repeat bg-center bg-[length:auto_90%] sm:bg-cover"
         style={{
           backgroundImage: 'url(/images/door_rudn.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
         }}
       />
 
