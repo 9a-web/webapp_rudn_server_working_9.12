@@ -14,16 +14,38 @@ import Logo3DAnchor from '../Logo3DAnchor';
 const AuthLayout = ({ title, subtitle, children, footer, showLogo = true }) => {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#0E0E10] text-white">
-      {/* Decorative gradients */}
+      {/* Background photo: door_rudn — облачное небо + дверь на холме */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: 'url(/images/door_rudn.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+
+      {/* Затемняющий градиент для читаемости формы (сверху темнее, снизу светлее) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(14,14,16,0.55) 0%, rgba(14,14,16,0.35) 40%, rgba(14,14,16,0.65) 100%)',
+        }}
+      />
+
+      {/* Decorative gradients (поверх фото — мягкое свечение) */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-600/30 blur-[120px]" />
-        <div className="absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full bg-fuchsia-500/20 blur-[140px]" />
-        <div className="absolute -bottom-40 left-1/4 h-96 w-96 rounded-full bg-sky-500/20 blur-[120px]" />
+        <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-indigo-600/20 blur-[120px]" />
+        <div className="absolute top-1/3 -right-40 h-[500px] w-[500px] rounded-full bg-fuchsia-500/15 blur-[140px]" />
+        <div className="absolute -bottom-40 left-1/4 h-96 w-96 rounded-full bg-sky-500/15 blur-[120px]" />
       </div>
 
       {/* Subtle grid pattern */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        className="pointer-events-none absolute inset-0 opacity-[0.025]"
         style={{
           backgroundImage:
             'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
