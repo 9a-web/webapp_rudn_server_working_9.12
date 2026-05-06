@@ -1,6 +1,8 @@
-# 📘 PROJECT DETAILS — Техническая документация
+# 📘 PROJECT DETAILS — Полная техническая документация
 
-**Обновлено:** 2025-07-17 | **Статус:** ✅ ПОЛНОСТЬЮ АКТУАЛИЗИРОВАН (автоматический аудит кода)
+**Обновлено:** 2026-05-06 | **Статус:** ✅ ПОЛНОСТЬЮ АКТУАЛИЗИРОВАН (real-time аудит)
+
+> **TL;DR:** [`AI_CONTEXT.md`](./AI_CONTEXT.md). **Запуск/команды:** [`README.md`](./README.md). **Текущий план:** [`memory/PRD.md`](./memory/PRD.md).
 
 ---
 
@@ -10,20 +12,23 @@
 2. [Backend структура](#2-backend-структура)
 3. [Frontend структура](#3-frontend-структура)
 4. [Модели данных](#4-модели-данных)
-5. [API интеграции](#5-api-интеграции)
-6. [Workflow и сценарии](#6-workflow-и-сценарии)
-7. [Deployment](#7-deployment)
-8. [VK Music интеграция](#8-vk-music-интеграция)
-9. [Система друзей](#9-система-друзей)
-10. [In-App уведомления](#10-in-app-уведомления)
-11. [Web Sessions (QR-авторизация)](#11-web-sessions-qr-авторизация)
-12. [Privacy Settings](#12-privacy-settings)
-13. [Система сообщений](#13-система-сообщений)
-14. [Совместное расписание](#14-совместное-расписание)
-15. [Streak-система](#15-streak-система)
-16. [Расширенная админ-панель](#16-расширенная-админ-панель)
-17. [MongoDB коллекции](#17-mongodb-коллекции)
-18. [Ключевые зависимости](#18-ключевые-зависимости)
+5. [Auth & Identity (Stage 9-10)](#5-auth--identity-stage-9-10)
+6. [Публичный профиль `/u/{uid}`](#6-публичный-профиль-uuid)
+7. [API интеграции (внешние)](#7-api-интеграции-внешние)
+8. [Workflow и сценарии](#8-workflow-и-сценарии)
+9. [Deployment](#9-deployment)
+10. [VK Music интеграция](#10-vk-music-интеграция)
+11. [Система друзей](#11-система-друзей)
+12. [In-App уведомления](#12-in-app-уведомления)
+13. [Web Sessions (QR-авторизация устройств)](#13-web-sessions-qr-авторизация-устройств)
+14. [Privacy Settings](#14-privacy-settings)
+15. [Система сообщений](#15-система-сообщений)
+16. [Совместное расписание](#16-совместное-расписание)
+17. [Streak-система](#17-streak-система)
+18. [Расширенная админ-панель](#18-расширенная-админ-панель)
+19. [3D-логотип (singleton)](#19-3d-логотип-singleton)
+20. [MongoDB коллекции (57)](#20-mongodb-коллекции-57)
+21. [Ключевые зависимости](#21-ключевые-зависимости)
 
 ---
 
@@ -33,154 +38,197 @@
 
 Приложение состоит из 4 основных слоёв:
 
-1. **Presentation Layer** — React 19 Telegram Web App
-2. **API Layer** — FastAPI REST API (268 endpoints)
-3. **Business Logic Layer** — Python модули (achievements, notifications, scheduler, music, VK auth)
-4. **Data Layer** — MongoDB (46 коллекций) + External APIs (РУДН, VK, Telegram, OpenWeather)
+1. **Presentation Layer** — React 19 (Telegram Web App + standalone SPA через Vite + react-router-dom)
+2. **API Layer** — FastAPI REST API (**339 endpoints** = 311 в `server.py` + 28 в `auth_routes.py`)
+3. **Business Logic Layer** — Python модули: `achievements`, `scheduler_v2`, `level_system`, `email_service`, `music_service`, `vk_auth_service`, `lk_parser`, `cover_service`, `notifications`, `services/delivery`
+4. **Data Layer** — MongoDB (**57 коллекций**) + External APIs (РУДН, VK, Telegram, OpenWeather, SMTP)
 
 ### 1.2 Технологический стек
 
 #### Backend
 - **Framework:** FastAPI 0.110.1
 - **Language:** Python 3.10+
-- **Database:** MongoDB (pymongo 4.5.0, motor 3.3.1)
+- **Database:** MongoDB (`pymongo` 4.5.0, `motor` 3.3.1)
 - **Async:** asyncio, httpx 0.24+, aiohttp 3.9+
 - **Scheduler:** APScheduler 3.10.4
 - **Telegram:** python-telegram-bot 20.7+
-- **Validation:** Pydantic v2.6+ (230 моделей)
-- **HTTP Client:** httpx (async), requests
+- **Validation:** Pydantic v2.6+ (**259 моделей**)
+- **HTTP Clients:** httpx (async), requests
 - **VK Music:** vkpymusic, vkaudiotoken
-- **Media:** yt-dlp, Pillow
+- **Media:** yt-dlp, Pillow, matplotlib
 - **Monitoring:** psutil
-- **Security:** cryptography, pyjwt, passlib, python-jose
-- **Data:** pandas, numpy, matplotlib
+- **Security:** cryptography (AES для LK), pyjwt + python-jose (JWT HS256), passlib + bcrypt (хеши паролей)
+- **SMTP:** aiosmtplib (Stage 9)
+- **Data:** pandas, numpy
+- **Cloud:** boto3 (опц. для S3)
+- **OAuth:** requests-oauthlib
 
 #### Frontend
 - **Framework:** React 19.0.0
 - **Bundler:** Vite 7.2.2
-- **Styling:** TailwindCSS 3.4.17
+- **Routing:** react-router-dom 7.5.1
+- **Styling:** TailwindCSS 3.4.17 + PostCSS + Autoprefixer
 - **Animation:** Framer Motion 12.23.24
-- **i18n:** i18next 25.6.0, react-i18next 16.2.0
-- **State:** React Hooks + Context API
-- **HTTP Client:** axios 1.12.2
+- **i18n:** i18next 25.6+, react-i18next 16.2, browser-languagedetector
+- **State:** React Hooks + Context API (4 контекста)
+- **HTTP:** axios 1.12.2 (с `Authorization: Bearer` interceptor + 401 → logout)
 - **Telegram:** @twa-dev/sdk 8.0.2
 - **Charts:** recharts 3.4.1
-- **QR Codes:** qrcode.react 4.2.0
+- **QR:** qrcode.react 4.2.0
 - **Screenshots:** html-to-image 1.11.13
 - **Confetti:** canvas-confetti 1.9.4
-- **Routing:** react-router-dom 7.5.1
-- **Icons:** lucide-react 0.546.0, inline VkLogoIcon
+- **Icons:** lucide-react 1.7.0 + inline VkLogoIcon
+- **3D:** three 0.183, @react-three/fiber 9.5, @react-three/drei 10.7
+- **JWT:** jwt-decode 4.0.0
+- **3dsvg:** 0.2.1 (для импорта SVG как 3D-меша)
 
 #### Infrastructure
-- **Container:** Docker/Kubernetes
-- **Process Manager:** Supervisor
-- **Database:** MongoDB (local)
-- **Reverse Proxy:** Nginx (handled by K8s ingress)
+- **Container:** Docker / Kubernetes (с ingress: `/api/*` → backend:8001, иначе → frontend:3000)
+- **Process Manager:** Supervisor (`backend`, `frontend`, `mongodb`, `code-server`, `nginx-code-proxy`)
+- **Database:** MongoDB (локально, port 27017)
+- **Reverse Proxy:** Nginx (через K8s ingress)
 
 ---
 
 ## 2. Backend структура
 
-### 2.1 Главные модули (LOC statistics)
+### 2.1 Главные модули (LOC + назначение)
 
-| Файл | LOC | Описание |
-|------|-----|----------|
-| `server.py` | **17,675** | ВСЕ API endpoints (268) |
-| `models.py` | **2,665** | Pydantic схемы (230 классов) |
-| `telegram_bot.py` | **1,359** | Telegram Bot логика |
-| `scheduler_v2.py` | **1,039** | Уведомления V2 |
-| `achievements.py` | **792** | 24 достижения |
-| `cover_service.py` | **502** | Обложки треков |
-| `music_service.py` | **387** | VK Music сервис |
-| `scheduler.py` | 383 | Старый планировщик (резерв) |
-| `lk_parser.py` | 380 | Парсинг ЛК РУДН |
-| `vk_auth_service.py` | 331 | VK авторизация + OAuth |
-| `rudn_parser.py` | 323 | Парсинг API РУДН |
-| `notifications.py` | 177 | Telegram уведомления |
-| `weather.py` | 118 | OpenWeatherMap API |
-| `config.py` | 113 | Конфигурация ENV |
-| `cache.py` | 42 | Кэширование данных |
-| **ИТОГО** | **~26,300** | |
+| Файл | LOC | Назначение |
+|------|-----|------------|
+| `server.py` | **20,789** | Все API endpoints (311), startup/shutdown hooks, middleware, app.state.db |
+| `models.py` | **3,035** | Pydantic схемы (259 классов) — User*, Task, Room, Message, Auth*, Schedule, Notifications, … |
+| `auth_routes.py` | **2,537** | `APIRouter` для `/api/auth/*` (28 endpoints) — все auth-провайдеры + sessions + password + email |
+| `auth_utils.py` | **817** | `_issue_token`, `verify_token`, `register_session`, `revoke_session`, bcrypt, rate-limit, HMAC validation Telegram, JWT с `jti` |
+| `email_service.py` | **278** | `send_email()` через `aiosmtplib` + DEV-fallback в `/app/logs/emails.log`; шаблоны для verify/reset/change-notif |
+| `level_system.py` | **775** | Уровни/XP, события `xp_events`, формулы прогрессии, награды |
+| `migrate_users.py` | **107** | One-time миграция `user_settings` → `users` (вызывается из startup hook) |
+| `scalability_check.py` | **30** | Диагностика индексов, размеров коллекций |
+| `seed_test_public_profile.py` | **130** | Сидер для PublicProfilePage (тестовые данные) |
+| `telegram_bot.py` | **1,458** | Telegram Bot (handlers, commands, message routing, anti-spam через `safe_send_telegram`) |
+| `scheduler_v2.py` | **1,051** | Daily Planner (06:00) → Notification Executor → Retry Handler (3 попытки: 1/3/5 мин) |
+| `scheduler.py` | **383** | Старый планировщик (резерв, можно удалить) |
+| `achievements.py` | **847** | 24 достижения, ACHIEVEMENTS dict, `track_user_action`, `check_and_award_achievements` |
+| `cover_service.py` | **502** | Получение / кэш обложек треков (iTunes / Last.fm fallback) |
+| `music_service.py` | **387** | VK Music сервис (поиск, плейлисты, стрим, similar) |
+| `vk_auth_service.py` | **331** | VK login/password + OAuth (token exchange) |
+| `lk_parser.py` | **380** | Парсинг ЛК РУДН (HTML scraping + AES-encrypted credentials) |
+| `rudn_parser.py` | **323** | Парсинг публичного API РУДН (`/rasp/lessons/view`) |
+| `notifications.py` | **177** | Telegram-нотификации (низкоуровневые) |
+| `weather.py` | **118** | OpenWeatherMap API |
+| `config.py` | **113** | ENV → Python settings (с дефолтами) |
+| `cache.py` | **42** | `get_cached`/`set_cached` для расписания |
+| `services/delivery.py` | **~250** | `MessagePriority`, `send_batch` (через семафор), retry/DLQ через `delivery_attempts` |
+| **Тестовые скрипты** | **~3,500** | `test_*.py`, `seed_*.py` (отдельно от prod-кода) |
 
-### 2.2 server.py — Главный файл
+**Итого ключевых:** ~30,500 LOC.
 
-**Ключевые зависимости:**
+### 2.2 server.py — главный файл
+
+#### Импорты (ключевые)
+
 ```python
-from models import *  # Все Pydantic модели
+from models import *
 from achievements import check_and_award_achievements, track_user_action, ACHIEVEMENTS
 from weather import get_weather_data
 from rudn_parser import get_faculties, get_filter_data, get_schedule
 from notifications import send_class_notification
 from cache import get_cached, set_cached
-from music_service import MusicService  # VK Music
-from vk_auth_service import VKAuthService  # VK авторизация
-from lk_parser import LKParser  # ЛК РУДН
-from cover_service import CoverService  # Обложки треков
+from music_service import MusicService
+from vk_auth_service import VKAuthService
+from lk_parser import LKParser
+from cover_service import CoverService
+from level_system import grant_xp, get_user_level
+from scheduler_v2 import schedule_daily_notifications, retry_failed_notifications
+from auth_routes import router as auth_router
+from migrate_users import migrate_user_settings_to_users
+from services.delivery import safe_send_telegram, send_batch, MessagePriority
 ```
 
-**Основные функции:**
+#### Ключевые async-функции
+
 ```python
 async def get_user_settings(telegram_id)
 async def update_last_activity(telegram_id)
 async def get_or_create_user_stats(telegram_id)
 async def create_in_app_notification(...)
-async def enrich_conversation(conv)  # НОВОЕ: обогащение диалогов
+async def enrich_conversation(conv)
+async def resolve_user_by_uid(uid)            # /u/{uid} helper
+async def get_current_user_required(request)  # JWT validation + session-revocation enforcement
 ```
 
-### 2.3 Endpoints по модулям (268 всего)
+#### Startup hooks
 
-| Модуль | Endpoints | Методы |
-|--------|-----------|--------|
-| Журнал посещений | **37** | 10 GET + 16 POST + 4 PUT + 7 DELETE |
-| VK Music | **35** | 18 GET + 11 POST + 1 PUT + 5 DELETE |
-| Админ панель | **31** | 17 GET + 8 POST + 3 PUT + 3 DELETE |
-| Групповые задачи | **19** | 4 GET + 6 POST + 5 PUT + 4 DELETE |
-| Сообщения (НОВОЕ) | **18** | 6 GET + 7 POST + 3 PUT + 2 DELETE |
-| Комнаты | **17** | 4 GET + 6 POST + 4 PUT + 3 DELETE |
-| Друзья | **15** | 6 GET + 7 POST + 0 PUT + 2 DELETE |
-| Пользователи | **11** | 6 GET + 2 POST + 2 PUT + 1 DELETE |
-| Уведомления | **11** | 4 GET + 2 POST + 4 PUT + 1 DELETE |
-| Личные задачи | **10** | 2 GET + 2 POST + 4 PUT + 2 DELETE |
-| Web Sessions | **10** | 2 GET + 5 POST + 0 PUT + 3 DELETE |
-| Совместное расписание (НОВОЕ) | **9** | 3 GET + 4 POST + 0 PUT + 2 DELETE |
-| Реферальная система | **7** | 4 GET + 3 POST |
-| Планировщик | **5** | 1 GET + 4 POST |
-| Профиль | **5** | 4 GET + 0 POST + 1 PUT |
-| Достижения | **5** | 3 GET + 2 POST |
-| Расписание РУДН | **4** | 2 GET + 2 POST |
-| ЛК РУДН | **4** | 2 GET + 1 POST + 0 PUT + 1 DELETE |
-| Бэкапы | **3** | 3 GET |
-| Другое | **9** | 6 GET + 3 POST |
-| **ИТОГО** | **268** | **123 GET + 87 POST + 29 PUT + 29 DELETE** |
+```python
+@app.on_event("startup")
+async def startup():
+    app.state.db = client[DB_NAME]
+    await migrate_user_settings_to_users()
+    await create_indexes()                   # TTL на auth_sessions, profile_views, auth_tokens
+    schedule_daily_notifications()
+    retry_failed_notifications()
+```
+
+### 2.3 Endpoints по модулям (339 всего)
+
+| Модуль | Endpoints | Методы | Описание |
+|--------|-----------|--------|----------|
+| Журнал посещений | **36** | GET+POST+PUT+DELETE | Журналы, студенты, предметы, занятия, заявки, ссылки на студентов |
+| VK Music | **35** | GET+POST+PUT+DELETE | Поиск, стрим, плейлисты, listening-rooms, OAuth, история, similar |
+| Админ-панель | **33** | GET+POST+PUT+DELETE | Статистика, мониторинг, рефералы, модальные изображения, рассылки, delivery |
+| 🔐 Auth | **28** | в `auth_routes.py` | Email/TG/VK/QR + me + sessions + password + email |
+| Групповые задачи | **18** | GET+POST+PUT+DELETE | CRUD + подзадачи + комментарии + приглашения |
+| 💬 Сообщения | **18** | GET+POST+PUT+DELETE | Чаты, реакции, типинг, пересылка, поиск, пины |
+| Профиль (legacy `/profile/*`) | **18** | GET+POST+PUT+DELETE | Обратная совместимость — `qr`, `schedule`, `privacy`, `wall-graffiti`, `avatar` |
+| Комнаты | **17** | GET+POST+PUT+DELETE | CRUD + участники + активность + роли |
+| Друзья | **15** | GET+POST+DELETE | Запросы, блокировки, поиск, mutual, favorites, events |
+| 🔗 Публичный профиль `/u/{uid}/*` | **13** | GET+POST+PUT | Resolve, профиль, schedule, qr, share-link, privacy, view, avatar, graffiti, wall-graffiti, friends, achievements |
+| Уведомления | **11** | GET+POST+PUT+DELETE | CRUD + настройки + тестирование |
+| Web Sessions | **9** | GET+POST+DELETE | QR-авторизация cross-device |
+| Пользователи | **9** | GET+POST+PUT+DELETE | Settings, тема, история, streak, visit |
+| Tasks (личные) | **9** | GET+POST+PUT+DELETE | CRUD + подзадачи + продуктивность |
+| 📤 Совместное расписание | **8** | GET+POST+DELETE | Шаринг, участники, токены |
+| Реферальная система | **7** | GET+POST | Коды, статистика, дерево, веб-апп |
+| Планировщик | **5** | GET+POST | Синхронизация, события, превью |
+| Достижения | **5** | GET+POST | Список, трекинг, пометить просмотренными |
+| Расписание РУДН | **4** | GET+POST | Факультеты, фильтры, расписание, кэш |
+| ЛК РУДН | **4** | GET+POST+DELETE | Подключение, отключение, данные, статус |
+| Privacy (legacy) | **4** | GET+PUT | Настройки приватности |
+| Бэкапы | **3** | GET | Экспорт БД |
+| Dev / диагностика | **5** | `/dev/*` | Внутренние тулзы |
+| Граффити / прочее | **8** | GET+POST | Wall-graffiti, weather, status |
+| **ИТОГО** | **339** | | |
 
 ### 2.4 achievements.py — 24 достижения
 
 **Категории:**
 1. **Basic** — базовые действия (выбор группы, первая неделя)
-2. **Social** — социальные (приглашения друзей)
-3. **Exploration** — исследование (открытие всех разделов)
-4. **Milestone** — milestone (получить все ачивки)
-5. **Activity** — активность (ночное/раннее использование)
+2. **Social** — приглашения друзей, рефералы
+3. **Exploration** — открытие всех разделов
+4. **Milestone** — milestone (получить все ачивки, 100 задач)
+5. **Activity** — ночное / раннее использование
 
-**Триггеры:**
+**Триггеры (примеры):**
 ```python
-"select_group" -> first_group
-"view_schedule" -> schedule_explorer (10x), schedule_master (50x)
-"invite_friend" -> friend_inviter (1x), super_inviter (5x)
-"night_usage" -> night_owl (5x)
-"early_usage" -> early_bird (5x)
-"view_analytics" -> analyst (1x), chart_lover (5x)
+"select_group" → first_group
+"view_schedule" → schedule_explorer (10x), schedule_master (50x)
+"invite_friend" → friend_inviter (1x), super_inviter (5x)
+"night_usage" → night_owl (5x)
+"early_usage" → early_bird (5x)
+"view_analytics" → analyst (1x), chart_lover (5x)
+"complete_task" → task_doer (10x), task_master (100x)
 ```
 
 ### 2.5 scheduler_v2.py — Уведомления V2
 
 **Трёхуровневая архитектура:**
-1. **Daily Planner** (06:00) — подготовка уведомлений
-2. **Notification Executor** — отправка
-3. **Retry Handler** (2 мин) — повтор
+1. **Daily Planner** (06:00) — анализ расписания, подготовка `scheduled_notifications`
+2. **Notification Executor** — отправка через `safe_send_telegram` (с антиспамом)
+3. **Retry Handler** (каждые 2 мин) — повтор неудачных через `delivery_attempts` (DLQ)
 
-**Точность:** ±10 секунд  
-**Retry:** 3 попытки (1, 3, 5 минут)
+- **Точность:** ±10 секунд
+- **Retry:** 3 попытки (через 1, 3, 5 минут)
+- **Anti-spam:** проверка `last_sent_at` для каждого `(user, notification_kind)`
 
 ---
 
@@ -190,639 +238,838 @@ async def enrich_conversation(conv)  # НОВОЕ: обогащение диал
 
 | Категория | Количество | LOC |
 |-----------|------------|-----|
-| Основные компоненты | **78** | ~39,100 |
+| Top-level компоненты | **91** | ~50,000 |
+| Auth компоненты | **12** | ~3,200 |
 | Journal компоненты | **17** | ~7,900 |
 | Music компоненты | **13** | ~6,100 |
 | Icons | **1** | ~30 |
-| Services (API клиенты) | **11** | ~4,150 |
-| Utils | **10** | ~1,730 |
-| Contexts | **2** | ~510 |
-| Hooks | **3** | ~200 |
-| App.jsx | **1** | ~2,600 |
-| Прочие (index, CSS, etc.) | **8** | ~950 |
-| **ИТОГО** | **~145 файлов** | **~64,000** |
+| Pages | **9** | ~3,700 |
+| Services (API клиенты) | **12** | ~4,600 |
+| Contexts | **4** | ~940 |
+| Utils | **14** | ~2,250 |
+| Hooks | **5** | ~455 |
+| Constants | **3** | ~120 |
+| `App.jsx` | **1** | 2,734 |
+| `index.jsx` + CSS | **3** | ~150 |
+| **ИТОГО** | **~185 файлов** | **~74,300** |
 
-### 3.2 Ключевые компоненты (по размеру)
-
-| Компонент | LOC | Описание |
-|-----------|-----|----------|
-| `AdminPanel.jsx` | **4,382** | Админ панель (расширенная) |
-| `TasksSection.jsx` | **3,085** | Личные задачи |
-| `App.jsx` | **2,600** | Главный компонент |
-| `SharedScheduleView.jsx` | **2,075** | Совместное расписание (НОВОЕ) |
-| `ChatModal.jsx` | **1,858** | Чат/сообщения (НОВОЕ) |
-| `ListeningRoomModal.jsx` | **1,836** | Комнаты прослушивания |
-| `ProfileModal.jsx` | **1,556** | Профиль пользователя |
-| `PlannerTimeline.jsx` | **1,386** | Таймлайн планировщика |
-| `FriendsSection.jsx` | **1,372** | Друзья |
-| `JournalStatsTab.jsx` | **1,205** | Статистика журнала |
-| `JournalDetailModal.jsx` | **1,146** | Детали журнала |
-| `RoomDetailModal.jsx` | **1,059** | Детали комнаты |
-| `PlayerContext.jsx` | **893** | Контекст плеера |
-| `MyAttendanceStats.jsx` | **869** | Статистика посещаемости |
-| `StreakRewardModal.jsx` | **845** | Streak награды (НОВОЕ) |
-
-### 3.3 Services (API клиенты) — 11 файлов
-
-| Service | Описание |
-|---------|----------|
-| `api.js` | Основной API клиент |
-| `roomsAPI.js` | Комнаты |
-| `groupTasksAPI.js` | Групповые задачи |
-| `journalAPI.js` | Журнал посещений |
-| `musicAPI.js` | VK Music |
-| `friendsAPI.js` | Друзья |
-| `notificationsAPI.js` | Уведомления |
-| `referralAPI.js` | Реферальная система |
-| `webSessionAPI.js` | Web Sessions |
-| `listeningRoomAPI.js` | Комнаты прослушивания |
-| `messagesAPI.js` | **Сообщения (НОВОЕ)** |
-
-### 3.4 Journal компоненты (17)
+### 3.2 Pages (9 SPA-страниц)
 
 ```
-/components/journal/
-├── JournalCard.jsx
-├── JournalDetailModal.jsx
-├── JournalStatsTab.jsx
-├── CreateJournalModal.jsx
-├── CreateSessionModal.jsx
-├── CreateSubjectModal.jsx
-├── EditJournalModal.jsx           # НОВОЕ
-├── EditSessionModal.jsx           # НОВОЕ
-├── SubjectDetailModal.jsx
-├── SubjectAttendanceModal.jsx
-├── AttendanceModal.jsx
-├── AddStudentsModal.jsx
-├── EditStudentModal.jsx
-├── LinkStudentModal.jsx
-├── ShareStudentLinkModal.jsx
-├── JournalApplicationsModal.jsx
-├── MyAttendanceStats.jsx
-└── index.js
+/app/frontend/src/pages/
+├── LoginPage.jsx
+├── RegisterWizard.jsx              # Многошаговая регистрация (provider → username → group/faculty)
+├── ForgotPasswordPage.jsx          # 🆕 Stage 9
+├── ResetPasswordPage.jsx           # 🆕 Stage 9 (auto-login после сброса)
+├── VerifyEmailPage.jsx             # 🆕 Stage 9
+├── VKCallbackPage.jsx              # OAuth callback VK ID
+├── QRConfirmPage.jsx               # Подтверждение QR-сессии
+├── PublicProfilePage.jsx           # /u/:uid (вне AuthGate)
+└── Test3DLogoPage.jsx              # 🆕 Тестовая страница 3D-логотипа
 ```
 
-### 3.5 Music компоненты (13)
+### 3.3 Маршруты (App.jsx)
+
+```jsx
+<BrowserRouter>
+  <Routes>
+    {/* Без авторизации */}
+    <Route path="/login" element={<LoginPage />} />
+    <Route path="/register" element={<RegisterWizard />} />
+    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <Route path="/verify-email" element={<VerifyEmailPage />} />
+    <Route path="/auth/vk/callback" element={<VKCallbackPage />} />
+    <Route path="/auth/qr/confirm" element={<QRConfirmPage />} />
+    <Route path="/u/:uid" element={<PublicProfilePage />} />
+
+    {/* Защищено AuthGate */}
+    <Route path="/" element={<AuthGate><Home /></AuthGate>} />
+
+    {/* Diag/тест */}
+    <Route path="/status-tester" element={<StatusTester />} />
+    <Route path="/streak-demo" element={<StreakRewardPreview />} />
+    <Route path="/test-3d-logo" element={<Test3DLogoPage />} />
+  </Routes>
+</BrowserRouter>
+```
+
+### 3.4 Top-level компоненты (91)
 
 ```
-/components/music/
-├── MusicSection.jsx         # Главный компонент
-├── MusicSearch.jsx          # Поиск треков
-├── TrackCard.jsx            # Карточка трека
-├── TrackCover.jsx           # Обложка трека
-├── TrackList.jsx            # Список треков
-├── ArtistCard.jsx           # Карточка исполнителя
-├── PlaylistCard.jsx         # Карточка плейлиста
-├── MiniPlayer.jsx           # Мини-плеер
-├── FullscreenPlayer.jsx     # Полноэкранный плеер
-├── VKAuthModal.jsx          # Авторизация VK
-├── PlayerContext.jsx        # Контекст плеера
-├── ListeningRoomModal.jsx   # Комнаты прослушивания
-├── SendTrackToFriendModal.jsx # Отправка трека другу (НОВОЕ)
-└── index.js
+AchievementNotification, AchievementsModal, AddRoomTaskModal, AddTaskModal,
+AdminPanel, AnalyticsModal, BottomNavigation, CalendarModal,
+ChangePasswordModal, ChatModal, ConversationsListModal, CreateEventModal,
+CreateGroupTaskModal, CreateRoomModal, DeleteConfirmModal, DesktopSidebar,
+DevicesModal, EditEventModal, EditRoomTaskModal, EditTaskModal,
+EmailVerificationBanner, ErrorBoundary, FriendCard, FriendProfileModal,
+FriendSearchModal, FriendsSection, GraffitiEditor, GreetingNotification,
+GroupSelector, GroupTaskCard, GroupTaskDetailModal, Header, JournalSection,
+LKConnectionModal, LevelDetailModal, LevelUpModal, LinkedAccountsModal,
+LiveScheduleCard, LiveScheduleCarousel, LiveScheduleSection, LoadingScreen,
+Logo3D, Logo3DAnchor, Logo3DHost, MenuModal, NewYearTheme,
+NotificationHistory, NotificationQueue, NotificationSettings,
+NotificationSettingsPanel, NotificationsPanel, PlannerEventCard,
+PlannerTimeline, PrepareForLectureModal, ProductivityStats, ProfileEditScreen,
+ProfileModal, ProfileScreen, ProfileSettingsModal, ReferralModal,
+ReferralTree, RippleEffect, RoomActivityFeed, RoomCard, RoomDetailModal,
+RoomParticipantsList, RoomStatsPanel, SelectFriendsModal, SessionsModal,
+ShareScheduleModal, SharedScheduleView, SkeletonCard, SnowfallBackground,
+StreakRewardModal, SubtasksList, SwipeHint, SyncPreviewModal, TagsInput,
+TaskCompletionBanner, TaskDetailModal, TasksSection, TelegramLinkConfirmModal,
+TelegramLinkScreen, TopGlow, UpcomingClassNotification, WallGraffiti,
+WeatherWidget, WeekDateSelector, WeekDaySelector, WelcomeScreen, YouTubePreview
 ```
 
-### 3.6 Utils (10)
+### 3.5 Auth компоненты (12)
+
+```
+/components/auth/
+├── AuthGate.jsx                       # Защита маршрутов
+├── AuthLayout.jsx                     # Базовый layout страниц авторизации
+├── AuthButton.jsx, AuthInput.jsx
+├── EmailLoginForm.jsx, EmailRegisterForm.jsx
+├── UsernameField.jsx                  # Real-time check-username
+├── TelegramLoginWidget.jsx            # Telegram Login Widget (HMAC)
+├── TelegramWebAppLoginButton.jsx      # 🆕 кнопка для Telegram WebApp
+├── TelegramWebAppConfirm.jsx          # 🆕 подтверждение в WebApp
+├── VkLoginButton.jsx
+└── QRLoginBlock.jsx                   # QR + polling статуса
+```
+
+### 3.6 Services (12 API клиентов)
+
+| Service | Файл | Описание |
+|---------|------|----------|
+| Основной | `api.js` | scheduleAPI, userAPI, achievementsAPI, tasksAPI, activityAPI, streakAPI, sharedScheduleAPI + axios interceptor |
+| Auth | `authAPI.js` | `/api/auth/*` (login/register/me/sessions/password/email) |
+| Друзья | `friendsAPI.js` | `/api/friends/*` |
+| Групповые задачи | `groupTasksAPI.js` | `/api/group-tasks/*` |
+| Журнал | `journalAPI.js` | `/api/journals/*` |
+| Listening Rooms | `listeningRoomAPI.js` | VK Music совместное прослушивание |
+| Сообщения | `messagesAPI.js` | `/api/messages/*` |
+| VK Music | `musicAPI.js` | `/api/music/*` |
+| Уведомления | `notificationsAPI.js` | In-app notifications |
+| Рефералы | `referralAPI.js` | `/api/referral/*` |
+| Комнаты | `roomsAPI.js` | `/api/rooms/*` |
+| Web Sessions | `webSessionAPI.js` | `/api/web-sessions/*` |
+
+### 3.7 Contexts (4)
+
+```
+/contexts/
+├── AuthContext.jsx              # token, user, login, logout, refreshMe + axios Bearer interceptor + 401 → logout
+├── TelegramContext.jsx          # Telegram WebApp SDK обёртка
+├── ThemeContext.jsx             # Light/Dark + accent colors
+└── Logo3DContext.jsx            # 🆕 Singleton 3D-логотипа (anchors map + setRect)
+```
+
+### 3.8 Utils (14)
 
 ```
 /utils/
-├── analytics.js      # Аналитика расписания
-├── animations.js     # Framer Motion presets
-├── botInfo.js        # Информация о боте (НОВОЕ)
-├── config.js         # Конфигурация (НОВОЕ)
-├── confetti.js       # Конфетти для достижений
-├── dateUtils.js      # Работа с датами
-├── gestures.js       # Жесты свайпов
-├── pluralize.js      # Склонение слов
-├── scheduleUtils.js  # Утилиты расписания
-└── textUtils.js      # Работа с текстом
+├── analytics.js          # Метрики расписания
+├── animations.js         # Framer Motion presets
+├── authStorage.js        # 🆕 localStorage wrapper для JWT
+├── botInfo.js            # Информация о боте (@username для приглашений)
+├── confetti.js           # Конфетти-эффект для achievements
+├── config.js             # Frontend конфигурация
+├── dateUtils.js          # Работа с датами (week numbers, isoWeek)
+├── gestures.js           # Жесты swipe (mobile)
+├── logoPreload.js        # 🆕 prefetch SVG для 3D-логотипа (экономия 500-3000ms)
+├── pluralize.js          # Склонение "1 задача / 2 задачи / 5 задач"
+├── safeRedirect.js       # 🆕 Whitelisted redirect (безопасность)
+├── scheduleUtils.js      # Утилиты расписания
+├── textUtils.js          # Работа с текстом (труcncate, escape)
+├── userIdentity.js       # 🆕 isSameUser(a, b) — поддержка uid+tid (КРИТИЧНО для UID-миграции)
+└── __tests__/            # Unit-тесты utils
 ```
 
-### 3.7 Hooks (3) — НОВОЕ
+### 3.9 Hooks (5)
 
 ```
 /hooks/
-├── useFaviconBadge.js  # Бейдж на иконке вкладки
-├── useFriendEvents.js  # Real-time события друзей
-└── useRipple.js        # Ripple эффект для кнопок
+├── useFaviconBadge.js          # Badge counter на favicon
+├── useFriendEvents.js          # Real-time события друзей (polling)
+├── useRipple.js                # Material Ripple эффект на кнопках
+├── useIsAdmin.js               # 🆕 Проверка admin-роли через /auth/me/is_admin
+└── useIsInsideTelegram.js      # 🆕 Детект Telegram WebApp окружения
 ```
 
-### 3.8 Дополнительные компоненты (НОВОЕ)
+### 3.10 Constants (3)
 
 ```
-/icons/
-└── VkLogoIcon.jsx      # Инлайн VK логотип (замена @vkontakte/icons)
-
-Новые основные компоненты:
-├── ChatModal.jsx                # Чат с другом
-├── ConversationsListModal.jsx   # Список диалогов
-├── DesktopSidebar.jsx           # Боковая панель для десктопа
-├── ShareScheduleModal.jsx       # Модал шаринга расписания
-├── SharedScheduleView.jsx       # Просмотр совместного расписания
-├── SelectFriendsModal.jsx       # Выбор друзей (универсальный)
-├── StreakRewardModal.jsx        # Награды за streak
-├── TelegramLinkConfirmModal.jsx # Подтверждение Telegram ссылки
-├── TelegramLinkScreen.jsx       # Экран привязки Telegram
+/constants/
+├── levelConstants.js     # Уровни/XP формулы
+├── publicBase.js         # PUBLIC_BASE_URL = REACT_APP_BACKEND_URL
+└── roomColors.js         # Палитра цветов для комнат
 ```
+
+### 3.11 Ключевые компоненты (по размеру)
+
+| Компонент | LOC | Назначение |
+|-----------|-----|------------|
+| `AdminPanel.jsx` | **4,400+** | Админ-панель (статистика, мониторинг, рассылки, рефералы) |
+| `TasksSection.jsx` | **3,000+** | Личные задачи с фильтрами/категориями |
+| `App.jsx` | **2,734** | Главный компонент + маршруты + основная логика |
+| `SharedScheduleView.jsx` | **2,000+** | Наложение расписаний друзей |
+| `ChatModal.jsx` | **1,800+** | Чат с другом (текст/музыка/расписание/реакции) |
+| `ListeningRoomModal.jsx` | **1,800+** | Комнаты прослушивания VK Music |
+| `ProfileModal.jsx` | **1,500+** | Профиль пользователя |
+| `PlannerTimeline.jsx` | **1,300+** | Timeline планировщика |
+| `FriendsSection.jsx` | **1,300+** | Список друзей + поиск |
+| `JournalStatsTab.jsx` | **1,200+** | Статистика журнала |
+| `JournalDetailModal.jsx` | **1,100+** | Детали журнала |
+| `RoomDetailModal.jsx` | **1,000+** | Детали комнаты |
+| `StreakRewardModal.jsx` | **800+** | Streak-награды с анимацией |
 
 ---
 
 ## 4. Модели данных
 
-### 4.1 UserSettings
+### 4.1 User (Stage 9 расширена)
 
 ```python
 {
-    "id": UUID,
-    "telegram_id": int,           # ID в Telegram
-    "username": str?,
-    "first_name": str?,
-    "last_name": str?,
-    "group_id": str,              # ID группы РУДН
-    "group_name": str,            # Название группы
-    "facultet_id": str,
-    "facultet_name": str?,
-    "level_id": str,
-    "kurs": str,
-    "form_code": str,
-    "notifications_enabled": bool,
-    "notification_time": int,     # 5-30 минут
-    "referral_code": str,
-    "referred_by": int?,
-    "invited_count": int,
-    "created_at": datetime,
-    "last_activity": datetime,
-    "privacy_settings": {
-        "show_online_status": bool,
-        "show_in_search": bool,
-        "show_friends_list": bool,
-        "show_achievements": bool,
-        "show_schedule": bool
-    }
+  "id": UUID,                          # Mongo _id (UUID)
+  "uid": "123456789",                  # 9-значный numeric public ID
+  "username": "petr_smirnov",          # lowercase, unique
+  "email": "petr@example.com",         # unique, optional
+  "password_hash": "$2b$12$...",       # bcrypt
+  "telegram_id": 12345678,             # optional
+  "vk_id": 87654321,                   # optional
+  "photo_url": "https://t.me/...",     # из Telegram/VK
+  "photo_url_custom": "https://...",   # 🆕 кастомный аватар
+  "email_verified": false,             # 🆕 Stage 9
+  "primary_auth": "email",             # email | telegram | vk
+  "auth_providers": ["email", "telegram"],
+  "first_name": "Пётр",
+  "last_name": "Смирнов",
+  "created_at": datetime,
+  "last_activity": datetime
 }
 ```
 
-### 4.2 Task
+### 4.2 UserSettings (legacy primary, telegram_id-based)
 
 ```python
 {
-    "id": UUID,
-    "telegram_id": int,
-    "text": str,
-    "completed": bool,
-    "category": str,              # учеба, личное, спорт, проекты
-    "priority": str,              # high, medium, low
-    "deadline": datetime?,
-    "target_date": datetime?,
-    "notes": str?,
-    "tags": List[str],
-    "order": int,
-    "subtasks": List[Subtask],
-    "created_at": datetime,
-    "updated_at": datetime
+  "telegram_id": 12345678,             # primary key
+  "uid": "123456789",                  # FK → users.uid (после миграции)
+  "username": str?,
+  "first_name": str?,
+  "last_name": str?,
+  "group_id": str,
+  "group_name": str,
+  "facultet_id": str,
+  "facultet_name": str?,
+  "level_id": str,
+  "kurs": str,
+  "form_code": str,
+  "notifications_enabled": bool,
+  "notification_time": int,            # 5-30 минут до пары
+  "referral_code": str,                # auto-gen (Stage 9)
+  "referred_by": int?,
+  "invited_count": int,
+  "created_at": datetime,
+  "last_activity": datetime,
+  "privacy_settings": {
+    "show_online_status": bool,
+    "show_in_search": bool,
+    "show_friends_list": bool,
+    "show_achievements": bool,
+    "show_schedule": bool
+  }
 }
 ```
 
-### 4.3 Room
+### 4.3 AuthSession (Stage 9)
 
 ```python
 {
-    "id": UUID,
-    "name": str,
-    "color": str,                 # #hex
-    "emoji": str,
-    "description": str?,
-    "owner_id": int,
-    "participants": List[{
-        "telegram_id": int,
-        "username": str?,
-        "first_name": str?,
-        "role": str,              # owner, member
-        "joined_at": datetime
-    }],
-    "total_tasks": int,
-    "completed_tasks": int,
-    "created_at": datetime
+  "id": UUID,
+  "uid": "123456789",
+  "jti": "uuid-jti-...",               # unique, в JWT
+  "device_label": "Chrome on macOS",   # parsed from UA
+  "ip": "192.168.1.1",
+  "user_agent": "Mozilla/5.0 ...",
+  "created_at": datetime,
+  "last_seen": datetime,
+  "expires_at": datetime,              # TTL индекс
+  "revoked": false
 }
 ```
 
-### 4.4 WebSession
+### 4.4 AuthToken (Stage 9 — для password-reset / email-verify)
 
 ```python
 {
-    "session_token": UUID,
-    "telegram_id": int?,          # После привязки
-    "status": str,                # pending, scanned, linked, expired, revoked
-    "device_info": {
-        "browser": str,
-        "os": str,
-        "device": str
-    },
-    "qr_url": str,
-    "created_at": datetime,
-    "expires_at": datetime,
-    "linked_at": datetime?,
-    "last_active": datetime?
+  "token_hash": "sha256_hex...",       # хранится только хеш
+  "purpose": "password_reset",         # | "email_verify"
+  "uid": "123456789",
+  "email": "petr@example.com",
+  "used": false,
+  "created_at": datetime,
+  "expires_at": datetime               # TTL: 1 час для reset, 24 часа для verify
 }
 ```
 
-### 4.5 ListeningRoom
+### 4.5 AuthEvent (Stage 9 audit-log)
 
 ```python
 {
-    "id": UUID,
-    "name": str,
-    "owner_id": int,
-    "invite_code": str,
-    "participants": List[{
-        "telegram_id": int,
-        "username": str?,
-        "joined_at": datetime,
-        "is_ready": bool
-    }],
-    "current_track": {
-        "track_id": str,
-        "title": str,
-        "artist": str,
-        "position": float,
-        "is_playing": bool,
-        "updated_at": datetime
-    },
-    "settings": {
-        "allow_skip": bool,
-        "private": bool
-    },
-    "created_at": datetime
+  "id": UUID,
+  "event": "login_success",            # login_success/failure, password_change, ...
+  "uid": "123456789",
+  "provider": "email",                 # email | telegram | vk | qr
+  "success": true,
+  "ts": datetime,
+  "ip": str,
+  "ua": str,
+  "extra": { "hashed_email": "..." }   # privacy-friendly
 }
 ```
 
-### 4.6 Conversation (НОВОЕ)
+### 4.6 Task
 
 ```python
 {
-    "id": UUID,
-    "participant_ids": List[int],     # telegram_id участников
-    "type": str,                       # "direct"
-    "created_at": datetime,
-    "updated_at": datetime
+  "id": UUID, "telegram_id": int, "text": str, "completed": bool,
+  "category": "учеба|личное|спорт|проекты", "priority": "high|medium|low",
+  "deadline": datetime?, "target_date": datetime?, "notes": str?,
+  "tags": List[str], "order": int,
+  "subtasks": [{"id": UUID, "text": str, "completed": bool}],
+  "created_at": datetime, "updated_at": datetime
 }
 ```
 
-### 4.7 Message (НОВОЕ)
+### 4.7 Room
 
 ```python
 {
-    "id": UUID,
-    "conversation_id": UUID,
-    "sender_id": int,                  # telegram_id
-    "type": str,                       # text, music, schedule, forward
-    "text": str?,
-    "music_data": dict?,               # Данные трека
-    "schedule_data": dict?,            # Данные расписания
-    "reply_to": UUID?,                 # ID сообщения-ответа
-    "forwarded_from": UUID?,           # Пересланное сообщение
-    "reactions": List[dict],           # Реакции
-    "is_pinned": bool,
-    "read_at": datetime?,
-    "created_at": datetime,
-    "updated_at": datetime?
+  "id": UUID, "name": str, "color": "#hex", "emoji": str,
+  "description": str?, "owner_id": int,
+  "participants": [{
+    "telegram_id": int, "username": str?, "first_name": str?,
+    "role": "owner|member", "joined_at": datetime
+  }],
+  "total_tasks": int, "completed_tasks": int, "created_at": datetime
 }
 ```
 
-### 4.8 SharedSchedule (НОВОЕ)
+### 4.8 Conversation + Message
+
+```python
+# Conversation
+{
+  "id": UUID, "participant_ids": [int, int], "type": "direct",
+  "created_at": datetime, "updated_at": datetime
+}
+
+# Message
+{
+  "id": UUID, "conversation_id": UUID, "sender_id": int,
+  "type": "text|music|schedule|forward",
+  "text": str?, "music_data": dict?, "schedule_data": dict?,
+  "reply_to": UUID?, "forwarded_from": UUID?,
+  "reactions": [{"user_id": int, "emoji": str}],
+  "is_pinned": bool, "read_at": datetime?,
+  "created_at": datetime, "updated_at": datetime?
+}
+```
+
+### 4.9 SharedSchedule
 
 ```python
 {
-    "id": UUID,
-    "owner_id": int,                   # telegram_id
-    "participants": List[{
-        "telegram_id": int,
-        "username": str?,
-        "first_name": str?,
-        "group_name": str?,
-        "added_at": datetime
-    }],
-    "created_at": datetime,
-    "updated_at": datetime
+  "id": UUID, "owner_id": int,
+  "participants": [{
+    "telegram_id": int, "username": str?, "first_name": str?,
+    "group_name": str?, "added_at": datetime
+  }],
+  "created_at": datetime, "updated_at": datetime
 }
 ```
+
+### 4.10 ListeningRoom (VK Music)
+
+```python
+{
+  "id": UUID, "name": str, "owner_id": int, "invite_code": str,
+  "participants": [{
+    "telegram_id": int, "username": str?,
+    "joined_at": datetime, "is_ready": bool
+  }],
+  "current_track": {
+    "track_id": str, "title": str, "artist": str,
+    "position": float, "is_playing": bool, "updated_at": datetime
+  },
+  "settings": {"allow_skip": bool, "private": bool},
+  "created_at": datetime
+}
+```
+
+### 4.11 WebSession (QR-авторизация устройств)
+
+```python
+{
+  "session_token": UUID, "telegram_id": int?,
+  "status": "pending|scanned|linked|expired|revoked",
+  "device_info": {"browser": str, "os": str, "device": str},
+  "qr_url": str,
+  "created_at": datetime, "expires_at": datetime,
+  "linked_at": datetime?, "last_active": datetime?
+}
+```
+
+> **Полные модели (259 классов) — в** `/app/backend/models.py`. Включают `*Request` / `*Response` / `*Public` / `*Update` варианты для каждого основного класса.
 
 ---
 
-## 5. API интеграции
+## 5. Auth & Identity (Stage 9-10)
 
-### 5.1 API РУДН
-
-**Base URL:** `http://www.rudn.ru/rasp/lessons/view`
+### 5.1 Архитектура
 
 ```
-# Факультеты
-GET /rasp/lessons/view
-→ HTML с <select id="facultet">
-
-# Фильтры
-POST /rasp/lessons/view
-Body: {facultet, level?, kurs?, forma?}
-→ HTML с обновленными <select>
-
-# Расписание
-POST /rasp/lessons/view
-Body: {facultet, level, kurs, forma, group, week}
-→ HTML таблица с расписанием
+┌──────────────┐    JWT (HS256, jti)    ┌──────────────┐
+│   Frontend   │ ◄────────────────────► │   Backend    │
+│ AuthContext  │   localStorage         │ auth_routes  │
+│ + axios int. │   ↓                    │ + auth_utils │
+└──────────────┘   Authorization: Bearer└──────────────┘
+                                              │
+                                              ▼
+                  ┌─────────────────────────────────────────────┐
+                  │ MongoDB:                                    │
+                  │   users (identity)                          │
+                  │   auth_sessions (jti, expires_at TTL)       │
+                  │   auth_tokens (sha256, purpose, TTL)        │
+                  │   auth_events (audit-log)                   │
+                  │   auth_qr_sessions / qr_login_sessions      │
+                  └─────────────────────────────────────────────┘
 ```
 
-### 5.2 OpenWeatherMap API
+### 5.2 JWT-структура
+
+```json
+{
+  "sub": "uid:123456789",
+  "uid": "123456789",
+  "tid": 12345678,
+  "jti": "uuid-of-session",
+  "iat": 1714000000,
+  "exp": 1716592000
+}
+```
+
+- **Algorithm:** HS256
+- **Secret:** `JWT_SECRET_KEY` (auto-gen при первом старте, можно задать через ENV)
+- **Expire:** 30 дней
+- **`jti`:** для отзыва сессий — каждый JWT привязан к записи в `auth_sessions`
+
+### 5.3 28 Auth endpoints (полный список)
 
 ```
-GET /weather?lat=55.7558&lon=37.6173&appid={KEY}&units=metric&lang=ru
-→ {temp, feels_like, humidity, wind_speed, description, icon}
+# ───── Регистрация / Логин ─────
+POST   /api/auth/register/email
+POST   /api/auth/login/email
+POST   /api/auth/login/telegram                  # HMAC-валидация Login Widget
+POST   /api/auth/login/telegram-webapp           # initData валидация
+POST   /api/auth/login/vk                        # VK ID OAuth code → token
+
+# ───── QR Cross-Device ─────
+POST   /api/auth/login/qr/init
+GET    /api/auth/login/qr/{qr_token}/status
+POST   /api/auth/login/qr/{qr_token}/confirm
+
+# ───── Текущий пользователь ─────
+GET    /api/auth/me                              # → UserPublic (включая email_verified, referral_code, invited_count, referred_by)
+GET    /api/auth/me/is_admin
+
+# ───── Linking ─────
+POST   /api/auth/link/email
+POST   /api/auth/link/telegram
+POST   /api/auth/link/telegram-webapp
+POST   /api/auth/link/vk
+DELETE /api/auth/link/{provider}                 # email | telegram | vk → 404 если не привязан
+
+# ───── Username & профиль ─────
+GET    /api/auth/check-username/{username}
+PATCH  /api/auth/profile-step
+
+# ───── Password Management (Stage 9) ─────
+POST   /api/auth/password/change                 # auth-required, wrong old → 401, new==old → 400, revoke other sessions, email-notification
+POST   /api/auth/password/forgot                 # privacy-aware (всегда 200), rate-limit 5/hr/IP + 3/hr/email, SHA-256 hashed token
+POST   /api/auth/password/reset                  # token + auto-login + revoke other sessions + email-notification
+
+# ───── Email Verification (Stage 9) ─────
+POST   /api/auth/email/send-verification         # 5/hr/uid
+POST   /api/auth/email/verify                    # token valid, not-reused, email-not-changed
+
+# ───── Sessions / Devices (Stage 9) ─────
+GET    /api/auth/sessions                        # с is_current + device_label (UA-parsed)
+DELETE /api/auth/sessions/{jti}                  # → 404 если нет
+POST   /api/auth/logout                          # отзыв текущей сессии (jti)
+POST   /api/auth/logout-all                      # ?keep_current=true|false
+
+# ───── Конфиг ─────
+GET    /api/auth/config                          # bot_username, VK_APP_ID, public flags
 ```
 
-### 5.3 Telegram Bot API
+### 5.4 Telegram HMAC-валидация
 
 ```python
-# Основные методы
-bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=...)
-bot.get_me()
-bot.get_user_profile_photos(user_id)
+def verify_telegram_login_widget_hash(data, bot_token):
+    secret = sha256(bot_token).digest()
+    check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data.items()) if k != 'hash')
+    expected_hash = hmac.new(secret, check_string.encode(), sha256).hexdigest()
+    return expected_hash == data['hash']
 ```
 
-### 5.4 VK Music API
+### 5.5 Sessions enforcement (КРИТИЧНО)
+
+```python
+# auth_utils.py
+async def get_current_user_required(request: Request):
+    token = extract_bearer(request)
+    payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    jti = payload['jti']
+
+    # Stage 9 fix: проверка отзыва сессии
+    db = request.app.state.db
+    session = await db.auth_sessions.find_one({"jti": jti})
+    if not session or session.get("revoked"):
+        raise HTTPException(401, "Session revoked")
+
+    user = await db.users.find_one({"uid": payload['uid']})
+    return user
+```
+
+### 5.6 Email Service (Stage 9)
+
+```python
+# email_service.py
+async def send_email(to, subject, html_body):
+    if not SMTP_HOST:
+        # DEV-fallback
+        with open('/app/logs/emails.log', 'a') as f:
+            f.write(f"[{datetime.now()}] To: {to}\nSubj: {subject}\n{html_body}\n---\n")
+        return
+    async with aiosmtplib.SMTP(...) as smtp:
+        await smtp.send_message(...)
+```
+
+**Шаблоны:**
+- `template_password_reset(token_url)` — ссылка на `/reset-password?token=...`
+- `template_email_verify(token_url)` — ссылка на `/verify-email?token=...`
+- `template_password_changed_notification(ip, ua)` — уведомление о смене
+
+---
+
+## 6. Публичный профиль `/u/{uid}`
+
+### 6.1 Архитектура
+
+- 9-значный numeric `uid` — единый public ID (легко вводить, не раскрывает `telegram_id`)
+- Доступ БЕЗ авторизации (вне `AuthGate`)
+- Privacy-фильтры применяются на уровне backend (см. `privacy_settings`)
+
+### 6.2 13 endpoints
+
+| Endpoint | Описание |
+|----------|----------|
+| `GET /api/u/{uid}/resolve` | UID → внутренние идентификаторы (`telegram_id`, `id`) |
+| `GET /api/u/{uid}` | `UserProfilePublic` (с privacy-фильтром) |
+| `GET /api/u/{uid}/schedule` | Расписание (для друзей + владельца) |
+| `GET /api/u/{uid}/qr` | QR-данные для добавления в друзья |
+| `GET /api/u/{uid}/share-link` | `{PUBLIC_BASE_URL}/u/{uid}` |
+| `GET /api/u/{uid}/privacy` | Только владелец |
+| `PUT /api/u/{uid}/privacy` | Обновить privacy_settings |
+| `POST /api/u/{uid}/view` | Регистрация просмотра (TTL 7 дней в `profile_views`) |
+| `GET /api/u/{uid}/avatar` | Кастомный аватар + fallback на photo_url |
+| `GET /api/u/{uid}/graffiti` | Граффити-логотип пользователя |
+| `GET /api/u/{uid}/wall-graffiti` | Стена с граффити (privacy-aware) |
+| `GET /api/u/{uid}/friends` | Список друзей (privacy: `show_friends_list`) |
+| `GET /api/u/{uid}/achievements` | Список достижений (privacy: `show_achievements`) |
+
+### 6.3 PublicProfilePage.jsx
+
+- ~480 LOC, состояния: `loading | 404 | hidden | 422 | loaded`
+- Hero: avatar gradient + initials, name, username, group/faculty, level/tier badge, online, friendship badge
+- Stats grid (Друзей / Общих / Достижений) + privacy-индикация
+- XP progress bar, member-since chip, profile_views (для владельца)
+- CTA: "Открыть в Telegram" / "Поделиться" / "Копировать ссылку"
+- Auto-регистрация просмотра + Document.title + meta description (SEO)
+
+---
+
+## 7. API интеграции (внешние)
+
+### 7.1 API РУДН
+
+```
+GET  http://www.rudn.ru/rasp/lessons/view
+POST http://www.rudn.ru/rasp/lessons/view  (Body: facultet/level/kurs/forma/group/week)
+```
+
+### 7.2 OpenWeatherMap
+
+```
+GET https://api.openweathermap.org/data/2.5/weather?lat=55.7558&lon=37.6173&appid={KEY}&units=metric&lang=ru
+```
+
+### 7.3 Telegram Bot API
+
+```python
+bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=...)
+bot.get_me() / get_user_profile_photos(user_id)
+# Через safe_send_telegram (services/delivery.py) — anti-spam + retry + DLQ
+```
+
+### 7.4 VK Music + VK ID OAuth
 
 ```python
 # vkpymusic
 service = MusicService(token)
-service.search(query)          # Поиск
-service.get_audio(user_id)     # Мои аудио
-service.get_popular()          # Популярные
-service.get_playlists(user_id) # Плейлисты
+service.search(query) / get_audio(user_id) / get_popular() / get_playlists(user_id)
+
+# OAuth (Stage 1-3 instrProfileAuth)
+GET /authorize?client_id={VK_APP_ID}&redirect_uri={VK_REDIRECT_URI}&response_type=code&scope=email
+POST /access_token?client_id=...&client_secret={VK_CLIENT_SECRET}&code=...
+GET /method/users.get?access_token=...
 ```
 
-### 5.5 VK OAuth (НОВОЕ)
+### 7.5 SMTP (Stage 9)
 
 ```python
-# OAuth авторизация через VK ID
-VK_APP_ID=...
-VK_CLIENT_SECRET=...
-VK_REDIRECT_URI=.../api/music/vk-callback
+# aiosmtplib
+async with aiosmtplib.SMTP(SMTP_HOST, SMTP_PORT, use_tls=SMTP_USE_TLS) as smtp:
+    await smtp.login(SMTP_USER, SMTP_PASSWORD)
+    await smtp.send_message(message)
 ```
+
+> При отсутствии SMTP_HOST — DEV-режим (логи в `/app/logs/emails.log`).
 
 ---
 
-## 6. Workflow и сценарии
+## 8. Workflow и сценарии
 
-### 6.1 Первый запуск (новый пользователь)
+### 8.1 Первый запуск (новый пользователь, Telegram)
 
 ```
-1. Пользователь → /start в @rudn_mosbot
-2. Bot создает user_settings (без группы)
-3. Показывает кнопку "Открыть расписание"
-4. WebApp → WelcomeScreen → GroupSelector
-5. 4 шага выбора: факультет → уровень/курс → форма → группа
+1. /start в @rudn_mosbot
+2. Bot создает user_settings (без группы) → migrate_users() создаёт user
+3. Кнопка "Открыть расписание" → Telegram WebApp
+4. Auto-login через POST /api/auth/login/telegram-webapp (initData)
+5. WelcomeScreen → GroupSelector (4 шага: факультет → уровень/курс → форма → группа)
 6. POST /api/user-settings → сохранение
-7. Достижение "Первопроходец" (10 очков)
-8. Главный экран с расписанием
+7. Достижение "Первопроходец" + XP grant
+8. Главный экран
 ```
 
-### 6.2 Просмотр расписания
+### 8.2 Email-регистрация (standalone)
 
 ```
-1. GET /api/user-settings/{telegram_id}
-2. POST /api/schedule {group_id, week_number}
-3. Отображение LiveScheduleCarousel + LiveScheduleSection
-4. POST /api/track-action {action: "view_schedule"}
-5. Проверка достижений
+1. /register → RegisterWizard
+2. Выбор провайдера → email
+3. EmailRegisterForm: email + password (двойной ввод) + username
+4. POST /api/auth/register/email → создание users + user_settings + JWT
+5. Step 2: имя/фамилия → PATCH /api/auth/profile-step
+6. Step 3: группа/факультет → PATCH /api/auth/profile-step
+7. Email verification: POST /api/auth/email/send-verification → ссылка на email
+8. Переход на главный экран (AuthGate пропускает, т.к. JWT есть)
 ```
 
-### 6.3 QR-авторизация (Web Sessions)
+### 8.3 Password Reset flow (Stage 9)
 
 ```
-1. Desktop: POST /api/web-sessions → session_token, qr_url
-2. Показ QR-кода
-3. Mobile: сканирование → POST /api/web-sessions/{token}/scanned
-4. Mobile: подтверждение → POST /api/web-sessions/{token}/link
-5. Desktop: polling GET /api/web-sessions/{token}/status
-6. status: "linked" → авторизован
+1. /forgot-password → POST /api/auth/password/forgot {email}
+2. Backend: всегда 200 (privacy-aware), создаёт SHA-256 hashed token (TTL 1 час)
+3. Email с ссылкой /reset-password?token=...
+4. /reset-password → POST /api/auth/password/reset {token, new_password}
+5. Backend: проверка token + bcrypt new_password + auto-login (_issue_token) + revoke других сессий + email-notification
+6. Frontend: setToken(jwt) → /
 ```
 
-### 6.4 Создание комнаты прослушивания
+### 8.4 QR Cross-Device login
+
+```
+Device 1 (desktop, без авторизации):
+1. /login → POST /api/auth/login/qr/init → {qr_token, qr_url}
+2. Показ QR + polling GET /api/auth/login/qr/{qr_token}/status
+
+Device 2 (mobile, авторизован):
+3. Сканирование QR → /auth/qr/confirm?token=...
+4. Подтверждение → POST /api/auth/login/qr/{qr_token}/confirm (с Bearer)
+
+Device 1:
+5. Polling видит "confirmed" → получает JWT → setToken → /
+```
+
+### 8.5 Web Sessions (старые QR для устройств)
+
+```
+1. POST /api/web-sessions → session_token + qr_url
+2. QR + polling GET /api/web-sessions/{token}/status
+3. Mobile: scanned → POST /api/web-sessions/{token}/scanned
+4. Mobile: link → POST /api/web-sessions/{token}/link
+5. status: "linked" → авторизован
+```
+
+### 8.6 Listening Room
 
 ```
 1. POST /api/music/rooms → {id, invite_code}
-2. Приглашение друзей через invite_code
-3. POST /api/music/rooms/join/{code}
-4. POST /api/music/rooms/{id}/sync → синхронизация воспроизведения
-5. WebSocket-like polling для обновлений
+2. Поделиться invite_code → друг POST /api/music/rooms/join/{code}
+3. POST /api/music/rooms/{id}/sync (от owner)
+4. Polling GET /api/music/rooms/{id}/state (для участников) → синхронизация
 ```
 
-### 6.5 Отправка сообщения (НОВОЕ)
+### 8.7 Streak
 
 ```
-1. Открыть ConversationsListModal → список диалогов
-2. POST /api/messages/conversations → создать/найти диалог
-3. POST /api/messages/send → отправить сообщение
-4. Поддержка: текст, музыка, расписание, пересылка
-5. POST /api/messages/{id}/reactions → добавить реакцию
-```
-
-### 6.6 Совместное расписание (НОВОЕ)
-
-```
-1. POST /api/shared-schedule → создать совместное расписание
-2. POST /api/shared-schedule/{id}/add-participant → добавить друга
-3. POST /api/shared-schedule/{id}/share-token → генерация ссылки
-4. GET /api/shared-schedule/token/{token} → расписание по ссылке
-5. SharedScheduleView отображает наложение расписаний
-```
-
-### 6.7 Streak-система (НОВОЕ)
-
-```
-1. POST /api/users/{id}/visit → визит при входе
-2. Автоматический подсчёт серий
-3. Каждые 7 дней → POST /api/users/{id}/streak-claim → награда
-4. StreakRewardModal → анимация награды
+1. Каждый вход → POST /api/users/{telegram_id}/visit
+2. Backend: подсчёт серии (current/max), update last_visit_date
+3. Если streak % 7 == 0 и !claimed_today → frontend показывает StreakRewardModal
+4. POST /api/users/{telegram_id}/streak-claim → bonus XP/items
 ```
 
 ---
 
-## 7. Deployment
+## 9. Deployment
 
-### 7.1 Конфигурация Supervisor
+### 9.1 Supervisor конфигурация
 
 ```ini
 [program:backend]
-command=python -m uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+command=/root/.venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --workers 1 --reload
 directory=/app/backend
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/supervisor/backend.out.log
-stderr_logfile=/var/log/supervisor/backend.err.log
+environment=APP_URL="...",INTEGRATION_PROXY_URL="..."
+autostart=true autorestart=true
 
 [program:frontend]
-command=yarn dev --host 0.0.0.0 --port 3000
+command=yarn start          # → vite --mode test --host 0.0.0.0 --port 3000
+environment=HOST="0.0.0.0",PORT="3000"
 directory=/app/frontend
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/supervisor/frontend.out.log
-stderr_logfile=/var/log/supervisor/frontend.err.log
+autostart=true autorestart=true
+
+[program:mongodb]
+command=/usr/bin/mongod --bind_ip_all
+autostart=true autorestart=true
 ```
 
-### 7.2 Порты и URL
+### 9.2 Порты и URL
 
-- **Backend:** 8001 (internal) → через ingress с `/api/` prefix
-- **Frontend:** 3000 (internal) → root URL
+- **Backend:** 8001 (internal) → ingress: `/api/*` → backend:8001
+- **Frontend:** 3000 (internal) → ingress: остальное → frontend:3000
 - **MongoDB:** 27017 (local)
 
-### 7.3 Команды управления
+### 9.3 Команды управления
 
 ```bash
-# Статус
 sudo supervisorctl status
-
-# Перезапуск
-sudo supervisorctl restart all
-sudo supervisorctl restart backend
-sudo supervisorctl restart frontend
-
-# Логи
-tail -f /var/log/supervisor/backend.*.log
-tail -f /var/log/supervisor/frontend.*.log
-tail -50 /var/log/supervisor/backend.err.log | grep -i error
+sudo supervisorctl restart all|backend|frontend
+tail -f /var/log/supervisor/{backend,frontend}.*.log
+tail -50 /var/log/supervisor/backend.err.log
+tail -f /app/logs/emails.log         # DEV SMTP
 ```
+
+### 9.4 Production
+
+См. [`DEPLOYMENT_GUIDE.md`](./DEPLOYMENT_GUIDE.md) и [`UPDATE_SERVER_STEPS.md`](./UPDATE_SERVER_STEPS.md).
 
 ---
 
-## 8. VK Music интеграция
+## 10. VK Music интеграция
 
-### 8.1 Компоненты
+### 10.1 Компоненты
 
-- `vk_auth_service.py` — авторизация VK (логин/пароль + OAuth)
-- `music_service.py` — API для работы с музыкой
-- `cover_service.py` — получение обложек треков
+- `vk_auth_service.py` — VK login/password + OAuth
+- `music_service.py` — VK Music API (поиск, плейлисты, стрим)
+- `cover_service.py` — обложки треков (iTunes / Last.fm fallback)
 
-### 8.2 Авторизация
-
-```python
-# Логин/пароль
-POST /api/music/auth/{telegram_id}
-Body: {"login": "...", "password": "..."}
-Response: {"success": true, "audio_count": 150}
-
-# VK OAuth (НОВОЕ)
-GET /api/music/vk-callback  # OAuth redirect
-GET /api/music/auth/config   # Конфигурация OAuth
-
-# Токен сохраняется в user_vk_tokens
-```
-
-### 8.3 API Endpoints (35)
+### 10.2 API endpoints (35) — выборка
 
 ```
-# Поиск и стриминг
+# Поиск / стрим
 GET    /api/music/search?q={query}
 GET    /api/music/stream/{track_id}
 GET    /api/music/redirect/{track_id}
-GET    /api/music/similar/{track_id}          # НОВОЕ
+GET    /api/music/similar/{track_id}
 
-# Библиотека
-GET    /api/music/my
-GET    /api/music/my-vk/{telegram_id}
+# Библиотека / плейлисты
+GET    /api/music/my, /api/music/my-vk/{telegram_id}
 GET    /api/music/popular
+GET    /api/music/playlists, /playlist/{owner_id}/{playlist_id}
 
-# Плейлисты
-GET    /api/music/playlists
-GET    /api/music/playlists-vk/{telegram_id}
-GET    /api/music/playlist/{owner_id}/{playlist_id}
-GET    /api/music/playlist-vk/{telegram_id}/{owner_id}/{playlist_id}
-
-# Исполнители
+# Артисты
 GET    /api/music/artist/{artist_name}
 
-# Избранное
-GET    /api/music/favorites/{telegram_id}
-POST   /api/music/favorites/{telegram_id}
-DELETE /api/music/favorites/{telegram_id}/{track_id}
-
-# История (НОВОЕ)
-GET    /api/music/history/{telegram_id}
-POST   /api/music/history/{telegram_id}
+# Избранное / История
+GET/POST/DELETE /api/music/favorites/{telegram_id}/...
+GET/POST /api/music/history/{telegram_id}
 
 # Авторизация
-POST   /api/music/auth/{telegram_id}
+POST   /api/music/auth/{telegram_id}                   # логин/пароль
 GET    /api/music/auth/status/{telegram_id}
-GET    /api/music/auth/config                  # НОВОЕ
-GET    /api/music/vk-callback                  # НОВОЕ
+GET    /api/music/auth/config                          # OAuth конфиг
+GET    /api/music/vk-callback                          # OAuth redirect
 DELETE /api/music/auth/{telegram_id}
 
 # Listening Rooms
-POST   /api/music/rooms
-GET    /api/music/rooms/{room_id}
-GET    /api/music/rooms/preview/{invite_code}  # НОВОЕ
-POST   /api/music/rooms/join/{invite_code}
-POST   /api/music/rooms/{room_id}/leave
-DELETE /api/music/rooms/{room_id}
-PUT    /api/music/rooms/{room_id}/settings
-GET    /api/music/rooms/user/{telegram_id}
-GET    /api/music/rooms/{room_id}/state
-POST   /api/music/rooms/{room_id}/sync
-GET    /api/music/rooms/{room_id}/queue        # НОВОЕ
-POST   /api/music/rooms/{room_id}/queue/add    # НОВОЕ
-GET    /api/music/rooms/{room_id}/history      # НОВОЕ
+POST   /api/music/rooms, /rooms/{room_id}/{leave|state|sync}
+GET    /api/music/rooms/preview/{invite_code}
+GET    /api/music/rooms/{room_id}/{queue|history}
+POST   /api/music/rooms/{room_id}/queue/add
 ```
 
 ---
 
-## 9. Система друзей
+## 11. Система друзей
 
-### 9.1 Функциональность
+### 11.1 Функциональность
 
-- Отправка/принятие/отклонение запросов
-- Удаление из друзей
-- Блокировка пользователей
-- Поиск друзей
-- Взаимные друзья
-- Избранные друзья
-- QR-коды для добавления
-- Просмотр расписания друзей (с учётом приватности)
-- Real-time события друзей (НОВОЕ)
+- Запросы / принятие / отклонение / отмена / удаление
+- Блокировки + просмотр заблокированных
+- Поиск (по username/имени)
+- Mutual friends, favorites
+- QR-коды для добавления (через `/u/{uid}/qr`)
+- Просмотр расписания друзей (с privacy)
+- Real-time события (polling через `useFriendEvents` hook + `/api/friends/events/{telegram_id}`)
 
-### 9.2 API Endpoints (15)
+### 11.2 15 endpoints
 
 ```
-POST   /api/friends/request/{target_id}
+POST   /api/friends/request/{target_telegram_id}
 POST   /api/friends/accept/{request_id}
 POST   /api/friends/reject/{request_id}
 POST   /api/friends/cancel/{request_id}
-DELETE /api/friends/{friend_id}
-POST   /api/friends/block/{target_id}
-DELETE /api/friends/block/{target_id}
-POST   /api/friends/{friend_id}/favorite
+DELETE /api/friends/{friend_telegram_id}
+POST   /api/friends/block/{target_telegram_id}
+DELETE /api/friends/block/{target_telegram_id}
+POST   /api/friends/{friend_telegram_id}/favorite
 GET    /api/friends/search?q={query}
-GET    /api/friends/{telegram_id}
-GET    /api/friends/{telegram_id}/requests
-GET    /api/friends/mutual/{id1}/{id2}
+GET    /api/friends/{telegram_id}                       # FriendsListResponse
+GET    /api/friends/{telegram_id}/requests              # FriendRequestsResponse
+GET    /api/friends/mutual/{telegram_id}/{other_telegram_id}
 GET    /api/friends/{telegram_id}/blocked
-GET    /api/friends/events/{telegram_id}       # НОВОЕ
-POST   /api/friends/process-invite
+GET    /api/friends/events/{telegram_id}
+POST   /api/friends/process-invite                      # из QR / share-link
 ```
 
 ---
 
-## 10. In-App уведомления
+## 12. In-App уведомления
 
-### 10.1 Типы уведомлений
+### 12.1 Типы
 
-- `friend_request` — запрос в друзья
-- `friend_accepted` — запрос принят
-- `room_invite` — приглашение в комнату
-- `task_assigned` — назначена задача
-- `task_completed` — задача выполнена
-- `achievement` — новое достижение
-- `system` — системные
-- `message` — новое сообщение (НОВОЕ)
+- `friend_request` / `friend_accepted`
+- `room_invite` / `task_assigned` / `task_completed`
+- `achievement` / `level_up` / `streak_reward`
+- `message` (новое сообщение в чате)
+- `system` (объявления, рассылки из админки)
+- `journal_invite` / `shared_schedule_invite`
 
-### 10.2 API Endpoints (11)
+### 12.2 11 endpoints
 
 ```
 GET    /api/notifications/{telegram_id}
@@ -834,350 +1081,343 @@ PUT    /api/notifications/{notification_id}/action
 GET    /api/notifications/{telegram_id}/settings
 PUT    /api/notifications/{telegram_id}/settings
 GET    /api/notifications/stats
-POST   /api/notifications/test                  # НОВОЕ
-POST   /api/notifications/test-inapp            # НОВОЕ
+POST   /api/notifications/test
+POST   /api/notifications/test-inapp
 ```
 
 ---
 
-## 11. Web Sessions (QR-авторизация)
+## 13. Web Sessions (QR-авторизация устройств)
 
-### 11.1 Описание
+### 13.1 Статусы
 
-Система позволяет авторизоваться на другом устройстве (например, десктоп) через сканирование QR-кода с мобильного телефона.
+`pending` → `scanned` → `linked` (или `expired` / `revoked`)
 
-### 11.2 Статусы сессии
-
-- `pending` — ожидает сканирования
-- `scanned` — QR отсканирован
-- `linked` — сессия привязана к пользователю
-- `expired` — сессия истекла
-- `revoked` — сессия отозвана
-
-### 11.3 API Endpoints (10)
+### 13.2 9 endpoints
 
 ```
-POST   /api/web-sessions                       # Создать сессию
-GET    /api/web-sessions/{token}/status        # Статус сессии
-POST   /api/web-sessions/{token}/link          # Привязать устройство
-POST   /api/web-sessions/{token}/scanned       # Отметить как отсканированную
-POST   /api/web-sessions/{token}/rejected      # Отклонить
-GET    /api/web-sessions/user/{id}/devices     # Список устройств
+POST   /api/web-sessions
+GET    /api/web-sessions/{token}/status
+POST   /api/web-sessions/{token}/link, /scanned, /rejected
 POST   /api/web-sessions/{token}/notify-revoked
-POST   /api/web-sessions/{token}/heartbeat     # Keep-alive
-DELETE /api/web-sessions/{token}               # Завершить сессию
-DELETE /api/web-sessions/user/{id}/all         # Завершить все сессии
+POST   /api/web-sessions/{token}/heartbeat
+DELETE /api/web-sessions/{token}
+GET    /api/web-sessions/user/{id}/devices
+DELETE /api/web-sessions/user/{id}/all
 ```
 
-### 11.4 Frontend компонент
+### 13.3 Frontend
 
-- `DevicesModal.jsx` — управление устройствами
+- `DevicesModal.jsx` — для legacy web_sessions (telegram_id-based)
+- `SessionsModal.jsx` — 🆕 для Stage 9 `auth_sessions` (jti-based)
 
 ---
 
-## 12. Privacy Settings
+## 14. Privacy Settings
 
-### 12.1 Описание
-
-Настройки приватности профиля пользователя.
-
-### 12.2 Поля
+### 14.1 Поля
 
 ```python
 {
-    "show_online_status": bool,    # Показывать онлайн статус
-    "show_in_search": bool,        # Показывать в поиске
-    "show_friends_list": bool,     # Показывать список друзей
-    "show_achievements": bool,     # Показывать достижения
-    "show_schedule": bool          # Показывать расписание
+  "show_online_status": bool,
+  "show_in_search": bool,
+  "show_friends_list": bool,
+  "show_achievements": bool,
+  "show_schedule": bool
 }
 ```
 
-### 12.3 API Endpoints (2)
+### 14.2 Endpoints
 
-```
-GET  /api/profile/{telegram_id}/privacy
-PUT  /api/profile/{telegram_id}/privacy
-```
+- Legacy (`/profile/{telegram_id}/privacy`): GET / PUT
+- Public profile (`/u/{uid}/privacy`): GET / PUT (только владелец)
 
-### 12.4 Frontend компонент
+### 14.3 Frontend
 
 - `PrivacySettingsModal.jsx`
 
 ---
 
-## 13. Система сообщений (НОВОЕ)
+## 15. Система сообщений
 
-### 13.1 Описание
+### 15.1 Типы
 
-Полноценная система обмена сообщениями между друзьями с поддержкой мультимедиа, реакций и пересылки.
+`text` | `music` | `schedule` | `forward`
 
-### 13.2 Типы сообщений
-
-- `text` — текстовое сообщение
-- `music` — трек VK Music
-- `schedule` — расписание
-- `forward` — пересланное сообщение
-
-### 13.3 API Endpoints (18)
+### 15.2 18 endpoints
 
 ```
 # Диалоги
-POST   /api/messages/conversations             # Создать/найти диалог
-GET    /api/messages/conversations/{telegram_id}  # Список диалогов
+POST   /api/messages/conversations
+GET    /api/messages/conversations/{telegram_id}
 
 # Сообщения
-POST   /api/messages/send                      # Отправить текст
-POST   /api/messages/send-music                # Отправить трек
-POST   /api/messages/send-schedule             # Отправить расписание
-POST   /api/messages/forward                   # Переслать
-GET    /api/messages/{conversation_id}/messages # Получить сообщения
-DELETE /api/messages/{message_id}              # Удалить
+POST   /api/messages/send / send-music / send-schedule / forward
+GET    /api/messages/{conversation_id}/messages
+DELETE /api/messages/{message_id}
 
 # Редактирование
-PUT    /api/messages/{message_id}/edit         # Редактировать
-PUT    /api/messages/{message_id}/pin          # Закрепить
-PUT    /api/messages/{conversation_id}/read    # Отметить прочитанными
+PUT    /api/messages/{message_id}/edit
+PUT    /api/messages/{message_id}/pin
+PUT    /api/messages/{conversation_id}/read
 
-# Реакции
-POST   /api/messages/{message_id}/reactions    # Реакция
+# Реакции и типинг
+POST   /api/messages/{message_id}/reactions
+POST/GET /api/messages/{conversation_id}/typing
 
-# Типинг
-POST   /api/messages/{conversation_id}/typing  # Начал печатать
-GET    /api/messages/{conversation_id}/typing   # Проверить типинг
-
-# Поиск
-GET    /api/messages/{conversation_id}/search  # Поиск по сообщениям
-GET    /api/messages/{conversation_id}/pinned  # Закреплённые
+# Поиск и пины
+GET    /api/messages/{conversation_id}/search
+GET    /api/messages/{conversation_id}/pinned
 
 # Непрочитанные
-GET    /api/messages/unread/{telegram_id}      # Счётчик непрочитанных
+GET    /api/messages/unread/{telegram_id}
 
-# Создание задач
-POST   /api/messages/create-task               # Создать задачу из сообщения
+# Создание задач из сообщений
+POST   /api/messages/create-task
 ```
 
-### 13.4 Frontend компоненты
+### 15.3 Frontend
 
-- `ChatModal.jsx` — основной чат (1,858 LOC)
-- `ConversationsListModal.jsx` — список диалогов (334 LOC)
-- `SendTrackToFriendModal.jsx` — отправка трека (Music)
-- `messagesAPI.js` — API клиент
+- `ChatModal.jsx` (1,800+ LOC)
+- `ConversationsListModal.jsx`
+- `SendTrackToFriendModal.jsx` (в Music)
+- `messagesAPI.js`
 
 ---
 
-## 14. Совместное расписание (НОВОЕ)
+## 16. Совместное расписание
 
-### 14.1 Описание
-
-Система для совместного просмотра расписаний с друзьями. Позволяет наложить расписания нескольких студентов и найти общие окна.
-
-### 14.2 API Endpoints (9)
+### 16.1 8 endpoints
 
 ```
-POST   /api/shared-schedule                    # Создать
-GET    /api/shared-schedule/{telegram_id}      # Получить своё
-POST   /api/shared-schedule/{id}/add-participant    # Добавить участника
-POST   /api/shared-schedule/{id}/add-my-schedule    # Добавить своё расписание
-DELETE /api/shared-schedule/{id}/remove-participant/{pid}  # Удалить участника
-DELETE /api/shared-schedule/{id}               # Удалить
-POST   /api/shared-schedule/{id}/share-token   # Генерация токена
-GET    /api/shared-schedule/token/{token}      # По токену
-GET    /api/shared-schedule/{id}/invite-link   # Ссылка приглашения
+POST   /api/shared-schedule
+GET    /api/shared-schedule/{telegram_id}
+POST   /api/shared-schedule/{id}/add-participant, /add-my-schedule
+DELETE /api/shared-schedule/{id}/remove-participant/{pid}
+DELETE /api/shared-schedule/{id}
+POST   /api/shared-schedule/{id}/share-token
+GET    /api/shared-schedule/token/{token}
 ```
 
-### 14.3 Frontend компоненты
+### 16.2 Frontend
 
-- `ShareScheduleModal.jsx` — модал для шаринга (684 LOC)
-- `SharedScheduleView.jsx` — просмотр совместного расписания (2,075 LOC)
+- `ShareScheduleModal.jsx` (~700 LOC)
+- `SharedScheduleView.jsx` (2,000+ LOC) — наложение расписаний с цветовой кодировкой
 
 ---
 
-## 15. Streak-система (НОВОЕ)
+## 17. Streak-система
 
-### 15.1 Описание
-
-Система ежедневных серий посещений. При каждом входе в приложение фиксируется визит. При непрерывной серии в 7 дней доступна награда.
-
-### 15.2 API Endpoints
+### 17.1 Endpoints
 
 ```
-POST /api/users/{telegram_id}/visit         # Зафиксировать визит
-POST /api/users/{telegram_id}/streak-claim  # Забрать награду за 7-дневный streak
+POST /api/users/{telegram_id}/visit         # фиксирует визит
+POST /api/users/{telegram_id}/streak-claim  # награда за 7-дневный streak
 ```
 
-### 15.3 UserStats поля
+### 17.2 UserStats поля
 
 ```python
 {
-    "visit_streak_current": int,    # Текущая серия
-    "visit_streak_max": int,        # Максимальная серия
-    "streak_claimed_today": bool,   # Награда получена сегодня
-    "last_visit_date": datetime     # Дата последнего визита
+  "visit_streak_current": int,
+  "visit_streak_max": int,
+  "streak_claimed_today": bool,
+  "last_visit_date": datetime
 }
 ```
 
-### 15.4 Frontend компонент
+### 17.3 Frontend
 
-- `StreakRewardModal.jsx` — анимация и получение награды (845 LOC)
+- `StreakRewardModal.jsx` (~850 LOC) — анимация + получение награды
 
 ---
 
-## 16. Расширенная админ-панель (НОВОЕ)
+## 18. Расширенная админ-панель
 
-### 16.1 Описание
-
-Админ-панель значительно расширена: мониторинг сервера, управление реферальными ссылками, статистика каналов, модальные изображения и рассылка из Telegram.
-
-### 16.2 API Endpoints (31)
+### 18.1 33 endpoints
 
 ```
 # Статистика
-GET  /api/admin/stats                      # Общая статистика
-GET  /api/admin/users                      # Список пользователей
-GET  /api/admin/users-activity             # Активность пользователей
-GET  /api/admin/hourly-activity            # Почасовая активность
-GET  /api/admin/weekly-activity            # Еженедельная активность
-GET  /api/admin/feature-usage              # Использование функций
-GET  /api/admin/top-users                  # Топ пользователей
-GET  /api/admin/faculty-stats              # Статистика факультетов
-GET  /api/admin/course-stats               # Статистика курсов
+GET  /api/admin/stats, /users, /users-activity, /hourly-activity, /weekly-activity,
+     /feature-usage, /top-users, /faculty-stats, /course-stats
 
-# Мониторинг (НОВОЕ)
-GET  /api/admin/online-users               # Онлайн пользователи
-POST /api/admin/track-activity             # Heartbeat
-GET  /api/admin/server-stats               # Метрики сервера
-GET  /api/admin/server-stats-history       # История метрик
-GET  /api/admin/online-stats-history       # История онлайн
-GET  /api/admin/channel-stats              # Статистика канала
-GET  /api/admin/channel-stats-history      # История канала
+# Мониторинг
+GET  /api/admin/online-users, /server-stats, /server-stats-history,
+     /online-stats-history, /channel-stats, /channel-stats-history
+POST /api/admin/track-activity
 
 # Журналы
-GET  /api/admin/journals                   # Все журналы
+GET  /api/admin/journals
 
-# Реферальные ссылки (НОВОЕ)
-GET  /api/admin/referral-stats             # Статистика рефералов
-POST /api/admin/referral-links             # Создать ссылку
-GET  /api/admin/referral-links             # Список ссылок
-GET  /api/admin/referral-links/{id}        # Детали ссылки
-PUT  /api/admin/referral-links/{id}        # Обновить
-DELETE /api/admin/referral-links/{id}      # Удалить
-GET  /api/admin/referral-links/analytics   # Аналитика
-POST /api/admin/referral-track             # Трекинг
+# Реферальные ссылки
+GET/POST/PUT/DELETE /api/admin/referral-links[/{id}]
+GET  /api/admin/referral-stats, /referral-links/analytics
+POST /api/admin/referral-track
 
-# Уведомления (НОВОЕ)
-POST /api/admin/send-notification          # Отправить уведомление
-POST /api/admin/notifications/parse-telegram  # Парсинг поста из Telegram
-POST /api/admin/notifications/send-from-post  # Рассылка из поста
+# Уведомления / рассылки
+POST /api/admin/send-notification
+POST /api/admin/notifications/parse-telegram         # парсинг поста по ссылке
+POST /api/admin/notifications/send-from-post         # массовая рассылка из распарсенного поста
 
-# Изображения (НОВОЕ)
-POST   /api/admin/modal-images             # Загрузить изображение
-GET    /api/admin/modal-images             # Список изображений
-DELETE /api/admin/modal-images/{id}        # Удалить
+# Модальные изображения
+POST/GET/DELETE /api/admin/modal-images[/{id}]
+
+# Delivery (services/delivery.py)
+GET  /api/admin/delivery/stats
 ```
 
-### 16.3 Frontend компонент
+### 18.2 Frontend
 
-- `AdminPanel.jsx` — расширенная админка (4,382 LOC)
-
----
-
-## 17. MongoDB коллекции (46)
-
-### Пользователи (6)
-| Коллекция | Описание |
-|-----------|----------|
-| `user_settings` | Настройки и группа |
-| `user_stats` | Статистика + streaks |
-| `user_achievements` | Полученные достижения |
-| `user_vk_tokens` | VK токены для музыки |
-| `user_blocks` | Заблокированные |
-| `web_sessions` | Веб-сессии (QR авторизация) |
-
-### Задачи (4)
-| Коллекция | Описание |
-|-----------|----------|
-| `tasks` | Личные задачи |
-| `group_tasks` | Групповые задачи |
-| `group_task_comments` | Комментарии |
-| `group_task_invites` | Приглашения |
-
-### Комнаты (3)
-| Коллекция | Описание |
-|-----------|----------|
-| `rooms` | Комнаты (участники встроены) |
-| `room_activities` | История активности |
-| `listening_rooms` | Комнаты прослушивания музыки |
-
-### Журнал посещений (8)
-| Коллекция | Описание |
-|-----------|----------|
-| `journals` / `attendance_journals` | Журналы |
-| `journal_students` | Студенты |
-| `journal_subjects` | Предметы |
-| `journal_sessions` | Занятия |
-| `attendance_records` | Записи посещаемости |
-| `journal_pending_members` | Ожидающие |
-| `journal_applications` | Заявки |
-
-### Друзья (2)
-| Коллекция | Описание |
-|-----------|----------|
-| `friends` | Связи друзей |
-| `friend_requests` | Запросы |
-
-### Сообщения (2) — НОВОЕ
-| Коллекция | Описание |
-|-----------|----------|
-| `conversations` | Чаты/диалоги |
-| `messages` | Сообщения |
-
-### Уведомления (4)
-| Коллекция | Описание |
-|-----------|----------|
-| `scheduled_notifications` | V2 запланированные |
-| `notification_history` | История |
-| `sent_notifications` | Отправленные |
-| `in_app_notifications` | Внутренние |
-
-### Реферальная система (5)
-| Коллекция | Описание |
-|-----------|----------|
-| `referral_connections` | Связи |
-| `referral_events` | События |
-| `admin_referral_links` | Админ-ссылки (НОВОЕ) |
-| `referral_link_events` | События ссылок (НОВОЕ) |
-| `referral_rewards` | Награды (НОВОЕ) |
-
-### Совместное расписание (2) — НОВОЕ
-| Коллекция | Описание |
-|-----------|----------|
-| `shared_schedules` | Совместные расписания |
-| `schedule_share_tokens` | Токены для шаринга |
-
-### Кэш и медиа (5)
-| Коллекция | Описание |
-|-----------|----------|
-| `schedule_cache` | Кэш расписаний |
-| `cover_cache` | Кэш обложек |
-| `music_favorites` | Избранные треки |
-| `music_history` | История прослушиваний (НОВОЕ) |
-| `modal_images` | Изображения модалов (НОВОЕ) |
-
-### Мониторинг и аналитика (5)
-| Коллекция | Описание |
-|-----------|----------|
-| `status_checks` | Проверки статуса |
-| `lk_connections` | Подключения ЛК |
-| `channel_stats_history` | История статистики канала (НОВОЕ) |
-| `online_stats_history` | История онлайн-статистики (НОВОЕ) |
-| `server_metrics_history` | История метрик сервера (НОВОЕ) |
+- `AdminPanel.jsx` (4,400+ LOC)
 
 ---
 
-## 18. Ключевые зависимости
+## 19. 3D-логотип (singleton)
 
-### Backend (requirements.txt)
+### 19.1 Архитектура (Stage 10)
+
+**Проблема:** При переходах между `/login` ↔ `/register` ↔ `/forgot-password` 3D-логотип перемонтировался → 500-3000ms лаг.
+
+**Решение:** Singleton через React Portal — один Canvas на body, плавно перелетает.
+
+```
+Logo3DProvider (контекст: Map<anchorId, anchorRef>)
+  ↓
+Logo3DHost (Portal на document.body)
+  - Один <Canvas> с <Logo3D />
+  - position: fixed; transition: 0.3s ease
+  - useEffect зависит от activeAnchorId+anchorRef → пересчитывает rect
+  ↓
+Logo3DAnchor (placeholder в каждой странице)
+  - <div ref={anchorRef} style={{ width, height }} />
+  - useEffect: ctxRef.current.registerAnchor(anchorId, ref)
+```
+
+### 19.2 Bug fixes (2026-04-24)
+
+- Дефолтный `lightPosition = [-0.5, 2, 4]` создавал новый массив на каждом рендере → `propsObject` useMemo инвалидировался → бесконечный `updateAnchorProps` цикл. **Fix:** вынесен в константу.
+- `useEffect` в `Logo3DAnchor` зависел от целого `ctx`-объекта (пересоздаётся при каждом setAnchors). **Fix:** `ctxRef`.
+- `setRect` в RAF-цикле создавал новый объект каждый кадр без сравнения. **Fix:** epsilon-сравнение (0.5px).
+- `useEffect` `Logo3DHost` зависел от `activeAnchor` целиком. **Fix:** `anchorId`+`anchorRef`.
+
+### 19.3 Файлы
+
+```
+/components/
+├── Logo3D.jsx               # 3D-меш (three.js + drei)
+├── Logo3DAnchor.jsx         # placeholder в каждой странице
+└── Logo3DHost.jsx           # Portal + один Canvas
+/contexts/Logo3DContext.jsx
+/utils/logoPreload.js        # prefetch SVG
+```
+
+---
+
+## 20. MongoDB коллекции (57)
+
+### 20.1 Сводка
+
+```
+db.users                      # 🔐 Identity (Stage 9)
+db.user_settings              # legacy primary (telegram_id)
+db.auth_sessions              # 🆕 JWT jti + TTL
+db.auth_tokens                # 🆕 SHA-256 (password_reset, email_verify) + TTL
+db.auth_events                # 🆕 audit-log
+db.auth_qr_sessions           # QR cross-device
+db.qr_login_sessions          # ↑ alias (legacy)
+db.web_sessions               # legacy QR авторизация устройств
+db.profile_views              # TTL 7 дней (для дедупликации)
+
+db.user_stats                 # streak + active_minutes
+db.user_achievements
+db.user_vk_tokens             # VK для музыки
+db.user_blocks
+db.blocked_users              # ↑ alias
+db.xp_events                  # 🆕 события начисления XP
+
+db.tasks                      # личные задачи
+db.group_tasks
+db.group_task_comments
+db.group_task_invites
+
+db.rooms                      # участники embedded
+db.room_activities
+db.listening_rooms            # VK Music совместное прослушивание
+
+db.journals
+db.attendance_journals        # ↑ alias
+db.journal_students
+db.journal_subjects
+db.journal_sessions
+db.attendance_records
+db.journal_pending_members
+db.journal_applications
+
+db.friends
+db.friendships                # 🆕 нормализованная схема
+db.friend_requests
+
+db.conversations
+db.messages
+
+db.scheduled_notifications    # V2
+db.notification_history
+db.sent_notifications
+db.in_app_notifications
+
+db.referral_connections
+db.referral_events
+db.admin_referral_links
+db.referral_link_events
+db.referral_rewards
+
+db.shared_schedules
+db.schedule_share_tokens
+
+db.schedule_cache
+db.cover_cache
+db.music_favorites
+db.music_history
+db.modal_images               # для админских модалов
+
+db.status_checks
+db.lk_connections
+db.channel_stats_history
+db.online_stats_history
+db.server_metrics_history
+
+db.command                    # служебные команды
+db.delivery_attempts          # 🆕 retry/DLQ Telegram-нотификаций
+```
+
+### 20.2 TTL-индексы
+
+| Коллекция | Поле | TTL |
+|-----------|------|-----|
+| `auth_sessions` | `expires_at` | 30 дней (по JWT) |
+| `auth_tokens` | `expires_at` | 1 час (reset) / 24 часа (verify) |
+| `auth_qr_sessions` | `expires_at` | 5 минут |
+| `qr_login_sessions` | `expires_at` | 5 минут |
+| `profile_views` | `created_at` | 7 дней |
+| `web_sessions` | `expires_at` | переменное |
+
+### 20.3 Unique индексы (Stage 9)
+
+```javascript
+db.users.createIndex({"username": 1}, {unique: true, partialFilterExpression: {username: {$exists: true}}})
+db.users.createIndex({"email": 1}, {unique: true, partialFilterExpression: {email: {$exists: true}}})
+db.users.createIndex({"uid": 1}, {unique: true})
+db.user_settings.createIndex({"telegram_id": 1}, {unique: true})
+db.user_settings.createIndex({"referral_code": 1}, {unique: true, sparse: true})
+db.auth_sessions.createIndex({"jti": 1}, {unique: true})
+```
+
+---
+
+## 21. Ключевые зависимости
+
+### Backend (`requirements.txt`)
+
 ```
 # Core
 fastapi==0.110.1
@@ -1186,16 +1426,25 @@ pymongo==4.5.0
 motor==3.3.1
 pydantic>=2.6.4
 python-multipart>=0.0.9
+python-dotenv>=1.0.1
 
 # HTTP
 requests>=2.31.0
 aiohttp>=3.9.0
 httpx>=0.24.0
 aiofiles
+multidict>=6.0.0
+attrs>=25.4.0
+aiohappyeyeballs>=2.5.0
+aiosignal>=1.4.0
+frozenlist>=1.1.1
+propcache>=0.2.0
+yarl>=1.17.0
 
 # Parsing
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
+soupsieve>=2.0.0
 
 # Telegram
 python-telegram-bot>=20.7
@@ -1212,11 +1461,20 @@ yt-dlp
 Pillow>=10.0.0
 matplotlib>=3.7.0
 
-# Security
+# Security & Auth (Stage 9)
 cryptography>=42.0.8
 pyjwt>=2.10.1
 passlib>=1.7.4
+bcrypt>=4.0.1
 python-jose>=3.3.0
+email-validator>=2.2.0
+aiosmtplib>=3.0.0          # 🆕 SMTP для password-reset / email-verify
+
+# OAuth
+requests-oauthlib>=2.0.0
+
+# Cloud (опц.)
+boto3>=1.34.129
 
 # Data
 pandas>=2.2.0
@@ -1224,13 +1482,17 @@ numpy>=1.26.0
 
 # System
 psutil
-python-dotenv>=1.0.1
-pytz
-tzdata>=2024.2
-tzlocal>=5.0.0
+pytz, tzdata>=2024.2, tzlocal>=5.0.0
+
+# Dev
+pytest>=8.0.0
+black>=24.1.1, isort>=5.13.2, flake8>=7.0.0, mypy>=1.8.0
+playwright, pyee, greenlet
+typer>=0.9.0, jq>=1.6.0
 ```
 
-### Frontend (package.json)
+### Frontend (`package.json`)
+
 ```json
 {
   "dependencies": {
@@ -1243,11 +1505,18 @@ tzlocal>=5.0.0
     "react-i18next": "^16.2.0",
     "i18next-browser-languagedetector": "^8.2.0",
     "@twa-dev/sdk": "^8.0.2",
-    "lucide-react": "^0.546.0",
+    "lucide-react": "^1.7.0",
     "recharts": "^3.4.1",
     "canvas-confetti": "^1.9.4",
     "qrcode.react": "^4.2.0",
-    "html-to-image": "^1.11.13"
+    "html-to-image": "^1.11.13",
+    "jwt-decode": "^4.0.0",
+    "three": "^0.183.2",
+    "@react-three/fiber": "^9.5.0",
+    "@react-three/drei": "^10.7.7",
+    "3dsvg": "^0.2.1",
+    "serve": "^14.2.5",
+    "signal-exit": "^4.1.0"
   },
   "devDependencies": {
     "vite": "^7.2.2",
@@ -1255,14 +1524,64 @@ tzlocal>=5.0.0
     "tailwindcss": "^3.4.17",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
-    "eslint": "9.23.0"
-  }
+    "eslint": "9.23.0",
+    "@eslint/js": "9.23.0",
+    "eslint-plugin-import": "2.31.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.4",
+    "globals": "15.15.0"
+  },
+  "packageManager": "yarn@1.22.22"
 }
 ```
 
+> **Важно для агента:** при `yarn install` падает с ошибкой engines (`camera-controls@3.1.2 requires node ≥22`). В контейнере Node 20 → используй `yarn install --ignore-engines`.
+
 ---
 
-**Конец подробной технической документации**
+## 22. Известные нюансы / гайды агенту
 
-**Последнее обновление:** 2025-07-17  
-**Метод обновления:** Автоматический аудит кода (grep, wc, find)
+1. **Не использовать `npm`** — yarn-only, есть `yarn.lock`.
+2. **Все backend routes** должны быть префиксированы `/api/` (Kubernetes ingress).
+3. **MongoDB ObjectID не сериализуется в JSON** — используй UUID, для identity — 9-значный numeric `uid`.
+4. **JWT в localStorage** через `authStorage.js`. Axios interceptor (см. `AuthContext.jsx`) автоматически добавляет `Authorization: Bearer` и при 401 → logout.
+5. **`isSameUser(a, b)` из `utils/userIdentity.js`** — единственно правильный способ сравнения юзеров (поддерживает и `uid`, и `tid`). Никогда не используй `===`.
+6. **`safe_send_telegram` из `services/delivery.py`** — единственная точка отправки Telegram-нотификаций (anti-spam + retry + DLQ).
+7. **При первом старте** выполняется `migrate_user_settings_to_users()` — миграция старых записей.
+8. **JWT_SECRET_KEY** — auto-gen при первом старте, можно задать вручную через ENV.
+9. **SMTP не настроен → DEV-режим** (логи в `/app/logs/emails.log`). Для production нужны SMTP credentials.
+10. **Frontend Hot Reload** — Vite автоматически перезагружает при изменении файлов в `src/`.
+11. **3D-логотип** — singleton через Portal. НИКОГДА не оборачивай `<Canvas>` напрямую в pages, используй `<Logo3DAnchor anchorId="login" />`.
+
+---
+
+## 23. Текущее состояние / Roadmap
+
+### ✅ Выполнено (актуально на 2026-05-06)
+
+- **Stage 1-3** мульти-авторизации (Email + Telegram + VK + QR)
+- **Stage 4** публичного профиля (`/u/{uid}/*` 13 endpoints + PublicProfilePage)
+- **Stage 9** Auth/Profile hardening:
+  - Password Management (forgot/reset/change + email-notifications)
+  - Email Verification (SHA-256 hashed tokens + rate-limit)
+  - Sessions/Devices с JWT `jti` + revoke
+  - Lowercase username, unique индексы, rate-limit hardening
+  - Session-revocation enforcement в `get_current_user_required`
+  - Referral integration во всех register/login endpoints
+- **Stage 10** UID singleton + 3D-логотип (Portal-based, 0 ошибок)
+
+### 🟡 Pending
+
+- **UID Phase P3** — `resolve_user(db, identifier)` helper, 11 новых `/api/u/{uid}/*` (settings, tasks, notifications), JWT с `uid`+`tid`
+- **UID Phase P4** — `backfill_uid_to_collections.py` для 38 коллекций, `uid` в 93 моделях, индексы по `uid`
+- **SMTP credentials** (P0) — нужны от пользователя для production
+- **RegisterWizard UX polish** — per-step validation, лучше feedback
+- **Frontend E2E testing** — через testing agent
+- **Auth_routes split** (P2) — `routes/{email_auth,oauth,sessions,password}.py`
+
+---
+
+**Конец полной технической документации.**
+
+**Метод обновления:** real-time аудит (grep, wc, fd) + актуализация при значимых изменениях кода.  
+**Источник истины:** код в `/app/backend` и `/app/frontend/src`. При расхождениях — приоритет у кода.
