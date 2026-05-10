@@ -33,7 +33,7 @@
     "CRITICAL: Wire session revocation into JWT validation. Either (a) inline is_session_active(db, jti) check inside get_current_user_required (auth_utils.py:426), or (b) replace Depends(get_current_user_required) with Depends(make_session_dependency(db)) for all auth-protected routes.",
     "HIGH: Add `email_verified: bool = False` (and ideally referral_code/invited_count/referred_by) to models.UserPublic so GET /auth/me exposes them. Update /auth/me handler (auth_routes.py:1525) to populate these from users doc and/or user_settings.",
     "MEDIUM: Auto-generate user_settings.referral_code during registration (register_email / register_telegram / register_vk) instead of only on /api/referral/get-code — matches spec wording and avoids extra round-trip for frontend.",
-    "Public preview URL https://rudn-server-3.preview.emergentagent.com/api/* returns HTTP 404 (Cloudflare/ingress not routing /api). Verify ingress config — tests had to use localhost:8001 directly."
+    "Public preview URL https://rudn-profile.preview.emergentagent.com/api/* returns HTTP 404 (Cloudflare/ingress not routing /api). Verify ingress config — tests had to use localhost:8001 directly."
   ],
   "critical_code_review_comments": [
     "auth_utils.py:735 — make_session_dependency is defined but NEVER imported/used. Dead code hiding the only place where session revocation would be enforced.",
