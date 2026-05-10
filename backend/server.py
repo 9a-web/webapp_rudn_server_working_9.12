@@ -280,6 +280,9 @@ from auth_utils import (
     get_current_user_optional,
     is_real_telegram_user,
     is_pseudo_tid,
+    effective_tid_for_user,
+    pseudo_tid_from_uid,
+    PSEUDO_TID_OFFSET,
 )
 from services.delivery import notify_user as _notify_user, safe_send_telegram
 from achievements import (
@@ -16121,9 +16124,21 @@ async def get_profile_qr_data(
             if not privacy.show_in_search:
                 raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль из поиска")
 
-        # Генерируем ссылку для добавления в друзья (открывает Web App напрямую)
-        bot_username = get_telegram_bot_username()
-        friend_link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
+        # Генерируем ссылку для добавления в друзья.
+        # 🐛 BUG-FIX (2026-07): для Email/VK-only пользователей (pseudo_tid)
+        # Telegram bot deep-link не имеет смысла — бот не сможет их найти.
+        # Используем публичную web-ссылку /u/{uid} вместо deep-link бота.
+        if is_pseudo_tid(telegram_id):
+            try:
+                from config import PUBLIC_BASE_URL
+            except Exception:
+                PUBLIC_BASE_URL = ""
+            owner_uid = user.get("uid") or str(int(telegram_id) - PSEUDO_TID_OFFSET)
+            base = (PUBLIC_BASE_URL or "").rstrip("/")
+            friend_link = f"{base}/u/{owner_uid}" if base else f"/u/{owner_uid}"
+        else:
+            bot_username = get_telegram_bot_username()
+            friend_link = f"https://t.me/{bot_username}/app?startapp=friend_{telegram_id}"
 
         display_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or user.get("username") or "Пользователь"
         return {
@@ -16885,11 +16900,46 @@ async def _get_user_profile_impl(
             if blocked_by_owner or blocked_by_viewer:
                 raise HTTPException(status_code=403, detail="Профиль недоступен")
 
+        # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
         if not user:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
+            # 🐛 BUG-FIX (2026-07): Если user_settings отсутствует (legacy / data drift),
+            # но юзер существует в `users` (например, старый Email/VK flow до миграции),
+            # пробуем достать минимальный профиль оттуда — иначе 404 ломает ВСЁ для этого UID.
+            users_doc = None
+            if is_pseudo_tid(telegram_id):
+                try:
+                    rec_uid = str(int(telegram_id) - PSEUDO_TID_OFFSET)
+                    users_doc = await db.users.find_one({"uid": rec_uid})
+                except Exception:
+                    users_doc = None
+            else:
+                users_doc = await db.users.find_one({"telegram_id": int(telegram_id)})
 
-        # Оптимизация: передаём user_doc чтобы не дублировать запрос в БД
+            if not users_doc:
+                raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+            # Лениво создаём user_settings, чтобы дальше всё работало нативно.
+            now_dt = datetime.now(timezone.utc)
+            init_doc = {
+                "telegram_id": int(telegram_id),
+                "uid": users_doc.get("uid"),
+                "first_name": users_doc.get("first_name"),
+                "last_name": users_doc.get("last_name"),
+                "username": users_doc.get("username"),
+                "created_at": users_doc.get("created_at") or now_dt,
+            }
+            try:
+                await db.user_settings.update_one(
+                    {"telegram_id": int(telegram_id)},
+                    {"$setOnInsert": init_doc},
+                    upsert=True,
+                )
+                user = await db.user_settings.find_one({"telegram_id": telegram_id}) or init_doc
+            except Exception as e:
+                logger.warning(f"Lazy user_settings create failed for tid={telegram_id}: {e}")
+                user = init_doc
+
         privacy = await get_user_privacy_settings(telegram_id, user_doc=user)
 
         # Анонимный запрос к скрытому из поиска профилю — запрет
@@ -17340,35 +17390,55 @@ async def resolve_uid(
       - Если у пользователя show_in_search=False и viewer НЕ сам пользователь
         и НЕ друг — возвращаем 404 (как будто пользователь не существует).
       - Если viewer заблокирован пользователем — тоже 404.
+
+    🐛 BUG-FIX (2026-07): Privacy-проверка теперь корректно работает и для
+    Email/VK-only пользователей через pseudo_tid. Раньше privacy-проверка
+    молча скипалась для них (утечка профиля).
+
+    🆕 Поле `is_setup` индикатор того, можно ли что-то осмысленное показать
+    (есть ли user_settings с групой/именем). Используется фронтом для UX.
     """
     user = await _resolve_user_by_uid(uid)
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    target_tid = user.get("telegram_id")
+    real_tid = user.get("telegram_id")
+    effective_tid = effective_tid_for_user(user)
+
     viewer_tid = current_user.get("tid") if current_user else None
     viewer_uid = current_user.get("sub") if current_user else None
 
+    try:
+        viewer_tid_int = int(viewer_tid) if viewer_tid is not None else None
+    except (TypeError, ValueError):
+        viewer_tid_int = None
+
     # Privacy-проверка: self — всегда OK, остальные — проверяем show_in_search + блок
-    is_self = (viewer_uid == uid) or (viewer_tid and target_tid and viewer_tid == target_tid)
-    if not is_self and target_tid:
+    is_self = (
+        viewer_uid == uid
+        or (viewer_tid_int is not None and effective_tid is not None and viewer_tid_int == int(effective_tid))
+        or (viewer_tid_int is not None and real_tid is not None and viewer_tid_int == int(real_tid))
+    )
+
+    # Дёрнем user_settings один раз — нужно и для privacy, и для is_setup
+    settings_doc = None
+    if effective_tid:
         try:
-            # Настройки приватности
-            settings_doc = await db.user_settings.find_one({"telegram_id": target_tid})
-            privacy = await get_user_privacy_settings(target_tid, user_doc=settings_doc)
+            settings_doc = await db.user_settings.find_one({"telegram_id": int(effective_tid)})
+        except Exception as e:
+            logger.warning(f"resolve_uid settings fetch failed for uid={uid}: {e}")
+
+    if not is_self and effective_tid:
+        try:
+            privacy = await get_user_privacy_settings(int(effective_tid), user_doc=settings_doc)
 
             is_friend = False
-            if viewer_tid:
-                # 🐛 BUG-P7 FIX: ранее использовались несуществующие коллекции
-                # `db.friendships` и `db.blocked_users` с неправильными полями —
-                # теперь используем проверенные helper'ы `are_friends()` и `is_blocked()`,
-                # которые работают с реальными коллекциями `db.friends` / `db.user_blocks`.
+            if viewer_tid_int is not None:
                 try:
                     blocked_by_owner, is_friend = await asyncio.gather(
-                        is_blocked(target_tid, viewer_tid),
-                        are_friends(viewer_tid, target_tid),
+                        is_blocked(int(effective_tid), int(viewer_tid_int)),
+                        are_friends(int(viewer_tid_int), int(effective_tid)),
                     )
-                    # Блокировка: если target заблокировал viewer → 404 (пользователь "не существует")
                     if blocked_by_owner:
                         raise HTTPException(status_code=404, detail="Пользователь не найден")
                 except HTTPException:
@@ -17383,17 +17453,33 @@ async def resolve_uid(
         except Exception as e:
             logger.warning(f"resolve_uid privacy check error for uid={uid}: {e}")
 
+    # Display name: предпочитаем актуальное имя из user_settings (юзер мог обновить)
+    src_for_name = settings_doc or user
     display_name = (
-        f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
+        f"{src_for_name.get('first_name', '') or ''} {src_for_name.get('last_name', '') or ''}".strip()
+        or src_for_name.get("username")
         or user.get("username")
         or f"User {uid}"
     )
+
+    # Профиль "настроен" если есть user_settings с базовыми данными.
+    is_setup = bool(
+        settings_doc
+        and (
+            settings_doc.get("first_name")
+            or settings_doc.get("username")
+            or settings_doc.get("group_name")
+        )
+    )
+
     return {
         "uid": uid,
-        "telegram_id": target_tid,
+        "telegram_id": real_tid,
+        "effective_tid": effective_tid,
         "display_name": display_name,
-        "username": user.get("username"),
-        "has_telegram": bool(target_tid),
+        "username": (src_for_name.get("username") or user.get("username")),
+        "has_telegram": bool(real_tid),
+        "is_setup": is_setup,
         "auth_providers": user.get("auth_providers", []),
     }
 
@@ -17407,14 +17493,22 @@ async def get_public_profile_by_uid(
 
     Если JWT передан — определяет viewer как его `tid` для персонализации
     (вычисление mutual friends, дружбы, блокировки).
+
+    🐛 BUG-FIX (2026-07): Email/VK-only пользователи (без реального telegram_id)
+    теперь корректно отображаются — используем `effective_tid_for_user`,
+    который возвращает pseudo_tid (10^10 + uid). user_settings уже хранится
+    под этим ключом при регистрации через Email/VK.
     """
     user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
+    target_tid = effective_tid_for_user(user)
 
     if not target_tid:
+        # Это может случиться только если у юзера нет ни telegram_id, ни uid
+        # (что не должно бывать в нормальной БД). 500 — индикатор data corruption.
+        logger.error(f"User {uid} has no telegram_id and no uid — DB corruption?")
         raise HTTPException(
-            status_code=422,
-            detail="Профиль пользователя не настроен (не связан с telegram-аккаунтом)",
+            status_code=500,
+            detail="Профиль повреждён: отсутствует идентификатор пользователя",
         )
 
     viewer_tid = None
@@ -17432,11 +17526,19 @@ async def get_public_schedule_by_uid(
     date: str = None,
     current_user: Dict[str, Any] = Depends(get_current_user_required),
 ):
-    """Расписание по UID (только для друзей или владельца)."""
+    """Расписание по UID (только для друзей или владельца).
+
+    🐛 BUG-FIX (2026-07): Для Email/VK-only пользователей расписание недоступно,
+    так как требуется группа РУДН (которая привязывается через Telegram-flow).
+    Возвращаем 404 с понятным сообщением.
+    """
     user = await _resolve_uid_or_404(uid)
     target_tid = user.get("telegram_id")
     if not target_tid:
-        raise HTTPException(status_code=422, detail="Профиль не настроен")
+        raise HTTPException(
+            status_code=404,
+            detail="У пользователя не подключено расписание (нет привязки к группе РУДН)",
+        )
 
     viewer_tid = current_user.get("tid")
     if viewer_tid is None:
@@ -17455,11 +17557,14 @@ async def get_public_qr_by_uid(
     uid: str,
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
-    """QR-код профиля по UID."""
+    """QR-код профиля по UID.
+
+    🐛 BUG-FIX (2026-07): работает и для Email/VK-only через pseudo_tid.
+    """
     user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
+    target_tid = effective_tid_for_user(user)
     if not target_tid:
-        raise HTTPException(status_code=422, detail="Профиль не настроен")
+        raise HTTPException(status_code=500, detail="Профиль повреждён")
 
     requester_tid = None
     if current_user:
@@ -17479,14 +17584,28 @@ async def get_public_share_link_by_uid(
     request: Request,
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
-    """Ссылки для шаринга профиля по UID."""
+    """Ссылки для шаринга профиля по UID.
+
+    🐛 BUG-FIX (2026-07): Email/VK-only пользователи получают полноценный
+    `public_link` + `share_text` через user_settings под pseudo_tid.
+    """
     user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
-    if not target_tid:
-        # Для пользователей без telegram — всё равно отдаём public_link
+    real_tid = user.get("telegram_id")
+    effective_tid = effective_tid_for_user(user)
+
+    if not real_tid:
+        # Email/VK-only — обогащаем display_name из user_settings (pseudo_tid),
+        # чтобы шеринг отображал полные имя/группу, если они уже заполнены.
+        settings_doc = None
+        if effective_tid:
+            settings_doc = await db.user_settings.find_one(
+                {"telegram_id": int(effective_tid)},
+                {"first_name": 1, "last_name": 1, "username": 1, "group_name": 1, "_id": 0},
+            )
+        merged = {**user, **(settings_doc or {})}
         display_name = (
-            f"{user.get('first_name', '') or ''} {user.get('last_name', '') or ''}".strip()
-            or user.get("username")
+            f"{merged.get('first_name', '') or ''} {merged.get('last_name', '') or ''}".strip()
+            or merged.get("username")
             or f"User {uid}"
         )
         # Stage 7: B-20 — fallback из request.url если PUBLIC_BASE_URL пуст
@@ -17499,17 +17618,17 @@ async def get_public_share_link_by_uid(
                 base = ""
         public_link = f"{base}/u/{uid}" if base else f"/u/{uid}"
         return {
-            "link": None,
-            "telegram_link": None,
+            "link": public_link,
+            "telegram_link": None,  # Нет реального TG-аккаунта — нет deep-ссылки
             "public_link": public_link,
             "uid": uid,
             "share_text": display_name,
             "display_name": display_name,
-            "group_name": None,
+            "group_name": (settings_doc or {}).get("group_name"),
         }
 
     return await get_profile_share_link(
-        telegram_id=int(target_tid),
+        telegram_id=int(real_tid),
         request=request,
         viewer_telegram_id=None,
         current_user=current_user,
@@ -17521,23 +17640,33 @@ async def get_public_privacy_by_uid(
     uid: str,
     current_user: Dict[str, Any] = Depends(get_current_user_required),
 ):
-    """Получить privacy настройки (только владелец)."""
-    user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
+    """Получить privacy настройки (только владелец).
 
-    # Проверка владельца: по sub (uid) или по tid
+    🐛 BUG-FIX (2026-07): корректно читает настройки для Email/VK-only
+    пользователей через pseudo_tid.
+    """
+    user = await _resolve_uid_or_404(uid)
+    target_tid = effective_tid_for_user(user)
+
+    # Проверка владельца: по sub (uid) или по реальному/effective tid
+    real_tid = user.get("telegram_id")
+    viewer_tid_int = None
+    try:
+        viewer_tid_int = int(current_user.get("tid")) if current_user.get("tid") is not None else None
+    except (TypeError, ValueError):
+        viewer_tid_int = None
+
     is_owner = (
         current_user.get("sub") == uid
-        or (target_tid and int(current_user.get("tid") or 0) == int(target_tid))
+        or (real_tid and viewer_tid_int == int(real_tid))
+        or (target_tid and viewer_tid_int == int(target_tid))
     )
     if not is_owner:
         raise HTTPException(status_code=403, detail="Доступ запрещён — только владелец")
 
     if not target_tid:
-        # Возвращаем дефолтные настройки
         return PrivacySettings()
 
-    # Stage 8: используем helper напрямую (авторизация уже проверена выше)
     return await get_user_privacy_settings(int(target_tid))
 
 
@@ -17547,19 +17676,30 @@ async def update_public_privacy_by_uid(
     settings: PrivacySettingsUpdate,
     current_user: Dict[str, Any] = Depends(get_current_user_required),
 ):
-    """Обновить privacy настройки (только владелец)."""
+    """Обновить privacy настройки (только владелец).
+
+    🐛 BUG-FIX (2026-07): корректно работает для Email/VK-only через pseudo_tid.
+    """
     user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
+    target_tid = effective_tid_for_user(user)
+    real_tid = user.get("telegram_id")
+
+    viewer_tid_int = None
+    try:
+        viewer_tid_int = int(current_user.get("tid")) if current_user.get("tid") is not None else None
+    except (TypeError, ValueError):
+        viewer_tid_int = None
 
     is_owner = (
         current_user.get("sub") == uid
-        or (target_tid and int(current_user.get("tid") or 0) == int(target_tid))
+        or (real_tid and viewer_tid_int == int(real_tid))
+        or (target_tid and viewer_tid_int == int(target_tid))
     )
     if not is_owner:
         raise HTTPException(status_code=403, detail="Доступ запрещён — только владелец")
 
     if not target_tid:
-        raise HTTPException(status_code=422, detail="Профиль не настроен")
+        raise HTTPException(status_code=500, detail="Профиль повреждён")
 
     # Stage 8: собираем $set с dot-notation (идентично update_privacy_settings)
     try:
@@ -17587,12 +17727,21 @@ async def update_public_privacy_by_uid(
 
     set_operations["privacy_updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    result = await db.user_settings.update_one(
+    # 🐛 BUG-FIX (2026-07): upsert=True чтобы Email/VK-only пользователь, у
+    # которого user_settings ещё не создан (старая БД до миграции), получил
+    # запись при первом же сохранении privacy.
+    await db.user_settings.update_one(
         {"telegram_id": int(target_tid)},
-        {"$set": set_operations},
+        {
+            "$set": set_operations,
+            "$setOnInsert": {
+                "telegram_id": int(target_tid),
+                "uid": uid,
+                "created_at": datetime.now(timezone.utc),
+            },
+        },
+        upsert=True,
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
 
     logger.info(f"🔒 Privacy settings updated via /u/{uid}: {list(update_data.keys())}")
     fresh = await db.user_settings.find_one(
@@ -17606,9 +17755,13 @@ async def register_view_by_uid(
     uid: str,
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
 ):
-    """Зарегистрировать просмотр профиля (viewer берётся из JWT)."""
+    """Зарегистрировать просмотр профиля (viewer берётся из JWT).
+
+    🐛 BUG-FIX (2026-07): теперь засчитывает просмотры и для Email/VK-only
+    пользователей через pseudo_tid.
+    """
     user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
+    target_tid = effective_tid_for_user(user)
     if not target_tid:
         return {"success": True, "counted": False, "reason": "profile-not-setup"}
 
@@ -17642,12 +17795,20 @@ async def _resolve_uid_with_privacy(
 
     Возвращает: (user_doc, target_tid, viewer_tid, privacy, is_owner, is_friend)
     Бросает HTTPException(404) если UID не найден или viewer заблокирован.
-    Бросает HTTPException(422) если у профиля нет telegram_id.
+
+    🐛 BUG-FIX (2026-07): Email/VK-only пользователи теперь резолвятся через
+    `effective_tid_for_user` (pseudo_tid). Раньше любая попытка получить
+    avatar/graffiti/friends/achievements падала на 422.
     """
     user = await _resolve_uid_or_404(uid)
-    target_tid = user.get("telegram_id")
+    target_tid = effective_tid_for_user(user)
     if not target_tid:
-        raise HTTPException(status_code=422, detail="Профиль не настроен")
+        # Это data corruption — у юзера нет ни telegram_id ни uid (что невозможно
+        # при нормальной регистрации, но защищаемся на всякий случай).
+        logger.error(f"_resolve_uid_with_privacy: user {uid} has no effective_tid")
+        raise HTTPException(status_code=500, detail="Профиль повреждён")
+
+    real_tid = user.get("telegram_id")  # Может быть None для Email/VK-only
 
     viewer_tid: Optional[int] = None
     viewer_uid: Optional[str] = None
@@ -17655,31 +17816,45 @@ async def _resolve_uid_with_privacy(
         viewer_tid = current_user.get("tid")
         viewer_uid = current_user.get("sub")
 
+    # Owner: совпадение по uid (надёжнее всего) ИЛИ по tid (с учётом pseudo_tid)
+    try:
+        viewer_tid_int = int(viewer_tid) if viewer_tid is not None else None
+    except (TypeError, ValueError):
+        viewer_tid_int = None
+
     is_owner = (
         (viewer_uid is not None and viewer_uid == uid)
-        or (viewer_tid is not None and int(viewer_tid) == int(target_tid))
+        or (viewer_tid_int is not None and viewer_tid_int == int(target_tid))
+        or (real_tid is not None and viewer_tid_int is not None and viewer_tid_int == int(real_tid))
     )
 
-    # Блокировка — даже до загрузки данных
-    if viewer_tid is not None and not is_owner:
-        blocked_by_owner, blocked_by_viewer = await asyncio.gather(
-            is_blocked(int(target_tid), int(viewer_tid)),
-            is_blocked(int(viewer_tid), int(target_tid)),
-        )
-        if blocked_by_owner or blocked_by_viewer:
-            # 404 — единый ответ, не раскрывает причину
-            raise HTTPException(status_code=404, detail="Профиль недоступен")
+    # Блокировка — даже до загрузки данных. Только если у обоих сторон есть РЕАЛЬНЫЕ
+    # ключи (real_tid у владельца, real_tid у viewer'а). Pseudo_tid тоже валиден,
+    # т.к. блокировки могут быть зафиксированы под любым tid.
+    if viewer_tid_int is not None and not is_owner:
+        try:
+            blocked_by_owner, blocked_by_viewer = await asyncio.gather(
+                is_blocked(int(target_tid), int(viewer_tid_int)),
+                is_blocked(int(viewer_tid_int), int(target_tid)),
+            )
+            if blocked_by_owner or blocked_by_viewer:
+                # 404 — единый ответ, не раскрывает причину
+                raise HTTPException(status_code=404, detail="Профиль недоступен")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"_resolve_uid_with_privacy block check failed for uid={uid}: {e}")
 
     privacy = await get_user_privacy_settings(int(target_tid))
 
     is_friend = False
-    if viewer_tid is not None and not is_owner:
+    if viewer_tid_int is not None and not is_owner:
         try:
-            is_friend = await are_friends(int(viewer_tid), int(target_tid))
+            is_friend = await are_friends(int(viewer_tid_int), int(target_tid))
         except Exception:
             is_friend = False
 
-    return user, int(target_tid), viewer_tid, privacy, is_owner, is_friend
+    return user, int(target_tid), viewer_tid_int, privacy, is_owner, is_friend
 
 
 @api_router.get("/u/{uid}/avatar")
