@@ -57,6 +57,8 @@ from auth_utils import (
     verify_password,
     verify_telegram_login_widget_hash,
     verify_telegram_webapp_init_data,
+    verify_telegram_webapp_init_data_detailed,
+    _extract_user_id_from_initdata,
 )
 from config import (
     get_telegram_bot_token,  # noqa: F401  (используется в verify_*)
@@ -1123,6 +1125,33 @@ def create_auth_router(db) -> APIRouter:
 
     # ============= LOGIN (Telegram WebApp initData) =============
 
+    # Мап причин неудачной верификации initData → (http_status, user_facing detail)
+    _INITDATA_ERROR_MAP = {
+        "no_initdata": (400, "WebApp не передал данные авторизации. Перезапустите бот."),
+        "no_token": (503, "Сервер не сконфигурирован: не задан токен Telegram-бота."),
+        "no_hash": (400, "WebApp данные повреждены (нет подписи). Перезапустите бот."),
+        "bad_signature": (
+            401,
+            "WebApp открыт через другой бот, либо данные подделаны. "
+            "Используйте официальный бот приложения.",
+        ),
+        "expired": (
+            401,
+            "Сессия WebApp устарела (>24 часов). Закройте бот и откройте заново.",
+        ),
+        "parse_error": (400, "WebApp данные имеют некорректный формат."),
+    }
+
+    def _raise_initdata_error(verify_result: Dict[str, Any]) -> None:
+        """🐛 BUG-FIX (2026-07): Гранулярные сообщения вместо generic 401.
+
+        Помогает пользователю понять КОНКРЕТНО что пошло не так
+        (а не просто видеть «Невалидные данные»).
+        """
+        reason = verify_result.get("reason") or "bad_signature"
+        status, detail = _INITDATA_ERROR_MAP.get(reason, (401, "Невалидные данные Telegram WebApp"))
+        raise HTTPException(status_code=status, detail=detail)
+
     @router.post("/login/telegram-webapp", response_model=AuthTokenResponse)
     async def login_telegram_webapp(req: TelegramWebAppLoginRequest, request: Request):
         """Логин через Telegram WebApp — пользователь уже в боте, верифицируем initData.
@@ -1143,13 +1172,30 @@ def create_auth_router(db) -> APIRouter:
                 detail="Слишком много попыток. Попробуйте позже.",
             )
 
-        parsed = verify_telegram_webapp_init_data(req.init_data)
+        # 🐛 BUG-FIX (2026-07): детальная верификация с multi-token fallback
+        verify_result = verify_telegram_webapp_init_data_detailed(req.init_data)
+        if not verify_result["ok"]:
+            tg_uid_unsafe = _extract_user_id_from_initdata(req.init_data)
+            await _log_auth_event(
+                db, event_type="login_telegram_webapp", success=False,
+                request=request,
+                extra={
+                    "reason": f"initdata_{verify_result.get('reason') or 'unknown'}",
+                    "tg_uid_unverified": tg_uid_unsafe,
+                },
+            )
+            _raise_initdata_error(verify_result)
+
+        parsed = verify_result["data"]
         if not parsed or not parsed.get("user"):
             await _log_auth_event(
                 db, event_type="login_telegram_webapp", success=False,
-                request=request, extra={"reason": "bad_initdata"},
+                request=request, extra={"reason": "initdata_no_user"},
             )
-            raise HTTPException(status_code=401, detail="Невалидные данные Telegram WebApp")
+            raise HTTPException(
+                status_code=400,
+                detail="WebApp не передал данные пользователя. Перезапустите бот.",
+            )
 
         tg_user = parsed["user"]
         tg_id = tg_user.get("id")
@@ -1760,9 +1806,22 @@ def create_auth_router(db) -> APIRouter:
         current_user: Dict[str, Any] = Depends(get_current_user_required),
     ):
         _enforce_link_rate_limit(current_user["sub"])  # Stage 7: B-02
-        parsed = verify_telegram_webapp_init_data(req.init_data)
+        # 🐛 BUG-FIX (2026-07): детальная верификация с multi-token fallback
+        verify_result = verify_telegram_webapp_init_data_detailed(req.init_data)
+        if not verify_result["ok"]:
+            await _log_auth_event(
+                db, event_type="link_telegram_webapp", uid=current_user["sub"],
+                success=False, request=request,
+                extra={"reason": f"initdata_{verify_result.get('reason') or 'unknown'}"},
+            )
+            _raise_initdata_error(verify_result)
+
+        parsed = verify_result["data"]
         if not parsed or not parsed.get("user"):
-            raise HTTPException(status_code=401, detail="Невалидные данные Telegram WebApp")
+            raise HTTPException(
+                status_code=400,
+                detail="WebApp не передал данные пользователя. Перезапустите бот.",
+            )
 
         tg_user = parsed["user"]
         tg_id = tg_user.get("id")
@@ -2125,6 +2184,56 @@ def create_auth_router(db) -> APIRouter:
                 "telegram_login": True,
                 "email_smtp_configured": is_email_configured(),
             },
+        }
+
+    @router.post("/diag/telegram-webapp")
+    async def diag_telegram_webapp(req: TelegramWebAppLoginRequest, request: Request):
+        """🩺 Diagnostic endpoint для отладки initData.
+
+        🐛 BUG-FIX (2026-07): помогает понять КОНКРЕТНО почему initData
+        отбраковывается (mismatch token / expired / corrupt). Безопасно — не
+        выдаёт ни токенов, ни PII, только структурную информацию.
+
+        Используется фронтом при ошибке логина для показа точной диагностики.
+        Rate-limited по IP.
+        """
+        client_ip = get_client_ip(request)
+        rl_max, rl_win = _RATE_LIMITS["login_telegram_ip"]
+        if not check_rate_limit(client_ip, "diag_telegram_webapp_ip", rl_max, rl_win):
+            raise HTTPException(status_code=429, detail="Слишком много запросов диагностики.")
+
+        from config import PRODUCTION_BOT_TOKEN, TEST_BOT_TOKEN
+
+        configured_kinds: list[str] = []
+        if PRODUCTION_BOT_TOKEN:
+            configured_kinds.append("production")
+        if TEST_BOT_TOKEN:
+            configured_kinds.append("test")
+
+        tg_uid_unsafe = _extract_user_id_from_initdata(req.init_data)
+        verify_result = verify_telegram_webapp_init_data_detailed(req.init_data)
+
+        # auth_date age
+        auth_date_age_sec: Optional[int] = None
+        try:
+            from urllib.parse import parse_qsl as _pq
+            _pairs = dict(_pq(req.init_data or "", keep_blank_values=True))
+            ad = int(_pairs.get("auth_date") or 0)
+            if ad:
+                auth_date_age_sec = int(datetime.now(timezone.utc).timestamp() - ad)
+        except Exception:
+            pass
+
+        return {
+            "ok": verify_result["ok"],
+            "reason": verify_result.get("reason"),
+            "matched_token_kind": verify_result.get("matched_token_kind"),
+            "configured_tokens": configured_kinds,
+            "env": ENV,
+            "bot_username": get_telegram_bot_username(),
+            "tg_user_id_from_initdata": tg_uid_unsafe,
+            "auth_date_age_sec": auth_date_age_sec,
+            "init_data_length": len(req.init_data or ""),
         }
 
     # ============= 🔐 PASSWORD MANAGEMENT (P2) =============

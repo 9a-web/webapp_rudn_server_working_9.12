@@ -10,12 +10,16 @@
  * `initDataUnsafe.user` и отрисовываются как превью.
  */
 import React, { useMemo, useState } from 'react';
-import { MessageCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { MessageCircle, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import useIsInsideTelegram from '../../hooks/useIsInsideTelegram';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const TelegramWebAppLoginButton = ({ onSubmit, label = 'Войти через Telegram' }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [diag, setDiag] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(false);
 
   // Реактивно читаем initData и user — SDK может заполнить чуть позже mount'а.
   const { initData, user: tgUser } = useIsInsideTelegram();
@@ -34,6 +38,7 @@ const TelegramWebAppLoginButton = ({ onSubmit, label = 'Войти через Te
     }
     setBusy(true);
     setError(null);
+    setDiag(null);
     try {
       const startParam = tg?.initDataUnsafe?.start_param || null;
       try { tg?.HapticFeedback?.impactOccurred?.('light'); } catch { /* noop */ }
@@ -42,6 +47,24 @@ const TelegramWebAppLoginButton = ({ onSubmit, label = 'Войти через Te
       setError(e?.message || 'Не удалось войти через Telegram');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleDiagnose = async () => {
+    if (!initData) return;
+    setDiagLoading(true);
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/auth/diag/telegram-webapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ init_data: initData }),
+      });
+      const data = await r.json();
+      setDiag(data);
+    } catch (e) {
+      setDiag({ error: e?.message || 'Не удалось получить диагностику' });
+    } finally {
+      setDiagLoading(false);
     }
   };
 
@@ -118,8 +141,54 @@ const TelegramWebAppLoginButton = ({ onSubmit, label = 'Войти через Te
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-          {error}
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200 space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div className="flex-1">{error}</div>
+          </div>
+          {!diag && (
+            <button
+              type="button"
+              onClick={handleDiagnose}
+              disabled={diagLoading || !initData}
+              className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-200 hover:bg-red-500/20 disabled:opacity-60"
+            >
+              {diagLoading ? 'Диагностика…' : 'Запустить диагностику'}
+            </button>
+          )}
+          {diag && (
+            <div className="rounded-md border border-red-400/30 bg-black/30 p-2 font-mono text-[10px] leading-snug text-red-100/90">
+              {diag.error ? (
+                <div>Ошибка диагностики: {diag.error}</div>
+              ) : (
+                <>
+                  <div>reason: <b>{diag.reason || 'ok'}</b></div>
+                  <div>matched_token: {diag.matched_token_kind || '—'}</div>
+                  <div>configured_tokens: {(diag.configured_tokens || []).join(', ') || '—'}</div>
+                  <div>env: {diag.env}</div>
+                  <div>bot_username: @{diag.bot_username}</div>
+                  <div>tg_uid: {diag.tg_user_id_from_initdata ?? '—'}</div>
+                  <div>auth_date_age: {diag.auth_date_age_sec != null ? `${diag.auth_date_age_sec}s` : '—'}</div>
+                  <div>initData_length: {diag.init_data_length}</div>
+                  {diag.reason === 'bad_signature' && (
+                    <div className="mt-1 text-amber-200">
+                      💡 Подсказка: WebApp открыт через <b>другой</b> бот, не @{diag.bot_username}.
+                    </div>
+                  )}
+                  {diag.reason === 'expired' && (
+                    <div className="mt-1 text-amber-200">
+                      💡 Подсказка: закрой бота и открой заново.
+                    </div>
+                  )}
+                  {diag.reason === 'no_token' && (
+                    <div className="mt-1 text-amber-200">
+                      💡 Подсказка: сервер не сконфигурирован — обратитесь к админу.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

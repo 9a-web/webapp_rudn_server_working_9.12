@@ -535,62 +535,182 @@ def verify_telegram_login_widget_hash(data: Dict[str, Any], bot_token: Optional[
 # ----- Telegram WebApp initData validation -----
 
 
-def verify_telegram_webapp_init_data(init_data: str, bot_token: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Проверяет `initData` из Telegram WebApp (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app).
+def _try_verify_initdata_with_token(
+    pairs: Dict[str, str],
+    received_hash: str,
+    bot_token: str,
+) -> bool:
+    """Низкоуровневая проверка HMAC initData одним конкретным токеном.
 
-    Возвращает распарсенные данные (user, auth_date...) если валидно, иначе None.
+    Возвращает True если хэш совпал.
+    """
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    computed_hash = hmac.new(
+        secret_key,
+        data_check_string.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(computed_hash, received_hash)
+
+
+def _extract_user_id_from_initdata(init_data: str) -> Optional[int]:
+    """Извлекает telegram user.id из init_data БЕЗ проверки подписи.
+
+    Используется ТОЛЬКО для диагностики (логи). Никогда — для авторизации.
     """
     if not init_data:
         return None
-
-    bot_token = bot_token or get_telegram_bot_token()
-    if not bot_token:
-        return None
-
     try:
         from urllib.parse import parse_qsl
         import json
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+        user_raw = pairs.get("user")
+        if not user_raw:
+            return None
+        user_obj = json.loads(user_raw)
+        return int(user_obj.get("id")) if user_obj.get("id") is not None else None
+    except Exception:
+        return None
 
+
+def verify_telegram_webapp_init_data_detailed(
+    init_data: str,
+    extra_tokens: Optional[list] = None,
+) -> Dict[str, Any]:
+    """Verify Telegram WebApp `initData` с детальным результатом.
+
+    🐛 BUG-FIX (2026-07): Multi-token fallback — пробуем ВСЕ доступные токены
+    (test + prod), чтобы корректно обрабатывать кейсы:
+      - WebApp открыт через production-бота, бэк в ENV=test (или наоборот)
+      - На сервере настроены оба токена, нужно поддерживать оба бота одновременно
+
+    Returns:
+        {
+          "ok": bool,
+          "reason": Optional[str],      # "no_token"|"no_hash"|"bad_signature"|"expired"|"parse_error"|None
+          "data": Optional[Dict],        # распарсенные данные, если ok=True
+          "matched_token_kind": Optional[str],  # "primary"|"test"|"extra_N" — какой токен сошёлся
+        }
+    """
+    from urllib.parse import parse_qsl
+    import json
+
+    if not init_data:
+        return {"ok": False, "reason": "no_initdata", "data": None, "matched_token_kind": None}
+
+    # Собираем список токенов: основной (через get_telegram_bot_token()) + все доступные
+    candidate_tokens: list[tuple[str, str]] = []  # [(kind, token), ...]
+    try:
+        primary = get_telegram_bot_token()
+        if primary:
+            candidate_tokens.append(("primary", primary))
+    except Exception:
+        pass
+
+    # Добавляем оба токена из env, если они отличаются от primary
+    try:
+        from config import PRODUCTION_BOT_TOKEN, TEST_BOT_TOKEN
+        if PRODUCTION_BOT_TOKEN and PRODUCTION_BOT_TOKEN not in [t for _, t in candidate_tokens]:
+            candidate_tokens.append(("production", PRODUCTION_BOT_TOKEN))
+        if TEST_BOT_TOKEN and TEST_BOT_TOKEN not in [t for _, t in candidate_tokens]:
+            candidate_tokens.append(("test", TEST_BOT_TOKEN))
+    except Exception:
+        pass
+
+    # Дополнительные токены (для тестов / админских ботов)
+    if extra_tokens:
+        for i, tok in enumerate(extra_tokens):
+            if tok and tok not in [t for _, t in candidate_tokens]:
+                candidate_tokens.append((f"extra_{i}", tok))
+
+    if not candidate_tokens:
+        logger.error("verify_telegram_webapp_init_data: нет ни одного bot_token на сервере!")
+        return {"ok": False, "reason": "no_token", "data": None, "matched_token_kind": None}
+
+    try:
         pairs = dict(parse_qsl(init_data, keep_blank_values=True))
         received_hash = pairs.pop("hash", "")
         if not received_hash:
-            return None
+            return {"ok": False, "reason": "no_hash", "data": None, "matched_token_kind": None}
 
-        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+        # Пробуем каждый токен по очереди
+        matched_kind: Optional[str] = None
+        for kind, token in candidate_tokens:
+            if _try_verify_initdata_with_token(pairs, received_hash, token):
+                matched_kind = kind
+                break
 
-        # Для WebApp: secret_key = HMAC-SHA256("WebAppData", bot_token)
-        secret_key = hmac.new(
-            b"WebAppData",
-            bot_token.encode("utf-8"),
-            hashlib.sha256,
-        ).digest()
+        if not matched_kind:
+            tg_uid = _extract_user_id_from_initdata(init_data)
+            logger.warning(
+                f"❌ initData bad_signature: tried {len(candidate_tokens)} token(s) "
+                f"[{','.join(k for k, _ in candidate_tokens)}], tg_uid={tg_uid}"
+            )
+            return {
+                "ok": False,
+                "reason": "bad_signature",
+                "data": None,
+                "matched_token_kind": None,
+            }
 
-        computed_hash = hmac.new(
-            secret_key,
-            data_check_string.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
+        # Подпись валидна — проверяем свежесть
+        try:
+            auth_date = int(pairs.get("auth_date", "0"))
+        except (TypeError, ValueError):
+            auth_date = 0
+        if not auth_date or datetime.now(timezone.utc).timestamp() - auth_date > 86400:
+            tg_uid = _extract_user_id_from_initdata(init_data)
+            logger.warning(f"⚠️ initData expired: auth_date={auth_date}, tg_uid={tg_uid}")
+            return {
+                "ok": False,
+                "reason": "expired",
+                "data": None,
+                "matched_token_kind": matched_kind,
+            }
 
-        if not hmac.compare_digest(computed_hash, received_hash):
-            return None
-
-        # Проверка свежести (auth_date не старше 1 дня)
-        auth_date = int(pairs.get("auth_date", "0"))
-        if datetime.now(timezone.utc).timestamp() - auth_date > 86400:
-            logger.warning("WebApp initData: auth_date устарел (>24h)")
-            return None
-
-        # Распарсим user JSON если есть
+        # Распарсим user JSON
         result = dict(pairs)
         if "user" in result:
             try:
                 result["user"] = json.loads(result["user"])
             except json.JSONDecodeError:
                 pass
-        return result
+
+        if matched_kind != "primary":
+            logger.info(
+                f"ℹ️ initData verified via {matched_kind!r} token (not primary). "
+                f"tg_uid={result.get('user', {}).get('id') if isinstance(result.get('user'), dict) else None}"
+            )
+
+        return {
+            "ok": True,
+            "reason": None,
+            "data": result,
+            "matched_token_kind": matched_kind,
+        }
     except Exception as e:
-        logger.warning(f"verify_telegram_webapp_init_data error: {e}")
-        return None
+        logger.warning(f"verify_telegram_webapp_init_data parse error: {e}")
+        return {"ok": False, "reason": "parse_error", "data": None, "matched_token_kind": None}
+
+
+def verify_telegram_webapp_init_data(init_data: str, bot_token: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Проверяет `initData` из Telegram WebApp.
+
+    Legacy-обёртка над `verify_telegram_webapp_init_data_detailed` для обратной
+    совместимости. Возвращает распарсенные данные если валидно, иначе None.
+
+    🐛 BUG-FIX (2026-07): Multi-token fallback — пробует все доступные токены
+    (TELEGRAM_BOT_TOKEN, TEST_TELEGRAM_BOT_TOKEN) что устраняет 401 при
+    несовпадении ENV / бота.
+    """
+    extra = [bot_token] if bot_token else None
+    result = verify_telegram_webapp_init_data_detailed(init_data, extra_tokens=extra)
+    return result["data"] if result["ok"] else None
 
 
 
