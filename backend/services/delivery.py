@@ -35,14 +35,23 @@
 from __future__ import annotations
 
 import asyncio
+import html as _html
 import logging
+import time as _time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Awaitable, Callable, Iterable, Optional
 
-from telegram.error import TelegramError
+from telegram.error import (
+    BadRequest,
+    Forbidden,
+    NetworkError,
+    RetryAfter,
+    TelegramError,
+    TimedOut,
+)
 
 from auth_utils import (
     PSEUDO_TID_OFFSET,
@@ -53,6 +62,108 @@ from auth_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Helpers / Constants
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _utc_now() -> datetime:
+    """Текущий момент в UTC (tz-aware). Единая точка для всего модуля."""
+    return datetime.now(timezone.utc)
+
+
+def _utc_now_naive() -> datetime:
+    """Naive UTC — для legacy-полей в БД, которые исторически naive."""
+    return _utc_now().replace(tzinfo=None)
+
+
+# Таймаут для одного TG-вызова. Защита от зависания (TG API иногда «висит»).
+TG_SEND_TIMEOUT_SEC = 25.0
+
+# Telegram caption (фото) лимит и text лимит
+TG_CAPTION_MAX = 1024
+TG_TEXT_MAX = 4096
+
+# Перманентные ошибки TG — НЕ ретраим (юзер заблокировал бота / неверный chat_id).
+_PERMANENT_TG_ERRORS = (
+    "bot was blocked",
+    "user is deactivated",
+    "chat not found",
+    "blocked by the user",
+    "forbidden",
+    "have no rights",
+)
+
+
+def _is_permanent_tg_error(err: BaseException) -> bool:
+    """True если ошибку TG нет смысла ретраить."""
+    if isinstance(err, Forbidden):
+        return True
+    msg = str(err).lower()
+    return any(p in msg for p in _PERMANENT_TG_ERRORS)
+
+
+def _html_escape_safe(text: Optional[str]) -> str:
+    """Эскейпит спецсимволы HTML — для безопасного fallback при parse_mode=HTML."""
+    if not text:
+        return ""
+    return _html.escape(str(text), quote=False)
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Circuit Breaker (in-memory) — на случай падения TG API
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class _TGCircuitBreaker:
+    """Простой circuit breaker: при N последовательных fail'ах открывается на T сек.
+
+    Открыт → safe_send_telegram сразу возвращает False (без вызова TG).
+    Это снимает нагрузку с TG API во время глобального отказа и не забивает retry-queue.
+
+    Перманентные ошибки (Forbidden, chat_not_found) НЕ считаются — это not TG-фейлы,
+    а проблемы конкретного юзера.
+    """
+
+    def __init__(self, fail_threshold: int = 10, open_duration_sec: float = 60.0):
+        self.fail_threshold = fail_threshold
+        self.open_duration_sec = open_duration_sec
+        self._consecutive_fails = 0
+        self._opened_at: Optional[float] = None
+
+    def is_open(self) -> bool:
+        if self._opened_at is None:
+            return False
+        if _time.monotonic() - self._opened_at >= self.open_duration_sec:
+            # Half-open: сбрасываем после паузы, даём шанс
+            self._opened_at = None
+            self._consecutive_fails = 0
+            logger.info("[delivery.cb] Circuit breaker reset (half-open).")
+            return False
+        return True
+
+    def record_success(self) -> None:
+        if self._consecutive_fails > 0 or self._opened_at is not None:
+            logger.info("[delivery.cb] TG send succeeded — resetting fail counter.")
+        self._consecutive_fails = 0
+        self._opened_at = None
+
+    def record_failure(self, transient: bool) -> None:
+        if not transient:
+            # Перманентные ошибки не считаем
+            return
+        self._consecutive_fails += 1
+        if self._consecutive_fails >= self.fail_threshold and self._opened_at is None:
+            self._opened_at = _time.monotonic()
+            logger.warning(
+                f"[delivery.cb] OPEN: {self._consecutive_fails} consecutive TG fails. "
+                f"Pausing TG sends for {self.open_duration_sec}s."
+            )
+
+
+_tg_breaker = _TGCircuitBreaker()
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -150,6 +261,19 @@ class DeliveryResult:
     retry_scheduled: bool = False
     attempts: int = 0
 
+    # ─── Cross-platform семантика (P2 fix) ────────────────────────────────
+    # True если у получателя ЕСТЬ реальный TG-аккаунт. Для VK/Email юзеров — False.
+    # Используется чтобы понять, является ли TG-fail реальной проблемой
+    # (retry имеет смысл) или ожидаемой ситуацией (in-app достаточно).
+    user_has_real_telegram: bool = False
+    # True если доставка считается успешной для данного типа пользователя:
+    #   — real-TG юзер: telegram_sent == True
+    #   — pseudo-tid юзер (VK/Email): in_app_id is not None
+    # Это «правда» успеха, в отличие от any_delivered (OR логика).
+    delivered_to_user: bool = False
+    # True если стоит ретраить — только если real-TG юзер и TG-fail с transient ошибкой
+    requires_retry: bool = False
+
     def to_dict(self) -> dict:
         """Сериализация в dict (для обратной совместимости со старыми хендлерами)."""
         return {
@@ -161,6 +285,9 @@ class DeliveryResult:
             "telegram_skipped_reason": self.telegram_skipped_reason,
             "retry_scheduled": self.retry_scheduled,
             "attempts": self.attempts,
+            "user_has_real_telegram": self.user_has_real_telegram,
+            "delivered_to_user": self.delivered_to_user,
+            "requires_retry": self.requires_retry,
         }
 
     # Dict-подобный доступ для обратной совместимости (как делают старые вызовы):
@@ -242,54 +369,151 @@ async def safe_send_telegram(
     reply_markup: Any = None,
     method: str = "auto",  # "auto" | "message" | "photo"
     log_ctx: str = "",
+    timeout: float = TG_SEND_TIMEOUT_SEC,
 ) -> bool:
     """Безопасная обёртка над `bot.send_message` / `bot.send_photo`.
 
     P0 guard: если `telegram_id` — pseudo_tid (VK/Email/QR-юзер), НЕ вызываем Bot API
     (иначе `chat not found` в логах). Просто логируем и возвращаем False.
 
+    P2 fix:
+    - timeout-protected (asyncio.wait_for) — не виснем на проблемах сети
+    - валидация пустого текста (TG возвращает 400 на пустой text)
+    - circuit breaker: при N последовательных fails — пауза, чтобы не забивать retry-queue
+    - pseudo-tid skip логируется как DEBUG (а не INFO) — это ожидаемая ситуация
+    - перманентные ошибки (Forbidden, chat_not_found) — INFO, не WARNING
+
     Returns:
         True если сообщение ушло в TG, False если пропущено или упало.
     """
+    # ── Guard 1: pseudo-tid / no-tid ───────────────────────────────────────
     if not is_real_telegram_user(telegram_id):
         reason = "pseudo_tid" if is_pseudo_tid(telegram_id) else "no_tid"
-        logger.info(
+        logger.debug(
             f"🟡 [delivery] Skip Telegram push: tid={telegram_id} reason={reason} "
             f"ctx={log_ctx or '-'}"
         )
         return False
 
+    # ── Guard 2: bot не инициализирован ────────────────────────────────────
     if bot is None:
         logger.debug(f"[delivery] bot is None (ctx={log_ctx})")
         return False
 
+    # ── Guard 3: circuit breaker открыт ────────────────────────────────────
+    if _tg_breaker.is_open():
+        logger.warning(
+            f"[delivery] Circuit breaker OPEN — skip TG send tid={telegram_id} ctx={log_ctx}"
+        )
+        return False
+
+    # ── Guard 4: валидация контента ────────────────────────────────────────
+    effective_method = method
+    if effective_method == "auto":
+        effective_method = "photo" if photo is not None else "message"
+
+    if effective_method == "message":
+        body = text or caption or ""
+        if not body.strip():
+            logger.warning(
+                f"[delivery] empty text for TG send tid={telegram_id} ctx={log_ctx} — skip"
+            )
+            return False
+        # TG лимит 4096 символов для text
+        if len(body) > TG_TEXT_MAX:
+            body = body[: TG_TEXT_MAX - 3] + "..."
+            text = body  # обновляем для kwargs ниже
+    else:  # photo
+        # photo сам может быть пустым только если ошибочно передали None — это поймает TG API
+        cap = caption or ""
+        if cap and len(cap) > TG_CAPTION_MAX:
+            caption = cap[: TG_CAPTION_MAX - 3] + "..."
+
+    # ── Send (с timeout) ───────────────────────────────────────────────────
+    kwargs: dict = {"chat_id": int(telegram_id)}
+    if parse_mode:
+        kwargs["parse_mode"] = parse_mode
+    if reply_markup is not None:
+        kwargs["reply_markup"] = reply_markup
+
     try:
-        effective_method = method
-        if effective_method == "auto":
-            effective_method = "photo" if photo is not None else "message"
-
-        kwargs: dict = {"chat_id": int(telegram_id)}
-        if parse_mode:
-            kwargs["parse_mode"] = parse_mode
-        if reply_markup is not None:
-            kwargs["reply_markup"] = reply_markup
-
         if effective_method == "photo":
             if caption is not None:
                 kwargs["caption"] = caption
-            await bot.send_photo(photo=photo, **kwargs)
+            await asyncio.wait_for(
+                bot.send_photo(photo=photo, **kwargs),
+                timeout=timeout,
+            )
         else:
             kwargs["text"] = text or caption or ""
-            await bot.send_message(**kwargs)
+            await asyncio.wait_for(
+                bot.send_message(**kwargs),
+                timeout=timeout,
+            )
+        _tg_breaker.record_success()
         return True
-    except TelegramError as e:
-        logger.warning(f"📤 [delivery] TelegramError tid={telegram_id} ctx={log_ctx}: {e}")
+
+    except asyncio.TimeoutError:
+        logger.warning(
+            f"📤 [delivery] TG send TIMEOUT ({timeout}s) tid={telegram_id} ctx={log_ctx}"
+        )
+        _tg_breaker.record_failure(transient=True)
         return False
+
+    except RetryAfter as e:
+        # TG flood-control: бот превысил rate. Записываем как transient.
+        logger.warning(
+            f"📤 [delivery] TG RetryAfter tid={telegram_id} ctx={log_ctx}: "
+            f"retry_after={getattr(e, 'retry_after', '?')}s"
+        )
+        _tg_breaker.record_failure(transient=True)
+        return False
+
+    except (Forbidden,) as e:
+        # Юзер заблокировал бота / деактивирован — НЕ ретраим
+        logger.info(
+            f"📤 [delivery] TG forbidden tid={telegram_id} ctx={log_ctx}: {e}"
+        )
+        _tg_breaker.record_failure(transient=False)
+        return False
+
+    except BadRequest as e:
+        # chat_not_found / message too long / parse-error и т.д.
+        # Большинство — перманентные (для данного юзера), retry бессмыслен.
+        permanent = _is_permanent_tg_error(e)
+        if permanent:
+            logger.info(
+                f"📤 [delivery] TG bad_request (permanent) tid={telegram_id} ctx={log_ctx}: {e}"
+            )
+        else:
+            logger.warning(
+                f"📤 [delivery] TG bad_request (transient?) tid={telegram_id} ctx={log_ctx}: {e}"
+            )
+        _tg_breaker.record_failure(transient=not permanent)
+        return False
+
+    except (NetworkError, TimedOut) as e:
+        logger.warning(
+            f"📤 [delivery] TG network error tid={telegram_id} ctx={log_ctx}: {e}"
+        )
+        _tg_breaker.record_failure(transient=True)
+        return False
+
+    except TelegramError as e:
+        permanent = _is_permanent_tg_error(e)
+        level = logger.info if permanent else logger.warning
+        level(
+            f"📤 [delivery] TelegramError tid={telegram_id} ctx={log_ctx}: {e}"
+        )
+        _tg_breaker.record_failure(transient=not permanent)
+        return False
+
     except Exception as e:  # noqa: BLE001
         logger.error(
             f"📤 [delivery] Unexpected error tid={telegram_id} ctx={log_ctx}: {e}",
             exc_info=True,
         )
+        _tg_breaker.record_failure(transient=True)
         return False
 
 
@@ -326,8 +550,8 @@ async def create_in_app_notification(
             "type": type,
             "category": category,
             "priority": priority,
-            "title": title[:200],
-            "message": message[:2000],
+            "title": (title or "")[:200],
+            "message": (message or "")[:2000],
             "emoji": emoji or "🔔",
             "data": data or {},
             "action_url": action_url,
@@ -335,7 +559,7 @@ async def create_in_app_notification(
             "action_taken": None,
             "read": False,
             "dismissed": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": _utc_now(),
             "read_at": None,
             "expires_at": None,
         }
@@ -388,7 +612,7 @@ async def _record_delivery_attempt(
             "max_attempts": _PRIORITY_RETRY_MAX[priority] + 1,
             "error": error,
             "next_retry_at": next_retry_at,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": _utc_now(),
         }
         await db[DELIVERY_ATTEMPTS_COLL].insert_one(doc)
     except Exception as e:  # noqa: BLE001
@@ -524,20 +748,24 @@ async def notify_user(
     # Определяем, нужно ли отправлять в TG
     should_send_tg = send_telegram if send_telegram is not None else _PRIORITY_SENDS_TG[prio]
 
+    # Сначала вычисляем real_tid — это важно для итоговой семантики
+    real_tid: Optional[int] = None
+    if user_doc:
+        ut = user_doc.get("telegram_id")
+        if ut is not None and is_real_telegram_user(ut):
+            real_tid = int(ut)
+    elif telegram_id is not None and is_real_telegram_user(telegram_id):
+        real_tid = int(telegram_id)
+
+    # P2 fix: запоминаем, есть ли у юзера реальный TG. Это ключ для requires_retry.
+    result.user_has_real_telegram = real_tid is not None
+
     if not should_send_tg:
         result.skipped.append(Channel.TELEGRAM)
         result.telegram_skipped_reason = "priority_low" if prio in (
             MessagePriority.SILENT, MessagePriority.LOW
         ) else "disabled"
     else:
-        real_tid: Optional[int] = None
-        if user_doc:
-            ut = user_doc.get("telegram_id")
-            if ut is not None and is_real_telegram_user(ut):
-                real_tid = int(ut)
-        elif telegram_id is not None and is_real_telegram_user(telegram_id):
-            real_tid = int(telegram_id)
-
         if real_tid is None:
             result.skipped.append(Channel.TELEGRAM)
             result.telegram_skipped_reason = (
@@ -546,7 +774,8 @@ async def notify_user(
         else:
             tg_text = telegram_text
             if tg_text is None:
-                tg_text = f"{emoji} <b>{title}</b>\n{message}"
+                # Fallback: эскейпим title/message чтобы избежать parse-error при HTML
+                tg_text = f"{emoji} <b>{_html_escape_safe(title)}</b>\n{_html_escape_safe(message)}"
 
             ok = await safe_send_telegram(
                 bot,
@@ -568,7 +797,7 @@ async def notify_user(
                 # ── 5. Retry scheduling (только если priority >= NORMAL) ─
                 if enable_retry and _PRIORITY_RETRY_MAX[prio] > 0:
                     delay = _RETRY_DELAYS_SEC[0]
-                    next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
+                    next_retry_at = _utc_now() + timedelta(seconds=delay)
                     try:
                         await _record_delivery_attempt(
                             db,
@@ -593,6 +822,32 @@ async def notify_user(
                         result.retry_scheduled = True
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"[delivery] retry schedule failed: {e}")
+
+    # ── 6. Финальная семантика: delivered_to_user / requires_retry ───────
+    # delivered_to_user: считаем успехом
+    #   — если у юзера есть TG → нужен telegram_sent
+    #   — если у юзера НЕТ TG (pseudo) → достаточно in-app
+    if result.user_has_real_telegram:
+        # Для real-TG юзера: успех = TG доставлено. In-app — приятный бонус.
+        # Если TG не пытались отправить (should_send_tg=False), но in-app есть — тоже OK.
+        if result.telegram_sent:
+            result.delivered_to_user = True
+        elif not should_send_tg and result.in_app_id is not None:
+            result.delivered_to_user = True
+        else:
+            result.delivered_to_user = False
+    else:
+        # pseudo-tid / no-tid юзер: in-app — единственный канал
+        result.delivered_to_user = result.in_app_id is not None
+
+    # requires_retry: только если хотели отправить в TG, real-TG юзер, и упало
+    result.requires_retry = (
+        should_send_tg
+        and result.user_has_real_telegram
+        and not result.telegram_sent
+        # Перманентные ошибки (Forbidden, chat_not_found) уже не пытаемся — circuit breaker отличит
+        # На этом уровне просто говорим «было неуспешно, можно ретраить»
+    )
 
     return result
 
@@ -673,18 +928,21 @@ async def notify_user_with_photo(
 
     # Telegram photo
     should_send_tg = send_telegram if send_telegram is not None else _PRIORITY_SENDS_TG[prio]
+
+    real_tid: Optional[int] = None
+    if user_doc:
+        ut = user_doc.get("telegram_id")
+        if ut is not None and is_real_telegram_user(ut):
+            real_tid = int(ut)
+    elif telegram_id is not None and is_real_telegram_user(telegram_id):
+        real_tid = int(telegram_id)
+
+    result.user_has_real_telegram = real_tid is not None
+
     if not should_send_tg:
         result.skipped.append(Channel.TELEGRAM)
         result.telegram_skipped_reason = "disabled"
     else:
-        real_tid: Optional[int] = None
-        if user_doc:
-            ut = user_doc.get("telegram_id")
-            if ut is not None and is_real_telegram_user(ut):
-                real_tid = int(ut)
-        elif telegram_id is not None and is_real_telegram_user(telegram_id):
-            real_tid = int(telegram_id)
-
         if real_tid is None:
             result.skipped.append(Channel.TELEGRAM)
             result.telegram_skipped_reason = (
@@ -693,11 +951,9 @@ async def notify_user_with_photo(
         else:
             tg_caption = caption if caption is not None else (
                 telegram_text if telegram_text is not None
-                else f"{emoji} <b>{title}</b>\n{message}"
+                else f"{emoji} <b>{_html_escape_safe(title)}</b>\n{_html_escape_safe(message)}"
             )
-            # TG caption лимит 1024 символа
-            if tg_caption and len(tg_caption) > 1024:
-                tg_caption = tg_caption[:1020] + "..."
+            # TG caption лимит 1024 символа — обрабатываем уже в safe_send_telegram
 
             ok = await safe_send_telegram(
                 bot,
@@ -715,6 +971,23 @@ async def notify_user_with_photo(
             else:
                 result.skipped.append(Channel.TELEGRAM)
                 result.telegram_skipped_reason = "send_error"
+
+    # Финальная семантика — как в notify_user
+    if result.user_has_real_telegram:
+        if result.telegram_sent:
+            result.delivered_to_user = True
+        elif not should_send_tg and result.in_app_id is not None:
+            result.delivered_to_user = True
+        else:
+            result.delivered_to_user = False
+    else:
+        result.delivered_to_user = result.in_app_id is not None
+
+    result.requires_retry = (
+        should_send_tg
+        and result.user_has_real_telegram
+        and not result.telegram_sent
+    )
 
     return result
 
@@ -746,13 +1019,22 @@ class BatchResult:
     skipped_telegram: int = 0
     skipped_in_app: int = 0
     errors: int = 0
+    # P2 fix: «доставлено пользователю» = TG (для real-TG) ИЛИ in-app (для pseudo).
+    # Это правильная метрика «отправлено» для cross-platform рассылок.
+    delivered_to_user: int = 0
+    # Сколько pseudo-tid юзеров (VK/Email) — для них TG не пытались (это OK)
+    pseudo_tid_recipients: int = 0
+    # Сколько real-TG юзеров — у которых TG-fail (стоит ретраить / есть проблема)
+    real_tg_failed: int = 0
     per_recipient: list[DeliveryResult] = field(default_factory=list)
 
     def summary(self) -> str:
         return (
             f"batch: total={self.total} "
-            f"tg_sent={self.delivered_telegram} tg_skip={self.skipped_telegram} "
-            f"in_app={self.delivered_in_app} err={self.errors}"
+            f"delivered={self.delivered_to_user} (tg={self.delivered_telegram} "
+            f"in_app={self.delivered_in_app}) "
+            f"pseudo={self.pseudo_tid_recipients} "
+            f"tg_fail={self.real_tg_failed} err={self.errors}"
         )
 
 
@@ -867,6 +1149,13 @@ async def send_batch(
             result.skipped_in_app += 1
         if res.errors:
             result.errors += 1
+        # P2 fix: cross-platform aware counters
+        if res.delivered_to_user:
+            result.delivered_to_user += 1
+        if not res.user_has_real_telegram:
+            result.pseudo_tid_recipients += 1
+        elif res.user_has_real_telegram and not res.telegram_sent:
+            result.real_tg_failed += 1
 
     logger.info(f"[delivery.batch] {log_ctx}: {result.summary()}")
     return result
@@ -892,7 +1181,7 @@ async def process_pending_retries(
     Returns:
         {"processed": N, "sent": K, "failed": M, "dlq": P}
     """
-    now = datetime.now(timezone.utc)
+    now = _utc_now()
     stats = {"processed": 0, "sent": 0, "failed": 0, "dlq": 0}
 
     try:
@@ -912,7 +1201,7 @@ async def process_pending_retries(
             # Атомарно захватываем запись — меняем status на 'processing'
             take = await db[DELIVERY_ATTEMPTS_COLL].update_one(
                 {"_id": attempt_doc["_id"], "status": "pending_retry"},
-                {"$set": {"status": "processing"}},
+                {"$set": {"status": "processing", "processing_started_at": _utc_now()}},
             )
             if take.modified_count == 0:
                 # Кто-то другой уже обрабатывает
@@ -924,12 +1213,23 @@ async def process_pending_retries(
             prio = _coerce_priority(attempt_doc.get("priority"))
             max_attempts = _PRIORITY_RETRY_MAX[prio]
 
+            # Выбираем текст: предпочитаем готовый telegram_text (с разметкой).
+            # Если его нет — берём message, но эскейпим HTML, чтобы не упасть на parse_mode=HTML.
+            tg_text = payload.get("telegram_text")
+            parse_mode_ = payload.get("parse_mode", "HTML")
+            if not tg_text:
+                raw_msg = payload.get("message") or payload.get("title") or ""
+                if parse_mode_ and parse_mode_.upper() == "HTML":
+                    tg_text = _html_escape_safe(raw_msg)
+                else:
+                    tg_text = raw_msg
+
             # Пробуем отправить
             ok = await safe_send_telegram(
                 bot,
                 tid,
-                text=payload.get("telegram_text") or payload.get("message"),
-                parse_mode=payload.get("parse_mode", "HTML"),
+                text=tg_text,
+                parse_mode=parse_mode_,
                 method="message",
                 log_ctx=f"{log_ctx}/attempt_{attempt_num}",
             )
@@ -941,7 +1241,7 @@ async def process_pending_retries(
                     {"$set": {
                         "status": "sent",
                         "attempt": attempt_num,
-                        "sent_at": datetime.now(timezone.utc),
+                        "sent_at": _utc_now(),
                     }},
                 )
                 stats["sent"] += 1
@@ -953,7 +1253,7 @@ async def process_pending_retries(
                         {"$set": {
                             "status": "dlq",
                             "attempt": attempt_num,
-                            "failed_at": datetime.now(timezone.utc),
+                            "failed_at": _utc_now(),
                             "error": "max_retries_exceeded",
                         }},
                     )
@@ -965,7 +1265,7 @@ async def process_pending_retries(
                 else:
                     # Следующая задержка (cap'им по размеру таблицы _RETRY_DELAYS_SEC)
                     delay_idx = min(attempt_num - 1, len(_RETRY_DELAYS_SEC) - 1)
-                    next_retry = datetime.now(timezone.utc) + timedelta(
+                    next_retry = _utc_now() + timedelta(
                         seconds=_RETRY_DELAYS_SEC[delay_idx]
                     )
                     await db[DELIVERY_ATTEMPTS_COLL].update_one(

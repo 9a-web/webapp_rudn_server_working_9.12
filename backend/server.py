@@ -270,7 +270,7 @@ from models import (
     DevResetStreakRequest,
     DevCommandRequest,
 )
-from notifications import get_notification_service
+from notifications import get_notification_service, init_notification_service_with_db
 from scheduler import get_scheduler  # Старая система (резерв)
 from scheduler_v2 import get_scheduler_v2  # Новая улучшенная система
 from cache import cache
@@ -761,6 +761,14 @@ async def startup_event():
     
     # 7. Запускаем планировщик уведомлений V2
     try:
+        # P2: подключаем db к notification_service ДО старта scheduler'а
+        # (раньше db получался через `from server import db` внутри методов — circular)
+        try:
+            init_notification_service_with_db(db)
+            logger.info("✅ Notification service attached to db")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to attach db to notification service: {e}")
+
         scheduler_v2 = get_scheduler_v2(db)
         scheduler_v2.start()
         logger.info("✅ Notification Scheduler V2 started successfully")
@@ -7148,21 +7156,33 @@ async def get_course_stats(days: Optional[int] = None):
 
 @api_router.post("/admin/send-notification")
 async def admin_send_notification(data: AdminSendNotificationRequest):
-    """Отправить уведомление пользователю от имени администратора"""
+    """Отправить уведомление пользователю от имени администратора.
+
+    P2 fix: теперь делегирует в unified `notify_user` (вместо двух параллельных
+    путей: InAppNotification.insert + send_message). Это:
+      — гарантирует одинаковую логику для всех каналов
+      — корректно работает для pseudo_tid (VK/Email) юзеров — только in-app
+      — задействует retry-механизм при transient TG-fail
+      — единое логирование результата
+
+    Если переданы send_in_app=False или send_telegram=False — соответствующий канал отключается.
+    """
     try:
         results = {
             "telegram_id": data.telegram_id,
             "in_app_sent": False,
             "telegram_sent": False,
+            "delivered_to_user": False,
+            "user_has_real_telegram": False,
             "errors": []
         }
-        
+
         # Проверяем существование пользователя
         user = await db.user_settings.find_one({"telegram_id": data.telegram_id})
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
-        
-        # Маппинг типов на NotificationType enum
+
+        # Маппинг типов
         type_mapping = {
             "admin_message": NotificationType.ADMIN_MESSAGE,
             "announcement": NotificationType.ANNOUNCEMENT,
@@ -7173,8 +7193,6 @@ async def admin_send_notification(data: AdminSendNotificationRequest):
             "level_up": NotificationType.LEVEL_UP,
             "room_invite": NotificationType.ROOM_INVITE,
         }
-        
-        # Маппинг категорий
         category_mapping = {
             "system": NotificationCategory.SYSTEM,
             "study": NotificationCategory.STUDY,
@@ -7183,78 +7201,87 @@ async def admin_send_notification(data: AdminSendNotificationRequest):
             "social": NotificationCategory.SOCIAL,
             "journal": NotificationCategory.JOURNAL,
         }
-        
         notification_type = type_mapping.get(data.notification_type, NotificationType.ADMIN_MESSAGE)
         notification_category = category_mapping.get(data.category, NotificationCategory.SYSTEM)
-        
-        # Отправляем In-App уведомление
-        if data.send_in_app:
-            try:
-                notification = InAppNotification(
-                    telegram_id=data.telegram_id,
-                    type=notification_type,
-                    category=notification_category,
-                    priority=NotificationPriority.HIGH,
-                    title=data.title,
-                    message=data.message,
-                    emoji="",  # Не используем emoji, иконка определяется по типу
-                    data={"from_admin": True}
-                )
-                await db.in_app_notifications.insert_one(notification.model_dump())
-                results["in_app_sent"] = True
-                logger.info(f"📬 Admin notification sent in-app to {data.telegram_id}")
-            except Exception as e:
-                logger.error(f"Failed to send in-app notification: {e}")
-                results["errors"].append(f"In-App: {str(e)}")
-        
-        # Отправляем Telegram сообщение
-        if data.send_telegram:
-            try:
-                from notifications import get_notification_service
-                notification_service = get_notification_service()
-                
-                # Форматируем красивое сообщение для Telegram
-                type_emojis = {
-                    "admin_message": "📢",
-                    "announcement": "📣",
-                    "app_update": "✨",
-                    "schedule_changed": "📅",
-                    "task_deadline": "⏰",
-                    "achievement_earned": "🏆",
-                    "level_up": "⭐",
-                    "room_invite": "🏠",
-                }
-                msg_emoji = type_emojis.get(data.notification_type, "🔔")
-                
-                tg_lines = []
-                tg_lines.append(f"{msg_emoji}  <b>{data.title}</b>")
-                tg_lines.append("")
-                if data.message.strip():
-                    tg_lines.append(data.message.strip())
-                    tg_lines.append("")
-                tg_lines.append("<i>RUDN Go • Уведомление</i>")
-                
-                tg_text = "\n".join(tg_lines)
-                
-                await notification_service.send_message(data.telegram_id, tg_text)
-                results["telegram_sent"] = True
-                logger.info(f"📨 Admin message sent via Telegram to {data.telegram_id}")
-            except Exception as e:
-                logger.error(f"Failed to send Telegram message: {e}")
-                results["errors"].append(f"Telegram: {str(e)}")
-        
-        if not results["in_app_sent"] and not results["telegram_sent"]:
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Не удалось отправить уведомление: {', '.join(results['errors'])}"
+
+        # Эмодзи по типу
+        type_emojis = {
+            "admin_message": "📢",
+            "announcement": "📣",
+            "app_update": "✨",
+            "schedule_changed": "📅",
+            "task_deadline": "⏰",
+            "achievement_earned": "🏆",
+            "level_up": "⭐",
+            "room_invite": "🏠",
+        }
+        msg_emoji = type_emojis.get(data.notification_type, "🔔")
+
+        # Готовим TG-текст (HTML)
+        tg_lines = [f"{msg_emoji}  <b>{data.title}</b>"]
+        if data.message and data.message.strip():
+            tg_lines.append("")
+            tg_lines.append(data.message.strip())
+        tg_lines.append("")
+        tg_lines.append("<i>RUDN Go • Уведомление</i>")
+        tg_text = "\n".join(tg_lines)
+
+        try:
+            from services.delivery import notify_user as _notify_user, MessagePriority as _MP
+            notification_service = get_notification_service()
+            bot_ref = notification_service.bot if notification_service else None
+
+            res = await _notify_user(
+                db,
+                bot_ref,
+                user_doc=user,
+                telegram_id=data.telegram_id,
+                title=data.title,
+                message=data.message or "",
+                emoji=msg_emoji,
+                type=notification_type.value if hasattr(notification_type, "value") else str(notification_type),
+                category=notification_category.value if hasattr(notification_category, "value") else str(notification_category),
+                priority=_MP.HIGH,
+                data={"from_admin": True},
+                telegram_text=tg_text,
+                telegram_parse_mode="HTML",
+                send_in_app=bool(data.send_in_app),
+                send_telegram=bool(data.send_telegram),
+                enable_retry=True,
+                log_ctx="admin_send_notification",
             )
-        
+
+            results["in_app_sent"] = bool(res.in_app_id)
+            results["telegram_sent"] = bool(res.telegram_sent)
+            results["delivered_to_user"] = bool(res.delivered_to_user)
+            results["user_has_real_telegram"] = bool(res.user_has_real_telegram)
+
+            if res.errors:
+                for k, v in res.errors.items():
+                    results["errors"].append(f"{k}: {v}")
+
+            logger.info(
+                f"📨 Admin notification → tid={data.telegram_id} "
+                f"in_app={results['in_app_sent']} tg={results['telegram_sent']} "
+                f"delivered={results['delivered_to_user']} "
+                f"has_tg={results['user_has_real_telegram']}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send admin notification: {e}", exc_info=True)
+            results["errors"].append(f"delivery: {str(e)}")
+
+        if not results["delivered_to_user"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Не удалось отправить уведомление: {', '.join(results['errors']) or 'unknown'}"
+            )
+
         return {
             "status": "success",
             "message": "Уведомление отправлено",
             **results
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -20633,6 +20660,11 @@ async def send_notification_from_post(data: dict):
             sent = batch_res.delivered_telegram
             failed = batch_res.total - sent
             in_app_created = batch_res.delivered_in_app
+            # P2 fix (option a): «sent» теперь = TG-delivered + in-app-only for pseudo-tid.
+            # Для VK/Email юзеров in-app — единственный канал, и он успешен → это «sent».
+            # `delivered_to_user` уже учитывает это корректно (см. BatchResult).
+            sent = batch_res.delivered_to_user
+            failed = batch_res.total - sent
         else:
             # ── Вариант 2: с фото — параллельный обход через notify_user_with_photo ──
             from services.delivery import notify_user_with_photo, MessagePriority
@@ -20670,14 +20702,12 @@ async def send_notification_from_post(data: dict):
                 if r is None:
                     failed += 1
                     continue
-                if r.telegram_sent:
+                # P2 fix: считаем по delivered_to_user (cross-platform aware).
+                if r.delivered_to_user:
                     sent += 1
-                elif r.get("telegram_skipped_reason") in ("pseudo_tid", "no_tid"):
-                    # VK/Email — in-app достаточно, не считаем как failed
-                    pass
                 else:
                     failed += 1
-                if r.get("in_app_id"):
+                if r.in_app_id:
                     in_app_created += 1
 
         logger.info(
