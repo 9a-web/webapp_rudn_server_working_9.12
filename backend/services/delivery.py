@@ -176,8 +176,9 @@ class Channel(str, Enum):
 
     TELEGRAM = "telegram"      # Telegram Bot API
     IN_APP = "in_app"          # MongoDB `in_app_notifications`
+    WEB_PUSH = "web_push"      # Web Push (PWA, RFC 8030 + VAPID) — iOS 16.4+, Android, Desktop
     EMAIL = "email"            # SMTP (план P3)
-    PUSH_FCM = "push_fcm"      # Firebase Cloud Messaging (план P3)
+    PUSH_FCM = "push_fcm"      # Firebase Cloud Messaging (план P3, нативные мобильные)
 
 
 class MessagePriority(str, Enum):
@@ -261,17 +262,14 @@ class DeliveryResult:
     retry_scheduled: bool = False
     attempts: int = 0
 
+    # ─── Web Push (PWA) ────────────────────────────────────────────────────
+    web_push_sent_count: int = 0          # сколько устройств получили push
+    web_push_failed_count: int = 0        # сколько устройств fail'нули
+    web_push_subscriptions: int = 0       # сколько активных подписок было у юзера
+
     # ─── Cross-platform семантика (P2 fix) ────────────────────────────────
-    # True если у получателя ЕСТЬ реальный TG-аккаунт. Для VK/Email юзеров — False.
-    # Используется чтобы понять, является ли TG-fail реальной проблемой
-    # (retry имеет смысл) или ожидаемой ситуацией (in-app достаточно).
     user_has_real_telegram: bool = False
-    # True если доставка считается успешной для данного типа пользователя:
-    #   — real-TG юзер: telegram_sent == True
-    #   — pseudo-tid юзер (VK/Email): in_app_id is not None
-    # Это «правда» успеха, в отличие от any_delivered (OR логика).
     delivered_to_user: bool = False
-    # True если стоит ретраить — только если real-TG юзер и TG-fail с transient ошибкой
     requires_retry: bool = False
 
     def to_dict(self) -> dict:
@@ -285,6 +283,9 @@ class DeliveryResult:
             "telegram_skipped_reason": self.telegram_skipped_reason,
             "retry_scheduled": self.retry_scheduled,
             "attempts": self.attempts,
+            "web_push_sent_count": self.web_push_sent_count,
+            "web_push_failed_count": self.web_push_failed_count,
+            "web_push_subscriptions": self.web_push_subscriptions,
             "user_has_real_telegram": self.user_has_real_telegram,
             "delivered_to_user": self.delivered_to_user,
             "requires_retry": self.requires_retry,
@@ -683,10 +684,15 @@ async def notify_user(
     # Каналы (override, если нужно)
     send_telegram: Optional[bool] = None,     # None → по приоритету
     send_in_app: bool = True,
+    send_web_push: Optional[bool] = None,     # None → по приоритету (как send_telegram)
     # Telegram-specific
     telegram_text: Optional[str] = None,      # если не задан — из title+message
     telegram_parse_mode: str = "HTML",
     telegram_reply_markup: Any = None,
+    # Web Push specific
+    web_push_url: Optional[str] = None,       # куда вести юзера по клику (relative или absolute)
+    web_push_tag: Optional[str] = None,       # group tag (одинаковый tag → схлопывается в одну)
+    web_push_icon: Optional[str] = None,
     # Retry
     enable_retry: bool = False,               # писать ли в delivery_attempts при fail
     # Diagnostics
@@ -823,30 +829,71 @@ async def notify_user(
                     except Exception as e:  # noqa: BLE001
                         logger.error(f"[delivery] retry schedule failed: {e}")
 
+    # ── 5b. Web Push channel (PWA / iOS 16.4+) ───────────────────────────
+    # Отправляем для NORMAL и выше приоритета (как TG).
+    # Делаем это для ВСЕХ юзеров с активной подпиской (real-TG и pseudo-tid).
+    # iOS-юзер мог установить PWA и не пользоваться TG — для него web push критичен.
+    should_send_wp = send_web_push if send_web_push is not None else _PRIORITY_SENDS_TG[prio]
+    if should_send_wp:
+        try:
+            from services.webpush import is_webpush_configured, send_web_push_to_user
+            if is_webpush_configured() and (uid or eff_tid is not None or real_tid is not None):
+                wp_body = message or title
+                wp_res = await send_web_push_to_user(
+                    db,
+                    telegram_id=eff_tid if eff_tid is not None else real_tid,
+                    uid=uid,
+                    title=f"{emoji} {title}".strip() if emoji else title,
+                    body=wp_body,
+                    url=web_push_url or action_url,
+                    tag=web_push_tag or f"{category}",
+                    icon=web_push_icon,
+                    data={"category": category, "type": type, **(data or {})},
+                    log_ctx=log_ctx or f"notify_user/{category}",
+                )
+                result.web_push_sent_count = wp_res.sent_count
+                result.web_push_failed_count = wp_res.failed_count
+                result.web_push_subscriptions = wp_res.sent_count + wp_res.failed_count + wp_res.removed_count
+                if wp_res.any_sent:
+                    result.delivered.append(Channel.WEB_PUSH)
+                elif wp_res.failed_count or wp_res.removed_count:
+                    result.skipped.append(Channel.WEB_PUSH)
+                    if wp_res.errors:
+                        result.errors["web_push"] = wp_res.errors[0][:120]
+                else:
+                    # Подписок нет — просто скип, без шума
+                    result.skipped.append(Channel.WEB_PUSH)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[delivery] web_push step failed: {e}")
+            result.skipped.append(Channel.WEB_PUSH)
+            result.errors["web_push"] = str(e)[:120]
+    else:
+        result.skipped.append(Channel.WEB_PUSH)
+
     # ── 6. Финальная семантика: delivered_to_user / requires_retry ───────
-    # delivered_to_user: считаем успехом
-    #   — если у юзера есть TG → нужен telegram_sent
-    #   — если у юзера НЕТ TG (pseudo) → достаточно in-app
+    # delivered_to_user: считаем успехом, если хоть один из ОСНОВНЫХ каналов сработал.
+    #   — real-TG юзер: TG ИЛИ web push (последний — отличный fallback)
+    #   — pseudo-tid юзер: in-app ИЛИ web push
     if result.user_has_real_telegram:
-        # Для real-TG юзера: успех = TG доставлено. In-app — приятный бонус.
-        # Если TG не пытались отправить (should_send_tg=False), но in-app есть — тоже OK.
-        if result.telegram_sent:
+        if result.telegram_sent or result.web_push_sent_count > 0:
             result.delivered_to_user = True
         elif not should_send_tg and result.in_app_id is not None:
+            # Если TG не пытались (low priority), достаточно in-app
             result.delivered_to_user = True
         else:
             result.delivered_to_user = False
     else:
-        # pseudo-tid / no-tid юзер: in-app — единственный канал
-        result.delivered_to_user = result.in_app_id is not None
+        # pseudo-tid юзер: web push ИЛИ in-app
+        result.delivered_to_user = (
+            result.web_push_sent_count > 0 or result.in_app_id is not None
+        )
 
-    # requires_retry: только если хотели отправить в TG, real-TG юзер, и упало
+    # requires_retry: только если real-TG юзер, хотели в TG, упало, и web push не спас
     result.requires_retry = (
         should_send_tg
         and result.user_has_real_telegram
         and not result.telegram_sent
-        # Перманентные ошибки (Forbidden, chat_not_found) уже не пытаемся — circuit breaker отличит
-        # На этом уровне просто говорим «было неуспешно, можно ретраить»
+        and result.web_push_sent_count == 0
     )
 
     return result

@@ -60,6 +60,9 @@ import ReferralModal from './components/ReferralModal';
 // --- Stage 3: Auth ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthGate from './components/auth/AuthGate';
+
+// --- Web Push (PWA) ---
+import { initWebPush } from './utils/webpush';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterWizard = lazy(() => import('./pages/RegisterWizard'));
 const VKCallbackPage = lazy(() => import('./pages/VKCallbackPage'));
@@ -119,6 +122,36 @@ const Home = () => {
     }
     return rawTgUser;
   }, [authUser, rawTgUser]);
+
+  // ─── Web Push (PWA) — авто-подписка при наличии user ─────────────────
+  // Запускается один раз при появлении валидного user.id. На iOS — только в standalone-режиме.
+  // Не делает ничего внутри Telegram WebApp (там TG-push уже есть).
+  useEffect(() => {
+    if (!user || !user.id) return;
+    // Detect Telegram WebApp — внутри него web push не нужен (есть TG-нотификации бота)
+    const inTelegramWebApp = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+    if (inTelegramWebApp) return;
+    // Запускаем асинхронно, не блокируем рендер
+    const timer = setTimeout(() => {
+      initWebPush({
+        telegram_id: user.id,
+        uid: user.uid || null,
+        autoPrompt: true,
+      })
+        .then((res) => {
+          if (res.success) {
+            console.log('[App] ✅ Web Push subscribed');
+          } else {
+            console.log('[App] Web Push not enabled:', res.reason);
+          }
+        })
+        .catch((e) => {
+          console.warn('[App] Web Push init error:', e);
+        });
+    }, 1500); // Небольшая задержка, чтобы не отвлекать от первой загрузки
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.uid]);
+
   // TEST: Greeting Notification
   const [testGreetingHour, setTestGreetingHour] = useState(null);
   const [greetingKey, setGreetingKey] = useState(0);

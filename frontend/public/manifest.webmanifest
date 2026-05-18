@@ -1,0 +1,37 @@
+{
+  "name": "RUDN Go — Расписание РУДН",
+  "short_name": "RUDN Go",
+  "description": "Расписание занятий РУДН с напоминаниями и геймификацией",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "orientation": "portrait",
+  "background_color": "#1C1C1E",
+  "theme_color": "#1C1C1E",
+  "lang": "ru",
+  "dir": "ltr",
+  "scope": "/",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/LogoRudn.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/LogoRudn.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/LogoRudn.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": []
+}

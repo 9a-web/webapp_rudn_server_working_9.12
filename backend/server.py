@@ -792,6 +792,23 @@ async def startup_event():
         except Exception as e:
             logger.warning(f"⚠️ Failed to schedule delivery indexes: {e}")
 
+        # 7.6. 📲 Web Push (PWA) — индексы + проверка конфигурации
+        try:
+            from services.webpush import (
+                ensure_push_subscriptions_indexes,
+                is_webpush_configured,
+            )
+            asyncio.create_task(ensure_push_subscriptions_indexes(db))
+            if is_webpush_configured():
+                logger.info("✅ Web Push (VAPID) configured and ready")
+            else:
+                logger.warning(
+                    "⚠️ Web Push NOT configured (VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY missing). "
+                    "PWA push notifications будут недоступны."
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to setup web push: {e}")
+
         # Retry worker: каждые 60 сек обрабатывает pending_retry
         async def _delivery_retry_loop():
             from services.delivery import process_pending_retries
@@ -4276,6 +4293,149 @@ async def get_user_invites(telegram_id: int):
     except Exception as e:
         logger.error(f"Ошибка при получении приглашений: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# Web Push (PWA) — VAPID-based push notifications для iOS 16.4+ / Android / Desktop
+# ============================================================================
+
+@api_router.get("/push/vapid-public-key")
+async def get_vapid_public_key_endpoint():
+    """Возвращает публичный VAPID ключ (base64url) для фронта.
+
+    Фронт использует его в `pushManager.subscribe({ applicationServerKey, ... })`.
+    Если ключ не настроен в .env → 503 (фронт скроет UI «Включить push»).
+    """
+    from services.webpush import get_vapid_public_key, is_webpush_configured
+    if not is_webpush_configured():
+        raise HTTPException(status_code=503, detail="web_push_not_configured")
+    return {"public_key": get_vapid_public_key()}
+
+
+@api_router.post("/push/subscribe")
+async def push_subscribe(payload: dict = Body(...)):
+    """Сохранить web push subscription.
+
+    Body:
+      {
+        "telegram_id": 123456789,          # опционально
+        "uid": "000123456",                # опционально, но желателен
+        "endpoint": "https://...",
+        "keys": {"p256dh": "...", "auth": "..."},
+        "user_agent": "Mozilla/..."        # опционально
+      }
+
+    Минимум один из (telegram_id, uid) должен быть указан.
+    Идемпотентный: повторный subscribe того же endpoint просто обновит привязку юзера.
+    """
+    from services.webpush import save_subscription, is_webpush_configured
+    if not is_webpush_configured():
+        raise HTTPException(status_code=503, detail="web_push_not_configured")
+
+    endpoint = (payload or {}).get("endpoint")
+    keys = (payload or {}).get("keys") or {}
+    p256dh = keys.get("p256dh")
+    auth = keys.get("auth")
+    telegram_id = payload.get("telegram_id")
+    uid_ = payload.get("uid")
+    user_agent = payload.get("user_agent") or ""
+
+    if not endpoint or not p256dh or not auth:
+        raise HTTPException(status_code=400, detail="missing endpoint/keys")
+    if telegram_id is None and not uid_:
+        raise HTTPException(status_code=400, detail="missing telegram_id or uid")
+
+    try:
+        tid_int = int(telegram_id) if telegram_id is not None else None
+    except (TypeError, ValueError):
+        tid_int = None
+
+    sub_id = await save_subscription(
+        db,
+        telegram_id=tid_int,
+        uid=uid_,
+        endpoint=endpoint,
+        p256dh=p256dh,
+        auth=auth,
+        user_agent=user_agent,
+    )
+    logger.info(
+        f"📲 [push.subscribe] saved sub_id={sub_id} tid={tid_int} uid={uid_} "
+        f"ua={(user_agent or '')[:60]}"
+    )
+    return {"status": "ok", "subscription_id": sub_id}
+
+
+@api_router.post("/push/unsubscribe")
+async def push_unsubscribe(payload: dict = Body(...)):
+    """Удалить subscription по endpoint."""
+    from services.webpush import remove_subscription
+    endpoint = (payload or {}).get("endpoint")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="missing endpoint")
+    ok = await remove_subscription(db, endpoint=endpoint)
+    return {"status": "ok", "removed": ok}
+
+
+@api_router.post("/push/test")
+async def push_test(payload: dict = Body(...)):
+    """Тестовый push — отправляется на все активные подписки указанного юзера.
+
+    Полезно для UI «Проверить push» в настройках. Никакого in-app/TG не делает.
+    """
+    from services.webpush import send_web_push_to_user, is_webpush_configured
+    if not is_webpush_configured():
+        raise HTTPException(status_code=503, detail="web_push_not_configured")
+    telegram_id = payload.get("telegram_id")
+    uid_ = payload.get("uid")
+    if telegram_id is None and not uid_:
+        raise HTTPException(status_code=400, detail="missing telegram_id or uid")
+    try:
+        tid_int = int(telegram_id) if telegram_id is not None else None
+    except (TypeError, ValueError):
+        tid_int = None
+
+    res = await send_web_push_to_user(
+        db,
+        telegram_id=tid_int,
+        uid=uid_,
+        title="🔔 Web Push работает!",
+        body="Это тестовое уведомление. Вы будете получать такие же, когда пара вот-вот начнётся.",
+        url="/",
+        tag="test",
+        log_ctx="push_test",
+    )
+    return {
+        "status": "ok",
+        "sent": res.sent_count,
+        "failed": res.failed_count,
+        "removed": res.removed_count,
+        "errors": res.errors,
+    }
+
+
+@api_router.get("/push/subscriptions")
+async def push_get_subscriptions(telegram_id: Optional[int] = None, uid: Optional[str] = None):
+    """Получить список подписок юзера (для UI: какие устройства подключены)."""
+    from services.webpush import get_subscriptions_for_user
+    if telegram_id is None and not uid:
+        raise HTTPException(status_code=400, detail="missing telegram_id or uid")
+    subs = await get_subscriptions_for_user(db, telegram_id=telegram_id, uid=uid)
+    # Прячем endpoint/keys — отдаём только мета-инфу
+    return {
+        "subscriptions": [
+            {
+                "id": s.get("id"),
+                "user_agent": s.get("user_agent", "")[:200],
+                "created_at": s.get("created_at"),
+                "last_success_at": s.get("last_success_at"),
+                "active": s.get("active", True),
+                "fail_count": s.get("fail_count", 0),
+            }
+            for s in subs
+        ],
+        "count": len(subs),
+    }
+
 
 @api_router.post("/notifications/test", response_model=SuccessResponse)
 async def send_test_notification_endpoint(telegram_id: int = Body(..., embed=True)):
