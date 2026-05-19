@@ -245,6 +245,128 @@ def _coerce_priority(priority: Any) -> MessagePriority:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Quiet Hours
+# ────────────────────────────────────────────────────────────────────────────
+
+# Москва — целевая TZ для quiet hours (т.к. большинство юзеров — РУДН).
+try:
+    import pytz as _pytz
+    _QH_TZ = _pytz.timezone("Europe/Moscow")
+except Exception:  # noqa: BLE001
+    _QH_TZ = timezone.utc
+
+
+def _parse_hhmm(s: str) -> Optional[tuple[int, int]]:
+    """Распарсить 'HH:MM' → (h, m). None при ошибке."""
+    if not s or not isinstance(s, str):
+        return None
+    try:
+        h_str, m_str = s.split(":", 1)
+        h, m = int(h_str), int(m_str)
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            return h, m
+    except (ValueError, AttributeError):
+        return None
+    return None
+
+
+def is_in_quiet_hours(
+    settings: Optional[dict] = None,
+    *,
+    enabled: Optional[bool] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    at: Optional[datetime] = None,
+) -> bool:
+    """True если текущий момент попадает в окно тихих часов.
+
+    Принимает либо dict с extended_notification_settings, либо явные параметры.
+    Окно может проходить через полночь (start > end, например 23:00 → 08:00).
+    """
+    if settings is not None:
+        enabled = settings.get("quiet_hours_enabled", False)
+        start = settings.get("quiet_hours_start", "23:00")
+        end = settings.get("quiet_hours_end", "08:00")
+
+    if not enabled:
+        return False
+
+    s = _parse_hhmm(start or "")
+    e = _parse_hhmm(end or "")
+    if not s or not e:
+        return False
+
+    now = at or datetime.now(_QH_TZ)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=_QH_TZ)
+    else:
+        now = now.astimezone(_QH_TZ)
+    now_min = now.hour * 60 + now.minute
+    s_min = s[0] * 60 + s[1]
+    e_min = e[0] * 60 + e[1]
+
+    if s_min == e_min:
+        return False  # окно нулевой длины
+
+    if s_min < e_min:
+        # Окно в течение одного дня: [start, end)
+        return s_min <= now_min < e_min
+    # Окно через полночь: [start, 24:00) ∪ [00:00, end)
+    return now_min >= s_min or now_min < e_min
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  HTML helpers
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def _safe_html_truncate(text: str, max_len: int) -> str:
+    """Обрезает text до max_len символов, не ломая HTML-теги (для TG parse_mode=HTML).
+
+    Стратегия:
+      1) Если text короче лимита — вернуть как есть.
+      2) Иначе обрезать до (max_len - суффикс), потом откатиться к ближайшей
+         безопасной позиции (после `>` или вне тега), затем закрыть все открытые теги.
+    """
+    if not text or len(text) <= max_len:
+        return text or ""
+
+    suffix = "…"
+    budget = max_len - len(suffix)
+    if budget <= 0:
+        return text[:max_len]
+
+    cut = text[:budget]
+    # Если мы оборвались посреди тега (`<b` без `>`), откатимся до последнего `<`
+    last_lt = cut.rfind("<")
+    last_gt = cut.rfind(">")
+    if last_lt > last_gt:
+        cut = cut[:last_lt]
+
+    # Закрываем открытые теги (простая стратегия: парсим открытые-закрытые)
+    import re as _re
+
+    open_tags: list[str] = []
+    for m in _re.finditer(r"<\s*(/?)\s*([a-zA-Z][a-zA-Z0-9]*)[^>]*>", cut):
+        is_close = m.group(1) == "/"
+        name = m.group(2).lower()
+        # void-теги в TG не используются, но игнор на всякий случай
+        if name in {"br", "hr", "img"}:
+            continue
+        if is_close:
+            # Закрываем последний открытый с таким именем
+            for i in range(len(open_tags) - 1, -1, -1):
+                if open_tags[i] == name:
+                    open_tags.pop(i)
+                    break
+        else:
+            open_tags.append(name)
+
+    closing = "".join(f"</{t}>" for t in reversed(open_tags))
+    return cut + suffix + closing
+
+
+# ────────────────────────────────────────────────────────────────────────────
 #  Result dataclass
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -293,11 +415,26 @@ class DeliveryResult:
 
     # Dict-подобный доступ для обратной совместимости (как делают старые вызовы):
     #   result["telegram_sent"], result["in_app_id"], result["telegram_skipped_reason"]
+    # Бэкается прямо через getattr — без полной сериализации на каждый ключ (был баг #16).
     def __getitem__(self, key: str) -> Any:
-        return self.to_dict()[key]
+        if not hasattr(self, key):
+            raise KeyError(key)
+        v = getattr(self, key)
+        # Channel enum → строковое значение для обратной совместимости
+        if isinstance(v, list) and v and isinstance(v[0], Channel):
+            return [c.value for c in v]
+        return v
 
     def get(self, key: str, default: Any = None) -> Any:
-        return self.to_dict().get(key, default)
+        if not hasattr(self, key):
+            return default
+        v = getattr(self, key)
+        if isinstance(v, list) and v and isinstance(v[0], Channel):
+            return [c.value for c in v]
+        return v
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
 
     @property
     def any_delivered(self) -> bool:
@@ -420,15 +557,16 @@ async def safe_send_telegram(
                 f"[delivery] empty text for TG send tid={telegram_id} ctx={log_ctx} — skip"
             )
             return False
-        # TG лимит 4096 символов для text
+        # TG лимит 4096 символов для text. Обрезка должна быть HTML-aware,
+        # иначе мы можем оборвать тег `<b` → TG вернёт parse-error (баг #9).
         if len(body) > TG_TEXT_MAX:
-            body = body[: TG_TEXT_MAX - 3] + "..."
+            body = _safe_html_truncate(body, TG_TEXT_MAX)
             text = body  # обновляем для kwargs ниже
     else:  # photo
         # photo сам может быть пустым только если ошибочно передали None — это поймает TG API
         cap = caption or ""
         if cap and len(cap) > TG_CAPTION_MAX:
-            caption = cap[: TG_CAPTION_MAX - 3] + "..."
+            caption = _safe_html_truncate(cap, TG_CAPTION_MAX)
 
     # ── Send (с timeout) ───────────────────────────────────────────────────
     kwargs: dict = {"chat_id": int(telegram_id)}
@@ -695,6 +833,9 @@ async def notify_user(
     web_push_icon: Optional[str] = None,
     # Retry
     enable_retry: bool = False,               # писать ли в delivery_attempts при fail
+    # Quiet hours — учитывать ли тихие часы юзера (skip TG/web-push, но in-app оставляем).
+    # Не действует на priority=URGENT (например, critical-системные).
+    respect_quiet_hours: bool = True,
     # Diagnostics
     log_ctx: str = "",
 ) -> DeliveryResult:
@@ -723,6 +864,31 @@ async def notify_user(
             eff_tid = pseudo_tid_from_uid(uid)
         except (TypeError, ValueError):
             eff_tid = None
+
+    # ── 2b. Quiet hours: глушим внешние каналы, но in-app оставляем ──────
+    # URGENT — обходит quiet hours (для критичных алертов).
+    quiet_now = False
+    if respect_quiet_hours and prio != MessagePriority.URGENT:
+        try:
+            qh_settings = None
+            if user_doc:
+                ext = user_doc.get("extended_notification_settings") or {}
+                if isinstance(ext, dict) and ext.get("quiet_hours_enabled"):
+                    qh_settings = ext
+            if qh_settings is None and eff_tid is not None:
+                # Fallback: достать из user_settings по telegram_id
+                us = await db.user_settings.find_one(
+                    {"telegram_id": int(eff_tid)},
+                    {"extended_notification_settings": 1},
+                )
+                if us:
+                    ext = us.get("extended_notification_settings") or {}
+                    if isinstance(ext, dict) and ext.get("quiet_hours_enabled"):
+                        qh_settings = ext
+            if qh_settings and is_in_quiet_hours(qh_settings):
+                quiet_now = True
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[delivery] quiet-hours check failed: {e}")
 
     # ── 3. In-app channel ────────────────────────────────────────────────
     if send_in_app and eff_tid is not None:
@@ -771,6 +937,9 @@ async def notify_user(
         result.telegram_skipped_reason = "priority_low" if prio in (
             MessagePriority.SILENT, MessagePriority.LOW
         ) else "disabled"
+    elif quiet_now:
+        result.skipped.append(Channel.TELEGRAM)
+        result.telegram_skipped_reason = "quiet_hours"
     else:
         if real_tid is None:
             result.skipped.append(Channel.TELEGRAM)
@@ -834,6 +1003,11 @@ async def notify_user(
     # Делаем это для ВСЕХ юзеров с активной подпиской (real-TG и pseudo-tid).
     # iOS-юзер мог установить PWA и не пользоваться TG — для него web push критичен.
     should_send_wp = send_web_push if send_web_push is not None else _PRIORITY_SENDS_TG[prio]
+    wp_blocked_quiet = False
+    if should_send_wp and quiet_now:
+        # Тихие часы — не звоним и не пушим, но in-app уже создали выше
+        should_send_wp = False
+        wp_blocked_quiet = True
     if should_send_wp:
         try:
             from services.webpush import is_webpush_configured, send_web_push_to_user
@@ -869,6 +1043,8 @@ async def notify_user(
             result.errors["web_push"] = str(e)[:120]
     else:
         result.skipped.append(Channel.WEB_PUSH)
+        if wp_blocked_quiet:
+            result.errors["web_push"] = "quiet_hours"
 
     # ── 6. Финальная семантика: delivered_to_user / requires_retry ───────
     # delivered_to_user: считаем успехом, если хоть один из ОСНОВНЫХ каналов сработал.
@@ -877,8 +1053,8 @@ async def notify_user(
     if result.user_has_real_telegram:
         if result.telegram_sent or result.web_push_sent_count > 0:
             result.delivered_to_user = True
-        elif not should_send_tg and result.in_app_id is not None:
-            # Если TG не пытались (low priority), достаточно in-app
+        elif (not should_send_tg or quiet_now) and result.in_app_id is not None:
+            # Если TG не пытались (low priority) ИЛИ заблокировано quiet hours — достаточно in-app
             result.delivered_to_user = True
         else:
             result.delivered_to_user = False
@@ -888,9 +1064,10 @@ async def notify_user(
             result.web_push_sent_count > 0 or result.in_app_id is not None
         )
 
-    # requires_retry: только если real-TG юзер, хотели в TG, упало, и web push не спас
+    # requires_retry: только если real-TG юзер, хотели в TG, упало (не из-за quiet_hours), и web push не спас
     result.requires_retry = (
         should_send_tg
+        and not quiet_now
         and result.user_has_real_telegram
         and not result.telegram_sent
         and result.web_push_sent_count == 0
@@ -1365,4 +1542,8 @@ __all__ = [
     # Retry
     "process_pending_retries",
     "ensure_delivery_attempts_indexes",
+    # Quiet hours
+    "is_in_quiet_hours",
+    # HTML helpers
+    "_safe_html_truncate",
 ]

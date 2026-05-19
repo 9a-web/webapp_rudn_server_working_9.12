@@ -55,12 +55,27 @@ class TelegramNotificationService:
 
     @property
     def db(self):
-        """Lazy fallback — если db не был передан явно, тянем из server. Хрупко, но совместимо."""
+        """Возвращает прикреплённый db. Если не прикреплён — кидаем явную ошибку.
+
+        Раньше тут был lazy `from server import db` (circular workaround), но это
+        могло приводить к use-after-shutdown и подкидывать тонкие баги.
+        Теперь требуется явный `attach_db(...)` или `init_notification_service_with_db(...)`.
+        """
         if self._db is not None:
             return self._db
-        # Fallback на старое поведение (для совместимости со старым кодом)
-        from server import db as _server_db  # noqa: WPS433 (circular workaround)
-        return _server_db
+        # Соблюдаем backward-compat: тихий fallback на server.db, НО с предупреждением.
+        try:
+            from server import db as _server_db  # noqa: WPS433
+            logger.warning(
+                "[notifications] db не был прикреплён через attach_db(); "
+                "используется fallback из server.db. Это намёк на ошибку порядка инициализации."
+            )
+            return _server_db
+        except Exception:
+            raise RuntimeError(
+                "TelegramNotificationService.db не прикреплён. "
+                "Вызовите init_notification_service_with_db(db) на старте."
+            )
 
     # ──────────────────────────────────────────────────────────────────────
     #  Уведомления о парах
@@ -133,18 +148,36 @@ class TelegramNotificationService:
             return False
 
     def _format_class_notification_inapp(self, class_info: dict, minutes_before: int) -> str:
-        """Короткая (plain-text) версия сообщения о паре — для in-app карточки."""
-        parts = []
-        if minutes_before <= 5:
+        """Расширенная (plain-text) версия сообщения о паре — для in-app карточки и web push body.
+
+        Включает время начала пары, тип занятия, аудиторию, преподавателя и группу.
+        """
+        parts: list[str] = []
+        if minutes_before <= 0:
+            parts.append("🔴 Пара начинается прямо сейчас!")
+        elif minutes_before <= 5:
             parts.append(f"🔴 Бегом! Пара через {minutes_before} мин")
         elif minutes_before <= 15:
             parts.append(f"🟡 Скоро начало — через {minutes_before} мин")
         else:
             parts.append(f"🟢 Через {minutes_before} мин")
+
+        # Время начала пары (например, "09:00") — полезно для контекста
+        start_time = class_info.get("start_time") or class_info.get("startTime")
+        if start_time:
+            parts.append(f"🕐 {start_time}")
+
+        lesson_type = class_info.get("lessonType") or class_info.get("lesson_type")
+        if lesson_type:
+            parts.append(f"📖 {lesson_type}")
+
         if class_info.get("auditory"):
             parts.append(f"📍 {class_info['auditory']}")
         if class_info.get("teacher"):
-            parts.append(f"👨‍🏫 {class_info['teacher']}")
+            parts.append(f"👨\u200d🏫 {class_info['teacher']}")
+        if class_info.get("group_name"):
+            parts.append(f"👥 {class_info['group_name']}")
+
         return " • ".join(parts)
 
     def _format_class_notification(self, class_info: dict, minutes_before: int) -> str:

@@ -2307,6 +2307,11 @@ class ExtendedNotificationSettings(BaseModel):
     achievements_push: bool = False
     system_enabled: bool = True
     system_push: bool = True
+    # Тихие часы (в эти часы НЕ шлём TG-push и web-push, но в in-app оставляем).
+    # Время в МСК, "HH:MM" формат. Если start > end — окно через полночь.
+    quiet_hours_enabled: bool = False
+    quiet_hours_start: str = "23:00"
+    quiet_hours_end: str = "08:00"
 
 
 class ExtendedNotificationSettingsUpdate(BaseModel):
@@ -2331,6 +2336,9 @@ class ExtendedNotificationSettingsUpdate(BaseModel):
     achievements_push: Optional[bool] = None
     system_enabled: Optional[bool] = None
     system_push: Optional[bool] = None
+    quiet_hours_enabled: Optional[bool] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
 
 
 class UnreadCountResponse(BaseModel):

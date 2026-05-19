@@ -614,6 +614,11 @@ async def create_indexes():
         
         # In-App Notifications - индекс для непрочитанных
         await safe_create_index(db.in_app_notifications, [("telegram_id", 1), ("read", 1), ("dismissed", 1)])
+
+        # БАГ #20 fix: TTL-индекс по expires_at — Mongo автоматически удаляет уведомления
+        # после истечения срока. Поле expires_at обычно None → TTL не удаляет (Mongo пропускает
+        # документы без значения этого поля); для конкретных уведомлений можно задать срок.
+        await safe_create_index(db.in_app_notifications, "expires_at", expireAfterSeconds=0)
         
         # Web Sessions - индексы для QR-авторизации
         await safe_create_index(db.web_sessions, "session_token", unique=True)
@@ -1457,14 +1462,22 @@ async def get_cached_schedule(group_id: str, week_number: int):
 
 @api_router.put("/user-settings/{telegram_id}/notifications", response_model=NotificationSettingsResponse)
 async def update_notification_settings(telegram_id: int, settings: NotificationSettingsUpdate):
-    """Обновить настройки уведомлений пользователя"""
+    """Обновить настройки уведомлений пользователя.
+
+    БАГ #7 fix: для pseudo-tid (VK/Email юзеров без TG-аккаунта) — корректно отвечаем
+    «Уведомления настроены», не предлагая запустить /start в боте, которого у них нет.
+    БАГ #8 fix: при выключении notifications_enabled=False — отменяем все pending,
+    чтобы они не «выстрелили» при последующем включении или ровно в назначенное время.
+    """
     try:
+        from auth_utils import is_real_telegram_user, is_pseudo_tid
+
         # Проверяем существование пользователя
         user = await db.user_settings.find_one({"telegram_id": telegram_id})
-        
+
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
-        
+
         # Обновляем настройки уведомлений
         await db.user_settings.update_one(
             {"telegram_id": telegram_id},
@@ -1474,32 +1487,75 @@ async def update_notification_settings(telegram_id: int, settings: NotificationS
                 "updated_at": datetime.utcnow()
             }}
         )
-        
-        # Если уведомления включены, отправляем тестовое уведомление и планируем реальные
+
         test_notification_sent = None
         test_notification_error = None
-        
+
         if settings.notifications_enabled:
-            # 1. Отправляем тестовое (сразу)
+            # ── Cross-platform: real-TG vs pseudo-tid ───────────────────────
+            is_real_tg = is_real_telegram_user(telegram_id)
+
+            # 1. Тестовое уведомление
             try:
                 notification_service = get_notification_service()
-                success = await notification_service.send_test_notification(telegram_id)
-                test_notification_sent = success
-                if not success:
-                    test_notification_error = "Не удалось отправить тестовое уведомление. Убедитесь, что вы начали диалог с ботом командой /start"
+                if is_real_tg:
+                    # Для real-TG юзера: пробуем полный канал (TG + in-app + web push)
+                    success = await notification_service.send_test_notification(telegram_id)
+                    test_notification_sent = success
+                    if not success:
+                        test_notification_error = (
+                            "Не удалось отправить тестовое уведомление в Telegram. "
+                            "Убедитесь, что вы запустили бота командой /start."
+                        )
+                else:
+                    # Для pseudo-tid: создаём только in-app + web push (без TG)
+                    from services.delivery import notify_user as _notify_user, MessagePriority as _MP
+                    dr = await _notify_user(
+                        db,
+                        notification_service.bot,
+                        telegram_id=telegram_id,
+                        title="Уведомления подключены!",
+                        message="Отлично — теперь вы не пропустите ни одной пары. Установите PWA для push-уведомлений.",
+                        emoji="🔔",
+                        type="announcement",
+                        category="system",
+                        priority=_MP.HIGH,
+                        send_telegram=False,  # явно — у юзера нет TG
+                        log_ctx="test_notification/pseudo",
+                    )
+                    # Для pseudo-tid считаем тест успешным, если in-app создан
+                    test_notification_sent = bool(dr.in_app_id)
+                    if not test_notification_sent:
+                        test_notification_error = "Не удалось создать тестовое уведомление в приложении."
             except Exception as e:
                 logger.warning(f"Failed to send test notification: {e}")
                 test_notification_sent = False
-                test_notification_error = f"Ошибка: {str(e)}. Пожалуйста, начните диалог с ботом командой /start в Telegram"
-            
+                if is_real_telegram_user(telegram_id):
+                    test_notification_error = f"Ошибка: {str(e)}. Пожалуйста, начните диалог с ботом командой /start в Telegram"
+                else:
+                    test_notification_error = f"Ошибка: {str(e)}"
+
             # 2. Планируем уведомления на сегодня (асинхронно)
             try:
                 scheduler = get_scheduler_v2(db)
                 stats = await scheduler.schedule_user_notifications(telegram_id)
-                logger.info(f"Scheduled {stats.get('scheduled', 0)} notifications for user {telegram_id}")
+                logger.info(
+                    f"Scheduled {stats.get('scheduled', 0)} notifications "
+                    f"(cancelled_old={stats.get('cancelled_old', 0)}) for user {telegram_id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to schedule notifications after enabling: {e}")
-        
+        else:
+            # БАГ #8 fix: notifications_enabled=False → отменяем все pending у юзера.
+            # Иначе старые scheduled_notifications.status=pending «выстрелят» в назначенное время.
+            try:
+                scheduler = get_scheduler_v2(db)
+                cancelled = await scheduler.cancel_all_pending_for_user(telegram_id)
+                if cancelled > 0:
+                    logger.info(f"🚫 Cancelled {cancelled} pending notifications after disabling for tid={telegram_id}")
+            except Exception as e:
+                logger.error(f"Failed to cancel pending after disabling notifications: {e}")
+
         return NotificationSettingsResponse(
             notifications_enabled=settings.notifications_enabled,
             notification_time=settings.notification_time,
@@ -18378,51 +18434,87 @@ async def create_notification(
     priority: NotificationPriority = NotificationPriority.NORMAL,
     data: dict = None,
     actions: list = None,
-    send_push: bool = None
+    send_push: bool = None,
+    action_url: Optional[str] = None,
 ) -> Optional[str]:
-    """Создать уведомление"""
+    """Создать уведомление пользователю (cross-platform aware).
+
+    БАГ #1 FIX (КРИТИЧЕСКИЙ): раньше тут было ДВОЙНОЕ создание in-app —
+    сначала прямой insert_one в db.in_app_notifications, потом ещё один через
+    notification_service.send_message → notify_user. Результат: дубли уведомлений
+    в панели пользователя для FRIEND_REQUEST, FRIEND_ACCEPTED, NEW_MESSAGE,
+    JOURNAL_INVITE и др.
+
+    Теперь — единая точка delivery.notify_user(), которая:
+      • создаёт ОДНУ in-app запись;
+      • для real-TG юзера: пытается TG-push + web push (PWA);
+      • для pseudo-tid (VK/Email): только in-app + web push;
+      • учитывает quiet_hours из extended_notification_settings;
+      • уважает should_in_app / should_push из настроек юзера.
+
+    Returns:
+        in_app_id (str) если уведомление создано, иначе None.
+    """
     try:
-        # Проверяем настройки
+        # Проверяем настройки (extended_notification_settings)
         should_in_app, should_push = await should_send_notification(telegram_id, category, notification_type)
-        
+
         if not should_in_app:
+            # Юзер выключил эту категорию полностью — даже in-app не создаём
             return None
-        
-        notification = InAppNotification(
+
+        # Маппинг приоритета приложения → MessagePriority delivery-слоя
+        from services.delivery import MessagePriority as _MP, notify_user as _notify_user
+        _prio_map = {
+            NotificationPriority.LOW: _MP.LOW,
+            NotificationPriority.NORMAL: _MP.NORMAL,
+            NotificationPriority.HIGH: _MP.HIGH,
+        }
+        prio = _prio_map.get(priority, _MP.NORMAL)
+
+        # Определяем итоговое значение send_telegram:
+        #   — если send_push явно задан (True/False) — приоритет за ним
+        #   — иначе берём should_push из настроек юзера
+        send_tg = send_push if send_push is not None else should_push
+        send_wp = send_push if send_push is not None else should_push
+
+        # Telegram-текст: HTML-формат для красоты
+        # Эскейп title/message не делаем — они приходят как plain (исторически).
+        # Если в будущем будет HTML — переопределить через telegram_text при вызове.
+        push_text = f"{emoji}  <b>{title}</b>\n{message}" if (send_tg or send_wp) else None
+
+        notification_service = get_notification_service()
+
+        dr = await _notify_user(
+            db,
+            notification_service.bot,
             telegram_id=telegram_id,
-            type=notification_type,
-            category=category,
-            priority=priority,
             title=title,
             message=message,
             emoji=emoji,
+            type=notification_type.value if hasattr(notification_type, "value") else str(notification_type),
+            category=category.value if hasattr(category, "value") else str(category),
+            priority=prio,
             data=data or {},
-            actions=actions or []
+            actions=actions or [],
+            action_url=action_url,
+            send_telegram=send_tg,
+            send_in_app=True,
+            send_web_push=send_wp,
+            telegram_text=push_text,
+            telegram_parse_mode="HTML",
+            log_ctx=f"create_notification/{category.value if hasattr(category, 'value') else category}",
         )
-        
-        await db.in_app_notifications.insert_one(notification.dict())
-        
-        # Отправляем push если нужно
-        if (send_push is True) or (send_push is None and should_push):
-            try:
-                from notifications import get_notification_service
-                notification_service = get_notification_service()
-                
-                # Красиво форматируем push-сообщение
-                push_text = f"{emoji}  <b>{title}</b>\n{message}"
-                
-                await notification_service.send_message(
-                    telegram_id,
-                    push_text
-                )
-            except Exception as e:
-                logger.warning(f"Failed to send push notification: {e}")
-        
-        logger.info(f"📬 Notification created: {notification_type} for {telegram_id}")
-        return notification.id
-        
+
+        if dr.in_app_id:
+            logger.info(
+                f"📬 Notification created: type={notification_type} tid={telegram_id} "
+                f"in_app={bool(dr.in_app_id)} tg={dr.telegram_sent} wp={dr.web_push_sent_count}"
+            )
+        return dr.in_app_id
+
     except Exception as e:
-        logger.error(f"Create notification error: {e}")
+        logger.error(f"Create notification error: {e}", exc_info=True)
         return None
 
 

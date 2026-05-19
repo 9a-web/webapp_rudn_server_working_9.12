@@ -129,7 +129,7 @@ class NotificationSchedulerV2:
             replace_existing=True,
         )
 
-        # === УРОВЕНЬ 3: Retry Handler ===
+        # === УРОВЕНЬ 3: Retry Handler (для scheduled_notifications) ===
         # Проверка и повтор неудачных уведомлений (каждые 2 минуты)
         self.scheduler.add_job(
             self.retry_failed_notifications,
@@ -137,6 +137,19 @@ class NotificationSchedulerV2:
             id='retry_handler',
             name='Retry failed notifications',
             replace_existing=True,
+        )
+
+        # === УРОВЕНЬ 3.5: DLQ Retry Worker (для delivery_attempts) ===
+        # БАГ #2 (КРИТИЧЕСКИЙ): раньше воркер process_pending_retries был написан, но НЕ запускался.
+        # Записи `delivery_attempts.status=pending_retry` (от notify_user/admin-рассылок/ачивок
+        # с enable_retry=True) копились и не обрабатывались. Теперь обрабатываем каждые 30 сек.
+        self.scheduler.add_job(
+            self._run_dlq_retries,
+            trigger=CronTrigger(second='*/30', timezone=MOSCOW_TZ),
+            id='dlq_retry_worker',
+            name='Process pending_retry from delivery_attempts (DLQ)',
+            replace_existing=True,
+            max_instances=1,  # одновременно только 1 (избегаем дубль-доставки)
         )
 
         # === MAINTENANCE ===
@@ -182,6 +195,7 @@ class NotificationSchedulerV2:
         logger.info("🔧 Recovery will run in 2 seconds")
         logger.info("📅 Daily planner will run at 06:00 Moscow time")
         logger.info("🔄 Retry handler checks every 2 minutes")
+        logger.info("📦 DLQ retry worker checks every 30 seconds")
     
     def stop(self):
         """Остановить планировщик"""
@@ -212,14 +226,17 @@ class NotificationSchedulerV2:
             now_naive_msk = now_msk.replace(tzinfo=None)
             grace_threshold = now_naive_msk - timedelta(minutes=RECOVERY_GRACE_MINUTES)
             today_str = now_msk.strftime('%Y-%m-%d')
+            # БАГ #6: расширяем окно recovery — берём также вчерашние pending,
+            # т.к. если backend упал ночью и поднялся утром, мы должны их обработать
+            # (отправить если в grace, иначе пометить expired).
+            yesterday_str = (now_msk - timedelta(days=1)).strftime('%Y-%m-%d')
 
-            logger.info(f"🔧 [recovery] Starting recovery for date={today_str}")
+            logger.info(f"🔧 [recovery] Starting recovery for dates={yesterday_str},{today_str}")
 
-            # Берём pending уведомления только сегодняшние (вчерашние/будущие — не наш кейс)
-            # scheduled_time в БД — naive МСК (исторически)
+            # Берём pending уведомления за вчера И сегодня.
             cursor = self.db.scheduled_notifications.find({
                 "status": "pending",
-                "date": today_str,
+                "date": {"$in": [yesterday_str, today_str]},
             })
 
             recovered_future = 0
@@ -291,6 +308,39 @@ class NotificationSchedulerV2:
 
         except Exception as e:  # noqa: BLE001
             logger.error(f"[recovery] Fatal error: {e}", exc_info=True)
+
+    async def _run_dlq_retries(self):
+        """Воркер обработки delivery_attempts.status=pending_retry.
+
+        БАГ #2 (КРИТИЧЕСКИЙ): раньше эта функция была написана в services/delivery.py,
+        но никем не вызывалась — записи копились без обработки. Теперь воркер запускается
+        каждые 30 сек и:
+          1) Берёт батч pending_retry с next_retry_at <= now
+          2) Повторно отправляет (notify_user → safe_send_telegram + web push)
+          3) При успехе → status=sent, при провале → инкремент attempts; если >= MAX → DLQ.
+
+        Не блокирует остальные jobs (max_instances=1 в start()).
+        """
+        try:
+            from notifications import get_notification_service
+            from services.delivery import process_pending_retries
+
+            svc = get_notification_service()
+            stats = await process_pending_retries(
+                self.db,
+                svc.bot,
+                limit=50,
+                log_ctx="dlq_worker",
+            )
+            if stats.get("processed", 0) > 0:
+                logger.info(
+                    f"📦 [dlq_worker] processed={stats['processed']} "
+                    f"sent={stats.get('sent', 0)} failed={stats.get('failed', 0)} "
+                    f"dlq={stats.get('dlq', 0)}"
+                )
+        except Exception as e:  # noqa: BLE001
+            # Воркер должен быть устойчив к ошибкам — иначе APScheduler его «выключит»
+            logger.error(f"[dlq_worker] error: {e}", exc_info=True)
     
     # ============================================================================
     # УРОВЕНЬ 1: DAILY PLANNER - Подготовка расписания на день
@@ -331,10 +381,22 @@ class NotificationSchedulerV2:
             #   — real-TG юзер → TG-push + in-app
             #   — pseudo-tid юзер → только in-app (TG-push корректно скипнут в delivery)
             # Это и есть истинная кроссплатформенность.
+            #
+            # БАГ #5 (исправлен): теперь учитываем ext.notifications_enabled и ext.study_enabled
+            # из extended_notification_settings. Если в расширенных настройках выключены
+            # учебные уведомления — не создаём их даже если глобальный notifications_enabled=True.
+            # Логика OR: глобальный включён ИЛИ ext отсутствует — допускаем; ext.study_enabled
+            # должен быть True (default True).
             cursor = self.db.user_settings.find({
                 "notifications_enabled": True,
                 "group_id": {"$exists": True, "$ne": None},
                 "telegram_id": {"$exists": True, "$ne": None, "$gt": 0},
+                # Расширенные настройки: study_enabled должен быть True
+                # (либо отсутствовать, что = default True). Используем $or для допуска legacy юзеров.
+                "$or": [
+                    {"extended_notification_settings": {"$exists": False}},
+                    {"extended_notification_settings.study_enabled": {"$ne": False}},
+                ],
             })
             
             total_notifications_created = 0
@@ -536,7 +598,10 @@ class NotificationSchedulerV2:
                 logger.debug(f"Notification already scheduled: {notification_key}")
                 return 0, 0
             
-            # Создаем запись в БД
+            # Создаем запись в БД.
+            # БАГ #3 (timezone): scheduled_time оставляем как naive MSK (поле семантически
+            # привязано к локальному времени пары и используется APScheduler с MOSCOW_TZ).
+            # ВСЕ остальные timestamp-поля — naive UTC (created_at, last_attempt_at, sent_at).
             notification_doc = {
                 "id": notification_id,
                 "notification_key": notification_key,
@@ -545,18 +610,19 @@ class NotificationSchedulerV2:
                 "class_info": {
                     "discipline": class_event.get('discipline', 'Unknown'),
                     "time": time_str,
+                    "start_time": start_time_str,  # для in-app карточки и web push
                     "teacher": class_event.get('teacher', ''),
                     "auditory": class_event.get('auditory', ''),
                     "lessonType": class_event.get('lessonType', ''),
                     "group_name": group_name
                 },
-                "scheduled_time": notification_datetime.replace(tzinfo=None),
+                "scheduled_time": notification_datetime.replace(tzinfo=None),  # naive MSK
                 "notification_time_minutes": notification_time,
                 "status": "pending",
                 "attempts": 0,
                 "last_attempt_at": None,
                 "error_message": None,
-                "created_at": now.replace(tzinfo=None),
+                "created_at": _utc_now_naive(),  # naive UTC (унификация с другими полями)
                 "sent_at": None
             }
             
@@ -742,33 +808,51 @@ class NotificationSchedulerV2:
         """
         try:
             now_naive_utc = _utc_now_naive()
-            today_msk = datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d')
+            now_msk = datetime.now(MOSCOW_TZ)
+            today_msk = now_msk.strftime('%Y-%m-%d')
+            # БАГ #10: расширяем окно retry — берём вчерашние И сегодняшние pending.
+            # Старая логика теряла уведомления, запланированные на 23:55 и упавшие в 23:56:
+            # после полуночи фильтр `date=today` уже не матчил их.
+            yesterday_msk = (now_msk - timedelta(days=1)).strftime('%Y-%m-%d')
+            date_filter = {"$in": [yesterday_msk, today_msk]}
 
             # Находим неудачные уведомления с попытками < MAX_RETRY_ATTEMPTS
             failed_notifications = await self.db.scheduled_notifications.find({
                 "status": "failed",
                 "attempts": {"$lt": MAX_RETRY_ATTEMPTS},
-                "date": today_msk,  # Только сегодняшние
+                "date": date_filter,
             }).to_list(None)
 
             # P2 fix: «зависшие» processing — если last_attempt_at > 5 мин назад,
             # значит send_notification крашнулся и не успел обновить статус. Восстанавливаем.
+            # БАГ #11 (атомарность): используем find_one_and_update, чтобы исключить race
+            # с живым send_notification, который параллельно может обновить ту же запись.
             stuck_threshold = now_naive_utc - timedelta(minutes=5)
-            stuck = await self.db.scheduled_notifications.find({
+            recovered_stuck = []
+            stuck_cursor = self.db.scheduled_notifications.find({
                 "status": "processing",
-                "date": today_msk,
+                "date": date_filter,
                 "last_attempt_at": {"$lt": stuck_threshold},
                 "attempts": {"$lt": MAX_RETRY_ATTEMPTS},
-            }).to_list(None)
-            if stuck:
-                logger.warning(f"🧟 Found {len(stuck)} stuck-in-processing notifications, recovering")
-                for s in stuck:
-                    await self.db.scheduled_notifications.update_one(
-                        {"id": s["id"], "status": "processing"},
-                        {"$set": {"status": "failed", "error_message": "stuck_in_processing"}},
-                    )
-                # Они теперь подберутся при следующем тике
-                failed_notifications.extend(stuck)
+            }, projection={"id": 1, "_id": 0})
+            stuck_ids = [s["id"] async for s in stuck_cursor]
+            for sid in stuck_ids:
+                recovered = await self.db.scheduled_notifications.find_one_and_update(
+                    {
+                        "id": sid,
+                        "status": "processing",
+                        "last_attempt_at": {"$lt": stuck_threshold},
+                    },
+                    {"$set": {"status": "failed", "error_message": "stuck_in_processing"}},
+                    return_document=ReturnDocument.AFTER,
+                )
+                if recovered:
+                    recovered_stuck.append(recovered)
+            if recovered_stuck:
+                logger.warning(
+                    f"🧟 Recovered {len(recovered_stuck)} stuck-in-processing notifications atomically"
+                )
+                failed_notifications.extend(recovered_stuck)
 
             if not failed_notifications:
                 return
@@ -846,10 +930,14 @@ class NotificationSchedulerV2:
 
         - scheduled_notifications старше 7 дней
         - sent_notifications старше expires_at (старая система)
+        - in_app_notifications старше 30 дней (БАГ #20)
+        - delivery_attempts старше 7 дней (если не в pending_retry)
         """
         try:
             now = _utc_now_naive()
             cutoff_date = (datetime.now(MOSCOW_TZ) - timedelta(days=7)).strftime('%Y-%m-%d')
+            in_app_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+            attempts_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
 
             # Очистка scheduled_notifications
             result1 = await self.db.scheduled_notifications.delete_many({
@@ -861,9 +949,28 @@ class NotificationSchedulerV2:
                 "expires_at": {"$lt": now}
             })
 
-            total_deleted = result1.deleted_count + result2.deleted_count
+            # БАГ #20: очистка in_app_notifications старше 30 дней
+            result3 = await self.db.in_app_notifications.delete_many({
+                "created_at": {"$lt": in_app_cutoff}
+            })
+
+            # Очистка завершённых delivery_attempts (sent / dlq) старше 7 дней.
+            # pending_retry НЕ трогаем — их обработает воркер.
+            result4 = await self.db.delivery_attempts.delete_many({
+                "status": {"$in": ["sent", "dlq"]},
+                "created_at": {"$lt": attempts_cutoff},
+            })
+
+            total_deleted = (
+                result1.deleted_count + result2.deleted_count
+                + result3.deleted_count + result4.deleted_count
+            )
             if total_deleted > 0:
-                logger.info(f"🧹 Cleaned up {total_deleted} old notification records")
+                logger.info(
+                    f"🧹 Cleaned up {total_deleted} old records: "
+                    f"scheduled={result1.deleted_count} sent_notifs={result2.deleted_count} "
+                    f"in_app={result3.deleted_count} delivery_attempts={result4.deleted_count}"
+                )
 
         except Exception as e:
             logger.error(f"Error cleaning up records: {e}", exc_info=True)
@@ -991,19 +1098,23 @@ class NotificationSchedulerV2:
     async def schedule_user_notifications(self, telegram_id: int) -> Dict:
         """
         Принудительно запланировать уведомления для конкретного пользователя на сегодня
-        (Вызывать при изменении настроек или расписания)
-        
+        (Вызывать при изменении настроек или расписания).
+
+        БАГ #4 (исправлен): теперь сначала отменяем все старые pending для этого
+        пользователя на сегодня — иначе при смене notification_time (например с 10 на 30)
+        юзер получал ОБА уведомления (за 30 и за 10 минут до пары).
+
         Args:
             telegram_id: ID пользователя
-            
+
         Returns:
-            Словарь с результатами {created, scheduled}
+            Словарь с результатами {created, scheduled, cancelled_old}
         """
         try:
             now = datetime.now(MOSCOW_TZ)
             today = now.strftime('%Y-%m-%d')
             current_day = now.strftime('%A')
-            
+
             # Переводим день недели на русский
             day_mapping = {
                 'Monday': 'Понедельник',
@@ -1015,35 +1126,130 @@ class NotificationSchedulerV2:
                 'Sunday': 'Воскресенье'
             }
             russian_day = day_mapping.get(current_day, current_day)
-            
+
             # Определяем номер недели
             week_number = self._get_week_number(now)
-            
+
             # Получаем данные пользователя
             user = await self.db.user_settings.find_one({"telegram_id": telegram_id})
             if not user:
                 logger.warning(f"User {telegram_id} not found for scheduling")
-                return {"created": 0, "scheduled": 0}
-            
+                return {"created": 0, "scheduled": 0, "cancelled_old": 0}
+
             if not user.get("notifications_enabled"):
                 logger.info(f"Notifications disabled for user {telegram_id}, skipping")
-                return {"created": 0, "scheduled": 0}
-            
-            logger.info(f"🔄 Force scheduling notifications for user {telegram_id}")
-            
+                return {"created": 0, "scheduled": 0, "cancelled_old": 0}
+
+            # Дополнительная проверка extended_notification_settings.study_enabled
+            ext = user.get("extended_notification_settings") or {}
+            if isinstance(ext, dict) and ext.get("study_enabled") is False:
+                logger.info(
+                    f"User {telegram_id}: study_enabled=False in extended_notification_settings, "
+                    f"skipping scheduling"
+                )
+                return {"created": 0, "scheduled": 0, "cancelled_old": 0}
+
+            # БАГ #4 fix: отменяем старые pending уведомления для этого юзера на сегодня
+            cancelled_old = await self._cancel_pending_for_user_today(telegram_id, today)
+
+            logger.info(
+                f"🔄 Force scheduling notifications for user {telegram_id} "
+                f"(cancelled_old={cancelled_old})"
+            )
+
             created, scheduled = await self._prepare_user_schedule(
-                user, 
-                russian_day, 
-                week_number, 
-                today, 
+                user,
+                russian_day,
+                week_number,
+                today,
                 now
             )
-            
-            return {"created": created, "scheduled": scheduled}
-            
+
+            return {
+                "created": created,
+                "scheduled": scheduled,
+                "cancelled_old": cancelled_old,
+            }
+
         except Exception as e:
             logger.error(f"Error scheduling user notifications: {e}", exc_info=True)
-            return {"created": 0, "scheduled": 0}
+            return {"created": 0, "scheduled": 0, "cancelled_old": 0}
+
+    async def _cancel_pending_for_user_today(self, telegram_id: int, date_str: str) -> int:
+        """Отменить все pending уведомления для (telegram_id, date_str).
+
+        Используется при:
+          — изменении настроек (schedule_user_notifications)
+          — выключении уведомлений (cancel_all_pending_for_user)
+
+        Возвращает количество отменённых записей.
+        """
+        try:
+            # Сначала достаём список id (для удаления APScheduler-jobs)
+            cursor = self.db.scheduled_notifications.find(
+                {"telegram_id": telegram_id, "date": date_str, "status": "pending"},
+                projection={"id": 1, "_id": 0},
+            )
+            ids = [doc["id"] async for doc in cursor]
+            if not ids:
+                return 0
+
+            # Отменяем в БД (атомарно, только pending → cancelled)
+            result = await self.db.scheduled_notifications.update_many(
+                {"id": {"$in": ids}, "status": "pending"},
+                {"$set": {"status": "cancelled", "error_message": "cancelled_by_reschedule"}},
+            )
+
+            # Удаляем APScheduler-jobs
+            for nid in ids:
+                job_id = self.scheduled_jobs.pop(nid, None) or f"notify_{nid}"
+                try:
+                    self.scheduler.remove_job(job_id)
+                except Exception:
+                    pass  # job уже мог исполниться
+
+            logger.info(
+                f"🚫 Cancelled {result.modified_count} pending notifications for tid={telegram_id} date={date_str}"
+            )
+            return int(result.modified_count)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error cancelling pending for user {telegram_id}: {e}")
+            return 0
+
+    async def cancel_all_pending_for_user(self, telegram_id: int) -> int:
+        """Отменить ВСЕ pending уведомления для юзера (сегодня и в будущем).
+
+        Используется при выключении уведомлений в настройках (БАГ #8).
+        """
+        try:
+            today = datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d')
+            cursor = self.db.scheduled_notifications.find(
+                {"telegram_id": telegram_id, "date": {"$gte": today}, "status": "pending"},
+                projection={"id": 1, "_id": 0},
+            )
+            ids = [doc["id"] async for doc in cursor]
+            if not ids:
+                return 0
+
+            result = await self.db.scheduled_notifications.update_many(
+                {"id": {"$in": ids}, "status": "pending"},
+                {"$set": {"status": "cancelled", "error_message": "user_disabled_notifications"}},
+            )
+
+            for nid in ids:
+                job_id = self.scheduled_jobs.pop(nid, None) or f"notify_{nid}"
+                try:
+                    self.scheduler.remove_job(job_id)
+                except Exception:
+                    pass
+
+            logger.info(
+                f"🚫 Cancelled ALL {result.modified_count} pending notifications for tid={telegram_id}"
+            )
+            return int(result.modified_count)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error cancelling all pending for user {telegram_id}: {e}")
+            return 0
 
     # ============================================================================
     # АВТО-НАПОМИНАНИЯ О ВОЗВРАЩЕНИИ
@@ -1187,12 +1393,36 @@ class NotificationSchedulerV2:
                             },
                             upsert=True
                         )
-                        
+
                         # Только если мы СОЗДАЛИ новую запись (upserted_id != None),
                         # значит мы первый воркер — отправляем уведомление
                         if dedup_result.upserted_id is not None:
                             try:
-                                success = await self.notification_service.send_message(telegram_id, message)
+                                # БАГ #12 fix: используем notify_user напрямую с HIGH priority
+                                # и enable_retry=True. Раньше шли через send_message(priority=NORMAL)
+                                # без retry → transient TG-failures навсегда теряли уведомление.
+                                from services.delivery import notify_user as _notify_user, MessagePriority as _MP
+                                # plain-text для in-app (HTML отдельно для TG)
+                                import re
+                                plain = re.sub(r"<[^>]+>", "", message).strip()
+                                title = plain.split("\n", 1)[0][:150] if plain else "Напоминание"
+
+                                dr = await _notify_user(
+                                    self.db,
+                                    self.notification_service.bot,
+                                    telegram_id=telegram_id,
+                                    title=title,
+                                    message=plain,
+                                    emoji="🔥" if "1d" in notif_type else "🌟",
+                                    type="announcement",
+                                    category="system",
+                                    priority=_MP.HIGH,
+                                    telegram_text=message,
+                                    telegram_parse_mode="HTML",
+                                    enable_retry=True,
+                                    log_ctx=f"inactivity_{notif_type}",
+                                )
+                                success = bool(dr.delivered_to_user)
                                 if success:
                                     sent_count += 1
                                     # Помечаем как успешно отправленное
