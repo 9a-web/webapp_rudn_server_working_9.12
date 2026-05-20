@@ -2161,7 +2161,7 @@ def create_auth_router(db) -> APIRouter:
         free: List[str] = [c for c in candidates if c not in taken][:count]
 
         return UsernameSuggestionsResponse(
-            base=(cleaned or None) if not is_generic else None,
+            base=(base_norm or None) if not is_generic else None,
             suggestions=free,
         )
 
