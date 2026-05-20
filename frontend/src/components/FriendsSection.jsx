@@ -98,9 +98,9 @@ const UserAvatar = ({ telegramId, firstName, username, size = 48, className = ''
 
 const TABS = [
   { id: 'friends', name: 'Друзья', icon: Users },
+  { id: 'search', name: 'Поиск', icon: Search },
+  { id: 'requests', name: 'Заявки', icon: Bell },
   { id: 'messages', name: 'Сообщения', icon: MessageCircle },
-  { id: 'requests', name: 'Запросы', icon: Bell },
-  { id: 'search', name: 'Поиск', icon: Search }
 ];
 
 // Skeleton Component
