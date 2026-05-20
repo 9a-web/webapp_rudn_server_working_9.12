@@ -41,6 +41,15 @@ Russian UI + code comments + Pydantic messages.
 
 ## What's been implemented
 
+### Phase 13 — Friend Suggestions (engagement-loop) (2026-05-20)
+- [x] **Backend** (`server.py`): новый эндпоинт `GET /api/friends/{tid}/suggestions`. Возвращает две группы — `group_mates` (тот же `group_id`) и `friends_of_friends` (≥1 общий друг), с фильтрацией existing friends / pending requests / blocks / privacy.show_in_search. Сортировка: `mutual_friends_count` desc, потом `first_name`. Лимит на группу — настраиваемый (default 12).
+- [x] **Models**: `FriendSuggestionsResponse` + `FriendSearchResult.suggestion_reason` / `uid`.
+- [x] **Frontend** (`friendsAPI.js`): метод `getFriendSuggestions(tid, limit)`.
+- [x] **FriendsSection.jsx**: подгружает suggestions при первом переходе на таб «Поиск» и при `friendEventTrigger` (SSE refresh after friend graph changes). В пустом состоянии (нет query, нет результатов) показывает две секции:
+  - «Из вашей группы» (Users-иконка) с `group_name`
+  - «Возможно вы знакомы» (Sparkles-иконка) — друзья ваших друзей
+- [x] Skeletons во время загрузки, корректное empty-state с подсказкой заполнить группу, если её ещё нет.
+
 ### Phase 12 — Friend Request fix + Audit bug squash (2026-05-20)
 **P0 — Web→Telegram friend request fix:**
 - [x] **Root cause**: Frontend sent body.telegram_id = guest device_id или Mongo doc.id вместо `effective_tid` (real telegram_id || pseudo_tid_from_uid(uid)). Backend тихо сохранял orphan-запись без user_settings, и она фильтровалась в `get_friend_requests`.

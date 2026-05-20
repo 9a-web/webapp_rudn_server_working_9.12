@@ -189,6 +189,7 @@ from models import (
     FriendRequestsResponse,
     FriendSearchResult,
     FriendSearchResponse,
+    FriendSuggestionsResponse,
     GlobalSearchResult,
     GlobalSearchResponse,
     ProcessFriendInviteRequest,
@@ -15755,6 +15756,163 @@ async def search_users(
         
     except Exception as e:
         logger.error(f"Search users error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/friends/{telegram_id}/suggestions", response_model=FriendSuggestionsResponse)
+async def get_friend_suggestions(telegram_id: int, limit: int = 12):
+    """Персональные предложения дружбы для пустого состояния таба «Поиск».
+
+    Возвращает две группы (без пересечений):
+      • group_mates          — одногруппники (тот же group_id),
+      • friends_of_friends   — пользователи, у которых ≥1 общий друг.
+
+    Все кандидаты отфильтрованы:
+      - не сам юзер
+      - не уже друзья
+      - не имеют pending заявку с обеих сторон
+      - не заблокированы (ни одну сторону)
+      - privacy.show_in_search != False
+
+    Сортировка: mutual_friends_count desc, затем first_name asc.
+    """
+    try:
+        # Существует ли вообще юзер? (валидация телега_id, как в send_friend_request)
+        me = await db.user_settings.find_one(
+            {"telegram_id": telegram_id},
+            {"_id": 0, "telegram_id": 1, "group_id": 1, "facultet_id": 1},
+        )
+        if not me:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # ── 1. Считаем «запрещённый» набор: self + блоки + друзья + pending ──
+        blocked_by_me = await db.user_blocks.find(
+            {"blocker_telegram_id": telegram_id}, {"_id": 0, "blocked_telegram_id": 1}
+        ).to_list(500)
+        blocked_me = await db.user_blocks.find(
+            {"blocked_telegram_id": telegram_id}, {"_id": 0, "blocker_telegram_id": 1}
+        ).to_list(500)
+        excluded = {telegram_id}
+        excluded.update(b["blocked_telegram_id"] for b in blocked_by_me)
+        excluded.update(b["blocker_telegram_id"] for b in blocked_me)
+
+        my_friends = await db.friends.find(
+            {"user_telegram_id": telegram_id}, {"_id": 0, "friend_telegram_id": 1}
+        ).to_list(2000)
+        my_friend_ids = {f["friend_telegram_id"] for f in my_friends}
+        excluded.update(my_friend_ids)
+
+        pending_reqs = await db.friend_requests.find(
+            {
+                "$or": [
+                    {"from_telegram_id": telegram_id, "status": "pending"},
+                    {"to_telegram_id": telegram_id, "status": "pending"},
+                ]
+            },
+            {"_id": 0, "from_telegram_id": 1, "to_telegram_id": 1},
+        ).to_list(500)
+        for r in pending_reqs:
+            excluded.add(r["from_telegram_id"])
+            excluded.add(r["to_telegram_id"])
+
+        # ── 2. Группа A: одногруппники ────────────────────────────────────
+        group_mates_docs: list[dict] = []
+        if me.get("group_id"):
+            group_mates_docs = await db.user_settings.find(
+                {
+                    "group_id": me["group_id"],
+                    "telegram_id": {"$nin": list(excluded)},
+                },
+                {
+                    "_id": 0, "telegram_id": 1, "uid": 1, "username": 1,
+                    "first_name": 1, "last_name": 1, "group_name": 1,
+                    "facultet_name": 1, "kurs": 1, "privacy_settings": 1,
+                },
+            ).limit(limit * 3).to_list(limit * 3)
+
+        # ── 3. Группа B: друзья-друзей ────────────────────────────────────
+        # Для каждого моего друга — берём ИХ друзей и собираем счётчик mutual.
+        fof_counts: dict[int, int] = {}
+        if my_friend_ids:
+            fof_rows = await db.friends.find(
+                {
+                    "user_telegram_id": {"$in": list(my_friend_ids)},
+                    "friend_telegram_id": {"$nin": list(excluded)},
+                },
+                {"_id": 0, "friend_telegram_id": 1},
+            ).to_list(5000)
+            for r in fof_rows:
+                fid = r["friend_telegram_id"]
+                fof_counts[fid] = fof_counts.get(fid, 0) + 1
+
+        # Исключаем тех, кто уже в group_mates
+        gm_ids = {u["telegram_id"] for u in group_mates_docs}
+        fof_ids = [tid for tid in fof_counts if tid not in gm_ids]
+
+        fof_docs: list[dict] = []
+        if fof_ids:
+            # Сортируем сразу по mutual count и берём top
+            fof_ids_sorted = sorted(fof_ids, key=lambda t: -fof_counts[t])[: limit * 2]
+            fof_docs = await db.user_settings.find(
+                {"telegram_id": {"$in": fof_ids_sorted}},
+                {
+                    "_id": 0, "telegram_id": 1, "uid": 1, "username": 1,
+                    "first_name": 1, "last_name": 1, "group_name": 1,
+                    "facultet_name": 1, "kurs": 1, "privacy_settings": 1,
+                },
+            ).to_list(len(fof_ids_sorted))
+
+        # ── 4. Privacy filter + сборка карточек ───────────────────────────
+        def _privacy_ok(doc: dict) -> bool:
+            p = doc.get("privacy_settings") or {}
+            if isinstance(p, dict):
+                return p.get("show_in_search", True) is not False
+            return True
+
+        # mutual count для одногруппников (отдельный батч — fof_counts только для группы B)
+        gm_tids = [u["telegram_id"] for u in group_mates_docs if _privacy_ok(u)]
+        gm_mutual = await get_mutual_friends_count_batch(telegram_id, gm_tids) if gm_tids else {}
+
+        def _to_card(doc: dict, reason: str, mutual: int) -> FriendSearchResult:
+            return FriendSearchResult(
+                telegram_id=doc["telegram_id"],
+                uid=doc.get("uid"),
+                username=doc.get("username"),
+                first_name=doc.get("first_name"),
+                last_name=doc.get("last_name"),
+                group_name=doc.get("group_name"),
+                facultet_name=doc.get("facultet_name"),
+                kurs=doc.get("kurs"),
+                mutual_friends_count=mutual,
+                friendship_status=None,
+                suggestion_reason=reason,
+            )
+
+        group_mates = [
+            _to_card(u, "group_mate", gm_mutual.get(u["telegram_id"], 0))
+            for u in group_mates_docs if _privacy_ok(u)
+        ]
+        # Sort: mutual desc, then first_name asc
+        group_mates.sort(key=lambda c: (-c.mutual_friends_count, (c.first_name or "").lower()))
+        group_mates = group_mates[:limit]
+
+        friends_of_friends = [
+            _to_card(u, "friends_of_friends", fof_counts.get(u["telegram_id"], 0))
+            for u in fof_docs if _privacy_ok(u)
+        ]
+        friends_of_friends.sort(key=lambda c: (-c.mutual_friends_count, (c.first_name or "").lower()))
+        friends_of_friends = friends_of_friends[:limit]
+
+        return FriendSuggestionsResponse(
+            group_mates=group_mates,
+            friends_of_friends=friends_of_friends,
+            total=len(group_mates) + len(friends_of_friends),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Friend suggestions error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

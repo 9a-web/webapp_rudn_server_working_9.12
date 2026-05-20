@@ -184,6 +184,13 @@ const FriendsSection = ({ userSettings, currentUser, onFriendProfileOpen, onChat
   const searchInputRef = useRef(null);
   const tabsContainerRef = useRef(null);
   const [friendEventTrigger, setFriendEventTrigger] = useState(0); // SSE refresh trigger
+
+  // === Friend Suggestions (для пустого состояния таба "Поиск") ===
+  // group_mates — одногруппники, friends_of_friends — друзья-друзей с mutual ≥ 1.
+  // Загружается один раз при первом переходе на таб и обновляется при friendEventTrigger.
+  const [suggestions, setSuggestions] = useState({ group_mates: [], friends_of_friends: [] });
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const suggestionsLoadedRef = useRef(false);
   
   // === Dev Command State ===
   const [devCommandResult, setDevCommandResult] = useState(null);
@@ -543,6 +550,36 @@ const FriendsSection = ({ userSettings, currentUser, onFriendProfileOpen, onChat
     const interval = setInterval(loadConversations, 5000);
     return () => clearInterval(interval);
   }, [activeTab, user?.id, loadConversations]);
+
+  // === Friend Suggestions loader ===
+  // Подгружаем при первом переходе на «Поиск» и при изменении friend-графа (SSE).
+  const loadSuggestions = useCallback(async () => {
+    if (!user?.id || isGuestUser) return;
+    setSuggestionsLoading(true);
+    try {
+      const data = await friendsAPI.getFriendSuggestions(user.id, 12);
+      setSuggestions({
+        group_mates: data?.group_mates || [],
+        friends_of_friends: data?.friends_of_friends || [],
+      });
+      suggestionsLoadedRef.current = true;
+    } catch (e) {
+      console.error('Load suggestions error:', e);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [user?.id, isGuestUser]);
+
+  useEffect(() => {
+    if (activeTab !== 'search' || !user?.id) return;
+    if (!suggestionsLoadedRef.current) loadSuggestions();
+  }, [activeTab, user?.id, loadSuggestions]);
+
+  // При SSE-обновлениях (новый друг / отклонённая заявка) — пересчитываем suggestions
+  useEffect(() => {
+    if (friendEventTrigger > 0 && suggestionsLoadedRef.current) loadSuggestions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendEventTrigger]);
 
   // === Синхронизация с NotificationsPanel через CustomEvent ===
   useEffect(() => {
@@ -1566,13 +1603,65 @@ const FriendsSection = ({ userSettings, currentUser, onFriendProfileOpen, onChat
                       <p className="text-gray-600 text-[12px] mt-1">Попробуйте другой запрос</p>
                     </motion.div>
                   ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-4">
-                        <Search className="w-8 h-8 text-purple-400/40" />
-                      </div>
-                      <p className="text-gray-400 text-[14px]">Введите имя или @username</p>
-                      <p className="text-gray-600 text-[12px] mt-1">Или используйте фильтры выше</p>
-                    </motion.div>
+                    /* === Suggestions: одногруппники + друзья-друзей === */
+                    <div className="space-y-5">
+                      {suggestionsLoading ? (
+                        <div className="space-y-2 pt-1">
+                          <SkeletonCard delay={0} />
+                          <SkeletonCard delay={0.05} />
+                          <SkeletonCard delay={0.1} />
+                        </div>
+                      ) : (suggestions.group_mates.length === 0 && suggestions.friends_of_friends.length === 0) ? (
+                        <motion.div
+                          data-testid="suggestions-empty"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-center py-12"
+                        >
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center mx-auto mb-4">
+                            <Search className="w-8 h-8 text-purple-400/40" />
+                          </div>
+                          <p className="text-gray-400 text-[14px]">Введите имя или @username</p>
+                          <p className="text-gray-600 text-[12px] mt-1">
+                            {userSettings?.group_id
+                              ? 'Или используйте фильтры выше'
+                              : 'Заполните группу в профиле — покажем одногруппников'}
+                          </p>
+                        </motion.div>
+                      ) : (
+                        <>
+                          {suggestions.group_mates.length > 0 && (
+                            <section data-testid="suggestions-group-mates" className="space-y-2">
+                              <div className="flex items-center justify-between px-1">
+                                <div>
+                                  <h3 className="text-[13px] font-semibold text-white/85">Из вашей группы</h3>
+                                  <p className="text-[11px] text-gray-500 mt-0.5">
+                                    {userSettings?.group_name || 'Одногруппники'} · {suggestions.group_mates.length}
+                                  </p>
+                                </div>
+                                <Users className="w-4 h-4 text-purple-400/60" />
+                              </div>
+                              {suggestions.group_mates.map((r, idx) => renderSearchResult(r, idx))}
+                            </section>
+                          )}
+
+                          {suggestions.friends_of_friends.length > 0 && (
+                            <section data-testid="suggestions-friends-of-friends" className="space-y-2">
+                              <div className="flex items-center justify-between px-1">
+                                <div>
+                                  <h3 className="text-[13px] font-semibold text-white/85">Возможно вы знакомы</h3>
+                                  <p className="text-[11px] text-gray-500 mt-0.5">
+                                    Друзья ваших друзей · {suggestions.friends_of_friends.length}
+                                  </p>
+                                </div>
+                                <Sparkles className="w-4 h-4 text-pink-400/60" />
+                              </div>
+                              {suggestions.friends_of_friends.map((r, idx) => renderSearchResult(r, idx))}
+                            </section>
+                          )}
+                        </>
+                      )}
+                    </div>
                   )}
                 </>
               )}

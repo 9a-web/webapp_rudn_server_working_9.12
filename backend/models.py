@@ -2013,6 +2013,11 @@ class FriendSearchResult(BaseModel):
     kurs: Optional[str] = None
     mutual_friends_count: int = 0
     friendship_status: Optional[str] = None  # "friend", "pending_incoming", "pending_outgoing", "blocked", None
+    # 🆕 Для /suggestions: почему мы рекомендуем этого юзера.
+    #   • "group_mate"          — учится в той же группе
+    #   • "friends_of_friends"  — есть >=1 общий друг
+    suggestion_reason: Optional[str] = None
+    uid: Optional[str] = None
 
 
 class FriendSearchResponse(BaseModel):
@@ -2020,6 +2025,18 @@ class FriendSearchResponse(BaseModel):
     results: List[FriendSearchResult]
     total: int
     query: Optional[str] = None
+
+
+class FriendSuggestionsResponse(BaseModel):
+    """Ответ на GET /friends/{tid}/suggestions — персональные подсказки.
+
+    `group_mates` — одногруппники, `friends_of_friends` — пользователи с
+    общими друзьями. Обе группы уже отфильтрованы от existing friends,
+    pending requests, blocks и self.
+    """
+    group_mates: List[FriendSearchResult] = []
+    friends_of_friends: List[FriendSearchResult] = []
+    total: int = 0
 
 
 class GlobalSearchResult(BaseModel):

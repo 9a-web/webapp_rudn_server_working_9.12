@@ -116,6 +116,19 @@ export const friendsAPI = {
     }
   },
 
+  // Персональные предложения друзей (одногруппники + друзья-друзей).
+  // Используется в табе «Поиск» при пустом запросе для engagement-loop'а.
+  getFriendSuggestions: async (telegramId, limit = 12) => {
+    try {
+      const response = await api.get(`/friends/${telegramId}/suggestions`, {
+        params: { limit },
+      });
+      return response.data;  // { group_mates, friends_of_friends, total }
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
   getMutualFriends: async (telegramId, otherTelegramId) => {
     try {
       const response = await api.get(`/friends/mutual/${telegramId}/${otherTelegramId}`);
