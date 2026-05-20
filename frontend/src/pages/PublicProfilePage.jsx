@@ -164,23 +164,78 @@ const PublicProfilePage = () => {
     if (!uid) return;
     setLoading(true);
     setError(null);
+    const base = getBackendURL();
+
+    // Helper: построить минимальный fallback-профиль из /resolve
+    // Используется когда основной /u/{uid} вернул ошибку валидации/неполных
+    // данных, но мы знаем что юзер существует.
+    const tryResolveFallback = async () => {
+      try {
+        const r = await axios.get(`${base}/api/u/${encodeURIComponent(uid)}/resolve`);
+        const d = r?.data || {};
+        if (!d.telegram_id && !d.effective_tid && !d.uid) return null;
+        // Синтезируем UserProfilePublic-совместимый минимум
+        const tid = d.effective_tid || d.telegram_id;
+        const name = String(d.display_name || `User ${d.uid || uid}`);
+        const parts = name.split(/\s+/);
+        return {
+          telegram_id: tid,
+          uid: d.uid || uid,
+          first_name: parts[0] || '',
+          last_name: parts.slice(1).join(' ') || null,
+          username: null,
+          group_name: null,
+          facultet_name: null,
+          kurs: null,
+          avatar_mode: 'telegram',
+          has_custom_avatar: false,
+          friends_list_hidden: false,
+          show_in_search: true,
+          is_setup_complete: !!d.is_setup,   // ← фронт может показать ненавязчивый бейдж
+          _is_partial: true,                  // ← внутренний флаг: данные неполные
+        };
+      } catch {
+        return null;
+      }
+    };
+
     try {
-      const base = getBackendURL();
       const resp = await axios.get(`${base}/api/u/${encodeURIComponent(uid)}`);
       setProfile(resp.data);
       profileLoadedForUidRef.current = uid;
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;
+
+      // 404 — твёрдо "не найдено"
       if (status === 404) {
-        setError({ kind: 'not_found', message: 'Профиль не найден' });
-      } else if (status === 422) {
-        setError({ kind: 'not_configured', message: detail || 'Профиль ещё не настроен' });
-      } else if (status === 403) {
-        setError({ kind: 'hidden', message: detail || 'Профиль скрыт владельцем' });
-      } else {
-        setError({ kind: 'generic', message: 'Не удалось загрузить профиль' });
+        setError({ kind: 'not_found', message: detail || 'Профиль не найден' });
+        return;
       }
+      // 403 — приватный/блокировка
+      if (status === 403) {
+        setError({ kind: 'hidden', message: detail || 'Профиль скрыт владельцем' });
+        return;
+      }
+
+      // 422 / 500 / network — пробуем мягкий fallback через /resolve.
+      // Это решает проблему "Владелец ещё не завершил настройку публичной
+      // страницы" — даже неполный профиль теперь показывается.
+      const fallback = await tryResolveFallback();
+      if (fallback) {
+        setProfile(fallback);
+        profileLoadedForUidRef.current = uid;
+        return;
+      }
+
+      // Если /resolve тоже отказал — generic ошибка
+      setError({
+        kind: 'generic',
+        message:
+          (status === 422 && (detail || 'Профиль ещё не настроен'))
+          || (typeof detail === 'string' ? detail : null)
+          || 'Не удалось загрузить профиль',
+      });
     } finally {
       setLoading(false);
     }
@@ -804,6 +859,38 @@ const PublicProfilePage = () => {
               }}
             >
               {fullName}
+            </motion.div>
+          )}
+
+          {/* Ненавязчивый бейдж для частично заполненного профиля.
+              Показывается когда данные пришли через fallback /resolve или
+              когда backend сообщил is_setup_complete=false. UX: не блокирует
+              просмотр, не выглядит как ошибка. */}
+          {(profile._is_partial || profile.is_setup_complete === false) && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.3 }}
+              style={{
+                marginTop: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 10px',
+                borderRadius: '999px',
+                background: 'rgba(255,193,7,0.12)',
+                border: '1px solid rgba(255,193,7,0.25)',
+                color: 'rgba(255,235,170,0.9)',
+                fontSize: '11px',
+                fontWeight: 500,
+                fontFamily: "'Poppins', sans-serif",
+                alignSelf: 'center',
+                position: 'relative',
+                zIndex: 1,
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>✨</span>
+              <span>Профиль в процессе настройки</span>
             </motion.div>
           )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, User, Sparkles, ScanLine, Users } from 'lucide-react';
+import { Menu, Bell, User, Sparkles, ScanLine, Users, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { headerItemVariants } from '../utils/animations';
@@ -7,9 +7,11 @@ import { MenuModal } from './MenuModal';
 import ProfileScreen from './ProfileScreen';
 import { rainbowConfetti } from '../utils/confetti';
 import { botAPI } from '../services/api';
+import { useSearch } from '../contexts/SearchContext';
 
 export const Header = React.memo(({ user, userSettings, onNotificationsClick, onAnalyticsClick, onAchievementsClick, hapticFeedback, onMenuStateChange, onProfileStateChange, onThemeChange, unreadNotificationsCount = 0, hasNewNotification = false, onQRScanned, onFriendsClick, openProfileTab, onProfileTabHandled }) => {
   const { t } = useTranslation();
+  const { openSearch } = useSearch();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState(null);
@@ -314,8 +316,35 @@ export const Header = React.memo(({ user, userSettings, onNotificationsClick, on
           </h1>
         </motion.div>
 
-        {/* Right side - Friends, QR, Notifications, Profile buttons */}
+        {/* Right side - Search, Friends, QR, Notifications, Profile buttons */}
         <div className="flex items-center gap-2">
+          {/* Search button — открывает глобальный поиск (Cmd/Ctrl+K) */}
+          <motion.button
+            onClick={() => {
+              if (hapticFeedback) hapticFeedback('impact', 'light');
+              openSearch();
+            }}
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center rounded-xl border border-white/10 transition-all duration-300 relative group"
+            style={{
+              backgroundColor: 'rgba(52, 52, 52, 0.6)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+            }}
+            aria-label="Открыть глобальный поиск"
+            title="Поиск (Ctrl+K)"
+            custom={1.5}
+            initial="initial"
+            animate="animate"
+            variants={headerItemVariants}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <div className="absolute inset-0 rounded-xl overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 via-cyan-400/20 to-blue-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </div>
+            <Search className="w-5 h-5 md:w-6 md:h-6 relative z-10" style={{ color: '#E7E7E7' }} />
+          </motion.button>
+
           {/* Friends button */}
           <motion.button
             onClick={() => {

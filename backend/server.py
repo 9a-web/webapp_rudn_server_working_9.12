@@ -189,6 +189,8 @@ from models import (
     FriendRequestsResponse,
     FriendSearchResult,
     FriendSearchResponse,
+    GlobalSearchResult,
+    GlobalSearchResponse,
     ProcessFriendInviteRequest,
     ProcessFriendInviteResponse,
     MutualFriendsResponse,
@@ -15736,6 +15738,327 @@ async def search_users(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# ГЛОБАЛЬНЫЙ ПОИСК (PUBLIC) — для главного поискового бара
+# ============================================================================
+# Особенности vs `/friends/search`:
+#   • Работает БЕЗ авторизации (для незарегистрированных гостей по deep-link).
+#   • Респектует `privacy.show_in_search` (скрытые не появляются).
+#   • Возвращает богатые карточки с UID, аватаром, online, уровнем.
+#   • Пагинация (limit/offset + has_more).
+#   • Если viewer авторизован — добавляет mutual_friends_count и friendship_status.
+#   • Безопасно фильтрует regex для предотвращения ReDoS.
+# ----------------------------------------------------------------------------
+import re as _re_search  # локальный импорт, чтобы не конфликтовать в namespace
+_REGEX_SAFE_CHARS = _re_search.compile(r"[^a-zA-Zа-яА-Я0-9_\-\s]")
+
+
+def _build_search_regex(query: str) -> str:
+    """Готовит regex-фрагмент из user query.
+
+    Безопасно: 
+      • удаляем все символы кроме букв/цифр/пробела/_/-
+      • экранируем оставшиеся для regex
+      • ограничиваем длину (защита от ReDoS на гигантских строках).
+    """
+    if not query:
+        return ""
+    safe = _REGEX_SAFE_CHARS.sub("", query)[:64].strip()
+    if not safe:
+        return ""
+    return _re_search.escape(safe)
+
+
+@api_router.get("/search/global", response_model=GlobalSearchResponse)
+async def global_search(
+    request: Request,
+    q: Optional[str] = None,
+    group_id: Optional[str] = None,
+    facultet_id: Optional[str] = None,
+    kurs: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Глобальный поиск пользователей.
+
+    Параметры:
+      • q — текстовый запрос (по username, first_name, last_name)
+      • group_id / facultet_id / kurs — фильтры
+      • limit (1..50, default 20), offset (≥0)
+
+    Поведение:
+      • Без авторизации — работает (анонимный поиск).
+      • Респектует `privacy.show_in_search=False` (такие юзеры скрыты).
+      • Свой профиль исключается из результатов (если viewer авторизован).
+      • Заблокированные обе стороны не видят друг друга.
+      • Сортировка: friends → mutual_count desc → name asc.
+      • UID всегда в ответе → фронт может сразу открыть /u/uid.
+    """
+    try:
+        # Валидация параметров
+        limit = max(1, min(int(limit or 20), 50))
+        offset = max(0, int(offset or 0))
+
+        viewer_tid: Optional[int] = None
+        if current_user:
+            try:
+                viewer_tid_raw = current_user.get("tid")
+                viewer_tid = int(viewer_tid_raw) if viewer_tid_raw is not None else None
+            except (TypeError, ValueError):
+                viewer_tid = None
+
+        # Базовый фильтр — privacy ниже разрулим
+        filter_query: Dict[str, Any] = {}
+
+        # Исключаем себя из результатов (свой профиль не показываем в поиске)
+        exclude_tids: List[int] = []
+        blocked_ids: List[int] = []
+        if viewer_tid is not None:
+            exclude_tids.append(viewer_tid)
+            # Заблокированные мной + те, кто заблокировал меня
+            blocked_by_me_cur = db.user_blocks.find(
+                {"blocker_telegram_id": viewer_tid},
+                {"blocked_telegram_id": 1, "_id": 0},
+            )
+            blocked_me_cur = db.user_blocks.find(
+                {"blocked_telegram_id": viewer_tid},
+                {"blocker_telegram_id": 1, "_id": 0},
+            )
+            async for b in blocked_by_me_cur:
+                blocked_ids.append(int(b.get("blocked_telegram_id", 0)))
+            async for b in blocked_me_cur:
+                blocked_ids.append(int(b.get("blocker_telegram_id", 0)))
+            if blocked_ids:
+                exclude_tids.extend(blocked_ids)
+
+        if exclude_tids:
+            filter_query["telegram_id"] = {"$nin": exclude_tids}
+
+        # Фильтры по справочнику
+        if group_id:
+            filter_query["group_id"] = group_id
+        if facultet_id:
+            filter_query["facultet_id"] = facultet_id
+        if kurs:
+            filter_query["kurs"] = kurs
+
+        # Текстовый поиск (защищён от ReDoS)
+        safe_pattern = _build_search_regex(q or "")
+        if safe_pattern:
+            filter_query["$or"] = [
+                {"username": {"$regex": safe_pattern, "$options": "i"}},
+                {"first_name": {"$regex": safe_pattern, "$options": "i"}},
+                {"last_name": {"$regex": safe_pattern, "$options": "i"}},
+            ]
+        elif not (group_id or facultet_id or kurs):
+            # Без query и фильтров — возвращаем популярных (топ по xp)
+            # вместо случайной выборки.
+            pass  # filter_query пустой → все юзеры
+
+        # Privacy: исключаем тех, кто скрыт из поиска. На уровне Mongo
+        # обработать с учётом отсутствия поля сложно — фильтруем после
+        # запроса. Берём больше элементов для буфера приватности (×2),
+        # но не больше 200.
+        fetch_limit = min(max(limit * 2, 40), 200)
+        # Pagination offset на уровне Mongo — оставит правильную часть после fetch
+        # с учётом приватности.
+        cursor = (
+            db.user_settings
+            .find(filter_query)
+            .sort([("xp", -1), ("first_name", 1)])
+            .skip(offset)
+            .limit(fetch_limit)
+        )
+        raw_users: List[dict] = await cursor.to_list(fetch_limit)
+
+        if not raw_users:
+            return GlobalSearchResponse(
+                results=[], total=0, has_more=False,
+                query=q, limit=limit, offset=offset,
+            )
+
+        # Применяем privacy-фильтр
+        filtered_users: List[dict] = []
+        for u in raw_users:
+            privacy_data = u.get("privacy_settings") or {}
+            show = privacy_data.get("show_in_search", True)
+            if show is False:
+                continue
+            filtered_users.append(u)
+
+        # Берём только нужный slice (limit)
+        page_users = filtered_users[:limit]
+        # Эвристика has_more: если получили больше limit (даже после privacy)
+        # или если raw_users == fetch_limit (есть ещё страницы)
+        has_more = len(filtered_users) > limit or len(raw_users) == fetch_limit
+
+        if not page_users:
+            return GlobalSearchResponse(
+                results=[], total=0, has_more=has_more,
+                query=q, limit=limit, offset=offset,
+            )
+
+        # Готовим IDs для batch-запросов
+        page_tids = [int(u["telegram_id"]) for u in page_users if u.get("telegram_id")]
+
+        # Кастомные аватары
+        avatars_set = set()
+        if page_tids:
+            avatars_cur = db.custom_avatars.find(
+                {"telegram_id": {"$in": page_tids}, "is_active": True},
+                {"telegram_id": 1, "_id": 0},
+            )
+            async for a in avatars_cur:
+                avatars_set.add(int(a.get("telegram_id", 0)))
+
+        # Stats для уровня (xp хранится в user_settings.xp, но в случае
+        # legacy — в user_stats.total_xp).
+        stats_map: Dict[int, dict] = {}
+        if page_tids:
+            stats_cur = db.user_stats.find(
+                {"telegram_id": {"$in": page_tids}},
+                {"telegram_id": 1, "total_xp": 1, "_id": 0},
+            )
+            async for s in stats_cur:
+                stats_map[int(s["telegram_id"])] = s
+
+        # Friendship status + mutual counts (только для авторизованного viewer)
+        friend_ids: set = set()
+        outgoing_set: set = set()
+        incoming_set: set = set()
+        mutual_counts: Dict[int, int] = {}
+
+        if viewer_tid is not None and page_tids:
+            # Дружбы
+            f_cur = db.friends.find(
+                {"user_telegram_id": viewer_tid, "friend_telegram_id": {"$in": page_tids}},
+                {"friend_telegram_id": 1, "_id": 0},
+            )
+            async for f in f_cur:
+                friend_ids.add(int(f["friend_telegram_id"]))
+
+            # Outgoing requests
+            o_cur = db.friend_requests.find(
+                {
+                    "from_telegram_id": viewer_tid,
+                    "to_telegram_id": {"$in": page_tids},
+                    "status": "pending",
+                },
+                {"to_telegram_id": 1, "_id": 0},
+            )
+            async for r in o_cur:
+                outgoing_set.add(int(r["to_telegram_id"]))
+
+            # Incoming requests
+            i_cur = db.friend_requests.find(
+                {
+                    "to_telegram_id": viewer_tid,
+                    "from_telegram_id": {"$in": page_tids},
+                    "status": "pending",
+                },
+                {"from_telegram_id": 1, "_id": 0},
+            )
+            async for r in i_cur:
+                incoming_set.add(int(r["from_telegram_id"]))
+
+            # Mutual friends (batch)
+            try:
+                mutual_counts = await get_mutual_friends_count_batch(viewer_tid, page_tids)
+            except Exception as e:
+                logger.warning(f"global_search: mutual_counts batch failed: {e}")
+                mutual_counts = {}
+
+        # Сборка результатов
+        from datetime import datetime as _dt_local, timezone as _tz_local
+        now_dt = _dt_local.now(_tz_local.utc)
+
+        results: List[GlobalSearchResult] = []
+        for u in page_users:
+            tid = int(u.get("telegram_id") or 0)
+            uid = u.get("uid")
+
+            # uid fallback: для legacy записей без uid — генерим из tid
+            if not uid and tid:
+                # Email/VK pseudo-tid → восстанавливаем uid из tid - PSEUDO_TID_OFFSET
+                if tid >= PSEUDO_TID_OFFSET:
+                    uid = str(tid - PSEUDO_TID_OFFSET)
+
+            # Online (5min threshold)
+            is_online = False
+            last_activity = u.get("last_activity")
+            if last_activity:
+                if isinstance(last_activity, str):
+                    try:
+                        last_activity = _dt_local.fromisoformat(last_activity.replace("Z", "+00:00"))
+                    except Exception:
+                        last_activity = None
+                if last_activity:
+                    if last_activity.tzinfo is None:
+                        last_activity = last_activity.replace(tzinfo=_tz_local.utc)
+                    is_online = (now_dt - last_activity).total_seconds() < 300
+
+            # Уровень
+            xp = (
+                int(u.get("xp") or 0)
+                or int((stats_map.get(tid) or {}).get("total_xp") or 0)
+            )
+            try:
+                lvl_info = calculate_level_info(xp)
+                level = int(lvl_info.get("level", 1))
+                tier = lvl_info.get("tier", "base")
+            except Exception:
+                level = 1
+                tier = "base"
+
+            # Friendship status
+            fs: Optional[str] = None
+            if viewer_tid is not None:
+                if tid in friend_ids:
+                    fs = "friend"
+                elif tid in incoming_set:
+                    fs = "pending_incoming"
+                elif tid in outgoing_set:
+                    fs = "pending_outgoing"
+
+            # Полное имя (graceful fallback)
+            first = (u.get("first_name") or "").strip()
+            last = (u.get("last_name") or "").strip()
+            full_name = (f"{first} {last}".strip()) or (u.get("username") or "") or f"User {uid or tid}"
+
+            results.append(GlobalSearchResult(
+                uid=uid,
+                telegram_id=tid if tid and tid < PSEUDO_TID_OFFSET else None,
+                username=u.get("username"),
+                first_name=first or None,
+                last_name=last or None,
+                full_name=full_name,
+                group_name=u.get("group_name"),
+                facultet_name=u.get("facultet_name"),
+                kurs=u.get("kurs"),
+                has_custom_avatar=(tid in avatars_set),
+                avatar_mode="custom" if tid in avatars_set else "telegram",
+                is_online=is_online,
+                level=level,
+                tier=tier,
+                mutual_friends_count=int(mutual_counts.get(tid, 0)),
+                friendship_status=fs,
+            ))
+
+        return GlobalSearchResponse(
+            results=results,
+            total=len(results),
+            has_more=has_more,
+            query=q,
+            limit=limit,
+            offset=offset,
+        )
+
+    except Exception as e:
+        logger.error(f"global_search error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Поиск временно недоступен")
+
+
 @api_router.get("/friends/{telegram_id}", response_model=FriendsListResponse)
 async def get_friends_list(telegram_id: int, favorites_only: bool = False, search: str = None):
     """Получить список друзей (оптимизировано: batch-запросы)"""
@@ -17255,6 +17578,17 @@ async def _get_user_profile_impl(
             if user_doc:
                 user_uid = user_doc.get("uid")
 
+        # Heuristic: профиль "настроен", если есть имя/группа/курс/факультет
+        # (хотя бы одно). Используется фронтом для ненавязчивого "Профиль в
+        # процессе настройки" бейджа — НЕ блокирует показ.
+        is_setup_complete = bool(
+            (user.get("first_name") or "").strip()
+            or (user.get("last_name") or "").strip()
+            or user.get("group_name")
+            or user.get("facultet_name")
+            or user.get("kurs")
+        )
+
         # Применяем privacy-фильтры ТОЛЬКО для чужих профилей (владелец видит всё)
         if is_own_profile:
             return UserProfilePublic(
@@ -17295,6 +17629,7 @@ async def _get_user_profile_impl(
                 online_status_hidden=False,
                 schedule_hidden=False,
                 is_hidden_from_search=not privacy.show_in_search,
+                is_setup_complete=is_setup_complete,
             )
 
         # --- Чужой просмотр: применяем privacy-фильтры ---
@@ -17354,6 +17689,7 @@ async def _get_user_profile_impl(
             online_status_hidden=(not privacy.show_online_status),
             schedule_hidden=(not privacy.show_schedule),
             is_hidden_from_search=(not privacy.show_in_search),
+            is_setup_complete=is_setup_complete,
         )
 
     except HTTPException:

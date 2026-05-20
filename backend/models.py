@@ -1953,6 +1953,9 @@ class UserProfilePublic(BaseModel):
     schedule_hidden: bool = False
     # Профиль скрыт из поиска (анонимный просмотр заблокирован, но владелец может смотреть)
     is_hidden_from_search: bool = False
+    # Стадия настройки профиля (есть ли first_name/group_name/etc). False для свежих
+    # TG-юзеров, которые ещё не прошли wizard. Фронт показывает мягкий бейдж.
+    is_setup_complete: bool = True
 
 
 class FriendCard(BaseModel):
@@ -2016,6 +2019,45 @@ class FriendSearchResponse(BaseModel):
     results: List[FriendSearchResult]
     total: int
     query: Optional[str] = None
+
+
+class GlobalSearchResult(BaseModel):
+    """Карточка пользователя в результатах глобального поиска.
+
+    Богаче чем FriendSearchResult — содержит uid (для навигации на /u/uid),
+    мета об аватаре, онлайн-статусе, уровне.
+    """
+    uid: Optional[str] = None              # 9-digit публичный UID
+    telegram_id: Optional[int] = None      # для backward-compat (для друзей)
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    full_name: Optional[str] = None        # уже собранное `first last` для display
+    group_name: Optional[str] = None
+    facultet_name: Optional[str] = None
+    kurs: Optional[str] = None
+    has_custom_avatar: bool = False
+    avatar_mode: Optional[str] = "telegram"
+    is_online: bool = False
+    level: int = 1
+    tier: Optional[str] = "base"
+    mutual_friends_count: int = 0          # только если viewer авторизован
+    friendship_status: Optional[str] = None  # "friend" / "pending_*" / None / "self"
+
+
+class GlobalSearchResponse(BaseModel):
+    """Ответ глобального поиска.
+
+    Sliced pagination: возвращает `results` и флаг `has_more` (для UX
+    "Показать ещё"). Total — best-effort: реальное число матчей до
+    privacy-фильтрации может быть меньше.
+    """
+    results: List[GlobalSearchResult]
+    total: int                              # actual count after privacy filter
+    has_more: bool = False                  # есть ли ещё страницы
+    query: Optional[str] = None
+    limit: int = 20
+    offset: int = 0
 
 
 class ProcessFriendInviteRequest(BaseModel):
