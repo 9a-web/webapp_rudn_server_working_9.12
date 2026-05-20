@@ -41,6 +41,32 @@ Russian UI + code comments + Pydantic messages.
 
 ## What's been implemented
 
+### Phase 12 — Friend Request fix + Audit bug squash (2026-05-20)
+**P0 — Web→Telegram friend request fix:**
+- [x] **Root cause**: Frontend sent body.telegram_id = guest device_id или Mongo doc.id вместо `effective_tid` (real telegram_id || pseudo_tid_from_uid(uid)). Backend тихо сохранял orphan-запись без user_settings, и она фильтровалась в `get_friend_requests`.
+- [x] **Backend** (`server.py`):
+  - `send_friend_request` — валидирует `sender_user` ДО создания записи, 400 «Войдите в аккаунт» при phantom-tid.
+  - `get_friend_requests` — авто-уборка orphan-rows (scope-fix: проверяем только противоположную сторону, не self).
+- [x] **Frontend**:
+  - `utils/userIdentity.js` — добавлен `getEffectiveTid(user)` helper.
+  - `PublicProfilePage.jsx` — все friend-actions переведены на `viewerTid = getEffectiveTid(currentUser)`.
+  - `App.jsx` — `effectiveUser` пробрасывается в `<FriendsSection currentUser=...>`.
+  - `FriendsSection.jsx` — использует `currentUser` prop, guard `if (isGuestUser)` блокирует отправку гостя.
+  - `App.jsx::handleFriendRequestConfirm` — аналогичный guard.
+
+**P1 — Audit bugs B-N01…B-N08 (`/app/backend/auth_routes.py`, frontend forms):**
+- [x] **B-N01**: удалён duplicate `/logout` endpoint (был в двух местах).
+- [x] **B-N02**: PublicProfilePage теперь использует `?continue=` (был `?returnTo=`, который LoginPage игнорировал).
+- [x] **B-N03**: убран двойной сабмит форм — `EmailRegisterForm`/`EmailLoginForm`: AuthButton type="submit" без onClick.
+- [x] **B-N04**: `RegisterWizard` читает `?ref=XYZ` из URL → `sessionStorage.pending_referral_code` → подбирается всеми формами (Email/Telegram/VK).
+- [x] **B-N05**: `_create_new_user` принимает `request`, сохраняет `last_login_ip`+`last_login_ua` сразу при регистрации (раньше — только при повторном login).
+- [x] **B-N06**: после `register_email` автоматически отправляется верификационное письмо (fail-soft, не ломает регистрацию).
+- [x] **B-N07**: server-side `.strip()` для `first_name`/`last_name`/`username` в `_create_new_user`.
+- [x] **B-N08**: `/email/verify` для анонимных клиентов возвращает `access_token`+`user` → авто-логин после клика по ссылке из письма. Frontend `AuthContext.verifyEmail` использует это.
+- [x] **Models**: добавлен `VerifyEmailResponse` (Optional access_token/user).
+
+**Testing**: 11/11 backend тестов прошли (iteration_3.json), 100% success.
+
 ### Stage 11 — Auth UI Glassmorphism + GroupSelector design unification (2026-05-06)
 - [x] **Auth pages**: full glassmorphism redesign (`AuthLayout`, `LoginPage`, `AuthInput`, `AuthButton`).
 - [x] **Background**: desktop `door_rudn.png` / mobile `door_rudn_mob.png` via Tailwind arbitrary variants.
