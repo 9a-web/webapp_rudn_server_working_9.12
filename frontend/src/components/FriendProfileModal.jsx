@@ -3,10 +3,11 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Star, UserMinus, Calendar, Users, 
-  MapPin, ChevronRight, AlertTriangle,
+  MapPin, ChevronRight, AlertTriangle, ExternalLink,
   EyeOff, ChevronLeft, ChevronDown, Wifi, Trophy, MessageCircle
 } from 'lucide-react';
 import { friendsAPI } from '../services/friendsAPI';
@@ -46,6 +47,7 @@ const formatRelativeTime = (iso) => {
 const FriendProfileModal = ({ 
   isOpen, onClose, friend, currentUserId, userSettings, onRemoveFriend, onToggleFavorite, onMessage
 }) => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [schedule, setSchedule] = useState(null);
   const [mutualFriends, setMutualFriends] = useState([]);
@@ -515,6 +517,33 @@ const FriendProfileModal = ({
 
                     {/* Actions */}
                     <div className="space-y-2">
+                      {/* Открыть публичный профиль /u/{uid} */}
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          // Приоритет: uid из друга/profile → tid как fallback.
+                          // Если есть uid (9-значный публичный) — переходим на /u/{uid},
+                          // иначе используем telegram_id (бэк всё равно резолвит).
+                          const targetId = friend?.uid || profile?.uid || friend?.telegram_id || profile?.telegram_id;
+                          if (!targetId) return;
+                          onClose?.();
+                          // Чуть отложим — даём модалке проиграть exit-анимацию
+                          setTimeout(() => navigate(`/u/${targetId}`), 50);
+                        }}
+                        className="w-full flex items-center gap-3.5 p-4 bg-emerald-500/[0.08] rounded-2xl text-left hover:bg-emerald-500/[0.14] transition-all border border-emerald-500/15"
+                      >
+                        <div className="p-2.5 rounded-xl bg-emerald-500/15">
+                          <ExternalLink className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-[14px] text-emerald-400">Открыть публичный профиль</p>
+                          <p className="text-[12px] text-gray-500 mt-0.5">
+                            Достижения, стена, друзья
+                          </p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-emerald-400/50" />
+                      </motion.button>
+
                       {/* Написать сообщение */}
                       <motion.button
                         whileTap={{ scale: 0.98 }}

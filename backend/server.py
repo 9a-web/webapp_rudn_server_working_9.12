@@ -16111,6 +16111,7 @@ async def get_friends_list(telegram_id: int, favorites_only: bool = False, searc
             
             friend_card = FriendCard(
                 telegram_id=fid,
+                uid=user_data.get("uid"),
                 username=user_data.get("username"),
                 first_name=user_data.get("first_name"),
                 last_name=user_data.get("last_name"),

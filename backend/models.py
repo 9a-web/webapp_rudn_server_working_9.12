@@ -1961,6 +1961,7 @@ class UserProfilePublic(BaseModel):
 class FriendCard(BaseModel):
     """Карточка друга для списка"""
     telegram_id: int
+    uid: Optional[str] = None  # 9-digit публичный UID — для перехода на /u/{uid}
     username: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
