@@ -10,7 +10,7 @@
  * сразу прыгаем на соответствующий шаг.
  */
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, User, Check, Mail, MessageCircle, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthLayout from '../components/auth/AuthLayout';
@@ -84,6 +84,15 @@ const Step1AuthMethod = ({ config, onNext }) => {
   }
 
   if (method === 'telegram') {
+    // 🎁 B-N04: подбираем pending_referral_code из URL `?ref=XYZ`, чтобы передать
+    // в Telegram WebApp / Login Widget при первой регистрации.
+    let pendingRef = null;
+    try { pendingRef = sessionStorage.getItem('pending_referral_code'); } catch { /* noop */ }
+
+    const _clearRef = () => {
+      try { sessionStorage.removeItem('pending_referral_code'); } catch { /* noop */ }
+    };
+
     return (
       <div className="flex flex-col items-center gap-4">
         <button
@@ -104,7 +113,8 @@ const Step1AuthMethod = ({ config, onNext }) => {
           <TelegramWebAppLoginButton
             label="Войти через Telegram"
             onSubmit={async (initData, startParam) => {
-              const resp = await loginTelegramWebApp(initData, startParam);
+              const resp = await loginTelegramWebApp(initData, startParam || pendingRef);
+              if (pendingRef) _clearRef();
               onNext(resp);
             }}
           />
@@ -118,7 +128,11 @@ const Step1AuthMethod = ({ config, onNext }) => {
                 onAuth={async (widgetUser) => {
                   setTgWidgetError(null);
                   try {
-                    const resp = await loginTelegramWidget(widgetUser);
+                    const payload = pendingRef
+                      ? { ...widgetUser, referral_code: pendingRef }
+                      : widgetUser;
+                    const resp = await loginTelegramWidget(payload);
+                    if (pendingRef) _clearRef();
                     onNext(resp);
                   } catch (e) {
                     setTgWidgetError(e?.message || 'Не удалось войти через Telegram');
@@ -155,6 +169,10 @@ const Step1AuthMethod = ({ config, onNext }) => {
   }
 
   if (method === 'vk') {
+    // 🎁 B-N04: пробрасываем pending_referral_code в VK OAuth state.
+    let pendingRefVk = null;
+    try { pendingRefVk = sessionStorage.getItem('pending_referral_code'); } catch { /* noop */ }
+
     return (
       <div className="flex flex-col gap-4">
         <button
@@ -166,7 +184,7 @@ const Step1AuthMethod = ({ config, onNext }) => {
         <div className="text-center text-sm text-white/70">
           Вы будете перенаправлены на VK ID для подтверждения.
         </div>
-        <VkLoginButton appId={config?.vk_app_id} />
+        <VkLoginButton appId={config?.vk_app_id} referralCode={pendingRefVk || undefined} />
       </div>
     );
   }
@@ -402,9 +420,20 @@ const Step3Academic = ({ onComplete, onSkip }) => {
 // ================= MAIN =================
 const RegisterWizard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isAuthenticated, refreshMe } = useAuth();
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState(null);
+
+  // 🎁 Referral code из URL `?ref=XYZ` → сохраняем в sessionStorage, чтобы
+  // EmailRegisterForm/Telegram/VK-кнопки могли подобрать его при регистрации.
+  // (B-N04) Раньше параметр игнорировался → реферальная программа ломалась.
+  useEffect(() => {
+    const ref = (searchParams.get('ref') || '').trim();
+    if (ref && /^[A-Za-z0-9_-]{1,64}$/.test(ref)) {
+      try { sessionStorage.setItem('pending_referral_code', ref); } catch { /* noop */ }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     authAPI.config().then(setConfig).catch(() => {});

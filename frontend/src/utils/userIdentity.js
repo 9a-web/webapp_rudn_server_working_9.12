@@ -161,12 +161,47 @@ export const pickFromArray = (arr, seed) => {
   return arr[hashSeed(seed) % arr.length];
 };
 
+/**
+ * Возвращает «эффективный» telegram_id для использования в legacy API
+ * (которое ожидает поле `telegram_id`).
+ *
+ * Приоритет:
+ *   1. user.telegram_id (если есть РЕАЛЬНЫЙ TG-id)
+ *   2. PSEUDO_TID_OFFSET + uid (для VK/Email/QR-юзеров)
+ *   3. null (например, для гостя без логина)
+ *
+ * 🔒 Безопасно: НЕ возвращает guest device_id из useTelegram(). Если хотите
+ *    разрешить guest fallback — делайте это явно на месте вызова.
+ *
+ * @returns {number | null}
+ */
+export const getEffectiveTid = (user) => {
+  if (!user || typeof user !== 'object') return null;
+
+  // 1. Real telegram_id
+  const realTid = toNumberOrNull(user.telegram_id);
+  if (realTid !== null && isRealTelegramTid(realTid)) return realTid;
+
+  // 2. pseudo_tid из uid
+  const uid = toNumberOrNull(user.uid ?? user.user_uid);
+  if (uid !== null && uid > 0) {
+    return PSEUDO_TID_OFFSET + uid;
+  }
+
+  // 3. Если есть готовый pseudo_tid (например, в legacy `user.id`)
+  const anyTid = toNumberOrNull(user.id);
+  if (anyTid !== null && isPseudoTid(anyTid)) return anyTid;
+
+  return null;
+};
+
 export default {
   PSEUDO_TID_OFFSET,
   isRealTelegramTid,
   isPseudoTid,
   getUid,
   getUidOrTid,
+  getEffectiveTid,
   isSameUser,
   getAvatarSeed,
   hashSeed,

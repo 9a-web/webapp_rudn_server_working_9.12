@@ -156,8 +156,13 @@ const getConversationTimeAgo = (dateStr) => {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 };
 
-const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinListeningRoom }) => {
-  const { user, webApp } = useTelegram();
+const FriendsSection = ({ userSettings, currentUser, onFriendProfileOpen, onChatOpen, onJoinListeningRoom }) => {
+  const { user: tgUser, webApp } = useTelegram();
+  // 🔒 Auth-aware identity: currentUser (effectiveUser из App.jsx) уже резолвит
+  // pseudo_tid для Email/VK-юзеров. Fallback на tgUser нужен только для
+  // legacy TG WebApp без авторизации (когда currentUser ещё не загружен).
+  const user = currentUser || tgUser;
+  const isGuestUser = !!(user?.is_guest);
   const [activeTab, setActiveTab] = useState('friends');
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
@@ -652,6 +657,10 @@ const FriendsSection = ({ userSettings, onFriendProfileOpen, onChatOpen, onJoinL
   const [sendingRequest, setSendingRequest] = useState(null);
 
   const handleSendRequest = async (targetId) => {
+    if (isGuestUser) {
+      showToast('Войдите в аккаунт, чтобы отправлять заявки в друзья', 'error');
+      return;
+    }
     try {
       setSendingRequest(targetId);
       hapticFeedback('impact', 'medium');

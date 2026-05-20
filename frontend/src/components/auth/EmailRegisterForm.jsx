@@ -34,7 +34,21 @@ const EmailRegisterForm = ({ onSuccess, onSwitchLogin }) => {
     if (v) { setError(v); return; }
     setError(null);
     try {
-      const resp = await registerEmail(email.trim(), password, firstName.trim(), lastName.trim() || null);
+      // 🎁 Подбираем pending_referral_code из sessionStorage (положен RegisterWizard'ом
+      // при заходе по ссылке `?ref=XYZ`). После успешной регистрации очищаем.
+      let referralCode = null;
+      try { referralCode = sessionStorage.getItem('pending_referral_code'); } catch { /* noop */ }
+
+      const resp = await registerEmail(
+        email.trim(),
+        password,
+        firstName.trim(),
+        lastName.trim() || null,
+        referralCode || null,
+      );
+      if (referralCode) {
+        try { sessionStorage.removeItem('pending_referral_code'); } catch { /* noop */ }
+      }
       onSuccess?.(resp);
     } catch (e) {
       setError(e.message);
@@ -77,7 +91,7 @@ const EmailRegisterForm = ({ onSuccess, onSwitchLogin }) => {
         </div>
       )}
 
-      <AuthButton type="submit" loading={loading} onClick={handleSubmit}>
+      <AuthButton type="submit" loading={loading}>
         Продолжить
       </AuthButton>
 

@@ -83,6 +83,7 @@ from models import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
     GenericSuccessResponse,
+    VerifyEmailResponse,
     LinkTelegramRequest,
     LinkTelegramWebAppRequest,
     LinkVKRequest,
@@ -358,15 +359,30 @@ async def _create_new_user(
     photo_url: Optional[str] = None,
     primary_auth: str,
     registration_step: int = 2,
+    request: Optional[Request] = None,
 ) -> dict:
     """Создаёт новый `users` документ с уникальным UID. Возвращает вставленный doc.
 
     Параллельно создаёт зеркальный документ в `user_settings` (для совместимости
     с legacy-endpoints). Если реального `telegram_id` нет — используется
     pseudo-tid (10^10 + uid), который гарантированно вне диапазона Telegram ID.
+
+    🐛 BUG-FIX (B-N05, B-N07): теперь
+      - сохраняем last_login_ip / last_login_ua для нового юзера (если передан
+        request) — раньше эти поля появлялись только после повторного login;
+      - применяем .strip() к first_name / last_name / username, чтобы убирать
+        пробелы из ввода (раньше «  Ivan  » сохранялся как есть).
     """
     uid = await generate_uid(db)
     now = datetime.now(timezone.utc)
+
+    # B-N07: server-side strip, защита от пробелов из формы
+    if first_name is not None:
+        first_name = first_name.strip() or None
+    if last_name is not None:
+        last_name = last_name.strip() or None
+    if username is not None:
+        username = username.strip() or None
 
     doc = {
         "id": str(uuid.uuid4()),
@@ -388,6 +404,14 @@ async def _create_new_user(
         "last_login_at": now,
         "registration_step": registration_step,
     }
+    # B-N05: пишем last_login_ip / last_login_ua сразу при создании юзера,
+    # если есть request-контекст. Это критично для security audit и фрод-мониторинга.
+    if request is not None:
+        try:
+            doc["last_login_ip"] = get_client_ip(request)
+            doc["last_login_ua"] = (request.headers.get("User-Agent") or "")[:500]
+        except Exception:
+            pass
 
     try:
         await db.users.insert_one(doc)
@@ -466,6 +490,66 @@ async def _create_new_user(
         f"effective_tid={effective_tid}"
     )
     return doc
+
+
+async def _create_email_verify_token_and_send(
+    db,
+    *,
+    user_doc: dict,
+    request: Optional[Request] = None,
+    fail_silently: bool = True,
+) -> bool:
+    """Создаёт верификационный токен и отправляет письмо.
+
+    Используется и в `/email/send-verification` (по запросу юзера), и в
+    `register_email` (автоматически сразу после регистрации — B-N06).
+
+    Возвращает True при успехе. При fail_silently=True не бросает исключения
+    (чтобы регистрация не падала на временной недоступности SMTP).
+    """
+    try:
+        email = user_doc.get("email")
+        if not email or user_doc.get("email_verified"):
+            return False
+        uid = user_doc["uid"]
+        raw = new_secure_token(32)
+        token_hash = hash_token(raw)
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(minutes=_EMAIL_VERIFY_TTL_MIN)
+
+        # Инвалидируем предыдущие активные verify-токены
+        await db.auth_tokens.update_many(
+            {"uid": uid, "purpose": "email_verify", "used_at": None},
+            {"$set": {"used_at": now, "invalidated": True}},
+        )
+        await db.auth_tokens.insert_one({
+            "id": str(uuid.uuid4()),
+            "uid": uid,
+            "purpose": "email_verify",
+            "token_hash": token_hash,
+            "email": email,
+            "created_at": now,
+            "expires_at": expires_at,
+            "used_at": None,
+        })
+
+        base = (EMAIL_PUBLIC_BASE_URL or "").rstrip("/")
+        verify_url = f"{base}/verify-email?token={raw}"
+        subj, html, text = template_email_verification(
+            verify_url=verify_url,
+            user_name=user_doc.get("first_name") or "",
+        )
+        await send_email(email, subj, html, text)
+        await _log_auth_event(
+            db, event_type="send_verification", uid=uid, success=True, request=request,
+            extra={"trigger": "auto_on_register" if fail_silently else "manual"},
+        )
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"_create_email_verify_token_and_send failed: {e}", exc_info=True)
+        if not fail_silently:
+            raise
+        return False
 
 
 async def _update_last_login(
@@ -947,12 +1031,23 @@ def create_auth_router(db) -> APIRouter:
             last_name=req.last_name,
             primary_auth="email",
             registration_step=2,
+            request=request,
         )
 
         # 🔗 P4: Обработка referral_code (если передан)
         await _process_referral_for_new_user(
             db, referral_code=req.referral_code, user_doc=user_doc, request=request,
         )
+
+        # ✉️ B-N06: авто-отправляем письмо подтверждения email.
+        # fail_silently=True — если SMTP недоступен, не ломаем регистрацию;
+        # юзер всегда может ретригернуть через /email/send-verification.
+        try:
+            await _create_email_verify_token_and_send(
+                db, user_doc=user_doc, request=request, fail_silently=True,
+            )
+        except Exception as e:  # на всякий случай — никогда не ломаем регистрацию
+            logger.warning(f"auto verification email failed for {user_doc.get('uid')}: {e}")
 
         await _log_auth_event(
             db, event_type="register_email", uid=user_doc["uid"],
@@ -1110,6 +1205,7 @@ def create_auth_router(db) -> APIRouter:
             photo_url=req.photo_url,
             primary_auth="telegram",
             registration_step=2,
+            request=request,
         )
 
         # 🔗 P4: Обработка referral_code
@@ -1266,6 +1362,7 @@ def create_auth_router(db) -> APIRouter:
             photo_url=tg_photo,
             primary_auth="telegram",
             registration_step=2,
+            request=request,
         )
 
         # 🔗 P4: Обработка referral_code
@@ -1375,6 +1472,7 @@ def create_auth_router(db) -> APIRouter:
                 photo_url=vk_profile.get("photo_200"),
                 primary_auth="vk",
                 registration_step=2,
+                request=request,
             )
             is_new = True
             # 🔗 P4: Обработка referral_code для нового VK-пользователя
@@ -1644,26 +1742,6 @@ def create_auth_router(db) -> APIRouter:
             "uid": user_doc.get("uid"),
             "telegram_id": user_doc.get("telegram_id"),
         }
-
-    # ============= /logout =============
-
-    @router.post("/logout")
-    async def logout(
-        request: Request,
-        current_user: Dict[str, Any] = Depends(get_current_user_required),
-    ):
-        """Logout — отзывает ТЕКУЩУЮ сессию (jti) + логирует event."""
-        jti = current_user.get("jti")
-        if jti:
-            try:
-                await revoke_session(db, uid=current_user["sub"], jti=jti)
-            except Exception as e:
-                logger.warning(f"logout revoke_session failed: {e}")
-        await _log_auth_event(
-            db, event_type="logout", uid=current_user["sub"],
-            success=True, request=request,
-        )
-        return {"success": True, "message": "Logged out. Delete the token on client side."}
 
     # ============= Link Email =============
 
@@ -2582,47 +2660,29 @@ def create_auth_router(db) -> APIRouter:
         if user_doc.get("email_verified"):
             return GenericSuccessResponse(success=True, message="Email уже подтверждён")
 
-        raw = new_secure_token(32)
-        token_hash = hash_token(raw)
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=_EMAIL_VERIFY_TTL_MIN)
-
-        # Инвалидируем предыдущие verify-токены
-        await db.auth_tokens.update_many(
-            {"uid": uid, "purpose": "email_verify", "used_at": None},
-            {"$set": {"used_at": datetime.now(timezone.utc), "invalidated": True}},
+        # Делегируем общему helper'у (DRY с register_email авто-отправкой)
+        ok = await _create_email_verify_token_and_send(
+            db, user_doc=user_doc, request=request, fail_silently=False,
         )
-        await db.auth_tokens.insert_one({
-            "id": str(uuid.uuid4()),
-            "uid": uid,
-            "purpose": "email_verify",
-            "token_hash": token_hash,
-            "email": user_doc["email"],  # фиксируем email на момент выдачи
-            "created_at": datetime.now(timezone.utc),
-            "expires_at": expires_at,
-            "used_at": None,
-        })
-        base = (EMAIL_PUBLIC_BASE_URL or "").rstrip("/")
-        verify_url = f"{base}/verify-email?token={raw}"
-        subj, html, text = template_email_verification(
-            verify_url=verify_url,
-            user_name=user_doc.get("first_name") or "",
-        )
-        await send_email(user_doc["email"], subj, html, text)
-        await _log_auth_event(
-            db, event_type="send_verification", uid=uid, success=True, request=request,
-        )
+        if not ok:
+            raise HTTPException(status_code=500, detail="Не удалось отправить письмо. Попробуйте позже.")
         return GenericSuccessResponse(
             success=True,
             message=f"Письмо отправлено на {user_doc['email']}. Проверьте почту.",
         )
 
-    @router.post("/email/verify", response_model=GenericSuccessResponse)
+    @router.post("/email/verify", response_model=VerifyEmailResponse)
     async def verify_email(
         req: VerifyEmailRequest,
         request: Request,
         current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
     ):
-        """Подтвердить email по токену (работает и для неавторизованного клиента)."""
+        """Подтвердить email по токену (работает и для неавторизованного клиента).
+
+        🐛 B-N08: если клиент НЕ авторизован — выдаём access_token + user, чтобы
+        фронт мог сразу залогинить пользователя после клика по ссылке из письма.
+        Авторизованным юзерам токен не выдаём (уже залогинены).
+        """
         client_ip = get_client_ip(request)
         rl_max, rl_win = _RATE_LIMITS["verify_email_ip"]
         if not check_rate_limit(client_ip, "verify_email_ip", rl_max, rl_win):
@@ -2663,7 +2723,23 @@ def create_auth_router(db) -> APIRouter:
             db, event_type="verify_email", uid=user_doc["uid"],
             success=True, request=request,
         )
-        return GenericSuccessResponse(success=True, message="Email успешно подтверждён ✓")
+
+        # 🆕 B-N08: если клиент анонимный — даём access_token для авто-логина
+        if current_user is None:
+            # Перезагружаем user_doc, чтобы вернуть свежий email_verified=True в payload
+            user_doc = await db.users.find_one({"uid": user_doc["uid"]}) or user_doc
+            token_resp = await _issue_token(
+                db, user_doc, is_new=False, request=request, provider="email_verify",
+            )
+            return VerifyEmailResponse(
+                success=True,
+                message="Email успешно подтверждён ✓",
+                access_token=token_resp.access_token,
+                token_type=token_resp.token_type,
+                user=token_resp.user,
+            )
+
+        return VerifyEmailResponse(success=True, message="Email успешно подтверждён ✓")
 
     # ============= 🖥️ SESSIONS / DEVICES (P4) =============
 

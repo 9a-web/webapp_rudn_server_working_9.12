@@ -15217,12 +15217,34 @@ async def update_friends_stats(telegram_id: int):
 
 @api_router.post("/friends/request/{target_telegram_id}", response_model=FriendActionResponse)
 async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(..., embed=True)):
-    """Отправить запрос на дружбу"""
+    """Отправить запрос на дружбу.
+
+    🐛 BUG-FIX (2026-05): валидируем отправителя ДО создания записи в БД.
+    Раньше при отправке из веба незалогиненным юзером (guest device_id) в
+    friend_requests попадал «фантомный» from_telegram_id, для которого нет
+    user_settings → notify_friend_request не вызывался и заявка не появлялась
+    у получателя (get_friend_requests фильтрует rows без user_settings).
+    Теперь — явный 400 с понятным текстом для фронта.
+    """
     try:
         # Проверяем, что не отправляем запрос самому себе
         if telegram_id == target_telegram_id:
             raise HTTPException(status_code=400, detail="Нельзя добавить себя в друзья")
-        
+
+        # 🔒 ВАЛИДАЦИЯ ОТПРАВИТЕЛЯ: если sender не зарегистрирован
+        # (например, гостевой device_id веб-клиента) — заявку не создаём.
+        # Это страхует от orphan-записей и тихих «потерь» уведомлений.
+        sender_user = await db.user_settings.find_one({"telegram_id": telegram_id})
+        if not sender_user:
+            logger.warning(
+                f"send_friend_request: phantom sender telegram_id={telegram_id} "
+                f"target={target_telegram_id} — request rejected"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Войдите в аккаунт, чтобы отправлять заявки в друзья"
+            )
+
         # Проверяем существование целевого пользователя
         target_user = await db.user_settings.find_one({"telegram_id": target_telegram_id})
         if not target_user:
@@ -15304,10 +15326,8 @@ async def send_friend_request(target_telegram_id: int, telegram_id: int = Body(.
         )
         await db.friend_requests.insert_one(request.dict())
         
-        # Отправляем уведомление получателю
-        sender_user = await db.user_settings.find_one({"telegram_id": telegram_id})
-        if sender_user:
-            await notify_friend_request(target_telegram_id, sender_user, request.id)
+        # Отправляем уведомление получателю (sender_user уже загружен в начале функции)
+        await notify_friend_request(target_telegram_id, sender_user, request.id)
         
         logger.info(f"👥 Friend request sent: {telegram_id} -> {target_telegram_id}")
         
@@ -16160,7 +16180,31 @@ async def get_friend_requests(telegram_id: int):
         # Batch-загрузка пользователей
         users_list = await db.user_settings.find({"telegram_id": {"$in": list(user_ids)}}).to_list(200)
         users_map = {u["telegram_id"]: u for u in users_list}
-        
+
+        # 🧹 Авто-уборка orphan-заявок (sender или recipient удалён / был phantom).
+        # До bugfix'а 2026-05 такие записи могли создаваться при отправке заявки из
+        # веба незалогиненным юзером — они тихо «висели» и блокировали повторную
+        # отправку. Удаляем их фоном, чтобы не показывать пустые/нерабочие карточки.
+        # ВАЖНО: проверяем только «другую» сторону. Сам вызывающий (telegram_id)
+        # очевидно существует, но его user_settings может не быть загружен в users_map,
+        # т.к. в users_map попадают только противоположные стороны.
+        orphan_ids = []
+        for r in incoming_data:
+            if r["from_telegram_id"] not in users_map:
+                orphan_ids.append(r["id"])
+        for r in outgoing_data:
+            if r["to_telegram_id"] not in users_map:
+                orphan_ids.append(r["id"])
+        if orphan_ids:
+            try:
+                await db.friend_requests.delete_many({"id": {"$in": orphan_ids}})
+                logger.info(f"🧹 Cleaned {len(orphan_ids)} orphan friend_requests for tid={telegram_id}")
+            except Exception as e:
+                logger.warning(f"Orphan cleanup failed: {e}")
+            orphan_set = set(orphan_ids)
+            incoming_data = [r for r in incoming_data if r["id"] not in orphan_set]
+            outgoing_data = [r for r in outgoing_data if r["id"] not in orphan_set]
+
         # Batch-подсчёт общих друзей
         mutual_counts = await get_mutual_friends_count_batch(telegram_id, list(user_ids))
         

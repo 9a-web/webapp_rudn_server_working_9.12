@@ -290,12 +290,17 @@ export const AuthProvider = ({ children }) => {
     return authAPI.sendVerification();
   };
 
-  /** Подтвердить email. Обновляет текущего user в state. */
+  /** Подтвердить email. Если backend вернул access_token (анонимный клиент) —
+   *  авто-логиним. Иначе обновляем /me. */
   const verifyEmail = async (token) => {
     setError(null);
     const r = await authAPI.verifyEmail(token);
-    // Рефрешим /me чтобы получить email_verified=true
-    try { await refreshMe(); } catch { /* noop */ }
+    // B-N08: анонимный клиент → backend выдаёт access_token + user → авто-логин
+    if (r && r.access_token && r.user) {
+      applyAuth(r.access_token, r.user);
+    } else {
+      try { await refreshMe(); } catch { /* noop */ }
+    }
     return r;
   };
 

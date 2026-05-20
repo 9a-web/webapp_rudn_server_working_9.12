@@ -2003,7 +2003,15 @@ const Home = () => {
   // Обработка подтверждения запроса в друзья
   const handleFriendRequestConfirm = async () => {
     if (!friendRequestModal.friendId || !effectiveUser?.id) return;
-    
+
+    // 🔒 Guard: гостевой device_id не имеет user_settings → backend вернёт 400
+    // и заявка не уйдёт. Лучше показать понятное сообщение сразу.
+    if (effectiveUser?.is_guest) {
+      showAlert('Войдите в аккаунт, чтобы отправлять заявки в друзья');
+      setFriendRequestModal({ isOpen: false, friendId: null, friendData: null, loading: false });
+      return;
+    }
+
     setFriendRequestModal(prev => ({ ...prev, loading: true }));
     
     try {
@@ -2338,6 +2346,7 @@ const Home = () => {
           <ErrorBoundary>
             <FriendsSection 
               userSettings={userSettings}
+              currentUser={effectiveUser}
               onFriendProfileOpen={setIsFriendProfileOpen}
               onChatOpen={setIsChatOpen}
               onJoinListeningRoom={(inviteCode) => {

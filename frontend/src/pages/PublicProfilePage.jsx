@@ -34,7 +34,7 @@ import { friendsAPI } from '../services/friendsAPI';
 import { useAuth } from '../contexts/AuthContext';
 import { getTierConfig } from '../constants/levelConstants';
 import { buildProfileUrl } from '../constants/publicBase';
-import { isSameUser } from '../utils/userIdentity';
+import { isSameUser, getEffectiveTid } from '../utils/userIdentity';
 import WallGraffiti from '../components/WallGraffiti';
 import LevelDetailModal from '../components/LevelDetailModal';
 import { getBackendURL } from '../services/api';
@@ -260,20 +260,22 @@ const PublicProfilePage = () => {
   // ---------------------------------------------------------------------------
   // Регистрация просмотра (1 раз на UID, debounced)
   // ---------------------------------------------------------------------------
+  const viewerTid = useMemo(() => getEffectiveTid(currentUser), [currentUser]);
+
   useEffect(() => {
-    if (!profile || !currentUser?.id || isOwner || viewSentRef.current) return;
+    if (!profile || !viewerTid || isOwner || viewSentRef.current) return;
     viewSentRef.current = true;
     const base = getBackendURL();
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       axios.post(
         `${base}/api/u/${encodeURIComponent(uid)}/view`,
-        { viewer_telegram_id: currentUser.id },
+        { viewer_telegram_id: viewerTid },
         { signal: ctrl.signal },
       ).catch(() => {});
     }, 800);
     return () => { clearTimeout(t); ctrl.abort(); };
-  }, [profile, currentUser?.id, isOwner, uid]);
+  }, [profile, viewerTid, isOwner, uid]);
 
   // ---------------------------------------------------------------------------
   // Загрузка кастомного аватара и header-граффити (по UID — privacy-safe)
@@ -399,10 +401,10 @@ const PublicProfilePage = () => {
   }, [loadProfile]);
 
   const handleSendFriendRequest = async () => {
-    if (!currentUser?.id || !profile?.telegram_id) return;
+    if (!viewerTid || !profile?.telegram_id) return;
     setFriendActionLoading(true); setFriendActionError(null);
     try {
-      await friendsAPI.sendFriendRequest(currentUser.id, profile.telegram_id);
+      await friendsAPI.sendFriendRequest(viewerTid, profile.telegram_id);
       await refreshAfterFriendAction();
     } catch (e) {
       setFriendActionError(e?.message || 'Не удалось отправить заявку');
@@ -412,11 +414,11 @@ const PublicProfilePage = () => {
   };
 
   const handleRemoveFriend = async () => {
-    if (!currentUser?.id || !profile?.telegram_id) return;
+    if (!viewerTid || !profile?.telegram_id) return;
     if (!window.confirm('Удалить из друзей?')) return;
     setFriendActionLoading(true); setFriendActionError(null);
     try {
-      await friendsAPI.removeFriend(currentUser.id, profile.telegram_id);
+      await friendsAPI.removeFriend(viewerTid, profile.telegram_id);
       await refreshAfterFriendAction();
       setShowFriendActions(false);
     } catch (e) {
@@ -427,11 +429,11 @@ const PublicProfilePage = () => {
   };
 
   const handleBlock = async () => {
-    if (!currentUser?.id || !profile?.telegram_id) return;
+    if (!viewerTid || !profile?.telegram_id) return;
     if (!window.confirm('Заблокировать пользователя? Вы больше не будете видеть друг друга.')) return;
     setFriendActionLoading(true); setFriendActionError(null);
     try {
-      await friendsAPI.blockUser(currentUser.id, profile.telegram_id);
+      await friendsAPI.blockUser(viewerTid, profile.telegram_id);
       // После блока — назад
       navigate(-1);
     } catch (e) {
@@ -456,8 +458,10 @@ const PublicProfilePage = () => {
   // Login redirect (с возвратом на текущий профиль)
   // ---------------------------------------------------------------------------
   const handleLogin = () => {
-    const returnTo = encodeURIComponent(location.pathname + location.search);
-    navigate(`/login?returnTo=${returnTo}`);
+    // ✅ Используем параметр `continue` (sanitize'ится в LoginPage через safeContinueUrl).
+    // Раньше передавали `returnTo` — LoginPage его игнорировал → юзер падал на /.
+    const continueUrl = encodeURIComponent(location.pathname + location.search);
+    navigate(`/login?continue=${continueUrl}`);
   };
 
   // ===========================================================================

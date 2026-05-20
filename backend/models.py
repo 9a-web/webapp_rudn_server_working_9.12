@@ -3087,6 +3087,22 @@ class GenericSuccessResponse(BaseModel):
     message: Optional[str] = None
 
 
+class VerifyEmailResponse(BaseModel):
+    """Ответ на POST /email/verify.
+
+    🐛 B-N08: дополнительно возвращаем access_token + user, если запрос пришёл от
+    анонимного клиента — это позволяет авто-логинить юзера сразу после клика на
+    ссылку из письма (раньше приходилось делать второй login).
+    """
+    success: bool = True
+    message: Optional[str] = None
+    # Опциональные поля авто-логина — заполняются только если verify запросил
+    # неавторизованный клиент (например, кликнул из письма в новой вкладке).
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+    user: Optional[UserPublic] = None
+
+
 class ProfileViewRequest(BaseModel):
     """Тело запроса POST /api/profile/{telegram_id}/view"""
     viewer_telegram_id: int

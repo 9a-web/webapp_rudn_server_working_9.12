@@ -83,7 +83,7 @@ const EmailLoginForm = ({ onSuccess, onSwitchRegister }) => {
         </div>
       )}
 
-      <AuthButton type="submit" loading={loading} onClick={handleSubmit}>
+      <AuthButton type="submit" loading={loading}>
         Войти
       </AuthButton>
 
