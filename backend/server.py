@@ -15797,8 +15797,10 @@ async def global_search(
     """
     try:
         # Валидация параметров
-        limit = max(1, min(int(limit or 20), 50))
-        offset = max(0, int(offset or 0))
+        # Используем `is None`, а не `or 20`, чтобы limit=0 явно ограничивался
+        # до 1 (а не «откатывался» к default 20).
+        limit = max(1, min(int(limit if limit is not None else 20), 50))
+        offset = max(0, int(offset if offset is not None else 0))
 
         viewer_tid: Optional[int] = None
         if current_user:
