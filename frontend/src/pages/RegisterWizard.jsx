@@ -281,14 +281,22 @@ const Step2Profile = ({ user, onComplete, onBack }) => {
 
       {conflictHint && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-relaxed text-amber-200">
-          <span className="font-semibold">Ник </span>
-          <span className="font-mono font-semibold">@{conflictHint}</span>
-          <span> из Telegram/VK уже занят другим пользователем. </span>
-          <span>Выберите другой ник — он будет виден друзьям и в поиске.</span>
+          <div className="font-semibold text-amber-100 mb-1">
+            Ник <span className="font-mono">@{conflictHint}</span> из Telegram/VK уже занят
+          </div>
+          <div className="text-amber-200/90">
+            Выберите другой ник — он будет виден друзьям и в поиске.
+            Можно нажать на одну из подсказок ниже или ввести свой.
+          </div>
         </div>
       )}
 
-      <UsernameField value={username} onChange={setUsername} onValidChange={setUsernameValid} />
+      <UsernameField
+        value={username}
+        onChange={setUsername}
+        onValidChange={setUsernameValid}
+        suggestBase={conflictHint || ''}
+      />
       <div className="grid grid-cols-2 gap-3">
         <AuthInput
           icon={User} type="text" label="Имя"

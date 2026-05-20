@@ -30,6 +30,7 @@ from pymongo.errors import DuplicateKeyError
 
 from auth_utils import (
     PROVIDERS,
+    USERNAME_PATTERN,
     USERNAME_RESERVED as RESERVED_USERNAMES,
     check_rate_limit,
     choose_primary_auth,
@@ -100,6 +101,7 @@ from models import (
     User,  # noqa: F401  (документация модели)
     UserPublic,
     UsernameCheckResponse,
+    UsernameSuggestionsResponse,
     VKLoginRequest,
 )
 
@@ -132,6 +134,7 @@ _RATE_LIMITS = {
     "profile_step_uid":  (60, 600),      # 60 patch / uid / 10 мин
     "check_username_ip": (120, 60),      # 2 запроса/сек/IP
     "check_username_uid": (60, 60),      # для авторизованных
+    "suggest_username_ip": (60, 60),     # 60 suggest/min/IP (мягко, т.к. поисково-подбираем)
 
     # P2: password management
     "forgot_password_ip":    (5, 3600),   # 5 запросов/час с IP
@@ -2052,6 +2055,115 @@ def create_auth_router(db) -> APIRouter:
             return UsernameCheckResponse(username=username, available=False, reason="Занято")
 
         return UsernameCheckResponse(username=username, available=True)
+
+    # ============= Username suggestions =============
+
+    @router.get("/suggest-username", response_model=UsernameSuggestionsResponse)
+    async def suggest_username(
+        request: Request,
+        base: Optional[str] = None,
+        count: int = 5,
+    ):
+        """Возвращает список свободных альтернатив на основе `base`.
+
+        Если `base` пустой/невалидный — возвращаем generic-варианты
+        (`user_<random>`). Если `base` валиден — стратегии:
+          • base + цифра (1..99) — `shkarol1`, `shkarol2`, ...
+          • base + год/семантика — `shkarol_rudn`, `shkarol_2026`
+          • base + случайные 2-3 цифры — `shkarol42`, `shkarol987`
+
+        Все кандидаты обрезаются до 32 символов, фильтруются от резервов
+        и проверяются против БД (case-insensitive). Endpoint публичный,
+        rate-limited по IP. Безопасно для use-case «выбрать альтернативу
+        при конфликте Telegram-username».
+        """
+        # Rate-limit по IP — мягкий, т.к. seeker может перебирать варианты
+        client_ip = get_client_ip(request)
+        rl_max, rl_win = _RATE_LIMITS["suggest_username_ip"]
+        if not check_rate_limit(client_ip, "suggest_username_ip", rl_max, rl_win):
+            raise HTTPException(
+                status_code=429,
+                detail="Слишком много запросов подсказок. Попробуйте через минуту.",
+            )
+
+        # Ограничиваем count, чтобы не нагружать БД и не выдавать чрезмерно
+        # длинные списки.
+        count = max(1, min(int(count or 5), 10))
+
+        # Нормализуем base — берём первые 32 символа из a-z0-9_; если короче 1
+        # символа — переключаемся на generic-режим.
+        raw = (base or "").strip().lower()
+        # Удаляем "@" если фронт случайно прислал его
+        if raw.startswith("@"):
+            raw = raw[1:]
+        # Заменяем недопустимые символы на "_"
+        cleaned = re.sub(r"[^a-z0-9_]", "_", raw)
+        # Срезаем "_" по краям и схлопываем дубли
+        cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+        # Если осталось меньше 3 символов — generic режим (random user_...)
+        is_generic = len(cleaned) < 3
+
+        if not is_generic:
+            # Урезаем base до 24 символов, чтобы оставить место для суффикса
+            base_norm = cleaned[:24]
+        else:
+            base_norm = "user"
+
+        # Генерация кандидатов в порядке приоритета
+        from secrets import randbelow as _randbelow
+
+        candidates: List[str] = []
+
+        def _add(s: str) -> None:
+            s = s.lower().strip("_")
+            if not s or len(s) < 3 or len(s) > 32:
+                return
+            if not USERNAME_PATTERN.match(s):
+                return
+            if s in RESERVED_USERNAMES:
+                return
+            if s not in candidates:
+                candidates.append(s)
+
+        if not is_generic:
+            # Префикс с цифрами 1..9 (короткие)
+            for n in range(1, 10):
+                _add(f"{base_norm}{n}")
+            # Семантические суффиксы
+            for sfx in ("_rudn", "_2026", "_user", "_ru", "01", "23"):
+                _add(f"{base_norm}{sfx}")
+            # Двух- и трёхзначные числа (немного randomness)
+            for _ in range(20):
+                n = 10 + _randbelow(990)  # 10..999
+                _add(f"{base_norm}{n}")
+        else:
+            # Generic — `user_<random>`
+            for _ in range(40):
+                n = 100 + _randbelow(900_000)  # 100..900099 → 3-6 цифр
+                _add(f"user_{n}")
+                _add(f"rudn_{n}")
+
+        # Проверяем доступность в БД пакетно (1 запрос)
+        if not candidates:
+            return UsernameSuggestionsResponse(
+                base=cleaned or None, suggestions=[],
+            )
+
+        existing_cursor = db.users.find(
+            {"username": {"$in": candidates}},
+            {"username": 1, "_id": 0},
+        )
+        taken: set = {
+            (doc.get("username") or "").lower()
+            async for doc in existing_cursor
+        }
+
+        free: List[str] = [c for c in candidates if c not in taken][:count]
+
+        return UsernameSuggestionsResponse(
+            base=(cleaned or None) if not is_generic else None,
+            suggestions=free,
+        )
 
     # ============= Profile step =============
 

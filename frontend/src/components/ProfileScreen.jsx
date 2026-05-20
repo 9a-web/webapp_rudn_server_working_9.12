@@ -14,6 +14,7 @@ import DevicesModal from './DevicesModal';
 import LKConnectionModal from './LKConnectionModal';
 import LevelDetailModal from './LevelDetailModal';
 import LevelUpModal from './LevelUpModal';
+import EditUsernameModal from './auth/EditUsernameModal';
 import GraffitiEditor from './GraffitiEditor';
 import WallGraffiti from './WallGraffiti';
 import { getTierColor, getTierName, getTierConfig, renderStars } from '../constants/levelConstants';
@@ -60,6 +61,8 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
   const [showLevelDetail, setShowLevelDetail] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [levelUpData, setLevelUpData] = useState(null);
+  // === Редактирование username (clickable nickname в профиле) ===
+  const [showEditUsername, setShowEditUsername] = useState(false);
   const prevLevelRef = useRef(null);
   const prevTierRef = useRef(null);
   
@@ -702,11 +705,16 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
             })()}
           </motion.div>
 
-          {/* Юзернейм или имя */}
+          {/* Юзернейм или имя — кликабельно для редактирования */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.3 }}
+            onClick={() => {
+              try { hapticFeedback?.('selection'); } catch { /* noop */ }
+              setShowEditUsername(true);
+            }}
+            title="Изменить никнейм"
             style={{
               marginTop: '8px',
               fontFamily: "'Proxima Nova ExCn', sans-serif",
@@ -715,9 +723,17 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
               color: '#FFFFFF',
               textAlign: 'center',
               lineHeight: 1.1,
+              cursor: 'pointer',
+              userSelect: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              justifyContent: 'center',
+              alignSelf: 'center',
             }}
           >
-            {(user.username || user.first_name || '').toUpperCase()}
+            <span>{(user.username || user.first_name || '').toUpperCase()}</span>
+            <Pen size={18} style={{ opacity: 0.45, marginTop: '6px' }} />
           </motion.div>
 
           {/* Группа */}
@@ -2206,6 +2222,14 @@ const ProfileScreen = ({ isOpen, onClose, user, userSettings, profilePhoto, hapt
         newTier={levelUpData?.newTier}
         oldTier={levelUpData?.oldTier}
         levelTitle={levelUpData?.levelTitle || profileData?.level_title || ''}
+      />
+
+      {/* Модалка редактирования никнейма (username) */}
+      <EditUsernameModal
+        isOpen={showEditUsername}
+        onClose={() => setShowEditUsername(false)}
+        currentUsername={user?.username || ''}
+        suggestBase={user?.username || ''}
       />
     </>
   );

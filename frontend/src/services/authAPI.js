@@ -87,6 +87,14 @@ export const authAPI = {
       { ...withAuth(), signal: opts.signal } // Stage 7: B-07 — AbortController support
     )),
 
+  // Подобрать свободные альтернативы (для случая конфликта username при TG/email регистрации).
+  // Публичный endpoint, поддерживает AbortController.
+  suggestUsername: unwrap((base = '', count = 5, opts = {}) =>
+    axios.get(`${BASE}/suggest-username`, {
+      params: { base: base ?? '', count },
+      signal: opts.signal,
+    })),
+
   updateProfileStep: unwrap((payload) =>
     axios.patch(`${BASE}/profile-step`, payload, withAuth())),
 

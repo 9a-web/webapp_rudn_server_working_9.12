@@ -2989,6 +2989,12 @@ class UsernameCheckResponse(BaseModel):
     reason: Optional[str] = None
 
 
+class UsernameSuggestionsResponse(BaseModel):
+    """Ответ для GET /api/auth/suggest-username — список свободных альтернатив."""
+    base: Optional[str] = None         # нормализованный исходный base (если был валидным)
+    suggestions: List[str] = []        # 0..N свободных вариантов в порядке приоритета
+
+
 # ==================== PASSWORD MANAGEMENT (P2) ====================
 
 class ChangePasswordRequest(BaseModel):

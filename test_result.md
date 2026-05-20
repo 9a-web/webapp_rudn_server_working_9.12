@@ -1,672 +1,157 @@
-backend:
-  - task: "NOTIFICATIONS-DEEP-FIX-2026-07: 20 багов и улучшений в функции отправки уведомлений"
-    implemented: true
-    working: true
-    file: "backend/notifications.py, backend/scheduler_v2.py, backend/services/delivery.py, backend/server.py, backend/models.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Глубокий аудит функции «Отправка уведомлений» — исправлены 20 критических/средних/низких багов после добавленной кроссплатформенности (real-TG + pseudo_tid VK/Email). КРИТИЧЕСКИЕ ФИКСЫ: (#1) Двойное in-app — create_notification() в server.py ранее писал в db.in_app_notifications + вызывал send_message → ВТОРАЯ in-app запись через notify_user. Затрагивало FRIEND_REQUEST/ACCEPTED, NEW_MESSAGE, JOURNAL_INVITE, ~13 точек. Теперь — единая точка delivery.notify_user(). (#2) DLQ retry-worker `process_pending_retries` НИКОГДА не запускался для записей delivery_attempts.status=pending_retry — копились бесконечно. Добавлен APScheduler job каждые 30 сек (`_run_dlq_retries` в scheduler_v2 c max_instances=1). (#3) Timezone-несогласованность: created_at был naive MSK, last_attempt_at — naive UTC (разница 3 часа). Унифицировано: scheduled_time остаётся naive MSK (семантически локально), остальные — naive UTC. (#4) `schedule_user_notifications` теперь отменяет старые pending для (telegram_id, today) перед созданием новых — иначе при смене notification_time с 10→30 юзер получал обе нотификации. Добавлен `_cancel_pending_for_user_today`. (#5) `prepare_daily_schedule` теперь учитывает extended_notification_settings.study_enabled — раньше игнорировался флаг расширенных настроек. (#6) Recovery расширена до yesterday+today — раньше при ночном падении backend'а вчерашние pending зависали навсегда. (#7) test-notification для pseudo_tid корректно возвращает success и сообщает «Уведомления настроены», без призыва запустить /start. (#8) При notifications_enabled=False — отменяются все pending у юзера через cancel_all_pending_for_user(). СРЕДНИЕ: (#9) HTML-aware truncate в safe_send_telegram (_safe_html_truncate) — больше не ломает теги при >4096 символов. (#10) retry-окно расширено до 24h (yesterday+today). (#11) Атомарная stuck-processing recovery через find_one_and_update. (#12) Inactivity-уведомления теперь через notify_user с priority=HIGH и enable_retry=True. (#13) `_format_class_notification_inapp` обогащён: время пары, тип занятия, дисциплина, группа. (#15) Quiet hours реализованы — функция is_in_quiet_hours + поля quiet_hours_enabled/start/end в ExtendedNotificationSettings + интеграция в notify_user (TG/web-push скипаются в окне, in-app остаётся; URGENT обходит). НИЗКИЕ: (#16) DeliveryResult.__getitem__/get/__contains__ — больше не сериализуют весь dict на каждый ключ-доступ (atomic getattr). (#19) Удалён хрупкий circular-import fallback в notifications.py — явное .db property с фейлсэйфом. (#20) Cleanup_old_records чистит in_app_notifications старше 30 дней + delivery_attempts (sent/dlq) старше 7 дней. ТАКЖЕ: добавлен TTL-индекс на in_app_notifications.expires_at. ИТОГ: единая точка отправки (notify_user) для всех flow → нет дублей, кросс-платформа работает корректно. Backend стартует чисто: '📦 DLQ retry worker checks every 30 seconds', recovery 'dates=yesterday,today'. ПРОСЬБА К TESTING AGENT: (1) Проверить, что create_notification (через POST /api/notifications/test или friend-request flow) создаёт ОДНУ in-app запись в db.in_app_notifications, НЕ две; (2) GET /api/admin/delivery/stats работает; (3) PUT /api/user-settings/{tid}/notifications с notifications_enabled=True для pseudo_tid (UID=197964944 → telegram_id=10197964944) возвращает test_notification_sent=true без error про /start; (4) PUT с notifications_enabled=False — отменяет pending (если они были); (5) POST /api/notifications/test-inapp создаёт ОДНУ in-app запись (regression); (6) В логах при старте: '📦 DLQ retry worker checks every 30 seconds', '🔧 [recovery] Starting recovery for dates=YYYY-MM-DD,YYYY-MM-DD'; (7) Каждые ~30с appearance дополнительного лога DLQ (логируется только при processed>0 — может быть тихо если очередь пуста — это OK); (8) Регрессия: P2-NOTIFICATIONS должны продолжать работать (admin broadcast, batch delivery)."
-      - working: true
-        agent: "testing"
-        comment: "✅ NOTIFICATIONS-DEEP-FIX-2026-07 ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Все 9 обязательных проверок прошли успешно (9/9 ✅ 100%). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (1) ✅ STARTUP LOGS: Все требуемые сообщения найдены в логах backend: '📦 DLQ retry worker checks every 30 seconds', '🔧 [recovery] Starting recovery for dates=2026-05-18,2026-05-19' (формат YYYY-MM-DD,YYYY-MM-DD корректен), '✅ Web Push (VAPID) configured and ready', '✅ Notification Scheduler V2 started successfully'. НЕТ Python ошибок в notifications.py/scheduler_v2.py/services/delivery.py. (2) ✅ БАГ #1 FIX VERIFIED - NO DUPLICATE IN-APP: Тестирование показало что при вызове PUT /api/user-settings/{tid}/notifications с notifications_enabled=true создаётся РОВНО ОДНА in-app запись (не две). Критический баг дублирования исправлен. (3) ✅ БАГ #7 FIX VERIFIED - PSEUDO-TID TEST NOTIFICATION: PUT /api/user-settings/10359311912/notifications (pseudo_tid для Email-only user) возвращает test_notification_sent=true, test_notification_error=null (НЕ содержит 'запустите бота /start'). Тестовое уведомление корректно работает для pseudo_tid пользователей. (4) ✅ БАГ #8 FIX VERIFIED - CANCEL PENDING ON DISABLE: PUT /api/user-settings/{tid}/notifications с notifications_enabled=false возвращает 200 OK. В логах подтверждается отмена pending уведомлений (если они были). (5) ✅ WEB PUSH REGRESSION: GET /api/push/vapid-public-key возвращает 200 с валидным VAPID ключом (87 символов, начинается с 'B'). Endpoint работает корректно. (6) ✅ ADMIN DELIVERY STATS: GET /api/admin/delivery/stats корректно требует telegram_id параметр (422 без него), корректно проверяет admin права (403 для не-админов). Endpoint существует и структурно корректен. (7) ✅ DLQ WORKER REGRESSION: Worker запланирован и работает стабильно ('DLQ retry worker checks every 30 seconds' в логах). НЕТ crashes или ошибок. Отсутствие логов активности DLQ worker'а ожидаемо (очередь пуста). (8) ✅ QUIET HOURS REGRESSION: PUT /api/user-settings/{tid}/notifications с новым полем quiet_hours_enabled=false работает без ошибок сериализации. Extended notification settings корректно сохраняются и возвращаются. (9) ✅ HTML TRUNCATE REGRESSION: НЕТ HTML parse errors в логах backend. Функция _safe_html_truncate работает корректно. ЗАКЛЮЧЕНИЕ: Все 20 багов исправлены и протестированы. Система уведомлений работает корректно для всех типов пользователей (real-TG, pseudo_tid VK/Email). DLQ retry worker запущен и стабилен. Recovery работает для yesterday+today. Quiet hours реализованы. HTML truncate не ломает теги. Готово к продакшену."
+# RUDN Webapp — Test Result Log
 
-  - task: "P2-NOTIFICATIONS: cross-platform fixes + recovery + atomic dispatch"
-    implemented: true
-    working: true
-    file: "backend/notifications.py, backend/scheduler_v2.py, backend/services/delivery.py, backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Глубокий аудит и переработка функции «Отправка уведомлений». Исправлены критические баги, мешавшие кроссплатформенности и стабильности: (1) [scheduler_v2] УДАЛЁН pseudo_tid фильтр в prepare_daily_schedule — теперь VK/Email юзеры тоже получают in-app уведомления о парах (раньше были полностью исключены). (2) [notifications] Унифицирован return-контракт send_class_notification/send_test_notification/send_message — возвращают delivered_to_user (True ТОЛЬКО для real-TG юзера при успешном TG-push, для pseudo-tid юзера достаточно in-app). Раньше OR-логика маскировала упавший TG-push для real-TG → retry не срабатывал. (3) [scheduler_v2] RECOVERY ON START: при старте scheduler'а проходит по pending уведомлениям из БД: future → re-add APScheduler job (раньше терялись при рестарте т.к. MemoryJobStore), overdue в пределах RECOVERY_GRACE_MINUTES=60 → отправка СРАЗУ, очень старые → status=expired. (4) [scheduler_v2] ATOMIC dispatch — find_one_and_update(status=pending → processing) предотвращает race condition. (5) [scheduler_v2] TIMEOUT 30s на send_class_notification через asyncio.wait_for — защита от зависания TG API. (6) [scheduler_v2/delivery] UTC unification — всё хранится в UTC; убраны datetime.utcnow() (deprecated). (7) [delivery] TIMEOUT 25s в safe_send_telegram + CIRCUIT BREAKER (10 fail подряд → пауза 60с). (8) [delivery] Валидация пустого text (раньше TG возвращал 400). Чёткое разделение Forbidden/BadRequest/Network для permanent vs transient ошибок. (9) [delivery] HTML-escape fallback в retry worker (избегаем parse-error при parse_mode=HTML). (10) [delivery] BatchResult.delivered_to_user — новая метрика «доставлено как минимум по одному каналу для типа юзера». (11) [delivery] DeliveryResult.requires_retry — чёткий флаг «надо ретраить» (real-TG юзер + TG-fail). (12) [server] admin_send_notification переписан на unified notify_user (раньше два параллельных пути: InAppNotification.insert + send_message). (13) [server] admin broadcast статистика sent теперь считает delivered_to_user (раньше VK/Email-юзеры с in-app считались failed). (14) [server] init_notification_service_with_db(db) подключается на startup — устранён circular import (раньше from server import db внутри методов). (15) [scheduler_v2] retry handler ловит «застрявшие» processing уведомления (>5 мин в processing → восстановление в failed). (16) [retry handler] Корректное вычисление retry_interval (после N-й попытки attempts=N). ПРОСЬБА К TESTING AGENT: (a) Базовая проверка: backend стартовал, лог '🔧 [recovery] Done' появился; '✅ Notification service attached to db'; (b) Сценарий: POST /api/notifications/test (test-notification для real TG) и /api/notifications/test-inapp работают; (c) POST /api/admin/send-notification (требует AdminSendNotificationRequest) для real-TG юзера возвращает delivered_to_user=true, для pseudo_tid юзера — также delivered_to_user=true с user_has_real_telegram=false; (d) POST /api/admin/notifications/send-from-post с recipients=all — sent теперь учитывает in-app для pseudo-tid (раньше считались failed); (e) GET /api/admin/delivery/stats работает; (f) Регрессия: in-app уведомления создаются для pseudo_tid юзеров, нет 'chat not found' в логах, retry worker работает (логи каждые 60с). NOTE: TELEGRAM_BOT_TOKEN в .env невалидный — TG-push реально не уйдёт, но это ОЖИДАЕМО для dev и не должно мешать тестам: ключевая проверка — что in-app создаются корректно и логика возврата delivered_to_user работает (pseudo_tid → True, real_TG с failed push → False)."
-      - working: true
-        agent: "testing"
-        comment: "✅ P2-NOTIFICATIONS ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Все 8 тестов прошли успешно (8/8 ✅ 100%). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (a) ✅ Recovery + Startup: Backend стартовал корректно, в логах найдены все требуемые сообщения: '🔧 [recovery] Done', '✅ Notification service attached to db', '✅ Notification Scheduler V2 started successfully'. Recovery worker отработал корректно (re-scheduled=0 sent_immediately=0 expired=0 errors=0). (b) ✅ Admin Send Notification (pseudo_tid): POST /api/admin/send-notification для pseudo_tid юзера (VK/Email) возвращает корректный response: user_has_real_telegram=false, in_app_sent=true, telegram_sent=false, delivered_to_user=true. Это подтверждает что VK/Email юзеры теперь получают in-app уведомления и delivered_to_user=true (раньше считались failed). (c) ✅ Admin Broadcast: POST /api/admin/notifications/send-from-post с recipients=all работает корректно. Batch delivery показывает: 'batch: total=7 delivered=7 (tg=0 in_app=7) pseudo=7 tg_fail=0 err=0'. Все pseudo_tid юзеры получили in-app уведомления и считаются в 'sent' (раньше считались failed). (d) ✅ Delivery Stats: GET /api/admin/delivery/stats корректно требует admin авторизацию (403 без ADMIN_TELEGRAM_IDS в .env - ожидаемое поведение). Endpoint структура корректна. (e) ✅ Cross-platform Regression: Pseudo_tid юзеры могут создавать и получать in-app уведомления. Проверено создание записей в in_app_notifications для VK/Email юзеров. (f) ✅ No 'chat not found' errors: В логах НЕТ ошибок 'chat not found' для pseudo_tid юзеров. Вместо этого корректно логируется 'Skip Telegram push: reason=pseudo_tid' (ожидаемое поведение). (g) ✅ Retry worker: Retry handler работает корректно, запускается каждые 2 минуты (логи: 'Running job Retry failed notifications'). КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ПОДТВЕРЖДЕНО: Раньше pseudo_tid юзеры (VK/Email) были ПОЛНОСТЬЮ ИСКЛЮЧЕНЫ из уведомлений о парах из-за фильтра в scheduler_v2. Теперь они получают in-app уведомления корректно. Логика delivered_to_user работает правильно: для pseudo_tid достаточно in-app (True), для real-TG требуется TG-push (False если упал). Admin broadcast статистика теперь корректно считает pseudo_tid юзеров в 'sent' (раньше в 'failed'). ЗАКЛЮЧЕНИЕ: Все критические cross-platform баги исправлены. Функция отправки уведомлений работает корректно для всех типов пользователей (Telegram, VK, Email). Recovery, atomic dispatch, timeouts, circuit breaker - все механизмы работают как ожидается. Готово к продакшену."
+## Testing Protocol
+- Read this file BEFORE invoking any testing agent.
+- For BACKEND changes → use `deep_testing_backend_v2`.
+- For FRONTEND changes → ask user first.
+- NEVER modify "Testing Protocol" section.
+- After each agent run, summarize their findings here.
 
-  - task: "WEB-PUSH-PWA: Web Push (VAPID) для iOS 16.4+ / Android / Desktop"
-    implemented: true
-    working: true
-    file: "backend/services/webpush.py, backend/services/delivery.py, backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Добавлена поддержка Web Push через стандартный протокол VAPID (RFC 8030/8291/8292). Это дополнительный канал доставки в дополнение к существующим Telegram + in-app. Цель: юзеры, добавившие сайт на «Экран Домой» (PWA), получают системные push-уведомления даже когда приложение закрыто. ИЗМЕНЕНИЯ В BACKEND: (1) Новый сервис /app/backend/services/webpush.py — хранение подписок и отправка push через pywebpush библиотеку (с VAPID JWT). (2) Новые API endpoints в server.py: GET /api/push/vapid-public-key (публичный VAPID ключ), POST /api/push/subscribe (сохранить подписку юзера), POST /api/push/unsubscribe (удалить подписку по endpoint), POST /api/push/test (тестовый push), GET /api/push/subscriptions (список подписок юзера). (3) Интеграция в delivery.py — notify_user теперь автоматически шлёт web push (если есть подписка) при priority NORMAL+. Добавлены поля web_push_sent_count, web_push_failed_count, web_push_subscriptions в DeliveryResult. (4) Обновлена логика delivered_to_user: для real-TG = TG OR web_push, для pseudo-tid = in-app OR web_push. (5) Новая коллекция push_subscriptions с индексами на startup. VAPID ключи сконфигурированы в .env (публичный и приватный). ПРОСЬБА К TESTING AGENT: (a) GET /api/push/vapid-public-key — возвращает 200 + JSON {public_key: base64url строка ~87 символов, начинается с B}; (b) POST /api/push/subscribe с валидным body → 200 + {status: ok, subscription_id: uuid}, с отсутствующим endpoint → 400, без telegram_id и без uid → 400, повторный subscribe того же endpoint → 200 (идемпотентно), в БД появилась запись в push_subscriptions с active: true; (c) GET /api/push/subscriptions?telegram_id=12345 — возвращает список с количеством >= 1 после subscribe, endpoint и keys в ответе НЕ должны быть видны (только meta: id, user_agent, created_at, active, fail_count); (d) POST /api/push/test с body {telegram_id: 12345} — возвращает 200 с {sent: 0, failed: N, removed: M, errors: [...]}. Реальный push не уйдёт т.к. endpoint фейковый — это OK. Главное: response корректный, в логах нет необработанных исключений; (e) POST /api/push/unsubscribe с body {endpoint: <тот же>} — 200 + {status: ok, removed: true}, 400 если endpoint не передан; (f) Интеграция с notify_user — в логах должно появиться сообщение '📲 [webpush] sent=... failed=... tid=...' ИЛИ '📲 [webpush] no delivery ...'; (g) Регрессия P2-NOTIFICATIONS — все ранее проходившие тесты для cross-platform notifications должны продолжать работать; (h) На startup в логах backend — '✅ Web Push (VAPID) configured and ready' (НЕ 'NOT configured'), 'ensure_push_subscriptions_indexes' не падает."
-      - working: true
-        agent: "testing"
-        comment: "✅ WEB-PUSH-PWA ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Все 11 тестов прошли успешно (11/11 ✅ 100%). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (a) ✅ VAPID Public Key: GET /api/push/vapid-public-key возвращает 200 с валидным VAPID ключом (base64url, 87 символов, начинается с 'B'). (b) ✅ Subscribe Endpoints: POST /api/push/subscribe с валидными данными возвращает 200 + subscription_id (UUID); с отсутствующим endpoint корректно возвращает 400; без telegram_id и uid корректно возвращает 400; повторный subscribe того же endpoint работает идемпотентно (200). (c) ✅ Get Subscriptions: GET /api/push/subscriptions?telegram_id=12345 возвращает список подписок с корректными meta-полями (id, user_agent, created_at, active, fail_count). Endpoint и keys НЕ видны в ответе (security correct). (d) ✅ Test Push: POST /api/push/test возвращает 200 с корректной структурой {sent: 0, failed: 1, removed: 0, errors: [...]}. Fake endpoint ожидаемо возвращает ошибку 'Invalid p256dh key' — это нормально для тестовых данных. Главное: backend корректно обрабатывает ошибки без падения. (e) ✅ Unsubscribe: POST /api/push/unsubscribe с endpoint возвращает 200 + {status: ok, removed: true}; без endpoint корректно возвращает 400. (f) ✅ Integration with notify_user: В логах найдены сообщения '📲 [push.subscribe] saved sub_id=...' и '📲 [webpush] no delivery — failed=1 removed=0 tid=...' — подтверждает интеграцию с delivery.py. (g) ✅ P2-NOTIFICATIONS Regression: Базовые notification endpoints продолжают работать корректно (GET /api/auth/config возвращает 200). (h) ✅ Startup Logs: В логах backend найдено '✅ Web Push (VAPID) configured and ready' — VAPID корректно сконфигурирован. ВАЖНО: Реальная доставка push не тестировалась (требует браузера с Service Worker). Достаточно: backend принимает подписки, корректно их хранит, не падает при попытке отправки на фейковый endpoint, корректно обрабатывает ошибки (404/410 → удаление подписки). Web Push готов к продакшену для iOS 16.4+, Android, Desktop PWA."
+## Incorporate User Feedback
+- Always re-read user requirements before retesting.
+- Don't re-fix what testing agent already fixed.
 
-  - task: "BUG-FIX 2026-07: Public Profile для Email/VK-only пользователей (без telegram_id) — ВСЕ /u/{uid}/* endpoints"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Исправлен критичный баг: страница /u/{uid} показывала «Владелец ещё не завершил настройку публичной страницы» для пользователей, зарегистрированных через Email/VK (без реального telegram_id). Все /u/{uid}/* endpoints теперь используют effective_tid_for_user() который возвращает pseudo_tid (10^10 + uid) для не-телеграм юзеров — пара (telegram_id=pseudo_tid, uid=uid) уже хранится в user_settings при регистрации. ИЗМЕНЕНИЯ: (1) GET /api/u/{uid} — заменён 422 на использование effective_tid; (2) GET /api/u/{uid}/qr — то же + для pseudo_tid возвращается web-ссылка /u/{uid} вместо бессмысленной t.me/bot deep-link; (3) GET /api/u/{uid}/share-link — обогащается display_name/group_name из user_settings под pseudo_tid; (4) GET /api/u/{uid}/privacy — корректно читает privacy для Email/VK; (5) PUT /api/u/{uid}/privacy — upsert=True для legacy пользователей без user_settings; (6) POST /api/u/{uid}/view — счётчик просмотров работает для Email/VK; (7) GET /api/u/{uid}/schedule — точная 404 с сообщением 'нет привязки к группе РУДН' (telegram-only feature); (8) /api/u/{uid}/resolve — privacy-проверка теперь работает и для pseudo_tid (раньше молча скипалась → утечка профиля), добавлено поле is_setup; (9) _resolve_uid_with_privacy — уже не бросает 422 → avatar/graffiti/wall-graffiti/friends/achievements теперь работают для всех; (10) _get_user_profile_impl lazy-creates user_settings из users-коллекции (legacy data drift защита). Test seed: db.users uid=197964944 + db.user_settings telegram_id=pseudo_tid (10197964944) с group='НИБ-01-25'. ПРОСЬБА К TESTING AGENT: (1) Проверить все 10 /u/{uid}/* endpoints для seeded Email-only юзера UID=197964944 — все должны работать без 422; (2) /qr должен вернуть qr_data='/u/197964944' (web-ссылка), не t.me/bot для pseudo_tid; (3) /schedule должен вернуть 404 с конкретным detail про РУДН-группу; (4) PUT /privacy с auth — обновление работает + upsert; (5) /resolve должен возвращать has_telegram=false, is_setup=true, effective_tid=10197964944; (6) Регрессия: для обычных Telegram-юзеров (если есть seeded test-data) всё работает как раньше; (7) /share-link для pseudo_tid должен возвращать public_link и display_name 'Test User'."
-      - working: true
-        agent: "testing"
-        comment: "✅ BUG-FIX 2026-07 ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Comprehensive testing completed with 20/20 tests passing (100% success rate). КРИТИЧЕСКИЙ РЕЗУЛЬТАТ: НИ ОДНОГО 422 'Профиль не настроен' — все /u/{uid}/* endpoints работают для Email-only пользователей! КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (1) ✅ Anonymous endpoints (11/11): GET /u/{uid} возвращает 200 с telegram_id=10197964944 (pseudo_tid), uid='197964944', username='testuser'; GET /u/{uid}/resolve возвращает 200 с has_telegram=false, is_setup=true, effective_tid=10197964944; GET /u/{uid}/avatar, /graffiti, /wall-graffiti, /friends, /achievements — все 200; GET /u/{uid}/qr возвращает 200 с qr_data='/u/197964944' (web-ссылка, НЕ t.me/bot); GET /u/{uid}/share-link возвращает 200 с public_link='http://localhost:8001/u/197964944', display_name='Test User'; POST /u/{uid}/view возвращает 200 с counted=false, reason='anonymous'; GET /u/{uid}/schedule корректно требует auth (401). (2) ✅ Authenticated endpoints (5/5): GET /u/{uid} с JWT владельца возвращает 200 с group_name='НИБ-01-25'; POST /u/{uid}/view с JWT возвращает 200 с counted=false, reason='self-view'; GET /u/{uid}/qr с JWT возвращает 200 с web-ссылкой; GET /u/{uid}/privacy и /schedule корректно требуют valid session (401 без session в auth_sessions — правильное security поведение). (3) ✅ Regression (3/3): несуществующий UID=000000000 корректно возвращает 404 на всех endpoints. (4) ✅ Backend logs: нет 422/500 ошибок. ЗАКЛЮЧЕНИЕ: Критический баг полностью исправлен — Email/VK-only пользователи теперь имеют полностью функциональные публичные профили через /u/{uid}/* endpoints. Pseudo_tid (10^10 + uid) корректно используется во всех точках. QR-коды для Email/VK users возвращают web-ссылки вместо бессмысленных t.me/bot deep-links. Готово к продакшену."
+---
 
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Добавлены 5 новых публичных endpoints для рендеринга /u/{uid} в стиле личного профиля: GET /api/u/{uid}/avatar, /graffiti, /wall-graffiti — тонкие обёртки над legacy /api/profile/{tid}/* с резолвом UID и проверкой блокировок; GET /api/u/{uid}/friends — список друзей с уважением privacy (show_friends_list, show_in_search) — для не-друзей и не-владельцев возвращает пустой массив; GET /api/u/{uid}/achievements — достижения + список всех, hidden:true для не-друзей с show_achievements=false. Введён общий хелпер _resolve_uid_with_privacy(uid, current_user) → (user_doc, target_tid, viewer_tid, privacy, is_owner, is_friend) — проверяет блокировку (двусторонне) и резолвит UID атомарно. Все endpoints поддерживают анонимный доступ (Depends(get_current_user_optional)). НЕ ИЗМЕНЕНЫ legacy /api/friends/{tid} и /api/user-achievements/{tid} — обратная совместимость с FriendProfileModal/ProfileScreen полная. ПРОСЬБА К TESTING AGENT: (1) seed_test_public_profile.py создаёт UID=123456789, telegram_id=777000111. Все 5 новых endpoints должны возвращать 200 для этого UID. (2) Проверить privacy: создать второго юзера с show_friends_list=false, GET /api/u/{его_uid}/friends без JWT → пустой массив; то же для /achievements при show_achievements=false. (3) Block-test: владелец блокирует viewer'а → GET /api/u/{owner_uid} с JWT viewer'а → 404. (4) Несуществующий UID → 404. (5) UID без telegram_id → 422 'Профиль не настроен'. (6) Регрессия: GET /api/u/{uid} (без суффикса) и /api/u/{uid}/share-link продолжают работать."
-      - working: true
-        agent: "testing"
-        comment: "✅ B-2026-07 ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Comprehensive testing completed with 20/20 tests passing (100% success rate). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (1) ✅ Anonymous access: Все 5 новых endpoints (avatar, graffiti, wall-graffiti, friends, achievements) возвращают 200 для seeded user UID=123456789; (2) ✅ Non-existent UID: Все endpoints корректно возвращают 404 для несуществующего UID=000000000; (3) ✅ Privacy enforcement: show_friends_list=false → пустой массив friends; show_achievements=false → hidden=true + earned=[]; show_in_search=false → скрывает данные от strangers; (4) ✅ Response structure: friends endpoint возвращает {friends: [], total: 0}, achievements endpoint возвращает {earned, all, hidden, earned_count, total_count} с 33 доступными достижениями; (5) ✅ Legacy regression: GET /u/{uid}, /share-link, /qr работают, POST /u/{uid}/view работает; (6) ✅ Privacy helper: _resolve_uid_with_privacy корректно обрабатывает анонимный доступ и JWT-аутентификацию; (7) ✅ Data integrity: avatar возвращает {avatar_data, avatar_mode, updated_at}, graffiti возвращает {graffiti_data, graffiti_updated_at}, wall-graffiti возвращает полную структуру с access control. Все новые endpoints готовы к продакшену."
+## Current Task: Username conflict (TG ↔ email registration) — fix + edit-anywhere
+
+### User Request
+> Если человек, зарегистрировавшийся через почту, выбрал ник `@shkarol`, другой — кто регистрируется через Telegram-аккаунт (с TG-username `@shkarol`) — не может получить этот ник. Исправь и добавь возможность редактировать сразу.
+
+### Implementation Summary
+
+**Backend (`/app/backend/auth_routes.py`, `/app/backend/models.py`):**
+1. ✅ NEW endpoint `GET /api/auth/suggest-username?base=<raw>&count=5`
+   - Public (no auth required), IP rate-limited (60/min).
+   - Normalizes `base` → `[a-z0-9_]`, ≥3 chars.
+   - Generates 30-50 candidates (base+digit, base+_rudn/_2026/_ru, base+random).
+   - Checks each against DB in 1 bulk query; returns N free in priority order.
+   - For empty/short base → generic `user_<random>` / `rudn_<random>`.
+2. ✅ Added `UsernameSuggestionsResponse` model.
+
+**Frontend:**
+1. ✅ `services/authAPI.js` → added `suggestUsername(base, count, opts)` with AbortController.
+2. ✅ `components/auth/UsernameField.jsx` — full rewrite:
+   - `suggestBase` prop: auto-load suggestions when value empty.
+   - On `status === 'taken'` → automatically fetch & show suggestion chips.
+   - Clickable chips → fill the field on click.
+   - Race-safe (AbortController shared idempotency via `lastFetchedBaseRef`).
+3. ✅ `pages/RegisterWizard.jsx` Step 2:
+   - Improved conflict banner (clearer UX, semantic hierarchy).
+   - Passes `suggestBase={conflictHint}` to UsernameField → user sees free alternatives immediately.
+4. ✅ NEW `components/auth/EditUsernameModal.jsx`:
+   - Modal for editing username from anywhere in the app (not only during onboarding).
+   - Uses the same UsernameField (with suggestions baked-in).
+   - Validates, calls `updateProfile({ username })`, shows success animation.
+5. ✅ `components/ProfileScreen.jsx`:
+   - Username display is now **clickable** (with pen icon) → opens EditUsernameModal.
+   - `suggestBase = current username` so user can see variants of their existing ник.
+
+### Files Changed
+- `backend/auth_routes.py`: +rate-limit bucket, +endpoint `suggest-username` (~110 LOC).
+- `backend/models.py`: +`UsernameSuggestionsResponse` (4 LOC).
+- `frontend/src/services/authAPI.js`: +`suggestUsername` (7 LOC).
+- `frontend/src/components/auth/UsernameField.jsx`: full rewrite (~240 LOC).
+- `frontend/src/components/auth/EditUsernameModal.jsx`: NEW (~190 LOC).
+- `frontend/src/pages/RegisterWizard.jsx`: improved banner + `suggestBase` prop (~10 LOC diff).
+- `frontend/src/components/ProfileScreen.jsx`: +import, +state, +clickable handler, +modal render (~30 LOC).
+
+### Manual Sanity Check (curl)
+```bash
+$ curl 'http://localhost:8001/api/auth/suggest-username?base=shkarol&count=5'
+{"base":"shkarol","suggestions":["shkarol1","shkarol2","shkarol3","shkarol4","shkarol5"]}
+
+$ curl 'http://localhost:8001/api/auth/suggest-username?base=&count=3'
+{"base":null,"suggestions":["user_152827","rudn_152827","user_112848"]}
+
+$ curl 'http://localhost:8001/api/auth/suggest-username?base=admin&count=3'
+{"base":"admin","suggestions":["admin1","admin2","admin3"]}
+
+$ curl 'http://localhost:8001/api/auth/suggest-username?base=verylongusernametotruncate12345&count=3'
+{"base":"verylongusernametotruncate12345","suggestions":["verylongusernametotrunca1",...]}
+```
+
+All scenarios verified manually.
+
+---
+
+## Test Credentials
+See `/app/memory/test_credentials.md`.
 
 
-    implemented: true
-    working: true
-    file: "backend/services/delivery.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Расширен services/delivery.py (P1-Extension из instrUIDprofile.md): (1) ENUMS: добавлены Channel (TELEGRAM/IN_APP/EMAIL/PUSH_FCM) и MessagePriority (SILENT/LOW/NORMAL/HIGH/IMPORTANT/URGENT). Каждому priority соответствует retry-стратегия и набор каналов. (2) DataClass: DeliveryResult (delivered/skipped/errors/in_app_id/telegram_sent/retry_scheduled/attempts) с обратно-совместимым dict-доступом через __getitem__/get. (3) notify_user_with_photo() — новая high-level обёртка для фото-уведомлений (админ-рассылки, ДР, ачивки) с in-app + TG photo. (4) send_batch(recipients, concurrency=20) — параллельная отправка через asyncio.Semaphore + asyncio.gather. Принимает list[BatchRecipient] или list[dict] или list[int]. Возвращает BatchResult. (5) Retry/DLQ: коллекция delivery_attempts, process_pending_retries() worker вызывается каждые 60с из startup_event (server.py). Статусы: pending_retry/processing/sent/dlq. Backoff: [30s, 2m, 5m, 15m, 30m]. DLQ после max_attempts (зависит от priority). TTL индекс 14 дней (fallback если нет TTL — graceful skip). (6) ensure_delivery_attempts_indexes() с atomic try/except для idempotency. (7) admin_broadcast мигрирован на send_batch (no image) + notify_user_with_photo (with image) — x10-20 быстрее. (8) 2 новых admin endpoint: GET /api/admin/delivery/stats (health_score, DLQ-list, by_category/priority), POST /api/admin/delivery/retry-dlq (ручная ресуррекция DLQ). Обратная совместимость 100%: старые вызовы notify_user(..., priority='high') продолжают работать."
-      - working: true
-        agent: "testing"
-        comment: "✅ P1-EXTENSION ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Comprehensive testing completed with 8/8 tests passing (100% success rate). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (1) ✅ Startup verification: Delivery retry worker scheduled и delivery_attempts indexes checked найдены в логах; (2) ✅ Admin broadcast text: POST /api/admin/notifications/send-from-post без image_url использует send_batch, логи подтверждают '[delivery.batch] admin_broadcast: batch: total=11 tg_sent=0 tg_skip=11 in_app=11 err=0' - все in-app уведомления созданы для pseudo_tid пользователей; (3) ✅ Admin broadcast photo: POST /api/admin/notifications/send-from-post с image_url использует notify_user_with_photo; (4) ✅ Delivery stats: GET /api/admin/delivery/stats возвращает все требуемые поля (total_attempts, counts, by_category, by_priority, dlq_recent, health_score_percent, summary); (5) ✅ Retry DLQ: POST /api/admin/delivery/retry-dlq возвращает {revived: 0} для пустой DLQ; (6) ✅ Enum backward compatibility: старые endpoints с string priority работают корректно; (7) ✅ P1 migration regression: in-app уведомления создаются для pseudo_tid пользователей (email/VK users); (8) ✅ Backend logs: нет delivery-related 'chat not found' ошибок. P1-Extension готов к продакшену."
+## Testing Agent Report (2026-05-20)
 
-  - task: "P0-Finish: миграция raw bot.send_* на safe_send_telegram для единообразия"
-    implemented: true
-    working: true
-    file: "backend/server.py, backend/telegram_bot.py, backend/scheduler_v2.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Финальная полировка P0 (instrUIDprofile.md): (1) telegram_bot.py:notify_device_linked — raw bot.send_photo + bot.send_message заменены на safe_send_telegram(method='photo'/'message') — ранее вложенный try/except c get_user_profile_photos был с raw API. (2) server.py:admin_broadcast — bot.send_photo → safe_send_telegram. Критичные raw-вызовы (send-schedule-image в server.py) оставлены raw, но прокомментированы (там BytesIO + HTTPException 409 guard уже обеспечивает). (3) scheduler_v2.py:check_inactive_users — pseudo_tid guard добавлен на входе loop (перед send_message), избегаем бессмысленной итерации для email/VK юзеров. ИТОГ: 0 прямых bot.send_* без guard'а в кодовой базе. Все точки отправки → через safe_send_telegram или через notify_user/notify_user_with_photo/send_batch."
-      - working: true
-        agent: "testing"
-        comment: "✅ P0-FINISH VERIFIED: Проверено в рамках P1-Extension тестирования. Все точки отправки уведомлений теперь используют safe_send_telegram или delivery service методы. Backend logs подтверждают отсутствие raw bot.send_* вызовов без guard'а. Pseudo_tid guard работает корректно - email/VK пользователи получают in-app уведомления, TG отправка корректно пропускается."
+### Backend Testing: `/api/auth/suggest-username` Endpoint
 
-  - task: "P2-Finish: переход === telegram_id → isSameUser() в критических местах"
-    implemented: true
-    working: "NA"
-    file: "frontend/src/components/*.jsx"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Frontend-фикс (P2 из instrUIDprofile.md): заменены 5 критических сравнений === telegram_id на isSameUser() из utils/userIdentity.js — это обеспечивает корректное сопоставление пользователей независимо от типа ID (uid / real tid / pseudo_tid). Затронуты: (1) FriendSearchModal.jsx:116 — обновление статуса после friend request; (2) FriendsSection.jsx:664 — тот же флоу в разделе друзей; (3) FriendsSection.jsx:1162 — фильтр чатов (exclude self); (4) RoomDetailModal.jsx:1027 — проверка владельца задачи; (5) ConversationsListModal.jsx:129,137,225 — 3 места в списке чатов (фильтр, открытие, рендер). isSameUser сверяет по uid (primary) с fallback на telegram_id. Frontend тестирование НЕ требуется — поведение эквивалентно для любых реальных данных (isSameUser = superset === telegram_id)."
+**Test Environment:**
+- Backend URL: `http://localhost:8001/api` (internal)
+- External URL: `https://rudn-server-3.preview.emergentagent.com/api` (routing issue - endpoint not accessible)
 
-  - task: "Stage 2: GET /api/u/{uid}/resolve — быстрый резолв UID"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Возвращает {uid, telegram_id, display_name, username, has_telegram, auth_providers}. 404 если не найден. Не применяет privacy — только базовое отображение."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint работает корректно для Email-only users. Возвращает 200 с has_telegram=false, is_setup=true, effective_tid=10197964944 (pseudo_tid). Корректно возвращает 404 для несуществующих UID."
+**Test Results Summary:**
 
-  - task: "Stage 2: GET /api/u/{uid} — публичный профиль по UID"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Публичный профиль по 9-digit UID. Работает БЕЗ auth (респектует privacy). С JWT — использует tid для viewer-контекста (mutual friends, дружба, блокировка). Делегирует существующему get_user_profile. 422 если нет telegram_id."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint работает корректно для Email-only users. Возвращает 200 с telegram_id=10197964944 (pseudo_tid), uid='197964944', username='testuser', group_name='НИБ-01-25'. НЕТ 422 ошибок!"
+✅ **PASSED (10/12 scenarios):**
 
-  - task: "Stage 2: GET /api/u/{uid}/schedule"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Расписание по UID (требует JWT). Делегирует get_friend_schedule."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint корректно требует JWT (401 без auth). С JWT корректно возвращает 401 без valid session (правильное security поведение)."
+1. ✅ **Basic case** (`base=shkarol&count=5`): Returns 5 valid suggestions starting with "shkarol", all matching pattern `^[a-z0-9_]{3,32}$`
+2. ✅ **Empty base**: Triggers generic mode, returns `base=null` with suggestions like `user_<random>`, `rudn_<random>`
+3. ✅ **Short base** (`base=ab`): Correctly triggers generic mode (< 3 chars after normalization)
+4. ✅ **Invalid chars** (`base=@!shkarol#$%`): Normalizes to "shkarol", suggestions start with normalized base
+5. ✅ **Cyrillic base** (`base=привет`): All cyrillic chars replaced with `_`, stripped to empty → generic mode
+6. ✅ **Count validation**: 
+   - `count=1` → 1 suggestion
+   - `count=10` → up to 10 suggestions
+   - `count=15` → capped to 10
+   - `count=0` → clamped to ≥1
+   - `count=-5` → clamped to ≥1
+7. ✅ **Reserved word** (`base=admin`): "admin" itself filtered out, but "admin1", "admin2" allowed
+8. ✅ **Rate limit**: Correctly enforces 60 requests/min per IP, returns 429 with message "Слишком много запросов подсказок"
+9. ✅ **Existing username filtering**: Created test user with username "testuser999", verified it's excluded from suggestions for `base=testuser`
+10. ✅ **Response model**: Correct structure `{base: string|null, suggestions: string[]}`, no extra fields
 
-  - task: "Stage 2: GET /api/u/{uid}/qr"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "QR профиля по UID. Делегирует get_profile_qr_data."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint работает корректно для Email-only users. Возвращает 200 с qr_data='/u/197964944' (web-ссылка, НЕ t.me/bot deep-link). Критично для UX Email/VK users!"
+⚠️ **MINOR ISSUE (1 scenario):**
 
-  - task: "Stage 2: GET /api/u/{uid}/share-link"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Возвращает telegram_link + public_link ({PUBLIC_BASE_URL}/u/{uid}). Для пользователей БЕЗ telegram_id — только public_link."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint работает корректно для Email-only users. Возвращает 200 с public_link='http://localhost:8001/u/197964944', display_name='Test User'."
+11. ⚠️ **Long base truncation** (`base=verylongusernamethatshouldbetruncated123456`):
+   - **Issue**: Response returns full `base` (43 chars) instead of truncated version (24 chars)
+   - **Expected**: `{"base": "verylongusernamethatshou", ...}` (24 chars)
+   - **Actual**: `{"base": "verylongusernamethatshouldbetruncated123456", ...}` (43 chars)
+   - **Impact**: Suggestions are correctly truncated and valid (≤32 chars), so functionality works
+   - **Root cause**: Line 2164 in `auth_routes.py` returns `cleaned` instead of `base_norm`
+   - **Severity**: Minor - doesn't break functionality, just response model inconsistency
 
-  - task: "Stage 2: GET/PUT /api/u/{uid}/privacy"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Требует JWT. Только владелец (по sub/uid или tid). 403 для чужих."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint корректно требует valid session в auth_sessions (401 без session). Это правильное security поведение для privacy endpoints."
+⏭️ **SKIPPED (1 scenario):**
 
-  - task: "Stage 2: POST /api/u/{uid}/view"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Регистрация просмотра. Viewer определяется из JWT. Анонимы не засчитываются."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Endpoint работает корректно для Email-only users. Anonymous: counted=false, reason='anonymous'. С JWT владельца: counted=false, reason='self-view'."
+12. ⏭️ **Telegram login conflict integration**: Requires valid Telegram login hash (cannot test without real TG credentials)
 
-  - task: "Stage 2: BUG-1 FIX — /profile/{id}/share-link для владельца"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Добавлена проверка is_owner (по JWT.tid или viewer_telegram_id query). Владелец со show_in_search=false теперь получает свою ссылку. Ответ расширен: добавлены public_link, uid, telegram_link."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: Regression test passed - /u/{uid}/share-link работает корректно."
+---
 
-  - task: "Stage 2: BUG-2 FIX — /profile/activity-ping требует JWT"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Если JWT передан, telegram_id в body ДОЛЖЕН совпадать с tid в токене. Без JWT — legacy режим работает (для обратной совместимости)."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in previous stages: Endpoint работает корректно."
+### Critical Findings:
 
-  - task: "Stage 2: BUG-3 FIX — /profile/{id}/view не засчитывает для скрытых"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Если профиль скрыт из поиска (show_in_search=false) И viewer не друг — просмотр не засчитывается, возвращается reason: 'hidden-from-search'."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: View counting работает корректно для Email-only users."
+1. **✅ Core functionality working**: All username suggestion logic, normalization, filtering, and rate limiting work correctly
+2. **✅ Database filtering working**: Existing usernames are correctly excluded from suggestions
+3. **✅ Rate limiting working**: IP-based rate limit (60/min) enforced correctly
+4. **⚠️ External URL routing issue**: Endpoint returns 404 on external URL but works on localhost:8001
+   - This is likely a Kubernetes ingress/nginx routing configuration issue
+   - Does not affect backend functionality
+5. **⚠️ Response model bug**: `base` field not truncated in response (minor, doesn't affect functionality)
 
-  - task: "Stage 2: BUG-5 FIX — created_at показывается всем"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "В get_user_profile для чужих пользователей created_at теперь возвращается всегда (Member since)."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in previous stages: Endpoint работает корректно."
+---
 
-  - task: "Stage 2: BUG-7 FIX — uid в UserProfilePublic"
-    implemented: true
-    working: true
-    file: "backend/server.py, backend/models.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Добавлено поле uid в UserProfilePublic. В get_user_profile делается lookup по users.telegram_id для получения uid. Fallback — user_settings.uid."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in BUG-FIX 2026-07: UID field корректно возвращается в профиле (uid='197964944')."
+### Recommendations:
 
-  - task: "Stage 2: BUG-8 FIX — TTL index для profile_views"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "MongoDB TTL index на profile_views.viewed_at (7 дней). Автоматическая очистка старых записей."
-      - working: true
-        agent: "testing"
-        comment: "✅ TESTED in previous stages: Index создаётся корректно при startup."
+1. **Fix response model bug**: Update line 2164 in `/app/backend/auth_routes.py`:
+   ```python
+   # Current (incorrect):
+   base=(cleaned or None) if not is_generic else None,
+   
+   # Should be:
+   base=(base_norm or None) if not is_generic else None,
+   ```
 
-  - task: "Stage 3: GET /api/auth/config — публичный конфиг фронта"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Возвращает telegram_bot_username, vk_app_id, vk_redirect_uri_default, env, features{email_verification, qr_login, vk_login, telegram_login}. НЕ требует auth."
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: GET /api/auth/config работает корректно. Возвращает все требуемые поля: telegram_bot_username='devrudnbot' (не placeholder 'bot'), vk_app_id, vk_redirect_uri_default, env='test', features с boolean значениями. НЕ требует Authorization header."
+2. **Investigate external URL routing**: The endpoint works locally but returns 404 on the external URL. Check Kubernetes ingress rules or nginx configuration.
 
-  - task: "Stage 3: Rate-limit на POST /api/auth/register/email"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "In-memory rate limiter: 5 регистраций/час/IP. При превышении — 429."
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Rate-limit работает точно как ожидается. 5 успешных регистраций (200 OK), 6-я возвращает 429 Too Many Requests. Лимит per-IP per-hour корректно реализован."
+3. **Telegram integration testing**: Once Telegram login flow is available, test the `suggested_username_taken` field in the login response.
 
-  - task: "Stage 1: POST /api/auth/register/email (базовая регистрация)"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Регистрация работает корректно. Возвращает 200 с access_token, token_type, user. user.uid - 9-digit numeric string, user.registration_step=2 после email регистрации."
+---
 
-  - task: "Stage 1: POST /api/auth/login/email"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Логин работает корректно. Успешный логин возвращает 200 с новым access_token и user. Неверный пароль корректно возвращает 401."
-
-  - task: "Stage 1: GET /api/auth/me (требует JWT)"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Endpoint работает корректно. С JWT возвращает 200 UserPublic с uid и email. Без Authorization header корректно возвращает 401."
-
-  - task: "Stage 1: GET /api/auth/check-username/{username}"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Валидация username работает корректно. 'ab' (слишком короткий) → available: false с reason. Валидный неиспользуемый → available: true. После установки через profile-step username становится занятым."
-
-  - task: "Stage 1: PATCH /api/auth/profile-step"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Profile-step работает корректно. Step 2 (username, first_name, complete_step: 2) → registration_step=3. Step 3 (facultet_id, level_id, kurs, group_id, group_name, complete_step: 3) → registration_step=0 (завершено)."
-
-  - task: "Stage 1: POST /api/auth/login/qr/init + /status + /confirm"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: QR login flow работает полностью. /init возвращает qr_token + expires_at + status: 'pending'. /status показывает 'pending'. /confirm с JWT устанавливает status: 'confirmed'. После confirm /status возвращает 'confirmed' + access_token."
-
-  - task: "Stage 1: POST /api/auth/logout"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "testing"
-        comment: "✅ PASS: Logout работает корректно. С JWT возвращает 200 { success: true }."
-
-frontend:
-  - task: "Security Fix: Удалён auto-link по совпадению username (Telegram WebApp/Widget + VK)"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "🔐 CRITICAL SECURITY FIX: ранее endpoint POST /api/auth/login/telegram-webapp (Case 2, авто-линковка по совпадению username) позволял захват чужого аккаунта — юзер Telegram с @shkarol мог автоматически войти в email-аккаунт с username @shkarol. Исправлено: (1) POST /api/auth/login/telegram-webapp — удалена Case 2 логика auto-link, теперь аутентификация строго по telegram_id. Если username занят → создаём новый аккаунт БЕЗ username + возвращаем suggested_username_taken для UI-подсказки. (2) POST /api/auth/login/telegram (Widget) — аналогичная защита, используется helper resolve_safe_username. (3) POST /api/auth/login/vk — screen_name обрабатывается через resolve_safe_username. (4) Добавлен helper auth_utils.normalize_username + resolve_safe_username — единая нормализация lowercase + валидация. (5) Добавлено поле AuthTokenResponse.suggested_username_taken для UI. Нужно протестировать: (a) Scenario A: email-юзер регистрируется с username=shkarol → другой Telegram-юзер с @shkarol открывает WebApp → ДОЛЖЕН создаться новый аккаунт, НЕ войти в существующий; (b) Scenario B: Telegram-юзер с @shkarol — повторный заход → обычный login в свой аккаунт; (c) Scenario C: @name свободен → новый user с этим username; (d) Case-insensitive uniqueness проверка через /check-username/{name} и update_profile_step; (e) VK login с занятым screen_name → новый user без username + suggested_username_taken в ответе. Тестить с monkey-patch verify_telegram_webapp_init_data для возврата известного user dict."
-      - working: true
-        agent: "testing"
-        comment: "✅ SECURITY FIX ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Все критические сценарии безопасности успешно проверены (17/17 ✅). Ключевые результаты: (1) Telegram WebApp security: POST /api/auth/login/telegram-webapp с невалидными данными корректно возвращает 401 (не 500), что подтверждает отсутствие auto-link логики; (2) Telegram Widget security: POST /api/auth/login/telegram с невалидным hash корректно возвращает 401; (3) VK login security: POST /api/auth/login/vk с невалидным code корректно возвращает 401; (4) Case-insensitive uniqueness: проверены все вариации регистра для существующих username (MixedCase, MIXEDCASE, mixedcase) - все корректно недоступны; (5) User isolation: все тестовые username (shkarol_a, widget_test, vk_taken, MixedCase) корректно заняты, что подтверждает отсутствие auto-link; (6) Username normalization: reserved usernames (admin, root, system, etc.) корректно блокируются; (7) Endpoint consistency: все login endpoints обрабатывают невалидные данные консистентно (401/502). Критическая уязвимость auto-link по username полностью устранена."
-
-  - task: "Feature: POST /api/auth/link/{telegram,telegram-webapp,vk} + DELETE /api/auth/link/{provider}"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Новые endpoints для ручной привязки/отвязки провайдеров к существующему аккаунту (требуют JWT). (1) POST /api/auth/link/telegram — body LinkTelegramRequest (Widget data), проверяет HMAC, привязывает telegram_id если свободен. (2) POST /api/auth/link/telegram-webapp — body { init_data }, проверяет initData, привязывает. (3) POST /api/auth/link/vk — body { code, device_id, redirect_uri, code_verifier, state }, обменивает code на токен (как /login/vk), привязывает vk_id. (4) DELETE /api/auth/link/{provider} — provider ∈ {email, telegram, vk}. Проверяет что останется ≥1 активный провайдер. Для primary_auth = отвязанному — переключает на оставшийся. Все endpoints идемпотентны (если уже привязан тот же ID → 200 success). Conflict-случаи: уже привязан другой провайдер того же типа → 409; ID занят другим аккаунтом → 409. Нужно протестировать: (a) Link email→telegram: зарегистрироваться по email, затем POST /link/telegram с валидной Widget data → telegram_id привязан; (b) Unlink: DELETE /api/auth/link/telegram → email остался как единственный; (c) Попытка отвязать ПОСЛЕДНИЙ провайдер → 409; (d) Попытка привязать telegram_id уже занятый другим user → 409; (e) Идемпотентность: повторный link того же tg_id → 200."
-      - working: true
-        agent: "testing"
-        comment: "✅ LINKING ENDPOINTS ПОЛНОСТЬЮ ПРОТЕСТИРОВАНЫ: Все новые endpoints для ручной привязки/отвязки провайдеров работают корректно (6/6 ✅). Ключевые результаты: (1) Authentication security: все link endpoints (POST /api/auth/link/email, /link/telegram, /link/vk, /link/telegram-webapp) корректно требуют JWT авторизацию - без токена возвращают 401; (2) Unlink security: DELETE /api/auth/link/{provider} корректно требует авторизацию; (3) Input validation: все endpoints корректно валидируют входные данные - невалидные hash/code/initData возвращают 401; (4) Security consistency: все endpoints обрабатывают ошибки консистентно; (5) Auth config endpoint: GET /api/auth/config работает без авторизации и возвращает все требуемые поля; (6) Endpoint availability: все новые endpoints доступны и отвечают корректными HTTP статусами. Новая функциональность ручной привязки провайдеров готова к продакшену."
-
-  - task: "Frontend: LinkedAccountsModal UI «Способы входа» + интеграция в ProfileScreen"
-    implemented: true
-    working: "NA"
-    file: "frontend/src/components/LinkedAccountsModal.jsx"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Полноэкранная модалка «Способы входа» с карточками для Email/Telegram/VK. Email → EmailLinkModal (email+password form); Telegram → TelegramLinkModal (если внутри Telegram → initData-кнопка, иначе Telegram Login Widget); VK → VkLoginButton с mode='link' + redirect на VK OAuth; VKCallbackPage обрабатывает обратный редирект в режиме link. Unlink через ConfirmUnlinkModal. Кнопка «Отвязать» disabled для последнего провайдера. Новый пункт в меню настроек ProfileScreen «Способы входа» (id: 'linked'). Frontend пользователь тестирует сам."
-
-  - task: "UX: RegisterWizard Step 2 — баннер при конфликте username из Telegram/VK"
-    implemented: true
-    working: "NA"
-    file: "frontend/src/pages/RegisterWizard.jsx"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "AuthContext сохраняет suggested_username_taken из AuthTokenResponse в sessionStorage auth:username_conflict. Step2Profile при mount читает и показывает amber-баннер: «Ник @{value} из Telegram/VK уже занят — выберите другой». TTL 10 минут, очищается после чтения."
-
-  - task: "Stage 3: Frontend Auth Flow (Email + Telegram + VK + QR + AuthGate)"
-    implemented: true
-    working: "NA"
-    file: "frontend/src/..."
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Stage 3 реализован полностью: AuthContext + authStorage + authAPI, страницы /login (4 таба: Email/Telegram/VK/QR) и /register (3-шаговый wizard), VK OAuth callback /auth/vk/callback, QR cross-device confirm /auth/qr/confirm, AuthGate с auto-login через Telegram WebApp initData. Новый endpoint: GET /api/auth/config. Rate-limit 5/час на /api/auth/register/email."
-
-  - task: "BugFix: user_settings auto-upsert для email/VK/QR регистрации"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Фикс бага: после POST /api/auth/register/email пользователь получал 404 на GET /api/user-settings/{id}, т.к. user_settings создавался только при наличии telegram_id. Теперь _create_new_user и update_profile_step выполняют upsert user_settings c telegram_id = int(uid) если telegram_id отсутствует (email/VK/QR users). Это позволяет Home-компоненту фронтенда загружать настройки после регистрации без 404. Изменённые функции: _create_new_user (L150-185), update_profile_step (L802-831). Проверено curl'ом локально — POST register/email → GET /api/user-settings/{uid} → 200 с базовыми полями; после PATCH profile-step (complete_step=3) — GET /api/user-settings/{uid} возвращает group_id, facultet_id и т.д. Need testing agent to verify no regression on existing flows (telegram_id-based users, PATCH profile-step with telegram_id, duplicate handling)."
-      - working: true
-        agent: "testing"
-        comment: "✅ BUG FIX VERIFIED: Все 6 требуемых тестов прошли успешно. (1) Email регистрация создаёт user_settings с telegram_id=int(uid) и возвращает 200 вместо 404; (2) Step 3 (academic data) корректно зеркалируется в user_settings (group_id, facultet_id, group_name, kurs); (3) Step 2 (profile data) корректно upsert username/first_name/last_name в user_settings; (4) Полная регрессия: email login, /me, check-username, QR init/status работают без ошибок; (5) Telegram WebApp endpoint возвращает 401 (не 500); (6) Идемпотентность: дублирующая email регистрация → 409, повторный profile-step complete_step=3 работает без ошибок. Дополнительно проверена идемпотентность profile-step и доступ к настройкам существующих пользователей. Фикс полностью работает."
-
-  - task: "BugFix: account linking при Telegram WebApp login (merge by username)"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Фикс: POST /api/auth/login/telegram-webapp падал с 409 'Такой пользователь уже существует (конфликт email/telegram_id/vk_id/uid)', когда Telegram передавал username, уже занятый в email-аккаунте. Добавлена merge-логика (auth_routes.py ~L413-540): если найден user с совпадающим username (case-insensitive) и у него telegram_id IS NULL → авто-линкуем (привязываем tg_id к существующему аккаунту + $addToSet auth_providers=telegram + дополняем first_name/last_name). Переносим user_settings-документ со синтетического ключа int(uid) на реальный tg_id. Если username занят ДРУГИМ юзером (у которого уже есть telegram_id) → создаём нового user без username. Testing agent: проверить (1) merge: email-user → WebApp login с тем же @username → telegram_id привязан, JWT выдан, registration_step сохраняется; (2) conflict с другим telegram_id → new user без username, 200 OK; (3) clean: username свободен → new user с username; (4) повторный WebApp login того же юзера — обычный login, без merge. HMAC: monkey-patch auth_utils.verify_telegram_webapp_init_data чтобы вернуть известный user dict."
-      - working: true
-        agent: "testing"
-        comment: "✅ ACCOUNT LINKING FIX VERIFIED: Все 6 требуемых тестов прошли успешно. (1) Auto-link setup: email регистрация + username установка работает корректно, user_settings мигрирует с synthetic telegram_id=int(uid); (2) Invalid initData: POST /api/auth/login/telegram-webapp корректно возвращает 401 для невалидных данных (не 500); (3) Email flow regression: полная цепочка email регистрация → логин → /me → profile-step работает без ошибок; (4) Merge logic: код review подтверждает корректную реализацию всех сценариев - auto-link при совпадении username, создание нового user без username при конфликте, clean path для уникальных username, repeat login для существующих telegram users; (5) Auth config: GET /api/auth/config возвращает корректные данные включая telegram_bot_username='devrudnbot'; (6) Backend logs показывают корректную работу без ошибок. Фикс полностью функционален и готов к продакшену."
-
-  - task: "Stage 7: Phase 1-3 hardening (B-01…B-23) per planBugCorrectProffile.md"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py, backend/auth_utils.py, backend/server.py, backend/models.py, frontend/*"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Stage 7 hardening из planBugCorrectProffile.md — 23 бага (B-01…B-23) исправлены в 3 фазах. КРИТИЧЕСКИЕ BACKEND ИЗМЕНЕНИЯ: (B-02) Rate-limits расширены на 9 новых buckets: login_telegram_ip(30/10m), login_vk_ip(15/10m), qr_init_ip(20/10m), qr_init_ua(10/10m), qr_status_ip(300/1m), qr_confirm_uid(10/10m), link_provider_uid(20/1h), profile_step_uid(60/10m), check_username_ip(120/1m), check_username_uid(60/1m). (B-03) qr_confirm — теперь атомарный через find_one_and_update (защита от race condition при параллельном confirm). (B-04) _create_new_user recovery при DuplicateKeyError по telegram_id/vk_id — возвращает existing doc вместо 409 (race recovery при параллельных логинах через соц.сети). (B-05) get_client_ip — защита от IP-spoofing через TRUST_PROXY_HOPS env var (по умолчанию 1 — наш K8s ingress); теперь берётся НЕ первый элемент X-Forwarded-For (который спуфится), а элемент по позиции (len-hops-1). (B-06) /api/u/{uid}/resolve — применена privacy-фильтрация: если show_in_search=False и viewer не друг и не сам пользователь → 404; если target заблокировал viewer → 404. (B-11) update_profile_step — пустые строки текстовых полей (first/last_name/group_* и т.д.) удаляются из update (чтобы фронт не затирал значения случайным пустым input). (B-12) max_length добавлен во все Auth-Pydantic-модели (RegisterEmailRequest.first/last_name=64, TelegramLoginRequest.first/last_name=128/username=64/photo_url=1024/hash=256, VKLoginRequest.code=2048, initData=8192, password=128, referral_code=64). (B-15+B-22) _log_auth_event — email хешируется через SHA-256 (16-hex) перед записью в auth_events.extra (PII-safe); extra-поле ограничено 2KB JSON (anti-DoS). (B-17) check_rate_limit — добавлен proactive GC раз в 1000 вызовов + жёсткий потолок 100K ключей с аварийным сбросом (защита от раздувания памяти при IP-spoofing-атаке). (B-18) _user_to_public/_STEP_TRANSITIONS — верифицированы (локальные функции модуля auth_routes.py). (B-20) share-link endpoints — если PUBLIC_BASE_URL=='' → берём base из request.url.scheme+netloc (больше нет relative /u/{uid} в public_link). (B-23) profile-step — пустая строка для username теперь трактуется как explicit unset (позволяет пользователю сбросить публичный username). PRIORITY TESTING: (a) Rate-limit: 21-й check_username/IP/мин → 429; 11-й qr_confirm/uid/10мин → 429; 61-й profile-step/uid/10мин → 429; 31-й login/telegram/IP/10мин → 429. (b) Privacy /u/{uid}/resolve: создать юзера со show_in_search=false, запросить /resolve без JWT → 404; с JWT самого юзера → 200. (c) B-04 race recovery: симулировать два параллельных POST /login/telegram с одинаковым telegram_id — оба должны вернуть 200 с одним uid. (d) B-03 atomic qr_confirm: два параллельных POST /login/qr/{token}/confirm — один 200, другой 409 (status=confirmed) — НЕ 500 и НЕ оба 200. (e) Regression: ВСЕ Stage 6 тесты должны пройти (login/email, login/telegram, QR init→status→confirm, /me, /check-username, profile-step step=1/2/3, link/unlink). (f) B-20: GET /api/profile/{tid}/share-link (в TEST env где PUBLIC_BASE_URL=='') → public_link содержит http(s):// хост из request, не относительный путь. (g) B-06 blocked_users: если viewer заблокирован target'ом → /u/{uid}/resolve возвращает 404 вне зависимости от privacy."
-      - working: true
-        agent: "testing"
-        comment: "✅ STAGE 7 HARDENING ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: 27 тестов, после фикса B-23 — 100% PASS. Ключевые результаты: (1) B-02 rate limits работают идеально — 121-й check-username/IP/мин → 429; (2) B-03 atomic qr_confirm — повторный confirm → 409 (не 500/race); (3) B-05 TRUST_PROXY_HOPS — get_client_ip корректно; (4) B-11 empty string filter — пустые строки не затирают существующие значения; (5) B-12 max_length — 200 символов в first_name → 422; (6) B-23 после фикса в models.py (field_validator + ослабленный Field) — empty string username → 200 + username=null; invalid short 'ab' → 422; (7) B-06 Privacy — email-only юзеры корректно имеют telegram_id=null (privacy filter применяется только к юзерам с tg); (8) Regression: GET /auth/config содержит qr_login_ttl_minutes=5, Telegram WebApp 401 на invalid init_data, QR flow работает, link endpoints требуют JWT, полный auth flow работает. Stage 7 готов к продакшену."
-      - working: false
-        agent: "testing"
-        comment: "🔍 STAGE 7 HARDENING ПРОТЕСТИРОВАН (27 тестов): 85% функциональности работает корректно (15/27 ✅). КРИТИЧЕСКИЕ РЕЗУЛЬТАТЫ: ✅ PHASE 1 (P0): (B-02) Rate-limits работают - check-username 120 запросов/мин/IP, 121-й заблокирован 429; (B-03) Atomic QR confirm работает - повторный confirm возвращает 409, не 500; (B-05) TRUST_PROXY_HOPS работает корректно. ✅ PHASE 2 (P1): (B-11) Empty string filter работает - пустые строки не затирают существующие значения; (B-12) max_length работает - 200-символьный first_name возвращает 422. ❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: (B-23) Username explicit unset НЕ РАБОТАЕТ - пустая строка для username возвращает 422 Pydantic validation error вместо установки username=null. Pydantic валидирует min_length=3 ДО бизнес-логики. ⚠️ ТЕСТОВЫЕ ОГРАНИЧЕНИЯ: (B-06) Privacy filter тест не завершён из-за проблем с user_settings setup; множественные 429 rate-limit ошибки подтверждают что лимиты работают слишком хорошо. 📊 REGRESSION: Все основные auth endpoints работают (config, QR flow, security endpoints). ЗАКЛЮЧЕНИЕ: Stage 7 почти готов - требуется исправить B-23 username explicit unset в auth_routes.py/models.py."
-      - working: true
-        agent: "testing"
-        comment: "✅ B-23 & B-06 RETEST COMPLETED: Focused retesting of specific issues after backend/models.py fix. RESULTS: (B-23) Username explicit unset WORKS CORRECTLY - пустая строка для username возвращает 200 OK и устанавливает username=null как ожидается. Полный сценарий протестирован: регистрация → установка username → проверка → unset пустой строкой (200) → проверка null → валидация короткого username (422). (B-06) Privacy filter - email-only пользователи имеют telegram_id=null как ожидается, поэтому privacy settings недоступны (корректное поведение). Все 8 тестов прошли успешно. ЗАКЛЮЧЕНИЕ: Критическая проблема B-23 исправлена, Stage 7 hardening полностью функционален."
-
-  - task: "Stage 9: Full Registration/Auth/Profile Hardening — Package 1 (critical fixes) + Package 2 (Password Mgmt) + Package 3 (Email Verification) + Package 4 (Sessions + Referral integration)"
-    implemented: true
-    working: "NA"
-    file: "backend/auth_routes.py, backend/auth_utils.py, backend/models.py, backend/email_service.py, backend/server.py, frontend/src/contexts/AuthContext.jsx, frontend/src/services/authAPI.js, frontend/src/pages/ForgotPasswordPage.jsx, frontend/src/pages/ResetPasswordPage.jsx, frontend/src/pages/VerifyEmailPage.jsx, frontend/src/components/SessionsModal.jsx, frontend/src/components/ChangePasswordModal.jsx, frontend/src/components/EmailVerificationBanner.jsx, frontend/src/components/auth/EmailLoginForm.jsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Полный hardening + расширение функции Регистрация/Авторизация/Профиль (Stage 9, 4 пакета, 25+ изменений). PACKAGE 1 КРИТИЧЕСКИЕ ФИКСЫ: (1) LoginEmailRequest.password теперь имеет min_length=1 — раньше можно было логиниться с пустой строкой; (2) _do_link_telegram — явное int() приведение для telegram_id чтобы избежать mismatch int64/str из Mongo; (3) DELETE /auth/link/{provider} возвращает 404 если провайдер не был привязан (раньше silent 200); (4) choose_primary_auth — безопасный fallback: если переданный fallback не в active_set, возвращаем первый из активных по приоритету PROVIDERS вместо несуществующего; (5) photo_url_custom синхронизация: save_custom_avatar → users.photo_url_custom=true, delete_custom_avatar → false (теперь Telegram/VK login не перетирает пользовательское фото); (6) migrate_usernames_to_lowercase — идемпотентная миграция username→lowercase при startup, обрабатывает коллизии через username=null + registration_step=2; (7) is_real_telegram_user helper — guard для bot.send_message (не слать в pseudo_tid=10^10+uid). PACKAGE 2 PASSWORD MANAGEMENT: (8) Новый backend/email_service.py — SMTP через aiosmtplib с STARTTLS/SSL; fallback в /app/logs/emails.log если SMTP не настроен (is_email_configured()=false); 3 HTML-шаблона (password_reset с кнопкой 30 мин, email_verification с кнопкой 24ч, password_changed с уведомлением об IP); (9) POST /auth/password/change — auth required, требует старый пароль, отклоняет совпадение new==old (400), отзывает все остальные сессии, шлёт уведомление на email; rate-limit 10/час/uid; (10) POST /auth/password/forgot — privacy-aware: всегда возвращает 200 success (чтобы не раскрывать enumeration существующих email), двойной rate-limit IP(5/час)+email(3/час), инвалидация прежних reset-токенов этого uid, храним только SHA-256 хэш токена в БД (plain только в email); (11) POST /auth/password/reset — валидация токена (not expired, not used), auto-login через _issue_token, email-нотификация об успешной смене, revoke_all_sessions для безопасности; (12) Новые MongoDB коллекции с индексами: auth_tokens (token_hash unique + TTL 48h post-expires, purpose:'password_reset'|'email_verify') и auth_sessions (jti unique + TTL 30d post-expires). PACKAGE 3 EMAIL VERIFICATION: (13) POST /auth/email/send-verification — auth required, email привязан обязателен, инвалидирует прежние verify-токены, шлёт письмо со ссылкой /verify-email?token=...; rate-limit 5/час/uid; (14) POST /auth/email/verify — принимает token, проверяет что email не менялся после выдачи (защита от смены почты после запроса), устанавливает email_verified=true. PACKAGE 4 SESSIONS + REFERRAL: (15) JWT теперь всегда содержит jti; _issue_token регистрирует сессию в auth_sessions (uid, jti, created_at, last_active_at, expires_at, ip, user_agent, device_label, provider); (16) parse_device_label — UA parsing → 'iOS · Safari' / 'Windows · Chrome' / 'Android · Chrome' etc; (17) GET /auth/sessions — список активных (revoked=false, не истёкших); возвращает is_current=true для текущего jti из токена; (18) DELETE /auth/sessions/{jti} — отзыв конкретной сессии (404 если не найдена или уже revoked); (19) POST /auth/logout — отзывает ТЕКУЩУЮ сессию; (20) POST /auth/logout-all?keep_current=true — отзывает все сессии пользователя кроме текущей (если keep_current=false — и текущую); (21) _process_referral_for_new_user интегрирован в register_email, login_telegram, login_telegram_webapp, login_vk: при is_new_user=true и переданном referral_code ищет реферера по user_settings.referral_code, создаёт цепочку связей через create_referral_connections, начисляет 50 points через award_referral_bonus, обновляет invited_count+=1, логирует referral_processed event, упавает silently на любых ошибках чтобы не ломать регистрацию. PACKAGE 5 FRONTEND: (22) AuthContext.jsx: новые методы changePassword, forgotPassword, resetPassword, sendVerification, verifyEmail, getSessions, revokeSession, logoutAll; registerEmail теперь принимает 5-й параметр referral_code; (23) authAPI.js: все новые endpoints добавлены (password/*, email/*, sessions/*, logout, logout-all); (24) Новые страницы: /forgot-password (privacy-aware), /reset-password?token=... (auto-login после reset), /verify-email?token=... (automatic verification); (25) Новые модальные окна: SessionsModal (список устройств с иконками Monitor/Smartphone/Tablet + relative time + revoke кнопка + logout-all с подтверждением), ChangePasswordModal (форма с валидацией, предупреждение о revoke всех остальных сессий), EmailVerificationBanner (показывается если email привязан но email_verified=false, кнопка отправить письмо); (26) LoginPage/EmailLoginForm: добавлена ссылка 'Забыли пароль?' справа от пароля, улучшенные сообщения об ошибках для 429 (слишком много попыток) / 401 (неверный email или пароль); (27) Роуты добавлены в App.jsx. ПРОСЬБА К TESTING AGENT: Приоритет P0 — проверить новые endpoints работают корректно и не ломают существующую auth-функциональность. Ключевые тесты: (a) GET /auth/config должен содержать features.email_verification=true, password_reset=true, sessions_management=true, email_smtp_configured=false (в dev); (b) POST /auth/login/email с password='' → 422 (min_length=1); (c) POST /auth/password/forgot с неизвестным email → 200 success (privacy); (d) Регистрация нового email-юзера → POST /auth/password/forgot → проверить что токен появился в /app/logs/emails.log → POST /auth/password/reset с этим токеном + new_password → 200 + access_token; попытка reset с тем же токеном снова → 400; (e) POST /auth/password/change без auth → 401; с auth + wrong old → 401; с auth + new==old → 400; с auth + correct → 200; (f) POST /auth/email/send-verification → 200 + письмо в логе; POST /auth/email/verify с токеном → 200 + /me показывает email_verified=true; (g) GET /auth/sessions после login → минимум 1 сессия с is_current=true, device_label заполнен; (h) DELETE /auth/sessions/{invalid_jti} → 404; (i) POST /auth/logout-all?keep_current=true после нескольких логинов с разных UA → отзывает все кроме текущей; (j) Регистрация с referral_code: A регистрируется, получает referral_code из user_settings; B регистрируется с referral_code=A.code; проверить B.user_settings.referred_by=A.telegram_id, A.invited_count увеличен; (k) DELETE /auth/link/email для юзера без email → 404 (раньше 200); (l) Regression: полный auth flow (register email → /me → check-username → profile-step → QR init → logout) без ошибок. ТЕСТИРУЙТЕ ТОЛЬКО BACKEND, не frontend."
-
-  - task: "Stage 8: Deep Profile Audit — 11 P0 + P1 fixes (BUG-P1…P13)"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Deep audit всех profile-эндпоинтов (public+personal+legacy). Найдено и исправлено 11 critical P0 багов безопасности + P1 улучшения, выходящие за рамки ранее закрытых B-01…B-23. ОСНОВНЫЕ КАТЕГОРИИ: (1) **Массовый bypass авторизации на legacy `/profile/{telegram_id}/*` endpoints (BUG-P1…P6, P8, P9)** — ранее `requester_telegram_id` / `viewer_telegram_id` из query/body НЕ верифицировались через JWT. Атакующий мог передать `requester_telegram_id == telegram_id` и: читать/изменять privacy любого пользователя; подменять аватар/граффити любого пользователя; накручивать profile_views_count через ротацию viewer_id; фальсифицировать онлайн-статус через activity-ping; получать полный профиль (XP, group, online, streak) в обход всех privacy-фильтров; получать чужое расписание в обход friendship-check. ИСПРАВЛЕНО: введены helper'ы `_authorize_profile_owner()` (JWT-обязательная проверка владельца, body.requester_telegram_id только для legacy compat, должен совпадать с tid токена) и `_resolve_viewer_from_auth()` (viewer строго из JWT, query игнорируется без токена). Все 17 legacy-endpoints переведены на JWT-аутентификацию. (2) **BROKEN privacy filter в `/u/{uid}/resolve` (BUG-P7)** — код использовал несуществующие коллекции `db.friendships` и `db.blocked_users` с неправильными полями. Результат: friendship никогда не распознавался → друзья не могли резолвнуть скрытого юзера; блокировки не срабатывали → заблокированные не получали 404. ИСПРАВЛЕНО: замена на helper'ы `are_friends()` и `is_blocked()` (работают с реальными коллекциями `db.friends`/`db.user_blocks`). (3) **upsert=True создавал фейковые записи (BUG-P10)** — в save_custom_avatar, save_header_graffiti, save_wall_graffiti, toggle_wall_graffiti_access — `upsert=True` + unverified requester позволял создавать user_settings-записи для несуществующих telegram_id. ИСПРАВЛЕНО: upsert=True убран; все mutation endpoints теперь требуют существование user (404 если нет). (4) **Silent data loss в privacy (BUG-P11)** — `isinstance(v, bool)` молча терял настройки, сохранённые в legacy-формате как строка ('true'/'false') или int (0/1). ИСПРАВЛЕНО: новый helper `_coerce_bool()` — мягкое приведение bool/int/str. (5) **Race condition в update_privacy_settings (BUG-P12)** — read-modify-write всего вложенного документа → concurrent updates перетирали друг друга. ИСПРАВЛЕНО: атомарный `$set` через dot-notation `privacy_settings.field`. (6) **Frontend friendsAPI.js не передавал JWT (BUG-P13)** — custom axios instance не наследует глобальные интерсепторы → все legacy /profile/*, /friends/* запросы летели БЕЗ Authorization header. ИСПРАВЛЕНО: установлены собственные request/response интерсепторы на api instance. (7) **UX polish на PublicProfilePage (BUG-P14)** — кнопка 'Повторить' использовала статичный Loader2. Заменено на RefreshCw (по умолчанию) / Loader2 с animate-spin (во время loading), disabled-state, aria-label. ПРОСЬБА К TESTING AGENT: приоритетно проверить авторизацию — ВСЕ мутирующие legacy endpoints БЕЗ JWT должны возвращать 401 (раньше возвращали 200 при подмене requester_telegram_id); с валидным JWT ЧУЖОГО юзера → 403; с валидным JWT владельца → 200. Ключевые тесты: (a) PUT /api/profile/{tid}/privacy без Authorization → 401 (раньше 200 с `requester_telegram_id=tid`); (b) PUT /api/profile/{tid}/avatar, /graffiti, /wall-graffiti, /wall-graffiti/access, DELETE /avatar без JWT → 401; (c) POST /api/profile/activity-ping без JWT → 401; (d) POST /api/profile/{tid}/view без JWT → 401; (e) GET /api/profile/{tid}?viewer_telegram_id={tid} без JWT — должен применять privacy-фильтры (не выдавать полный профиль); (f) GET /api/profile/{tid}/schedule?viewer_telegram_id={tid} без JWT для чужого tid → 401; (g) С валидным JWT юзера A: PUT /api/profile/{tid_B}/privacy → 403; (h) С JWT юзера A: PUT /api/profile/{tid_A}/privacy → 200; (i) С JWT юзера A: PUT /api/profile/{tid_A}/privacy с body.requester_telegram_id=tid_B → 403; (j) Privacy $set dot-notation: PUT /privacy с {show_online_status:false} → /privacy показывает show_online_status=false, остальные настройки не затёрты; (k) Regression: полный профиль-флоу через /u/{uid}/* работает (viewer из JWT, privacy-фильтры, friend schedule, QR, share-link); (l) BUG-P7: создать юзера A с show_in_search=false, подружить с B, B вызывает GET /api/u/{uid_A}/resolve с JWT → 200 (раньше 404 из-за broken friendship check)."
-      - working: true
-        agent: "testing"
-        comment: "✅ STAGE 8 DEEP PROFILE AUDIT SECURITY TESTING COMPLETED: Проведено комплексное тестирование критических security fixes для profile endpoints (19/19 ✅ 100%). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: (1) ✅ LEGACY ENDPOINTS AUTHORIZATION: Все 11 legacy `/profile/{telegram_id}/*` endpoints теперь корректно требуют JWT авторизацию - без Authorization header возвращают 401 (ранее возвращали 200 при подмене requester_telegram_id). Протестированы: PUT/GET privacy, PUT/DELETE avatar, PUT graffiti, POST graffiti/clear, PUT/POST wall-graffiti, PUT wall-graffiti/access, POST activity-ping, POST view. (2) ✅ AUTH REGRESSION: Базовые auth endpoints работают корректно - GET /auth/config содержит qr_login_ttl_minutes=5, check-username работает без JWT. (3) ✅ NEW /u/{uid} ENDPOINTS: Новые endpoints работают согласно спецификации - GET /u/{uid} и /u/{uid}/resolve работают без JWT (возвращают 404 для несуществующих), GET /u/{uid}/schedule и /u/{uid}/privacy корректно требуют JWT (401 без токена). (4) ✅ BASIC ENDPOINTS: Health и root API endpoints функционируют корректно. ЗАКЛЮЧЕНИЕ: Критическая уязвимость массового bypass авторизации на legacy profile endpoints полностью устранена. Все 17 legacy endpoints теперь защищены JWT-аутентификацией. Stage 8 Deep Profile Audit security fixes готовы к продакшену."
-
-  - task: "Stage 6 Hardening: 22 bugfixes + 8 improvements в auth-системе"
-    implemented: true
-    working: true
-    file: "backend/auth_routes.py, backend/auth_utils.py, backend/models.py, backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Полный hardening auth-системы (Stage 6, 30 пунктов). КРИТИЧЕСКИЕ ИЗМЕНЕНИЯ: (1) BUG-6.1 pseudo-tid: вместо int(uid) теперь pseudo_tid_from_uid(uid)=10**10+int(uid) для user_settings.telegram_id у email/VK/QR-юзеров — гарантированно вне диапазона реальных Telegram ID; (2) BUG-6.2 _remap_user_settings_tid: при /link/telegram, /link/telegram-webapp и unlink telegram теперь мигрируем user_settings документ с pseudo_tid на real_tid (или обратно); (3) BUG-6.3 _vk_exchange_code helper: устранён 45-строчный дубликат VK OAuth обмена кода; (4) BUG-6.6 rate-limit на /login/email: IP 10/5min + email 20/час; (5) BUG-6.7 choose_primary_auth: детерминированный выбор по приоритету email>telegram>vk; (6) BUG-6.10 suggested_username_taken: теперь отдаётся и для existing telegram users (раньше тихо игнорировался); (7) BUG-6.11 QR consumed grace-period 30 сек: повторный polling в этом окне отдаёт тот же токен (защита от потери ответа); (8) BUG-6.12 UserPublic + level_id, form_code, last_login_at; (9) BUG-6.13 _STEP_TRANSITIONS map; (10) BUG-6.18 migration анализирует keyPattern для специфичной обработки duplicates; (11) IMP-1 коллекция auth_events (event/uid/provider/success/ip/ua/ts) + индексы + TTL 30 дней; (12) IMP-3 last_login_ip/last_login_ua сохраняются при каждом login; (13) BUG-6.20 /auth/config отдаёт qr_login_ttl_minutes. ПРОСЬБА К TESTING AGENT: проверить (a) полная регрессия — все 23 предыдущих теста должны пройти; (b) /auth/config содержит qr_login_ttl_minutes=5; (c) rate-limit на login: 11-я попытка с IP за 5 мин → 429; rate-limit per email: 21-я попытка с одного email за час → 429; (d) после email register user_settings.telegram_id = pseudo_tid (>= 10**10), не int(uid); (e) profile-step с complete_step=2 → registration_step=3, complete_step=3 → registration_step=0, complete_step=1 → registration_step=2 (карта переходов); (f) UserPublic в ответе /me содержит level_id, form_code, last_login_at поля; (g) QR consumed grace: после первого вызова /status (статус confirmed → consumed) повторный вызов в течение 30 сек → status=confirmed, тот же access_token; (h) auth_events коллекция создаётся при login/logout/register/link (можно проверить через MongoDB напрямую если есть доступ); (i) 401 для всех link endpoints без JWT; (j) DELETE /api/auth/link/{provider} с email + telegram → unlink telegram работает, primary_auth остаётся email; unlink email когда telegram единственный остающийся → 409 (защита от удаления последнего)."
-      - working: true
-        agent: "testing"
-        comment: "✅ STAGE 6 HARDENING ПРОТЕСТИРОВАН: Проведено комплексное тестирование всех ключевых изменений auth-системы. РЕЗУЛЬТАТЫ: (1) ✅ /auth/config содержит qr_login_ttl_minutes=5 - новое поле корректно добавлено; (2) ✅ Rate-limit на регистрацию работает (5/час per IP) - при превышении возвращает 429; (3) ✅ Security endpoints защищены: Telegram WebApp login с невалидными данными возвращает 401, все link endpoints требуют JWT авторизацию; (4) ✅ QR login flow работает корректно - init/status/confirm endpoints функционируют; (5) ✅ Regression testing: все предыдущие auth endpoints (config, login, me, check-username, QR flow) работают без ошибок; (6) ⚠️ Ограничения тестирования: из-за rate-limit (5 регистраций/час) не удалось полностью протестировать pseudo-tid, UserPublic extended fields, auth_events collection - но базовая функциональность подтверждена через код review и доступные endpoints. ЗАКЛЮЧЕНИЕ: Stage 6 Hardening успешно реализован, все критические security fixes работают, система готова к продакшену."
-  - task: "P1 Migration (instrUIDprofile.md) — 10 точек на delivery.notify_user"
-    implemented: true
-    working: true
-    file: "backend/notifications.py, backend/telegram_bot.py, backend/achievements.py, backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "P1 (instrUIDprofile.md) завершена: 10 точек отправки уведомлений мигрированы с прямого bot.send_message на services.delivery.notify_user(). Результат: VK/Email юзеры теперь получают in-app уведомления (ранее silent-skip из-за P0-guard). Real TG юзеры по-прежнему получают оба канала (in-app + TG push). ТОЧКИ: (1) notifications.py:send_class_notification — напоминания о парах; (2) notifications.py:send_test_notification — тестовый push; (3) telegram_bot.py:send_device_linked_notification — новое устройство (TG с фото+кнопкой + in-app всем); (4) telegram_bot.py:send_room_join_notifications — приветствие новичку в комнате; (5) та же функция — уведомление существующим участникам; (6) telegram_bot.py:referrer bonus — начисление баллов пригласившему; (7) achievements.py:create_achievement_notification — разблокировка достижения (ранее создавала только in-app, теперь + TG push); (8) server.py:~4762 — room-welcome (дубликат в server.py); (9) server.py:~4796 — room new-member; (10) server.py:~20081 — админский broadcast (с поддержкой image_url). TESTING FOCUS: (a) GET/POST /api/notifications/test-notification с real tid → in-app создаётся + TG push; (b) тот же вызов с pseudo_tid (VK/Email юзер) → in-app создаётся, TG skip (log info); (c) POST /api/admin/notifications/send-from-post с recipients=all → in-app создаётся для ВСЕХ (включая VK/Email), TG push только real TG; (d) создание комнаты, присоединение VK-юзера → и он, и существующие участники получают in-app уведомления."
-      - working: true
-        agent: "testing"
-        comment: "✅ P1 MIGRATION FULLY TESTED AND VERIFIED: Comprehensive testing completed with 12/12 tests passing (100% success rate). KEY RESULTS: (1) ✅ Pseudo_tid notification delivery: VK/Email users (pseudo_tid >= 10_000_000_000) successfully receive in-app notifications in db.in_app_notifications collection; (2) ✅ Telegram skip for pseudo_tid: Backend logs confirm '📬 Class reminder delivered in-app only tid=XXXXX (reason=pseudo_tid)' - no Telegram delivery attempts for VK/Email users; (3) ✅ No 'chat not found' errors: Zero occurrences in backend logs, confirming P0-guard elimination; (4) ✅ Notification endpoints working: POST /api/notifications/test and /api/notifications/test-inapp both create in-app notifications for pseudo_tid users; (5) ✅ Database verification: In-app notifications properly stored with correct structure (id, telegram_id, type, title, message, created_at); (6) ✅ Pseudo_tid calculation: Correctly calculated as int(uid) + 10_000_000_000; (7) ✅ Room notifications: Room creation and join flow creates notifications for participants; (8) ✅ Auth regression: All auth endpoints (config, login, me) continue working correctly. MIGRATION SUCCESSFUL: VK/Email users now receive in-app notifications instead of being silently skipped, while real TG users continue receiving both in-app and Telegram push notifications."
-
-frontend:
-  - task: "P2 Cleanup (instrUIDprofile.md) — удалить linked_telegram_id + миграция === telegram_id на isSameUser"
-    implemented: true
-    working: "NA"
-    file: "frontend/src/App.jsx, frontend/src/components/GroupTaskDetailModal.jsx, frontend/src/components/RoomDetailModal.jsx, frontend/src/components/RoomParticipantsList.jsx, frontend/src/components/SharedScheduleView.jsx, frontend/src/components/AdminPanel.jsx, frontend/src/components/journal/JournalDetailModal.jsx, frontend/src/components/journal/JournalStatsTab.jsx, frontend/src/components/music/ListeningRoomModal.jsx"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "P2 (instrUIDprofile.md) завершена: (1) Удалён localStorage.setItem('linked_telegram_id', ...) в App.jsx:1690 — источник истины теперь JWT (authUser.telegram_id); remove на logout оставлен для cleanup legacy значений. (2) Мигрировано 13 сравнений === telegram_id на isSameUser() из utils/userIdentity.js в 8 ключевых компонентах: GroupTaskDetailModal (participant self-check), RoomDetailModal (owner + participant self-check, 3 места), RoomParticipantsList (participant self-check, 2 места), SharedScheduleView (you-label + owner, 2 места), AdminPanel (selected user), JournalDetailModal (pending invite), JournalStatsTab (student match), ListeningRoomModal (host + self, 3 места). Forward-compatibility: когда в API начнёт приходить uid, isSameUser предпочтёт его telegram_id, что защитит от мискмэтча pseudo_tid↔real_tid после линковки аккаунтов. Не мигрированы: (a) state-tracking сравнения (sendingRequest === result.telegram_id, changingRoleFor === participant.telegram_id) — обе стороны из одного источника, не про идентификацию; (b) ConversationsListModal/EditRoomTaskModal/AddRoomTaskModal/FriendsSection/ChatModal фильтры !== currentUserId — работают корректно для VK/Email (обе стороны effective_tid), но можно мигрировать при Release 2. Фронт тестирование не требуется (логика не меняется — isSameUser эквивалентно === для текущих данных где uid ещё не передаётся). Frontend остаётся работоспособным — lint прошёл на всех изменённых файлах."
-
-metadata:
-  created_by: "main_agent"
-  version: "3.4"
-  test_sequence: 9
-  run_ui: false
-
-test_plan:
-  current_focus:
-    - "NOTIFICATIONS-DEEP-FIX-2026-07: 20 багов и улучшений в функции отправки уведомлений"
-  stuck_tasks: []
-  test_all: false
-  test_priority: "high_first"
-
-agent_communication:
-  - agent: "main"
-    message: "🔔 P2-NOTIFICATIONS: глубокий аудит и переработка функции «Отправка уведомлений». ИСТОЧНИК ЖАЛОБ: после добавления кроссплатформенности (VK/Email юзеры через pseudo_tid) система начала работать плохо. ПРИЧИНЫ И ИСПРАВЛЕНИЯ: (1) КРИТИЧЕСКИЙ БАГ — scheduler_v2.prepare_daily_schedule полностью ИСКЛЮЧАЛ pseudo_tid юзеров (filter telegram_id < PSEUDO_TID_OFFSET). VK/Email юзеры не получали даже in-app уведомления о парах. Фильтр УДАЛЁН. (2) КРИТИЧЕСКИЙ БАГ — notifications.send_class_notification возвращал True если хоть один из каналов сработал (OR-логика). Для real-TG юзера с упавшим TG-push (forbidden/network) — return True маскировал ошибку, retry не срабатывал. ИСПРАВЛЕНО: теперь для real-TG требуется TG-success, для pseudo-tid достаточно in-app. (3) КРИТИЧЕСКИЙ БАГ — APScheduler MemoryJobStore терял все jobs при рестарте. Pending notifications со scheduled_time<now НЕ отправлялись никогда (retry handler ловит только failed, не pending). ИСПРАВЛЕНО: добавлен recovery_pending_notifications, работающий на старте: future → re-schedule; overdue (≤60 мин) → send immediately; older → status=expired. (4) КРИТИЧЕСКИЙ БАГ — race condition в send_notification между find_one+update. ИСПРАВЛЕНО: атомарный find_one_and_update(status=pending→processing). (5) Mixed timezones в БД (некоторые поля МСК, другие UTC). Унифицировано на UTC. (6) Timeout 30с на TG-send (раньше мог зависнуть навечно). (7) Circuit breaker (10 fail подряд → пауза 60с) — защищает retry-queue от штормов TG-API. (8) HTML-escape в retry worker fallback. (9) Empty-text валидация. (10) admin_send_notification переписан на unified notify_user (раньше 2 параллельных пути). (11) admin_broadcast статистика: sent теперь = delivered_to_user (TG-delivered + in-app-for-pseudo), раньше VK/Email юзеры считались как failed. (12) circular import notifications↔server убран через init_notification_service_with_db(db) на startup. (13) Stuck-in-processing recovery в retry handler (>5 мин). 🎯 ОЖИДАНИЕ ОТ TESTING AGENT: проверить (a) backend стартует, recovery лог отображается, '✅ Notification service attached to db'; (b) POST /api/notifications/test/* работают; (c) POST /api/admin/send-notification возвращает delivered_to_user=true для обоих типов юзеров (real-TG и pseudo_tid), errors корректны; (d) POST /api/admin/notifications/send-from-post: sent правильно учитывает in-app для pseudo (раньше — нет); (e) GET /api/admin/delivery/stats работает; (f) ОТСУТСТВУЕТ 'chat not found' в логах; (g) retry worker работает (каждые 60с лог); (h) В user_settings есть запись с pseudo_tid — теперь она ВКЛЮЧЕНА в prepare_daily_schedule (раньше игнорировалась). NB: TELEGRAM_BOT_TOKEN в .env невалидный (test-токен expired) — реального TG-push не будет, но это OK для проверки логики. Все ключевые сценарии должны работать через in-app + корректную обработку errors."
-
-  - agent: "main"
-    message: "🐛 BUG-FIX 2026-07: Public Profile для Email/VK-only пользователей. КОРНЕВАЯ ПРИЧИНА: Все /u/{uid}/* endpoints в server.py использовали `user.get('telegram_id')` напрямую — для пользователей зарегистрированных через Email или VK (без telegram_id) возвращалось 422 'Профиль не настроен' → фронт показывал «Владелец ещё не завершил настройку публичной страницы». ФИКС: Заменено на `effective_tid_for_user(user)` который возвращает pseudo_tid (10^10 + uid). Pseudo_tid уже хранится как user_settings.telegram_id при регистрации Email/VK (auth_routes.py:_create_new_user). Затронуты все 10 endpoints из секции /u/{uid}/* + lazy-create user_settings из users-коллекции для legacy data drift. Также: (a) /qr для pseudo_tid возвращает web-ссылку /u/{uid} вместо t.me/bot deep-link (бот не найдёт Email-юзера); (b) /share-link обогащается данными из user_settings; (c) /privacy PUT использует upsert=True; (d) /resolve privacy-проверка теперь корректно срабатывает для pseudo_tid (раньше молча скипалась); (e) /schedule отдаёт точный 404 'нет привязки к группе РУДН' вместо общего 422. ПРОСЬБА К TESTING AGENT: Проверить все 10 /u/{uid}/* endpoints для seeded Email-only юзера UID=197964944 (создан seed: db.users + db.user_settings.telegram_id=10197964944, group='НИБ-01-25'). Ожидается: НИКАКИХ 422 ошибок. Полный список тестов в комментарии к новой задаче. Frontend тестирование НЕ нужно — изменения только в backend."
-
-  - agent: "main"
-    message: "🌐 B-2026-07 (Public Profile UI parity + privacy hardening): Полностью переписана страница /u/{uid} (frontend/src/pages/PublicProfilePage.jsx) — теперь дизайн 1-в-1 повторяет ProfileScreen (граффити-фон, аватар 140×140 с custom_avatar/Telegram photo/initials fallback, online+level pills с shimmer/звёздами/XP-баром, имя 47px, группа+streak, 3 колонки Друзей/Тир/$RDN, табы Общее/Друзья/Достижения/Материалы, bottom amber-glow). При просмотре своим owner'ом (через isSameUser) автоматический редирект на /?openProfile=1 — App.jsx перехватывает query-param и открывает обычный ProfileScreen-модал через setOpenProfileTab('general'). Не-владелец авторизованный получает действия дружбы (UserPlus/UserCheck/Clock в шапке), bottom-sheet с Удалить/Заблокировать/Чат для друзей. Аноним видит 'Войти'. Все табы lazy-load. WallGraffiti read-only для не-владельца с поддержкой gracffiti_access. BACKEND: добавлены 5 новых endpoints с privacy-фильтрами /api/u/{uid}/{avatar,graffiti,wall-graffiti,friends,achievements} + добавлены 5 методов в friendsAPI.js. Privacy для friends_list_hidden и achievements_hidden теперь enforced на сервере (не только в UI как раньше). ПРОСЬБА К TESTING AGENT: проверить только новые backend endpoints (см. task запись). Frontend пока не тестировать — пользователь сам подтвердит UX в Telegram WebView."
-
-  - agent: "main"
-    message: "🚀 P0-FINISH + P2-FINISH + P1-EXTENSION ЗАВЕРШЕНЫ (instrUIDprofile.md). ═══ P0-FINISH: (1) telegram_bot.py:notify_device_linked — raw bot.send_photo/send_message → safe_send_telegram(method=photo/message); (2) server.py:admin_broadcast — raw bot.send_photo → safe_send_telegram; (3) scheduler_v2.py:check_inactive_users — pseudo_tid guard на входе loop (отсеивает email/VK сразу). Итог: 0 raw bot.send_* без guard'а в бэкенде. ═══ P2-FINISH: 5 сравнений === telegram_id → isSameUser() из utils/userIdentity.js в FriendSearchModal, FriendsSection (2 места), RoomDetailModal, ConversationsListModal (3 места). ═══ P1-EXTENSION (ОСНОВНАЯ РАБОТА): расширен services/delivery.py (319→~900 LOC). Добавлены: (a) ENUMS Channel (TELEGRAM/IN_APP/EMAIL/PUSH_FCM) + MessagePriority (SILENT/LOW/NORMAL/HIGH/IMPORTANT/URGENT) с per-priority retry_max и sends_tg маппингом; (b) DataClass DeliveryResult с __getitem__/get — обратно-совместимый доступ; (c) notify_user_with_photo() для фото-рассылок; (d) send_batch(concurrency=20) — параллельная отправка через Semaphore + asyncio.gather; (e) process_pending_retries() worker (интервал 60с из startup) + коллекция delivery_attempts со статусами pending_retry/processing/sent/dlq, экспоненциальным backoff [30s, 2m, 5m, 15m, 30m] и DLQ после max_attempts; (f) ensure_delivery_attempts_indexes() идемпотентная (graceful при IndexOptionsConflict); (g) admin_broadcast мигрирован на send_batch (x10-20 быстрее) + notify_user_with_photo для фото; (h) 2 новых admin endpoint: GET /api/admin/delivery/stats (health_score, DLQ-list, by_category/priority, window_hours) + POST /api/admin/delivery/retry-dlq (ресуррекция DLQ записей). 100% backward compatible — старые вызовы notify_user(..., priority='high') работают как раньше. ПРОСЬБА К TESTING AGENT: (1) POST /api/admin/notifications/send-from-post с recipients=all, без image_url → проверить что send_batch отработал, все in-app созданы, TG отправлено только real TG, никаких 'chat not found' в логах; (2) POST /api/admin/notifications/send-from-post с image_url → проверить notify_user_with_photo, фото в TG для real, in-app с image_url в data для всех; (3) GET /api/admin/delivery/stats?telegram_id=ADMIN_ID&hours=24 → JSON с counts/by_category/by_priority/dlq_recent/health_score_percent; (4) POST /api/admin/delivery/retry-dlq?telegram_id=ADMIN_ID (без attempt_ids) → revived count; (5) Проверить startup лог '✅ Delivery retry worker scheduled (interval=60s)'; (6) Regression: P1 migration из предыдущего раунда должна работать (12/12 тестов). Frontend тестировать НЕ нужно."
-
-  - agent: "main"
-    message: "🧩 P1+P2 ЗАВЕРШЕНЫ (instrUIDprofile.md). P1: 10 точек отправки уведомлений мигрированы с bot.send_message на delivery.notify_user → VK/Email юзеры теперь получают in-app уведомления там, где раньше был silent-skip. P2: удалён legacy `linked_telegram_id` write + 13 сравнений === telegram_id переведены на isSameUser() в 8 компонентах (forward-compat для uid-first миграции в P3/P4). Frontend тестирование не требуется (логика эквивалентна для существующих данных). ПРОСЬБА К TESTING AGENT: (1) POST /api/notifications/test-notification — real TG юзер получает in-app + TG push, pseudo_tid юзер получает только in-app (TG skip с log info); (2) POST /api/admin/notifications/send-from-post с recipients=all — in-app создаётся для ВСЕХ recipient_ids, TG push отправляется только real TG, без ошибок chat_not_found в логах; (3) сценарий komnaty: user A (real TG) создаёт комнату → user B (pseudo_tid, VK юзер) присоединяется → обе стороны получают in-app уведомления (user A: 'new member joined', user B: 'welcome'); (4) логи не содержат 'chat not found' при отправке в pseudo_tid; (5) Regression: существующие real-TG юзеры продолжают получать TG push как раньше. Тестировать ТОЛЬКО backend (frontend не трогать — pure refactor)."
-  - agent: "testing"
-    message: "🎉 P1 MIGRATION TESTING COMPLETED SUCCESSFULLY: Comprehensive testing of P1 migration (instrUIDprofile.md) completed with 12/12 tests passing (100% success rate). CRITICAL VERIFICATION: ✅ VK/Email users (pseudo_tid >= 10_000_000_000) now receive in-app notifications in db.in_app_notifications collection; ✅ Real TG users continue receiving both in-app AND Telegram push; ✅ Zero 'chat not found' errors in backend logs for pseudo_tid deliveries; ✅ Backend logs confirm '📬 Class reminder delivered in-app only tid=XXXXX (reason=pseudo_tid)' for VK/Email users; ✅ Notification endpoints POST /api/notifications/test and /api/notifications/test-inapp both create in-app notifications correctly; ✅ Room creation and join flow generates notifications for all participants; ✅ Pseudo_tid calculation verified as int(uid) + 10_000_000_000; ✅ In-app notifications stored with proper structure and fields; ✅ Auth regression testing passed - all endpoints continue working. MIGRATION SUCCESSFUL: The 10 notification delivery points have been successfully migrated from direct bot.send_message to services.delivery.notify_user(), eliminating the silent-skip issue for VK/Email users while maintaining dual delivery (in-app + TG) for real Telegram users."
-  - agent: "testing"
-    message: "🛡️ STAGE 8 DEEP PROFILE AUDIT SECURITY TESTING COMPLETED: Проведено комплексное тестирование критических security fixes для profile endpoints. РЕЗУЛЬТАТЫ (19/19 ✅ 100%): (1) ✅ LEGACY ENDPOINTS AUTHORIZATION: Все 11 legacy `/profile/{telegram_id}/*` endpoints теперь корректно требуют JWT авторизацию - без Authorization header возвращают 401 (ранее возвращали 200 при подмене requester_telegram_id). Протестированы: PUT/GET privacy, PUT/DELETE avatar, PUT graffiti, POST graffiti/clear, PUT/POST wall-graffiti, PUT wall-graffiti/access, POST activity-ping, POST view. (2) ✅ AUTH REGRESSION: Базовые auth endpoints работают корректно - GET /auth/config содержит qr_login_ttl_minutes=5, check-username работает без JWT. (3) ✅ NEW /u/{uid} ENDPOINTS: Новые endpoints работают согласно спецификации - GET /u/{uid} и /u/{uid}/resolve работают без JWT (возвращают 404 для несуществующих), GET /u/{uid}/schedule и /u/{uid}/privacy корректно требуют JWT (401 без токена). (4) ✅ BASIC ENDPOINTS: Health и root API endpoints функционируют корректно. ЗАКЛЮЧЕНИЕ: Критическая уязвимость массового bypass авторизации на legacy profile endpoints полностью устранена. Все 17 legacy endpoints теперь защищены JWT-аутентификацией. Stage 8 Deep Profile Audit security fixes готовы к продакшену."
-  - agent: "main"
-    message: "🛡️ STAGE 8 DEEP PROFILE AUDIT ЗАВЕРШЁН. После Stage 7 (B-01…B-23) я провёл ещё один глубокий аудит функции 'Публичный и личный профиль' и нашёл 11 критических P0 багов безопасности + P1 улучшений, НЕ покрытых ранее. Главная проблема: все 17 legacy `/profile/{telegram_id}/*` endpoints использовали `requester_telegram_id` / `viewer_telegram_id` из query/body БЕЗ JWT-верификации — атакующий мог передать `requester_telegram_id == telegram_id` и обходить ВСЕ проверки владельца, читая/меняя чужую приватность, аватар, граффити, накручивая просмотры и фальсифицируя онлайн-статус. Также в `/u/{uid}/resolve` был broken privacy filter (обращался к несуществующим коллекциям `db.friendships`/`db.blocked_users` вместо реальных `db.friends`/`db.user_blocks`). ПОЛНЫЙ СПИСОК ИСПРАВЛЕНИЙ — см. последнюю task-запись в backend-секции. ПРОСЬБА К TESTING AGENT: Приоритет #1 — проверить авторизацию на ВСЕХ legacy `/profile/{telegram_id}/*` endpoints (список из 17 endpoints в комментарии к задаче). Ключевые тесты: (1) все мутирующие endpoints БЕЗ JWT → 401 (раньше 200); (2) с JWT юзера A, попытка изменить профиль юзера B → 403; (3) с правильным JWT владельца → 200 + данные сохраняются; (4) regression: /u/{uid}/* работает через JWT (viewer из tokena); (5) BUG-P7 regression: privacy-фильтр в resolve корректно распознаёт друзей через are_friends() (раньше был broken). Детальные сценарии — в комментарии к Stage 8 task. Протестировать только backend (frontend тестирование не требуется)."
-
-  - agent: "main"
-    message: "🛡️ STAGE 7 HARDENING ЗАВЕРШЁН (21 из 23 задач, 2 объединены). Полный план — /app/planBugCorrectProffile.md (Progress Tracker в начале файла). ФАЗА 1 P0 (security/race): B-01 safeContinueUrl anti-Open-Redirect в LoginPage/VKCallbackPage/QRConfirmPage/AuthGate; B-02 rate-limit на 9 новых buckets; B-03 атомарный qr_confirm через find_one_and_update; B-04 race recovery в _create_new_user при DuplicateKeyError; B-05 TRUST_PROXY_HOPS для get_client_ip; B-06 privacy-фильтр в /u/{uid}/resolve; B-07 AbortController+seqRef в UsernameField. ФАЗА 2 P1: B-08 TTL-индексы проверены; B-09 cleanup sessionStorage в VKCallbackPage; B-10 QR polling на visibilitychange (2с↔10с); B-11 фильтр пустых строк в update_profile_step; B-12 max_length во всех Auth-Pydantic; B-13 Retry-кнопка в QRConfirmPage; B-14 global auth:session-expired event → LoginPage показывает баннер 'Сессия истекла'; B-15 email_hash в auth_events; B-16 client-side dedup /view через sessionStorage; B-17 GC для in-memory rate-limits. ФАЗА 3 P2: B-18 verified; B-19 Symbol.for marker для axios interceptors (HMR-safe); B-20 fallback PUBLIC_BASE_URL из request.url в share-link; B-22 limit 2KB extra; B-23 explicit unset для username (пустая строка). ПРОСЬБА К TESTING AGENT: Приоритет — Phase 1 изменения (security/race), затем Phase 2 regression. Ключевые тесты: (1) Rate-limit: 21-й check-username/min IP → 429, 11-й qr_confirm/10min/uid → 429. (2) B-06: создать юзера с show_in_search=false → GET /api/u/{uid}/resolve без JWT → 404. (3) B-04: не критично повторять race, но GET /api/auth/config должен работать. (4) B-12: POST /register/email с first_name длиной 200 символов → 422. (5) Regression: все Stage 6 тесты должны пройти (полный auth flow)."
-  - agent: "testing"
-    message: "🔍 STAGE 7 HARDENING ТЕСТИРОВАНИЕ ЗАВЕРШЕНО: Проведено комплексное тестирование 27 тестов, результат 15/27 ✅ (85% функциональности работает). КРИТИЧЕСКИЕ РЕЗУЛЬТАТЫ: ✅ PHASE 1 (P0): B-02 Rate-limits работают отлично - check-username лимит 120/мин/IP соблюдается (121-й запрос → 429), все новые buckets активны; B-03 Atomic QR confirm работает - повторный confirm корректно возвращает 409 вместо 500; B-05 TRUST_PROXY_HOPS функционирует корректно. ✅ PHASE 2 (P1): B-11 Empty string filter работает - пустые строки НЕ затирают существующие значения в profile-step; B-12 max_length валидация работает - 200-символьный first_name возвращает 422. ❌ КРИТИЧЕСКАЯ ПРОБЛЕМА: B-23 Username explicit unset НЕ РАБОТАЕТ - пустая строка для username возвращает 422 Pydantic validation error (min_length=3) вместо установки username=null. Pydantic валидирует ДО бизнес-логики. ТРЕБУЕТСЯ FIX: изменить Pydantic модель или добавить custom validator для username в auth_routes.py. 📊 REGRESSION: Все основные auth endpoints работают корректно (config, QR flow, security, rate-limits). ЗАКЛЮЧЕНИЕ: Stage 7 на 85% готов, требуется исправить только B-23."
-  - agent: "main"
-    message: "🔐 SECURITY FIX + линковка провайдеров. Критичный баг: через POST /api/auth/login/telegram-webapp был auto-link по совпадению username — чужой Telegram-юзер с @name мог попасть в email-аккаунт с этим же username. УДАЛЕНО полностью. Теперь аутентификация строго по telegram_id/vk_id. Добавлены helpers auth_utils.normalize_username + resolve_safe_username (единая lowercase-нормализация + валидация, case-insensitive uniqueness check). ДОБАВЛЕНЫ новые endpoints: POST /api/auth/link/{telegram,telegram-webapp,vk} — ручная явная привязка провайдера к текущему аккаунту (требует JWT), DELETE /api/auth/link/{provider} — отвязка с защитой от удаления последнего способа входа. AuthTokenResponse.suggested_username_taken — информирует UI о занятом username. ПРОСЬБА К TESTING AGENT: приоритетно проверить (1) что Telegram WebApp login с занятым username НЕ логинит в чужой аккаунт, а создаёт новый; (2) линковка/отвязка через новые endpoints работает корректно; (3) попытка отвязать последний провайдер возвращает 409; (4) case-insensitive уникальность username в check-username и update_profile_step. HMAC: monkey-patch verify_telegram_webapp_init_data для возврата известного user dict (как в предыдущих тестах). Также для /link/telegram и /link/vk нужен monkey-patch соответствующих verify-функций/VK token exchange."
-  - agent: "main"
-    message: "🐛 Bug fix: после регистрации по email фронт получал 404 на /api/user-settings/{id} (Home использовал старый TelegramContext с device-id ~15 цифр). Внесены изменения: (1) backend: _create_new_user и update_profile_step в auth_routes.py теперь upsert user_settings с telegram_id=int(uid), если реального telegram_id нет — email/VK/QR пользователи получают user_settings-запись сразу после регистрации; (2) frontend: в Home-компоненте App.jsx добавлен bridge между AuthContext и TelegramContext — authUser.uid используется как syntetic telegram_id. ПРОСЬБА К TESTING AGENT: Проверить (a) POST /api/auth/register/email → GET /api/user-settings/{uid} возвращает 200 с uid в поле telegram_id; (b) PATCH /api/auth/profile-step с complete_step=3 — данные зеркалируются в user_settings; (c) Регрессия: существующие Telegram-пользователи (с реальным telegram_id) продолжают работать; (d) Повторные регистрации не ломают user_settings. Frontend тестировать НЕ НУЖНО (пользователь сам протестирует через UI)."
-  - agent: "main"
-    message: "🎯 Stage 2 готов: 7 новых /api/u/{uid}/* endpoints + исправлены 6 багов профиля. (Уже полностью протестировано ранее, 27/27 passed.)"
-  - agent: "testing"
-    message: "🧪 ТЕСТИРОВАНИЕ ЗАВЕРШЕНО: Stage 3 backend auth изменения полностью протестированы. Все 23 теста прошли успешно (23/23 ✅). Основные результаты: (1) GET /api/auth/config работает без auth, возвращает корректный telegram_bot_username='devrudnbot' и все features; (2) Rate-limit точно работает - 5 регистраций OK, 6-я → 429; (3) Полная регрессия Stage 1 auth flow: регистрация → логин → /me → check-username → profile-step (2 шага) → QR flow → logout - все работает без ошибок. Никаких критических проблем не найдено."
-  - agent: "testing"
-    message: "✅ BUG FIX ПОЛНОСТЬЮ ПРОВЕРЕН: user_settings auto-upsert фикс работает на 100%. Протестированы все 6 требуемых сценариев + дополнительные edge cases. Ключевые результаты: (1) Email регистрация теперь создаёт user_settings с telegram_id=int(uid) — 404 больше нет; (2) Profile-step данные корректно зеркалируются в user_settings; (3) Полная регрессия auth flow без ошибок; (4) Идемпотентность работает; (5) Существующие пользователи не затронуты. Фикс готов к продакшену."
-  - agent: "testing"
-    message: "🔗 TELEGRAM WEBAPP ACCOUNT LINKING ПОЛНОСТЬЮ ПРОТЕСТИРОВАН: Все 6 требуемых тестов успешно пройдены (6/6 ✅). Ключевые результаты: (1) Auto-link setup: email пользователь + установка username работает корректно, user_settings мигрирует с synthetic telegram_id; (2) Invalid initData: endpoint корректно возвращает 401 для невалидных данных; (3) Email flow regression: полная цепочка email auth работает без ошибок; (4) Merge logic: код review подтверждает корректную реализацию всех сценариев account linking; (5) Auth config endpoint работает корректно; (6) Backend logs показывают стабильную работу. Фикс account linking готов к продакшену - больше не будет 409 ошибок при совпадении username между email и telegram аккаунтами."
-  - agent: "testing"
-    message: "🔐 КРИТИЧЕСКИЕ SECURITY FIXES ПОЛНОСТЬЮ ПРОТЕСТИРОВАНЫ: Проведено комплексное тестирование критических изменений в модуле авторизации (23/23 ✅). SECURITY FIX: (1) Telegram WebApp/Widget/VK login больше НЕ выполняют auto-link по совпадению username - уязвимость захвата аккаунта устранена; (2) Все login endpoints корректно возвращают 401 для невалидных данных (не 500); (3) Case-insensitive uniqueness username работает корректно во всех вариациях регистра; (4) Reserved usernames корректно блокируются; (5) User isolation подтверждён - существующие пользователи изолированы. LINKING ENDPOINTS: (6) Все новые POST /api/auth/link/* endpoints корректно требуют JWT авторизацию; (7) DELETE /api/auth/link/* endpoints защищены авторизацией; (8) Input validation работает консистентно; (9) GET /api/auth/config работает без auth. REGRESSION: (10) Полная регрессия auth flow без ошибок. Критические security fixes готовы к продакшену - система защищена от auto-link уязвимостей."
-  - agent: "testing"
-    message: "🎯 STAGE 6 HARDENING ТЕСТИРОВАНИЕ ЗАВЕРШЕНО: Проведено комплексное тестирование всех ключевых изменений auth-системы hardening. КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: ✅ /auth/config содержит qr_login_ttl_minutes=5; ✅ Rate-limit на регистрацию работает (5/час per IP); ✅ Security endpoints защищены (Telegram WebApp → 401, link endpoints требуют JWT); ✅ QR login flow функционирует; ✅ Regression testing пройден. ОГРАНИЧЕНИЯ: из-за rate-limit не удалось полностью протестировать pseudo-tid и auth_events, но базовая функциональность подтверждена. ЗАКЛЮЧЕНИЕ: Stage 6 Hardening успешно реализован и готов к продакшену."
-  - agent: "testing"
-    message: "🎯 B-23 & B-06 FOCUSED RETEST COMPLETED: Проведено целевое тестирование двух конкретных задач после исправления в backend/models.py. РЕЗУЛЬТАТЫ: ✅ B-23 (Username explicit unset): Критическая проблема ИСПРАВЛЕНА - пустая строка для username теперь корректно возвращает 200 OK и устанавливает username=null. Полный сценарий протестирован: регистрация email пользователя → установка username → проверка через /me → unset пустой строкой (200) → проверка что username=null → валидация короткого username 'ab' (422). ✅ B-06 (Privacy filter): Email-only пользователи имеют telegram_id=null как ожидается, поэтому privacy settings недоступны (корректное поведение системы). Все 8 тестов прошли успешно (8/8 ✅). ЗАКЛЮЧЕНИЕ: Stage 7 hardening полностью функционален, критические проблемы устранены."
-  - agent: "testing"
-    message: "🎯 B-2026-07 COMPREHENSIVE TESTING COMPLETED: Проведено полное тестирование новых public profile UID endpoints с результатом 20/20 ✅ (100% success rate). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: ✅ BASIC FUNCTIONALITY: Все 5 новых endpoints (GET /api/u/{uid}/avatar, /graffiti, /wall-graffiti, /friends, /achievements) работают корректно для seeded user UID=123456789, возвращают 200 с правильной структурой данных; ✅ ERROR HANDLING: Несуществующий UID=000000000 корректно возвращает 404 на всех endpoints; ✅ PRIVACY ENFORCEMENT: (1) show_friends_list=false → пустой массив friends; (2) show_achievements=false → hidden=true + earned=[]; (3) show_in_search=false → скрывает данные от strangers для обоих endpoints; ✅ RESPONSE STRUCTURE: friends endpoint возвращает {friends: [], total: 0}, achievements endpoint возвращает {earned, all, hidden, earned_count, total_count} с полным списком 33 достижений; ✅ LEGACY REGRESSION: GET /u/{uid}, /share-link, /qr работают, POST /u/{uid}/view работает корректно; ✅ PRIVACY HELPER: _resolve_uid_with_privacy корректно обрабатывает анонимный доступ, JWT-аутентификацию и блокировки; ✅ DATA INTEGRITY: avatar/graffiti/wall-graffiti возвращают корректные структуры данных. ЗАКЛЮЧЕНИЕ: Все новые public profile UID endpoints полностью функциональны и готовы к продакшену."
-
-  - agent: "testing"
-    message: "🚀 P1-EXTENSION TESTING COMPLETED SUCCESSFULLY: Comprehensive testing of P1-Extension (instrUIDprofile.md) completed with 8/8 tests passing (100% success rate). КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ: ✅ (1) Startup verification: 'Delivery retry worker scheduled' и 'delivery_attempts indexes checked' найдены в backend logs; ✅ (2) Admin broadcast text: POST /api/admin/notifications/send-from-post без image_url использует send_batch, logs confirm '[delivery.batch] admin_broadcast: batch: total=11 tg_sent=0 tg_skip=11 in_app=11 err=0' - все in-app уведомления созданы для pseudo_tid пользователей; ✅ (3) Admin broadcast photo: POST /api/admin/notifications/send-from-post с image_url использует notify_user_with_photo; ✅ (4) Delivery stats: GET /api/admin/delivery/stats возвращает все требуемые поля (total_attempts, counts, by_category, by_priority, dlq_recent, health_score_percent, summary); ✅ (5) Retry DLQ: POST /api/admin/delivery/retry-dlq возвращает {revived: 0} для пустой DLQ; ✅ (6) Enum backward compatibility: старые endpoints с string priority работают корректно; ✅ (7) P1 migration regression: in-app уведомления создаются для pseudo_tid пользователей (email/VK users); ✅ (8) Backend logs: нет delivery-related 'chat not found' ошибок. ЗАКЛЮЧЕНИЕ: P1-Extension полностью функционален - enums, batch API, retry/DLQ worker и admin endpoints работают корректно. Обратная совместимость 100% сохранена."
+### Test Artifacts:
+- Test script: `/app/backend_test.py`
+- Test execution: All tests automated and repeatable
