@@ -76,7 +76,7 @@ const EmailRegisterForm = ({ onSuccess, onSwitchLogin }) => {
       </div>
       <AuthInput
         icon={Lock} type="password" label="Пароль"
-        placeholder="Минимум 6 символов" autoComplete="new-password"
+        placeholder="Минимум 8 символов" autoComplete="new-password"
         value={password} onChange={(e) => setPassword(e.target.value)} required
       />
       <AuthInput

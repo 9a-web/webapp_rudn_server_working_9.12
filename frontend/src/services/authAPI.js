@@ -115,6 +115,13 @@ export const authAPI = {
   verifyEmail: unwrap((token) =>
     axios.post(`${BASE}/email/verify`, { token }, withAuth())),
 
+  // 🔧 2026-07: 4-digit code email verification
+  verifyEmailCode: unwrap(({ email, code }) =>
+    axios.post(`${BASE}/email/verify-code`, { email, code }, withAuth())),
+
+  resendVerifyCode: unwrap(({ email }) =>
+    axios.post(`${BASE}/email/resend-code`, { email })),
+
   // ========== P4: Sessions / Devices ==========
   getSessions: unwrap(() =>
     axios.get(`${BASE}/sessions`, withAuth())),

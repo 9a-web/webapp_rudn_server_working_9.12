@@ -3075,8 +3075,28 @@ class ResetPasswordRequest(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    """Подтверждение email по токену."""
+    """Подтверждение email по токену (длинному, из URL ссылки)."""
     token: str = Field(..., min_length=16, max_length=128)
+
+
+class VerifyEmailCodeRequest(BaseModel):
+    """🔧 2026-07: Подтверждение email по 4-значному коду.
+
+    Юзер вводит код, который пришёл в письме. Email берётся из тела запроса,
+    так как этот endpoint вызывается СРАЗУ после регистрации (юзер может быть
+    как авторизован, так и нет — на случай если код вводится с другого устройства).
+    """
+    email: str = Field(..., min_length=3, max_length=200)
+    code: str = Field(..., min_length=4, max_length=4, pattern=r"^\d{4}$")
+
+
+class ResendVerifyCodeRequest(BaseModel):
+    """🔧 2026-07: Повторная отправка 4-значного кода.
+
+    Используется кнопкой «Прислать код заново» в шаге подтверждения email.
+    Работает анонимно (юзер ещё может быть не залогинен).
+    """
+    email: str = Field(..., min_length=3, max_length=200)
 
 
 # ==================== SESSIONS / DEVICES (P4) ====================

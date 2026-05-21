@@ -61,6 +61,7 @@ import ReferralModal from './components/ReferralModal';
 // --- Stage 3: Auth ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthGate from './components/auth/AuthGate';
+import EmailVerifyReminderModal from './components/auth/EmailVerifyReminderModal';
 
 // --- Web Push (PWA) ---
 import { initWebPush } from './utils/webpush';
@@ -2764,6 +2765,8 @@ function App() {
                           <Route path="/test-3d-logo" element={<Test3DLogoPage />} />
                         </Routes>
                       </Suspense>
+                      {/* 🔔 Глобальный модал-напоминание о подтверждении email (2026-07) */}
+                      <EmailVerifyReminderModal />
                     </SearchProvider>
                   </BrowserRouter>
                 </Logo3DProvider>

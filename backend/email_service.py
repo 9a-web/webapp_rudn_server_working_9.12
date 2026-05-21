@@ -227,25 +227,52 @@ def template_password_reset(reset_url: str, user_name: str = "") -> tuple[str, s
     return subject, html, text
 
 
-def template_email_verification(verify_url: str, user_name: str = "") -> tuple[str, str, str]:
+def template_email_verification(
+    verify_url: str,
+    user_name: str = "",
+    code: str = "",
+) -> tuple[str, str, str]:
+    """Email-template для подтверждения адреса.
+
+    🔧 2026-07: добавлен 4-значный код. Юзер может либо:
+       - кликнуть по кнопке (классический URL flow),
+       - либо ввести 4-значный код в приложении (новый UX-flow).
+    """
     subject = "✉️ Подтвердите email — RUDN Go"
     greeting = f"Здравствуйте, {user_name}!" if user_name else "Здравствуйте!"
+
+    code_block_html = ""
+    code_block_text = ""
+    if code:
+        code_block_html = f"""
+        <div style="margin:28px auto;padding:24px 32px;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:14px;text-align:center;max-width:340px;">
+          <p style="margin:0 0 12px;font-size:13px;color:#1e40af;font-weight:500;text-transform:uppercase;letter-spacing:1px;">Код подтверждения</p>
+          <p style="margin:0;font-size:42px;letter-spacing:14px;font-weight:700;color:#1e293b;font-family:'SFMono-Regular',Menlo,Consolas,monospace;">{code}</p>
+          <p style="margin:14px 0 0;font-size:12px;color:#64748b;">Введите код в приложении</p>
+        </div>
+        """
+        code_block_text = f"\n\nКод подтверждения: {code}\n(Введите его в приложении)\n"
+
     body = f"""
         <p>{greeting}</p>
         <p>Подтвердите ваш email, чтобы активировать все функции аккаунта.</p>
-        <p style="text-align:center;margin:28px 0;">
+        {code_block_html}
+        <p style="text-align:center;color:#64748b;font-size:13px;margin:12px 0;">— или —</p>
+        <p style="text-align:center;margin:20px 0;">
           <a href="{verify_url}" style="display:inline-block;padding:14px 32px;background:#10b981;color:#fff;text-decoration:none;border-radius:10px;font-weight:600;">
-            Подтвердить email
+            Подтвердить через ссылку
           </a>
         </p>
-        <p style="font-size:13px;color:#6b7280;">Ссылка действительна 24 часа.</p>
+        <p style="font-size:13px;color:#6b7280;">Код и ссылка действительны 24 часа.</p>
         <p style="font-size:12px;color:#3b82f6;word-break:break-all;">{verify_url}</p>
     """
     html = _base_template(body, preheader="Подтверждение email")
     text = (
         f"{greeting}\n\n"
-        f"Для подтверждения email перейдите по ссылке:\n{verify_url}\n\n"
-        f"Ссылка действительна 24 часа."
+        f"Для подтверждения email используйте один из вариантов:"
+        f"{code_block_text}"
+        f"\nИли перейдите по ссылке:\n{verify_url}\n\n"
+        f"Действительно 24 часа."
     )
     return subject, html, text
 

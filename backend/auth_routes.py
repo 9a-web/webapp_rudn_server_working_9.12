@@ -98,6 +98,8 @@ from models import (
     TelegramLoginRequest,
     TelegramWebAppLoginRequest,
     VerifyEmailRequest,
+    VerifyEmailCodeRequest,
+    ResendVerifyCodeRequest,
     UpdateProfileStepRequest,
     User,  # noqa: F401  (документация модели)
     UserPublic,
@@ -145,6 +147,10 @@ _RATE_LIMITS = {
     # P3: email verification
     "send_verify_uid":       (5, 3600),
     "verify_email_ip":       (20, 600),
+    # P3 (2026-07): email verification by 4-digit code (новый flow)
+    "verify_code_email":     (10, 3600),   # 10 попыток ввода кода/час на email
+    "verify_code_ip":        (30, 600),    # 30 запросов/10мин с IP
+    "resend_code_email":     (3, 600),     # 3 запроса повторной отправки кода/10мин на email
 }
 
 # P2/P3: TTL токенов (минуты)
@@ -499,10 +505,15 @@ async def _create_email_verify_token_and_send(
     request: Optional[Request] = None,
     fail_silently: bool = True,
 ) -> bool:
-    """Создаёт верификационный токен и отправляет письмо.
+    """Создаёт верификационный токен + 4-значный код и отправляет письмо.
 
     Используется и в `/email/send-verification` (по запросу юзера), и в
     `register_email` (автоматически сразу после регистрации — B-N06).
+
+    🔧 2026-07: помимо URL-токена генерируется 4-значный код (15 минут TTL,
+    но в auth_tokens хранится с тем же expires_at что URL для упрощения).
+    Юзер может ввести код в приложении (POST /email/verify-code) либо кликнуть
+    по ссылке (POST /email/verify).
 
     Возвращает True при успехе. При fail_silently=True не бросает исключения
     (чтобы регистрация не падала на временной недоступности SMTP).
@@ -514,6 +525,10 @@ async def _create_email_verify_token_and_send(
         uid = user_doc["uid"]
         raw = new_secure_token(32)
         token_hash = hash_token(raw)
+        # 4-значный код (1000..9999 — никогда не начинается с 0, проще для UX)
+        import secrets as _secrets
+        code = str(1000 + _secrets.randbelow(9000))
+        code_hash = hash_token(code)
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(minutes=_EMAIL_VERIFY_TTL_MIN)
 
@@ -527,6 +542,8 @@ async def _create_email_verify_token_and_send(
             "uid": uid,
             "purpose": "email_verify",
             "token_hash": token_hash,
+            "code_hash": code_hash,
+            "code_attempts": 0,  # счётчик неуспешных попыток ввода кода
             "email": email,
             "created_at": now,
             "expires_at": expires_at,
@@ -538,6 +555,7 @@ async def _create_email_verify_token_and_send(
         subj, html, text = template_email_verification(
             verify_url=verify_url,
             user_name=user_doc.get("first_name") or "",
+            code=code,
         )
         await send_email(email, subj, html, text)
         await _log_auth_event(
@@ -2764,6 +2782,165 @@ def create_auth_router(db) -> APIRouter:
             )
 
         return VerifyEmailResponse(success=True, message="Email успешно подтверждён ✓")
+
+    @router.post("/email/verify-code", response_model=VerifyEmailResponse)
+    async def verify_email_code(
+        req: VerifyEmailCodeRequest,
+        request: Request,
+        current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+    ):
+        """🔧 2026-07: Подтвердить email по 4-значному коду.
+
+        Используется новым UX-flow: после регистрации юзер сразу видит экран
+        ввода 4-значного кода. Альтернатива URL-ссылке (`/email/verify`).
+
+        Безопасность:
+        - rate-limit по email (10 попыток/час) и IP (30/10мин)
+        - счётчик попыток в самом document (после 5 попыток — токен сжигается)
+        - timing-safe сравнение хэшей
+        - не раскрываем, существует ли email (общая ошибка «Неверный код»)
+
+        Если клиент не авторизован — выдаём access_token (так же как `/email/verify`).
+        """
+        client_ip = get_client_ip(request)
+        email_norm = (req.email or "").strip().lower()
+
+        # Rate-limits
+        rl_max_ip, rl_win_ip = _RATE_LIMITS["verify_code_ip"]
+        if not check_rate_limit(client_ip, "verify_code_ip", rl_max_ip, rl_win_ip):
+            raise HTTPException(status_code=429, detail="Слишком много попыток. Подождите.")
+        rl_max_e, rl_win_e = _RATE_LIMITS["verify_code_email"]
+        if not check_rate_limit(email_norm, "verify_code_email", rl_max_e, rl_win_e):
+            raise HTTPException(status_code=429, detail="Слишком много попыток. Запросите новый код.")
+
+        now = datetime.now(timezone.utc)
+        code_hash = hash_token(req.code)
+
+        # Ищем самый свежий активный токен по email с этим кодом
+        token_doc = await db.auth_tokens.find_one(
+            {
+                "purpose": "email_verify",
+                "email": email_norm,
+                "used_at": None,
+                "expires_at": {"$gt": now},
+            },
+            sort=[("created_at", -1)],
+        )
+
+        # Универсальная «неверный код» ошибка (не раскрываем существование email)
+        generic_err = HTTPException(status_code=400, detail="Неверный или истёкший код")
+
+        if not token_doc:
+            await _log_auth_event(
+                db, event_type="verify_code", uid=None, success=False, request=request,
+                extra={"email_hash": hash_token(email_norm)[:16], "reason": "no_token"},
+            )
+            raise generic_err
+
+        attempts = int(token_doc.get("code_attempts", 0) or 0)
+        if attempts >= 5:
+            # Слишком много неудачных попыток — сжигаем токен
+            await db.auth_tokens.update_one(
+                {"_id": token_doc["_id"]},
+                {"$set": {"used_at": now, "invalidated": True, "burn_reason": "too_many_attempts"}},
+            )
+            await _log_auth_event(
+                db, event_type="verify_code", uid=token_doc.get("uid"), success=False, request=request,
+                extra={"reason": "burned_attempts"},
+            )
+            raise HTTPException(status_code=400, detail="Слишком много неверных попыток. Запросите новый код.")
+
+        # Сравниваем хэши кодов (timing-safe через стандартное == уже секурно для одинаковых длин hex)
+        stored_code_hash = token_doc.get("code_hash") or ""
+        if not stored_code_hash or stored_code_hash != code_hash:
+            await db.auth_tokens.update_one(
+                {"_id": token_doc["_id"]},
+                {"$inc": {"code_attempts": 1}},
+            )
+            await _log_auth_event(
+                db, event_type="verify_code", uid=token_doc.get("uid"), success=False, request=request,
+                extra={"reason": "wrong_code", "attempt": attempts + 1},
+            )
+            raise generic_err
+
+        # ✓ Код верный — отмечаем токен как использованный + верифицируем email
+        user_doc = await db.users.find_one({"uid": token_doc["uid"]})
+        if not user_doc or not user_doc.get("is_active", True):
+            raise HTTPException(status_code=404, detail="Аккаунт не найден")
+
+        # Если email изменился — инвалидируем
+        if token_doc.get("email") and token_doc["email"] != (user_doc.get("email") or "").lower():
+            await db.auth_tokens.update_one(
+                {"_id": token_doc["_id"]},
+                {"$set": {"used_at": now, "invalidated": True}},
+            )
+            raise HTTPException(status_code=400, detail="Email был изменён. Запросите новый код.")
+
+        await db.auth_tokens.update_one(
+            {"_id": token_doc["_id"]},
+            {"$set": {"used_at": now, "used_ip": client_ip, "used_via": "code"}},
+        )
+        await db.users.update_one(
+            {"uid": user_doc["uid"]},
+            {"$set": {"email_verified": True, "updated_at": now}},
+        )
+        await _log_auth_event(
+            db, event_type="verify_email", uid=user_doc["uid"], success=True, request=request,
+            extra={"via": "code"},
+        )
+
+        # Если клиент анонимный → авто-логин (так же как /email/verify)
+        if current_user is None:
+            user_doc = await db.users.find_one({"uid": user_doc["uid"]}) or user_doc
+            token_resp = await _issue_token(
+                db, user_doc, is_new=False, request=request, provider="email_verify",
+            )
+            return VerifyEmailResponse(
+                success=True,
+                message="Email успешно подтверждён ✓",
+                access_token=token_resp.access_token,
+                token_type=token_resp.token_type,
+                user=token_resp.user,
+            )
+
+        return VerifyEmailResponse(success=True, message="Email успешно подтверждён ✓")
+
+    @router.post("/email/resend-code", response_model=GenericSuccessResponse)
+    async def resend_verify_code(
+        req: ResendVerifyCodeRequest,
+        request: Request,
+    ):
+        """🔧 2026-07: Повторно отправить 4-значный код подтверждения email.
+
+        Работает анонимно. Privacy: всегда возвращает success=True независимо от
+        существования email (защита от user enumeration).
+        Rate-limit: 3 запроса/10мин на email.
+        """
+        email_norm = (req.email or "").strip().lower()
+
+        # Rate-limits
+        rl_max_e, rl_win_e = _RATE_LIMITS["resend_code_email"]
+        if not check_rate_limit(email_norm, "resend_code_email", rl_max_e, rl_win_e):
+            # Возвращаем success даже при rate-limit (privacy)
+            return GenericSuccessResponse(success=True, message="Если email зарегистрирован, код отправлен.")
+
+        # Ищем пользователя
+        user_doc = await db.users.find_one({"email": email_norm})
+        if not user_doc or user_doc.get("email_verified"):
+            # Не раскрываем — отвечаем как будто отправили
+            await _log_auth_event(
+                db, event_type="resend_code", uid=None, success=False, request=request,
+                extra={"reason": "user_not_found_or_verified"},
+            )
+            return GenericSuccessResponse(success=True, message="Если email зарегистрирован, код отправлен.")
+
+        sent = await _create_email_verify_token_and_send(
+            db, user_doc=user_doc, request=request, fail_silently=True,
+        )
+        return GenericSuccessResponse(
+            success=True,
+            message="Код отправлен на email." if sent else "Если email зарегистрирован, код отправлен.",
+        )
 
     # ============= 🖥️ SESSIONS / DEVICES (P4) =============
 

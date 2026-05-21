@@ -17,6 +17,7 @@ import AuthLayout from '../components/auth/AuthLayout';
 import AuthInput from '../components/auth/AuthInput';
 import AuthButton from '../components/auth/AuthButton';
 import EmailRegisterForm from '../components/auth/EmailRegisterForm';
+import EmailVerifyCodeStep from '../components/auth/EmailVerifyCodeStep';
 import TelegramWebAppLoginButton from '../components/auth/TelegramWebAppLoginButton';
 import TelegramLoginWidget from '../components/auth/TelegramLoginWidget';
 import VkLoginButton from '../components/auth/VkLoginButton';
@@ -60,11 +61,35 @@ const StepIndicator = ({ current, total }) => (
 const Step1AuthMethod = ({ config, onNext }) => {
   const [method, setMethod] = useState(null);
   const [tgWidgetError, setTgWidgetError] = useState(null);
+  // 🔧 2026-07: после успешной email-регистрации показываем экран ввода 4-значного кода
+  const [pendingEmailVerify, setPendingEmailVerify] = useState(null); // { email }
   const { loginTelegramWebApp, loginTelegramWidget } = useAuth();
 
   // Подсказка для UI — кнопка «Войти через Telegram» рендерится всегда;
   // если юзер не в Telegram, сама кнопка покажет инструкцию открыть через бота.
   const { inside: isInsideTelegram, ready: tgReady } = useIsInsideTelegram();
+
+  // Экран ввода 4-значного кода — после успешной email-регистрации
+  if (pendingEmailVerify?.email) {
+    return (
+      <div>
+        <EmailVerifyCodeStep
+          email={pendingEmailVerify.email}
+          variant="page"
+          onVerified={() => {
+            // Email подтверждён → дальше по шагам
+            setPendingEmailVerify(null);
+            onNext?.();
+          }}
+          onSkip={() => {
+            // Юзер выбрал «Подтвердить позже» → продолжаем
+            setPendingEmailVerify(null);
+            onNext?.();
+          }}
+        />
+      </div>
+    );
+  }
 
   if (method === 'email') {
     return (
@@ -76,7 +101,17 @@ const Step1AuthMethod = ({ config, onNext }) => {
           <ArrowLeft size={14} /> Назад
         </button>
         <EmailRegisterForm
-          onSuccess={onNext}
+          onSuccess={(resp) => {
+            // Сохраняем email и переключаемся на верификацию.
+            // resp может содержать user.email, либо берём из формы (но форма уже unmounted).
+            const verifiedEmail = resp?.user?.email || null;
+            if (verifiedEmail && !resp?.user?.email_verified) {
+              setPendingEmailVerify({ email: verifiedEmail });
+            } else {
+              // Если email уже verified (теоретически — переход с linkEmail) — сразу дальше
+              onNext?.();
+            }
+          }}
           onSwitchLogin={() => window.location.assign('/login')}
         />
       </div>
