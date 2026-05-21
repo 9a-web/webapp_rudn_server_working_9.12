@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Search, UserPlus, Bell, Star, 
@@ -158,6 +159,7 @@ const getConversationTimeAgo = (dateStr) => {
 
 const FriendsSection = ({ userSettings, currentUser, onFriendProfileOpen, onChatOpen, onJoinListeningRoom }) => {
   const { user: tgUser, webApp } = useTelegram();
+  const navigate = useNavigate();
   // 🔒 Auth-aware identity: currentUser (effectiveUser из App.jsx) уже резолвит
   // pseudo_tid для Email/VK-юзеров. Fallback на tgUser нужен только для
   // legacy TG WebApp без авторизации (когда currentUser ещё не загружен).
@@ -757,8 +759,10 @@ const FriendsSection = ({ userSettings, currentUser, onFriendProfileOpen, onChat
 
   const handleOpenProfile = (friend) => {
     hapticFeedback('impact', 'light');
-    setSelectedProfile(friend);
-    onFriendProfileOpen?.(true);
+    // Открываем публичный профиль /u/{uid}. Приоритет: uid (9-значный публичный) → telegram_id (бэк резолвит).
+    const targetId = friend?.uid || friend?.telegram_id;
+    if (!targetId) return;
+    navigate(`/u/${targetId}`);
   };
 
   const handleCloseProfile = () => {
