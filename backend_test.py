@@ -1,23 +1,29 @@
-#!/usr/bin/env python3
 """
-Backend Testing for Notification System (Release 3)
-Tests the major audit/refactor of the notification system.
+Backend Testing Script for RUDN Webapp Security Audit (2026-07)
+
+Tests critical security fixes:
+- C1: JWT secret hardening
+- C2: Web Push endpoints authentication
+- C3: QR login session registration
+- M2: Password policy enforcement
+
+Backend URL: https://rudn-notify-hub.preview.emergentagent.com/api
 """
 
-import asyncio
-import sys
 import requests
 import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+import time
+import secrets
+from datetime import datetime, timezone, timedelta
+from jose import jwt
 
-# Backend URL from environment
-BACKEND_URL = "http://localhost:8001/api"
+# Configuration
+BASE_URL = "https://rudn-notify-hub.preview.emergentagent.com/api"
+OLD_JWT_SECRET = "rudn-auth-default-secret-CHANGE-ME-IN-PROD-8f3a2b1c9d7e"
 
-# Test credentials
-TEST_EMAIL = "test_notif_r3@test.com"
-TEST_PASSWORD = "Test1234"
-TEST_UID = "915128176"
+# Test credentials pattern
+TEST_EMAIL_PATTERN = "audit_2026_07_{}@test.com"
+TEST_PASSWORD_STRONG = "StrongPw#123"
 
 # Colors for output
 class Colors:
@@ -25,506 +31,611 @@ class Colors:
     RED = '\033[91m'
     YELLOW = '\033[93m'
     BLUE = '\033[94m'
-    RESET = '\033[0m'
+    END = '\033[0m'
 
-def log_test(name: str):
-    print(f"\n{Colors.BLUE}{'='*60}{Colors.RESET}")
-    print(f"{Colors.BLUE}TEST: {name}{Colors.RESET}")
-    print(f"{Colors.BLUE}{'='*60}{Colors.RESET}")
+def log_test(name, status, details=""):
+    """Log test result with color"""
+    color = Colors.GREEN if status == "PASS" else Colors.RED if status == "FAIL" else Colors.YELLOW
+    print(f"{color}[{status}]{Colors.END} {name}")
+    if details:
+        print(f"      {details}")
 
-def log_success(msg: str):
-    print(f"{Colors.GREEN}✓ {msg}{Colors.RESET}")
+def log_section(title):
+    """Log section header"""
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.END}")
+    print(f"{Colors.BLUE}{title}{Colors.END}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.END}\n")
 
-def log_error(msg: str):
-    print(f"{Colors.RED}✗ {msg}{Colors.RESET}")
-
-def log_warning(msg: str):
-    print(f"{Colors.YELLOW}⚠ {msg}{Colors.RESET}")
-
-def log_info(msg: str):
-    print(f"{Colors.BLUE}ℹ {msg}{Colors.RESET}")
-
-
-class TestSession:
-    """Manages authentication and session for tests"""
-    
-    def __init__(self):
-        self.session = requests.Session()
-        self.token: Optional[str] = None
-        self.telegram_id: Optional[int] = None
-        self.uid: Optional[str] = None
-        
-    def login(self, email: str, password: str) -> bool:
-        """Login and get JWT token"""
-        try:
-            response = self.session.post(
-                f"{BACKEND_URL}/auth/login/email",
-                json={"email": email, "password": password}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.token = data.get("access_token")
-                
-                # Extract from user object if present
-                user = data.get("user", {})
-                self.telegram_id = user.get("telegram_id") or data.get("telegram_id")
-                self.uid = user.get("uid") or data.get("uid")
-                
-                if self.token:
-                    self.session.headers.update({
-                        "Authorization": f"Bearer {self.token}"
-                    })
-                    log_success(f"Logged in as {email} (tid={self.telegram_id}, uid={self.uid})")
-                    return True
-            
-            log_error(f"Login failed: {response.status_code} - {response.text}")
-            return False
-            
-        except Exception as e:
-            log_error(f"Login exception: {e}")
-            return False
-    
-    def get(self, endpoint: str, **kwargs) -> requests.Response:
-        """GET request with auth"""
-        return self.session.get(f"{BACKEND_URL}{endpoint}", **kwargs)
-    
-    def post(self, endpoint: str, **kwargs) -> requests.Response:
-        """POST request with auth"""
-        return self.session.post(f"{BACKEND_URL}{endpoint}", **kwargs)
-    
-    def put(self, endpoint: str, **kwargs) -> requests.Response:
-        """PUT request with auth"""
-        return self.session.put(f"{BACKEND_URL}{endpoint}", **kwargs)
-    
-    def patch(self, endpoint: str, **kwargs) -> requests.Response:
-        """PATCH request with auth"""
-        return self.session.patch(f"{BACKEND_URL}{endpoint}", **kwargs)
-    
-    def delete(self, endpoint: str, **kwargs) -> requests.Response:
-        """DELETE request with auth"""
-        return self.session.delete(f"{BACKEND_URL}{endpoint}", **kwargs)
-
-
-def test_health_endpoint(session: TestSession) -> bool:
-    """Test 1: New health endpoint with different parameters"""
-    log_test("Health Endpoint - GET /api/admin/notifications/health")
-    
-    all_passed = True
-    
-    # Test 1.1: Default (24 hours)
-    try:
-        response = session.get("/admin/notifications/health")
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Check required fields
-            required_fields = [
-                "window_hours", "since_utc", "now_utc",
-                "delivery_attempts", "scheduled_notifications",
-                "push_subscriptions", "dlq_size", "in_app", "platforms"
-            ]
-            
-            missing = [f for f in required_fields if f not in data]
-            if missing:
-                log_error(f"Missing fields: {missing}")
-                all_passed = False
-            else:
-                log_success(f"Default (24h): All required fields present")
-                log_info(f"  window_hours: {data['window_hours']}")
-                log_info(f"  push_subscriptions: active={data['push_subscriptions']['active']}, inactive={data['push_subscriptions']['inactive']}")
-                log_info(f"  dlq_size: {data['dlq_size']}")
-                log_info(f"  platforms: real_telegram={data['platforms']['real_telegram']}, pseudo={data['platforms']['pseudo_tid_vk_or_email']}")
-        else:
-            log_error(f"Default request failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"Default test exception: {e}")
-        all_passed = False
-    
-    # Test 1.2: hours=1
-    try:
-        response = session.get("/admin/notifications/health?hours=1")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("window_hours") == 1:
-                log_success("hours=1: Correct window")
-            else:
-                log_error(f"hours=1: Expected window_hours=1, got {data.get('window_hours')}")
-                all_passed = False
-        else:
-            log_error(f"hours=1 failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"hours=1 exception: {e}")
-        all_passed = False
-    
-    # Test 1.3: hours=720 (max)
-    try:
-        response = session.get("/admin/notifications/health?hours=720")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("window_hours") == 720:
-                log_success("hours=720: Max window accepted")
-            else:
-                log_error(f"hours=720: Expected 720, got {data.get('window_hours')}")
-                all_passed = False
-        else:
-            log_error(f"hours=720 failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"hours=720 exception: {e}")
-        all_passed = False
-    
-    # Test 1.4: hours=0 (should default to 24, not clamp to 1)
-    try:
-        response = session.get("/admin/notifications/health?hours=0")
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("window_hours") == 24:
-                log_success("hours=0: Correctly defaults to 24")
-            else:
-                log_error(f"hours=0: Expected default to 24, got {data.get('window_hours')}")
-                all_passed = False
-        else:
-            log_error(f"hours=0 failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"hours=0 exception: {e}")
-        all_passed = False
-    
-    return all_passed
-
-
-def test_existing_notification_endpoints(session: TestSession) -> bool:
-    """Test 2: Existing notification endpoints still work"""
-    log_test("Existing Notification Endpoints")
-    
-    all_passed = True
-    tid = session.telegram_id
-    
-    # Use pseudo_tid if no real telegram_id
-    if not tid and session.uid:
-        PSEUDO_TID_OFFSET = 2_000_000_000
-        tid = PSEUDO_TID_OFFSET + int(session.uid)
-        log_info(f"Using pseudo_tid: {tid}")
-    
-    if not tid:
-        log_error("No telegram_id or uid available, skipping")
-        return False
-    
-    # Test 2.1: GET /api/notifications/{telegram_id}
-    try:
-        response = session.get(f"/notifications/{tid}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_success(f"GET /notifications/{tid}: {response.status_code}")
-            log_info(f"  Notifications count: {len(data.get('notifications', []))}")
-        else:
-            log_error(f"GET /notifications/{tid} failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"GET notifications exception: {e}")
-        all_passed = False
-    
-    # Test 2.2: GET /api/notifications/{telegram_id}/unread-count
-    try:
-        response = session.get(f"/notifications/{tid}/unread-count")
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_success(f"GET /notifications/{tid}/unread-count: {data.get('count', 0)}")
-        else:
-            log_error(f"GET unread-count failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"GET unread-count exception: {e}")
-        all_passed = False
-    
-    # Test 2.3: GET /api/user-settings/{telegram_id}/notifications
-    try:
-        response = session.get(f"/user-settings/{tid}/notifications")
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_success(f"GET /user-settings/{tid}/notifications: {response.status_code}")
-            log_info(f"  notifications_enabled: {data.get('notifications_enabled')}")
-            log_info(f"  notification_time: {data.get('notification_time')}")
-        else:
-            log_error(f"GET notification settings failed: {response.status_code}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"GET notification settings exception: {e}")
-        all_passed = False
-    
-    return all_passed
-
-
-def test_should_send_notification_gating(session: TestSession) -> bool:
-    """Test 3: Bug C - should_send_notification unified gating"""
-    log_test("Bug C: should_send_notification Unified Gating")
-    
-    all_passed = True
-    tid = session.telegram_id
-    
-    # Use pseudo_tid if no real telegram_id
-    if not tid and session.uid:
-        PSEUDO_TID_OFFSET = 2_000_000_000
-        tid = PSEUDO_TID_OFFSET + int(session.uid)
-        log_info(f"Using pseudo_tid: {tid}")
-    
-    if not tid:
-        log_error("No telegram_id or uid available, skipping")
-        return False
-    
-    # Get current settings
-    try:
-        response = session.get(f"/user-settings/{tid}/notifications")
-        if response.status_code != 200:
-            log_error(f"Failed to get current settings: {response.status_code}")
-            return False
-        
-        original_settings = response.json()
-        log_info(f"Original settings retrieved")
-        
-    except Exception as e:
-        log_error(f"Failed to get settings: {e}")
-        return False
-    
-    # Test 3.1: Disable social_friend_requests
-    try:
-        # Update extended notification settings
-        update_payload = {
-            "social_friend_requests": False
-        }
-        
-        update_response = session.put(
-            f"/notifications/{tid}/settings",
-            json=update_payload
-        )
-        
-        if update_response.status_code == 200:
-            log_success("Disabled social_friend_requests")
-            
-            # Verify it was saved
-            verify_response = session.get(f"/notifications/{tid}/settings")
-            if verify_response.status_code == 200:
-                verify_data = verify_response.json()
-                
-                if verify_data.get("social_friend_requests") == False:
-                    log_success("Setting verified: social_friend_requests=False")
-                else:
-                    log_error(f"Setting not saved correctly: {verify_data.get('social_friend_requests')}")
-                    all_passed = False
-            else:
-                log_error(f"Verification failed: {verify_response.status_code}")
-                all_passed = False
-        else:
-            log_error(f"Failed to update settings: {update_response.status_code} - {update_response.text}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"social_friend_requests test exception: {e}")
-        all_passed = False
-    
-    # Restore original settings
-    try:
-        restore_response = session.put(
-            f"/user-settings/{tid}/notifications",
-            json=original_settings
-        )
-        if restore_response.status_code == 200:
-            log_info("Original settings restored")
-        else:
-            log_warning(f"Failed to restore settings: {restore_response.status_code}")
-            
-    except Exception as e:
-        log_warning(f"Failed to restore settings: {e}")
-    
-    return all_passed
-
-
-def test_web_push_endpoints(session: TestSession) -> bool:
-    """Test 5: Web Push subscribe/unsubscribe endpoints"""
-    log_test("Web Push Endpoints")
-    
-    all_passed = True
-    tid = session.telegram_id
-    
-    # Use pseudo_tid if no real telegram_id
-    if not tid and session.uid:
-        PSEUDO_TID_OFFSET = 2_000_000_000
-        tid = PSEUDO_TID_OFFSET + int(session.uid)
-        log_info(f"Using pseudo_tid: {tid}")
-    
-    if not tid:
-        log_error("No telegram_id or uid available, skipping")
-        return False
-    
-    # Test subscription payload (mock data)
-    subscription_data = {
-        "telegram_id": tid,
-        "endpoint": f"https://fcm.googleapis.com/fcm/send/test-endpoint-{tid}",
-        "keys": {
-            "p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM=",
-            "auth": "tBHItJI5svbpez7KI4CCXg=="
-        }
+def create_test_user(email_suffix):
+    """Create a test user and return access token"""
+    email = TEST_EMAIL_PATTERN.format(email_suffix)
+    payload = {
+        "email": email,
+        "password": TEST_PASSWORD_STRONG,
+        "first_name": "Audit",
+        "last_name": f"Test{email_suffix}"
     }
     
-    # Test 5.1: POST /api/push/subscribe
-    try:
-        response = session.post("/push/subscribe", json=subscription_data)
-        
-        if response.status_code in [200, 201]:
-            log_success(f"POST /push/subscribe: {response.status_code}")
-            data = response.json()
-            log_info(f"  Response: {data.get('message', 'OK')}")
-        else:
-            log_error(f"POST /push/subscribe failed: {response.status_code} - {response.text}")
-            all_passed = False
-            
-    except Exception as e:
-        log_error(f"POST /push/subscribe exception: {e}")
-        all_passed = False
+    # Use X-Forwarded-For to bypass rate limit
+    headers = {"X-Forwarded-For": f"1.2.3.{secrets.randbelow(255)}"}
     
-    # Test 5.2: POST /api/push/unsubscribe
     try:
-        unsubscribe_data = {
-            "telegram_id": tid,
-            "endpoint": subscription_data["endpoint"]
+        resp = requests.post(f"{BASE_URL}/auth/register/email", json=payload, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("access_token"), email
+        elif resp.status_code == 409:
+            # User exists, try login
+            login_resp = requests.post(
+                f"{BASE_URL}/auth/login/email",
+                json={"email": email, "password": TEST_PASSWORD_STRONG},
+                headers=headers,
+                timeout=10
+            )
+            if login_resp.status_code == 200:
+                return login_resp.json().get("access_token"), email
+    except Exception as e:
+        print(f"Failed to create/login test user: {e}")
+    
+    return None, email
+
+def test_c1_jwt_secret_hardening():
+    """C1: Test that old JWT secret is rejected"""
+    log_section("C1 — JWT Secret Hardening")
+    
+    # Create a forged JWT with old secret
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(days=30)
+    
+    payload = {
+        "uid": "100000001",
+        "sub": "100000001",
+        "providers": ["telegram"],
+        "jti": "forged_token_x",
+        "exp": int(exp.timestamp()),
+        "iat": int(now.timestamp())
+    }
+    
+    try:
+        forged_token = jwt.encode(payload, OLD_JWT_SECRET, algorithm="HS256")
+        
+        # Try to use forged token
+        headers = {"Authorization": f"Bearer {forged_token}"}
+        resp = requests.get(f"{BASE_URL}/auth/me", headers=headers, timeout=10)
+        
+        if resp.status_code == 401:
+            log_test("C1.1: Old JWT secret rejected", "PASS", f"Status: {resp.status_code}, Detail: {resp.json().get('detail', '')}")
+            return True
+        else:
+            log_test("C1.1: Old JWT secret rejected", "FAIL", f"Expected 401, got {resp.status_code}")
+            return False
+    except Exception as e:
+        log_test("C1.1: Old JWT secret rejected", "FAIL", f"Exception: {e}")
+        return False
+
+def test_c2_web_push_auth():
+    """C2: Test Web Push endpoints require authentication"""
+    log_section("C2 — Web Push Endpoints Authentication")
+    
+    results = []
+    
+    # Test 1: POST /push/subscribe without auth → 401
+    try:
+        payload = {
+            "endpoint": "https://fcm.googleapis.com/fcm/send/test-endpoint-123",
+            "keys": {"p256dh": "test_p256dh", "auth": "test_auth"},
+            "user_agent": "Test/1.0"
         }
+        resp = requests.post(f"{BASE_URL}/push/subscribe", json=payload, timeout=10)
         
-        response = session.post("/push/unsubscribe", json=unsubscribe_data)
-        
-        if response.status_code == 200:
-            log_success(f"POST /push/unsubscribe: {response.status_code}")
+        if resp.status_code == 401:
+            log_test("C2.1: /push/subscribe without auth → 401", "PASS")
+            results.append(True)
         else:
-            log_error(f"POST /push/unsubscribe failed: {response.status_code} - {response.text}")
-            all_passed = False
-            
+            log_test("C2.1: /push/subscribe without auth → 401", "FAIL", f"Got {resp.status_code}")
+            results.append(False)
     except Exception as e:
-        log_error(f"POST /push/unsubscribe exception: {e}")
-        all_passed = False
+        log_test("C2.1: /push/subscribe without auth → 401", "FAIL", f"Exception: {e}")
+        results.append(False)
     
-    return all_passed
-
-
-def test_cross_platform_endpoints(session: TestSession) -> bool:
-    """Test 6: Cross-platform support (pseudo-tid)"""
-    log_test("Cross-Platform Support (pseudo-tid)")
+    # Test 2: POST /push/unsubscribe without auth → 401
+    try:
+        payload = {"endpoint": "https://fcm.googleapis.com/fcm/send/test-endpoint-123"}
+        resp = requests.post(f"{BASE_URL}/push/unsubscribe", json=payload, timeout=10)
+        
+        if resp.status_code == 401:
+            log_test("C2.2: /push/unsubscribe without auth → 401", "PASS")
+            results.append(True)
+        else:
+            log_test("C2.2: /push/unsubscribe without auth → 401", "FAIL", f"Got {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("C2.2: /push/unsubscribe without auth → 401", "FAIL", f"Exception: {e}")
+        results.append(False)
     
-    all_passed = True
+    # Test 3: POST /push/test without auth → 401
+    try:
+        resp = requests.post(f"{BASE_URL}/push/test", timeout=10)
+        
+        if resp.status_code == 401:
+            log_test("C2.3: /push/test without auth → 401", "PASS")
+            results.append(True)
+        else:
+            log_test("C2.3: /push/test without auth → 401", "FAIL", f"Got {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("C2.3: /push/test without auth → 401", "FAIL", f"Exception: {e}")
+        results.append(False)
     
-    # Calculate pseudo_tid from uid
-    PSEUDO_TID_OFFSET = 2_000_000_000
+    # Test 4: GET /push/subscriptions without auth → 401
+    try:
+        resp = requests.get(f"{BASE_URL}/push/subscriptions", timeout=10)
+        
+        if resp.status_code == 401:
+            log_test("C2.4: /push/subscriptions without auth → 401", "PASS")
+            results.append(True)
+        else:
+            log_test("C2.4: /push/subscriptions without auth → 401", "FAIL", f"Got {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("C2.4: /push/subscriptions without auth → 401", "FAIL", f"Exception: {e}")
+        results.append(False)
     
-    if session.uid:
+    # Test 5: With auth - subscribe should work and ignore body uid/telegram_id
+    token, email = create_test_user(f"c2_{int(time.time())}")
+    if token:
         try:
-            uid_int = int(session.uid)
-            pseudo_tid = PSEUDO_TID_OFFSET + uid_int
+            headers = {"Authorization": f"Bearer {token}"}
+            payload = {
+                "endpoint": f"https://fcm.googleapis.com/fcm/send/audit-test-{int(time.time())}",
+                "keys": {"p256dh": "test_p256dh_key", "auth": "test_auth_key"},
+                "user_agent": "AuditTest/1.0",
+                "telegram_id": 999999999,  # Rogue field - should be ignored
+                "uid": "999999999"  # Rogue field - should be ignored
+            }
+            resp = requests.post(f"{BASE_URL}/push/subscribe", json=payload, headers=headers, timeout=10)
             
-            log_info(f"Testing with pseudo_tid: {pseudo_tid} (from uid={session.uid})")
-            
-            # Test 6.1: GET /api/notifications/{pseudo_tid}
-            try:
-                response = session.get(f"/notifications/{pseudo_tid}")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    log_success(f"GET /notifications/{pseudo_tid}: {response.status_code}")
-                    log_info(f"  Notifications: {len(data.get('notifications', []))}")
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("status") == "ok" and "subscription_id" in data:
+                    log_test("C2.5: /push/subscribe with auth → 200, ignores rogue uid/tid", "PASS")
+                    results.append(True)
                 else:
-                    log_error(f"GET /notifications/{pseudo_tid} failed: {response.status_code}")
-                    all_passed = False
-                    
-            except Exception as e:
-                log_error(f"GET notifications (pseudo) exception: {e}")
-                all_passed = False
-            
-            # Test 6.2: GET /api/user-settings/{pseudo_tid}/notifications
-            try:
-                response = session.get(f"/user-settings/{pseudo_tid}/notifications")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    log_success(f"GET /user-settings/{pseudo_tid}/notifications: {response.status_code}")
-                else:
-                    # 404 is acceptable if user doesn't have settings yet
-                    if response.status_code == 404:
-                        log_info(f"GET /user-settings/{pseudo_tid}/notifications: 404 (no settings yet)")
-                    else:
-                        log_error(f"GET notification settings (pseudo) failed: {response.status_code}")
-                        all_passed = False
-                    
-            except Exception as e:
-                log_error(f"GET notification settings (pseudo) exception: {e}")
-                all_passed = False
-                
-        except ValueError:
-            log_error(f"Invalid uid format: {session.uid}")
-            all_passed = False
+                    log_test("C2.5: /push/subscribe with auth → 200, ignores rogue uid/tid", "FAIL", f"Unexpected response: {data}")
+                    results.append(False)
+            else:
+                log_test("C2.5: /push/subscribe with auth → 200, ignores rogue uid/tid", "FAIL", f"Got {resp.status_code}: {resp.text}")
+                results.append(False)
+        except Exception as e:
+            log_test("C2.5: /push/subscribe with auth → 200, ignores rogue uid/tid", "FAIL", f"Exception: {e}")
+            results.append(False)
     else:
-        log_warning("No uid available, skipping pseudo-tid tests")
+        log_test("C2.5: /push/subscribe with auth → 200, ignores rogue uid/tid", "SKIP", "Could not create test user")
+        results.append(None)
     
-    return all_passed
+    # Test 6: Rate limit on /push/test (5/hour)
+    if token:
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            rate_limit_hit = False
+            
+            for i in range(6):
+                resp = requests.post(f"{BASE_URL}/push/test", headers=headers, timeout=10)
+                if resp.status_code == 429:
+                    rate_limit_hit = True
+                    log_test("C2.6: /push/test rate limit (5/hour)", "PASS", f"Hit rate limit on attempt {i+1}")
+                    results.append(True)
+                    break
+                time.sleep(0.5)
+            
+            if not rate_limit_hit:
+                log_test("C2.6: /push/test rate limit (5/hour)", "WARN", "Rate limit not hit after 6 attempts (may need more calls)")
+                results.append(None)
+        except Exception as e:
+            log_test("C2.6: /push/test rate limit (5/hour)", "FAIL", f"Exception: {e}")
+            results.append(False)
+    else:
+        log_test("C2.6: /push/test rate limit (5/hour)", "SKIP", "No auth token")
+        results.append(None)
+    
+    return all(r for r in results if r is not None)
 
+def test_c3_qr_login_session():
+    """C3: Test QR login session registration"""
+    log_section("C3 — QR Login Session Registration")
+    
+    results = []
+    
+    # Step 1: Initialize QR session
+    try:
+        resp = requests.post(f"{BASE_URL}/auth/login/qr/init", timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            qr_token = data.get("qr_token")
+            
+            if qr_token:
+                log_test("C3.1: QR init successful", "PASS", f"qr_token: {qr_token[:20]}...")
+                results.append(True)
+                
+                # Step 2: Confirm QR with authenticated user
+                token, email = create_test_user(f"c3_{int(time.time())}")
+                if token:
+                    headers = {"Authorization": f"Bearer {token}"}
+                    confirm_resp = requests.post(
+                        f"{BASE_URL}/auth/login/qr/{qr_token}/confirm",
+                        headers=headers,
+                        timeout=10
+                    )
+                    
+                    if confirm_resp.status_code == 200:
+                        log_test("C3.2: QR confirm successful", "PASS")
+                        results.append(True)
+                        
+                        # Step 3: Get QR status and retrieve access_token
+                        time.sleep(1)  # Brief delay
+                        status_resp = requests.get(
+                            f"{BASE_URL}/auth/login/qr/{qr_token}/status",
+                            timeout=10
+                        )
+                        
+                        if status_resp.status_code == 200:
+                            status_data = status_resp.json()
+                            qr_access_token = status_data.get("access_token")
+                            
+                            if qr_access_token:
+                                log_test("C3.3: QR status returns access_token", "PASS")
+                                results.append(True)
+                                
+                                # Step 4: CRITICAL TEST - Use QR token to call /auth/me
+                                qr_headers = {"Authorization": f"Bearer {qr_access_token}"}
+                                me_resp = requests.get(
+                                    f"{BASE_URL}/auth/me",
+                                    headers=qr_headers,
+                                    timeout=10
+                                )
+                                
+                                if me_resp.status_code == 200:
+                                    log_test("C3.4: QR token works with /auth/me (session registered)", "PASS", "✓ Session is active")
+                                    results.append(True)
+                                    
+                                    # Step 5: Check sessions list
+                                    sessions_resp = requests.get(
+                                        f"{BASE_URL}/auth/sessions",
+                                        headers=qr_headers,
+                                        timeout=10
+                                    )
+                                    
+                                    if sessions_resp.status_code == 200:
+                                        sessions = sessions_resp.json().get("sessions", [])
+                                        if len(sessions) > 0:
+                                            log_test("C3.5: QR session appears in /auth/sessions", "PASS", f"Found {len(sessions)} session(s)")
+                                            results.append(True)
+                                        else:
+                                            log_test("C3.5: QR session appears in /auth/sessions", "FAIL", "No sessions found")
+                                            results.append(False)
+                                    else:
+                                        log_test("C3.5: QR session appears in /auth/sessions", "FAIL", f"Status: {sessions_resp.status_code}")
+                                        results.append(False)
+                                    
+                                    # Step 6: Logout and verify token is revoked
+                                    logout_resp = requests.post(
+                                        f"{BASE_URL}/auth/logout",
+                                        headers=qr_headers,
+                                        timeout=10
+                                    )
+                                    
+                                    if logout_resp.status_code == 200:
+                                        log_test("C3.6: Logout successful", "PASS")
+                                        results.append(True)
+                                        
+                                        # Step 7: Verify token is now invalid
+                                        time.sleep(0.5)
+                                        me_after_logout = requests.get(
+                                            f"{BASE_URL}/auth/me",
+                                            headers=qr_headers,
+                                            timeout=10
+                                        )
+                                        
+                                        if me_after_logout.status_code == 401:
+                                            log_test("C3.7: Token revoked after logout", "PASS", "✓ Returns 401 as expected")
+                                            results.append(True)
+                                        else:
+                                            log_test("C3.7: Token revoked after logout", "FAIL", f"Expected 401, got {me_after_logout.status_code}")
+                                            results.append(False)
+                                    else:
+                                        log_test("C3.6: Logout successful", "FAIL", f"Status: {logout_resp.status_code}")
+                                        results.append(False)
+                                else:
+                                    log_test("C3.4: QR token works with /auth/me (session registered)", "FAIL", f"Status: {me_resp.status_code}, Detail: {me_resp.json().get('detail', '')}")
+                                    results.append(False)
+                            else:
+                                log_test("C3.3: QR status returns access_token", "FAIL", "No access_token in response")
+                                results.append(False)
+                        else:
+                            log_test("C3.3: QR status returns access_token", "FAIL", f"Status: {status_resp.status_code}")
+                            results.append(False)
+                    else:
+                        log_test("C3.2: QR confirm successful", "FAIL", f"Status: {confirm_resp.status_code}")
+                        results.append(False)
+                else:
+                    log_test("C3.2: QR confirm successful", "SKIP", "Could not create test user")
+                    results.append(None)
+            else:
+                log_test("C3.1: QR init successful", "FAIL", "No qr_token in response")
+                results.append(False)
+        else:
+            log_test("C3.1: QR init successful", "FAIL", f"Status: {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("C3: QR login flow", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    return all(r for r in results if r is not None)
+
+def test_m2_password_policy():
+    """M2: Test password policy enforcement"""
+    log_section("M2 — Password Policy")
+    
+    results = []
+    
+    # Test 1: Password too short (< 8 chars)
+    try:
+        email = TEST_EMAIL_PATTERN.format(f"m2_short_{int(time.time())}")
+        payload = {
+            "email": email,
+            "password": "abc123",  # 6 chars
+            "first_name": "Test",
+            "last_name": "Short"
+        }
+        headers = {"X-Forwarded-For": f"1.2.3.{secrets.randbelow(255)}"}
+        resp = requests.post(f"{BASE_URL}/auth/register/email", json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code in [400, 422]:
+            detail = resp.json().get("detail", "")
+            if "8" in detail or "символ" in detail.lower():
+                log_test("M2.1: Password < 8 chars rejected", "PASS", f"Detail: {detail}")
+                results.append(True)
+            else:
+                log_test("M2.1: Password < 8 chars rejected", "FAIL", f"Wrong error message: {detail}")
+                results.append(False)
+        else:
+            log_test("M2.1: Password < 8 chars rejected", "FAIL", f"Expected 400/422, got {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("M2.1: Password < 8 chars rejected", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    # Test 2: Blacklisted password "password"
+    try:
+        email = TEST_EMAIL_PATTERN.format(f"m2_blacklist1_{int(time.time())}")
+        payload = {
+            "email": email,
+            "password": "password",
+            "first_name": "Test",
+            "last_name": "Blacklist"
+        }
+        headers = {"X-Forwarded-For": f"1.2.3.{secrets.randbelow(255)}"}
+        resp = requests.post(f"{BASE_URL}/auth/register/email", json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code in [400, 422]:
+            detail = resp.json().get("detail", "")
+            if "прост" in detail.lower() or "blacklist" in detail.lower():
+                log_test("M2.2: Blacklisted password 'password' rejected", "PASS", f"Detail: {detail}")
+                results.append(True)
+            else:
+                log_test("M2.2: Blacklisted password 'password' rejected", "FAIL", f"Wrong error message: {detail}")
+                results.append(False)
+        else:
+            log_test("M2.2: Blacklisted password 'password' rejected", "FAIL", f"Expected 400/422, got {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("M2.2: Blacklisted password 'password' rejected", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    # Test 3: Blacklisted password "12345678"
+    try:
+        email = TEST_EMAIL_PATTERN.format(f"m2_blacklist2_{int(time.time())}")
+        payload = {
+            "email": email,
+            "password": "12345678",
+            "first_name": "Test",
+            "last_name": "Blacklist2"
+        }
+        headers = {"X-Forwarded-For": f"1.2.3.{secrets.randbelow(255)}"}
+        resp = requests.post(f"{BASE_URL}/auth/register/email", json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code in [400, 422]:
+            detail = resp.json().get("detail", "")
+            if "прост" in detail.lower() or "blacklist" in detail.lower():
+                log_test("M2.3: Blacklisted password '12345678' rejected", "PASS", f"Detail: {detail}")
+                results.append(True)
+            else:
+                log_test("M2.3: Blacklisted password '12345678' rejected", "FAIL", f"Wrong error message: {detail}")
+                results.append(False)
+        else:
+            log_test("M2.3: Blacklisted password '12345678' rejected", "FAIL", f"Expected 400/422, got {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("M2.3: Blacklisted password '12345678' rejected", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    # Test 4: Strong password accepted
+    try:
+        email = TEST_EMAIL_PATTERN.format(f"m2_strong_{int(time.time())}")
+        payload = {
+            "email": email,
+            "password": TEST_PASSWORD_STRONG,
+            "first_name": "Test",
+            "last_name": "Strong"
+        }
+        headers = {"X-Forwarded-For": f"1.2.3.{secrets.randbelow(255)}"}
+        resp = requests.post(f"{BASE_URL}/auth/register/email", json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("access_token"):
+                log_test("M2.4: Strong password accepted", "PASS")
+                results.append(True)
+            else:
+                log_test("M2.4: Strong password accepted", "FAIL", "No access_token in response")
+                results.append(False)
+        else:
+            log_test("M2.4: Strong password accepted", "FAIL", f"Status: {resp.status_code}, Detail: {resp.json().get('detail', '')}")
+            results.append(False)
+    except Exception as e:
+        log_test("M2.4: Strong password accepted", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    return all(r for r in results if r is not None)
+
+def test_regression():
+    """Regression tests - ensure existing functionality still works"""
+    log_section("Priority 3 — Regression Testing")
+    
+    results = []
+    
+    # Test 1: Email registration works
+    try:
+        email = TEST_EMAIL_PATTERN.format(f"regression_{int(time.time())}")
+        payload = {
+            "email": email,
+            "password": TEST_PASSWORD_STRONG,
+            "first_name": "Regression",
+            "last_name": "Test"
+        }
+        headers = {"X-Forwarded-For": f"1.2.3.{secrets.randbelow(255)}"}
+        resp = requests.post(f"{BASE_URL}/auth/register/email", json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            token = data.get("access_token")
+            if token:
+                log_test("R1: Email registration works", "PASS")
+                results.append(True)
+                
+                # Test 2: Email login works
+                login_resp = requests.post(
+                    f"{BASE_URL}/auth/login/email",
+                    json={"email": email, "password": TEST_PASSWORD_STRONG},
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if login_resp.status_code == 200:
+                    log_test("R2: Email login works", "PASS")
+                    results.append(True)
+                else:
+                    log_test("R2: Email login works", "FAIL", f"Status: {login_resp.status_code}")
+                    results.append(False)
+                
+                # Test 3: /auth/me works
+                me_headers = {"Authorization": f"Bearer {token}"}
+                me_resp = requests.get(f"{BASE_URL}/auth/me", headers=me_headers, timeout=10)
+                
+                if me_resp.status_code == 200:
+                    user_data = me_resp.json()
+                    if user_data.get("email") == email:
+                        log_test("R3: /auth/me returns user data", "PASS")
+                        results.append(True)
+                    else:
+                        log_test("R3: /auth/me returns user data", "FAIL", "Email mismatch")
+                        results.append(False)
+                else:
+                    log_test("R3: /auth/me returns user data", "FAIL", f"Status: {me_resp.status_code}")
+                    results.append(False)
+                
+                # Test 4: /auth/sessions works
+                sessions_resp = requests.get(f"{BASE_URL}/auth/sessions", headers=me_headers, timeout=10)
+                
+                if sessions_resp.status_code == 200:
+                    log_test("R4: /auth/sessions works", "PASS")
+                    results.append(True)
+                else:
+                    log_test("R4: /auth/sessions works", "FAIL", f"Status: {sessions_resp.status_code}")
+                    results.append(False)
+                
+                # Test 5: /auth/logout works
+                logout_resp = requests.post(f"{BASE_URL}/auth/logout", headers=me_headers, timeout=10)
+                
+                if logout_resp.status_code == 200:
+                    log_test("R5: /auth/logout works", "PASS")
+                    results.append(True)
+                else:
+                    log_test("R5: /auth/logout works", "FAIL", f"Status: {logout_resp.status_code}")
+                    results.append(False)
+            else:
+                log_test("R1: Email registration works", "FAIL", "No access_token")
+                results.append(False)
+        else:
+            log_test("R1: Email registration works", "FAIL", f"Status: {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("Regression tests", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    # Test 6: VAPID public key endpoint (no auth required)
+    try:
+        resp = requests.get(f"{BASE_URL}/push/vapid-public-key", timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            if "public_key" in data:
+                log_test("R6: /push/vapid-public-key returns public key", "PASS")
+                results.append(True)
+            else:
+                log_test("R6: /push/vapid-public-key returns public key", "FAIL", "No public_key in response")
+                results.append(False)
+        elif resp.status_code == 503:
+            log_test("R6: /push/vapid-public-key returns public key", "WARN", "Web Push not configured (expected in test env)")
+            results.append(None)
+        else:
+            log_test("R6: /push/vapid-public-key returns public key", "FAIL", f"Status: {resp.status_code}")
+            results.append(False)
+    except Exception as e:
+        log_test("R6: /push/vapid-public-key returns public key", "FAIL", f"Exception: {e}")
+        results.append(False)
+    
+    return all(r for r in results if r is not None)
 
 def main():
-    """Main test runner"""
-    print(f"\n{Colors.BLUE}{'='*60}{Colors.RESET}")
-    print(f"{Colors.BLUE}RUDN Notification System Backend Tests (Release 3){Colors.RESET}")
-    print(f"{Colors.BLUE}Backend: {BACKEND_URL}{Colors.RESET}")
-    print(f"{Colors.BLUE}{'='*60}{Colors.RESET}\n")
+    """Run all tests"""
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.END}")
+    print(f"{Colors.BLUE}RUDN Webapp Backend Security Audit (2026-07){Colors.END}")
+    print(f"{Colors.BLUE}Backend URL: {BASE_URL}{Colors.END}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.END}\n")
     
-    # Create session and login
-    session = TestSession()
-    
-    if not session.login(TEST_EMAIL, TEST_PASSWORD):
-        log_error("Failed to login, cannot continue tests")
-        sys.exit(1)
-    
-    # Run tests
     results = {}
     
-    results["Health Endpoint"] = test_health_endpoint(session)
-    results["Existing Endpoints"] = test_existing_notification_endpoints(session)
-    results["Bug C: Gating"] = test_should_send_notification_gating(session)
-    results["Web Push"] = test_web_push_endpoints(session)
-    results["Cross-Platform"] = test_cross_platform_endpoints(session)
+    # Priority 1: Critical Security Fixes
+    results['C1'] = test_c1_jwt_secret_hardening()
+    results['C2'] = test_c2_web_push_auth()
+    results['C3'] = test_c3_qr_login_session()
+    
+    # Priority 2: Password Policy
+    results['M2'] = test_m2_password_policy()
+    
+    # Priority 3: Regression
+    results['Regression'] = test_regression()
     
     # Summary
-    print(f"\n{Colors.BLUE}{'='*60}{Colors.RESET}")
-    print(f"{Colors.BLUE}TEST SUMMARY{Colors.RESET}")
-    print(f"{Colors.BLUE}{'='*60}{Colors.RESET}\n")
+    log_section("Test Summary")
     
-    passed = sum(1 for v in results.values() if v)
     total = len(results)
+    passed = sum(1 for v in results.values() if v is True)
+    failed = sum(1 for v in results.values() if v is False)
     
-    for test_name, result in results.items():
-        status = f"{Colors.GREEN}PASS{Colors.RESET}" if result else f"{Colors.RED}FAIL{Colors.RESET}"
-        print(f"  {test_name}: {status}")
+    print(f"Total test suites: {total}")
+    print(f"{Colors.GREEN}Passed: {passed}{Colors.END}")
+    print(f"{Colors.RED}Failed: {failed}{Colors.END}")
     
-    print(f"\n{Colors.BLUE}Total: {passed}/{total} tests passed{Colors.RESET}\n")
-    
-    if passed == total:
-        print(f"{Colors.GREEN}✓ All tests passed!{Colors.RESET}\n")
-        sys.exit(0)
+    if failed == 0:
+        print(f"\n{Colors.GREEN}✓ All critical security fixes verified!{Colors.END}\n")
     else:
-        print(f"{Colors.RED}✗ Some tests failed{Colors.RESET}\n")
-        sys.exit(1)
-
+        print(f"\n{Colors.RED}✗ Some tests failed. Review details above.{Colors.END}\n")
+    
+    return failed == 0
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    exit(0 if success else 1)

@@ -158,8 +158,40 @@ TELEGRAM_BOT_TOKEN = get_telegram_bot_token()
 
 # ========== JWT / AUTH КОНФИГУРАЦИЯ ==========
 
-# JWT secret — обязательно переопределять в production
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "rudn-auth-default-secret-CHANGE-ME-IN-PROD-8f3a2b1c9d7e")
+# 🔐 SECURITY (C1 fix, 2026-07): JWT secret НИКОГДА не должен иметь hardcoded
+# default в коде. Старый default попадал в git, что давало возможность
+# подделать любой токен. Теперь:
+#   - в test/dev: если не задан в .env — генерируется случайный per-process
+#     (юзеры разлогинятся после рестарта, что приемлемо в test)
+#   - в production: HARD-FAIL при импорте, если переменная не задана
+#     или совпадает со старым «небезопасным» значением
+_JWT_INSECURE_DEFAULTS = {
+    "rudn-auth-default-secret-CHANGE-ME-IN-PROD-8f3a2b1c9d7e",
+    "change-me",
+    "secret",
+    "",
+}
+
+def _resolve_jwt_secret() -> str:
+    import secrets as _secrets
+    raw = (os.getenv("JWT_SECRET_KEY") or "").strip()
+    if raw and raw not in _JWT_INSECURE_DEFAULTS and len(raw) >= 32:
+        return raw
+    # Небезопасный/отсутствующий ключ
+    if ENV == "production":
+        raise RuntimeError(
+            "❌ JWT_SECRET_KEY не задан или использует небезопасное значение. "
+            "Сгенерируйте: python -c 'import secrets;print(secrets.token_urlsafe(64))' "
+            "и положите в backend/.env как JWT_SECRET_KEY=..."
+        )
+    ephemeral = _secrets.token_urlsafe(64)
+    logger.warning(
+        "⚠️ JWT_SECRET_KEY не задан в .env — используется случайный ephemeral-ключ "
+        "(юзеры разлогинятся при рестарте). Задайте JWT_SECRET_KEY в backend/.env."
+    )
+    return ephemeral
+
+JWT_SECRET_KEY = _resolve_jwt_secret()
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRE_DAYS", "30"))
 
@@ -169,11 +201,13 @@ VK_CLIENT_SECRET = os.getenv("VK_CLIENT_SECRET", "")
 VK_REDIRECT_URI = os.getenv("VK_REDIRECT_URI", "")
 
 # Публичный URL для shareable-ссылок (= REACT_APP_BACKEND_URL во frontend .env)
-# Используется для генерации `/u/{uid}` публичных ссылок
-# Источник истины — frontend .env (REACT_APP_BACKEND_URL), но и backend может его знать
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
+# Используется для генерации `/u/{uid}` публичных ссылок, ссылок в email,
+# а также как fallback для email_service.PUBLIC_BASE_URL.
+# Источник истины — backend .env (PUBLIC_BASE_URL), затем frontend .env (REACT_APP_BACKEND_URL)
+PUBLIC_BASE_URL = (
+    os.getenv("PUBLIC_BASE_URL", "").strip()
+    or os.getenv("REACT_APP_BACKEND_URL", "").strip()
+)
 
 # Логируем текущую конфигурацию при импорте
 logger.info(f"📋 Конфигурация загружена: ENV={ENV}")
-if JWT_SECRET_KEY.startswith("rudn-auth-default"):
-    logger.warning("⚠️  JWT_SECRET_KEY использует дефолтное значение! Задайте свой в .env")

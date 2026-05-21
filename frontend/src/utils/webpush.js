@@ -25,6 +25,28 @@
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 /**
+ * Получить access_token из authStorage (для авторизованных push-запросов).
+ * Динамический require, чтобы не создавать круговой импорт.
+ */
+function getAuthHeaders() {
+  try {
+    let token = null;
+    try {
+      // Используем localStorage напрямую (та же ключ, что в authStorage.js)
+      token = (typeof window !== "undefined" && window.localStorage)
+        ? window.localStorage.getItem("rudn_auth_token") || window.localStorage.getItem("auth_token")
+        : null;
+    } catch (_) {}
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  } catch (e) {
+    // ignore
+  }
+  return {};
+}
+
+/**
  * Конвертирует base64url-строку в Uint8Array (формат, который требует PushManager.subscribe).
  */
 function urlBase64ToUint8Array(base64String) {
@@ -163,14 +185,28 @@ async function ensureServiceWorker() {
 }
 
 /**
- * Получить VAPID public key с backend.
+ * Получить VAPID public key с backend (с in-memory + sessionStorage кэшем).
  */
+let _vapidKeyCache = null;
 async function fetchVapidPublicKey() {
+  if (_vapidKeyCache) return _vapidKeyCache;
+  try {
+    const fromSession = sessionStorage.getItem("vapid_public_key");
+    if (fromSession) {
+      _vapidKeyCache = fromSession;
+      return fromSession;
+    }
+  } catch (_) {}
   try {
     const r = await fetch(`${BACKEND_URL}/api/push/vapid-public-key`);
     if (!r.ok) return null;
     const json = await r.json();
-    return json.public_key || null;
+    const key = json.public_key || null;
+    if (key) {
+      _vapidKeyCache = key;
+      try { sessionStorage.setItem("vapid_public_key", key); } catch (_) {}
+    }
+    return key;
   } catch (e) {
     console.warn("[webpush] vapid fetch failed:", e);
     return null;
@@ -179,12 +215,14 @@ async function fetchVapidPublicKey() {
 
 /**
  * Отправить подписку на backend.
+ *
+ * 🔧 C2 fix (2026-07): теперь backend требует Authorization Bearer и берёт
+ *    uid/telegram_id ИСКЛЮЧИТЕЛЬНО из JWT. Параметры telegram_id/uid в body
+ *    игнорируются — оставлены только для обратной совместимости и логов.
  */
-async function sendSubscriptionToBackend({ subscription, telegram_id, uid }) {
+async function sendSubscriptionToBackend({ subscription }) {
   const subJson = subscription.toJSON();
   const body = {
-    telegram_id: telegram_id ?? null,
-    uid: uid ?? null,
     endpoint: subJson.endpoint,
     keys: subJson.keys,
     user_agent: navigator.userAgent || "",
@@ -192,9 +230,13 @@ async function sendSubscriptionToBackend({ subscription, telegram_id, uid }) {
   try {
     const r = await fetch(`${BACKEND_URL}/api/push/subscribe`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(body),
     });
+    if (r.status === 401) {
+      console.warn("[webpush] backend subscribe: 401 — не авторизован. Push требует логин.");
+      return false;
+    }
     if (!r.ok) {
       console.warn("[webpush] backend subscribe failed:", r.status);
       return false;
@@ -215,7 +257,7 @@ async function removeSubscriptionFromBackend(endpoint) {
   try {
     await fetch(`${BACKEND_URL}/api/push/unsubscribe`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({ endpoint }),
     });
   } catch (e) {
@@ -226,13 +268,17 @@ async function removeSubscriptionFromBackend(endpoint) {
 /**
  * Главная инициализация — вызывайте при загрузке приложения с известными идентификаторами.
  *
+ * 🔧 M3 fix (2026-07): autoPrompt по умолчанию = false. Permission запрашивается
+ *    только через `requestWebPushPermission()` (вызывается из user-gesture click handler).
+ *    Если autoPrompt=true и permission=default → нативный prompt сразу.
+ *
  * @param {Object} opts
- * @param {number|null} opts.telegram_id - реальный TG id или pseudo_tid (10^10+uid)
- * @param {string|null} opts.uid - UID юзера
- * @param {boolean} opts.autoPrompt - запрашивать permission сразу (MVP: true)
+ * @param {number|null} opts.telegram_id - (legacy, не используется на бэке) реальный TG id
+ * @param {string|null} opts.uid - (legacy, не используется на бэке) UID юзера
+ * @param {boolean} opts.autoPrompt - запрашивать permission сразу (default: false)
  * @returns {Promise<{success: boolean, reason?: string}>}
  */
-export async function initWebPush({ telegram_id, uid, autoPrompt = true } = {}) {
+export async function initWebPush({ telegram_id, uid, autoPrompt = false } = {}) {
   // Bug B fix: внутри Telegram WebApp / VK Mini App web push НЕ работает.
   // Скипаем сразу, чтобы не дёргать SW и не вызывать permission prompt.
   if (isTelegramWebApp()) {
@@ -301,8 +347,8 @@ export async function initWebPush({ telegram_id, uid, autoPrompt = true } = {}) 
     }
   }
 
-  // 7. Отправляем подписку на backend (idempotent)
-  const ok = await sendSubscriptionToBackend({ subscription, telegram_id, uid });
+  // 7. Отправляем подписку на backend (idempotent). uid/tid берутся из JWT.
+  const ok = await sendSubscriptionToBackend({ subscription });
   if (!ok) {
     return { success: false, reason: "backend_subscribe_failed" };
   }
@@ -367,6 +413,34 @@ export async function disableWebPush() {
   }
   await removeSubscriptionFromBackend(endpoint);
   return { success: true };
+}
+
+/**
+ * 🔧 M3 fix (2026-07): Запросить permission на push (вызывать ИЗ user-gesture click).
+ *    Возвращает: { permission: 'granted'|'denied'|'default', supported, in_telegram, in_vk }
+ *    Сразу после granted рекомендуется вызвать initWebPush({autoPrompt: false}).
+ */
+export async function requestWebPushPermission() {
+  if (isTelegramWebApp()) return { permission: null, supported: false, in_telegram: true };
+  if (isVKMiniApp()) return { permission: null, supported: false, in_vk: true };
+  if (!isWebPushSupported()) return { permission: null, supported: false };
+  if (Notification.permission === "granted") return { permission: "granted", supported: true };
+  if (Notification.permission === "denied") return { permission: "denied", supported: true };
+  try {
+    const perm = await Notification.requestPermission();
+    return { permission: perm, supported: true };
+  } catch (e) {
+    console.warn("[webpush] requestPermission failed:", e);
+    return { permission: "default", supported: true, error: String(e) };
+  }
+}
+
+/**
+ * 🔧 H4 fix: вернуть текущий VAPID public key (с кэшем).
+ *    Полезно UI для проверки, что push-инфраструктура настроена.
+ */
+export async function getVapidPublicKey() {
+  return await fetchVapidPublicKey();
 }
 
 /**

@@ -22,7 +22,7 @@ const EmailRegisterForm = ({ onSuccess, onSwitchLogin }) => {
     if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
       return 'Введите корректный email';
     }
-    if (password.length < 6) return 'Пароль должен быть не менее 6 символов';
+    if (password.length < 8) return 'Пароль должен быть не менее 8 символов';
     if (password !== confirmPassword) return 'Пароли не совпадают';
     if (!firstName.trim()) return 'Введите имя';
     return null;

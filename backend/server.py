@@ -4371,42 +4371,52 @@ async def get_vapid_public_key_endpoint():
 
 
 @api_router.post("/push/subscribe")
-async def push_subscribe(payload: dict = Body(...)):
-    """Сохранить web push subscription.
+async def push_subscribe(
+    payload: dict = Body(...),
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Сохранить web push subscription для АВТОРИЗОВАННОГО пользователя.
+
+    🔐 SECURITY (C2 fix, 2026-07): tid/uid берутся ИСКЛЮЧИТЕЛЬНО из JWT,
+    параметры из body игнорируются (раньше был IDOR — атакующий мог
+    подписаться на чужие push-уведомления, зная только telegram_id).
 
     Body:
       {
-        "telegram_id": 123456789,          # опционально
-        "uid": "000123456",                # опционально, но желателен
         "endpoint": "https://...",
         "keys": {"p256dh": "...", "auth": "..."},
         "user_agent": "Mozilla/..."        # опционально
       }
 
-    Минимум один из (telegram_id, uid) должен быть указан.
     Идемпотентный: повторный subscribe того же endpoint просто обновит привязку юзера.
     """
+    from auth_utils import check_rate_limit
     from services.webpush import save_subscription, is_webpush_configured
     if not is_webpush_configured():
         raise HTTPException(status_code=503, detail="web_push_not_configured")
+
+    # uid и telegram_id — ТОЛЬКО из JWT (никогда из body)
+    uid_ = current_user.get("uid")
+    tid_int = current_user.get("tid")  # реальный или pseudo (из effective_tid_for_user)
+    try:
+        tid_int = int(tid_int) if tid_int is not None else None
+    except (TypeError, ValueError):
+        tid_int = None
+    if not uid_ and tid_int is None:
+        raise HTTPException(status_code=401, detail="invalid_token_no_identity")
+
+    # Rate limit: 20 подписок/час на uid (защита от заваливания таблицы)
+    if uid_ and not check_rate_limit(str(uid_), "push_subscribe_uid", 20, 3600):
+        raise HTTPException(status_code=429, detail="Слишком много подписок. Попробуйте позже.")
 
     endpoint = (payload or {}).get("endpoint")
     keys = (payload or {}).get("keys") or {}
     p256dh = keys.get("p256dh")
     auth = keys.get("auth")
-    telegram_id = payload.get("telegram_id")
-    uid_ = payload.get("uid")
-    user_agent = payload.get("user_agent") or ""
+    user_agent = (payload or {}).get("user_agent") or ""
 
     if not endpoint or not p256dh or not auth:
         raise HTTPException(status_code=400, detail="missing endpoint/keys")
-    if telegram_id is None and not uid_:
-        raise HTTPException(status_code=400, detail="missing telegram_id or uid")
-
-    try:
-        tid_int = int(telegram_id) if telegram_id is not None else None
-    except (TypeError, ValueError):
-        tid_int = None
 
     sub_id = await save_subscription(
         db,
@@ -4425,33 +4435,69 @@ async def push_subscribe(payload: dict = Body(...)):
 
 
 @api_router.post("/push/unsubscribe")
-async def push_unsubscribe(payload: dict = Body(...)):
-    """Удалить subscription по endpoint."""
+async def push_unsubscribe(
+    payload: dict = Body(...),
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Удалить subscription по endpoint.
+
+    🔐 SECURITY (C2 fix): удаляем подписку ТОЛЬКО если она принадлежит
+    текущему юзеру (защита от анонимного массового unsubscribe).
+    """
     from services.webpush import remove_subscription
     endpoint = (payload or {}).get("endpoint")
     if not endpoint:
         raise HTTPException(status_code=400, detail="missing endpoint")
+
+    # Проверяем владение подпиской
+    uid_ = current_user.get("uid")
+    tid_ = current_user.get("tid")
+    sub_doc = await db.web_push_subscriptions.find_one({"endpoint": endpoint}, {"_id": 0, "uid": 1, "telegram_id": 1})
+    if sub_doc:
+        owns = False
+        if uid_ and sub_doc.get("uid") == uid_:
+            owns = True
+        if tid_ is not None and sub_doc.get("telegram_id") == tid_:
+            owns = True
+        if not owns:
+            # Не отдаём 403 явно (privacy), но и не удаляем
+            logger.warning(
+                f"⚠️ push.unsubscribe: foreign endpoint attempt by uid={uid_} "
+                f"(sub.uid={sub_doc.get('uid')}, sub.tid={sub_doc.get('telegram_id')})"
+            )
+            return {"status": "ok", "removed": False}
+
     ok = await remove_subscription(db, endpoint=endpoint)
     return {"status": "ok", "removed": ok}
 
 
 @api_router.post("/push/test")
-async def push_test(payload: dict = Body(...)):
-    """Тестовый push — отправляется на все активные подписки указанного юзера.
+async def push_test(
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Тестовый push — отправляется на все активные подписки текущего юзера.
 
-    Полезно для UI «Проверить push» в настройках. Никакого in-app/TG не делает.
+    🔐 SECURITY (C2 fix): без body, цель — всегда сам пользователь.
+    Rate limit: 5 тестов/час/uid (защита от self-spam).
     """
+    from auth_utils import check_rate_limit
     from services.webpush import send_web_push_to_user, is_webpush_configured
     if not is_webpush_configured():
         raise HTTPException(status_code=503, detail="web_push_not_configured")
-    telegram_id = payload.get("telegram_id")
-    uid_ = payload.get("uid")
-    if telegram_id is None and not uid_:
-        raise HTTPException(status_code=400, detail="missing telegram_id or uid")
+
+    uid_ = current_user.get("uid")
+    tid_ = current_user.get("tid")
     try:
-        tid_int = int(telegram_id) if telegram_id is not None else None
+        tid_int = int(tid_) if tid_ is not None else None
     except (TypeError, ValueError):
         tid_int = None
+    if not uid_ and tid_int is None:
+        raise HTTPException(status_code=401, detail="invalid_token_no_identity")
+
+    # Rate limit
+    rl_key = str(uid_) if uid_ else f"tid:{tid_int}"
+    if not check_rate_limit(rl_key, "push_test_uid", 5, 3600):
+        raise HTTPException(status_code=429, detail="Слишком частые тестовые push. Попробуйте через час.")
 
     res = await send_web_push_to_user(
         db,
@@ -4473,12 +4519,22 @@ async def push_test(payload: dict = Body(...)):
 
 
 @api_router.get("/push/subscriptions")
-async def push_get_subscriptions(telegram_id: Optional[int] = None, uid: Optional[str] = None):
-    """Получить список подписок юзера (для UI: какие устройства подключены)."""
+async def push_get_subscriptions(
+    current_user: Dict[str, Any] = Depends(get_current_user_required),
+):
+    """Получить список подписок текущего юзера (для UI: какие устройства подключены).
+
+    🔐 SECURITY (C2 fix): только подписки текущего пользователя.
+    """
     from services.webpush import get_subscriptions_for_user
-    if telegram_id is None and not uid:
-        raise HTTPException(status_code=400, detail="missing telegram_id or uid")
-    subs = await get_subscriptions_for_user(db, telegram_id=telegram_id, uid=uid)
+    uid_ = current_user.get("uid")
+    tid_ = current_user.get("tid")
+    try:
+        tid_int = int(tid_) if tid_ is not None else None
+    except (TypeError, ValueError):
+        tid_int = None
+
+    subs = await get_subscriptions_for_user(db, telegram_id=tid_int, uid=uid_)
     # Прячем endpoint/keys — отдаём только мета-инфу
     return {
         "subscriptions": [

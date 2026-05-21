@@ -114,7 +114,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Best-effort: отзываем сессию на сервере + отписываемся от push
     try { await authAPI.logout(); } catch { /* ignore */ }
+    try {
+      // Динамический импорт, чтобы не тянуть webpush.js без необходимости
+      const mod = await import('../utils/webpush');
+      await mod.disableWebPush();
+    } catch { /* ignore */ }
     clearLocalAuth();
   }, [clearLocalAuth]);
 
@@ -326,6 +332,7 @@ export const AuthProvider = ({ children }) => {
     applyQRResult,
     logout,
     refreshMe,
+    refreshUser: refreshMe, // M7 alias: refreshUser → refreshMe (для удобства)
     updateProfile,
     // P2/P3: Password & email verification
     changePassword,

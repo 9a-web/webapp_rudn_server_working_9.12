@@ -3,7 +3,9 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-        <meta name="theme-color" content="#1C1C1E" />
+        <!-- L7 fix: separate theme-color for light/dark mode -->
+        <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#1C1C1E" media="(prefers-color-scheme: dark)" />
         <meta name="description" content="RUDN Schedule - Telegram WebApp" />
         
         <!-- iOS Web App -->
@@ -18,58 +20,31 @@
         <!-- Telegram WebApp SDK (локальная копия) -->
         <script src="/telegram-web-app.js"></script>
         
-        <!-- ⭐️ Telegram Full Screen Initialization -->
+        <!-- ⭐️ Telegram WebApp Initialization (H3 fix 2026-07: убрали 26x спам expand()) -->
         <script>
-            // Инициализируем full screen сразу при загрузке
             (function() {
-                console.log('🟢 [index.html] Начало инициализации Telegram WebApp');
-                
-                // Ждем загрузки Telegram WebApp API
-                var checkTelegram = setInterval(function() {
+                console.log('🟢 [index.html] Telegram WebApp init');
+                var attempts = 0;
+                var MAX_WAIT = 50; // макс. 0.5 сек ожидания загрузки SDK
+                var iv = setInterval(function() {
+                    attempts++;
                     if (window.Telegram && window.Telegram.WebApp) {
-                        clearInterval(checkTelegram);
-                        
+                        clearInterval(iv);
                         var tg = window.Telegram.WebApp;
-                        console.log('🟢 [index.html] Telegram WebApp API загружен');
-                        console.log('📊 [index.html] Состояние до ready():', {
-                            isExpanded: tg.isExpanded,
-                            viewportHeight: tg.viewportHeight
-                        });
-                        
-                        // Вызываем ready
-                        tg.ready();
-                        console.log('✅ [index.html] tg.ready() вызван');
-                        
-                        // Агрессивно вызываем expand много раз
-                        var expandAttempts = 0;
-                        var maxAttempts = 20;
-                        
-                        var tryExpand = function() {
-                            expandAttempts++;
-                            console.log('🔄 [index.html] Попытка expand #' + expandAttempts);
-                            tg.expand();
-                            
-                            setTimeout(function() {
-                                console.log('📏 [index.html] isExpanded:', tg.isExpanded, ', viewportHeight:', tg.viewportHeight);
-                                
-                                if (!tg.isExpanded && expandAttempts < maxAttempts) {
-                                    setTimeout(tryExpand, 100);
-                                } else if (tg.isExpanded) {
-                                    console.log('🎉 [index.html] УСПЕХ! WebApp развернут на полный экран');
+                        try { tg.ready(); } catch (e) {}
+                        try { tg.expand(); } catch (e) {}
+                        // Подписываемся на изменение viewport — если свернётся, развернём
+                        try {
+                            tg.onEvent('viewportChanged', function() {
+                                if (!tg.isExpanded) {
+                                    try { tg.expand(); } catch (_) {}
                                 }
-                            }, 50);
-                        };
-                        
-                        // Начинаем попытки expand
-                        tryExpand();
-                        
-                        // Дополнительные вызовы с интервалами
-                        setTimeout(function() { tg.expand(); }, 10);
-                        setTimeout(function() { tg.expand(); }, 50);
-                        setTimeout(function() { tg.expand(); }, 100);
-                        setTimeout(function() { tg.expand(); }, 200);
-                        setTimeout(function() { tg.expand(); }, 500);
-                        setTimeout(function() { tg.expand(); }, 1000);
+                            });
+                        } catch (e) {}
+                        console.log('✅ [index.html] tg.ready() + tg.expand() called once. platform=' + tg.platform + ', isExpanded=' + tg.isExpanded);
+                    } else if (attempts >= MAX_WAIT) {
+                        clearInterval(iv);
+                        console.warn('⚠️ [index.html] Telegram WebApp SDK not available — standalone PWA mode');
                     }
                 }, 10);
             })();

@@ -39,9 +39,21 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds
 
 
 def hash_password(password: str) -> str:
-    """Хэширует пароль через bcrypt."""
-    if not password or len(password) < 6:
-        raise ValueError("Пароль должен содержать минимум 6 символов")
+    """Хэширует пароль через bcrypt.
+
+    🔧 M2 fix (2026-07): min length 6 → 8 (NIST 800-63B recommendation).
+    Дополнительно: проверка на топ-100 «худших паролей» (быстрая защита от brute-force).
+    """
+    if not password or len(password) < 8:
+        raise ValueError("Пароль должен содержать минимум 8 символов")
+    # Тривиальные пароли (расширяемый список — топ из haveibeenpwned/SecLists)
+    _BLACKLIST = {
+        "password", "12345678", "123456789", "qwerty123", "qwertyui",
+        "1q2w3e4r", "password1", "password123", "admin123", "letmein1",
+        "welcome1", "qwerty12", "abc12345", "12341234",
+    }
+    if password.lower() in _BLACKLIST:
+        raise ValueError("Слишком простой пароль. Используйте более надёжную комбинацию.")
     return pwd_context.hash(password)
 
 

@@ -1589,17 +1589,41 @@ def create_auth_router(db) -> APIRouter:
         if status == "confirmed" and session.get("confirmed_uid"):
             user_doc = await db.users.find_one({"uid": session["confirmed_uid"]})
             if user_doc:
+                # 🔐 C3 FIX (2026-07): создаём jti и регистрируем сессию.
+                # Раньше JWT выдавался с дефолтным jti, но запись в auth_sessions
+                # не создавалась → следующий запрос ловил 401 «Сессия отозвана»
+                # из get_current_user_required.is_session_active().
+                import secrets as _secrets
+                from config import JWT_EXPIRE_DAYS as _EXP_DAYS
+                jti = _secrets.token_urlsafe(12)
+                expires_at_jwt = now + timedelta(days=_EXP_DAYS)
+
                 token = create_jwt(
                     uid=user_doc["uid"],
                     telegram_id=effective_tid_for_user(user_doc),
                     providers=user_doc.get("auth_providers", []),
+                    jti=jti,
                 )
+                # Регистрируем сессию (best-effort)
+                try:
+                    await register_session(
+                        db,
+                        uid=user_doc["uid"],
+                        jti=jti,
+                        expires_at=expires_at_jwt,
+                        request=request,
+                        provider=user_doc.get("primary_auth") or "qr",
+                    )
+                except Exception as _e:
+                    logger.warning(f"qr_status: register_session failed (continuing): {_e}")
+
                 await db.auth_qr_sessions.update_one(
                     {"qr_token": qr_token},
                     {"$set": {
                         "status": "consumed",
                         "issued_token": token,
                         "issued_at": now,
+                        "issued_jti": jti,
                     }},
                 )
                 await _update_last_login(db, user_doc["uid"])

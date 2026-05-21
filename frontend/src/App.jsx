@@ -137,7 +137,7 @@ const Home = () => {
       initWebPush({
         telegram_id: user.id,
         uid: user.uid || null,
-        autoPrompt: true,
+        autoPrompt: false, // M3 fix: разрешение запрашиваем только из user-gesture (см. NotificationSettings)
       })
         .then((res) => {
           if (res.success) {
