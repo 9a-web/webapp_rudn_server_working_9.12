@@ -64,14 +64,16 @@ export function isWebPushSupported() {
 /**
  * Проверяет: запущено ли приложение в standalone-режиме (для iOS обязательно).
  * Android Chrome тоже учитывает, но там обычно push работает и в браузере.
+ *
+ * Bug L fix: явные скобки вокруг && и || — для читаемости и защиты от
+ * случайного редактирования.
  */
 export function isStandalone() {
   if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia &&
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true
-  );
+  const matchStandalone =
+    !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  const iosStandalone = window.navigator && window.navigator.standalone === true;
+  return matchStandalone || iosStandalone;
 }
 
 /**
@@ -80,6 +82,58 @@ export function isStandalone() {
 export function isIOS() {
   if (typeof navigator === "undefined") return false;
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+/**
+ * Bug B fix: определяет, запущено ли приложение внутри Telegram WebApp.
+ *
+ * Внутри TG WebView (мобильный/Desktop TG-клиент) Web Push НЕ работает:
+ *   - PushManager либо отсутствует, либо subscribe() возвращает ошибку
+ *   - В iOS-TG нельзя установить PWA на главный экран
+ *   - Юзеру не нужен web push в TG — он уже получит TG-bot push
+ *
+ * Поэтому в TG-контексте мы НЕ регистрируем SW и не запрашиваем permission —
+ * иначе юзер видит лишний модал и в логах появляются ошибки subscribe.
+ *
+ * Что проверяем:
+ *   1. window.Telegram.WebApp существует и initData/initDataUnsafe непустые
+ *      (это значит юзер реально открыл WebApp через бота)
+ *   2. userAgent содержит "Telegram" (часть TG-клиентов добавляет)
+ */
+export function isTelegramWebApp() {
+  if (typeof window === "undefined") return false;
+  try {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) {
+      // initData может быть пустым, если открыли вне бота — тогда это просто браузер
+      if (tg.initData && tg.initData.length > 0) return true;
+      // initDataUnsafe может быть с user → значит реально через бота
+      if (tg.initDataUnsafe && tg.initDataUnsafe.user) return true;
+    }
+  } catch (e) { /* ignore */ }
+  // Дополнительная эвристика: User-Agent
+  try {
+    if (navigator && navigator.userAgent && /Telegram/i.test(navigator.userAgent)) {
+      return true;
+    }
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+/**
+ * VK Mini App detection — для будущего использования.
+ * Внутри VK MiniApp Web Push тоже не работает, нужны VK SDK callbacks.
+ */
+export function isVKMiniApp() {
+  if (typeof window === "undefined") return false;
+  try {
+    // VK Bridge кладёт глобал window.vkBridge или window.vk
+    if (window.vkBridge || (window.vk && window.vk.bridge)) return true;
+    // VK Mini App открывается в iframe с url-параметром vk_user_id
+    const params = new URLSearchParams(window.location.search || "");
+    if (params.get("vk_user_id")) return true;
+  } catch (e) { /* ignore */ }
+  return false;
 }
 
 /**
@@ -179,6 +233,17 @@ async function removeSubscriptionFromBackend(endpoint) {
  * @returns {Promise<{success: boolean, reason?: string}>}
  */
 export async function initWebPush({ telegram_id, uid, autoPrompt = true } = {}) {
+  // Bug B fix: внутри Telegram WebApp / VK Mini App web push НЕ работает.
+  // Скипаем сразу, чтобы не дёргать SW и не вызывать permission prompt.
+  if (isTelegramWebApp()) {
+    console.log("[webpush] Telegram WebApp detected — skip web push (use bot push instead)");
+    return { success: false, reason: "telegram_webapp" };
+  }
+  if (isVKMiniApp()) {
+    console.log("[webpush] VK Mini App detected — skip web push (use VK SDK instead)");
+    return { success: false, reason: "vk_miniapp" };
+  }
+
   // 1. Базовая поддержка
   if (!isWebPushSupported()) {
     return { success: false, reason: "not_supported" };
@@ -242,15 +307,36 @@ export async function initWebPush({ telegram_id, uid, autoPrompt = true } = {}) 
     return { success: false, reason: "backend_subscribe_failed" };
   }
 
-  // 8. Подписываемся на сообщения от SW (notification click)
+  // 8. Подписываемся на сообщения от SW (notification click).
+  // Improvement 2 (cross-channel dedup): после клика по push помечаем
+  // соответствующее in-app как прочитанное, чтобы бейдж в UI не висел.
   if (!window.__rudn_webpush_listener_attached) {
     navigator.serviceWorker.addEventListener("message", (event) => {
       if (event.data && event.data.type === "NOTIFICATION_CLICK") {
         const url = event.data.url || "/";
+        const notificationId = event.data.notificationId || null;
+
+        // Помечаем in-app как read через backend API (fire-and-forget).
+        if (notificationId && telegram_id) {
+          try {
+            const apiBase = (typeof process !== "undefined" && process.env && process.env.REACT_APP_BACKEND_URL)
+              || (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.REACT_APP_BACKEND_URL)
+              || "";
+            fetch(`${apiBase}/api/notifications/${encodeURIComponent(notificationId)}/read?telegram_id=${encodeURIComponent(telegram_id)}`, {
+              method: "PATCH",
+            }).catch(() => { /* ignore */ });
+            // Уведомляем фронт-стейт, чтобы бейдж обновился без перезагрузки
+            window.dispatchEvent(new CustomEvent("notification-marked-read", {
+              detail: { notificationId },
+            }));
+          } catch (e) {
+            // ignore
+          }
+        }
+
         try {
           // Если уже на нужной странице — ничего не делаем
           if (window.location.pathname + window.location.search !== url) {
-            // Используем react-router если есть, иначе fallback на window.location
             window.location.href = url;
           }
         } catch (e) {
@@ -287,6 +373,13 @@ export async function disableWebPush() {
  * Получить текущий статус: есть ли активная подписка.
  */
 export async function getWebPushStatus() {
+  // Bug B fix: в TG/VK web push неприменим — отдаём явный статус
+  if (isTelegramWebApp()) {
+    return { supported: false, reason: "telegram_webapp", subscribed: false };
+  }
+  if (isVKMiniApp()) {
+    return { supported: false, reason: "vk_miniapp", subscribed: false };
+  }
   if (!isWebPushSupported()) return { supported: false };
   if (isIOS() && !isStandalone()) {
     return {

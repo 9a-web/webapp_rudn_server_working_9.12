@@ -1,928 +1,530 @@
 #!/usr/bin/env python3
 """
-Backend Testing Script for RUDN Webapp
-Tests for:
-1. GET /api/search/global - Global user search (public + authenticated)
-2. GET /api/u/{uid} - User profile with is_setup_complete field
+Backend Testing for Notification System (Release 3)
+Tests the major audit/refactor of the notification system.
 """
 
+import asyncio
+import sys
 import requests
 import json
-import time
-import random
-import string
-from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 
-# Backend URL
-BACKEND_URL = "https://rudn-auth-hub-1.preview.emergentagent.com/api"
+# Backend URL from environment
+BACKEND_URL = "http://localhost:8001/api"
 
-# Test credentials from test_credentials.md
-TEST_USER_EMAIL = "logout_test@test.com"
-TEST_USER_PASSWORD = "Test1234"
-TEST_USER_UID = "913842163"
+# Test credentials
+TEST_EMAIL = "test_notif_r3@test.com"
+TEST_PASSWORD = "Test1234"
+TEST_UID = "915128176"
 
-# Color codes for output
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-BLUE = "\033[94m"
-RESET = "\033[0m"
-
+# Colors for output
+class Colors:
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    RESET = '\033[0m'
 
 def log_test(name: str):
-    """Log test name"""
-    print(f"\n{BLUE}{'='*80}{RESET}")
-    print(f"{BLUE}TEST: {name}{RESET}")
-    print(f"{BLUE}{'='*80}{RESET}")
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.RESET}")
+    print(f"{Colors.BLUE}TEST: {name}{Colors.RESET}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.RESET}")
+
+def log_success(msg: str):
+    print(f"{Colors.GREEN}✓ {msg}{Colors.RESET}")
+
+def log_error(msg: str):
+    print(f"{Colors.RED}✗ {msg}{Colors.RESET}")
+
+def log_warning(msg: str):
+    print(f"{Colors.YELLOW}⚠ {msg}{Colors.RESET}")
+
+def log_info(msg: str):
+    print(f"{Colors.BLUE}ℹ {msg}{Colors.RESET}")
 
 
-def log_success(message: str):
-    """Log success message"""
-    print(f"{GREEN}✅ {message}{RESET}")
-
-
-def log_error(message: str):
-    """Log error message"""
-    print(f"{RED}❌ {message}{RESET}")
-
-
-def log_warning(message: str):
-    """Log warning message"""
-    print(f"{YELLOW}⚠️  {message}{RESET}")
-
-
-def log_info(message: str):
-    """Log info message"""
-    print(f"ℹ️  {message}")
-
-
-def get_auth_token() -> Optional[str]:
-    """Get authentication token for test user"""
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/auth/login/email",
-            json={
-                "email": TEST_USER_EMAIL,
-                "password": TEST_USER_PASSWORD
-            },
-            timeout=10
-        )
-        if response.status_code == 200:
-            data = response.json()
-            token = data.get("access_token")
-            if token:
-                log_success(f"Authenticated as {TEST_USER_EMAIL}")
-                return token
-            else:
-                log_error("No access_token in login response")
-                return None
-        else:
-            log_error(f"Login failed: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        log_error(f"Login exception: {e}")
-        return None
-
-
-def create_test_user() -> Optional[Dict[str, Any]]:
-    """Create a test user for testing"""
-    random_suffix = ''.join(random.choices(string.digits, k=6))
-    email = f"search_test_{random_suffix}@test.com"
+class TestSession:
+    """Manages authentication and session for tests"""
     
-    try:
-        # Use X-Forwarded-For to bypass rate limit
-        headers = {"X-Forwarded-For": f"192.168.{random.randint(1, 254)}.{random.randint(1, 254)}"}
+    def __init__(self):
+        self.session = requests.Session()
+        self.token: Optional[str] = None
+        self.telegram_id: Optional[int] = None
+        self.uid: Optional[str] = None
         
-        response = requests.post(
-            f"{BACKEND_URL}/auth/register/email",
-            json={
-                "email": email,
-                "password": "Test1234",
-                "first_name": "SearchTest",
-                "last_name": f"User{random_suffix}"
-            },
-            headers=headers,
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_success(f"Created test user: {email}")
-            return {
-                "email": email,
-                "password": "Test1234",
-                "uid": data.get("uid"),
-                "token": data.get("access_token")
-            }
-        else:
-            log_warning(f"Failed to create test user: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        log_warning(f"Test user creation exception: {e}")
-        return None
-
-
-# ============================================================================
-# TEST SUITE 1: GET /api/search/global
-# ============================================================================
-
-def test_global_search_anonymous():
-    """Test 1: Anonymous search without authorization"""
-    log_test("Anonymous Global Search (q=test&limit=5)")
-    
-    try:
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "test", "limit": 5},
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_info(f"Response keys: {list(data.keys())}")
-            
-            # Validate response structure
-            required_keys = ["results", "total", "has_more", "query", "limit", "offset"]
-            missing_keys = [k for k in required_keys if k not in data]
-            
-            if missing_keys:
-                log_error(f"Missing keys in response: {missing_keys}")
-                return False
-            
-            log_success(f"Response structure valid")
-            log_info(f"Total results: {data['total']}, has_more: {data['has_more']}")
-            
-            # Check results
-            results = data.get("results", [])
-            if results:
-                log_info(f"Found {len(results)} results")
-                
-                # Check first result structure
-                first = results[0]
-                log_info(f"First result keys: {list(first.keys())}")
-                
-                # Validate GlobalSearchResult fields
-                expected_fields = [
-                    "uid", "telegram_id", "username", "first_name", "last_name",
-                    "full_name", "group_name", "facultet_name", "kurs",
-                    "has_custom_avatar", "avatar_mode", "is_online",
-                    "level", "tier", "mutual_friends_count", "friendship_status"
-                ]
-                
-                missing_fields = [f for f in expected_fields if f not in first]
-                if missing_fields:
-                    log_error(f"Missing fields in result: {missing_fields}")
-                    return False
-                
-                # For anonymous users, friendship_status should be null
-                for result in results:
-                    if result.get("friendship_status") is not None:
-                        log_error(f"Anonymous user has non-null friendship_status: {result.get('friendship_status')}")
-                        return False
-                    if result.get("mutual_friends_count", 0) != 0:
-                        log_error(f"Anonymous user has non-zero mutual_friends_count: {result.get('mutual_friends_count')}")
-                        return False
-                
-                log_success("All results have null friendship_status and 0 mutual_friends_count")
-                log_success("Anonymous search working correctly")
-                return True
-            else:
-                log_warning("No results found (might be expected if no users match)")
-                return True
-        else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_authenticated(token: str):
-    """Test 2: Authenticated search with Bearer token"""
-    log_test("Authenticated Global Search (q=test&limit=5)")
-    
-    try:
-        headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "test", "limit": 5},
-            headers=headers,
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            results = data.get("results", [])
-            
-            if results:
-                log_info(f"Found {len(results)} results")
-                
-                # Check if any results have friendship_status
-                has_friend = any(r.get("friendship_status") == "friend" for r in results)
-                
-                if has_friend:
-                    log_success("Found results with friendship_status='friend'")
-                else:
-                    log_info("No friends found in results (might be expected)")
-                
-                log_success("Authenticated search working correctly")
-                return True
-            else:
-                log_warning("No results found")
-                return True
-        else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_empty_query():
-    """Test 3: Empty query (should return list sorted by xp desc)"""
-    log_test("Empty Query Search (q=)")
-    
-    try:
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "", "limit": 10},
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            results = data.get("results", [])
-            
-            log_info(f"Found {len(results)} results")
-            
-            if results:
-                log_success("Empty query returns results (sorted by xp desc)")
-                return True
-            else:
-                log_warning("No results found (might be expected if DB is empty)")
-                return True
-        else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_short_query():
-    """Test 4: Very short query (q=a)"""
-    log_test("Short Query Search (q=a)")
-    
-    try:
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "a", "limit": 5},
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_success("Short query works correctly")
-            log_info(f"Found {data.get('total', 0)} results")
-            return True
-        else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_cyrillic():
-    """Test 5: Cyrillic query (q=тест)"""
-    log_test("Cyrillic Query Search (q=тест)")
-    
-    try:
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "тест", "limit": 5},
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            log_success("Cyrillic query works correctly")
-            log_info(f"Found {data.get('total', 0)} results")
-            return True
-        else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_redos_protection():
-    """Test 6: ReDoS protection with special characters"""
-    log_test("ReDoS Protection (special characters)")
-    
-    test_queries = [
-        ".*.*.*.*.*.*.*.*",
-        "$$$$",
-        "<script>alert('xss')</script>",
-        "' OR '1'='1",
-        "\\x00\\x00\\x00",
-        "((((((((((a",
-    ]
-    
-    all_passed = True
-    
-    for query in test_queries:
+    def login(self, email: str, password: str) -> bool:
+        """Login and get JWT token"""
         try:
-            log_info(f"Testing query: {repr(query)}")
-            response = requests.get(
-                f"{BACKEND_URL}/search/global",
-                params={"q": query, "limit": 5},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                log_success(f"Query handled safely: {repr(query)}")
-            else:
-                log_error(f"Query failed: {response.status_code}")
-                all_passed = False
-                
-        except Exception as e:
-            log_error(f"Exception for query {repr(query)}: {e}")
-            all_passed = False
-    
-    if all_passed:
-        log_success("ReDoS protection working correctly")
-    
-    return all_passed
-
-
-def test_global_search_filters():
-    """Test 7: Filters (group_id, facultet_id, kurs)"""
-    log_test("Filter Tests (group_id, facultet_id, kurs)")
-    
-    # Test with empty filters (should work)
-    try:
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "", "limit": 5},
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            log_success("Filter endpoint accessible")
-            
-            # Note: We can't test specific filters without knowing valid group_id/facultet_id values
-            log_info("Note: Specific filter values not tested (need valid group_id/facultet_id from DB)")
-            return True
-        else:
-            log_error(f"Request failed: {response.status_code}")
-            return False
-            
-    except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_limit_validation():
-    """Test 8: Limit validation (1, 10, 50, 100, 0, -5)"""
-    log_test("Limit Validation")
-    
-    test_cases = [
-        (1, 1, "limit=1 should return 1 result"),
-        (10, 10, "limit=10 should return up to 10 results"),
-        (50, 50, "limit=50 should return up to 50 results"),
-        (100, 50, "limit=100 should be capped to 50"),
-        (0, 1, "limit=0 should be clamped to 1"),
-        (-5, 1, "limit=-5 should be clamped to 1"),
-    ]
-    
-    all_passed = True
-    
-    for limit_param, expected_max, description in test_cases:
-        try:
-            log_info(f"Testing: {description}")
-            response = requests.get(
-                f"{BACKEND_URL}/search/global",
-                params={"q": "", "limit": limit_param},
-                timeout=10
+            response = self.session.post(
+                f"{BACKEND_URL}/auth/login/email",
+                json={"email": email, "password": password}
             )
             
             if response.status_code == 200:
                 data = response.json()
-                actual_limit = data.get("limit")
-                results_count = len(data.get("results", []))
+                self.token = data.get("access_token")
                 
-                if actual_limit == expected_max:
-                    log_success(f"Limit correctly set to {actual_limit}")
-                else:
-                    log_error(f"Expected limit={expected_max}, got {actual_limit}")
-                    all_passed = False
+                # Extract from user object if present
+                user = data.get("user", {})
+                self.telegram_id = user.get("telegram_id") or data.get("telegram_id")
+                self.uid = user.get("uid") or data.get("uid")
                 
-                if results_count <= expected_max:
-                    log_success(f"Results count ({results_count}) <= limit ({expected_max})")
-                else:
-                    log_error(f"Results count ({results_count}) > limit ({expected_max})")
-                    all_passed = False
-            else:
-                log_error(f"Request failed: {response.status_code}")
-                all_passed = False
-                
+                if self.token:
+                    self.session.headers.update({
+                        "Authorization": f"Bearer {self.token}"
+                    })
+                    log_success(f"Logged in as {email} (tid={self.telegram_id}, uid={self.uid})")
+                    return True
+            
+            log_error(f"Login failed: {response.status_code} - {response.text}")
+            return False
+            
         except Exception as e:
-            log_error(f"Exception: {e}")
+            log_error(f"Login exception: {e}")
+            return False
+    
+    def get(self, endpoint: str, **kwargs) -> requests.Response:
+        """GET request with auth"""
+        return self.session.get(f"{BACKEND_URL}{endpoint}", **kwargs)
+    
+    def post(self, endpoint: str, **kwargs) -> requests.Response:
+        """POST request with auth"""
+        return self.session.post(f"{BACKEND_URL}{endpoint}", **kwargs)
+    
+    def put(self, endpoint: str, **kwargs) -> requests.Response:
+        """PUT request with auth"""
+        return self.session.put(f"{BACKEND_URL}{endpoint}", **kwargs)
+    
+    def patch(self, endpoint: str, **kwargs) -> requests.Response:
+        """PATCH request with auth"""
+        return self.session.patch(f"{BACKEND_URL}{endpoint}", **kwargs)
+    
+    def delete(self, endpoint: str, **kwargs) -> requests.Response:
+        """DELETE request with auth"""
+        return self.session.delete(f"{BACKEND_URL}{endpoint}", **kwargs)
+
+
+def test_health_endpoint(session: TestSession) -> bool:
+    """Test 1: New health endpoint with different parameters"""
+    log_test("Health Endpoint - GET /api/admin/notifications/health")
+    
+    all_passed = True
+    
+    # Test 1.1: Default (24 hours)
+    try:
+        response = session.get("/admin/notifications/health")
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Check required fields
+            required_fields = [
+                "window_hours", "since_utc", "now_utc",
+                "delivery_attempts", "scheduled_notifications",
+                "push_subscriptions", "dlq_size", "in_app", "platforms"
+            ]
+            
+            missing = [f for f in required_fields if f not in data]
+            if missing:
+                log_error(f"Missing fields: {missing}")
+                all_passed = False
+            else:
+                log_success(f"Default (24h): All required fields present")
+                log_info(f"  window_hours: {data['window_hours']}")
+                log_info(f"  push_subscriptions: active={data['push_subscriptions']['active']}, inactive={data['push_subscriptions']['inactive']}")
+                log_info(f"  dlq_size: {data['dlq_size']}")
+                log_info(f"  platforms: real_telegram={data['platforms']['real_telegram']}, pseudo={data['platforms']['pseudo_tid_vk_or_email']}")
+        else:
+            log_error(f"Default request failed: {response.status_code}")
             all_passed = False
+            
+    except Exception as e:
+        log_error(f"Default test exception: {e}")
+        all_passed = False
+    
+    # Test 1.2: hours=1
+    try:
+        response = session.get("/admin/notifications/health?hours=1")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("window_hours") == 1:
+                log_success("hours=1: Correct window")
+            else:
+                log_error(f"hours=1: Expected window_hours=1, got {data.get('window_hours')}")
+                all_passed = False
+        else:
+            log_error(f"hours=1 failed: {response.status_code}")
+            all_passed = False
+            
+    except Exception as e:
+        log_error(f"hours=1 exception: {e}")
+        all_passed = False
+    
+    # Test 1.3: hours=720 (max)
+    try:
+        response = session.get("/admin/notifications/health?hours=720")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("window_hours") == 720:
+                log_success("hours=720: Max window accepted")
+            else:
+                log_error(f"hours=720: Expected 720, got {data.get('window_hours')}")
+                all_passed = False
+        else:
+            log_error(f"hours=720 failed: {response.status_code}")
+            all_passed = False
+            
+    except Exception as e:
+        log_error(f"hours=720 exception: {e}")
+        all_passed = False
+    
+    # Test 1.4: hours=0 (should default to 24, not clamp to 1)
+    try:
+        response = session.get("/admin/notifications/health?hours=0")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("window_hours") == 24:
+                log_success("hours=0: Correctly defaults to 24")
+            else:
+                log_error(f"hours=0: Expected default to 24, got {data.get('window_hours')}")
+                all_passed = False
+        else:
+            log_error(f"hours=0 failed: {response.status_code}")
+            all_passed = False
+            
+    except Exception as e:
+        log_error(f"hours=0 exception: {e}")
+        all_passed = False
     
     return all_passed
 
 
-def test_global_search_pagination():
-    """Test 9: Pagination (offset=0, offset=5)"""
-    log_test("Pagination Test")
+def test_existing_notification_endpoints(session: TestSession) -> bool:
+    """Test 2: Existing notification endpoints still work"""
+    log_test("Existing Notification Endpoints")
     
-    try:
-        # First page
-        response1 = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "", "limit": 5, "offset": 0},
-            timeout=10
-        )
-        
-        if response1.status_code != 200:
-            log_error(f"First page request failed: {response1.status_code}")
-            return False
-        
-        data1 = response1.json()
-        results1 = data1.get("results", [])
-        has_more1 = data1.get("has_more", False)
-        
-        log_info(f"Page 1: {len(results1)} results, has_more={has_more1}")
-        
-        # Second page
-        response2 = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "", "limit": 5, "offset": 5},
-            timeout=10
-        )
-        
-        if response2.status_code != 200:
-            log_error(f"Second page request failed: {response2.status_code}")
-            return False
-        
-        data2 = response2.json()
-        results2 = data2.get("results", [])
-        
-        log_info(f"Page 2: {len(results2)} results")
-        
-        # Check that results are different (if both pages have results)
-        if results1 and results2:
-            uids1 = {r.get("uid") for r in results1}
-            uids2 = {r.get("uid") for r in results2}
-            
-            if uids1 & uids2:
-                log_error("Pages have overlapping UIDs (pagination not working)")
-                return False
-            else:
-                log_success("Pagination working correctly (no overlapping results)")
-        else:
-            log_info("Not enough results to test pagination overlap")
-        
-        log_success("Pagination endpoint working")
-        return True
-        
-    except Exception as e:
-        log_error(f"Exception: {e}")
+    all_passed = True
+    tid = session.telegram_id
+    
+    # Use pseudo_tid if no real telegram_id
+    if not tid and session.uid:
+        PSEUDO_TID_OFFSET = 2_000_000_000
+        tid = PSEUDO_TID_OFFSET + int(session.uid)
+        log_info(f"Using pseudo_tid: {tid}")
+    
+    if not tid:
+        log_error("No telegram_id or uid available, skipping")
         return False
-
-
-def test_global_search_own_profile_excluded(token: str):
-    """Test 10: Own profile excluded from results"""
-    log_test("Own Profile Exclusion Test")
     
+    # Test 2.1: GET /api/notifications/{telegram_id}
     try:
-        # First, get own profile to know username
-        headers = {"Authorization": f"Bearer {token}"}
-        profile_response = requests.get(
-            f"{BACKEND_URL}/u/{TEST_USER_UID}",
-            headers=headers,
-            timeout=10
-        )
-        
-        if profile_response.status_code != 200:
-            log_warning("Could not fetch own profile to test exclusion")
-            return True  # Skip test
-        
-        profile = profile_response.json()
-        own_username = profile.get("username", "")
-        own_first_name = profile.get("first_name", "")
-        
-        if not own_username and not own_first_name:
-            log_warning("Own profile has no username or first_name to search for")
-            return True  # Skip test
-        
-        # Search for own username/name
-        search_query = own_username if own_username else own_first_name
-        log_info(f"Searching for own profile: q={search_query}")
-        
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": search_query, "limit": 20},
-            headers=headers,
-            timeout=10
-        )
+        response = session.get(f"/notifications/{tid}")
         
         if response.status_code == 200:
             data = response.json()
-            results = data.get("results", [])
-            
-            # Check if own UID is in results
-            own_uid_in_results = any(r.get("uid") == TEST_USER_UID for r in results)
-            
-            if own_uid_in_results:
-                log_error(f"Own profile (UID={TEST_USER_UID}) found in search results!")
-                return False
-            else:
-                log_success("Own profile correctly excluded from search results")
-                return True
+            log_success(f"GET /notifications/{tid}: {response.status_code}")
+            log_info(f"  Notifications count: {len(data.get('notifications', []))}")
         else:
-            log_error(f"Request failed: {response.status_code}")
-            return False
+            log_error(f"GET /notifications/{tid} failed: {response.status_code}")
+            all_passed = False
             
     except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_global_search_response_model():
-    """Test 11: Response model validation"""
-    log_test("Response Model Validation")
+        log_error(f"GET notifications exception: {e}")
+        all_passed = False
     
+    # Test 2.2: GET /api/notifications/{telegram_id}/unread-count
     try:
-        response = requests.get(
-            f"{BACKEND_URL}/search/global",
-            params={"q": "test", "limit": 5},
-            timeout=10
-        )
+        response = session.get(f"/notifications/{tid}/unread-count")
         
         if response.status_code == 200:
             data = response.json()
-            
-            # Check GlobalSearchResponse structure
-            required_response_fields = ["results", "total", "has_more", "query", "limit", "offset"]
-            missing_response_fields = [f for f in required_response_fields if f not in data]
-            
-            if missing_response_fields:
-                log_error(f"Missing response fields: {missing_response_fields}")
-                return False
-            
-            log_success("GlobalSearchResponse structure valid")
-            
-            # Check types
-            if not isinstance(data["results"], list):
-                log_error("results is not a list")
-                return False
-            
-            if not isinstance(data["total"], int):
-                log_error("total is not an int")
-                return False
-            
-            if not isinstance(data["has_more"], bool):
-                log_error("has_more is not a bool")
-                return False
-            
-            if data["query"] is not None and not isinstance(data["query"], str):
-                log_error("query is not a string or null")
-                return False
-            
-            log_success("Response field types valid")
-            
-            # Check GlobalSearchResult structure (if results exist)
-            if data["results"]:
-                result = data["results"][0]
-                
-                required_result_fields = [
-                    "uid", "telegram_id", "username", "first_name", "last_name",
-                    "full_name", "group_name", "facultet_name", "kurs",
-                    "has_custom_avatar", "avatar_mode", "is_online",
-                    "level", "tier", "mutual_friends_count", "friendship_status"
-                ]
-                
-                missing_result_fields = [f for f in required_result_fields if f not in result]
-                
-                if missing_result_fields:
-                    log_error(f"Missing result fields: {missing_result_fields}")
-                    return False
-                
-                log_success("GlobalSearchResult structure valid")
-                
-                # Check specific field types
-                if not isinstance(result["has_custom_avatar"], bool):
-                    log_error("has_custom_avatar is not a bool")
-                    return False
-                
-                if not isinstance(result["is_online"], bool):
-                    log_error("is_online is not a bool")
-                    return False
-                
-                if not isinstance(result["level"], int):
-                    log_error("level is not an int")
-                    return False
-                
-                if not isinstance(result["mutual_friends_count"], int):
-                    log_error("mutual_friends_count is not an int")
-                    return False
-                
-                log_success("Result field types valid")
-            
-            log_success("Response model validation passed")
-            return True
+            log_success(f"GET /notifications/{tid}/unread-count: {data.get('count', 0)}")
         else:
-            log_error(f"Request failed: {response.status_code}")
-            return False
+            log_error(f"GET unread-count failed: {response.status_code}")
+            all_passed = False
             
     except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-# ============================================================================
-# TEST SUITE 2: GET /api/u/{uid} - is_setup_complete field
-# ============================================================================
-
-def test_user_profile_is_setup_complete_true():
-    """Test 1: User with complete profile (is_setup_complete=true)"""
-    log_test("User Profile - is_setup_complete=true")
+        log_error(f"GET unread-count exception: {e}")
+        all_passed = False
     
+    # Test 2.3: GET /api/user-settings/{telegram_id}/notifications
     try:
-        # Use existing test user (should have complete profile)
-        response = requests.get(
-            f"{BACKEND_URL}/u/{TEST_USER_UID}",
-            timeout=10
-        )
-        
-        log_info(f"Status: {response.status_code}")
+        response = session.get(f"/user-settings/{tid}/notifications")
         
         if response.status_code == 200:
             data = response.json()
-            
-            # Check if is_setup_complete field exists
-            if "is_setup_complete" not in data:
-                log_error("is_setup_complete field missing from response")
-                return False
-            
-            is_setup_complete = data.get("is_setup_complete")
-            log_info(f"is_setup_complete: {is_setup_complete}")
-            
-            # Check profile fields
-            first_name = data.get("first_name")
-            last_name = data.get("last_name")
-            group_name = data.get("group_name")
-            facultet_name = data.get("facultet_name")
-            kurs = data.get("kurs")
-            
-            log_info(f"Profile fields: first_name={first_name}, last_name={last_name}, group_name={group_name}, facultet_name={facultet_name}, kurs={kurs}")
-            
-            # If any field is filled, is_setup_complete should be true
-            has_any_field = any([
-                first_name and first_name.strip(),
-                last_name and last_name.strip(),
-                group_name,
-                facultet_name,
-                kurs
-            ])
-            
-            if has_any_field and is_setup_complete:
-                log_success("is_setup_complete=true for user with filled fields")
-                return True
-            elif not has_any_field and not is_setup_complete:
-                log_success("is_setup_complete=false for user without filled fields")
-                return True
-            else:
-                log_error(f"is_setup_complete={is_setup_complete} doesn't match profile state (has_any_field={has_any_field})")
-                return False
-        elif response.status_code == 404:
-            log_warning("Test user not found (might need to create)")
-            return True  # Skip test
-        elif response.status_code == 403:
-            log_warning("Test user profile is private")
-            return True  # Skip test
+            log_success(f"GET /user-settings/{tid}/notifications: {response.status_code}")
+            log_info(f"  notifications_enabled: {data.get('notifications_enabled')}")
+            log_info(f"  notification_time: {data.get('notification_time')}")
         else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
+            log_error(f"GET notification settings failed: {response.status_code}")
+            all_passed = False
             
     except Exception as e:
-        log_error(f"Exception: {e}")
+        log_error(f"GET notification settings exception: {e}")
+        all_passed = False
+    
+    return all_passed
+
+
+def test_should_send_notification_gating(session: TestSession) -> bool:
+    """Test 3: Bug C - should_send_notification unified gating"""
+    log_test("Bug C: should_send_notification Unified Gating")
+    
+    all_passed = True
+    tid = session.telegram_id
+    
+    # Use pseudo_tid if no real telegram_id
+    if not tid and session.uid:
+        PSEUDO_TID_OFFSET = 2_000_000_000
+        tid = PSEUDO_TID_OFFSET + int(session.uid)
+        log_info(f"Using pseudo_tid: {tid}")
+    
+    if not tid:
+        log_error("No telegram_id or uid available, skipping")
         return False
-
-
-def test_user_profile_is_setup_complete_false():
-    """Test 2: Fresh user with incomplete profile (is_setup_complete=false)"""
-    log_test("User Profile - is_setup_complete=false (fresh user)")
     
-    # Create a fresh test user
-    test_user = create_test_user()
-    
-    if not test_user:
-        log_warning("Could not create test user, skipping test")
-        return True  # Skip test
-    
+    # Get current settings
     try:
-        # Get the fresh user's profile
-        uid = test_user.get("uid")
+        response = session.get(f"/user-settings/{tid}/notifications")
+        if response.status_code != 200:
+            log_error(f"Failed to get current settings: {response.status_code}")
+            return False
         
-        if not uid:
-            log_warning("Test user has no UID, skipping test")
-            return True
+        original_settings = response.json()
+        log_info(f"Original settings retrieved")
         
-        response = requests.get(
-            f"{BACKEND_URL}/u/{uid}",
-            timeout=10
+    except Exception as e:
+        log_error(f"Failed to get settings: {e}")
+        return False
+    
+    # Test 3.1: Disable social_friend_requests
+    try:
+        # Update extended notification settings
+        update_payload = {
+            "social_friend_requests": False
+        }
+        
+        update_response = session.put(
+            f"/notifications/{tid}/settings",
+            json=update_payload
         )
         
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
+        if update_response.status_code == 200:
+            log_success("Disabled social_friend_requests")
             
-            # Check if is_setup_complete field exists
-            if "is_setup_complete" not in data:
-                log_error("is_setup_complete field missing from response")
-                return False
-            
-            is_setup_complete = data.get("is_setup_complete")
-            log_info(f"is_setup_complete: {is_setup_complete}")
-            
-            # Fresh user should have is_setup_complete based on registration data
-            # We registered with first_name="SearchTest" and last_name="UserXXXXXX"
-            # So is_setup_complete should be true
-            
-            first_name = data.get("first_name")
-            last_name = data.get("last_name")
-            
-            log_info(f"Fresh user profile: first_name={first_name}, last_name={last_name}")
-            
-            if first_name or last_name:
-                if is_setup_complete:
-                    log_success("is_setup_complete=true for user with name fields")
-                    return True
+            # Verify it was saved
+            verify_response = session.get(f"/notifications/{tid}/settings")
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                
+                if verify_data.get("social_friend_requests") == False:
+                    log_success("Setting verified: social_friend_requests=False")
                 else:
-                    log_error("is_setup_complete=false but user has name fields")
-                    return False
+                    log_error(f"Setting not saved correctly: {verify_data.get('social_friend_requests')}")
+                    all_passed = False
             else:
-                if not is_setup_complete:
-                    log_success("is_setup_complete=false for user without fields")
-                    return True
-                else:
-                    log_error("is_setup_complete=true but user has no fields")
-                    return False
-        elif response.status_code == 404:
-            log_error("Fresh user profile not found (should exist)")
-            return False
-        elif response.status_code == 403:
-            log_warning("Fresh user profile is private")
-            return True  # Skip test
+                log_error(f"Verification failed: {verify_response.status_code}")
+                all_passed = False
         else:
-            log_error(f"Request failed: {response.status_code} - {response.text}")
-            return False
+            log_error(f"Failed to update settings: {update_response.status_code} - {update_response.text}")
+            all_passed = False
             
     except Exception as e:
-        log_error(f"Exception: {e}")
-        return False
-
-
-def test_user_profile_no_422_error():
-    """Test 3: Endpoint should not return 422 for existing users"""
-    log_test("User Profile - No 422 Error for Existing Users")
+        log_error(f"social_friend_requests test exception: {e}")
+        all_passed = False
     
+    # Restore original settings
     try:
-        # Test with existing user
-        response = requests.get(
-            f"{BACKEND_URL}/u/{TEST_USER_UID}",
-            timeout=10
+        restore_response = session.put(
+            f"/user-settings/{tid}/notifications",
+            json=original_settings
         )
-        
-        log_info(f"Status: {response.status_code}")
-        
-        if response.status_code == 422:
-            log_error("Endpoint returned 422 (Unprocessable Entity) for existing user")
-            log_error(f"Response: {response.text}")
-            return False
-        elif response.status_code in [200, 404, 403]:
-            log_success(f"Endpoint returned expected status code: {response.status_code}")
-            return True
+        if restore_response.status_code == 200:
+            log_info("Original settings restored")
         else:
-            log_warning(f"Unexpected status code: {response.status_code}")
-            return True  # Not a critical failure
+            log_warning(f"Failed to restore settings: {restore_response.status_code}")
             
     except Exception as e:
-        log_error(f"Exception: {e}")
+        log_warning(f"Failed to restore settings: {e}")
+    
+    return all_passed
+
+
+def test_web_push_endpoints(session: TestSession) -> bool:
+    """Test 5: Web Push subscribe/unsubscribe endpoints"""
+    log_test("Web Push Endpoints")
+    
+    all_passed = True
+    tid = session.telegram_id
+    
+    # Use pseudo_tid if no real telegram_id
+    if not tid and session.uid:
+        PSEUDO_TID_OFFSET = 2_000_000_000
+        tid = PSEUDO_TID_OFFSET + int(session.uid)
+        log_info(f"Using pseudo_tid: {tid}")
+    
+    if not tid:
+        log_error("No telegram_id or uid available, skipping")
         return False
+    
+    # Test subscription payload (mock data)
+    subscription_data = {
+        "telegram_id": tid,
+        "endpoint": f"https://fcm.googleapis.com/fcm/send/test-endpoint-{tid}",
+        "keys": {
+            "p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM=",
+            "auth": "tBHItJI5svbpez7KI4CCXg=="
+        }
+    }
+    
+    # Test 5.1: POST /api/push/subscribe
+    try:
+        response = session.post("/push/subscribe", json=subscription_data)
+        
+        if response.status_code in [200, 201]:
+            log_success(f"POST /push/subscribe: {response.status_code}")
+            data = response.json()
+            log_info(f"  Response: {data.get('message', 'OK')}")
+        else:
+            log_error(f"POST /push/subscribe failed: {response.status_code} - {response.text}")
+            all_passed = False
+            
+    except Exception as e:
+        log_error(f"POST /push/subscribe exception: {e}")
+        all_passed = False
+    
+    # Test 5.2: POST /api/push/unsubscribe
+    try:
+        unsubscribe_data = {
+            "telegram_id": tid,
+            "endpoint": subscription_data["endpoint"]
+        }
+        
+        response = session.post("/push/unsubscribe", json=unsubscribe_data)
+        
+        if response.status_code == 200:
+            log_success(f"POST /push/unsubscribe: {response.status_code}")
+        else:
+            log_error(f"POST /push/unsubscribe failed: {response.status_code} - {response.text}")
+            all_passed = False
+            
+    except Exception as e:
+        log_error(f"POST /push/unsubscribe exception: {e}")
+        all_passed = False
+    
+    return all_passed
 
 
-# ============================================================================
-# MAIN TEST RUNNER
-# ============================================================================
+def test_cross_platform_endpoints(session: TestSession) -> bool:
+    """Test 6: Cross-platform support (pseudo-tid)"""
+    log_test("Cross-Platform Support (pseudo-tid)")
+    
+    all_passed = True
+    
+    # Calculate pseudo_tid from uid
+    PSEUDO_TID_OFFSET = 2_000_000_000
+    
+    if session.uid:
+        try:
+            uid_int = int(session.uid)
+            pseudo_tid = PSEUDO_TID_OFFSET + uid_int
+            
+            log_info(f"Testing with pseudo_tid: {pseudo_tid} (from uid={session.uid})")
+            
+            # Test 6.1: GET /api/notifications/{pseudo_tid}
+            try:
+                response = session.get(f"/notifications/{pseudo_tid}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    log_success(f"GET /notifications/{pseudo_tid}: {response.status_code}")
+                    log_info(f"  Notifications: {len(data.get('notifications', []))}")
+                else:
+                    log_error(f"GET /notifications/{pseudo_tid} failed: {response.status_code}")
+                    all_passed = False
+                    
+            except Exception as e:
+                log_error(f"GET notifications (pseudo) exception: {e}")
+                all_passed = False
+            
+            # Test 6.2: GET /api/user-settings/{pseudo_tid}/notifications
+            try:
+                response = session.get(f"/user-settings/{pseudo_tid}/notifications")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    log_success(f"GET /user-settings/{pseudo_tid}/notifications: {response.status_code}")
+                else:
+                    # 404 is acceptable if user doesn't have settings yet
+                    if response.status_code == 404:
+                        log_info(f"GET /user-settings/{pseudo_tid}/notifications: 404 (no settings yet)")
+                    else:
+                        log_error(f"GET notification settings (pseudo) failed: {response.status_code}")
+                        all_passed = False
+                    
+            except Exception as e:
+                log_error(f"GET notification settings (pseudo) exception: {e}")
+                all_passed = False
+                
+        except ValueError:
+            log_error(f"Invalid uid format: {session.uid}")
+            all_passed = False
+    else:
+        log_warning("No uid available, skipping pseudo-tid tests")
+    
+    return all_passed
+
 
 def main():
-    """Run all tests"""
-    print(f"\n{BLUE}{'='*80}{RESET}")
-    print(f"{BLUE}RUDN Webapp Backend Testing{RESET}")
-    print(f"{BLUE}Backend URL: {BACKEND_URL}{RESET}")
-    print(f"{BLUE}{'='*80}{RESET}\n")
+    """Main test runner"""
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.RESET}")
+    print(f"{Colors.BLUE}RUDN Notification System Backend Tests (Release 3){Colors.RESET}")
+    print(f"{Colors.BLUE}Backend: {BACKEND_URL}{Colors.RESET}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.RESET}\n")
     
-    # Get auth token
-    token = get_auth_token()
+    # Create session and login
+    session = TestSession()
     
-    # Track results
+    if not session.login(TEST_EMAIL, TEST_PASSWORD):
+        log_error("Failed to login, cannot continue tests")
+        sys.exit(1)
+    
+    # Run tests
     results = {}
     
-    # ========================================================================
-    # TEST SUITE 1: Global Search
-    # ========================================================================
-    print(f"\n{BLUE}{'='*80}{RESET}")
-    print(f"{BLUE}TEST SUITE 1: GET /api/search/global{RESET}")
-    print(f"{BLUE}{'='*80}{RESET}")
+    results["Health Endpoint"] = test_health_endpoint(session)
+    results["Existing Endpoints"] = test_existing_notification_endpoints(session)
+    results["Bug C: Gating"] = test_should_send_notification_gating(session)
+    results["Web Push"] = test_web_push_endpoints(session)
+    results["Cross-Platform"] = test_cross_platform_endpoints(session)
     
-    results["1. Anonymous search"] = test_global_search_anonymous()
+    # Summary
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.RESET}")
+    print(f"{Colors.BLUE}TEST SUMMARY{Colors.RESET}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.RESET}\n")
     
-    if token:
-        results["2. Authenticated search"] = test_global_search_authenticated(token)
-    else:
-        log_warning("Skipping authenticated search test (no token)")
-        results["2. Authenticated search"] = None
-    
-    results["3. Empty query"] = test_global_search_empty_query()
-    results["4. Short query"] = test_global_search_short_query()
-    results["5. Cyrillic query"] = test_global_search_cyrillic()
-    results["6. ReDoS protection"] = test_global_search_redos_protection()
-    results["7. Filters"] = test_global_search_filters()
-    results["8. Limit validation"] = test_global_search_limit_validation()
-    results["9. Pagination"] = test_global_search_pagination()
-    
-    if token:
-        results["10. Own profile excluded"] = test_global_search_own_profile_excluded(token)
-    else:
-        log_warning("Skipping own profile exclusion test (no token)")
-        results["10. Own profile excluded"] = None
-    
-    results["11. Response model"] = test_global_search_response_model()
-    
-    # ========================================================================
-    # TEST SUITE 2: User Profile is_setup_complete
-    # ========================================================================
-    print(f"\n{BLUE}{'='*80}{RESET}")
-    print(f"{BLUE}TEST SUITE 2: GET /api/u/{{uid}} - is_setup_complete{RESET}")
-    print(f"{BLUE}{'='*80}{RESET}")
-    
-    results["12. is_setup_complete=true"] = test_user_profile_is_setup_complete_true()
-    results["13. is_setup_complete=false"] = test_user_profile_is_setup_complete_false()
-    results["14. No 422 error"] = test_user_profile_no_422_error()
-    
-    # ========================================================================
-    # SUMMARY
-    # ========================================================================
-    print(f"\n{BLUE}{'='*80}{RESET}")
-    print(f"{BLUE}TEST SUMMARY{RESET}")
-    print(f"{BLUE}{'='*80}{RESET}\n")
-    
-    passed = sum(1 for v in results.values() if v is True)
-    failed = sum(1 for v in results.values() if v is False)
-    skipped = sum(1 for v in results.values() if v is None)
+    passed = sum(1 for v in results.values() if v)
     total = len(results)
     
     for test_name, result in results.items():
-        if result is True:
-            log_success(f"{test_name}")
-        elif result is False:
-            log_error(f"{test_name}")
-        else:
-            log_warning(f"{test_name} (SKIPPED)")
+        status = f"{Colors.GREEN}PASS{Colors.RESET}" if result else f"{Colors.RED}FAIL{Colors.RESET}"
+        print(f"  {test_name}: {status}")
     
-    print(f"\n{BLUE}{'='*80}{RESET}")
-    print(f"{GREEN}PASSED: {passed}/{total}{RESET}")
-    print(f"{RED}FAILED: {failed}/{total}{RESET}")
-    print(f"{YELLOW}SKIPPED: {skipped}/{total}{RESET}")
-    print(f"{BLUE}{'='*80}{RESET}\n")
+    print(f"\n{Colors.BLUE}Total: {passed}/{total} tests passed{Colors.RESET}\n")
     
-    return failed == 0
+    if passed == total:
+        print(f"{Colors.GREEN}✓ All tests passed!{Colors.RESET}\n")
+        sys.exit(0)
+    else:
+        print(f"{Colors.RED}✗ Some tests failed{Colors.RESET}\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    main()

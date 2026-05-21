@@ -15,10 +15,29 @@ import { notificationsAPI } from '../services/notificationsAPI';
 import { friendsAPI } from '../services/friendsAPI';
 import NotificationSettingsPanel from './NotificationSettingsPanel';
 
-// Очистка Telegram HTML-тегов (tg-emoji, tg-spoiler и др.), оставляя только содержимое
+// Очистка HTML-тегов из текста уведомления.
+// Bug I fix (Релиз 3): раньше убирали только <tg-*> теги, а обычные <b>/<i>/<a>
+// от админских уведомлений отображались в UI как литералы ("<b>Привет</b>").
+// Теперь применяем 2-этапную очистку:
+//   1. <tg-XXX>contents</tg-XXX>  → contents (сохраняем содержимое TG-эмодзи и т.д.)
+//   2. <любой_тег>                → ""        (стрипаем остальные HTML-теги)
+//   3. &amp;/&lt;/&gt;/&quot;/&#39; → их символы (decodes basic HTML entities)
 const cleanTgHtml = (text) => {
   if (!text) return '';
-  return text.replace(/<tg-[^>]*>(.*?)<\/tg-[^>]*>/g, '$1');
+  let s = String(text);
+  // 1) Заменяем парные tg-теги, сохраняя содержимое
+  s = s.replace(/<tg-[^>]*>(.*?)<\/tg-[^>]*>/g, '$1');
+  // 2) Стрипаем все оставшиеся HTML-теги (включая <b>, <i>, <a>, <br/>, и т.д.)
+  s = s.replace(/<\/?[a-zA-Z][^>]*>/g, '');
+  // 3) Декодируем базовые HTML-сущности
+  s = s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  return s;
 };
 
 // Конфиг категорий
@@ -127,6 +146,20 @@ const NotificationsPanel = ({
     }
   }, [isOpen, loadNotifications]);
 
+  // Bug H fix / Improvement 3: фоновый polling, пока панель ОТКРЫТА.
+  // Каждые 30 секунд обновляем список — чтобы новые уведомления (friend_request,
+  // class_starting и т.д.) появлялись в UI без перезагрузки страницы.
+  // Используем visibility-aware polling: не дёргаем API, если вкладка скрыта.
+  useEffect(() => {
+    if (!isOpen || !telegramId) return undefined;
+    const POLL_INTERVAL_MS = 30000;
+    const intervalId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      loadNotifications();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [isOpen, telegramId, loadNotifications]);
+
   // Слушаем события из FriendsSection
   useEffect(() => {
     const handleFriendAction = (e) => {
@@ -142,6 +175,31 @@ const NotificationsPanel = ({
     };
     window.addEventListener('friend-request-action-from-friends', handleFriendAction);
     return () => window.removeEventListener('friend-request-action-from-friends', handleFriendAction);
+  }, []);
+
+  // Improvement 2: слушаем событие от SW (через webpush.js) — после клика по push
+  // соответствующее in-app помечается прочитанным; обновляем локальный state.
+  useEffect(() => {
+    const handleMarkedRead = (e) => {
+      const { notificationId } = e.detail || {};
+      if (!notificationId) return;
+      setNotifications(prev => {
+        let foundUnread = false;
+        const next = prev.map(n => {
+          if (n.id === notificationId && !n.read) {
+            foundUnread = true;
+            return { ...n, read: true };
+          }
+          return n;
+        });
+        if (foundUnread) {
+          setUnreadCount(c => Math.max(0, c - 1));
+        }
+        return next;
+      });
+    };
+    window.addEventListener('notification-marked-read', handleMarkedRead);
+    return () => window.removeEventListener('notification-marked-read', handleMarkedRead);
   }, []);
 
   // Отметить как прочитанное
@@ -175,7 +233,13 @@ const NotificationsPanel = ({
     hapticFeedback?.('impact', 'light');
     try {
       await notificationsAPI.dismissNotification(notificationId, telegramId);
+      // Bug K fix: если удаляем непрочитанное — корректно декрементим бейдж.
+      const dismissedItem = notifications.find(n => n.id === notificationId);
+      const wasUnread = dismissedItem && !dismissedItem.read;
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (error) {
       console.error('Error dismissing notification:', error);
     }
@@ -220,11 +284,15 @@ const NotificationsPanel = ({
         }
       }
       
-      // Обновляем UI — НЕ удаляем, а помечаем как обработанное
+      // Обновляем UI — НЕ удаляем, а помечаем как обработанное.
+      // Bug K fix: декремент unreadCount только если уведомление было непрочитанным.
+      const wasUnread = !notification.read;
       setNotifications(prev => prev.map(n => 
         n.id === notification.id ? { ...n, action_taken: actionId, read: true } : n
       ));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
       
       hapticFeedback?.('notification', 'success');
     } catch (error) {

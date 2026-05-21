@@ -33,8 +33,8 @@ from pymongo.errors import DuplicateKeyError
 
 from auth_utils import (
     PSEUDO_TID_OFFSET,  # noqa: F401  # kept for backward compat (export)
-    is_pseudo_tid,
-    is_real_telegram_user,
+    is_pseudo_tid,  # noqa: F401  # may be unused after Improvement 8, kept for export
+    is_real_telegram_user,  # noqa: F401  # may be unused now, kept for export & future use
 )
 from notifications import get_notification_service
 
@@ -577,13 +577,21 @@ class NotificationSchedulerV2:
             # Вычисляем время отправки уведомления
             notification_datetime = class_start_time - timedelta(minutes=notification_time)
             
-            # Пропускаем, если время уже прошло (с запасом 1 минута)
-            if notification_datetime < now - timedelta(minutes=1):
+            # Bug E fix: расширяем grace period с 1 до 10 минут — если планировщик/процесс
+            # ненадолго залип (GC, restart, ingress hiccup), мы всё равно пытаемся отправить
+            # запоздавшее уведомление. APScheduler сам отработает overdue job (misfire_grace_time).
+            # Если событие пары уже совсем в прошлом (>10 минут просрочки) — скипаем.
+            past_threshold = timedelta(minutes=10)
+            if notification_datetime < now - past_threshold:
                 logger.debug(
-                    f"Skipping past notification: {notification_datetime.strftime('%H:%M')} "
+                    f"Skipping past notification (>{past_threshold}): {notification_datetime.strftime('%H:%M')} "
                     f"< {now.strftime('%H:%M')}"
                 )
                 return 0, 0
+            # Если просрочка <= grace — планируем «сейчас» с небольшим запасом,
+            # чтобы APScheduler не отбросил job как misfire.
+            fire_immediately = notification_datetime < now
+            effective_run_date = (now + timedelta(seconds=5)) if fire_immediately else notification_datetime
             
             # Создаем уникальный ID и ключ
             notification_id = str(uuid.uuid4())
@@ -639,10 +647,11 @@ class NotificationSchedulerV2:
             try:
                 self.scheduler.add_job(
                     self.send_notification,
-                    trigger=DateTrigger(run_date=notification_datetime),
+                    trigger=DateTrigger(run_date=effective_run_date),
                     args=[notification_id],
                     id=job_id,
-                    name=f"Notify {telegram_id} at {notification_datetime.strftime('%H:%M')}",
+                    name=f"Notify {telegram_id} at {notification_datetime.strftime('%H:%M')}"
+                          + (" [overdue→now]" if fire_immediately else ""),
                     replace_existing=True
                 )
                 
@@ -651,6 +660,7 @@ class NotificationSchedulerV2:
                 logger.info(
                     f"📅 Scheduled notification for user {telegram_id}: "
                     f"{class_event.get('discipline')} at {notification_datetime.strftime('%H:%M')}"
+                    + (" (overdue, firing in ~5s)" if fire_immediately else "")
                 )
                 
                 return 1, 1
@@ -715,6 +725,45 @@ class NotificationSchedulerV2:
                 f"📤 Sending notification to {telegram_id}: "
                 f"{class_info['discipline']} at {class_info['time']}"
             )
+
+            # ── Bug D fix: проверяем актуальные настройки уведомлений на момент ОТПРАВКИ ──
+            # Между планированием и отправкой пользователь мог:
+            #   1. Выключить notifications_enabled / study_enabled
+            #   2. Включить quiet_hours (которые сейчас активны)
+            # Если так — отменяем доставку, помечаем уведомление 'cancelled'
+            # вместо silent-fail в TG.
+            try:
+                user_settings = await self.db.user_settings.find_one(
+                    {"telegram_id": int(telegram_id)},
+                    {
+                        "extended_notification_settings": 1,
+                        "notifications_enabled": 1,
+                    },
+                )
+                if user_settings:
+                    ext_settings = user_settings.get("extended_notification_settings") or {}
+                    # Legacy notifications_enabled = master switch
+                    legacy_enabled = user_settings.get("notifications_enabled", True)
+                    master_enabled = ext_settings.get("notifications_enabled", legacy_enabled)
+                    study_enabled = ext_settings.get("study_enabled", True)
+                    if not (master_enabled and study_enabled):
+                        await self.db.scheduled_notifications.update_one(
+                            {"id": notification_id},
+                            {"$set": {
+                                "status": "cancelled",
+                                "error_message": "user disabled study notifications between scheduling and sending",
+                            }},
+                        )
+                        logger.info(
+                            f"🚫 Skipped notification {notification_id} for tid={telegram_id} "
+                            f"(study={study_enabled}, master={master_enabled})"
+                        )
+                        return
+                    # NB: quiet_hours тоже проверяются ниже в notify_user (delivery.py),
+                    # там TG-канал просто помечается quiet_hours, in-app останется. Здесь
+                    # дополнительно не блокируем, чтобы in-app в любом случае сохранился.
+            except Exception as st_err:  # noqa: BLE001
+                logger.warning(f"[scheduler] settings check failed for {notification_id}: {st_err}")
 
             # ── Отправка с таймаутом ─────────────────────────────────────
             success = False
@@ -1032,14 +1081,16 @@ class NotificationSchedulerV2:
             if result.modified_count == 0:
                 return False
             
-            # Удаляем задачу из scheduler
-            job_id = self.scheduled_jobs.get(notification_id)
-            if job_id:
-                try:
-                    self.scheduler.remove_job(job_id)
-                    del self.scheduled_jobs[notification_id]
-                except Exception:
-                    pass
+            # Удаляем задачу из scheduler.
+            # Bug J fix: даже если scheduled_jobs пуст (после рестарта процесса),
+            # job_id всё равно можно вычислить как f"notify_{notification_id}" — APScheduler
+            # хранит jobs в Mongo job_store, и они переживают рестарт.
+            job_id = self.scheduled_jobs.get(notification_id) or f"notify_{notification_id}"
+            try:
+                self.scheduler.remove_job(job_id)
+            except Exception:
+                pass
+            self.scheduled_jobs.pop(notification_id, None)
             
             logger.info(f"🚫 Notification {notification_id} cancelled")
             return True
@@ -1293,10 +1344,14 @@ class NotificationSchedulerV2:
                     if not last_visit or not telegram_id:
                         continue
                     
-                    # 🛡 P0-guard (instrUIDprofile.md): inactivity-reminders уходят
-                    # ТОЛЬКО в Telegram (через бот). У pseudo_tid-юзеров (VK/Email)
-                    # нет TG-чата, поэтому ретраим бессмысленно — пропускаем сразу.
-                    if not is_real_telegram_user(telegram_id):
+                    # Improvement 8 (Bug M) fix: ранее inactivity-напоминания уходили
+                    # ТОЛЬКО real-TG-юзерам. Теперь поддерживаем pseudo_tid (VK/Email):
+                    #   * Real-TG: TG-push + in-app + web push (если PWA подписан)
+                    #   * Pseudo:  in-app + web push (если PWA подписан)
+                    # notify_user сам корректно роутит каналы (см. services/delivery.py).
+                    # Если у юзера нет web push subscription и он pseudo — уведомление
+                    # сохранится в in-app и появится при следующем входе.
+                    if not telegram_id:
                         continue
                     
                     from datetime import date as date_type

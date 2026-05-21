@@ -167,6 +167,32 @@ _tg_breaker = _TGCircuitBreaker()
 
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Telegram RetryAfter capture (Bug F)
+# ────────────────────────────────────────────────────────────────────────────
+#
+# Когда TG отдаёт RetryAfter, он сообщает «подожди N секунд». Раньше мы это
+# просто логировали и продолжали ретраить по своему расписанию (_RETRY_DELAYS_SEC),
+# что могло вызвать новые flood-control баны.
+#
+# Теперь safe_send_telegram сохраняет `retry_after` в module-level переменной,
+# а notify_user / process_pending_retries читают её ДО планирования next_retry,
+# чтобы не ретраить раньше разрешённого TG времени.
+
+_last_retry_after_sec: Optional[float] = None
+
+
+def _consume_retry_after() -> Optional[float]:
+    """Достаёт и сбрасывает последнее значение `retry_after` от TG (одноразовое).
+
+    Возвращает секунды задержки, если TG только что вернул RetryAfter; иначе None.
+    """
+    global _last_retry_after_sec
+    v = _last_retry_after_sec
+    _last_retry_after_sec = None
+    return v
+
+
+# ────────────────────────────────────────────────────────────────────────────
 #  Enums
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -601,9 +627,18 @@ async def safe_send_telegram(
 
     except RetryAfter as e:
         # TG flood-control: бот превысил rate. Записываем как transient.
+        # Bug F fix: сохраняем retry_after в module-level переменную, чтобы вызывающий
+        # код (notify_user / process_pending_retries) мог использовать его как минимум
+        # для next_retry_at, не нарушая ограничения TG.
+        global _last_retry_after_sec
+        retry_after_val = getattr(e, "retry_after", None)
+        try:
+            _last_retry_after_sec = float(retry_after_val) if retry_after_val is not None else None
+        except (TypeError, ValueError):
+            _last_retry_after_sec = None
         logger.warning(
             f"📤 [delivery] TG RetryAfter tid={telegram_id} ctx={log_ctx}: "
-            f"retry_after={getattr(e, 'retry_after', '?')}s"
+            f"retry_after={retry_after_val}s (will respect on next retry)"
         )
         _tg_breaker.record_failure(transient=True)
         return False
@@ -971,7 +1006,10 @@ async def notify_user(
 
                 # ── 5. Retry scheduling (только если priority >= NORMAL) ─
                 if enable_retry and _PRIORITY_RETRY_MAX[prio] > 0:
-                    delay = _RETRY_DELAYS_SEC[0]
+                    # Bug F fix: уважаем retry_after от TG, если он был.
+                    base_delay = _RETRY_DELAYS_SEC[0]
+                    tg_retry_after = _consume_retry_after()
+                    delay = max(base_delay, int(tg_retry_after) + 1) if tg_retry_after else base_delay
                     next_retry_at = _utc_now() + timedelta(seconds=delay)
                     try:
                         await _record_delivery_attempt(
@@ -1022,7 +1060,15 @@ async def notify_user(
                     url=web_push_url or action_url,
                     tag=web_push_tag or f"{category}",
                     icon=web_push_icon,
-                    data={"category": category, "type": type, **(data or {})},
+                    # Improvement 2: кладём notification_id в payload, чтобы SW мог
+                    # сообщить клиенту, и клиент пометил in-app как read при клике
+                    # по push-уведомлению. Это убирает «duplicate badge».
+                    data={
+                        "category": category,
+                        "type": type,
+                        "notification_id": result.in_app_id,
+                        **(data or {}),
+                    },
                     log_ctx=log_ctx or f"notify_user/{category}",
                 )
                 result.web_push_sent_count = wp_res.sent_count
@@ -1103,13 +1149,26 @@ async def notify_user_with_photo(
     actions: Optional[list] = None,
     send_telegram: Optional[bool] = None,
     send_in_app: bool = True,
+    send_web_push: Optional[bool] = None,     # Bug A fix: добавили web push для photo
     # Telegram-specific
     telegram_parse_mode: str = "HTML",
     telegram_reply_markup: Any = None,
     telegram_text: Optional[str] = None,
+    # Web Push specific (для photo — кладём image URL в payload data для SW)
+    web_push_url: Optional[str] = None,
+    web_push_tag: Optional[str] = None,
+    web_push_icon: Optional[str] = None,
+    # Quiet hours — Bug G fix: photo тоже должен уважать тихие часы
+    respect_quiet_hours: bool = True,
     log_ctx: str = "",
 ) -> DeliveryResult:
-    """Как `notify_user`, но шлёт в TG фото с caption. In-app сохраняет `image_url` в data."""
+    """Как `notify_user`, но шлёт в TG фото с caption. In-app сохраняет `image_url` в data.
+
+    Bug A fix (Релиз 3): теперь photo-уведомления тоже идут через Web Push (PWA),
+      это критично для VK/Email-юзеров на PWA и для real-TG-юзеров, когда TG-пуш
+      не дошёл. SW отображает картинку из `data.image_url`, если задана.
+    Bug G fix: теперь уважаются тихие часы (respect_quiet_hours=True по умолчанию).
+    """
     result = DeliveryResult()
     prio = _coerce_priority(priority)
     result.attempts = 1
@@ -1126,11 +1185,39 @@ async def notify_user_with_photo(
         except (TypeError, ValueError):
             eff_tid = None
 
-    # In-app: добавляем image_url в data
+    # ── Quiet hours: глушим внешние каналы, но in-app оставляем ─────────
+    # URGENT обходит quiet_hours.
+    quiet_now = False
+    if respect_quiet_hours and prio != MessagePriority.URGENT:
+        try:
+            qh_settings = None
+            if user_doc:
+                ext = user_doc.get("extended_notification_settings") or {}
+                if isinstance(ext, dict) and ext.get("quiet_hours_enabled"):
+                    qh_settings = ext
+            if qh_settings is None and eff_tid is not None:
+                us = await db.user_settings.find_one(
+                    {"telegram_id": int(eff_tid)},
+                    {"extended_notification_settings": 1},
+                )
+                if us:
+                    ext = us.get("extended_notification_settings") or {}
+                    if isinstance(ext, dict) and ext.get("quiet_hours_enabled"):
+                        qh_settings = ext
+            if qh_settings and is_in_quiet_hours(qh_settings):
+                quiet_now = True
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[delivery.photo] quiet-hours check failed: {e}")
+
+    # ── In-app: добавляем image_url в data ──────────────────────────────
+    image_url_for_payload: Optional[str] = None
+    if isinstance(photo, str) and photo.startswith(("http://", "https://")):
+        image_url_for_payload = photo
+
     if send_in_app and eff_tid is not None:
         merged_data = dict(data or {})
-        if isinstance(photo, str) and photo.startswith(("http://", "https://")):
-            merged_data.setdefault("image_url", photo)
+        if image_url_for_payload:
+            merged_data.setdefault("image_url", image_url_for_payload)
         result.in_app_id = await create_in_app_notification(
             db,
             telegram_id=eff_tid,
@@ -1150,7 +1237,7 @@ async def notify_user_with_photo(
         else:
             result.skipped.append(Channel.IN_APP)
 
-    # Telegram photo
+    # ── Telegram photo ─────────────────────────────────────────────────
     should_send_tg = send_telegram if send_telegram is not None else _PRIORITY_SENDS_TG[prio]
 
     real_tid: Optional[int] = None
@@ -1166,6 +1253,9 @@ async def notify_user_with_photo(
     if not should_send_tg:
         result.skipped.append(Channel.TELEGRAM)
         result.telegram_skipped_reason = "disabled"
+    elif quiet_now:
+        result.skipped.append(Channel.TELEGRAM)
+        result.telegram_skipped_reason = "quiet_hours"
     else:
         if real_tid is None:
             result.skipped.append(Channel.TELEGRAM)
@@ -1196,21 +1286,79 @@ async def notify_user_with_photo(
                 result.skipped.append(Channel.TELEGRAM)
                 result.telegram_skipped_reason = "send_error"
 
-    # Финальная семантика — как в notify_user
+    # ── Bug A fix: Web Push channel для photo (PWA / iOS 16.4+) ─────────
+    should_send_wp = send_web_push if send_web_push is not None else _PRIORITY_SENDS_TG[prio]
+    wp_blocked_quiet = False
+    if should_send_wp and quiet_now:
+        should_send_wp = False
+        wp_blocked_quiet = True
+    if should_send_wp:
+        try:
+            from services.webpush import is_webpush_configured, send_web_push_to_user
+            if is_webpush_configured() and (uid or eff_tid is not None or real_tid is not None):
+                wp_body = message or title
+                # Кладём image_url в data — SW может его показать (если поддерживает large icon)
+                wp_data: dict[str, Any] = {
+                    "category": category,
+                    "type": type,
+                    "notification_id": result.in_app_id,  # Improvement 2: cross-channel dedup
+                }
+                if data:
+                    wp_data.update(data)
+                if image_url_for_payload:
+                    wp_data["image_url"] = image_url_for_payload
+                wp_res = await send_web_push_to_user(
+                    db,
+                    telegram_id=eff_tid if eff_tid is not None else real_tid,
+                    uid=uid,
+                    title=f"{emoji} {title}".strip() if emoji else title,
+                    body=wp_body,
+                    url=web_push_url or action_url,
+                    tag=web_push_tag or f"{category}",
+                    # Для photo — иконка по умолчанию — это сама фотка (если URL)
+                    icon=web_push_icon or image_url_for_payload,
+                    data=wp_data,
+                    log_ctx=log_ctx or f"notify_user_photo/{category}",
+                )
+                result.web_push_sent_count = wp_res.sent_count
+                result.web_push_failed_count = wp_res.failed_count
+                result.web_push_subscriptions = wp_res.sent_count + wp_res.failed_count + wp_res.removed_count
+                if wp_res.any_sent:
+                    result.delivered.append(Channel.WEB_PUSH)
+                elif wp_res.failed_count or wp_res.removed_count:
+                    result.skipped.append(Channel.WEB_PUSH)
+                    if wp_res.errors:
+                        result.errors["web_push"] = wp_res.errors[0][:120]
+                else:
+                    result.skipped.append(Channel.WEB_PUSH)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[delivery.photo] web_push step failed: {e}")
+            result.skipped.append(Channel.WEB_PUSH)
+            result.errors["web_push"] = str(e)[:120]
+    else:
+        result.skipped.append(Channel.WEB_PUSH)
+        if wp_blocked_quiet:
+            result.errors["web_push"] = "quiet_hours"
+
+    # ── Финальная семантика — как в notify_user ─────────────────────────
     if result.user_has_real_telegram:
-        if result.telegram_sent:
+        if result.telegram_sent or result.web_push_sent_count > 0:
             result.delivered_to_user = True
-        elif not should_send_tg and result.in_app_id is not None:
+        elif (not should_send_tg or quiet_now) and result.in_app_id is not None:
             result.delivered_to_user = True
         else:
             result.delivered_to_user = False
     else:
-        result.delivered_to_user = result.in_app_id is not None
+        result.delivered_to_user = (
+            result.web_push_sent_count > 0 or result.in_app_id is not None
+        )
 
     result.requires_retry = (
         should_send_tg
+        and not quiet_now
         and result.user_has_real_telegram
         and not result.telegram_sent
+        and result.web_push_sent_count == 0
     )
 
     return result
@@ -1489,9 +1637,11 @@ async def process_pending_retries(
                 else:
                     # Следующая задержка (cap'им по размеру таблицы _RETRY_DELAYS_SEC)
                     delay_idx = min(attempt_num - 1, len(_RETRY_DELAYS_SEC) - 1)
-                    next_retry = _utc_now() + timedelta(
-                        seconds=_RETRY_DELAYS_SEC[delay_idx]
-                    )
+                    base_delay = _RETRY_DELAYS_SEC[delay_idx]
+                    # Bug F fix: уважаем TG RetryAfter — он точно знает свой rate-limit
+                    tg_retry_after = _consume_retry_after()
+                    final_delay = max(base_delay, int(tg_retry_after) + 1) if tg_retry_after else base_delay
+                    next_retry = _utc_now() + timedelta(seconds=final_delay)
                     await db[DELIVERY_ATTEMPTS_COLL].update_one(
                         {"_id": attempt_doc["_id"]},
                         {"$set": {

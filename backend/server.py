@@ -18936,22 +18936,30 @@ async def should_send_notification(telegram_id: int, category: NotificationCateg
     elif category == NotificationCategory.SOCIAL:
         in_app = settings.social_enabled
         push = settings.social_push
+        # Bug C fix: per-type тогглы должны применяться К ОБОИМ каналам (in-app + push),
+        # иначе юзер выключил «уведомления о заявках в друзья», а push всё равно прилетает.
         if notification_type == NotificationType.FRIEND_REQUEST:
             in_app = in_app and settings.social_friend_requests
+            push = push and settings.social_friend_requests
         elif notification_type == NotificationType.FRIEND_ACCEPTED:
             in_app = in_app and settings.social_friend_accepted
+            push = push and settings.social_friend_accepted
         elif notification_type == NotificationType.NEW_MESSAGE:
             in_app = in_app and settings.social_messages
             push = push and settings.social_messages
     elif category == NotificationCategory.ROOMS:
         in_app = settings.rooms_enabled
         push = settings.rooms_push
+        # Bug C fix: rooms-подтипы тоже должны единообразно гейтить push
         if notification_type == NotificationType.ROOM_TASK_NEW:
             in_app = in_app and settings.rooms_new_tasks
+            push = push and settings.rooms_new_tasks
         elif notification_type == NotificationType.ROOM_TASK_ASSIGNED:
             in_app = in_app and settings.rooms_assignments
+            push = push and settings.rooms_assignments
         elif notification_type == NotificationType.ROOM_TASK_COMPLETED:
             in_app = in_app and settings.rooms_completions
+            push = push and settings.rooms_completions
     elif category == NotificationCategory.JOURNAL:
         in_app = settings.journal_enabled
         push = settings.journal_push
@@ -21298,6 +21306,132 @@ def _compute_free_windows(schedules: dict, participants: list) -> list:
 
 
 # ============ Эндпоинты для Admin: уведомления из Telegram постов ============
+
+
+@api_router.get("/admin/notifications/health")
+async def admin_notifications_health(hours: int = 24):
+    """Improvement 7 (Релиз 3): метрики здоровья каналов системы уведомлений.
+
+    Возвращает агрегированную статистику за последние `hours` часов:
+      * delivery_attempts (по каналам: in_app / telegram / web_push)
+      * scheduled_notifications (по статусам: pending/sent/failed/cancelled)
+      * push_subscriptions (active/inactive)
+      * dlq_size
+      * cross-platform breakdown (real-TG vs pseudo-tid)
+
+    Используется админ-панелью и мониторингом для observability:
+      сколько уведомлений ушло за день, сколько провалилось, какие каналы здоровы.
+
+    Параметры:
+      hours — глубина окна (1-720, default 24)
+    """
+    try:
+        hours = max(1, min(int(hours or 24), 720))
+        now = datetime.utcnow()
+        since = now - timedelta(hours=hours)
+
+        # ── 1. Delivery attempts (агрегируем по каналу/статусу) ──────────
+        delivery_pipeline = [
+            {"$match": {"created_at": {"$gte": since}}},
+            {"$group": {
+                "_id": {"channel": "$channel", "status": "$status"},
+                "count": {"$sum": 1},
+            }},
+        ]
+        delivery_attempts: Dict[str, Dict[str, int]] = {}
+        try:
+            async for row in db.delivery_attempts.aggregate(delivery_pipeline):
+                ch = (row.get("_id") or {}).get("channel") or "unknown"
+                st = (row.get("_id") or {}).get("status") or "unknown"
+                delivery_attempts.setdefault(ch, {})[st] = int(row.get("count", 0))
+        except Exception as agg_err:
+            logger.warning(f"[health] delivery_attempts agg failed: {agg_err}")
+
+        # ── 2. Scheduled notifications (планировщик пар) ─────────────────
+        sched_pipeline = [
+            {"$match": {"created_at": {"$gte": since}}},
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+        ]
+        scheduled_by_status: Dict[str, int] = {}
+        try:
+            async for row in db.scheduled_notifications.aggregate(sched_pipeline):
+                scheduled_by_status[row.get("_id") or "unknown"] = int(row.get("count", 0))
+        except Exception as agg_err:
+            logger.warning(f"[health] scheduled agg failed: {agg_err}")
+
+        # ── 3. Web Push subscriptions (active/inactive) ──────────────────
+        subs_active = 0
+        subs_inactive = 0
+        try:
+            subs_active = await db.push_subscriptions.count_documents({"active": True})
+            subs_inactive = await db.push_subscriptions.count_documents({"active": False})
+        except Exception as e:
+            logger.debug(f"[health] subs count failed: {e}")
+
+        # ── 4. DLQ size ──────────────────────────────────────────────────
+        dlq_size = 0
+        try:
+            dlq_size = await db.notifications_dlq.count_documents({})
+        except Exception as e:
+            logger.debug(f"[health] dlq count failed: {e}")
+
+        # ── 5. In-app stats (read/unread) за окно ────────────────────────
+        in_app_unread = 0
+        in_app_total = 0
+        try:
+            in_app_unread = await db.in_app_notifications.count_documents({
+                "created_at": {"$gte": since},
+                "read": False,
+            })
+            in_app_total = await db.in_app_notifications.count_documents({
+                "created_at": {"$gte": since},
+            })
+        except Exception as e:
+            logger.debug(f"[health] in_app count failed: {e}")
+
+        # ── 6. Cross-platform breakdown ──────────────────────────────────
+        # Сколько уведомлений ушло real-TG юзерам vs pseudo (VK/Email)
+        real_tg_count = 0
+        pseudo_count = 0
+        try:
+            from auth_utils import PSEUDO_TID_OFFSET as _OFFSET
+            real_tg_count = await db.in_app_notifications.count_documents({
+                "created_at": {"$gte": since},
+                "telegram_id": {"$gt": 0, "$lt": int(_OFFSET)},
+            })
+            pseudo_count = await db.in_app_notifications.count_documents({
+                "created_at": {"$gte": since},
+                "telegram_id": {"$gte": int(_OFFSET)},
+            })
+        except Exception as e:
+            logger.debug(f"[health] platform breakdown failed: {e}")
+
+        return {
+            "window_hours": hours,
+            "since_utc": since.isoformat() + "Z",
+            "now_utc": now.isoformat() + "Z",
+            "delivery_attempts": delivery_attempts,
+            "scheduled_notifications": scheduled_by_status,
+            "push_subscriptions": {
+                "active": subs_active,
+                "inactive": subs_inactive,
+            },
+            "dlq_size": dlq_size,
+            "in_app": {
+                "total": in_app_total,
+                "unread": in_app_unread,
+                "read_ratio": round(1 - (in_app_unread / in_app_total), 3) if in_app_total else None,
+            },
+            "platforms": {
+                "real_telegram": real_tg_count,
+                "pseudo_tid_vk_or_email": pseudo_count,
+                "total": real_tg_count + pseudo_count,
+            },
+        }
+    except Exception as e:
+        logger.error(f"[admin.health] error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @api_router.post("/admin/notifications/parse-telegram")
 async def parse_telegram_post(data: dict):

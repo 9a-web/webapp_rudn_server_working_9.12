@@ -14,7 +14,7 @@
  */
 
 // Версия SW. Меняйте при существенных правках, чтобы заставить браузер обновить SW.
-const SW_VERSION = "rudn-go-sw-v1";
+const SW_VERSION = "rudn-go-sw-v2";
 
 self.addEventListener("install", (event) => {
   console.log(`[SW ${SW_VERSION}] install`);
@@ -83,7 +83,12 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = (event.notification.data && event.notification.data.url) || "/";
+  const notifData = event.notification.data || {};
+  const targetUrl = notifData.url || "/";
+  // Improvement 2: cross-channel dedup. Backend кладёт `notification_id` (in-app ID)
+  // в payload web push. SW передаёт его клиенту, который вызывает markAsRead → в UI
+  // больше не висит «непрочитанный» бейдж после того, как юзер открыл уведомление через push.
+  const notificationId = notifData.notification_id || null;
 
   event.waitUntil(
     (async () => {
@@ -97,10 +102,13 @@ self.addEventListener("notificationclick", (event) => {
       for (const client of allClients) {
         if ("focus" in client) {
           try {
-            // Сообщаем клиенту, что нужно перейти на targetUrl
+            // Сообщаем клиенту, что нужно перейти на targetUrl и пометить уведомление прочитанным
             client.postMessage({
               type: "NOTIFICATION_CLICK",
               url: targetUrl,
+              notificationId,
+              category: notifData.category || null,
+              notifType: notifData.type || null,
             });
             return client.focus();
           } catch (e) {
@@ -109,9 +117,13 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
 
-      // Не нашли — открываем новое окно
+      // Не нашли — открываем новое окно. notification_id передаём через URL
+      // фрагмент, чтобы фронт мог пометить read после загрузки.
       if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
+        const url = notificationId
+          ? `${targetUrl}${targetUrl.includes("?") ? "&" : "?"}nid=${encodeURIComponent(notificationId)}`
+          : targetUrl;
+        return self.clients.openWindow(url);
       }
     })(),
   );
