@@ -37,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import html as _html
 import logging
+import re
 import time as _time
 import uuid
 from dataclasses import dataclass, field
@@ -696,6 +697,60 @@ async def safe_send_telegram(
 # ────────────────────────────────────────────────────────────────────────────
 
 
+# ── Cleanup helper for plain-text channels ────────────────────────────────
+# Релиз 4 (исправление загрязнения PWA/Browser push <tg-emoji> тэгами):
+#   Telegram-специфичные тэги типа <tg-emoji emoji-id="...">🔥</tg-emoji>
+#   красиво рендерятся ТОЛЬКО внутри Telegram (premium emoji). На любом
+#   другом канале (in-app DB, Web Push body, OS notification) они отображаются
+#   как литеральный текст: `<tg-emoji emoji-id="123">🔥</tg-emoji> Привет`,
+#   что выглядит как баг.
+#
+#   Эта функция:
+#     1. Конвертирует `<tg-emoji ...>X</tg-emoji>` → `X` (сохраняет unicode-emoji
+#        внутри как fallback — обычно сам символ).
+#     2. Снимает все остальные HTML-теги (<b>, <i>, <a href=..>, <br/>, …).
+#     3. Декодирует базовые HTML entities (&amp;, &lt;, &gt;, &quot;, &#39;, &nbsp;).
+#     4. Нормализует пробелы.
+#
+#   ⚠️ НЕ применять к `telegram_text` — там tg-emoji обязаны остаться целыми.
+
+_TG_EMOJI_TAG_RE = re.compile(r"<tg-[a-zA-Z\-]+[^>]*>(.*?)</tg-[a-zA-Z\-]+>", re.DOTALL)
+_ANY_HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
+_HTML_ENTITY_MAP = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&apos;": "'",
+    "&nbsp;": " ",
+}
+
+
+def strip_tg_html_for_plain(text: Optional[str]) -> str:
+    """Очищает HTML/TG-теги из текста для канала, который НЕ умеет HTML
+    (in-app DB, Web Push body, OS-уведомление).
+
+    Сохраняет содержимое `<tg-emoji>` (unicode-эмодзи внутри тэга), чтобы
+    юзер всё равно видел эмодзи, но без литерального HTML.
+
+    Идемпотентна — повторный вызов на уже-очищенном тексте не меняет результат.
+    """
+    if not text:
+        return ""
+    s = str(text)
+    # 1) Парные tg-теги: оставляем содержимое
+    s = _TG_EMOJI_TAG_RE.sub(r"\1", s)
+    # 2) Все прочие HTML-теги — стрипаем
+    s = _ANY_HTML_TAG_RE.sub("", s)
+    # 3) HTML entities
+    for ent, ch in _HTML_ENTITY_MAP.items():
+        s = s.replace(ent, ch)
+    # 4) Нормализация пробелов (несколько подряд → один; trim)
+    s = re.sub(r"[ \t]+", " ", s).strip()
+    return s
+
+
 async def create_in_app_notification(
     db,
     *,
@@ -718,15 +773,20 @@ async def create_in_app_notification(
     """
     try:
         notif_id = str(uuid.uuid4())
+        # Релиз 4: defensive cleaning — независимо от того, что прислал caller,
+        # в БД in-app никогда не должно попадать <tg-emoji> / <b> / прочих HTML.
+        clean_title = strip_tg_html_for_plain(title)
+        clean_message = strip_tg_html_for_plain(message)
+        clean_emoji = strip_tg_html_for_plain(emoji) or "🔔"
         doc = {
             "id": notif_id,
             "telegram_id": int(telegram_id),
             "type": type,
             "category": category,
             "priority": priority,
-            "title": (title or "")[:200],
-            "message": (message or "")[:2000],
-            "emoji": emoji or "🔔",
+            "title": clean_title[:200],
+            "message": clean_message[:2000],
+            "emoji": clean_emoji,
             "data": data or {},
             "action_url": action_url,
             "actions": actions or [],
@@ -1050,12 +1110,18 @@ async def notify_user(
         try:
             from services.webpush import is_webpush_configured, send_web_push_to_user
             if is_webpush_configured() and (uid or eff_tid is not None or real_tid is not None):
-                wp_body = message or title
+                # Релиз 4: чистим текст от <tg-emoji>/<b>/<i> ПЕРЕД отправкой
+                # в OS-уведомление. На уровне OS HTML не рендерится и видится литералом.
+                wp_clean_title = strip_tg_html_for_plain(title)
+                wp_clean_message = strip_tg_html_for_plain(message)
+                wp_clean_emoji = strip_tg_html_for_plain(emoji)
+                wp_body = wp_clean_message or wp_clean_title
+                wp_title = f"{wp_clean_emoji} {wp_clean_title}".strip() if wp_clean_emoji else wp_clean_title
                 wp_res = await send_web_push_to_user(
                     db,
                     telegram_id=eff_tid if eff_tid is not None else real_tid,
                     uid=uid,
-                    title=f"{emoji} {title}".strip() if emoji else title,
+                    title=wp_title,
                     body=wp_body,
                     url=web_push_url or action_url,
                     tag=web_push_tag or f"{category}",
@@ -1296,7 +1362,12 @@ async def notify_user_with_photo(
         try:
             from services.webpush import is_webpush_configured, send_web_push_to_user
             if is_webpush_configured() and (uid or eff_tid is not None or real_tid is not None):
-                wp_body = message or title
+                # Релиз 4: чистим текст от <tg-emoji>/<b>/<i> для OS-уведомления
+                wp_clean_title = strip_tg_html_for_plain(title)
+                wp_clean_message = strip_tg_html_for_plain(message)
+                wp_clean_emoji = strip_tg_html_for_plain(emoji)
+                wp_body = wp_clean_message or wp_clean_title
+                wp_title = f"{wp_clean_emoji} {wp_clean_title}".strip() if wp_clean_emoji else wp_clean_title
                 # Кладём image_url в data — SW может его показать (если поддерживает large icon)
                 wp_data: dict[str, Any] = {
                     "category": category,
@@ -1311,7 +1382,7 @@ async def notify_user_with_photo(
                     db,
                     telegram_id=eff_tid if eff_tid is not None else real_tid,
                     uid=uid,
-                    title=f"{emoji} {title}".strip() if emoji else title,
+                    title=wp_title,
                     body=wp_body,
                     url=web_push_url or action_url,
                     tag=web_push_tag or f"{category}",
@@ -1696,4 +1767,5 @@ __all__ = [
     "is_in_quiet_hours",
     # HTML helpers
     "_safe_html_truncate",
+    "strip_tg_html_for_plain",
 ]

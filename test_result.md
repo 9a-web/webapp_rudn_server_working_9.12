@@ -115,11 +115,37 @@ in-app (раньше только real-TG).
 - Backend smoke test: `GET /api/admin/notifications/health` отвечает 200.
 - Сервисы поднялись без ошибок (`scheduler_v2 recovery done`).
 - **deep_testing_backend_v2**: 5/5 PASSED ✅
-  - Health endpoint: все поля присутствуют, параметры hours=1/24/720 работают
-  - Existing endpoints: без регрессий
-  - Bug C (unified gating): settings persistence работает
-  - Web Push subscribe/unsubscribe: ok
-  - Cross-platform pseudo_tid: ok
+
+---
+
+## Релиз 4 — Очистка `<tg-emoji>` из PWA / Browser push / In-app panel
+
+### Проблема
+`<tg-emoji emoji-id="...">🔥</tg-emoji>` — Telegram-специфичный HTML, который красиво
+рендерится только внутри TG (premium emoji). На любом другом канале:
+* In-app DB / панель уведомлений — литерал `<tg-emoji ...>` (старый bug, частично фиксили в Релизе 3 на фронте через `cleanTgHtml`, но в БД оставался мусор).
+* Web Push payload `body` → OS-уведомление показывало `<tg-emoji emoji-id="123">🔥</tg-emoji> Иван…` буквально.
+
+### Что сделано
+**Централизованная защита в `services/delivery.py`:**
+- Новая функция `strip_tg_html_for_plain(text)`:
+  * `<tg-emoji ...>X</tg-emoji>` → `X` (сохраняем emoji внутри как fallback)
+  * `<b>`, `<i>`, `<a>`, `<br/>`, и любые другие HTML-теги → стрипаются
+  * HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&nbsp;`) → декодятся
+  * Нормализация пробелов
+- Применена внутри `create_in_app_notification()` к `title`, `message`, `emoji` — defensive layer для БД.
+- Применена в Web Push payload (`notify_user` + `notify_user_with_photo`) к `title`, `message`, `emoji` — для OS-уведомлений.
+- **`telegram_text` НЕ трогается** — TG получает HTML с premium emoji как раньше.
+
+### Поправлены 3 места «единого стиля»
+- `journal_attendance approved` — emoji `""` → `"✅"`
+- `journal_attendance rejected` — emoji `""` → `"❌"`
+- `test_inapp` — убран двойной 🔔 (был в title и в emoji)
+
+### Проверено
+* Unit-смок `strip_tg_html_for_plain`: 7/7 ✅
+* End-to-end в БД: `<tg-emoji ...>👤</tg-emoji> Иван` → `'👤 Иван'` ✅
+* TG-канал по-прежнему получает оригинальный HTML с premium emoji
 
 ---
 

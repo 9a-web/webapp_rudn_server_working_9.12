@@ -4536,7 +4536,7 @@ async def create_test_inapp_notification(telegram_id: int = Body(..., embed=True
             telegram_id=telegram_id,
             notification_type=NotificationType.ANNOUNCEMENT,
             category=NotificationCategory.SYSTEM,
-            title="🔔 Тестовое уведомление",
+            title="Тестовое уведомление",
             message="Это тестовое уведомление для проверки анимации колокольчика!",
             emoji="🔔",
             priority=NotificationPriority.HIGH,
@@ -10702,7 +10702,7 @@ async def process_journal_application(application_id: str, data: ProcessJournalA
                 priority=NotificationPriority.HIGH,
                 title="Заявка одобрена!",
                 message=f"Вы добавлены в журнал «{journal.get('name', 'Журнал')}» как «{student['full_name']}»",
-                emoji="",
+                emoji="✅",
                 data={
                     "journal_id": journal_id,
                     "student_id": data.student_id,
@@ -10738,7 +10738,7 @@ async def process_journal_application(application_id: str, data: ProcessJournalA
                 priority=NotificationPriority.NORMAL,
                 title="Заявка отклонена",
                 message=f"Ваша заявка на вступление в журнал «{journal.get('name', 'Журнал')}» была отклонена",
-                emoji="",
+                emoji="❌",
                 data={"journal_id": journal_id}
             )
             
