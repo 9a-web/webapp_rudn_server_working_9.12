@@ -1,5 +1,21 @@
 # Test credentials
 
+## Quiz section (Тесты по лекциям) — deepseek-v4-flash (2026-06-22)
+
+Fresh local MongoDB in this pod (cloned repo). Working account with completed
+group settings (bypasses onboarding, so bottom nav incl. the "Тесты" tab is visible):
+- Email: `quiz_qa@test.com`
+- Password: `Test1234`
+- uid: `500341037`, telegram_id (pseudo tid): `10500341037`
+- Seeded `user_settings` (group ТЕСТ-01) so `needsOnboarding=false`.
+
+Note: older accounts below (logout_test@, stage*@) were from the ORIGINAL
+environment and do NOT exist in this pod's DB. Register new ones on the fly.
+
+OpenModel/deepseek key is set in backend/.env (`OPENMODEL_API_KEY`). The quiz
+generate endpoint really calls the model (no mock).
+
+
 ## Stage 9 testing (2026-04-22)
 
 Test users created on-the-fly by testing agent:

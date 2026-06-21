@@ -1,0 +1,73 @@
+{
+  "summary": "Frontend E2E for new Quiz (Тесты) feature is BLOCKED at step 1: after email login with the seeded account quiz_qa@test.com / Test1234 the SPA hard-redirects to /register (RegisterWizard, 'Шаг 3 из 3 — учебные данные', faculty picker) instead of mounting Home with the bottom nav. The 'Тесты' tab, QuizSection, import modal and player therefore could not be reached through the UI. The backend itself is healthy and the seeded user_settings ARE present (verified directly): GET /api/user-settings/10500341037 → 200 with group_id=TESTGRP, group_name=ТЕСТ-01, facultet_id=1. So the data exists but the post-login client-side routing/onboarding check does not recognise it and forces the user back into the registration wizard. UI smoke for the new Quiz code path (rendering, tabs, generation, MCQ player, retry, delete) could NOT be verified end-to-end because of this blocker.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AuthGate / LoginPage / RegisterWizard routing",
+        "issue": "After successful POST /api/auth/login/email for quiz_qa@test.com, app navigates to /register and renders RegisterWizard step 3 (faculty picker) even though user already has complete user_settings on the backend (group_id=TESTGRP, facultet_id=1). The onboarding/post-login check is almost certainly probing GET /api/user-settings/{authUser.uid} (=500341037) instead of /api/user-settings/{pseudo_tid} (=10500341037, the actual key in user_settings). Same root cause is hinted at by the long comment block in App.jsx around line 98-103 (PSEUDO_TID_OFFSET=10_000_000_000) but it's only applied inside Home — the route guard that decides Home vs /register doesn't apply the same offset.",
+        "selector": "router redirect to /register; visible header 'Регистрация — Шаг 3 из 3 — учебные данные'",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "EmailVerifyReminderModal",
+        "issue": "Reminder modal (\"Подтвердите email\") is rendered on top of /register even before the user reaches Home. With CTAs 'Напомнить позже' and 'Подтвердить сейчас' covering the wizard, it obscures the real reason the user is on /register and confuses the flow. Likely fine functionally, but on the wrong screen.",
+        "selector": "modal with text 'Подтвердите email'",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Login → Home → bottom nav → 'Тесты' tab → generate quiz → player → retry → close → card list → delete",
+        "issue": "Cannot be exercised because login does not land on Home. All subsequent assertions (quiz-section, quiz-import-cta, import-lecture-modal, import-text-area, import-title-input, import-num-slider, import-generate-btn, quiz-player, quiz-question-text, quiz-option-0..3, quiz-explanation, quiz-next-btn, quiz-results, quiz-retry-btn, quiz-player-close/quiz-results-close, quiz-card, quiz-card-title, quiz-card-delete) are UNVERIFIED in this run.",
+        "affected_selectors": [
+          "[data-testid=quiz-section]",
+          "[data-testid=quiz-import-cta]",
+          "[data-testid=quiz-empty-state]",
+          "[data-testid=import-lecture-modal]",
+          "[data-testid=import-text-area]",
+          "[data-testid=import-title-input]",
+          "[data-testid=import-num-slider]",
+          "[data-testid=import-generate-btn]",
+          "[data-testid=quiz-player]",
+          "[data-testid=quiz-question-text]",
+          "[data-testid^=quiz-option-]",
+          "[data-testid=quiz-explanation]",
+          "[data-testid=quiz-next-btn]",
+          "[data-testid=quiz-results]",
+          "[data-testid=quiz-retry-btn]",
+          "[data-testid=quiz-player-close]",
+          "[data-testid=quiz-results-close]",
+          "[data-testid=quiz-card]",
+          "[data-testid=quiz-card-title]",
+          "[data-testid=quiz-card-delete]"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX (HIGH): In the post-login route guard (AuthGate / LoginPage / Register redirect logic), when querying GET /api/user-settings/{id} to decide 'is onboarding complete?', use the same pseudo_tid mapping used in App.jsx Home (PSEUDO_TID_OFFSET=10_000_000_000; pseudo_tid = 10_000_000_000 + uid) for email/VK/QR users that have no real telegram_id. Right now Home gets it right and renders BottomNavigation + QuizSection; the route guard upstream of Home does not, so the user never reaches Home.",
+    "Repro: open /login in a normal browser, log in with quiz_qa@test.com / Test1234, observe redirect to /register step 3 even though GET /api/user-settings/10500341037 returns 200 with group_id=TESTGRP. Hitting /api/user-settings/500341037 (the raw uid) returns 404 — that is what the FE is presumably calling.",
+    "After the fix, re-run frontend testing to validate the full Quiz E2E flow (this iteration could not exercise it). Backend was already verified by main agent; the file QuizSection.jsx / ImportLectureModal.jsx / QuizPlayer.jsx and BottomNavigation.jsx ('quiz' tab) look correct on code review — they just can't be reached."
+  ],
+  "critical_code_review_comments": [
+    "App.jsx line ~98-127: pseudo_tid_from_uid logic (PSEUDO_TID_OFFSET=10_000_000_000) is duplicated client-side and lives only inside Home. Any code path that runs BEFORE Home (login redirect, AuthGate's needsOnboarding check) likely uses authUser.uid directly and gets a 404 from /api/user-settings/{uid}, producing the false 'needs onboarding' verdict observed here. Extract into a shared util (e.g. utils/identity.js → resolveScheduleTid(authUser)) and use it everywhere.",
+    "QuizSection.jsx: data-testid coverage is excellent and matches the spec. handleDelete uses window.confirm — fine on web, but on Telegram WebApp this often no-ops; consider TG.WebApp.showConfirm fallback for parity with the rest of the app.",
+    "QuizSection.jsx setTimeout(() => setPlayerQuizId(quiz.id), 200) after handleCreated is fragile — relies on import modal exit animation timing. Safer: open the player from a useEffect on a 'pendingQuiz' state that the modal close transition flips, or pass the new quiz into the player props directly.",
+    "BottomNavigation.jsx: new 'quiz' tab is wired correctly (id: 'quiz', GraduationCap icon, shortLabel via i18n with fallback 'Тесты', gradient violet→fuchsia). Visually consistent with the dark RUDN palette."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not in scope)", "frontend": "0% — blocked before reaching Quiz section"},
+  "test_credentials": "quiz_qa@test.com / Test1234 (pseudo_tid 10500341037, uid 500341037). user_settings present on backend (verified via curl).",
+  "seed_data_creation": "None created by this iteration. Existing seed in /app/memory/test_credentials.md is correct and confirmed via /api/user-settings/10500341037.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Frontend cannot be tested end-to-end until the post-login redirect bug is fixed. Repro: navigate to /login, log in with quiz_qa@test.com / Test1234, observe redirect to /register (Шаг 3 из 3) instead of Home. Backend curl: GET https://e6729424-0667-45d4-9b56-abde1365e207.preview.emergentagent.com/api/user-settings/10500341037 → 200 with group_id=TESTGRP. GET .../api/user-settings/500341037 → 404 (almost certainly what the FE is hitting). Once fixed, run the full Quiz flow per the original review_request — code in QuizSection/ImportLectureModal/QuizPlayer/quizAPI and BottomNavigation looks correct on review.",
+  "rca of the issue": "Root cause (high-confidence hypothesis, not patched in this iteration because it is business-logic, not a test-script fix): the SPA's onboarding gate fetches /api/user-settings/{authUser.uid} using the raw 9-digit uid (500341037) rather than the pseudo_tid (10_000_000_000 + uid = 10500341037) that the backend actually keys user_settings on for email/VK/QR users. Home component DOES translate uid→pseudo_tid (see PSEUDO_TID_OFFSET in App.jsx), but the gate that decides Home vs /register runs first and gets a 404, so the user is shoved into RegisterWizard step 3 (faculty picker). Mitigation: centralise the pseudo_tid mapping (e.g. utils/identity.resolveScheduleTid(authUser)) and use it in every onboarding check + every user-settings fetch; alternatively, make the backend tolerate /api/user-settings/{uid} as an alias for the pseudo_tid for non-telegram identities. Either fix unblocks the entire Quiz E2E run."
+}

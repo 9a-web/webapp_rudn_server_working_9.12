@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Compass, NotebookText, BookOpenCheck, AudioLines, Users, Undo2 } from 'lucide-react';
+import { Compass, NotebookText, BookOpenCheck, AudioLines, Users, Undo2, GraduationCap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
@@ -196,6 +196,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
     { id: 'home', icon: Compass, shortLabel: t('bottomNav.homeShort', 'Главная'), gradient: 'from-green-400 to-cyan-400', color: '#34d399' },
     { id: 'tasks', icon: NotebookText, shortLabel: 'Продуктивность', gradient: 'from-yellow-400 to-orange-400', color: '#fbbf24' },
     { id: 'journal', icon: BookOpenCheck, shortLabel: t('bottomNav.journalShort', 'Журнал'), gradient: 'from-indigo-400 to-blue-400', color: '#818cf8' },
+    { id: 'quiz', icon: GraduationCap, shortLabel: t('bottomNav.quizShort', 'Тесты'), gradient: 'from-violet-400 to-fuchsia-400', color: '#a78bfa' },
     { id: 'music', icon: AudioLines, shortLabel: t('bottomNav.musicShort', 'Музыка'), gradient: 'from-pink-400 to-red-400', color: '#f472b6' },
   ];
 

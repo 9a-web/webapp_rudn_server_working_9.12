@@ -15,6 +15,7 @@ import { BottomNavigation } from './components/BottomNavigation';
 import { TasksSection } from './components/TasksSection';
 import { JournalSection } from './components/JournalSection';
 import FriendsSection from './components/FriendsSection';
+import { QuizSection } from './components/quiz/QuizSection';
 import GroupSelector from './components/GroupSelector';
 import WelcomeScreen from './components/WelcomeScreen';
 import StatusTester from './StatusTester';
@@ -405,6 +406,7 @@ const Home = () => {
   // Состояние для модального окна совместного прослушивания
   const [isListeningRoomOpen, setIsListeningRoomOpen] = useState(false);
   const [isSendTrackModalOpen, setIsSendTrackModalOpen] = useState(false);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
 
   // Состояния для связки Telegram профиля через QR
   const [showTelegramLinkScreen, setShowTelegramLinkScreen] = useState(false);
@@ -447,6 +449,7 @@ const Home = () => {
     isChatOpen ||
     isListeningRoomOpen ||
     isSendTrackModalOpen ||
+    isQuizModalOpen ||
     isAdminPanelOpen ||
     showStreakModal ||
     showReferralModal ||
@@ -2338,6 +2341,15 @@ const Home = () => {
               openListeningRoomRef={openListeningRoomRef}
               pendingListenInvite={pendingListenInvite}
               onListenInviteHandled={() => setPendingListenInvite(null)}
+            />
+          </div>
+        )}
+
+        {/* Раздел "Тесты по лекциям" */}
+        {activeTab === 'quiz' && (
+          <div className="px-4">
+            <QuizSection
+              onModalStateChange={setIsQuizModalOpen}
             />
           </div>
         )}

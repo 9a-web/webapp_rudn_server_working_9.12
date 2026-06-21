@@ -882,6 +882,11 @@ api_router = APIRouter(prefix="/api")
 auth_router = create_auth_router(db)
 api_router.include_router(auth_router)
 
+# ===== QUIZ: тесты по лекциям (deepseek-v4-flash через OpenModel) =====
+from quiz_routes import create_quiz_router
+quiz_router = create_quiz_router(db)
+api_router.include_router(quiz_router)
+
 
 # Define Models (старые для совместимости)
 class StatusCheck(BaseModel):
