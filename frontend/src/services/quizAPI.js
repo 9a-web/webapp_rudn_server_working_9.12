@@ -50,8 +50,26 @@ const handleError = (error) => {
 
 export const quizAPI = {
   /**
+   * Извлечь текст из загруженного файла (.txt/.md/.pdf/.docx) на сервере.
+   * @param {File} file
+   */
+  extractText: async (file) => {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const response = await api.post('/quiz/extract-text', form, {
+        headers: { 'Content-Type': undefined }, // пусть axios сам выставит multipart boundary
+        timeout: 60000,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
+  /**
    * Сгенерировать тест из текста лекции.
-   * @param {{text:string, title?:string, num_questions?:number, language?:string}} payload
+   * @param {{text:string, title?:string, num_questions?:number, language?:string, mode?:string}} payload
    */
   generate: async (payload) => {
     try {

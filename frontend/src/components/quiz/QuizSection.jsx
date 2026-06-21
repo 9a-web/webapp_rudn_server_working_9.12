@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Sparkles, FileQuestion, Play, Trash2, Loader2, GraduationCap, Trophy } from 'lucide-react';
+import { Plus, Sparkles, FileQuestion, Play, Trash2, Loader2, GraduationCap, Trophy, ListChecks, ToggleRight, Layers } from 'lucide-react';
 import { quizAPI } from '../../services/quizAPI';
 import { ImportLectureModal } from './ImportLectureModal';
 import { QuizPlayer } from './QuizPlayer';
+
+const MODE_META = {
+  multiple_choice: { label: 'Тест', icon: ListChecks },
+  true_false: { label: 'Верно/неверно', icon: ToggleRight },
+  flashcard: { label: 'Карточки', icon: Layers },
+};
 
 const cardStyle = {
   backgroundColor: 'rgba(40, 40, 44, 0.6)',
@@ -47,7 +53,7 @@ export const QuizSection = ({ onModalStateChange }) => {
     setShowImport(false);
     if (quiz?.id) {
       setQuizzes((prev) => [{
-        id: quiz.id, title: quiz.title, num_questions: quiz.num_questions,
+        id: quiz.id, title: quiz.title, mode: quiz.mode, num_questions: quiz.num_questions,
         language: quiz.language, source_preview: quiz.source_preview,
         created_at: quiz.created_at, best_score: null, best_percent: null, attempts_count: 0,
       }, ...prev]);
@@ -142,12 +148,14 @@ export const QuizSection = ({ onModalStateChange }) => {
               >
                 <div className="flex items-center gap-3.5">
                   <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500/30 to-fuchsia-500/20 border border-violet-400/20 flex items-center justify-center">
-                    <FileQuestion className="w-5 h-5 text-violet-300" strokeWidth={2.2} />
+                    {React.createElement((MODE_META[q.mode] || MODE_META.multiple_choice).icon, { className: 'w-5 h-5 text-violet-300', strokeWidth: 2.2 })}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-foreground font-semibold text-[14.5px] truncate" data-testid="quiz-card-title">{q.title}</p>
                     <div className="flex items-center gap-2 mt-0.5 text-[11.5px] text-muted-foreground">
-                      <span>{q.num_questions} вопросов</span>
+                      <span className="text-violet-300/90">{(MODE_META[q.mode] || MODE_META.multiple_choice).label}</span>
+                      <span className="opacity-40">•</span>
+                      <span>{q.num_questions} {q.mode === 'flashcard' ? 'карточек' : 'вопросов'}</span>
                       <span className="opacity-40">•</span>
                       <span>{formatDate(q.created_at)}</span>
                       {q.best_percent != null && (
