@@ -308,6 +308,7 @@ export const BottomNavigation = React.memo(({ activeTab = 'home', onTabChange, h
                     key={tab.id}
                     ref={(el) => { tabRefs.current[tab.id] = el; }}
                     onClick={() => handleTabClick(tab.id)}
+                    data-testid={`bottom-nav-${tab.id}`}
                     className="relative flex items-center justify-center touch-manipulation active:scale-[0.92] transition-transform duration-150"
                     style={{
                       height: '42px',

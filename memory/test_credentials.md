@@ -7,7 +7,8 @@ group settings (bypasses onboarding, so bottom nav incl. the "Тесты" tab is
 - Email: `quiz_qa@test.com`
 - Password: `Test1234`
 - uid: `500341037`, telegram_id (pseudo tid): `10500341037`
-- Seeded `user_settings` (group ТЕСТ-01) so `needsOnboarding=false`.
+- Seeded `user_settings` (group ТЕСТ-01) AND `users.registration_step=0`
+  so `needsOnboarding=false` (login lands directly on Home, not /register).
 
 Note: older accounts below (logout_test@, stage*@) were from the ORIGINAL
 environment and do NOT exist in this pod's DB. Register new ones on the fly.
