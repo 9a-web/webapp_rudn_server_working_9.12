@@ -54,12 +54,22 @@ verified by curl (real LLM generation, valid MCQs with explanations).
 - frontend/.env REACT_APP_BACKEND_URL points to this pod's preview URL.
 - Fresh local Mongo: original env accounts don't exist; register on the fly.
 
+## Implemented v2 — modes + file formats (2026-06-22) ✅
+- Import **.pdf / .docx** (server-side extraction via pypdf + python-docx):
+  new `POST /api/quiz/extract-text`; frontend uploads pdf/docx, reads txt/md client-side.
+- Three generation **modes** (param `mode`): `multiple_choice`, `true_false`
+  (2-option Верно/Неверно), `flashcard` (flip cards front→back, self-assessment
+  знал/не знал scoring).
+- **Answer review (разбор)** on the results screen for all modes (per-question
+  correct vs your answer + explanation; flashcards show front/back + знал mark).
+- Mode selector in the import modal; mode badge + count label on quiz cards.
+- Verified E2E by testing agent (iteration_7) — 100%, no bugs.
+
 ## Backlog / Next action items
 - P2: Don't show the "Подтвердите email" reminder modal on every load (it overlays
   Home and intercepts bottom-nav clicks for unverified accounts). Pre-existing.
 - P2: QuizSection opens the player after import via setTimeout(200ms); make it
   event-driven (pending-quiz state) for robustness.
-- P3: Support more import formats (.docx/.pdf) and "flip card" / true-false modes.
 - P3: i18n — add proper `quiz.*` / `bottomNav.quizShort` keys to ru/en JSON
   (currently rendered via t(key, 'Russian default') fallbacks).
-- P3: Per-question review on the results screen; attempt history.
+- P3: Per-attempt history view; share/export a generated quiz by link.

@@ -113,7 +113,7 @@ export const QuizSection = ({ onModalStateChange }) => {
               Импортировать лекцию <Sparkles className="w-3.5 h-3.5 text-violet-300" />
             </p>
             <p className="text-muted-foreground text-[12.5px] mt-0.5">
-              Файл .txt или вставь текст — получишь тест с вопросами
+              .txt · .pdf · .docx или вставь текст — тест, «верно/неверно» или карточки
             </p>
           </div>
         </div>
