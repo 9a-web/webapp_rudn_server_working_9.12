@@ -1,147 +1,65 @@
-# PRD — RUDN Schedule (Auth/Registration/Profile Hardening)
+# PRD — RUDN Schedule WebApp
 
-## Original Problem Statement
-GitHub: https://github.com/9a-web/webapp_rudn_server_working_9.12.git
+## Original problem statement (2026-06-22)
+Repo: https://github.com/9a-web/webapp_rudn_server_working_9.12 (cloned into /app).
+Add a new section integrating **deepseek-v4-flash** (via the openmodel.ai gateway):
+the user imports a text file with a lecture, and the model generates flashcards —
+a quiz of multiple-choice questions based on the lecture.
 
-Глубокий аудит и максимальное улучшение функции **Регистрация / Авторизация / Профиль**:
-1. Найти и исправить ВСЕ критические и минорные баги в auth/registration/profile-модулях.
-2. Реализовать Password Management (forgot/reset/change с SMTP).
-3. Реализовать Email Verification.
-4. Реализовать Sessions/Devices management (list + revoke).
-5. Полностью интегрировать referral-логику во все регистрационные endpoints.
-
-## Language
-Russian UI + code comments + Pydantic messages.
-
-## Stack
-- Backend: FastAPI + MongoDB (motor) + aiosmtplib
-- Frontend: React (Vite) + Tailwind + shadcn
-- Auth: JWT (HS256, с `jti` для отзыва) + bcrypt + SMTP
+### User choices
+- Quiz format: **multiple choice** — 1 question + 4 options, 1 correct.
+- Design: **fit the existing dark RUDN design**, take ideas from the attached
+  monday.com-style mockup (cards, big import CTA, empty state).
+- Questions language: **Russian**, ~10 by default.
+- OpenModel API key provided by user (stored in backend/.env).
 
 ## Architecture
-```
-/app/backend/
-  auth_routes.py   # /auth/* endpoints
-  auth_utils.py    # JWT, bcrypt, sessions, rate-limit
-  email_service.py # SMTP + DEV fallback → /app/logs/emails.log
-  models.py        # Pydantic
-  server.py        # app + db + app.state.db
-/app/frontend/src/
-  pages/ForgotPasswordPage.jsx, ResetPasswordPage.jsx, VerifyEmailPage.jsx
-  components/SessionsModal.jsx, ChangePasswordModal.jsx, EmailVerificationBanner.jsx
-  contexts/AuthContext.jsx, services/authAPI.js
-```
+- Backend: FastAPI (`/app/backend/server.py`, monolith) + MongoDB (motor),
+  UUID identity, JWT auth (`auth_utils`, `auth_routes`), all routes under `/api`.
+- Frontend: React 19 + Vite, Tailwind, framer-motion, lucide-react, i18next (RU/EN).
+  Single `/` route → `<Home>` shell with internal `activeTab` sections +
+  `BottomNavigation`. Standalone SPA + Telegram WebApp.
+- Model gateway: **OpenModel** (https://api.openmodel.ai/v1). deepseek-v4-flash
+  supports ONLY the Anthropic `messages` protocol → `POST /v1/messages`,
+  `Authorization: Bearer om-...`. Response `content` has a `thinking` block + a
+  `text` block; only the `text` block is parsed (JSON).
 
-## DB Collections (key)
-- `users` — _id, uid, email, username (lowercase, unique), password_hash, telegram_id, vk_id, photo_url, photo_url_custom, email_verified, primary_auth, auth_providers[]
-- `user_settings` — telegram_id (primary), uid, referral_code (auto-gen), referred_by, invited_count, group_id, facultet_id, …
-- `auth_sessions` — uid, jti (unique), expires_at (TTL), revoked, device_label, ip, user_agent
-- `auth_tokens` — token_hash (sha256), purpose (password_reset|email_verify), used, expires_at (TTL)
-- `auth_events` — event, uid, provider, success, ts, ip, ua, extra (hashed email)
+## Implemented — Quiz section "Тесты по лекциям" (2026-06-22) ✅
+Backend (`/app/backend/quiz_routes.py`, `create_quiz_router(db)` mounted in server.py):
+- `POST /api/quiz/generate` — text + title + num_questions(3-20) + language →
+  calls deepseek-v4-flash, validates/parses JSON, stores quiz (collection `quizzes`).
+  Rate-limited 30/hour/user. Input capped at 24k chars.
+- `GET /api/quiz/list` — summaries for current user.
+- `GET /api/quiz/{id}` — full quiz (owner only).
+- `DELETE /api/quiz/{id}` — delete quiz + its attempts.
+- `POST /api/quiz/{id}/attempt` — score answers, store attempt (`quiz_attempts`),
+  update best_score.
+- Env: `OPENMODEL_API_KEY`, `OPENMODEL_BASE_URL`, `OPENMODEL_QUIZ_MODEL`.
 
-## What's been implemented
+Frontend:
+- `services/quizAPI.js` — axios instance + JWT interceptor, 120s timeout on generate.
+- `components/quiz/QuizSection.jsx` — list + import CTA + empty state.
+- `components/quiz/ImportLectureModal.jsx` — .txt/.md upload (drag&drop) + paste +
+  title + questions slider + animated generation loader.
+- `components/quiz/QuizPlayer.jsx` — one-question MCQ, lock/reveal (green/red) +
+  explanation, progress, results score-ring, retry, confetti on ≥80%.
+- Wired into `App.jsx` (5th tab `quiz`) + `BottomNavigation.jsx` (GraduationCap,
+  violet→fuchsia gradient). Bottom-nav buttons have `data-testid="bottom-nav-*"`.
 
-### Phase 13 — Friend Suggestions (engagement-loop) (2026-05-20)
-- [x] **Backend** (`server.py`): новый эндпоинт `GET /api/friends/{tid}/suggestions`. Возвращает две группы — `group_mates` (тот же `group_id`) и `friends_of_friends` (≥1 общий друг), с фильтрацией existing friends / pending requests / blocks / privacy.show_in_search. Сортировка: `mutual_friends_count` desc, потом `first_name`. Лимит на группу — настраиваемый (default 12).
-- [x] **Models**: `FriendSuggestionsResponse` + `FriendSearchResult.suggestion_reason` / `uid`.
-- [x] **Frontend** (`friendsAPI.js`): метод `getFriendSuggestions(tid, limit)`.
-- [x] **FriendsSection.jsx**: подгружает suggestions при первом переходе на таб «Поиск» и при `friendEventTrigger` (SSE refresh after friend graph changes). В пустом состоянии (нет query, нет результатов) показывает две секции:
-  - «Из вашей группы» (Users-иконка) с `group_name`
-  - «Возможно вы знакомы» (Sparkles-иконка) — друзья ваших друзей
-- [x] Skeletons во время загрузки, корректное empty-state с подсказкой заполнить группу, если её ещё нет.
+Status: Verified E2E by testing agent (iteration_6) — 100% frontend pass; backend
+verified by curl (real LLM generation, valid MCQs with explanations).
 
-### Phase 12 — Friend Request fix + Audit bug squash (2026-05-20)
-**P0 — Web→Telegram friend request fix:**
-- [x] **Root cause**: Frontend sent body.telegram_id = guest device_id или Mongo doc.id вместо `effective_tid` (real telegram_id || pseudo_tid_from_uid(uid)). Backend тихо сохранял orphan-запись без user_settings, и она фильтровалась в `get_friend_requests`.
-- [x] **Backend** (`server.py`):
-  - `send_friend_request` — валидирует `sender_user` ДО создания записи, 400 «Войдите в аккаунт» при phantom-tid.
-  - `get_friend_requests` — авто-уборка orphan-rows (scope-fix: проверяем только противоположную сторону, не self).
-- [x] **Frontend**:
-  - `utils/userIdentity.js` — добавлен `getEffectiveTid(user)` helper.
-  - `PublicProfilePage.jsx` — все friend-actions переведены на `viewerTid = getEffectiveTid(currentUser)`.
-  - `App.jsx` — `effectiveUser` пробрасывается в `<FriendsSection currentUser=...>`.
-  - `FriendsSection.jsx` — использует `currentUser` prop, guard `if (isGuestUser)` блокирует отправку гостя.
-  - `App.jsx::handleFriendRequestConfirm` — аналогичный guard.
+## Setup notes (this pod)
+- Repo cloned to /app; backend deps in /root/.venv, frontend deps via yarn.
+- frontend/.env REACT_APP_BACKEND_URL points to this pod's preview URL.
+- Fresh local Mongo: original env accounts don't exist; register on the fly.
 
-**P1 — Audit bugs B-N01…B-N08 (`/app/backend/auth_routes.py`, frontend forms):**
-- [x] **B-N01**: удалён duplicate `/logout` endpoint (был в двух местах).
-- [x] **B-N02**: PublicProfilePage теперь использует `?continue=` (был `?returnTo=`, который LoginPage игнорировал).
-- [x] **B-N03**: убран двойной сабмит форм — `EmailRegisterForm`/`EmailLoginForm`: AuthButton type="submit" без onClick.
-- [x] **B-N04**: `RegisterWizard` читает `?ref=XYZ` из URL → `sessionStorage.pending_referral_code` → подбирается всеми формами (Email/Telegram/VK).
-- [x] **B-N05**: `_create_new_user` принимает `request`, сохраняет `last_login_ip`+`last_login_ua` сразу при регистрации (раньше — только при повторном login).
-- [x] **B-N06**: после `register_email` автоматически отправляется верификационное письмо (fail-soft, не ломает регистрацию).
-- [x] **B-N07**: server-side `.strip()` для `first_name`/`last_name`/`username` в `_create_new_user`.
-- [x] **B-N08**: `/email/verify` для анонимных клиентов возвращает `access_token`+`user` → авто-логин после клика по ссылке из письма. Frontend `AuthContext.verifyEmail` использует это.
-- [x] **Models**: добавлен `VerifyEmailResponse` (Optional access_token/user).
-
-**Testing**: 11/11 backend тестов прошли (iteration_3.json), 100% success.
-
-### Stage 11 — Auth UI Glassmorphism + GroupSelector design unification (2026-05-06)
-- [x] **Auth pages**: full glassmorphism redesign (`AuthLayout`, `LoginPage`, `AuthInput`, `AuthButton`).
-- [x] **Background**: desktop `door_rudn.png` / mobile `door_rudn_mob.png` via Tailwind arbitrary variants.
-- [x] **SMTP**: VK Workspace (noreply@rudn-schedule.ru) configured in `/app/backend/.env` — password reset & email verification working.
-- [x] **GroupSelector glass variant**: new `variant="glass"` prop for inline rendering inside `AuthLayout` (used by `RegisterWizard` Step 3) — frosted-glass buttons, inline progress, breadcrumb, accent-tinted hover.
-- [x] **GroupSelector default variant**: legacy fullscreen overlay (App.jsx flow + ProfileEditScreen) — кнопки списка переведены на glassmorphism (`bg-white/[0.05]` + `backdrop-blur(14px) saturate(160%)` + inset-highlight + indigo hover-shadow). Layout (fullscreen + bottom progress bar) сохранён.
-- [x] **Documentation**: `AI_CONTEXT.md`, `PROJECT_DETAILS.md`, `README.md` полностью переписаны.
-- [x] **Files touched**: `frontend/src/components/GroupSelector.jsx`, `frontend/src/components/auth/*`, `frontend/src/pages/LoginPage.jsx`, `frontend/src/pages/RegisterWizard.jsx`, `backend/.env`.
-
-### Stage 10 — UID migration + Singleton 3D Logo (2026-04-24)
-- [x] **P0 backend:** Все raw `bot.send_*` мигрированы на `safe_send_telegram` в `server.py` и `telegram_bot.py`. Добавлен `pseudo_tid` guard в `check_inactive_users`.
-- [x] **P1 backend extension:** Рефакторинг `services/delivery.py` с `MessagePriority`, `send_batch` через семафор, retry/DLQ через `delivery_attempts`. Добавлен `/api/admin/delivery/stats`.
-- [x] **P2 frontend:** Замена `=== telegram_id` на `isSameUser()` для поддержки `uid` во фронтенд-компонентах.
-- [x] **3D Logo singleton (Frontend):** `Logo3DProvider` + `Logo3DHost` (один Canvas в Portal на body) + `Logo3DAnchor` placeholders. Логотип НЕ перемонтируется при переходах — плавно перелетает через CSS-transition позиции/размера. Экономит ~500-3000 ms на каждом переходе между LoadingScreen/Auth-страницами.
-- [x] **Bug fix (2026-04-24):** Исправлен критический регресс `Maximum update depth exceeded` после внедрения singleton-логотипа. Корневые причины:
-  - Дефолтный `lightPosition = [-0.5, 2, 4]` создавал новый массив на каждом рендере → `propsObject` useMemo инвалидировался → бесконечный `updateAnchorProps` цикл. Вынесен в константу.
-  - `useEffect` в `Logo3DAnchor` зависел от целого `ctx`-объекта (пересоздаётся при каждом setAnchors). Заменено на `ctxRef`.
-  - `setRect` в RAF-цикле создавал новый объект каждый кадр без сравнения значений. Добавлено epsilon-сравнение (0.5px), функциональный setState возвращает prev.
-  - useEffect Logo3DHost зависел от `activeAnchor` целиком — теперь от `anchorId`+`anchorRef`.
-  - **Файлы:** `Logo3DAnchor.jsx`, `Logo3DHost.jsx`. Проверено скриншот-тестом: `/login` → `/register` → `/forgot-password` работают, 0 ошибок в консоли.
-
-### Stage 9 — Full hardening (2026-04-22)
-- [x] **Package 1 (P0 critical):** lowercase username migration; unique indexes on `username`/`email`; rate-limit hardening (12 buckets); `photo_url_custom` sync; `LoginEmailRequest.password min_length=1`; `DELETE /link/email` returns 404 if email absent; `choose_primary_auth` safe fallback; `is_real_telegram_user` guard.
-- [x] **Package 2 — Password Management:**
-  - `POST /auth/password/forgot` — privacy-aware (always 200 to prevent enumeration), rate-limited (5/hr/IP + 3/hr/email), SHA-256 hashed tokens.
-  - `POST /auth/password/reset` — token validation + auto-login via `_issue_token` + revoke other sessions + email notification.
-  - `POST /auth/password/change` — auth-required, wrong old → 401, new==old → 400, revokes other sessions (keeps current by design, industry-standard UX), email notification.
-- [x] **Package 3 — Email Verification:**
-  - `POST /auth/email/send-verification` — 5/hr/uid rate-limit.
-  - `POST /auth/email/verify` — token valid, not-reused, email-not-changed check.
-- [x] **Package 4 — Sessions + Referral:**
-  - JWT with `jti`; `auth_sessions` collection; `register_session` on every `_issue_token`.
-  - `GET /auth/sessions` with `is_current` + device_label parsing (UA).
-  - `DELETE /auth/sessions/{jti}` — 404 if missing.
-  - `POST /auth/logout` — revokes current session (jti) — **FIXED (was no-op)**.
-  - `POST /auth/logout-all?keep_current=true|false`.
-  - **Session-revocation enforcement in `get_current_user_required`** via `request.app.state.db` (FIXED 2026-04-22 — was CRITICAL bug).
-  - Referral integration in `register_email`, `login_telegram`, `login_telegram_webapp`, `login_vk` — fail-soft.
-  - `referral_code` auto-generated on user creation in `_create_new_user` (no more lazy).
-- [x] **UserPublic extended** (2026-04-22): `email_verified`, `referral_code`, `invited_count`, `referred_by` — visible on `/auth/me` and register/login responses.
-- [x] **Frontend:** ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, SessionsModal, ChangePasswordModal, EmailVerificationBanner, AuthContext methods, authAPI methods, routes in App.jsx.
-
-## Testing status (2026-04-22)
-- **Backend iteration_1:** 11/15 pass. Found 3 issues (session revocation, UserPublic fields, referral_code lazy).
-- **Backend iteration_2 (after fixes):** 15/16 pass (94%). All critical/high/medium bugs fixed and re-verified.
-- **Frontend:** Not tested (user will test manually after SMTP setup).
-
-## Pending items
-
-### P1 (next up)
-- **UID Phase P3:** универсальный `resolve_user(db, identifier)` helper, 11 новых `/api/u/{uid}/*` эндпоинтов (settings, tasks, notifications), JWT с `uid`+`tid`.
-- **UID Phase P4:** миграционный скрипт `backfill_uid_to_collections.py` для 38 коллекций, добавить `uid` в 93 Pydantic-модели, индексы по `uid`.
-- RegisterWizard UX polish — better per-step validation and feedback.
-- Frontend E2E testing via testing agent.
-
-### P0 (needs user input)
-- **SMTP credentials** — currently DEV-mode (emails → /app/logs/emails.log).
-
-### P2 (backlog)
-- Split `auth_routes.py` (~2500 lines) into `routes/email_auth.py`, `routes/oauth.py`, `routes/sessions.py`, `routes/password.py`.
-- Profile UX polish and design review (if needed).
-
-## Integrations status
-- Telegram Login Widget + WebApp: configured (TEST_TELEGRAM_BOT_TOKEN).
-- VK ID OAuth: configured (VK_APP_ID + VK_CLIENT_SECRET).
-- SMTP: DEV-mode working; real-mode requires user SMTP credentials.
-
-## Test credentials
-See `/app/memory/test_credentials.md`.
+## Backlog / Next action items
+- P2: Don't show the "Подтвердите email" reminder modal on every load (it overlays
+  Home and intercepts bottom-nav clicks for unverified accounts). Pre-existing.
+- P2: QuizSection opens the player after import via setTimeout(200ms); make it
+  event-driven (pending-quiz state) for robustness.
+- P3: Support more import formats (.docx/.pdf) and "flip card" / true-false modes.
+- P3: i18n — add proper `quiz.*` / `bottomNav.quizShort` keys to ru/en JSON
+  (currently rendered via t(key, 'Russian default') fallbacks).
+- P3: Per-question review on the results screen; attempt history.
